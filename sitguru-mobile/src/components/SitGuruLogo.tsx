@@ -1,4 +1,7 @@
-import { Image, StyleSheet, type ImageStyle, type StyleProp } from 'react-native';
+import { Image, StyleSheet, type ImageSourcePropType, type ImageStyle, type StyleProp } from 'react-native';
+
+import sitGuruLogoHorizontal from '@/assets/images/sitguru-logo-horizontal.jpg';
+import sitGuruSymbolGreen from '@/assets/images/sitguru-symbol-green.jpg';
 
 type SitGuruLogoVariant = 'symbol' | 'horizontal';
 type SitGuruLogoSize = 'small' | 'medium' | 'large';
@@ -10,12 +13,12 @@ type SitGuruLogoProps = {
   variant?: SitGuruLogoVariant;
 };
 
-const logoSources = {
-  horizontal: require('@/assets/images/sitguru-logo-horizontal.jpg'),
-  symbol: require('@/assets/images/sitguru-symbol-green.jpg'),
+const logoSources: Record<SitGuruLogoVariant, ImageSourcePropType> = {
+  horizontal: sitGuruLogoHorizontal,
+  symbol: sitGuruSymbolGreen,
 };
 
-const logoSizes = {
+const logoSizes: Record<SitGuruLogoVariant, Record<SitGuruLogoSize, ImageStyle>> = {
   horizontal: {
     small: {
       width: 128,
@@ -55,6 +58,7 @@ export default function SitGuruLogo({
   return (
     <Image
       accessibilityLabel={accessibilityLabel}
+      alt={accessibilityLabel}
       resizeMode="contain"
       source={logoSources[variant]}
       style={[

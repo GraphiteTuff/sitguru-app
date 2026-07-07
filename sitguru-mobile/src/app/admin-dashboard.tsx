@@ -1,12 +1,6 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
@@ -67,14 +61,9 @@ export default function AdminDashboardScreen() {
     [gurus],
   );
 
-  function updateGuruBookingStatus(
-    guruId: string,
-    booking_status: GuruBookingStatus,
-  ) {
+  function updateGuruBookingStatus(guruId: string, booking_status: GuruBookingStatus) {
     setGurus((currentGurus) =>
-      currentGurus.map((guru) =>
-        guru.id === guruId ? { ...guru, booking_status } : guru,
-      ),
+      currentGurus.map((guru) => (guru.id === guruId ? { ...guru, booking_status } : guru)),
     );
   }
 
@@ -87,8 +76,7 @@ export default function AdminDashboardScreen() {
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/guru-dashboard')}
-            style={styles.topLinkButton}
-          >
+            style={styles.topLinkButton}>
             <Text style={styles.topLinkText}>Guru Dashboard</Text>
           </Pressable>
         </View>
@@ -98,8 +86,8 @@ export default function AdminDashboardScreen() {
             <Text style={styles.heroEyebrow}>Admin dashboard</Text>
             <Text style={styles.title}>Guru booking status controls.</Text>
             <Text style={styles.subtitle}>
-              Change each Guru's booking_status while keeping public search and
-              profile CTAs aligned with the current Supabase gurus columns.
+              Change each Guru booking_status while keeping public search and profile CTAs aligned
+              with the current Supabase gurus columns.
             </Text>
           </View>
 
@@ -117,14 +105,7 @@ export default function AdminDashboardScreen() {
 
             return (
               <View key={option.value} style={styles.legendItem}>
-                <View
-                  style={[
-                    styles.legendDot,
-                    {
-                      backgroundColor: tone.textColor,
-                    },
-                  ]}
-                />
+                <View style={[styles.legendDot, { backgroundColor: tone.textColor }]} />
                 <View style={styles.legendCopy}>
                   <Text style={styles.legendTitle}>{option.label}</Text>
                   <Text style={styles.legendText}>{option.description}</Text>
@@ -140,9 +121,7 @@ export default function AdminDashboardScreen() {
               guru={guru}
               isWide={isWide}
               key={guru.id}
-              onChangeStatus={(booking_status) =>
-                updateGuruBookingStatus(guru.id, booking_status)
-              }
+              onChangeStatus={(booking_status) => updateGuruBookingStatus(guru.id, booking_status)}
             />
           ))}
         </View>
@@ -203,8 +182,7 @@ function GuruStatusCard({
               backgroundColor: statusTone.backgroundColor,
               borderColor: statusTone.borderColor,
             },
-          ]}
-        >
+          ]}>
           <Text style={[styles.statusBadgeText, { color: statusTone.textColor }]}>
             {getGuruBookingStatusLabel(guru.booking_status)}
           </Text>
@@ -215,10 +193,7 @@ function GuruStatusCard({
         <Detail label="profile_completed" value={guru.profile_completed ? 'true' : 'false'} />
         <Detail label="is_active" value={guru.is_active ? 'true' : 'false'} />
         <Detail label="rate" value={formatGuruRate(guru)} />
-        <Detail
-          label="service_area_enabled"
-          value={guru.service_area_enabled ? 'true' : 'false'}
-        />
+        <Detail label="service_area_enabled" value={guru.service_area_enabled ? 'true' : 'false'} />
         <Detail label="service_city" value={guru.service_city} />
         <Detail label="service_state" value={guru.service_state} />
         <Detail label="service_zip" value={guru.service_zip} />
@@ -252,14 +227,8 @@ function GuruStatusCard({
                     backgroundColor: tone.backgroundColor,
                     borderColor: tone.borderColor,
                   },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusButtonText,
-                    selected && { color: tone.textColor },
-                  ]}
-                >
+                ]}>
+                <Text style={[styles.statusButtonText, selected && { color: tone.textColor }]}>
                   {option.label}
                 </Text>
               </Pressable>
@@ -271,15 +240,7 @@ function GuruStatusCard({
   );
 }
 
-function Detail({
-  label,
-  value,
-  wide = false,
-}: {
-  label: string;
-  value: string;
-  wide?: boolean;
-}) {
+function Detail({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   return (
     <View style={[styles.detailCard, wide && styles.detailCardWide]}>
       <Text style={styles.detailLabel}>{label}</Text>

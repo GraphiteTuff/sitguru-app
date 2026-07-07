@@ -13,42 +13,149 @@ type Action = { label: string; href?: Href; note?: string };
 type CardProps = { title: string; eyebrow?: string; children: ReactNode };
 
 const fallbackRoleActions: Action[] = [
-  { label: 'Pet Parent Dashboard', href: '/pet-parent-dashboard' }, { label: 'Guru Dashboard', href: '/guru-dashboard' }, { label: 'Ambassador Dashboard', href: '/ambassador-dashboard' },
+  { label: 'Pet Parent Dashboard', href: '/pet-parent-dashboard' },
+  { label: 'Guru Dashboard', href: '/guru-dashboard' },
+  { label: 'Ambassador Dashboard', href: '/ambassador-dashboard' },
 ];
-const quickActions: Action[] = [
-  { label: 'My Pets / Pet Passports', href: '/pet-passports' }, { label: 'Find Care', href: '/find-care' }, { label: 'Messages', href: '/conversation' }, { label: 'Notifications', href: '/notifications' }, { label: 'Booking Details', href: '/booking-details' }, { label: 'Payments & Payouts', href: '/payments' }, { label: 'Help & Support', href: '/support' }, { label: 'Guru Pricing', href: '/guru-pricing' },
-];
-const adminQuickAction: Action = { label: 'Admin Operations', href: '/admin-operations' };
-const notificationPrefs = [['Booking alerts', true], ['Message alerts', true], ['PawReport Live alerts', true], ['Payment/payout alerts', false], ['PawPerks/referral alerts', true]] as const;
 
-function showPlaceholder(label: string) { Alert.alert('Visual preview', `${label} will be available after account settings are connected.`); }
-function openAction(action: Action) { if (action.href) router.push(action.href); else showPlaceholder(action.note ?? action.label); }
-function SettingsCard({ title, eyebrow, children }: CardProps) { return <View style={styles.card}>{eyebrow ? <Text style={styles.cardEyebrow}>{eyebrow}</Text> : null}<Text style={styles.cardTitle}>{title}</Text>{children}</View>; }
-function PillButton({ action, secondary = false, onPress }: { action: Action; secondary?: boolean; onPress?: () => void }) { return <Pressable accessibilityRole="button" onPress={onPress ?? (() => openAction(action))} style={[styles.pillButton, secondary && styles.pillButtonSecondary]}><Text style={[styles.pillButtonText, secondary && styles.pillButtonTextSecondary]}>{action.label}</Text></Pressable>; }
-function InfoRow({ label, value }: { label: string; value: string }) { return <View style={styles.infoRow}><Text style={styles.infoLabel}>{label}</Text><Text style={styles.infoValue}>{value}</Text></View>; }
+const quickActions: Action[] = [
+  { label: 'My Pets / Pet Passports', href: '/pet-passports' },
+  { label: 'Find Care', href: '/find-care' },
+  { label: 'Messages', href: '/conversation' },
+  { label: 'Notifications', href: '/notifications' },
+  { label: 'Booking Details', href: '/booking-details' },
+  { label: 'Payments & Payouts', href: '/payments' },
+  { label: 'Help & Support', href: '/support' },
+  { label: 'Guru Pricing', href: '/guru-pricing' },
+];
+
+const adminQuickAction: Action = { label: 'Admin Operations', href: '/admin-operations' };
+
+const notificationPrefs = [
+  ['Booking alerts', true],
+  ['Message alerts', true],
+  ['PawReport Live alerts', true],
+  ['Payment/payout alerts', false],
+  ['PawPerks/referral alerts', true],
+] as const;
+
+function showPlaceholder(label: string) {
+  Alert.alert('Visual preview', `${label} will be available after account settings are connected.`);
+}
+
+function openAction(action: Action) {
+  if (action.href) {
+    router.push(action.href);
+    return;
+  }
+
+  showPlaceholder(action.note ?? action.label);
+}
+
+function SettingsCard({ title, eyebrow, children }: CardProps) {
+  return (
+    <View style={styles.card}>
+      {eyebrow ? <Text style={styles.cardEyebrow}>{eyebrow}</Text> : null}
+      <Text style={styles.cardTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function PillButton({
+  action,
+  secondary = false,
+  onPress,
+}: {
+  action: Action;
+  secondary?: boolean;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress ?? (() => openAction(action))}
+      style={[styles.pillButton, secondary && styles.pillButtonSecondary]}>
+      <Text style={[styles.pillButtonText, secondary && styles.pillButtonTextSecondary]}>
+        {action.label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  );
+}
 
 export default function AccountScreen() {
-  const { user, session, isAuthenticated, loading, signOut, profile, roles: authRoles, primaryRole, roleOptions, profileLoading, profileError, reloadProfileAndRoles } = useAuth();
-  const profileName = profile?.full_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Not loaded yet';
+  const {
+    user,
+    isAuthenticated,
+    loading,
+    signOut,
+    profile,
+    roles: authRoles,
+    primaryRole,
+    roleOptions,
+    profileLoading,
+    profileError,
+    reloadProfileAndRoles,
+  } = useAuth();
+
+  const profileName =
+    profile?.full_name ||
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
+    'Not loaded yet';
+
   const displayName = profileName === 'Not loaded yet' ? user?.email?.split('@')[0] ?? null : profileName;
   const location = [profile?.city, profile?.state].filter(Boolean).join(', ');
   const loadedRoles = authRoles.length ? authRoles.map(roleLabel).join(', ') : 'No roles found yet';
   const status = profileError ? 'Warning' : profile ? 'Profile loaded' : 'Needs setup';
-  const roleActions: Action[] = roleOptions.length ? roleOptions.map((option) => ({ label: `${option.label} Dashboard`, href: option.dashboardPath })) : fallbackRoleActions;
+
+  const roleActions: Action[] = roleOptions.length
+    ? roleOptions.map((option) => ({ label: `${option.label} Dashboard`, href: option.dashboardPath }))
+    : fallbackRoleActions;
+
   const rolePills: AppRole[] = authRoles.length ? authRoles : ['pet_parent', 'guru', 'ambassador'];
   const shownQuickActions = authRoles.includes('admin') ? [...quickActions, adminQuickAction] : quickActions;
 
   async function handleSignOut() {
     const result = await signOut();
-    if (result.error) Alert.alert('Sign out failed', result.error);
-    else router.replace('/login');
+
+    if (result.error) {
+      Alert.alert('Sign out failed', result.error);
+      return;
+    }
+
+    router.replace('/login');
   }
 
   return (
     <SitGuruScreen scroll center={false} maxWidth={760}>
       <View style={styles.page}>
-        <View style={styles.topBar}><Pressable accessibilityRole="button" onPress={() => router.push('/pet-parent-dashboard')} style={styles.backButton}><Text style={styles.backButtonText}>← Back</Text></Pressable><SitGuruLogo size="small" variant="symbol" /></View>
-        <View style={styles.heroPanel}><Text style={styles.heroEyebrow}>Account hub</Text><Text style={styles.title}>Account & Settings</Text><Text style={styles.subtitle}>Manage your SitGuru profile, roles, alerts, privacy, and support options.</Text></View>
+        <View style={styles.topBar}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/pet-parent-dashboard')}
+            style={styles.backButton}>
+            <Text style={styles.backButtonText}>← Back</Text>
+          </Pressable>
+
+          <SitGuruLogo size="small" variant="symbol" />
+        </View>
+
+        <View style={styles.heroPanel}>
+          <Text style={styles.heroEyebrow}>Account hub</Text>
+          <Text style={styles.title}>Account & Settings</Text>
+          <Text style={styles.subtitle}>
+            Manage your SitGuru profile, roles, alerts, privacy, and support options.
+          </Text>
+        </View>
 
         <SitGuruRoleIdentityCard
           avatarUrl={profile?.avatar_url}
@@ -61,12 +168,22 @@ export default function AccountScreen() {
           secondaryActionLabel="Switch dashboard"
           showEmail
           statusLabel={profileLoading ? 'Loading…' : status}
-          subtitle={isAuthenticated ? `${location ? `${location} • ` : ''}Manage the dashboards connected to your SitGuru account.` : 'Log in to load your profile photo, dashboards, city, and account status.'}
+          subtitle={
+            isAuthenticated
+              ? `${location ? `${location} • ` : ''}Manage the dashboards connected to your SitGuru account.`
+              : 'Log in to load your profile photo, dashboards, city, and account status.'
+          }
           title="Account profile"
-          tone={primaryRole === 'guru' ? 'guru' : primaryRole === 'ambassador' ? 'ambassador' : primaryRole === 'admin' ? 'admin' : 'petParent'}
+          tone={
+            primaryRole === 'guru'
+              ? 'guru'
+              : primaryRole === 'ambassador'
+                ? 'ambassador'
+                : primaryRole === 'admin'
+                  ? 'admin'
+                  : 'petParent'
+          }
         />
-
-
 
         <SettingsCard title="Account profile" eyebrow="Profile details">
           {isAuthenticated ? (
@@ -79,33 +196,350 @@ export default function AccountScreen() {
               <InfoRow label="Default dashboard" value={primaryRole ? roleLabel(primaryRole) : 'None yet'} />
               <InfoRow label="Profile status" value={profileLoading ? 'Loading…' : status} />
               {profileError ? <Text style={styles.safetyNote}>{profileError}</Text> : null}
+
               <View style={styles.buttonGrid}>
-                <PillButton action={{ label: profileLoading ? 'Refreshing…' : 'Refresh account data' }} onPress={reloadProfileAndRoles} />
+                <PillButton
+                  action={{ label: profileLoading ? 'Refreshing…' : 'Refresh account data' }}
+                  onPress={reloadProfileAndRoles}
+                />
                 <PillButton action={{ label: 'Switch dashboard', href: '/role-selection' }} secondary />
                 <PillButton action={{ label: loading ? 'Signing Out…' : 'Sign Out' }} onPress={handleSignOut} secondary />
               </View>
             </>
           ) : (
             <>
-              <Text style={styles.safetyNote}>Log in or create account to load your SitGuru website profile and roles.</Text>
-              <View style={styles.buttonGrid}><PillButton action={{ label: 'Log in', href: '/login' }} /><PillButton action={{ label: 'Create account', href: '/signup' }} secondary /></View>
+              <Text style={styles.safetyNote}>
+                Log in or create account to load your SitGuru website profile and roles.
+              </Text>
+              <View style={styles.buttonGrid}>
+                <PillButton action={{ label: 'Log in', href: '/login' }} />
+                <PillButton action={{ label: 'Create account', href: '/signup' }} secondary />
+              </View>
             </>
           )}
         </SettingsCard>
-        <SettingsCard title="Dashboard access" eyebrow="Your SitGuru access"><View style={styles.roleGrid}>{rolePills.map((role) => <Text key={role} style={styles.rolePill}>{roleLabel(role)}</Text>)}</View><View style={styles.buttonGrid}>{roleActions.map((action) => <PillButton key={action.label} action={action} secondary />)}<PillButton action={{ label: 'Manage dashboards', href: '/role-selection' }} secondary /></View></SettingsCard>
-        <SettingsCard title="Quick account actions"><View style={styles.buttonGrid}>{shownQuickActions.map((action) => <PillButton key={action.label} action={action} secondary />)}</View></SettingsCard>
-        <SettingsCard title="Notification preferences">{notificationPrefs.map(([label, enabled]) => <Pressable key={label} accessibilityRole="switch" accessibilityState={{ checked: enabled }} onPress={() => showPlaceholder(label)} style={styles.preferenceRow}><Text style={styles.preferenceLabel}>{label}</Text><View style={[styles.toggleTrack, enabled && styles.toggleTrackOn]}><View style={[styles.toggleThumb, enabled && styles.toggleThumbOn]} /></View></Pressable>)}<PillButton action={{ label: 'Open Notifications', href: '/notifications' }} /></SettingsCard>
-        <SettingsCard title="Security & session"><InfoRow label="Password" value="Update password placeholder" /><InfoRow label="Two-factor authentication" value="Visual-only setup status" /><InfoRow label="Devices & sessions" value="Review signed-in devices" /><InfoRow label="Data & privacy" value="Download or manage data placeholder" /><Text style={styles.safetyNote}>Keep booking, payments, messages, and PawReport updates inside SitGuru.</Text><PillButton action={{ label: 'Auth & Role Session Plan', href: '/auth-readiness' }} secondary /></SettingsCard>
-        <SettingsCard title="Payment and payout readiness"><InfoRow label="Pet Parent payment method" value="Placeholder card readiness" /><InfoRow label="Guru Stripe Connect" value="Payout setup placeholder" /><InfoRow label="Ambassador rewards" value="Rewards destination placeholder" /><View style={styles.buttonGrid}><PillButton action={{ label: 'Payments & Payouts', href: '/payments' }} secondary /><PillButton action={{ label: 'Guru Pricing', href: '/guru-pricing' }} secondary /><PillButton action={{ label: 'Booking Details', href: '/booking-details' }} secondary /></View></SettingsCard>
-        <SettingsCard title="Support"><InfoRow label="Help Center" value="Browse common SitGuru questions placeholder" /><InfoRow label="Contact SitGuru" value="Send a support message" /><InfoRow label="Report a safety concern" value="Use urgent safety support placeholder" /><View style={styles.buttonGrid}><PillButton action={{ label: 'Help & Support', href: '/support' }} secondary /><PillButton action={{ label: 'Contact SitGuru', href: '/conversation' }} secondary /><PillButton action={{ label: 'Report Safety Concern', note: 'Report a safety concern' }} secondary /></View></SettingsCard>
-        <SettingsCard title="App settings"><InfoRow label="App version" value="SitGuru preview 1.0" /><InfoRow label="Accessibility" value="Large tap targets and readable labels" /><InfoRow label="Saved preferences" value="Notification and dashboard preferences" />{isAuthenticated ? <PillButton action={{ label: 'Sign Out' }} onPress={handleSignOut} /> : null}</SettingsCard>
+
+        <SettingsCard title="Dashboard access" eyebrow="Your SitGuru access">
+          <View style={styles.roleGrid}>
+            {rolePills.map((role) => (
+              <Text key={role} style={styles.rolePill}>
+                {roleLabel(role)}
+              </Text>
+            ))}
+          </View>
+
+          <View style={styles.buttonGrid}>
+            {roleActions.map((action) => (
+              <PillButton key={action.label} action={action} secondary />
+            ))}
+            <PillButton action={{ label: 'Manage dashboards', href: '/role-selection' }} secondary />
+          </View>
+        </SettingsCard>
+
+        <SettingsCard title="Quick account actions">
+          <View style={styles.buttonGrid}>
+            {shownQuickActions.map((action) => (
+              <PillButton key={action.label} action={action} secondary />
+            ))}
+          </View>
+        </SettingsCard>
+
+        <SettingsCard title="Notification preferences">
+          {notificationPrefs.map(([label, enabled]) => (
+            <Pressable
+              key={label}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: enabled }}
+              onPress={() => showPlaceholder(label)}
+              style={styles.preferenceRow}>
+              <Text style={styles.preferenceLabel}>{label}</Text>
+              <View style={[styles.toggleTrack, enabled && styles.toggleTrackOn]}>
+                <View style={[styles.toggleThumb, enabled && styles.toggleThumbOn]} />
+              </View>
+            </Pressable>
+          ))}
+
+          <PillButton action={{ label: 'Open Notifications', href: '/notifications' }} />
+        </SettingsCard>
+
+        <SettingsCard title="Security & session">
+          <InfoRow label="Password" value="Update password placeholder" />
+          <InfoRow label="Two-factor authentication" value="Visual-only setup status" />
+          <InfoRow label="Devices & sessions" value="Review signed-in devices" />
+          <InfoRow label="Data & privacy" value="Download or manage data placeholder" />
+          <Text style={styles.safetyNote}>
+            Keep booking, payments, messages, and PawReport updates inside SitGuru.
+          </Text>
+          <PillButton action={{ label: 'Auth & Role Session Plan', href: '/auth-readiness' }} secondary />
+        </SettingsCard>
+
+        <SettingsCard title="Payment and payout readiness">
+          <InfoRow label="Pet Parent payment method" value="Placeholder card readiness" />
+          <InfoRow label="Guru Stripe Connect" value="Payout setup placeholder" />
+          <InfoRow label="Ambassador rewards" value="Rewards destination placeholder" />
+          <View style={styles.buttonGrid}>
+            <PillButton action={{ label: 'Payments & Payouts', href: '/payments' }} secondary />
+            <PillButton action={{ label: 'Guru Pricing', href: '/guru-pricing' }} secondary />
+            <PillButton action={{ label: 'Booking Details', href: '/booking-details' }} secondary />
+          </View>
+        </SettingsCard>
+
+        <SettingsCard title="Support">
+          <InfoRow label="Help Center" value="Browse common SitGuru questions placeholder" />
+          <InfoRow label="Contact SitGuru" value="Send a support message" />
+          <InfoRow label="Report a safety concern" value="Use urgent safety support placeholder" />
+          <View style={styles.buttonGrid}>
+            <PillButton action={{ label: 'Help & Support', href: '/support' }} secondary />
+            <PillButton action={{ label: 'Contact SitGuru', href: '/conversation' }} secondary />
+            <PillButton action={{ label: 'Report Safety Concern', note: 'Report a safety concern' }} secondary />
+          </View>
+        </SettingsCard>
+
+        <SettingsCard title="App settings">
+          <InfoRow label="App version" value="SitGuru preview 1.0" />
+          <InfoRow label="Accessibility" value="Large tap targets and readable labels" />
+          <InfoRow label="Saved preferences" value="Notification and dashboard preferences" />
+          {isAuthenticated ? <PillButton action={{ label: 'Sign Out' }} onPress={handleSignOut} /> : null}
+        </SettingsCard>
+
         <View style={styles.bottomDockSpacer} />
       </View>
-      <View style={styles.bottomDock}>{[['Dashboard', '/pet-parent-dashboard'], ['Messages', '/conversation'], ['Alerts', '/notifications'], ['Account', '/account']].map(([label, href]) => <Pressable key={label} accessibilityRole="button" onPress={() => router.push(href as Href)} style={[styles.dockButton, label === 'Account' && styles.dockButtonActive]}><Text style={[styles.dockButtonText, label === 'Account' && styles.dockButtonTextActive]}>{label}</Text></Pressable>)}</View>
+
+      <View style={styles.bottomDock}>
+        {[
+          ['Dashboard', '/pet-parent-dashboard'],
+          ['Messages', '/conversation'],
+          ['Alerts', '/notifications'],
+          ['Account', '/account'],
+        ].map(([label, href]) => (
+          <Pressable
+            key={label}
+            accessibilityRole="button"
+            onPress={() => router.push(href as Href)}
+            style={[styles.dockButton, label === 'Account' && styles.dockButtonActive]}>
+            <Text style={[styles.dockButtonText, label === 'Account' && styles.dockButtonTextActive]}>
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
     </SitGuruScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { gap: 16, paddingBottom: 8 }, topBar: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }, backButton: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 }, backButtonText: { color: SitGuruColors.text, fontSize: 14, fontWeight: '900' }, heroPanel: { backgroundColor: SitGuruColors.primaryDark, borderRadius: 30, gap: 8, padding: 22 }, heroEyebrow: { color: '#C9F26D', fontSize: 12, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase' }, title: { color: '#FFFFFF', fontSize: 34, fontWeight: '900', letterSpacing: -1, lineHeight: 38 }, subtitle: { color: '#DCEFE2', fontSize: 15, fontWeight: '700', lineHeight: 22 }, profileCard: { alignItems: 'center', backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.primaryLight, borderRadius: 30, borderWidth: 1, elevation: 3, flexDirection: 'row', flexWrap: 'wrap', gap: 14, padding: 18 }, avatar: { alignItems: 'center', backgroundColor: SitGuruColors.surfaceSoft, borderColor: SitGuruColors.primaryLight, borderRadius: 28, borderWidth: 1, height: 76, justifyContent: 'center', width: 76 }, avatarText: { color: SitGuruColors.primary, fontSize: 24, fontWeight: '900' }, profileCopy: { flex: 1, gap: 5, minWidth: 210 }, profileName: { color: SitGuruColors.text, fontSize: 24, fontWeight: '900' }, profileText: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '800' }, profileMeta: { color: SitGuruColors.primary, fontSize: 12, fontWeight: '900' }, progressTrack: { backgroundColor: SitGuruColors.border, borderRadius: 999, height: 9, overflow: 'hidden' }, progressFill: { backgroundColor: SitGuruColors.primary, height: 9 }, authButtonStack: { gap: 8, minWidth: 160 }, card: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 28, borderWidth: 1, gap: 12, padding: 18 }, cardEyebrow: { color: SitGuruColors.primary, fontSize: 12, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' }, cardTitle: { color: SitGuruColors.text, fontSize: 22, fontWeight: '900', letterSpacing: -0.4 }, roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, rolePill: { backgroundColor: SitGuruColors.surfaceSoft, borderRadius: 999, color: SitGuruColors.primary, fontSize: 13, fontWeight: '900', overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 8 }, buttonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, pillButton: { alignItems: 'center', backgroundColor: SitGuruColors.primary, borderRadius: 999, flexGrow: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 16 }, pillButtonSecondary: { backgroundColor: SitGuruColors.surfaceSoft, borderColor: SitGuruColors.primaryLight, borderWidth: 1 }, pillButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' }, pillButtonTextSecondary: { color: SitGuruColors.primary }, preferenceRow: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between', paddingVertical: 6 }, preferenceLabel: { color: SitGuruColors.text, flex: 1, fontSize: 15, fontWeight: '800' }, toggleTrack: { backgroundColor: SitGuruColors.border, borderRadius: 999, height: 30, justifyContent: 'center', padding: 3, width: 54 }, toggleTrackOn: { backgroundColor: SitGuruColors.primaryLight }, toggleThumb: { backgroundColor: '#FFFFFF', borderRadius: 999, height: 24, width: 24 }, toggleThumbOn: { alignSelf: 'flex-end', backgroundColor: SitGuruColors.primary }, infoRow: { backgroundColor: SitGuruColors.background, borderColor: SitGuruColors.border, borderRadius: 18, borderWidth: 1, gap: 4, padding: 13 }, infoLabel: { color: SitGuruColors.text, fontSize: 14, fontWeight: '900' }, infoValue: { color: SitGuruColors.textMuted, fontSize: 13, fontWeight: '700', lineHeight: 18 }, safetyNote: { backgroundColor: '#FFF8ED', borderColor: '#F8DEC8', borderRadius: 18, borderWidth: 1, color: SitGuruColors.text, fontSize: 14, fontWeight: '800', lineHeight: 20, padding: 14 }, bottomDockSpacer: { height: 86 }, bottomDock: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: SitGuruColors.border, borderRadius: 999, borderWidth: 1, bottom: 16, elevation: 8, flexDirection: 'row', gap: 6, left: 16, padding: 8, position: 'absolute', right: 16 }, dockButton: { alignItems: 'center', backgroundColor: SitGuruColors.surfaceSoft, borderRadius: 999, flex: 1, justifyContent: 'center', minHeight: 48, paddingHorizontal: 8 }, dockButtonActive: { backgroundColor: SitGuruColors.primary }, dockButtonText: { color: SitGuruColors.primary, fontSize: 12, fontWeight: '900' }, dockButtonTextActive: { color: '#FFFFFF' },
+  page: {
+    gap: 16,
+    paddingBottom: 8,
+  },
+  topBar: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  backButtonText: {
+    color: SitGuruColors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  heroPanel: {
+    backgroundColor: SitGuruColors.primaryDark,
+    borderRadius: 30,
+    gap: 8,
+    padding: 22,
+  },
+  heroEyebrow: {
+    color: '#C9F26D',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 34,
+    fontWeight: '900',
+    letterSpacing: -1,
+    lineHeight: 38,
+  },
+  subtitle: {
+    color: '#DCEFE2',
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  card: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.border,
+    borderRadius: 28,
+    borderWidth: 1,
+    gap: 12,
+    padding: 18,
+  },
+  cardEyebrow: {
+    color: SitGuruColors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  cardTitle: {
+    color: SitGuruColors.text,
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.4,
+  },
+  roleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  rolePill: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderRadius: 999,
+    color: SitGuruColors.primary,
+    fontSize: 13,
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  buttonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  pillButton: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.primary,
+    borderRadius: 999,
+    flexGrow: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 16,
+  },
+  pillButtonSecondary: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderColor: SitGuruColors.primaryLight,
+    borderWidth: 1,
+  },
+  pillButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  pillButtonTextSecondary: {
+    color: SitGuruColors.primary,
+  },
+  preferenceRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  preferenceLabel: {
+    color: SitGuruColors.text,
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  toggleTrack: {
+    backgroundColor: SitGuruColors.border,
+    borderRadius: 999,
+    height: 30,
+    justifyContent: 'center',
+    padding: 3,
+    width: 54,
+  },
+  toggleTrackOn: {
+    backgroundColor: SitGuruColors.primaryLight,
+  },
+  toggleThumb: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    height: 24,
+    width: 24,
+  },
+  toggleThumbOn: {
+    alignSelf: 'flex-end',
+    backgroundColor: SitGuruColors.primary,
+  },
+  infoRow: {
+    backgroundColor: SitGuruColors.background,
+    borderColor: SitGuruColors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 4,
+    padding: 13,
+  },
+  infoLabel: {
+    color: SitGuruColors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  infoValue: {
+    color: SitGuruColors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  safetyNote: {
+    backgroundColor: '#FFF8ED',
+    borderColor: '#F8DEC8',
+    borderRadius: 18,
+    borderWidth: 1,
+    color: SitGuruColors.text,
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 20,
+    padding: 14,
+  },
+  bottomDockSpacer: {
+    height: 86,
+  },
+  bottomDock: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderColor: SitGuruColors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    bottom: 16,
+    elevation: 8,
+    flexDirection: 'row',
+    gap: 6,
+    left: 16,
+    padding: 8,
+    position: 'absolute',
+    right: 16,
+  },
+  dockButton: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderRadius: 999,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 8,
+  },
+  dockButtonActive: {
+    backgroundColor: SitGuruColors.primary,
+  },
+  dockButtonText: {
+    color: SitGuruColors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  dockButtonTextActive: {
+    color: '#FFFFFF',
+  },
 });

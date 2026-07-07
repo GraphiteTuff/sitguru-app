@@ -18,7 +18,14 @@ const existingRoutes = new Set(['/backend-readiness','/schema-readiness','/auth-
 function placeholder(label: string) {
   Alert.alert('Real Wiring Start Plan placeholder', `${label} is a safe visual-only planning action. No backend, auth, SQL, Stripe, GPS, storage, push notification, native API, or production wiring is added here.`);
 }
-function openAction(action: Action) { action.href && existingRoutes.has(String(action.href)) ? router.push(action.href) : placeholder(action.placeholder ?? action.label); }
+function openAction(action: Action) {
+  if (action.href && existingRoutes.has(String(action.href))) {
+    router.push(action.href);
+    return;
+  }
+
+  placeholder(action.placeholder ?? action.label);
+}
 
 const strategy: Strategy[] = [
   { title: 'Start with Auth', priority: '1', why: 'Every protected feature needs a known signed-in identity before real data can be trusted.', status: 'Blocker', action: { label: 'Auth Readiness', href: href('/auth-readiness') } },

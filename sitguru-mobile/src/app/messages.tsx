@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-    Image,
-    Pressable,
-    StyleSheet,
-    Text,
-    useWindowDimensions,
-    View,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 
 import SitGuruLogo from '@/components/SitGuruLogo';
@@ -374,7 +374,13 @@ function ProfileAvatar({
   return (
     <View style={[styles.avatarBase, avatarStyle]}>
       {uri ? (
-        <Image source={{ uri }} style={imageStyle} resizeMode="cover" />
+        <Image
+          accessibilityLabel={`${label} profile photo`}
+          alt={`${label} profile photo`}
+          source={{ uri }}
+          style={imageStyle}
+          resizeMode="cover"
+        />
       ) : (
         <Text style={emojiStyle}>{emoji}</Text>
       )}

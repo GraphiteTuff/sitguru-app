@@ -1,8 +1,12 @@
 import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
-import Animated, { Keyframe, Easing } from 'react-native-reanimated';
+import Animated, { Easing, Keyframe } from 'react-native-reanimated';
+
+import expoLogo from '@/assets/images/expo-logo.png';
+import logoGlow from '@/assets/images/logo-glow.png';
 
 import classes from './animated-icon.module.css';
+
 const DURATION = 300;
 
 export function AnimatedSplashOverlay() {
@@ -58,15 +62,25 @@ export function AnimatedIcon() {
   return (
     <View style={styles.iconContainer}>
       <Animated.View entering={glowKeyframe.duration(60 * 1000 * 4)} style={styles.glow}>
-        <Image style={styles.glow} source={require('@/assets/images/logo-glow.png')} />
+        <Image
+          accessibilityLabel="SitGuru glow animation"
+          alt="SitGuru glow animation"
+          source={logoGlow}
+          style={styles.glow}
+        />
       </Animated.View>
 
-      <Animated.View style={styles.background} entering={keyframe.duration(DURATION)}>
+      <Animated.View entering={keyframe.duration(DURATION)} style={styles.background}>
         <div className={classes.expoLogoBackground} />
       </Animated.View>
 
-      <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
-        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+      <Animated.View entering={logoKeyframe.duration(DURATION)} style={styles.imageContainer}>
+        <Image
+          accessibilityLabel="SitGuru app icon"
+          alt="SitGuru app icon"
+          source={expoLogo}
+          style={styles.image}
+        />
       </Animated.View>
     </View>
   );

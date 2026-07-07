@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-    Image,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 
 import SitGuruLogo from '@/components/SitGuruLogo';
@@ -87,7 +87,7 @@ export default function ConversationScreen() {
     setNotice('Message added locally. Real messaging will connect to SitGuru conversations later.');
   }
 
-  function useQuickReply(reply: string) {
+  function handleQuickReply(reply: string) {
     setDraftMessage(reply);
     setNotice('');
   }
@@ -341,7 +341,7 @@ export default function ConversationScreen() {
               <Pressable
                 key={reply}
                 accessibilityRole="button"
-                onPress={() => useQuickReply(reply)}
+                onPress={() => handleQuickReply(reply)}
                 style={styles.quickReplyPill}
               >
                 <Text style={styles.quickReplyText}>{reply}</Text>
@@ -474,7 +474,7 @@ function ProfileAvatar({
   return (
     <View style={[styles.avatarBase, avatarStyle]}>
       {uri ? (
-        <Image source={{ uri }} style={imageStyle} resizeMode="cover" />
+        <Image alt={label} source={{ uri }} style={imageStyle} resizeMode="cover" />
       ) : (
         <Text style={emojiStyle}>{emoji}</Text>
       )}
@@ -1084,6 +1084,12 @@ const styles = StyleSheet.create({
     color: SitGuruColors.text,
     fontSize: 12,
     fontWeight: '900',
-  },  topBarActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  },
+  topBarActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
 
 });
