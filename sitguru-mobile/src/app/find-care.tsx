@@ -18,6 +18,8 @@ import {
   getGuruSearchBadge,
   getGuruServices,
   getGuruSlug,
+  getGuruVisibilityLabel,
+  getGuruBookingStatusLabel,
   isGuruBookable,
   isKnownPreviewGuru,
   type PublicGuruProfile,
@@ -54,6 +56,7 @@ const previewGurus: PublicGuruProfile[] = [
   is_accepting_bookings: false,
   role: 'Local Pet Care Guru',
   services: services as string[],
+  service_area: `${city}, ${state} service area`,
   source: 'placeholder',
 }));
 
@@ -180,19 +183,36 @@ export default function FindCareScreen() {
             const photoUrl = resolveSupabaseStorageUrl(getGuruPhotoUrl(guru));
             const bookable = isGuruBookable(guru);
             const preview = isKnownPreviewGuru(guru);
-            const chips = getGuruServices(guru).slice(0, 3);
+            const allServices = getGuruServices(guru);
+            const chips = allServices.slice(0, 4);
+            const extraServiceCount = Math.max(0, allServices.length - chips.length);
+            const bookingStatus = getGuruBookingStatusLabel(guru);
+            const visibilityStatus = getGuruVisibilityLabel(guru);
             return (
               <View key={guru.id} style={styles.guruCard}>
-                <View style={styles.guruPhotoSlot}><SitGuruProfilePhotoFrame fallbackEmoji="" helperLabel={preview ? 'Local Guru Preview' : 'Local Guru'} imageUrl={photoUrl} name={name} roleLabel={getGuruSearchBadge(guru)} shape="square" size="lg" /></View>
+                <View style={styles.guruPhotoSlot}>
+                  <SitGuruProfilePhotoFrame fallbackEmoji="🐾" helperLabel={preview ? 'Local Guru Preview' : 'Local Guru'} imageUrl={photoUrl} name={name} roleLabel={getGuruSearchBadge(guru)} shape="square" size="lg" />
+                  <View style={styles.photoTrustRow}>
+                    <Text style={styles.photoTrustText}>✓ Profile</Text>
+                    <Text style={styles.photoTrustText}>✓ Updates</Text>
+                    <Text style={styles.photoTrustText}>✓ SitGuru care</Text>
+                  </View>
+                </View>
                 <View style={styles.guruContent}>
                   <View style={styles.guruTopRow}><SitGuruProfilePhotoFrame imageUrl={photoUrl} name={name} shape="circle" size="sm" /><View style={styles.guruMeta}><View style={styles.nameRow}><Text style={styles.guruName}>{name}</Text>{guru.is_verified && !preview ? <Text style={styles.verifiedBadge}>Verified</Text> : null}</View><Text style={styles.guruRole}>{guru.role || 'Pet Care Guru'}</Text></View></View>
-                  <Text style={styles.statusBadge}>{getGuruSearchBadge(guru)}</Text>
+                  <View style={styles.statusRow}>
+                    <Text style={styles.statusBadge}>{bookingStatus}</Text>
+                    <Text style={styles.visibilityBadge}>{visibilityStatus}</Text>
+                  </View>
                   <Text style={styles.guruBio} numberOfLines={3}>{guru.bio || 'Trusted local care with clear updates, thoughtful routines, and SitGuru safety reminders.'}</Text>
-                  <Text style={styles.guruInfoText}>⌖ {getGuruLocationLabel(guru)}</Text>
+                  <View style={styles.detailPanel}>
+                    <Text style={styles.detailLabel}>Service area</Text>
+                    <Text style={styles.detailValue}>⌖ {getGuruLocationLabel(guru)}</Text>
+                  </View>
                   <View style={styles.guruStatsRow}><View style={styles.guruStat}><Text style={styles.guruStatValue}>{getGuruRatingLabel(guru)}</Text><Text style={styles.guruStatLabel}>Rating</Text></View><View style={styles.guruStat}><Text style={styles.guruStatValue}>{getGuruRateLabel(guru)}</Text><Text style={styles.guruStatLabel}>Rate</Text></View></View>
-                  {chips.length ? <View style={styles.chips}>{chips.map((chip) => <Text key={chip} style={styles.chip}>{chip}</Text>)}</View> : null}
-                  <View style={styles.guruActions}><Pressable accessibilityRole="button" onPress={() => handleViewProfile(guru)} style={styles.viewButton}><Text style={styles.viewButtonText}>View Profile</Text></Pressable><Pressable accessibilityRole="button" onPress={() => router.push('/conversation')} style={styles.messageButton}><Text style={styles.messageButtonText}>Message</Text></Pressable></View>
-                  <Pressable accessibilityRole="button" onPress={() => handleBookingAction(guru)} style={[styles.bookButton, (!bookable || preview) && styles.disabledBookButton]}><Text style={[styles.bookButtonText, (!bookable || preview) && styles.disabledBookButtonText]}>{getGuruBookingLabel(guru)}</Text></Pressable>
+                  {chips.length ? <View style={styles.serviceSection}><Text style={styles.sectionLabel}>Services</Text><View style={styles.chips}>{chips.map((chip) => <Text key={chip} style={styles.chip}>{chip}</Text>)}{extraServiceCount ? <Text style={styles.moreChip}>+{extraServiceCount} more</Text> : null}</View></View> : null}
+                  <View style={styles.guruActions}><Pressable accessibilityRole="button" onPress={() => handleViewProfile(guru)} style={styles.viewButton}><Text style={styles.viewButtonText}>View Profile</Text></Pressable><Pressable accessibilityRole="button" onPress={() => handleBookingAction(guru)} style={[styles.bookButton, (!bookable || preview) && styles.disabledBookButton]}><Text style={[styles.bookButtonText, (!bookable || preview) && styles.disabledBookButtonText]}>{getGuruBookingLabel(guru)}</Text></Pressable></View>
+                  <Pressable accessibilityRole="button" onPress={() => router.push('/conversation')} style={styles.messageButton}><Text style={styles.messageButtonText}>Ask a Question</Text></Pressable>
                 </View>
               </View>
             );
@@ -251,8 +271,10 @@ const styles = StyleSheet.create({
   resultsText: { color: SitGuruColors.textMuted, fontSize: 15, fontWeight: '700', lineHeight: 22 },
   resultsGrid: { gap: 16 },
   resultsGridWide: { flexDirection: 'row', flexWrap: 'wrap' },
-  guruCard: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 30, borderWidth: 1, flexGrow: 1, gap: 14, maxWidth: 420, minWidth: 300, padding: 16 },
-  guruPhotoSlot: { alignItems: 'center', backgroundColor: SitGuruColors.surfaceSoft, borderRadius: 24, padding: 16 },
+  guruCard: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 30, borderWidth: 1, flexGrow: 1, gap: 14, maxWidth: 420, minWidth: 300, overflow: 'hidden', padding: 16 },
+  guruPhotoSlot: { alignItems: 'center', backgroundColor: SitGuruColors.surfaceSoft, borderColor: SitGuruColors.primaryLight, borderRadius: 24, borderWidth: 1, gap: 12, padding: 16 },
+  photoTrustRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  photoTrustText: { backgroundColor: '#FFFFFF', borderRadius: 999, color: SitGuruColors.primaryDark, fontSize: 11, fontWeight: '900', overflow: 'hidden', paddingHorizontal: 9, paddingVertical: 5 },
   guruContent: { gap: 12 },
   guruTopRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   guruMeta: { flex: 1, gap: 3 },
@@ -260,21 +282,29 @@ const styles = StyleSheet.create({
   guruName: { color: SitGuruColors.text, fontSize: 22, fontWeight: '900' },
   verifiedBadge: { backgroundColor: SitGuruColors.primaryLight, borderRadius: 999, color: SitGuruColors.primaryDark, fontSize: 10, fontWeight: '900', overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 4 },
   guruRole: { color: SitGuruColors.textSoft, fontSize: 12, fontWeight: '900' },
+  statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statusBadge: { alignSelf: 'flex-start', backgroundColor: SitGuruColors.primary, borderRadius: 999, color: '#FFFFFF', fontSize: 11, fontWeight: '900', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 6, textTransform: 'uppercase' },
+  visibilityBadge: { alignSelf: 'flex-start', backgroundColor: SitGuruColors.surfaceSoft, borderColor: SitGuruColors.primaryLight, borderRadius: 999, borderWidth: 1, color: SitGuruColors.primaryDark, fontSize: 11, fontWeight: '900', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 6, textTransform: 'uppercase' },
   guruBio: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '700', lineHeight: 21 },
   guruInfoText: { color: SitGuruColors.primaryDark, fontSize: 13, fontWeight: '900' },
+  detailPanel: { backgroundColor: SitGuruColors.background, borderColor: SitGuruColors.border, borderRadius: 18, borderWidth: 1, gap: 4, padding: 12 },
+  detailLabel: { color: SitGuruColors.textSoft, fontSize: 11, fontWeight: '900', letterSpacing: 0.5, textTransform: 'uppercase' },
+  detailValue: { color: SitGuruColors.primaryDark, fontSize: 14, fontWeight: '900', lineHeight: 19 },
   guruStatsRow: { flexDirection: 'row', gap: 10 },
   guruStat: { backgroundColor: SitGuruColors.background, borderColor: SitGuruColors.border, borderRadius: 18, borderWidth: 1, flex: 1, padding: 12 },
   guruStatValue: { color: SitGuruColors.text, fontSize: 15, fontWeight: '900' },
   guruStatLabel: { color: SitGuruColors.textSoft, fontSize: 11, fontWeight: '900', marginTop: 3 },
+  serviceSection: { gap: 8 },
+  sectionLabel: { color: SitGuruColors.textSoft, fontSize: 11, fontWeight: '900', letterSpacing: 0.5, textTransform: 'uppercase' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: SitGuruColors.surfaceSoft, borderRadius: 999, color: SitGuruColors.primaryDark, fontSize: 12, fontWeight: '900', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 7 },
+  moreChip: { backgroundColor: SitGuruColors.primaryLight, borderRadius: 999, color: SitGuruColors.primaryDark, fontSize: 12, fontWeight: '900', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 7 },
   guruActions: { flexDirection: 'row', gap: 10 },
   viewButton: { alignItems: 'center', backgroundColor: SitGuruColors.primary, borderRadius: 999, flex: 1, padding: 13 },
   viewButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
-  messageButton: { alignItems: 'center', backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.primary, borderRadius: 999, borderWidth: 1, flex: 1, padding: 13 },
+  messageButton: { alignItems: 'center', backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.primary, borderRadius: 999, borderWidth: 1, padding: 13 },
   messageButtonText: { color: SitGuruColors.primary, fontSize: 13, fontWeight: '900' },
-  bookButton: { alignItems: 'center', backgroundColor: SitGuruColors.primaryDark, borderRadius: 999, padding: 14 },
+  bookButton: { alignItems: 'center', backgroundColor: SitGuruColors.primaryDark, borderRadius: 999, flex: 1, padding: 13 },
   bookButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   disabledBookButton: { backgroundColor: SitGuruColors.surfaceSoft, borderColor: SitGuruColors.border, borderWidth: 1 },
   disabledBookButtonText: { color: SitGuruColors.primaryDark },
