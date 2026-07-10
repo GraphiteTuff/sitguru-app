@@ -1,1012 +1,763 @@
 import { router } from 'expo-router';
 import {
+  Image,
+  ImageSourcePropType,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from 'react-native';
 
-import SitGuruLogo from '@/components/SitGuruLogo';
+import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
-import { SitGuruColors } from '@/constants/colors';
+import { AppFonts } from '@/constants/fonts';
+import { BrandColors } from '@/constants/theme';
+import {
+  setThemePreference,
+  SitGuruThemePreference,
+  useThemePreference,
+} from '@/hooks/use-color-scheme';
+import { useTheme, useThemeMode } from '@/hooks/use-theme';
 
-type AppRoute = '/find-care' | '/signup' | '/login';
+type AppRoute =
+  | '/find-care'
+  | '/signup'
+  | '/login'
+  | '/messages'
+  | '/request-booking';
 
-type MediaCard = {
+type ThemeOption = {
   label: string;
-  title: string;
-  subtitle: string;
-  route: AppRoute;
+  value: SitGuruThemePreference;
+  icon: 'sun' | 'moon';
 };
 
 type RoleCard = {
   title: string;
-  eyebrow: string;
-  description: string;
+  subtitle: string;
   route: AppRoute;
+  icon: 'findGuru' | 'becomeGuru' | 'ambassador';
+  accent: string;
 };
 
-const services = ['Walks', 'Sitting', 'Boarding', 'Drop-ins', 'Day Care'];
+type ServiceCard = {
+  title: string;
+  icon: 'walks' | 'dropIns' | 'sitting' | 'boarding';
+  badgeColorLight: string;
+  badgeColorDark: string;
+};
 
-const mediaCards: MediaCard[] = [
-  {
-    label: 'Pet Parents',
-    title: 'Find care nearby',
-    subtitle: 'Search trusted local Gurus by service and ZIP code.',
-    route: '/find-care',
-  },
-  {
-    label: 'Pet Gurus',
-    title: 'Earn locally',
-    subtitle: 'Offer pet care services independently in your area.',
-    route: '/signup',
-  },
-  {
-    label: 'PawReport™',
-    title: 'Stay connected',
-    subtitle: 'Photos, care notes, food, water, potty updates, and visit timing.',
-    route: '/find-care',
-  },
+const heroSceneLight =
+  require('../assets/images/home-hero-scene-light.png') as ImageSourcePropType;
+
+const heroSceneDark =
+  require('../assets/images/home-hero-scene-dark.png') as ImageSourcePropType;
+
+const sitGuruLogoLight =
+  require('../assets/images/sitguru-logo-light.png') as ImageSourcePropType;
+
+const sitGuruLogoDark =
+  require('../assets/images/sitguru-logo-dark.png') as ImageSourcePropType;
+
+const themeOptions: ThemeOption[] = [
+  { label: 'Light', value: 'light', icon: 'sun' },
+  { label: 'Dark', value: 'dark', icon: 'moon' },
 ];
 
 const roleCards: RoleCard[] = [
   {
-    title: 'Pet Parents',
-    eyebrow: 'Find Care',
-    description:
-      'Search local Gurus, message, request care, and keep pet details organized.',
+    title: 'Find a Guru',
+    subtitle: 'Book trusted\nlocal care',
     route: '/find-care',
+    icon: 'findGuru',
+    accent: '#EAF2DA',
   },
   {
-    title: 'Pet Gurus',
-    eyebrow: 'Offer Care',
-    description:
-      'Create a profile, set your service area, manage bookings, and view earnings.',
+    title: 'Become a Guru',
+    subtitle: 'Earn doing what\nyou love',
     route: '/signup',
+    icon: 'becomeGuru',
+    accent: '#F8D6B9',
   },
   {
-    title: 'Ambassadors',
-    eyebrow: 'Grow Community',
-    description:
-      'Share SitGuru, track referrals, complete training, and support local growth.',
+    title: 'Become an Ambassador',
+    subtitle: 'Share SitGuru.\nEarn rewards.',
     route: '/signup',
+    icon: 'ambassador',
+    accent: '#F7EFE2',
   },
 ];
 
-export default function HomeScreen() {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 760;
+const services: ServiceCard[] = [
+  {
+    title: 'Walks',
+    icon: 'walks',
+    badgeColorLight: '#FFF2C7',
+    badgeColorDark: '#2D452A',
+  },
+  {
+    title: 'Drop-ins',
+    icon: 'dropIns',
+    badgeColorLight: '#F9EDD7',
+    badgeColorDark: '#453F22',
+  },
+  {
+    title: 'Sitting',
+    icon: 'sitting',
+    badgeColorLight: '#F7E8DB',
+    badgeColorDark: '#493421',
+  },
+  {
+    title: 'Boarding',
+    icon: 'boarding',
+    badgeColorLight: '#EEF1E6',
+    badgeColorDark: '#29412F',
+  },
+];
+
+function RoleIllustration({
+  icon,
+  accent,
+  isDark,
+}: {
+  icon: RoleCard['icon'];
+  accent: string;
+  isDark: boolean;
+}) {
+  const iconColor = isDark ? '#F7EEDB' : BrandColors.greenDark;
+  const bubbleColor = isDark ? '#173826' : accent;
 
   return (
-    <SitGuruScreen scroll center={false} maxWidth={820}>
-      <View style={styles.page}>
-        <View style={styles.topBar}>
-          <SitGuruLogo size="medium" variant="horizontal" />
+    <View style={[staticStyles.roleArtBubble, { backgroundColor: bubbleColor }]}>
+      <SitGuruIcon name={icon} size={28} color={iconColor} strokeWidth={2.35} />
+
+      {icon === 'ambassador' ? (
+        <View style={staticStyles.roleHeartBadge}>
+          <Text style={staticStyles.roleHeartText}>♥</Text>
         </View>
+      ) : null}
+    </View>
+  );
+}
 
-        <View style={[styles.hero, isWide && styles.heroWide]}>
-          <View style={styles.heroCopy}>
-            <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>Local trusted marketplace</Text>
+export default function HomeScreen() {
+  const theme = useTheme();
+  const themeMode = useThemeMode();
+  const themePreference = useThemePreference();
+  const isDark = themeMode === 'dark';
+
+  const styles = createStyles(theme, isDark);
+  const heroImage = isDark ? heroSceneDark : heroSceneLight;
+  const logoImage = isDark ? sitGuruLogoDark : sitGuruLogoLight;
+
+  return (
+    <SitGuruScreen scroll={false} center maxWidth={430}>
+      <View style={styles.phoneShell}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.statusBar}>
+            <Text style={styles.statusTime}>9:41</Text>
+
+            <View style={styles.statusIcons}>
+              <View style={styles.signalBars}>
+                <View style={[styles.signalBar, { height: 6 }]} />
+                <View style={[styles.signalBar, { height: 8 }]} />
+                <View style={[styles.signalBar, { height: 10 }]} />
+              </View>
+
+              <Text style={styles.wifiText}>⌁</Text>
+
+              <View style={styles.batteryWrap}>
+                <View style={styles.batteryBody}>
+                  <View style={styles.batteryFill} />
+                </View>
+                <View style={styles.batteryCap} />
+              </View>
             </View>
+          </View>
 
-            <Text style={styles.title}>Trusted pet care. Made simple.</Text>
+          <View style={styles.header}>
+            <Image source={logoImage} resizeMode="contain" style={styles.logoImage} />
 
-            <Text style={styles.subtitle}>
-              SitGuru connects Pet Parents with trusted independent local Gurus
-              for walks, sitting, boarding, training, drop-in visits, and more.
+            <View style={styles.modeToggle}>
+              {themeOptions.map((option) => {
+                const active = themePreference === option.value;
+
+                return (
+                  <Pressable
+                    key={option.value}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Switch to ${option.label} mode`}
+                    onPress={() => setThemePreference(option.value)}
+                    style={[styles.modeButton, active && styles.modeButtonActive]}
+                  >
+                    <SitGuruIcon
+                      name={option.icon}
+                      size={18}
+                      color={
+                        active
+                          ? isDark
+                            ? '#0E1D16'
+                            : '#F3AA1F'
+                          : styles.toggleInactive.color
+                      }
+                      strokeWidth={2.4}
+                    />
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroTitle}>
+              Local pet care{'\n'}that feels{'\n'}personal.
             </Text>
 
-            <View style={[styles.heroActions, isWide && styles.heroActionsWide]}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/find-care')}
-                style={styles.primaryButton}
-              >
-                <Text style={styles.primaryButtonText}>Find Care</Text>
-              </Pressable>
-
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/login')}
-                style={styles.secondaryButton}
-              >
-                <Text style={styles.secondaryButtonText}>Log In</Text>
-              </Pressable>
-            </View>
+            <Text style={styles.heroSubtitle}>
+              Book trusted Gurus for walks,{'\n'}drop-ins, sitting, and more.
+            </Text>
           </View>
 
-          <View style={styles.heroMediaStack}>
-            <View style={styles.mainPhotoCard}>
-              <View style={styles.photoPlaceholder}>
-                <Text style={styles.photoPlaceholderIcon}>🐾</Text>
-                <Text style={styles.photoPlaceholderTitle}>Hero Photo Area</Text>
-                <Text style={styles.photoPlaceholderText}>
-                  Add a real Pet Parent, Guru, or pet lifestyle photo here.
-                </Text>
+          <View style={styles.heroScene}>
+            <Image source={heroImage} resizeMode="cover" style={styles.heroImage} />
+
+            <View pointerEvents="none" style={styles.heroFadeTopStrong} />
+            <View pointerEvents="none" style={styles.heroFadeTopMedium} />
+            <View pointerEvents="none" style={styles.heroFadeTopSoft} />
+          </View>
+
+          <View style={styles.contentShelf}>
+            <View style={styles.roleGroup}>
+              <View style={styles.roleCardRow}>
+                {roleCards.map((card) => (
+                  <Pressable
+                    key={card.title}
+                    accessibilityRole="button"
+                    onPress={() => router.push(card.route)}
+                    style={styles.roleCard}
+                  >
+                    <RoleIllustration
+                      icon={card.icon}
+                      accent={card.accent}
+                      isDark={isDark}
+                    />
+
+                    <Text style={styles.roleTitle}>{card.title}</Text>
+                    <Text style={styles.roleSubtitle}>{card.subtitle}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.servicesSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Popular Services</Text>
+
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => router.push('/find-care')}
+                >
+                  <Text style={styles.viewAll}>View all</Text>
+                </Pressable>
               </View>
 
-              <View style={styles.photoOverlay}>
-                <Text style={styles.photoOverlayTitle}>Care nearby</Text>
-                <Text style={styles.photoOverlayText}>
-                  Search by service and ZIP code.
-                </Text>
+              <View style={styles.servicesRow}>
+                {services.map((service) => (
+                  <Pressable
+                    key={service.title}
+                    accessibilityRole="button"
+                    onPress={() => router.push('/find-care')}
+                    style={styles.serviceCard}
+                  >
+                    <View
+                      style={[
+                        styles.serviceIconBubble,
+                        {
+                          backgroundColor: isDark
+                            ? service.badgeColorDark
+                            : service.badgeColorLight,
+                        },
+                      ]}
+                    >
+                      <SitGuruIcon
+                        name={service.icon}
+                        size={22}
+                        color={isDark ? '#F1D36A' : BrandColors.greenDark}
+                        strokeWidth={2.35}
+                      />
+                    </View>
+
+                    <Text style={styles.serviceText}>{service.title}</Text>
+                  </Pressable>
+                ))}
               </View>
             </View>
 
-            <View style={styles.floatingStatCard}>
-              <Text style={styles.floatingStatValue}>PawReport™</Text>
-              <Text style={styles.floatingStatText}>
-                Photos, notes, timing, and care updates.
-              </Text>
-            </View>
+            <View style={styles.bottomSpacer} />
           </View>
-        </View>
+        </ScrollView>
 
-        <View style={styles.bottomSearchPanel}>
-          <Text style={styles.searchEyebrow}>Start here</Text>
-          <Text style={styles.searchTitle}>What service do you need?</Text>
-
-          <View style={styles.serviceRow}>
-            {services.map((service) => (
-              <Pressable
-                key={service}
-                accessibilityRole="button"
-                onPress={() => router.push('/find-care')}
-                style={styles.servicePill}
-              >
-                <Text style={styles.servicePillText}>{service}</Text>
-              </Pressable>
-            ))}
-          </View>
+        <View style={styles.bottomNav}>
+          <Pressable accessibilityRole="button" style={styles.navItem}>
+            <SitGuruIcon
+              name="home"
+              size={22}
+              color={styles.navActive.color}
+              strokeWidth={2.6}
+            />
+            <Text style={styles.navLabelActive}>Home</Text>
+          </Pressable>
 
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/find-care')}
-            style={styles.zipSearchButton}
+            style={styles.navItem}
           >
-            <View style={styles.zipIconCircle}>
-              <Text style={styles.zipIcon}>⌖</Text>
-            </View>
+            <SitGuruIcon
+              name="explore"
+              size={22}
+              color={styles.navMuted.color}
+              strokeWidth={2.25}
+            />
+            <Text style={styles.navLabel}>Explore</Text>
+          </Pressable>
 
-            <View style={styles.zipSearchCopy}>
-              <Text style={styles.zipSearchTitle}>Search Gurus by ZIP code</Text>
-              <Text style={styles.zipSearchText}>
-                Find trusted local care near you.
-              </Text>
-            </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/request-booking')}
+            style={styles.navItem}
+          >
+            <SitGuruIcon
+              name="bookings"
+              size={22}
+              color={styles.navMuted.color}
+              strokeWidth={2.25}
+            />
+            <Text style={styles.navLabel}>Bookings</Text>
+          </Pressable>
 
-            <Text style={styles.zipArrow}>→</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/messages')}
+            style={styles.navItem}
+          >
+            <SitGuruIcon
+              name="messages"
+              size={22}
+              color={styles.navMuted.color}
+              strokeWidth={2.25}
+            />
+            <Text style={styles.navLabel}>Messages</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/login')}
+            style={styles.navItem}
+          >
+            <SitGuruIcon
+              name="profile"
+              size={22}
+              color={styles.navMuted.color}
+              strokeWidth={2.25}
+            />
+            <Text style={styles.navLabel}>Profile</Text>
           </Pressable>
         </View>
-
-        <View style={styles.mediaSection}>
-          <View style={styles.sectionHeading}>
-            <Text style={styles.sectionEyebrow}>Built around real care</Text>
-            <Text style={styles.sectionTitle}>People, pets, and local trust.</Text>
-          </View>
-
-          <View style={[styles.mediaGrid, isWide && styles.mediaGridWide]}>
-            {mediaCards.map((card) => (
-              <Pressable
-                key={card.label}
-                accessibilityRole="button"
-                onPress={() => router.push(card.route)}
-                style={styles.mediaCard}
-              >
-                <View style={styles.mediaImageFrame}>
-                  <View style={styles.mediaImagePlaceholder}>
-                    <Text style={styles.mediaImageIcon}>＋</Text>
-                    <Text style={styles.mediaImageText}>Photo</Text>
-                  </View>
-
-                  <View style={styles.mediaLabel}>
-                    <Text style={styles.mediaLabelText}>{card.label}</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.mediaTitle}>{card.title}</Text>
-                <Text style={styles.mediaSubtitle}>{card.subtitle}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.roleSection}>
-          <View style={styles.sectionHeading}>
-            <Text style={styles.sectionEyebrow}>SitGuru One Access</Text>
-            <Text style={styles.sectionTitle}>
-              One account. All your dashboards.
-            </Text>
-            <Text style={styles.sectionText}>
-              Create an account once and choose the role that fits you best.
-              Multiple roles can live under one SitGuru login.
-            </Text>
-          </View>
-
-          <View style={[styles.roleGrid, isWide && styles.roleGridWide]}>
-            {roleCards.map((role, index) => (
-              <Pressable
-                key={role.title}
-                accessibilityRole="button"
-                onPress={() => router.push(role.route)}
-                style={styles.roleCard}
-              >
-                <View style={styles.roleTopRow}>
-                  <Text style={styles.roleEyebrow}>{role.eyebrow}</Text>
-                  <View style={styles.roleNumber}>
-                    <Text style={styles.roleNumberText}>{index + 1}</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.roleTitle}>{role.title}</Text>
-                <Text style={styles.roleDescription}>{role.description}</Text>
-                <Text style={styles.roleLink}>
-                  {role.route === '/find-care' ? 'Find care →' : 'Get started →'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <View style={[styles.pawReportPanel, isWide && styles.pawReportPanelWide]}>
-          <View style={styles.pawReportVisual}>
-            <View style={styles.pawReportPhotoSlot}>
-              <Text style={styles.pawReportPhotoIcon}>🐶</Text>
-              <Text style={styles.pawReportPhotoText}>Visit photo area</Text>
-            </View>
-
-            <View style={styles.pawReportFloatingNote}>
-              <Text style={styles.pawReportFloatingTitle}>Visit complete</Text>
-              <Text style={styles.pawReportFloatingText}>
-                Food, water, potty, notes, and photos updated.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.pawReportCopy}>
-            <Text style={styles.pawReportEyebrow}>Exclusive SitGuru Feature</Text>
-            <Text style={styles.pawReportTitle}>
-              Stay connected with every visit.
-            </Text>
-            <Text style={styles.pawReportText}>
-              Every booking includes a SitGuru PawReport™ with photos, potty
-              updates, food and water confirmations, care notes, visit timing,
-              and a complete summary from your Guru.
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.stepsPanel}>
-          <Text style={styles.sectionEyebrow}>How SitGuru works</Text>
-          <Text style={styles.sectionTitle}>Simple from the first tap.</Text>
-
-          <View style={styles.stepList}>
-            <View style={styles.stepItem}>
-              <Text style={styles.stepNumber}>01</Text>
-              <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Find a Guru</Text>
-                <Text style={styles.stepText}>
-                  Search local care by service and location.
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.stepDivider} />
-
-            <View style={styles.stepItem}>
-              <Text style={styles.stepNumber}>02</Text>
-              <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Message or request care</Text>
-                <Text style={styles.stepText}>
-                  Choose the right care for your pet and keep details organized.
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.stepDivider} />
-
-            <View style={styles.stepItem}>
-              <Text style={styles.stepNumber}>03</Text>
-              <View style={styles.stepCopy}>
-                <Text style={styles.stepTitle}>Book on-platform</Text>
-                <Text style={styles.stepText}>
-                  Keep booking details, care notes, updates, and support in one
-                  place.
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.localPanel}>
-          <Text style={styles.localTitle}>
-            Built for Pet Parents, Pet Gurus, and local communities.
-          </Text>
-
-          <Text style={styles.localText}>
-            Pet Parents can find local care, Pet Gurus can apply to offer
-            services independently, and Ambassadors can help spread the word.
-            SitGuru keeps the experience simple, welcoming, and easy to start.
-          </Text>
-
-          <View style={[styles.localActions, isWide && styles.localActionsWide]}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push('/find-care')}
-              style={styles.primaryButton}
-            >
-              <Text style={styles.primaryButtonText}>Find Care Near Me</Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push('/signup')}
-              style={styles.secondaryButton}
-            >
-              <Text style={styles.secondaryButtonText}>Become a Guru</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={styles.bottomDockSpacer} />
-      </View>
-
-      <View style={styles.bottomDock}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/find-care')}
-          style={styles.dockPrimaryAction}
-        >
-          <Text style={styles.dockPrimaryText}>Find Care</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/signup')}
-          style={styles.dockIconButton}
-        >
-          <Text style={styles.dockIconText}>Guru</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/login')}
-          style={styles.dockIconButton}
-        >
-          <Text style={styles.dockIconText}>Login</Text>
-        </Pressable>
       </View>
     </SitGuruScreen>
   );
 }
 
-const styles = StyleSheet.create({
-  page: {
-    gap: 22,
-    paddingBottom: 18,
-    paddingTop: 2,
-  },
-  topBar: {
+const staticStyles = StyleSheet.create({
+  roleArtBubble: {
     alignItems: 'center',
-    flexDirection: 'row',
+    borderRadius: 18,
+    height: 58,
     justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  hero: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 38,
-    borderWidth: 1,
-    elevation: 5,
-    gap: 18,
-    overflow: 'hidden',
-    padding: 18,
-  },
-  heroWide: {
-    flexDirection: 'row',
-  },
-  heroCopy: {
-    flex: 1,
-    gap: 18,
-    justifyContent: 'center',
-    padding: 4,
-  },
-  heroBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  heroBadgeText: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  title: {
-    color: SitGuruColors.text,
-    fontSize: 44,
-    fontWeight: '900',
-    letterSpacing: -1.7,
-    lineHeight: 46,
-  },
-  subtitle: {
-    color: SitGuruColors.textMuted,
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 27,
-    maxWidth: 540,
-  },
-  heroActions: {
-    gap: 12,
-  },
-  heroActionsWide: {
-    flexDirection: 'row',
-  },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primary,
-    borderRadius: 999,
-    justifyContent: 'center',
-    minHeight: 56,
-    paddingHorizontal: 22,
-    paddingVertical: 15,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 56,
-    paddingHorizontal: 22,
-    paddingVertical: 15,
-  },
-  secondaryButtonText: {
-    color: SitGuruColors.text,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  heroMediaStack: {
-    flex: 1,
-    gap: 12,
-    minHeight: 360,
-  },
-  mainPhotoCard: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 34,
-    borderWidth: 1,
-    flex: 1,
-    minHeight: 330,
-    overflow: 'hidden',
+    marginBottom: 12,
     position: 'relative',
+    width: 58,
   },
-  photoPlaceholder: {
+  roleHeartBadge: {
     alignItems: 'center',
-    flex: 1,
-    gap: 8,
+    backgroundColor: BrandColors.coral,
+    borderRadius: 999,
+    height: 18,
     justifyContent: 'center',
-    padding: 22,
-  },
-  photoPlaceholderIcon: {
-    fontSize: 46,
-  },
-  photoPlaceholderTitle: {
-    color: SitGuruColors.text,
-    fontSize: 18,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  photoPlaceholderText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
-    maxWidth: 240,
-    textAlign: 'center',
-  },
-  photoOverlay: {
-    backgroundColor: 'rgba(16, 21, 19, 0.32)',
-    borderRadius: 24,
-    bottom: 14,
-    left: 14,
-    padding: 14,
     position: 'absolute',
-    right: 14,
+    right: 5,
+    top: 6,
+    width: 18,
   },
-  photoOverlayTitle: {
+  roleHeartText: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  photoOverlayText: {
-    color: '#E8F4EC',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-    marginTop: 3,
-  },
-  floatingStatCard: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 24,
-    borderWidth: 1,
-    elevation: 3,
-    gap: 4,
-    padding: 16,
-  },
-  floatingStatValue: {
-    color: SitGuruColors.text,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  floatingStatText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-  },
-  bottomSearchPanel: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 32,
-    borderWidth: 1,
-    elevation: 4,
-    gap: 14,
-    padding: 18,
-  },
-  searchEyebrow: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
-  },
-  searchTitle: {
-    color: SitGuruColors.text,
-    fontSize: 25,
-    fontWeight: '900',
-    letterSpacing: -0.6,
-    lineHeight: 30,
-  },
-  serviceRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  servicePill: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  servicePillText: {
-    color: SitGuruColors.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  zipSearchButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 26,
-    flexDirection: 'row',
-    gap: 12,
-    minHeight: 72,
-    padding: 14,
-  },
-  zipIconCircle: {
-    alignItems: 'center',
-    backgroundColor: '#C9F26D',
-    borderRadius: 999,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  zipIcon: {
-    color: SitGuruColors.text,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  zipSearchCopy: {
-    flex: 1,
-    gap: 3,
-  },
-  zipSearchTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  zipSearchText: {
-    color: '#DCEFE2',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  zipArrow: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  mediaSection: {
-    gap: 14,
-  },
-  sectionHeading: {
-    gap: 8,
-    paddingHorizontal: 2,
-  },
-  sectionEyebrow: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
-  },
-  sectionTitle: {
-    color: SitGuruColors.text,
-    fontSize: 30,
-    fontWeight: '900',
-    letterSpacing: -0.8,
-    lineHeight: 35,
-  },
-  sectionText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 24,
-    maxWidth: 620,
-  },
-  mediaGrid: {
-    gap: 12,
-  },
-  mediaGridWide: {
-    flexDirection: 'row',
-  },
-  mediaCard: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 30,
-    borderWidth: 1,
-    elevation: 3,
-    flex: 1,
-    gap: 10,
-    overflow: 'hidden',
-    padding: 12,
-  },
-  mediaImageFrame: {
-    backgroundColor: SitGuruColors.background,
-    borderRadius: 24,
-    height: 220,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  mediaImagePlaceholder: {
-    alignItems: 'center',
-    flex: 1,
-    gap: 6,
-    justifyContent: 'center',
-  },
-  mediaImageIcon: {
-    color: SitGuruColors.primary,
-    fontSize: 30,
-    fontWeight: '900',
-  },
-  mediaImageText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 13,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  mediaLabel: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    left: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    position: 'absolute',
-    top: 12,
-  },
-  mediaLabelText: {
-    color: SitGuruColors.text,
     fontSize: 11,
     fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  mediaTitle: {
-    color: SitGuruColors.text,
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: -0.3,
-    paddingHorizontal: 4,
-  },
-  mediaSubtitle: {
-    color: SitGuruColors.textMuted,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-    paddingBottom: 4,
-    paddingHorizontal: 4,
-  },
-  roleSection: {
-    gap: 14,
-  },
-  roleGrid: {
-    gap: 12,
-  },
-  roleGridWide: {
-    flexDirection: 'row',
-  },
-  roleCard: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 30,
-    borderWidth: 1,
-    elevation: 3,
-    flex: 1,
-    gap: 12,
-    minHeight: 190,
-    padding: 18,
-  },
-  roleTopRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  roleEyebrow: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  roleNumber: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 999,
-    height: 34,
-    justifyContent: 'center',
-    width: 34,
-  },
-  roleNumberText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  roleTitle: {
-    color: SitGuruColors.text,
-    fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: -0.3,
-  },
-  roleDescription: {
-    color: SitGuruColors.textMuted,
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-  },
-  roleLink: {
-    color: SitGuruColors.primary,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  pawReportPanel: {
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 38,
-    gap: 18,
-    overflow: 'hidden',
-    padding: 18,
-  },
-  pawReportPanelWide: {
-    flexDirection: 'row',
-  },
-  pawReportVisual: {
-    flex: 1,
-    minHeight: 300,
-    position: 'relative',
-  },
-  pawReportPhotoSlot: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: 30,
-    borderWidth: 1,
-    flex: 1,
-    gap: 8,
-    justifyContent: 'center',
-    minHeight: 300,
-    padding: 20,
-  },
-  pawReportPhotoIcon: {
-    fontSize: 46,
-  },
-  pawReportPhotoText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  pawReportFloatingNote: {
-    backgroundColor: '#C9F26D',
-    borderRadius: 22,
-    bottom: 14,
-    gap: 4,
-    left: 14,
-    padding: 14,
-    position: 'absolute',
-    right: 14,
-  },
-  pawReportFloatingTitle: {
-    color: SitGuruColors.text,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  pawReportFloatingText: {
-    color: '#263229',
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  pawReportCopy: {
-    flex: 1,
-    gap: 12,
-    justifyContent: 'center',
-    padding: 4,
-  },
-  pawReportEyebrow: {
-    color: '#C9F26D',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
-  },
-  pawReportTitle: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '900',
-    letterSpacing: -0.8,
-    lineHeight: 37,
-  },
-  pawReportText: {
-    color: '#DCEFE2',
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
-  stepsPanel: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 32,
-    borderWidth: 1,
-    gap: 16,
-    padding: 20,
-  },
-  stepList: {
-    gap: 0,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    gap: 16,
-    paddingVertical: 12,
-  },
-  stepNumber: {
-    color: SitGuruColors.primary,
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: -0.3,
-    width: 38,
-  },
-  stepCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  stepTitle: {
-    color: SitGuruColors.text,
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  stepText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-  },
-  stepDivider: {
-    backgroundColor: SitGuruColors.border,
-    height: 1,
-    marginLeft: 54,
-  },
-  localPanel: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 36,
-    borderWidth: 1,
-    gap: 14,
-    padding: 22,
-  },
-  localTitle: {
-    color: SitGuruColors.text,
-    fontSize: 30,
-    fontWeight: '900',
-    letterSpacing: -0.8,
-    lineHeight: 35,
-  },
-  localText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
-  localActions: {
-    gap: 12,
-    marginTop: 4,
-  },
-  localActionsWide: {
-    flexDirection: 'row',
-  },
-  bottomDockSpacer: {
-    height: 86,
-  },
-  bottomDock: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    bottom: 16,
-    elevation: 8,
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    left: 16,
-    padding: 8,
-    position: 'absolute',
-    right: 16,
-  },
-  dockPrimaryAction: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primary,
-    borderRadius: 999,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 50,
-    paddingHorizontal: 18,
-  },
-  dockPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  dockIconButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 50,
-    minWidth: 74,
-    paddingHorizontal: 14,
-  },
-  dockIconText: {
-    color: SitGuruColors.text,
-    fontSize: 13,
-    fontWeight: '900',
+    lineHeight: 14,
   },
 });
+
+function createStyles(theme: ReturnType<typeof useTheme>, isDark: boolean) {
+  const colors = 'colors' in theme ? theme.colors : theme;
+
+  const bg = isDark ? '#06140F' : '#FFF9F2';
+  const shell = isDark ? '#081C14' : '#FFFBF7';
+
+  const roleGroupBackground = isDark ? '#0D241A' : '#FFF7ED';
+  const roleCardBackground = isDark ? '#102C20' : '#FFF9F3';
+
+  const serviceCardBackground = isDark ? '#0B241A' : '#FFFDF8';
+
+  const border = isDark ? '#244A39' : '#E9DDCD';
+  const roleBorder = isDark ? '#315D45' : '#EEE2D2';
+  const serviceBorder = isDark ? '#2C5B42' : '#EFDEC9';
+
+  const title = isDark ? '#FFF4E2' : BrandColors.greenDark;
+  const body = isDark ? '#DED8C9' : '#5F665E';
+  const muted = isDark ? '#AEB9B0' : '#77827A';
+  const accentOutline = isDark ? '#C58A1D' : '#F2822E';
+  const primary = colors.primary ?? BrandColors.green;
+  const textSecondary = colors.textSecondary ?? muted;
+  const heroFadeColor = bg;
+
+  return StyleSheet.create({
+    toggleInactive: {
+      color: textSecondary,
+    },
+    navActive: {
+      color: isDark ? '#58D58A' : primary,
+    },
+    navMuted: {
+      color: textSecondary,
+    },
+
+    phoneShell: {
+      backgroundColor: bg,
+      borderColor: border,
+      borderRadius: 34,
+      borderWidth: 1,
+      maxWidth: 430,
+      minHeight: '100%',
+      overflow: 'hidden',
+      width: '100%',
+    },
+    scrollContent: {
+      paddingBottom: 100,
+      paddingTop: 14,
+    },
+
+    statusBar: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+      paddingHorizontal: 22,
+    },
+    statusTime: {
+      color: title,
+      fontFamily: AppFonts.bold,
+      fontSize: 14,
+    },
+    statusIcons: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 7,
+    },
+    signalBars: {
+      alignItems: 'flex-end',
+      flexDirection: 'row',
+      gap: 2,
+    },
+    signalBar: {
+      backgroundColor: title,
+      borderRadius: 2,
+      width: 3,
+    },
+    wifiText: {
+      color: title,
+      fontFamily: AppFonts.bold,
+      fontSize: 12,
+      lineHeight: 13,
+    },
+    batteryWrap: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 2,
+    },
+    batteryBody: {
+      borderColor: title,
+      borderRadius: 3,
+      borderWidth: 1.2,
+      height: 10,
+      padding: 1,
+      width: 18,
+    },
+    batteryFill: {
+      backgroundColor: title,
+      borderRadius: 2,
+      flex: 1,
+    },
+    batteryCap: {
+      backgroundColor: title,
+      borderRadius: 1,
+      height: 5,
+      width: 2,
+    },
+
+    header: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 24,
+      minHeight: 44,
+      paddingHorizontal: 22,
+    },
+    logoImage: {
+      height: isDark ? 43 : 41,
+      width: isDark ? 154 : 152,
+    },
+
+    modeToggle: {
+      alignItems: 'center',
+      backgroundColor: shell,
+      borderColor: accentOutline,
+      borderRadius: 14,
+      borderWidth: 1.6,
+      flexDirection: 'row',
+      gap: 4,
+      padding: 4,
+    },
+    modeButton: {
+      alignItems: 'center',
+      borderRadius: 11,
+      height: 30,
+      justifyContent: 'center',
+      width: 42,
+    },
+    modeButtonActive: {
+      backgroundColor: isDark ? 'rgba(226, 170, 45, 0.18)' : '#FFF4D8',
+    },
+
+    heroCopy: {
+      paddingHorizontal: isDark ? 28 : 32,
+      zIndex: 10,
+    },
+    heroTitle: {
+      color: title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: isDark ? 32 : 33,
+      letterSpacing: -1.1,
+      lineHeight: isDark ? 37 : 38,
+      marginBottom: 10,
+    },
+    heroSubtitle: {
+      color: body,
+      fontFamily: AppFonts.medium,
+      fontSize: 14,
+      lineHeight: 20,
+      marginBottom: 8,
+    },
+
+    heroScene: {
+      height: isDark ? 334 : 348,
+      marginTop: isDark ? -24 : -34,
+      overflow: 'hidden',
+      position: 'relative',
+      width: '100%',
+    },
+    heroImage: {
+      height: isDark ? 356 : 370,
+      marginTop: isDark ? -18 : -20,
+      width: '100%',
+    },
+
+    heroFadeTopStrong: {
+      backgroundColor: heroFadeColor,
+      height: isDark ? 18 : 20,
+      left: 0,
+      opacity: isDark ? 0.34 : 0.22,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      zIndex: 4,
+    },
+    heroFadeTopMedium: {
+      backgroundColor: heroFadeColor,
+      height: isDark ? 20 : 22,
+      left: 0,
+      opacity: isDark ? 0.18 : 0.12,
+      position: 'absolute',
+      right: 0,
+      top: isDark ? 16 : 18,
+      zIndex: 4,
+    },
+    heroFadeTopSoft: {
+      backgroundColor: heroFadeColor,
+      height: isDark ? 22 : 24,
+      left: 0,
+      opacity: isDark ? 0.08 : 0.06,
+      position: 'absolute',
+      right: 0,
+      top: isDark ? 34 : 38,
+      zIndex: 4,
+    },
+
+    contentShelf: {
+      backgroundColor: bg,
+      marginTop: isDark ? -44 : -48,
+      paddingHorizontal: 14,
+      paddingTop: 12,
+      zIndex: 20,
+    },
+
+    roleGroup: {
+      backgroundColor: roleGroupBackground,
+      borderColor: roleBorder,
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: isDark ? 0.24 : 0.08,
+      shadowRadius: 18,
+    },
+    roleCardRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    roleCard: {
+      alignItems: 'center',
+      backgroundColor: roleCardBackground,
+      borderColor: roleBorder,
+      borderRadius: 20,
+      borderWidth: 1,
+      flex: 1,
+      minHeight: isDark ? 144 : 148,
+      paddingBottom: 12,
+      paddingHorizontal: 10,
+      paddingTop: 14,
+    },
+    roleTitle: {
+      color: title,
+      fontFamily: AppFonts.bold,
+      fontSize: 13,
+      lineHeight: 17,
+      marginBottom: 5,
+      textAlign: 'center',
+    },
+    roleSubtitle: {
+      color: body,
+      fontFamily: AppFonts.medium,
+      fontSize: 11,
+      lineHeight: 15,
+      textAlign: 'center',
+    },
+
+    servicesSection: {
+      backgroundColor: 'transparent',
+      paddingBottom: 0,
+      paddingHorizontal: 8,
+      paddingTop: 16,
+    },
+    sectionHeader: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    sectionTitle: {
+      color: title,
+      fontFamily: AppFonts.bold,
+      fontSize: 16,
+      lineHeight: 20,
+    },
+    viewAll: {
+      color: isDark ? '#39B96D' : BrandColors.greenDark,
+      fontFamily: AppFonts.bold,
+      fontSize: 12,
+    },
+    servicesRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    serviceCard: {
+      alignItems: 'center',
+      backgroundColor: serviceCardBackground,
+      borderColor: serviceBorder,
+      borderRadius: 18,
+      borderWidth: 1,
+      flex: 1,
+      justifyContent: 'center',
+      minHeight: 82,
+      paddingHorizontal: 4,
+      paddingVertical: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 7 },
+      shadowOpacity: isDark ? 0.18 : 0.05,
+      shadowRadius: 13,
+    },
+    serviceIconBubble: {
+      alignItems: 'center',
+      borderRadius: 12,
+      height: 34,
+      justifyContent: 'center',
+      marginBottom: 8,
+      width: 34,
+    },
+    serviceText: {
+      color: title,
+      fontFamily: AppFonts.semiBold,
+      fontSize: 12,
+      lineHeight: 14,
+      textAlign: 'center',
+    },
+
+    bottomSpacer: {
+      backgroundColor: 'transparent',
+      height: 20,
+    },
+
+    bottomNav: {
+      alignItems: 'center',
+      backgroundColor: isDark ? '#071A12' : '#FFFDF8',
+      borderColor: isDark ? '#224D38' : '#EEDFCC',
+      borderRadius: 24,
+      borderWidth: 1,
+      bottom: 8,
+      flexDirection: 'row',
+      height: 76,
+      justifyContent: 'space-around',
+      left: 10,
+      paddingBottom: 8,
+      paddingHorizontal: 8,
+      paddingTop: 8,
+      position: 'absolute',
+      right: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -8 },
+      shadowOpacity: isDark ? 0.28 : 0.08,
+      shadowRadius: 18,
+    },
+    navItem: {
+      alignItems: 'center',
+      flex: 1,
+      gap: 4,
+      justifyContent: 'center',
+    },
+    navLabelActive: {
+      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+    },
+    navLabel: {
+      color: muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 11,
+    },
+  });
+}
