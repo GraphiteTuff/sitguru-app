@@ -59,12 +59,13 @@ export default function SitGuruProfilePhotoFrame({
   fallbackEmoji,
   helperLabel,
 }: SitGuruProfilePhotoFrameProps) {
-  const [failed, setFailed] = useState(false);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const resolvedUrl = useMemo(() => resolveSupabaseStorageUrl(imageUrl), [imageUrl]);
   const initials = useMemo(
     () => initialsFromValue(name) || initialsFromValue(email) || 'SG',
     [email, name],
   );
+
   const dim = dimensions(size, shape);
   const radius =
     shape === 'circle'
@@ -75,7 +76,7 @@ export default function SitGuruProfilePhotoFrame({
           ? 22
           : Math.max(18, dim.width * 0.3);
 
-  const showImage = Boolean(resolvedUrl) && !failed;
+  const showImage = Boolean(resolvedUrl) && failedUrl !== resolvedUrl;
   const imageLabel = name ? `${name} profile photo` : 'SitGuru profile photo';
 
   return (
@@ -86,7 +87,11 @@ export default function SitGuruProfilePhotoFrame({
             accessibilityIgnoresInvertColors
             accessibilityLabel={imageLabel}
             alt={imageLabel}
-            onError={() => setFailed(true)}
+            onError={() => {
+              if (resolvedUrl) {
+                setFailedUrl(resolvedUrl);
+              }
+            }}
             resizeMode="cover"
             source={{ uri: resolvedUrl }}
             style={styles.image}
