@@ -37,8 +37,8 @@ type RoleCard = {
   title: string;
   subtitle: string;
   route: AppRoute;
-  icon: 'findGuru' | 'becomeGuru' | 'ambassador';
-  accent: string;
+  imageLight: ImageSourcePropType;
+  imageDark: ImageSourcePropType;
 };
 
 type ServiceCard = {
@@ -60,6 +60,24 @@ const sitGuruLogoLight =
 const sitGuruLogoDark =
   require('../assets/images/sitguru-logo-dark.png') as ImageSourcePropType;
 
+const roleFindGuruLight =
+  require('../assets/images/role-find-guru-light.png') as ImageSourcePropType;
+
+const roleBecomeGuruLight =
+  require('../assets/images/role-become-guru-light.png') as ImageSourcePropType;
+
+const roleAmbassadorLight =
+  require('../assets/images/role-ambassador-light.png') as ImageSourcePropType;
+
+const roleFindGuruDark =
+  require('../assets/images/role-find-guru-dark.png') as ImageSourcePropType;
+
+const roleBecomeGuruDark =
+  require('../assets/images/role-become-guru-dark.png') as ImageSourcePropType;
+
+const roleAmbassadorDark =
+  require('../assets/images/role-ambassador-dark.png') as ImageSourcePropType;
+
 const themeOptions: ThemeOption[] = [
   { label: 'Light', value: 'light', icon: 'sun' },
   { label: 'Dark', value: 'dark', icon: 'moon' },
@@ -70,22 +88,22 @@ const roleCards: RoleCard[] = [
     title: 'Find a Guru',
     subtitle: 'Book trusted\nlocal care',
     route: '/find-care',
-    icon: 'findGuru',
-    accent: '#EAF2DA',
+    imageLight: roleFindGuruLight,
+    imageDark: roleFindGuruDark,
   },
   {
     title: 'Become a Guru',
     subtitle: 'Earn doing what\nyou love',
     route: '/signup',
-    icon: 'becomeGuru',
-    accent: '#F8D6B9',
+    imageLight: roleBecomeGuruLight,
+    imageDark: roleBecomeGuruDark,
   },
   {
     title: 'Become an Ambassador',
     subtitle: 'Share SitGuru.\nEarn rewards.',
     route: '/signup',
-    icon: 'ambassador',
-    accent: '#F7EFE2',
+    imageLight: roleAmbassadorLight,
+    imageDark: roleAmbassadorDark,
   },
 ];
 
@@ -115,31 +133,6 @@ const services: ServiceCard[] = [
     badgeColorDark: '#29412F',
   },
 ];
-
-function RoleIllustration({
-  icon,
-  accent,
-  isDark,
-}: {
-  icon: RoleCard['icon'];
-  accent: string;
-  isDark: boolean;
-}) {
-  const iconColor = isDark ? '#F7EEDB' : BrandColors.greenDark;
-  const bubbleColor = isDark ? '#173826' : accent;
-
-  return (
-    <View style={[staticStyles.roleArtBubble, { backgroundColor: bubbleColor }]}>
-      <SitGuruIcon name={icon} size={28} color={iconColor} strokeWidth={2.35} />
-
-      {icon === 'ambassador' ? (
-        <View style={staticStyles.roleHeartBadge}>
-          <Text style={staticStyles.roleHeartText}>♥</Text>
-        </View>
-      ) : null}
-    </View>
-  );
-}
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -240,11 +233,13 @@ export default function HomeScreen() {
                     onPress={() => router.push(card.route)}
                     style={styles.roleCard}
                   >
-                    <RoleIllustration
-                      icon={card.icon}
-                      accent={card.accent}
-                      isDark={isDark}
-                    />
+                    <View style={styles.roleImageWrap}>
+                      <Image
+                        source={isDark ? card.imageDark : card.imageLight}
+                        resizeMode="contain"
+                        style={styles.roleImage}
+                      />
+                    </View>
 
                     <Text style={styles.roleTitle}>{card.title}</Text>
                     <Text style={styles.roleSubtitle}>{card.subtitle}</Text>
@@ -372,35 +367,6 @@ export default function HomeScreen() {
     </SitGuruScreen>
   );
 }
-
-const staticStyles = StyleSheet.create({
-  roleArtBubble: {
-    alignItems: 'center',
-    borderRadius: 18,
-    height: 58,
-    justifyContent: 'center',
-    marginBottom: 12,
-    position: 'relative',
-    width: 58,
-  },
-  roleHeartBadge: {
-    alignItems: 'center',
-    backgroundColor: BrandColors.coral,
-    borderRadius: 999,
-    height: 18,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 5,
-    top: 6,
-    width: 18,
-  },
-  roleHeartText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '900',
-    lineHeight: 14,
-  },
-});
 
 function createStyles(theme: ReturnType<typeof useTheme>, isDark: boolean) {
   const colors = 'colors' in theme ? theme.colors : theme;
@@ -637,24 +603,39 @@ function createStyles(theme: ReturnType<typeof useTheme>, isDark: boolean) {
       borderRadius: 20,
       borderWidth: 1,
       flex: 1,
-      minHeight: isDark ? 144 : 148,
-      paddingBottom: 12,
-      paddingHorizontal: 10,
-      paddingTop: 14,
+      minHeight: isDark ? 154 : 158,
+      overflow: 'hidden',
+      paddingBottom: 11,
+      paddingHorizontal: 6,
+      paddingTop: 8,
+    },
+    roleImageWrap: {
+      alignItems: 'center',
+      backgroundColor: 'transparent',
+      height: 74,
+      justifyContent: 'center',
+      marginBottom: 5,
+      overflow: 'visible',
+      width: '100%',
+    },
+    roleImage: {
+      backgroundColor: 'transparent',
+      height: 78,
+      width: '118%',
     },
     roleTitle: {
       color: title,
       fontFamily: AppFonts.bold,
       fontSize: 13,
-      lineHeight: 17,
-      marginBottom: 5,
+      lineHeight: 16,
+      marginBottom: 4,
       textAlign: 'center',
     },
     roleSubtitle: {
       color: body,
       fontFamily: AppFonts.medium,
       fontSize: 11,
-      lineHeight: 15,
+      lineHeight: 14,
       textAlign: 'center',
     },
 
