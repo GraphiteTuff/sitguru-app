@@ -1,61 +1,48 @@
-/**
- * SitGuru color scheme controller for web.
- *
- * Supports:
- * - Light Mode
- * - Dark Mode
- * - System Mode
- *
- * Uses localStorage on web so the homepage theme toggle remembers the user's
- * choice across refreshes. Falls back safely to light mode during static render.
- */
+import { useSyncExternalStore } from 'react';
 
-import { useEffect, useSyncExternalStore } from 'react';
-import { Appearance, ColorSchemeName } from 'react-native';
+export type SitGuruThemePreference =
+  | 'light'
+  | 'dark';
 
-export type SitGuruThemePreference = 'light' | 'dark' | 'system';
+const STORAGE_KEY =
+  'sitguru-theme-preference';
 
-const STORAGE_KEY = 'sitguru-theme-preference';
+const listeners =
+  new Set<() => void>();
 
-let themePreference: SitGuruThemePreference = 'system';
-let systemScheme: ColorSchemeName = Appearance.getColorScheme();
+let systemScheme:
+  SitGuruThemePreference =
+  'light';
 
-const listeners = new Set<() => void>();
+let themePreference:
+  SitGuruThemePreference =
+  'light';
 
-function canUseDOM() {
-  return typeof window !== 'undefined' && typeof document !== 'undefined';
-}
-
-function readStoredPreference(): SitGuruThemePreference {
-  if (!canUseDOM()) return 'system';
-
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-
-  if (stored === 'light' || stored === 'dark' || stored === 'system') {
-    return stored;
+function normalizeStoredPreference(
+  value: string | null,
+): SitGuruThemePreference | null {
+  if (value === 'light') {
+    return 'light';
   }
 
-  return 'system';
+  if (value === 'dark') {
+    return 'dark';
+  }
+
+  return null;
 }
 
-function writeStoredPreference(preference: SitGuruThemePreference) {
-  if (!canUseDOM()) return;
-
-  window.localStorage.setItem(STORAGE_KEY, preference);
+function emitChange() {
+  listeners.forEach(
+    (listener) => {
+      listener();
+    },
+  );
 }
 
-function applyDocumentTheme(scheme: NonNullable<ColorSchemeName>) {
-  if (!canUseDOM()) return;
-
-  document.documentElement.dataset.theme = scheme;
-  document.documentElement.style.colorScheme = scheme;
-}
-
-function emitThemeChange() {
-  listeners.forEach((listener) => listener());
-}
-
-function subscribe(listener: () => void) {
+function subscribe(
+  listener: () => void,
+) {
   listeners.add(listener);
 
   return () => {
@@ -63,82 +50,124 @@ function subscribe(listener: () => void) {
   };
 }
 
-function resolveScheme(): NonNullable<ColorSchemeName> {
-  if (themePreference === 'light') return 'light';
-  if (themePreference === 'dark') return 'dark';
-
-  return systemScheme ?? 'light';
-}
-
-function getSnapshot(): NonNullable<ColorSchemeName> {
-  return resolveScheme();
-}
-
-function hydratePreferenceFromStorage() {
-  themePreference = readStoredPreference();
-  applyDocumentTheme(resolveScheme());
-}
-
-export function getThemePreference() {
+function getSnapshot():
+  SitGuruThemePreference {
   return themePreference;
 }
 
-export function setThemePreference(preference: SitGuruThemePreference) {
-  themePreference = preference;
-  writeStoredPreference(preference);
-  applyDocumentTheme(resolveScheme());
-  emitThemeChange();
+function getServerSnapshot():
+  SitGuruThemePreference {
+  return 'light';
 }
 
-export function toggleThemePreference() {
-  const nextPreference: SitGuruThemePreference =
-    resolveScheme() === 'dark' ? 'light' : 'dark';
+if (
+  typeof window !== 'undefined'
+) {
+  const mediaQuery =
+    window.matchMedia(
+      '(prefers-color-scheme: dark)',
+    );
 
-  setThemePreference(nextPreference);
+  systemScheme =
+    mediaQuery.matches
+      ? 'dark'
+      : 'light';
+
+  let storedPreference:
+    SitGuruThemePreference | null =
+    null;
+
+  try {
+    storedPreference =
+      normalizeStoredPreference(
+        window.localStorage.getItem(
+          STORAGE_KEY,
+        ),
+      );
+  } catch {
+    storedPreference = null;
+  }
+
+  themePreference =
+    storedPreference ??
+    systemScheme;
+
+  const handleSystemThemeChange = (
+    event: MediaQueryListEvent,
+  ) => {
+    systemScheme =
+      event.matches
+        ? 'dark'
+        : 'light';
+
+    let hasStoredPreference =
+      false;
+
+    try {
+      hasStoredPreference =
+        Boolean(
+          normalizeStoredPreference(
+            window.localStorage.getItem(
+              STORAGE_KEY,
+            ),
+          ),
+        );
+    } catch {
+      hasStoredPreference =
+        false;
+    }
+
+    if (!hasStoredPreference) {
+      themePreference =
+        systemScheme;
+
+      emitChange();
+    }
+  };
+
+  mediaQuery.addEventListener(
+    'change',
+    handleSystemThemeChange,
+  );
 }
 
-export function useThemePreference() {
-  useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+export function setThemePreference(
+  nextPreference:
+    SitGuruThemePreference,
+) {
+  themePreference =
+    nextPreference;
 
-  useEffect(() => {
-    hydratePreferenceFromStorage();
-    emitThemeChange();
+  if (
+    typeof window !== 'undefined'
+  ) {
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        nextPreference,
+      );
+    } catch {
+      // Continue with the session-only preference.
+    }
+  }
 
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      systemScheme = colorScheme;
-      applyDocumentTheme(resolveScheme());
-      emitThemeChange();
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
-  return themePreference;
+  emitChange();
 }
 
-export function useColorScheme(): NonNullable<ColorSchemeName> {
-  const scheme = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-
-  useEffect(() => {
-    hydratePreferenceFromStorage();
-    emitThemeChange();
-
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      systemScheme = colorScheme;
-      applyDocumentTheme(resolveScheme());
-      emitThemeChange();
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
-  return scheme ?? 'light';
+export function useThemePreference():
+  SitGuruThemePreference {
+  return useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 }
 
-export function useIsDarkColorScheme() {
-  return useColorScheme() === 'dark';
+export function useColorScheme():
+  SitGuruThemePreference {
+  return useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 }

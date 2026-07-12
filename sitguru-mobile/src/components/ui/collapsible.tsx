@@ -1,65 +1,139 @@
-import { SymbolView } from 'expo-symbols';
-import { PropsWithChildren, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import {
+  ChevronRight,
+} from 'lucide-react-native';
+import {
+  useState,
+  type PropsWithChildren,
+} from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import {
+  ThemedText,
+} from '@/components/themed-text';
+import {
+  ThemedView,
+} from '@/components/themed-view';
+import {
+  Spacing,
+} from '@/constants/theme';
+import {
+  useTheme,
+} from '@/hooks/use-theme';
 
-export function Collapsible({ children, title }: PropsWithChildren & { title: string }) {
-  const [isOpen, setIsOpen] = useState(false);
+export function Collapsible({
+  children,
+  title,
+}: PropsWithChildren<{
+  title: string;
+}>) {
+  const [isOpen, setIsOpen] =
+    useState(false);
+
   const theme = useTheme();
 
   return (
-    <ThemedView>
+    <ThemedView
+      type="backgroundElement"
+      style={styles.container}
+    >
       <Pressable
-        style={({ pressed }) => [styles.heading, pressed && styles.pressedHeading]}
-        onPress={() => setIsOpen((value) => !value)}>
-        <ThemedView type="backgroundElement" style={styles.button}>
-          <SymbolView
-            name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
-            size={14}
-            weight="bold"
-            tintColor={theme.text}
-            style={{ transform: [{ rotate: isOpen ? '-90deg' : '90deg' }] }}
+        accessibilityRole="button"
+        accessibilityState={{
+          expanded: isOpen,
+        }}
+        onPress={() =>
+          setIsOpen(
+            (current) => !current,
+          )
+        }
+        style={({ pressed }) => [
+          styles.heading,
+          pressed &&
+            styles.pressed,
+        ]}
+      >
+        <View
+          style={[
+            styles.chevron,
+            isOpen &&
+              styles.chevronOpen,
+          ]}
+        >
+          <ChevronRight
+            color={
+              theme.colors.text
+            }
+            size={18}
+            strokeWidth={2.4}
           />
-        </ThemedView>
+        </View>
 
-        <ThemedText type="small">{title}</ThemedText>
+        <ThemedText
+          type="defaultSemiBold"
+          style={styles.title}
+        >
+          {title}
+        </ThemedText>
       </Pressable>
-      {isOpen && (
-        <Animated.View entering={FadeIn.duration(200)}>
-          <ThemedView type="backgroundElement" style={styles.content}>
-            {children}
-          </ThemedView>
-        </Animated.View>
-      )}
+
+      {isOpen ? (
+        <ThemedView
+          type="backgroundElement"
+          style={styles.content}
+        >
+          {children}
+        </ThemedView>
+      ) : null}
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    borderRadius: Spacing.three,
+    overflow: 'hidden',
+  },
   heading: {
+    alignItems: 'center',
     flexDirection: 'row',
-    alignItems: 'center',
     gap: Spacing.two,
+    minHeight: 52,
+    paddingHorizontal:
+      Spacing.three,
+    paddingVertical:
+      Spacing.two,
   },
-  pressedHeading: {
-    opacity: 0.7,
+  pressed: {
+    opacity: 0.72,
   },
-  button: {
-    width: Spacing.four,
-    height: Spacing.four,
-    borderRadius: 12,
-    justifyContent: 'center',
+  chevron: {
     alignItems: 'center',
+    justifyContent: 'center',
+    transform: [
+      {
+        rotate: '0deg',
+      },
+    ],
+  },
+  chevronOpen: {
+    transform: [
+      {
+        rotate: '90deg',
+      },
+    ],
+  },
+  title: {
+    flex: 1,
   },
   content: {
-    marginTop: Spacing.three,
-    borderRadius: Spacing.three,
-    marginLeft: Spacing.four,
-    padding: Spacing.four,
+    gap: Spacing.three,
+    paddingBottom:
+      Spacing.four,
+    paddingHorizontal:
+      Spacing.four,
   },
 });

@@ -1,30 +1,68 @@
-/**
- * SitGuru color scheme controller for native.
- *
- * Supports:
- * - Light Mode
- * - Dark Mode
- * - System Mode
- *
- * This gives the homepage toggle a clean way to switch the whole app theme
- * without touching booking, messaging, auth, Supabase, or Stripe logic.
- */
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSyncExternalStore } from 'react';
+import {
+  Appearance,
+  type ColorSchemeName,
+} from 'react-native';
 
-import { useEffect, useSyncExternalStore } from 'react';
-import { Appearance, ColorSchemeName } from 'react-native';
+export type SitGuruThemePreference =
+  | 'light'
+  | 'dark';
 
-export type SitGuruThemePreference = 'light' | 'dark' | 'system';
+const STORAGE_KEY =
+  'sitguru-theme-preference';
 
-let themePreference: SitGuruThemePreference = 'system';
-let systemScheme: ColorSchemeName = Appearance.getColorScheme();
+const listeners =
+  new Set<() => void>();
 
-const listeners = new Set<() => void>();
+let storedPreferenceLoaded = false;
 
-function emitThemeChange() {
-  listeners.forEach((listener) => listener());
+function normalizeAppearance(
+  value:
+    | ColorSchemeName
+    | null
+    | undefined,
+): SitGuruThemePreference {
+  return value === 'dark'
+    ? 'dark'
+    : 'light';
 }
 
-function subscribe(listener: () => void) {
+function normalizeStoredPreference(
+  value: string | null,
+): SitGuruThemePreference | null {
+  if (value === 'light') {
+    return 'light';
+  }
+
+  if (value === 'dark') {
+    return 'dark';
+  }
+
+  return null;
+}
+
+let systemScheme:
+  SitGuruThemePreference =
+  normalizeAppearance(
+    Appearance.getColorScheme(),
+  );
+
+let themePreference:
+  SitGuruThemePreference =
+  systemScheme;
+
+function emitChange() {
+  listeners.forEach(
+    (listener) => {
+      listener();
+    },
+  );
+}
+
+function subscribe(
+  listener: () => void,
+) {
   listeners.add(listener);
 
   return () => {
@@ -32,50 +70,91 @@ function subscribe(listener: () => void) {
   };
 }
 
-function getSnapshot(): ColorSchemeName {
-  if (themePreference === 'light') return 'light';
-  if (themePreference === 'dark') return 'dark';
-
-  return systemScheme ?? 'light';
-}
-
-export function getThemePreference() {
+function getSnapshot():
+  SitGuruThemePreference {
   return themePreference;
 }
 
-export function setThemePreference(preference: SitGuruThemePreference) {
-  themePreference = preference;
-  emitThemeChange();
+void AsyncStorage.getItem(
+  STORAGE_KEY,
+)
+  .then(
+    (
+      storedValue: string | null,
+    ) => {
+      const storedPreference =
+        normalizeStoredPreference(
+          storedValue,
+        );
+
+      if (storedPreference) {
+        themePreference =
+          storedPreference;
+      }
+
+      storedPreferenceLoaded =
+        true;
+
+      emitChange();
+    },
+  )
+  .catch(() => {
+    storedPreferenceLoaded =
+      true;
+  });
+
+Appearance.addChangeListener(
+  ({
+    colorScheme,
+  }: {
+    colorScheme: ColorSchemeName;
+  }) => {
+    systemScheme =
+      normalizeAppearance(
+        colorScheme,
+      );
+
+    if (!storedPreferenceLoaded) {
+      themePreference =
+        systemScheme;
+
+      emitChange();
+    }
+  },
+);
+
+export function setThemePreference(
+  nextPreference:
+    SitGuruThemePreference,
+) {
+  themePreference =
+    nextPreference;
+
+  storedPreferenceLoaded =
+    true;
+
+  emitChange();
+
+  void AsyncStorage.setItem(
+    STORAGE_KEY,
+    nextPreference,
+  );
 }
 
-export function toggleThemePreference() {
-  themePreference = getSnapshot() === 'dark' ? 'light' : 'dark';
-  emitThemeChange();
+export function useThemePreference():
+  SitGuruThemePreference {
+  return useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getSnapshot,
+  );
 }
 
-export function useThemePreference() {
-  useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-
-  return themePreference;
-}
-
-export function useColorScheme(): NonNullable<ColorSchemeName> {
-  const scheme = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-
-  useEffect(() => {
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      systemScheme = colorScheme;
-      emitThemeChange();
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
-  return scheme ?? 'light';
-}
-
-export function useIsDarkColorScheme() {
-  return useColorScheme() === 'dark';
+export function useColorScheme():
+  SitGuruThemePreference {
+  return useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getSnapshot,
+  );
 }
