@@ -39,6 +39,7 @@ import {
 import RoleGate from '@/components/RoleGate';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import {
   setThemePreference,
@@ -210,6 +211,7 @@ export default function PetParentDashboardScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadMessage, setLoadMessage] = useState('');
   const [now, setNow] = useState(Date.now());
+  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
 
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -296,19 +298,34 @@ export default function PetParentDashboardScreen() {
   useEffect(() => {
     if (!user?.id || !isSupabaseConfigured) return;
 
+    let effectActive = true;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const refreshSoon = () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
+      if (!effectActive) return;
+
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+
       refreshTimer = setTimeout(() => {
-        void refreshDashboard(false);
+        if (effectActive) {
+          void refreshDashboard(false);
+        }
       }, 500);
     };
 
-    let channel = supabase.channel(`pet-parent-dashboard-${user.id}`);
+    const channelName = [
+      'pet-parent-dashboard',
+      user.id,
+      Date.now().toString(36),
+      Math.random().toString(36).slice(2, 8),
+    ].join('-');
+
+    const channel = supabase.channel(channelName);
 
     REALTIME_TABLES.forEach((table) => {
-      channel = channel.on(
+      channel.on(
         'postgres_changes',
         {
           event: '*',
@@ -322,7 +339,12 @@ export default function PetParentDashboardScreen() {
     channel.subscribe();
 
     return () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
+      effectActive = false;
+
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+
       void supabase.removeChannel(channel);
     };
   }, [refreshDashboard, user?.id]);
@@ -543,8 +565,8 @@ export default function PetParentDashboardScreen() {
 
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Open profile"
-                  onPress={() => router.push('/account')}
+                  accessibilityLabel="Switch workspace"
+                  onPress={() => setWorkspaceSwitcherOpen(true)}
                   style={styles.profileButton}
                 >
                   <Avatar
@@ -984,10 +1006,16 @@ export default function PetParentDashboardScreen() {
                 />
               }
               label="Profile"
-              onPress={() => router.push('/account')}
+              onPress={() => setWorkspaceSwitcherOpen(true)}
               styles={styles}
             />
                 </View>
+
+                <SitGuruWorkspaceSwitcher
+                  currentRole="pet_parent"
+                  onClose={() => setWorkspaceSwitcherOpen(false)}
+                  visible={workspaceSwitcherOpen}
+                />
               </View>
             </View>
 

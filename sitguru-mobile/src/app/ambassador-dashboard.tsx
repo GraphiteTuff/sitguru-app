@@ -294,22 +294,36 @@ export default function AmbassadorDashboardScreen() {
       return;
     }
 
+    let effectActive = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const refreshSoon = () => {
+      if (!effectActive) {
+        return;
+      }
+
       if (timer) {
         clearTimeout(timer);
       }
 
       timer = setTimeout(() => {
-        void refreshDashboard(false);
+        if (effectActive) {
+          void refreshDashboard(false);
+        }
       }, 450);
     };
 
-    let channel = supabase.channel(`ambassador-dashboard-${user.id}`);
+    const channelName = [
+      'ambassador-dashboard',
+      user.id,
+      Date.now().toString(36),
+      Math.random().toString(36).slice(2, 8),
+    ].join('-');
+
+    const channel = supabase.channel(channelName);
 
     REALTIME_TABLES.forEach((table) => {
-      channel = channel.on(
+      channel.on(
         'postgres_changes',
         {
           event: '*',
@@ -323,6 +337,8 @@ export default function AmbassadorDashboardScreen() {
     channel.subscribe();
 
     return () => {
+      effectActive = false;
+
       if (timer) {
         clearTimeout(timer);
       }

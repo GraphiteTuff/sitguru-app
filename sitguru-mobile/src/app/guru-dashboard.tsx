@@ -36,6 +36,7 @@ import {
 import RoleGate from '@/components/RoleGate';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import {
   setThemePreference,
@@ -300,6 +301,9 @@ export default function GuruDashboardScreen() {
   const [now, setNow] =
     useState(Date.now());
 
+  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] =
+    useState(false);
+
   const profileName =
     firstString(profileRecord, [
       'full_name',
@@ -428,29 +432,41 @@ export default function GuruDashboardScreen() {
       return;
     }
 
+    let effectActive = true;
     let timer:
       | ReturnType<typeof setTimeout>
       | null = null;
 
     const refreshSoon = () => {
+      if (!effectActive) {
+        return;
+      }
+
       if (timer) {
         clearTimeout(timer);
       }
 
-      timer = setTimeout(
-        () =>
-          void refreshDashboard(false),
-        450,
-      );
+      timer = setTimeout(() => {
+        if (effectActive) {
+          void refreshDashboard(false);
+        }
+      }, 450);
     };
 
-    let channel = supabase.channel(
-      `guru-dashboard-${user.id}`,
+    const channelName = [
+      'guru-dashboard',
+      user.id,
+      Date.now().toString(36),
+      Math.random().toString(36).slice(2, 8),
+    ].join('-');
+
+    const channel = supabase.channel(
+      channelName,
     );
 
     REALTIME_TABLES.forEach(
       (table) => {
-        channel = channel.on(
+        channel.on(
           'postgres_changes',
           {
             event: '*',
@@ -465,6 +481,8 @@ export default function GuruDashboardScreen() {
     channel.subscribe();
 
     return () => {
+      effectActive = false;
+
       if (timer) {
         clearTimeout(timer);
       }
@@ -907,11 +925,9 @@ export default function GuruDashboardScreen() {
 
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel="Open Guru profile"
+                        accessibilityLabel="Switch workspace"
                         onPress={() =>
-                          router.push(
-                            '/guru-profile',
-                          )
+                          setWorkspaceSwitcherOpen(true)
                         }
                         style={
                           styles.profileButton
@@ -1740,13 +1756,17 @@ export default function GuruDashboardScreen() {
                     }
                     label="Profile"
                     onPress={() =>
-                      router.push(
-                        '/guru-profile',
-                      )
+                      setWorkspaceSwitcherOpen(true)
                     }
                     styles={styles}
                   />
                 </View>
+
+                <SitGuruWorkspaceSwitcher
+                  currentRole="guru"
+                  onClose={() => setWorkspaceSwitcherOpen(false)}
+                  visible={workspaceSwitcherOpen}
+                />
               </View>
             </View>
 
