@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
+  Activity,
+  AlertTriangle,
   Archive,
   Award,
   BriefcaseBusiness,
@@ -10,6 +12,8 @@ import {
   ChevronRight,
   GraduationCap,
   HandCoins,
+  Link2,
+  MapPin,
   MessageCircle,
   PauseCircle,
   PawPrint,
@@ -18,9 +22,11 @@ import {
   Send,
   ShieldCheck,
   Sparkles,
+  Target,
   Users,
   Wallet,
 } from "lucide-react";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type AmbassadorSummaryRow = {
@@ -62,6 +68,35 @@ type AmbassadorSummaryRow = {
   display_name?: string | null;
   tier?: string | null;
   guru_referral_url?: string | null;
+  workspace_exists?: boolean;
+  signup_intent?: string | null;
+  profile_role?: string | null;
+  account_type?: string | null;
+  assigned_roles?: string[];
+  profile_zip_code?: string | null;
+  service_area?: string | null;
+  email_verified?: boolean | null;
+  phone_verified?: boolean | null;
+  needs_attention?: boolean;
+  attention_items?: string[];
+  auth_created_at?: string | null;
+  profile_updated_at?: string | null;
+  onboarding_step?: number | null;
+  onboarding_percent?: number | null;
+  dashboard_enabled?: boolean | null;
+  login_enabled?: boolean | null;
+  payout_status?: string | null;
+  referral_clicks?: number | null;
+  qualified_referrals?: number | null;
+  community_leads?: number | null;
+  lead_new?: number | null;
+  lead_contacted?: number | null;
+  lead_interested?: number | null;
+  lead_applied?: number | null;
+  lead_active?: number | null;
+  ambassador_points?: number | null;
+  ambassador_rank?: string | null;
+  last_activity_at?: string | null;
 };
 
 type AmbassadorDetailRow = {
@@ -78,6 +113,11 @@ type AmbassadorDetailRow = {
   photo_uploaded_at: string | null;
   archived_at: string | null;
   archived_reason: string | null;
+  onboarding_step?: number | null;
+  onboarding_percent?: number | null;
+  dashboard_enabled?: boolean | null;
+  login_enabled?: boolean | null;
+  payout_status?: string | null;
 };
 
 type AmbassadorRegistryFilters = {
@@ -87,6 +127,42 @@ type AmbassadorRegistryFilters = {
   training: string;
   photo: string;
   rewards: string;
+  attention: string;
+};
+
+type GenericRow = Record<string, unknown>;
+
+type AuthUserSnapshot = {
+  id: string;
+  email?: string | null;
+  phone?: string | null;
+  created_at?: string | null;
+  email_confirmed_at?: string | null;
+  phone_confirmed_at?: string | null;
+  confirmed_at?: string | null;
+  user_metadata?: GenericRow | null;
+  app_metadata?: GenericRow | null;
+};
+
+type OperationalMetrics = {
+  referralClicks: number;
+  qualifiedReferrals: number;
+  petParentSignups: number;
+  guruSignups: number;
+  businessSignups: number;
+  communityLeads: number;
+  completedBookings: number;
+  leadNew: number;
+  leadContacted: number;
+  leadInterested: number;
+  leadApplied: number;
+  leadActive: number;
+  pendingRewards: number;
+  approvedRewards: number;
+  readyRewards: number;
+  paidRewards: number;
+  totalEarned: number;
+  lastActivityAt: string | null;
 };
 
 const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
@@ -128,6 +204,826 @@ function isSuperUserEmail(email?: string | null) {
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function asRecord(value: unknown): GenericRow {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as GenericRow)
+    : {};
+}
+
+function firstString(record: GenericRow | null | undefined, keys: string[]) {
+  if (!record) return "";
+
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
+function firstNumber(record: GenericRow | null | undefined, keys: string[]) {
+  if (!record) return 0;
+
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number.parseFloat(value);
+
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  return 0;
+}
+
+function firstBoolean(
+  record: GenericRow | null | undefined,
+  keys: string[],
+): boolean | null {
+  if (!record) return null;
+
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === "boolean") return value;
+    if (value === 1 || value === "1" || value === "true") return true;
+    if (value === 0 || value === "0" || value === "false") return false;
+  }
+
+  return null;
+}
+
+function uniqueStrings(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(values.map((value) => asString(value)).filter(Boolean)),
+  );
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "Not recorded";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function isWithinDays(value: string | null | undefined, days: number) {
+  if (!value) return false;
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return false;
+
+  const elapsed = Date.now() - date.getTime();
+  return elapsed >= 0 && elapsed <= days * 24 * 60 * 60 * 1000;
+}
+
+function isMissingAmbassadorWorkspace(ambassador: AmbassadorSummaryRow) {
+  return (
+    ambassador.workspace_exists === false ||
+    ambassador.ambassador_id.startsWith("pending:")
+  );
+}
+
+function getAccountLifecycleHref(ambassador: AmbassadorSummaryRow) {
+  const query = ambassador.user_id || ambassador.email || ambassador.ambassador_id;
+  return `/admin/account-lifecycle?query=${encodeURIComponent(query)}`;
+}
+
+function getPrimaryAdminHref(ambassador: AmbassadorSummaryRow) {
+  if (isMissingAmbassadorWorkspace(ambassador)) {
+    return getAccountLifecycleHref(ambassador);
+  }
+
+  return `/admin/ambassadors/${ambassador.ambassador_id}`;
+}
+
+function getPrimaryAdminLabel(ambassador: AmbassadorSummaryRow) {
+  return isMissingAmbassadorWorkspace(ambassador)
+    ? "Review Lifecycle"
+    : "View Dashboard";
+}
+
+function hasNeedsAttention(ambassador: AmbassadorSummaryRow) {
+  return Boolean(
+    ambassador.needs_attention || ambassador.attention_items?.length,
+  );
+}
+
+function getRankFromPoints(points: number) {
+  if (points >= 100) return "City Captain";
+  if (points >= 50) return "Gold";
+  if (points >= 20) return "Silver";
+  return "Bronze";
+}
+
+function normalizeLeadStage(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+  if (["active", "approved", "converted", "complete", "completed"].includes(normalized)) {
+    return "active";
+  }
+
+  if (["applied", "application_submitted", "submitted"].includes(normalized)) {
+    return "applied";
+  }
+
+  if (["interested", "qualified", "warm", "considering"].includes(normalized)) {
+    return "interested";
+  }
+
+  if (["contacted", "follow_up", "followed_up", "replied"].includes(normalized)) {
+    return "contacted";
+  }
+
+  return "new";
+}
+
+function rowMatchesOwner(
+  row: GenericRow,
+  ambassadorId?: string | null,
+  userId?: string | null,
+) {
+  const ownerValues = uniqueStrings([
+    firstString(row, ["ambassador_id"]),
+    firstString(row, ["referrer_id"]),
+    firstString(row, ["user_id"]),
+    firstString(row, ["owner_id"]),
+    firstString(row, ["created_by"]),
+    firstString(row, ["profile_id"]),
+  ]);
+
+  return ownerValues.some(
+    (value) => value === ambassadorId || value === userId,
+  );
+}
+
+function buildOperationalMetrics({
+  ambassadorId,
+  userId,
+  referralRows,
+  leadRows,
+  rewardRows,
+  activityRows,
+}: {
+  ambassadorId?: string | null;
+  userId?: string | null;
+  referralRows: GenericRow[];
+  leadRows: GenericRow[];
+  rewardRows: GenericRow[];
+  activityRows: GenericRow[];
+}): OperationalMetrics {
+  const referrals = referralRows.filter((row) =>
+    rowMatchesOwner(row, ambassadorId, userId),
+  );
+  const leads = leadRows.filter((row) =>
+    rowMatchesOwner(row, ambassadorId, userId),
+  );
+  const rewards = rewardRows.filter((row) =>
+    rowMatchesOwner(row, ambassadorId, userId),
+  );
+  const activities = activityRows.filter((row) =>
+    rowMatchesOwner(row, ambassadorId, userId),
+  );
+
+  const referralClicks = referrals.reduce((sum, row) => {
+    const type = firstString(row, ["event_type", "type", "status"]).toLowerCase();
+    const savedCount = firstNumber(row, ["clicks", "link_clicks", "click_count"]);
+    return sum + Math.max(0, savedCount || (type.includes("click") ? 1 : 0));
+  }, 0);
+
+  const qualifiedReferrals = referrals.reduce((sum, row) => {
+    const status = firstString(row, ["status", "referral_status", "qualification_status"]).toLowerCase();
+    const qualified = firstBoolean(row, ["qualified", "is_qualified", "approved"]);
+    const savedCount = firstNumber(row, ["qualified_count", "approved_count"]);
+
+    if (savedCount > 0) return sum + savedCount;
+    if (qualified === true) return sum + 1;
+    return sum + (["qualified", "approved", "converted"].includes(status) ? 1 : 0);
+  }, 0);
+
+  const referralTypeCount = (terms: string[]) =>
+    referrals.filter((row) => {
+      const type = firstString(row, [
+        "referral_type",
+        "lead_type",
+        "type",
+        "category",
+      ]).toLowerCase();
+      return terms.some((term) => type.includes(term));
+    }).length;
+
+  const petParentSignups = referralTypeCount(["pet_parent", "pet parent", "customer"]);
+  const guruSignups = referralTypeCount(["guru", "sitter", "caregiver"]);
+  const businessSignups = referralTypeCount(["business", "partner"]);
+  const communityLeads = [...referrals, ...leads].filter((row) => {
+    const type = firstString(row, ["lead_type", "referral_type", "type", "category"]).toLowerCase();
+    return type.includes("community") || type.includes("neighborhood") || type.includes("campus");
+  }).length;
+
+  const completedBookings = referrals.filter((row) => {
+    const status = firstString(row, ["booking_status", "status"]).toLowerCase();
+    return ["booking_completed", "completed", "complete"].includes(status) || Boolean(firstString(row, ["completed_booking_at"]));
+  }).length;
+
+  const leadCounts = {
+    new: 0,
+    contacted: 0,
+    interested: 0,
+    applied: 0,
+    active: 0,
+  };
+
+  leads.forEach((row) => {
+    const stage = normalizeLeadStage(
+      firstString(row, ["stage", "status", "lead_status", "pipeline_stage"]),
+    );
+    leadCounts[stage] += 1;
+  });
+
+  const rewardAmountByStatus = (statuses: string[]) =>
+    rewards
+      .filter((row) =>
+        statuses.includes(
+          firstString(row, ["status", "financial_status"]).toLowerCase(),
+        ),
+      )
+      .reduce(
+        (sum, row) =>
+          sum + Math.max(0, firstNumber(row, ["amount", "reward_amount"])),
+        0,
+      );
+
+  const pendingRewards = rewardAmountByStatus(["pending", "pending_review"]);
+  const approvedRewards = rewardAmountByStatus(["approved"]);
+  const readyRewards = rewardAmountByStatus(["ready_for_payout", "queued"]);
+  const paidRewards = rewardAmountByStatus(["paid"]);
+  const totalEarned = rewards.reduce(
+    (sum, row) => sum + Math.max(0, firstNumber(row, ["amount", "reward_amount"])),
+    0,
+  );
+
+  const lastActivityAt = activities
+    .map((row) => firstString(row, ["created_at", "updated_at"]))
+    .filter(Boolean)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
+
+  return {
+    referralClicks,
+    qualifiedReferrals,
+    petParentSignups,
+    guruSignups,
+    businessSignups,
+    communityLeads,
+    completedBookings,
+    leadNew: leadCounts.new,
+    leadContacted: leadCounts.contacted,
+    leadInterested: leadCounts.interested,
+    leadApplied: leadCounts.applied,
+    leadActive: leadCounts.active,
+    pendingRewards,
+    approvedRewards,
+    readyRewards,
+    paidRewards,
+    totalEarned,
+    lastActivityAt,
+  };
+}
+
+function isAmbassadorIntentUser({
+  authUser,
+  profile,
+  roles,
+}: {
+  authUser?: AuthUserSnapshot;
+  profile?: GenericRow;
+  roles: string[];
+}) {
+  const metadata = asRecord(authUser?.user_metadata);
+  const values = [
+    ...roles,
+    firstString(profile, ["role"]),
+    firstString(profile, ["account_type"]),
+    firstString(profile, ["source"]),
+    firstString(metadata, ["role"]),
+    firstString(metadata, ["account_type"]),
+    firstString(metadata, ["signup_role"]),
+    firstString(metadata, ["account_intent"]),
+    firstString(metadata, ["signup_source"]),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return values.includes("ambassador");
+}
+
+function buildAttentionItems({
+  workspaceExists,
+  roles,
+  profileRole,
+  accountType,
+  referralCode,
+  phone,
+  zipCode,
+  city,
+  state,
+  serviceArea,
+  email,
+  emailVerified,
+  status,
+  dashboardEnabled,
+  loginEnabled,
+}: {
+  workspaceExists: boolean;
+  roles: string[];
+  profileRole: string;
+  accountType: string;
+  referralCode: string;
+  phone: string;
+  zipCode: string;
+  city: string;
+  state: string;
+  serviceArea: string;
+  email: string;
+  emailVerified: boolean | null;
+  status: string;
+  dashboardEnabled: boolean | null;
+  loginEnabled: boolean | null;
+}) {
+  const items: string[] = [];
+  const normalizedRoles = roles.map((role) => role.toLowerCase());
+  const normalizedProfileRole = profileRole.toLowerCase();
+  const normalizedAccountType = accountType.toLowerCase();
+
+  if (!workspaceExists) items.push("Ambassador workspace missing");
+  if (!normalizedRoles.includes("ambassador")) items.push("Ambassador role missing");
+  if (
+    normalizedProfileRole &&
+    normalizedProfileRole !== "ambassador" &&
+    normalizedAccountType !== "ambassador" &&
+    normalizedAccountType !== "both"
+  ) {
+    items.push("Profile role mismatch");
+  }
+  if (!referralCode) items.push("Referral code missing");
+  if (!phone) items.push("Phone missing");
+  if (!zipCode && !(city && state)) items.push("ZIP or city/state missing");
+  if (!serviceArea) items.push("Service/community area missing");
+  if (email && emailVerified === false) items.push("Email verification pending");
+  if (status === "active" && dashboardEnabled === false) {
+    items.push("Active Ambassador dashboard disabled");
+  }
+  if (status === "active" && loginEnabled === false) {
+    items.push("Active Ambassador login disabled");
+  }
+
+  return uniqueStrings(items);
+}
+
+async function loadAllAuthUsers(): Promise<AuthUserSnapshot[]> {
+  const users: AuthUserSnapshot[] = [];
+  const perPage = 1000;
+
+  try {
+    for (let page = 1; page <= 10; page += 1) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      });
+
+      if (error) {
+        console.warn("Unable to load auth users for Ambassador Intelligence:", error.message);
+        break;
+      }
+
+      const pageUsers = (data?.users || []) as AuthUserSnapshot[];
+      users.push(...pageUsers);
+
+      if (pageUsers.length < perPage) break;
+    }
+  } catch (error) {
+    console.warn("Unable to load auth users for Ambassador Intelligence:", error);
+  }
+
+  return users;
+}
+
+async function loadOptionalAdminRows(table: string): Promise<GenericRow[]> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from(table)
+      .select("*")
+      .limit(10000);
+
+    if (error) {
+      console.warn(`Unable to load ${table}:`, error.message);
+      return [];
+    }
+
+    return (data || []) as GenericRow[];
+  } catch (error) {
+    console.warn(`Unable to load ${table}:`, error);
+    return [];
+  }
+}
+
+function buildUnifiedAmbassadorRows({
+  summaryRows,
+  detailRows,
+  profileRows,
+  roleRows,
+  authUsers,
+  referralRows,
+  leadRows,
+  rewardRows,
+  activityRows,
+}: {
+  summaryRows: AmbassadorSummaryRow[];
+  detailRows: AmbassadorDetailRow[];
+  profileRows: GenericRow[];
+  roleRows: GenericRow[];
+  authUsers: AuthUserSnapshot[];
+  referralRows: GenericRow[];
+  leadRows: GenericRow[];
+  rewardRows: GenericRow[];
+  activityRows: GenericRow[];
+}) {
+  const detailMap = new Map(detailRows.map((row) => [row.id, row]));
+  const profileByUserId = new Map<string, GenericRow>();
+  const profileByEmail = new Map<string, GenericRow>();
+  const authByUserId = new Map(authUsers.map((user) => [user.id, user]));
+  const authByEmail = new Map(
+    authUsers
+      .filter((user) => user.email)
+      .map((user) => [String(user.email).toLowerCase(), user]),
+  );
+  const rolesByUserId = new Map<string, string[]>();
+
+  profileRows.forEach((profile) => {
+    const userId = firstString(profile, ["id", "user_id"]);
+    const email = firstString(profile, ["email"]).toLowerCase();
+
+    if (userId) profileByUserId.set(userId, profile);
+    if (email) profileByEmail.set(email, profile);
+  });
+
+  roleRows.forEach((roleRow) => {
+    const userId = firstString(roleRow, ["user_id", "profile_id", "id"]);
+    const role = firstString(roleRow, ["role", "role_name"]);
+
+    if (!userId || !role) return;
+
+    rolesByUserId.set(
+      userId,
+      uniqueStrings([...(rolesByUserId.get(userId) || []), role]),
+    );
+  });
+
+  const existingUserIds = new Set(
+    summaryRows.map((row) => row.user_id).filter(Boolean) as string[],
+  );
+  const existingEmails = new Set(
+    summaryRows
+      .map((row) => asString(row.email).toLowerCase())
+      .filter(Boolean),
+  );
+
+  const enrichedRows = summaryRows.map((row) => {
+    const detail = detailMap.get(row.ambassador_id);
+    const userId = row.user_id || "";
+    const email = asString(row.email).toLowerCase();
+    const profile =
+      profileByUserId.get(userId) || profileByEmail.get(email) || undefined;
+    const authUser = authByUserId.get(userId) || authByEmail.get(email);
+    const metadata = asRecord(authUser?.user_metadata);
+    const roles = uniqueStrings([
+      ...(rolesByUserId.get(userId) || []),
+      firstString(profile, ["role"]),
+    ]);
+    const profileRole = firstString(profile, ["role"]);
+    const accountType = firstString(profile, ["account_type"]);
+    const zipCode = firstString(profile, ["zip_code", "service_zip", "service_zip_code"]);
+    const serviceArea = firstString(profile, ["service_area", "community_area"]);
+    const profileCity = firstString(profile, ["city", "service_city"]);
+    const profileState = firstString(profile, ["state", "service_state"]);
+    const referralCode =
+      detail?.referral_code ||
+      row.referral_code ||
+      firstString(profile, ["referral_code", "ambassador_code"]);
+    const emailVerified = authUser
+      ? Boolean(authUser.email_confirmed_at || authUser.confirmed_at)
+      : null;
+    const phoneVerified = authUser
+      ? Boolean(authUser.phone_confirmed_at)
+      : null;
+    const points = Math.max(
+      0,
+      Math.round(
+        firstNumber(profile, [
+          "ambassador_points",
+          "growth_points",
+          "rank_points",
+          "points_balance",
+        ]),
+      ),
+    );
+    const metrics = buildOperationalMetrics({
+      ambassadorId: row.ambassador_id,
+      userId,
+      referralRows,
+      leadRows,
+      rewardRows,
+      activityRows,
+    });
+    const status = detail?.status || row.status || "new";
+    const dashboardEnabled = detail?.dashboard_enabled ?? null;
+    const loginEnabled = detail?.login_enabled ?? null;
+    const attentionItems = buildAttentionItems({
+      workspaceExists: true,
+      roles,
+      profileRole,
+      accountType,
+      referralCode: asString(referralCode),
+      phone: asString(row.phone) || firstString(profile, ["phone"]),
+      zipCode,
+      city: asString(row.city) || profileCity,
+      state: asString(row.state) || profileState,
+      serviceArea,
+      email: asString(row.email) || firstString(profile, ["email"]),
+      emailVerified,
+      status,
+      dashboardEnabled,
+      loginEnabled,
+    });
+
+    return {
+      ...row,
+      display_name: detail?.display_name || row.display_name || null,
+      ambassador_type: detail?.ambassador_type || row.ambassador_type || null,
+      tier: detail?.tier || row.tier || null,
+      status,
+      referral_code: referralCode || null,
+      guru_referral_url: detail?.guru_referral_url || row.guru_referral_url || null,
+      ambassador_photo_url: detail?.ambassador_photo_url || row.ambassador_photo_url || firstString(profile, ["avatar_url", "photo_url", "profile_photo_url"]) || null,
+      ambassador_photo_path: detail?.ambassador_photo_path || row.ambassador_photo_path || null,
+      photo_approved: detail?.photo_approved ?? row.photo_approved ?? false,
+      photo_uploaded_at: detail?.photo_uploaded_at || row.photo_uploaded_at || null,
+      archived_at: detail?.archived_at || row.archived_at || null,
+      archived_reason: detail?.archived_reason || row.archived_reason || null,
+      onboarding_step: detail?.onboarding_step ?? null,
+      onboarding_percent: detail?.onboarding_percent ?? numberValue(row.training_percent),
+      dashboard_enabled: dashboardEnabled,
+      login_enabled: loginEnabled,
+      payout_status: detail?.payout_status || null,
+      workspace_exists: true,
+      signup_intent:
+        firstString(metadata, ["account_intent", "signup_role", "role"]) ||
+        firstString(profile, ["account_type", "role"]) ||
+        "ambassador",
+      profile_role: profileRole || null,
+      account_type: accountType || null,
+      assigned_roles: roles,
+      profile_zip_code: zipCode || null,
+      service_area: serviceArea || null,
+      email_verified: emailVerified,
+      phone_verified: phoneVerified,
+      needs_attention: attentionItems.length > 0,
+      attention_items: attentionItems,
+      auth_created_at: authUser?.created_at || null,
+      profile_updated_at: firstString(profile, ["updated_at"]) || null,
+      referral_clicks: Math.max(numberValue(row.referral_clicks), metrics.referralClicks),
+      qualified_referrals: Math.max(numberValue(row.qualified_referrals), metrics.qualifiedReferrals),
+      community_leads: Math.max(numberValue(row.community_leads), metrics.communityLeads),
+      lead_new: metrics.leadNew,
+      lead_contacted: metrics.leadContacted,
+      lead_interested: metrics.leadInterested,
+      lead_applied: metrics.leadApplied,
+      lead_active: metrics.leadActive,
+      ambassador_points: points,
+      ambassador_rank: getRankFromPoints(points),
+      last_activity_at: metrics.lastActivityAt,
+      pet_parent_signups: Math.max(numberValue(row.pet_parent_signups), metrics.petParentSignups),
+      guru_signups: Math.max(numberValue(row.guru_signups), metrics.guruSignups),
+      business_signups: Math.max(numberValue(row.business_signups), metrics.businessSignups),
+      completed_bookings: Math.max(numberValue(row.completed_bookings), metrics.completedBookings),
+      pending_rewards: Math.max(numberValue(row.pending_rewards), metrics.pendingRewards),
+      approved_rewards: Math.max(numberValue(row.approved_rewards), metrics.approvedRewards),
+      ready_for_payout_rewards: Math.max(numberValue(row.ready_for_payout_rewards), metrics.readyRewards),
+      paid_rewards: Math.max(numberValue(row.paid_rewards), metrics.paidRewards),
+      total_earned: Math.max(numberValue(row.total_earned), metrics.totalEarned),
+      total_paid: Math.max(numberValue(row.total_paid), metrics.paidRewards),
+    } satisfies AmbassadorSummaryRow;
+  });
+
+  const candidateUserIds = new Set<string>();
+
+  authUsers.forEach((authUser) => {
+    const profile = profileByUserId.get(authUser.id);
+    const roles = rolesByUserId.get(authUser.id) || [];
+
+    if (isAmbassadorIntentUser({ authUser, profile, roles })) {
+      candidateUserIds.add(authUser.id);
+    }
+  });
+
+  profileRows.forEach((profile) => {
+    const userId = firstString(profile, ["id", "user_id"]);
+    if (!userId) return;
+
+    const authUser = authByUserId.get(userId);
+    const roles = rolesByUserId.get(userId) || [];
+
+    if (isAmbassadorIntentUser({ authUser, profile, roles })) {
+      candidateUserIds.add(userId);
+    }
+  });
+
+  rolesByUserId.forEach((roles, userId) => {
+    if (roles.some((role) => role.toLowerCase() === "ambassador")) {
+      candidateUserIds.add(userId);
+    }
+  });
+
+  const pendingRows: AmbassadorSummaryRow[] = [];
+
+  candidateUserIds.forEach((userId) => {
+    const authUser = authByUserId.get(userId);
+    const profile = profileByUserId.get(userId);
+    const metadata = asRecord(authUser?.user_metadata);
+    const email = (
+      authUser?.email || firstString(profile, ["email"])
+    )?.toLowerCase() || "";
+
+    if (existingUserIds.has(userId) || (email && existingEmails.has(email))) {
+      return;
+    }
+
+    const roles = uniqueStrings([
+      ...(rolesByUserId.get(userId) || []),
+      firstString(profile, ["role"]),
+    ]);
+    const fullName =
+      firstString(profile, ["full_name", "display_name"]) ||
+      firstString(metadata, ["full_name", "name"]) ||
+      email.split("@")[0] ||
+      "New Ambassador Signup";
+    const phone = authUser?.phone || firstString(profile, ["phone"]);
+    const profileRole = firstString(profile, ["role"]);
+    const accountType = firstString(profile, ["account_type"]);
+    const zipCode = firstString(profile, ["zip_code", "service_zip", "service_zip_code"]);
+    const serviceArea = firstString(profile, ["service_area", "community_area"]);
+    const city = firstString(profile, ["city", "service_city"]);
+    const state = firstString(profile, ["state", "service_state"]);
+    const referralCode = firstString(profile, ["referral_code", "ambassador_code"]);
+    const emailVerified = authUser
+      ? Boolean(authUser.email_confirmed_at || authUser.confirmed_at)
+      : null;
+    const phoneVerified = authUser ? Boolean(authUser.phone_confirmed_at) : null;
+    const points = Math.max(
+      0,
+      Math.round(
+        firstNumber(profile, [
+          "ambassador_points",
+          "growth_points",
+          "rank_points",
+          "points_balance",
+        ]),
+      ),
+    );
+    const metrics = buildOperationalMetrics({
+      userId,
+      referralRows,
+      leadRows,
+      rewardRows,
+      activityRows,
+    });
+    const attentionItems = buildAttentionItems({
+      workspaceExists: false,
+      roles,
+      profileRole,
+      accountType,
+      referralCode,
+      phone: asString(phone),
+      zipCode,
+      city,
+      state,
+      serviceArea,
+      email,
+      emailVerified,
+      status: "signup_incomplete",
+      dashboardEnabled: false,
+      loginEnabled: true,
+    });
+    const createdAt =
+      authUser?.created_at || firstString(profile, ["created_at"]) || null;
+
+    pendingRows.push({
+      ambassador_id: `pending:${userId}`,
+      user_id: userId,
+      full_name: fullName,
+      display_name: firstString(profile, ["display_name"]) || null,
+      email: email || null,
+      phone: asString(phone) || null,
+      program: firstString(metadata, ["program", "ambassador_type"]) || "Ambassador Program",
+      internal_role:
+        firstString(metadata, ["signup_role", "role", "account_intent"]) ||
+        "ambassador",
+      source:
+        firstString(profile, ["source"]) ||
+        firstString(metadata, ["signup_source"]) ||
+        "SitGuru signup",
+      status: "signup_incomplete",
+      referral_code: referralCode || null,
+      referral_link: referralCode
+        ? `https://www.sitguru.com/signup?ref=${encodeURIComponent(referralCode)}`
+        : null,
+      city: city || null,
+      state: state || null,
+      county: firstString(profile, ["county"]) || null,
+      country: firstString(profile, ["country"]) || null,
+      training_status: "not_started",
+      training_percent: 0,
+      created_at: createdAt,
+      pet_parent_signups: metrics.petParentSignups,
+      guru_signups: metrics.guruSignups,
+      business_signups: metrics.businessSignups,
+      completed_bookings: metrics.completedBookings,
+      pending_rewards: metrics.pendingRewards,
+      approved_rewards: metrics.approvedRewards,
+      ready_for_payout_rewards: metrics.readyRewards,
+      paid_rewards: metrics.paidRewards,
+      total_earned: metrics.totalEarned,
+      total_paid: metrics.paidRewards,
+      ambassador_photo_url:
+        firstString(profile, ["avatar_url", "photo_url", "profile_photo_url"]) || null,
+      ambassador_photo_path: null,
+      photo_approved: false,
+      photo_uploaded_at: null,
+      archived_at: null,
+      archived_reason: null,
+      ambassador_type:
+        firstString(metadata, ["ambassador_type", "program"]) || "Ambassador",
+      tier: null,
+      guru_referral_url: null,
+      workspace_exists: false,
+      signup_intent:
+        firstString(metadata, ["account_intent", "signup_role", "role"]) ||
+        "ambassador",
+      profile_role: profileRole || null,
+      account_type: accountType || null,
+      assigned_roles: roles,
+      profile_zip_code: zipCode || null,
+      service_area: serviceArea || null,
+      email_verified: emailVerified,
+      phone_verified: phoneVerified,
+      needs_attention: true,
+      attention_items: attentionItems,
+      auth_created_at: authUser?.created_at || null,
+      profile_updated_at: firstString(profile, ["updated_at"]) || null,
+      onboarding_step: 0,
+      onboarding_percent: 0,
+      dashboard_enabled: false,
+      login_enabled: true,
+      payout_status: "not_ready",
+      referral_clicks: metrics.referralClicks,
+      qualified_referrals: metrics.qualifiedReferrals,
+      community_leads: metrics.communityLeads,
+      lead_new: metrics.leadNew,
+      lead_contacted: metrics.leadContacted,
+      lead_interested: metrics.leadInterested,
+      lead_applied: metrics.leadApplied,
+      lead_active: metrics.leadActive,
+      ambassador_points: points,
+      ambassador_rank: getRankFromPoints(points),
+      last_activity_at: metrics.lastActivityAt,
+    });
+  });
+
+  return [...enrichedRows, ...pendingRows].sort((a, b) => {
+    const aTime = new Date(a.auth_created_at || a.created_at || 0).getTime();
+    const bTime = new Date(b.auth_created_at || b.created_at || 0).getTime();
+    return bTime - aTime;
+  });
 }
 
 function currency(value: number | null | undefined) {
@@ -173,6 +1069,10 @@ function statusClass(status?: string | null) {
 
   if (cleanStatus === "paused") {
     return "bg-amber-100 text-amber-800 ring-amber-200";
+  }
+
+  if (cleanStatus === "signup_incomplete") {
+    return "bg-rose-100 text-rose-800 ring-rose-200";
   }
 
   if (cleanStatus === "archived") {
@@ -226,9 +1126,12 @@ function buildAmbassadorDirectMessageHref(ambassador: AmbassadorSummaryRow) {
     recipientRole: "ambassador",
     recipientName: ambassadorName,
     source: "admin_ambassadors_dashboard",
-    ambassadorId: ambassador.ambassador_id,
     ambassadorName,
   });
+
+  if (!isMissingAmbassadorWorkspace(ambassador)) {
+    params.set("ambassadorId", ambassador.ambassador_id);
+  }
 
   if (ambassador.user_id) {
     params.set("recipientId", ambassador.user_id);
@@ -352,21 +1255,57 @@ function getLocationLabel(ambassador: AmbassadorSummaryRow) {
 
 function buildAdminCards(rows: AmbassadorSummaryRow[]) {
   const activeRows = rows.filter((row) => !isArchivedAmbassador(row));
+  const newSignups = rows.filter((row) =>
+    isWithinDays(row.auth_created_at || row.created_at, 7),
+  );
+  const attentionRows = rows.filter(hasNeedsAttention);
 
   return [
     {
-      label: "Total Ambassadors",
+      label: "Total Ambassador Records",
       value: rows.length.toLocaleString(),
-      subtext: "All active and archived Ambassador records",
+      subtext: "All Ambassador workspaces and signup-intent accounts",
       icon: GraduationCap,
       group: "Pipeline",
     },
     {
       label: "Active Pipeline",
       value: activeRows.length.toLocaleString(),
-      subtext: "Not archived",
+      subtext: "All records not archived",
       icon: Users,
       group: "Pipeline",
+    },
+    {
+      label: "New Signups (7 Days)",
+      value: newSignups.length.toLocaleString(),
+      subtext: "Recent Ambassador account intent or workspace creation",
+      icon: Sparkles,
+      group: "Pipeline",
+    },
+    {
+      label: "Needs Attention",
+      value: attentionRows.length.toLocaleString(),
+      subtext: "Provisioning, role, verification, or required setup issues",
+      icon: AlertTriangle,
+      group: "Pipeline",
+    },
+    {
+      label: "Referral Link Clicks",
+      value: rows
+        .reduce((sum, row) => sum + numberValue(row.referral_clicks), 0)
+        .toLocaleString(),
+      subtext: "Mobile-aligned referral link activity",
+      icon: Link2,
+      group: "Performance",
+    },
+    {
+      label: "Qualified Referrals",
+      value: rows
+        .reduce((sum, row) => sum + numberValue(row.qualified_referrals), 0)
+        .toLocaleString(),
+      subtext: "Approved, qualified, or converted referrals",
+      icon: Target,
+      group: "Performance",
     },
     {
       label: "Pet Parent Signups",
@@ -391,8 +1330,17 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
       value: rows
         .reduce((sum, row) => sum + numberValue(row.business_signups), 0)
         .toLocaleString(),
-      subtext: "Local business/community leads",
+      subtext: "Local business and partner leads",
       icon: BriefcaseBusiness,
+      group: "Performance",
+    },
+    {
+      label: "Community Leads",
+      value: rows
+        .reduce((sum, row) => sum + numberValue(row.community_leads), 0)
+        .toLocaleString(),
+      subtext: "Campus, neighborhood, and community outreach leads",
+      icon: MapPin,
       group: "Performance",
     },
     {
@@ -414,6 +1362,15 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
       group: "Rewards",
     },
     {
+      label: "Approved Rewards",
+      value: currency(
+        rows.reduce((sum, row) => sum + numberValue(row.approved_rewards), 0),
+      ),
+      subtext: "Approved but not yet queued for payout",
+      icon: HandCoins,
+      group: "Rewards",
+    },
+    {
       label: "Ready for Payout",
       value: currency(
         rows.reduce(
@@ -422,6 +1379,15 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
         ),
       ),
       subtext: "Queued for payout processing",
+      icon: Wallet,
+      group: "Rewards",
+    },
+    {
+      label: "Paid Rewards",
+      value: currency(
+        rows.reduce((sum, row) => sum + numberValue(row.paid_rewards), 0),
+      ),
+      subtext: "Rewards already paid",
       icon: Wallet,
       group: "Rewards",
     },
@@ -561,6 +1527,20 @@ function AmbassadorQuickActions({
   ambassador: AmbassadorSummaryRow;
 }) {
   const ambassadorName = getAmbassadorName(ambassador);
+
+  if (isMissingAmbassadorWorkspace(ambassador)) {
+    return (
+      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold leading-5 text-rose-800">
+        Status actions are unavailable until the missing Ambassador workspace is repaired.
+        <Link
+          href={getAccountLifecycleHref(ambassador)}
+          className="mt-2 inline-flex min-h-9 items-center justify-center rounded-xl bg-rose-700 px-3 py-2 text-xs font-black text-white transition hover:bg-rose-800"
+        >
+          Review Account Lifecycle
+        </Link>
+      </div>
+    );
+  }
 
   if (isArchivedAmbassador(ambassador)) {
     return (
@@ -865,6 +1845,7 @@ function buildRegistryFilters(
     training: getSingleSearchParam(searchParams, "training"),
     photo: getSingleSearchParam(searchParams, "photo"),
     rewards: getSingleSearchParam(searchParams, "rewards"),
+    attention: getSingleSearchParam(searchParams, "attention"),
   };
 }
 
@@ -875,7 +1856,8 @@ function hasActiveRegistryFilters(filters: AmbassadorRegistryFilters) {
       filters.type ||
       filters.training ||
       filters.photo ||
-      filters.rewards,
+      filters.rewards ||
+      filters.attention,
   );
 }
 
@@ -924,6 +1906,31 @@ function getRewardsFilterMatch(ambassador: AmbassadorSummaryRow, filter: string)
   return true;
 }
 
+function getAttentionFilterMatch(
+  ambassador: AmbassadorSummaryRow,
+  filter: string,
+) {
+  const issues = ambassador.attention_items || [];
+  const issueText = issues.join(" ").toLowerCase();
+
+  if (!filter) return true;
+  if (filter === "yes") return hasNeedsAttention(ambassador);
+  if (filter === "no") return !hasNeedsAttention(ambassador);
+  if (filter === "workspace") return isMissingAmbassadorWorkspace(ambassador);
+  if (filter === "role") return issueText.includes("role");
+  if (filter === "verification") return issueText.includes("verification");
+  if (filter === "setup") {
+    return (
+      issueText.includes("phone") ||
+      issueText.includes("zip") ||
+      issueText.includes("service/community") ||
+      issueText.includes("referral code")
+    );
+  }
+
+  return true;
+}
+
 function filterAmbassadorsForRegistry(
   ambassadors: AmbassadorSummaryRow[],
   filters: AmbassadorRegistryFilters,
@@ -951,6 +1958,13 @@ function filterAmbassadorsForRegistry(
       typeLabel,
       getSourceLabel(ambassador),
       getAmbassadorCategory(ambassador),
+      ambassador.profile_role,
+      ambassador.account_type,
+      ambassador.profile_zip_code,
+      ambassador.service_area,
+      ambassador.assigned_roles?.join(" "),
+      ambassador.attention_items?.join(" "),
+      ambassador.ambassador_rank,
     ]
       .filter(Boolean)
       .join(" ")
@@ -962,6 +1976,10 @@ function filterAmbassadorsForRegistry(
     const matchesTraining = getTrainingFilterMatch(ambassador, filters.training);
     const matchesPhoto = getPhotoFilterMatch(ambassador, filters.photo);
     const matchesRewards = getRewardsFilterMatch(ambassador, filters.rewards);
+    const matchesAttention = getAttentionFilterMatch(
+      ambassador,
+      filters.attention,
+    );
 
     return (
       matchesQuery &&
@@ -969,7 +1987,8 @@ function filterAmbassadorsForRegistry(
       matchesType &&
       matchesTraining &&
       matchesPhoto &&
-      matchesRewards
+      matchesRewards &&
+      matchesAttention
     );
   });
 }
@@ -1053,6 +2072,186 @@ function AmbassadorGroupSection({
 }
 
 
+function SignupHealthSection({
+  ambassadors,
+}: {
+  ambassadors: AmbassadorSummaryRow[];
+}) {
+  const recentOrAttention = ambassadors
+    .filter(
+      (ambassador) =>
+        hasNeedsAttention(ambassador) ||
+        isWithinDays(ambassador.auth_created_at || ambassador.created_at, 30),
+    )
+    .slice(0, 12);
+
+  const missingWorkspaceCount = ambassadors.filter(
+    isMissingAmbassadorWorkspace,
+  ).length;
+  const roleIssueCount = ambassadors.filter((ambassador) =>
+    (ambassador.attention_items || []).some((item) =>
+      item.toLowerCase().includes("role"),
+    ),
+  ).length;
+  const verificationCount = ambassadors.filter((ambassador) =>
+    (ambassador.attention_items || []).some((item) =>
+      item.toLowerCase().includes("verification"),
+    ),
+  ).length;
+
+  return (
+    <section className="rounded-[2rem] border border-[#dbe8d5] bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-[#2f6f3e]" />
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-[#2f6f3e]">
+              Signup & Workspace Health
+            </p>
+          </div>
+          <h2 className="mt-2 text-2xl font-black text-[#102819]">
+            New Ambassador signups and provisioning status
+          </h2>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+            This section includes fully provisioned Ambassador workspaces and
+            signup-intent accounts that still need role, workspace, referral,
+            verification, or required profile repairs.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 xl:min-w-[430px]">
+          <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3">
+            <p className="text-[10px] font-black uppercase tracking-wide text-rose-700">
+              Missing Workspace
+            </p>
+            <p className="mt-1 text-2xl font-black text-rose-900">
+              {missingWorkspaceCount}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3">
+            <p className="text-[10px] font-black uppercase tracking-wide text-amber-700">
+              Role Issues
+            </p>
+            <p className="mt-1 text-2xl font-black text-amber-900">
+              {roleIssueCount}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3">
+            <p className="text-[10px] font-black uppercase tracking-wide text-blue-700">
+              Verification
+            </p>
+            <p className="mt-1 text-2xl font-black text-blue-900">
+              {verificationCount}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {recentOrAttention.length === 0 ? (
+        <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">
+          No recent Ambassador signup or workspace issues require attention.
+        </div>
+      ) : (
+        <div className="mt-5 grid gap-3 lg:grid-cols-2">
+          {recentOrAttention.map((ambassador) => {
+            const missingWorkspace = isMissingAmbassadorWorkspace(ambassador);
+            const issues = ambassador.attention_items || [];
+
+            return (
+              <article
+                key={`health-${ambassador.ambassador_id}`}
+                className={`rounded-3xl border p-4 ${
+                  hasNeedsAttention(ambassador)
+                    ? "border-rose-100 bg-rose-50/60"
+                    : "border-emerald-100 bg-emerald-50/50"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-base font-black text-[#102819]">
+                      {getAmbassadorName(ambassador)}
+                    </p>
+                    <p className="mt-1 break-words text-xs font-semibold text-slate-600">
+                      {ambassador.email || "No email saved"}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      Signed up: {formatDateTime(
+                        ambassador.auth_created_at || ambassador.created_at,
+                      )}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ${
+                      missingWorkspace
+                        ? "bg-rose-100 text-rose-800 ring-rose-200"
+                        : "bg-emerald-100 text-emerald-800 ring-emerald-200"
+                    }`}
+                  >
+                    {missingWorkspace ? "Workspace Missing" : "Workspace Ready"}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl bg-white p-3 ring-1 ring-black/5">
+                    <p className="font-black uppercase tracking-wide text-slate-500">
+                      Signup Intent
+                    </p>
+                    <p className="mt-1 font-bold text-[#102819]">
+                      {prettyStatus(ambassador.signup_intent)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-white p-3 ring-1 ring-black/5">
+                    <p className="font-black uppercase tracking-wide text-slate-500">
+                      Assigned Roles
+                    </p>
+                    <p className="mt-1 font-bold text-[#102819]">
+                      {ambassador.assigned_roles?.join(", ") || "None saved"}
+                    </p>
+                  </div>
+                </div>
+
+                {issues.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {issues.map((issue) => (
+                      <span
+                        key={issue}
+                        className="rounded-full bg-white px-3 py-1 text-[10px] font-black text-rose-800 ring-1 ring-rose-200"
+                      >
+                        {issue}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs font-bold text-emerald-800">
+                    Required signup workspace records are present.
+                  </p>
+                )}
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <Link
+                    href={getPrimaryAdminHref(ambassador)}
+                    className="inline-flex min-h-10 items-center justify-center rounded-xl bg-[#2f6f3e] px-3 py-2 text-xs font-black text-white transition hover:bg-[#255b33]"
+                  >
+                    {getPrimaryAdminLabel(ambassador)}
+                  </Link>
+                  <Link
+                    href={buildAmbassadorDirectMessageHref(ambassador)}
+                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-[#cfe4c8] bg-white px-3 py-2 text-xs font-black text-[#2f6f3e] transition hover:bg-[#eef7ea]"
+                  >
+                    Message
+                  </Link>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+
 function AmbassadorRegistryTable({
   ambassadors,
   allAmbassadors,
@@ -1070,6 +2269,7 @@ function AmbassadorRegistryTable({
     { value: "interested", label: "Interested" },
     { value: "onboarding_sent", label: "Onboarding Sent" },
     { value: "paused", label: "Paused" },
+    { value: "signup_incomplete", label: "Signup Incomplete" },
     { value: "archived", label: "Archived" },
   ];
   const typeOptions = uniqueSorted(allAmbassadors.map(getAmbassadorTypeLabel));
@@ -1114,7 +2314,7 @@ function AmbassadorRegistryTable({
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <div className="rounded-2xl border border-[#e2ecd9] bg-[#fbfcf9] p-4">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
               Ambassador Records
@@ -1158,13 +2358,29 @@ function AmbassadorRegistryTable({
               )}
             </p>
           </div>
+          <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-rose-700">
+              Needs Attention
+            </p>
+            <p className="mt-1 text-2xl font-black text-rose-900">
+              {allAmbassadors.filter(hasNeedsAttention).length}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">
+              Missing Workspace
+            </p>
+            <p className="mt-1 text-2xl font-black text-amber-900">
+              {allAmbassadors.filter(isMissingAmbassadorWorkspace).length}
+            </p>
+          </div>
         </div>
 
         <form
           action="/admin/ambassadors"
           className="mt-5 rounded-[1.5rem] border border-[#e2ecd9] bg-[#f8fbf6] p-4"
         >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_repeat(5,minmax(0,0.8fr))]">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_repeat(6,minmax(0,0.8fr))]">
             <label className="block">
               <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
                 Search
@@ -1261,6 +2477,25 @@ function AmbassadorRegistryTable({
                 <option value="paid">Paid</option>
               </select>
             </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                Attention
+              </span>
+              <select
+                name="attention"
+                defaultValue={filters.attention}
+                className="min-h-11 w-full rounded-2xl border border-[#dbe8d5] bg-white px-4 py-2 text-sm font-bold text-[#102819] outline-none transition focus:border-[#2f6f3e] focus:ring-4 focus:ring-[#2f6f3e]/10"
+              >
+                <option value="">All Records</option>
+                <option value="yes">Needs Attention</option>
+                <option value="no">No Attention Needed</option>
+                <option value="workspace">Missing Workspace</option>
+                <option value="role">Role Issues</option>
+                <option value="verification">Verification Pending</option>
+                <option value="setup">Required Setup Missing</option>
+              </select>
+            </label>
           </div>
 
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1309,11 +2544,17 @@ function AmbassadorRegistryTable({
               numberValue(ambassador.approved_rewards) +
               numberValue(ambassador.ready_for_payout_rewards) +
               numberValue(ambassador.paid_rewards);
+            const missingWorkspace = isMissingAmbassadorWorkspace(ambassador);
+            const attentionItems = ambassador.attention_items || [];
 
             return (
               <article
                 key={ambassador.ambassador_id}
-                className="rounded-[1.6rem] border border-[#e2ecd9] bg-white p-4 shadow-sm transition hover:border-[#b9d5b7] hover:shadow-md sm:p-5"
+                className={`rounded-[1.6rem] border bg-white p-4 shadow-sm transition hover:shadow-md sm:p-5 ${
+                  hasNeedsAttention(ambassador)
+                    ? "border-rose-200 hover:border-rose-300"
+                    : "border-[#e2ecd9] hover:border-[#b9d5b7]"
+                }`}
               >
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.85fr)] xl:items-start">
                   <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
@@ -1347,10 +2588,10 @@ function AmbassadorRegistryTable({
 
                       <div className="mt-4 grid gap-2 sm:grid-cols-2">
                         <Link
-                          href={`/admin/ambassadors/${ambassador.ambassador_id}`}
+                          href={getPrimaryAdminHref(ambassador)}
                           className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2f6f3e] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#255b33]"
                         >
-                          View Dashboard
+                          {getPrimaryAdminLabel(ambassador)}
                         </Link>
                         <Link
                           href={buildAmbassadorDirectMessageHref(ambassador)}
@@ -1358,6 +2599,14 @@ function AmbassadorRegistryTable({
                         >
                           Message
                         </Link>
+                        {!missingWorkspace ? (
+                          <Link
+                            href={getAccountLifecycleHref(ambassador)}
+                            className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-100 sm:col-span-2"
+                          >
+                            Account Lifecycle Diagnostics
+                          </Link>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -1376,6 +2625,13 @@ function AmbassadorRegistryTable({
                       <p className="mt-1 text-xs font-semibold text-slate-500">
                         {ambassador.program || ambassador.internal_role || "Program not saved"}
                       </p>
+                      <div className="mt-3 space-y-1 border-t border-[#e2ecd9] pt-3 text-[11px] font-bold text-slate-600">
+                        <p>Profile role: {ambassador.profile_role || "Not saved"}</p>
+                        <p>Account type: {ambassador.account_type || "Not saved"}</p>
+                        <p>
+                          Assigned roles: {ambassador.assigned_roles?.join(", ") || "None saved"}
+                        </p>
+                      </div>
                     </div>
 
                     <div className="rounded-2xl border border-[#edf3e8] bg-[#f8fbf6] p-4">
@@ -1385,14 +2641,25 @@ function AmbassadorRegistryTable({
                       <p className="mt-2 break-words rounded-xl bg-[#f0f7ed] px-3 py-2 text-sm font-black text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
                         {ambassador.referral_code || "Not saved"}
                       </p>
-                      <span
-                        className={`mt-3 inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ${photoStatusClass(
-                          hasPhoto,
-                          ambassador.photo_approved,
-                        )}`}
-                      >
-                        {getPhotoStatusLabel(hasPhoto, ambassador.photo_approved)}
-                      </span>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ${photoStatusClass(
+                            hasPhoto,
+                            ambassador.photo_approved,
+                          )}`}
+                        >
+                          {getPhotoStatusLabel(hasPhoto, ambassador.photo_approved)}
+                        </span>
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ${
+                            missingWorkspace
+                              ? "bg-rose-100 text-rose-800 ring-rose-200"
+                              : "bg-emerald-100 text-emerald-800 ring-emerald-200"
+                          }`}
+                        >
+                          {missingWorkspace ? "Workspace Missing" : "Workspace Ready"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -1415,6 +2682,12 @@ function AmbassadorRegistryTable({
                           style={{ width: `${trainingPercent}%` }}
                         />
                       </div>
+                      <div className="mt-3 border-t border-[#e2ecd9] pt-3 text-xs font-bold leading-5 text-slate-600">
+                        <p>Onboarding: {numberValue(ambassador.onboarding_percent)}%</p>
+                        <p>
+                          Rank: {ambassador.ambassador_rank || "Bronze"} ({numberValue(ambassador.ambassador_points)} pts)
+                        </p>
+                      </div>
                     </div>
 
                     <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
@@ -1425,8 +2698,14 @@ function AmbassadorRegistryTable({
                         <p>{numberValue(ambassador.pet_parent_signups)} Pet Parents</p>
                         <p>{numberValue(ambassador.guru_signups)} Gurus</p>
                         <p>{numberValue(ambassador.business_signups)} Businesses</p>
+                        <p>{numberValue(ambassador.community_leads)} Community leads</p>
+                        <p>{numberValue(ambassador.referral_clicks)} Link clicks</p>
+                        <p>{numberValue(ambassador.qualified_referrals)} Qualified</p>
                         <p className="mt-1 font-black text-[#102819]">
-                          {referralTotal} total
+                          {referralTotal} signup records
+                        </p>
+                        <p className="mt-1 text-[11px] font-bold text-slate-500">
+                          Pipeline: {numberValue(ambassador.lead_new)} new · {numberValue(ambassador.lead_contacted)} contacted · {numberValue(ambassador.lead_interested)} interested · {numberValue(ambassador.lead_applied)} applied · {numberValue(ambassador.lead_active)} active
                         </p>
                       </div>
                     </div>
@@ -1446,6 +2725,36 @@ function AmbassadorRegistryTable({
                     </div>
                   </div>
                 </div>
+
+                {hasNeedsAttention(ambassador) ? (
+                  <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-700" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-rose-900">
+                          Admin attention required
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {attentionItems.map((item) => (
+                            <span
+                              key={item}
+                              className="rounded-full bg-white px-3 py-1 text-[10px] font-black text-rose-800 ring-1 ring-rose-200"
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="mt-3 text-xs font-semibold text-rose-800">
+                          Auth created: {formatDateTime(
+                            ambassador.auth_created_at || ambassador.created_at,
+                          )} · Last activity: {formatDateTime(
+                            ambassador.last_activity_at,
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </article>
             );
           })}
@@ -1482,42 +2791,57 @@ export default async function AdminAmbassadorsPage({
 
   const summaryRows = (data || []) as AmbassadorSummaryRow[];
 
+  const [
+    authUsers,
+    profileRows,
+    roleRows,
+    referralRows,
+    leadRows,
+    rewardRows,
+    activityRows,
+  ] = await Promise.all([
+    loadAllAuthUsers(),
+    loadOptionalAdminRows("profiles"),
+    loadOptionalAdminRows("user_roles"),
+    loadOptionalAdminRows("ambassador_referrals"),
+    loadOptionalAdminRows("ambassador_leads"),
+    loadOptionalAdminRows("ambassador_rewards"),
+    loadOptionalAdminRows("ambassador_activity_log"),
+  ]);
+
   let detailRows: AmbassadorDetailRow[] = [];
 
   if (summaryRows.length > 0) {
-    const { data: detailData } = await supabase
-      .from("ambassadors")
-      .select(
-        "id, display_name, ambassador_type, tier, status, referral_code, guru_referral_url, ambassador_photo_url, ambassador_photo_path, photo_approved, photo_uploaded_at, archived_at, archived_reason",
-      )
-      .in(
-        "id",
-        summaryRows.map((row) => row.ambassador_id),
-      );
+    const realAmbassadorIds = summaryRows
+      .map((row) => row.ambassador_id)
+      .filter((id) => id && !id.startsWith("pending:"));
 
-    detailRows = (detailData || []) as AmbassadorDetailRow[];
+    if (realAmbassadorIds.length > 0) {
+      const { data: detailData, error: detailError } = await supabaseAdmin
+        .from("ambassadors")
+        .select(
+          "id, display_name, ambassador_type, tier, status, referral_code, guru_referral_url, ambassador_photo_url, ambassador_photo_path, photo_approved, photo_uploaded_at, archived_at, archived_reason, onboarding_step, onboarding_percent, dashboard_enabled, login_enabled, payout_status",
+        )
+        .in("id", realAmbassadorIds);
+
+      if (detailError) {
+        console.warn("Unable to load Ambassador detail enrichment:", detailError.message);
+      }
+
+      detailRows = (detailData || []) as AmbassadorDetailRow[];
+    }
   }
 
-  const detailMap = new Map(detailRows.map((row) => [row.id, row]));
-
-  const ambassadors = summaryRows.map((row) => {
-    const detail = detailMap.get(row.ambassador_id);
-
-    return {
-      ...row,
-      display_name: detail?.display_name || null,
-      ambassador_type: detail?.ambassador_type || null,
-      tier: detail?.tier || null,
-      status: detail?.status || row.status,
-      referral_code: detail?.referral_code || row.referral_code,
-      guru_referral_url: detail?.guru_referral_url || null,
-      ambassador_photo_url: detail?.ambassador_photo_url || null,
-      ambassador_photo_path: detail?.ambassador_photo_path || null,
-      photo_approved: detail?.photo_approved || false,
-      photo_uploaded_at: detail?.photo_uploaded_at || null,
-      archived_at: detail?.archived_at || null,
-      archived_reason: detail?.archived_reason || null,
-    };
+  const ambassadors = buildUnifiedAmbassadorRows({
+    summaryRows,
+    detailRows,
+    profileRows,
+    roleRows,
+    authUsers,
+    referralRows,
+    leadRows,
+    rewardRows,
+    activityRows,
   });
 
   const registryFilters = buildRegistryFilters(resolvedSearchParams);
@@ -1543,6 +2867,13 @@ export default async function AdminAmbassadorsPage({
   ).length;
   const photoApprovedCount = ambassadors.filter(
     (row) => row.ambassador_photo_url && row.photo_approved,
+  ).length;
+  const newSignupCount = ambassadors.filter((row) =>
+    isWithinDays(row.auth_created_at || row.created_at, 7),
+  ).length;
+  const needsAttentionCount = ambassadors.filter(hasNeedsAttention).length;
+  const missingWorkspaceCount = ambassadors.filter(
+    isMissingAmbassadorWorkspace,
   ).length;
 
   const activeAmbassadors = ambassadors.filter(
@@ -1590,11 +2921,15 @@ export default async function AdminAmbassadorsPage({
               <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
                 View every Ambassador in one clean registry. Track onboarding,
                 training, referral codes, Pet Parent and Guru referrals, rewards,
-                payout readiness, direct messages, and admin dashboard access.
+                payout readiness, direct messages, admin dashboard access,
+                signup provisioning, role health, and mobile-aligned activity.
+                {photoApprovedCount > 0
+                  ? ` ${photoApprovedCount} Ambassador photos are approved.`
+                  : ""}
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:min-w-[420px]">
+            <div className="grid grid-cols-2 gap-3 sm:min-w-[520px] xl:grid-cols-3">
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
                   Active
@@ -1627,6 +2962,25 @@ export default async function AdminAmbassadorsPage({
                   {photoPendingCount}
                 </p>
               </div>
+              <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-violet-700">
+                  New Signups (7d)
+                </p>
+                <p className="mt-1 text-2xl font-extrabold text-violet-900">
+                  {newSignupCount}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-rose-700">
+                  Needs Attention
+                </p>
+                <p className="mt-1 text-2xl font-extrabold text-rose-900">
+                  {needsAttentionCount}
+                </p>
+                <p className="mt-1 text-[10px] font-bold text-rose-700">
+                  {missingWorkspaceCount} missing workspace
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -1651,6 +3005,8 @@ export default async function AdminAmbassadorsPage({
             </pre>
           </section>
         ) : null}
+
+        <SignupHealthSection ambassadors={ambassadors} />
 
         <section className="grid gap-4 xl:grid-cols-3">
           <div className="rounded-[2rem] border border-[#dbe8d5] bg-white p-4 shadow-sm sm:p-5">
