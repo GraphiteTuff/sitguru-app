@@ -95,6 +95,32 @@ type AuthContextValue = {
     error: string | null;
   }>;
 
+  sendLoginCode: (
+    email: string,
+  ) => Promise<{
+    error: string | null;
+  }>;
+
+  verifyLoginCode: (
+    email: string,
+    token: string,
+  ) => Promise<{
+    error: string | null;
+  }>;
+
+  sendSmsLoginCode: (
+    phone: string,
+  ) => Promise<{
+    error: string | null;
+  }>;
+
+  verifySmsLoginCode: (
+    phone: string,
+    token: string,
+  ) => Promise<{
+    error: string | null;
+  }>;
+
   signInWithGoogle:
     () => Promise<SocialAuthResult>;
 
@@ -172,6 +198,45 @@ function friendlyAuthError(
     )
   ) {
     return 'This sign-in option is not enabled yet.';
+  }
+
+  if (
+    normalized.includes(
+      'token has expired',
+    ) ||
+    normalized.includes(
+      'otp expired',
+    ) ||
+    normalized.includes(
+      'expired otp',
+    )
+  ) {
+    return 'That six-digit code has expired. Request a new code and try again.';
+  }
+
+  if (
+    normalized.includes(
+      'invalid token',
+    ) ||
+    normalized.includes(
+      'invalid otp',
+    ) ||
+    normalized.includes(
+      'token is invalid',
+    )
+  ) {
+    return 'That six-digit code is not valid. Check the newest email or text message and try again.';
+  }
+
+  if (
+    normalized.includes(
+      'signups not allowed',
+    ) ||
+    normalized.includes(
+      'user not found',
+    )
+  ) {
+    return 'No existing SitGuru account could use that login code. Check the email address or phone number, or create an account.';
   }
 
   if (
@@ -1383,6 +1448,293 @@ export function AuthProvider({
       [],
     );
 
+  const sendLoginCode =
+    useCallback(
+      async (email: string) => {
+        if (
+          !isSupabaseConfigured
+        ) {
+          const message =
+            'Supabase is not configured yet.';
+
+          setAuthError(message);
+
+          return {
+            error: message,
+          };
+        }
+
+        setLoading(true);
+        setAuthError(null);
+
+        try {
+          const { error } =
+            await supabase.auth
+              .signInWithOtp({
+                email:
+                  email
+                    .trim()
+                    .toLowerCase(),
+                options: {
+                  shouldCreateUser:
+                    false,
+                },
+              });
+
+          if (error) {
+            throw error;
+          }
+
+          setAuthError(null);
+          setLoading(false);
+
+          return {
+            error: null,
+          };
+        } catch (error) {
+          const message =
+            friendlyAuthError(
+              error instanceof Error
+                ? error.message
+                : undefined,
+            );
+
+          setAuthError(message);
+          setLoading(false);
+
+          return {
+            error: message,
+          };
+        }
+      },
+      [],
+    );
+
+  const verifyLoginCode =
+    useCallback(
+      async (
+        email: string,
+        token: string,
+      ) => {
+        if (
+          !isSupabaseConfigured
+        ) {
+          const message =
+            'Supabase is not configured yet.';
+
+          setAuthError(message);
+
+          return {
+            error: message,
+          };
+        }
+
+        setLoading(true);
+        setAuthError(null);
+
+        try {
+          const {
+            data,
+            error,
+          } =
+            await supabase.auth
+              .verifyOtp({
+                email:
+                  email
+                    .trim()
+                    .toLowerCase(),
+                token:
+                  token.trim(),
+                type: 'email',
+              });
+
+          if (error) {
+            throw error;
+          }
+
+          if (
+            !data.session?.user
+          ) {
+            throw new Error(
+              'SitGuru did not receive a completed email-code session.',
+            );
+          }
+
+          setSession(
+            data.session,
+          );
+
+          await loadProfileAndRoles(
+            data.session.user,
+          );
+
+          setAuthError(null);
+          setLoading(false);
+
+          return {
+            error: null,
+          };
+        } catch (error) {
+          const message =
+            friendlyAuthError(
+              error instanceof Error
+                ? error.message
+                : undefined,
+            );
+
+          setAuthError(message);
+          setLoading(false);
+
+          return {
+            error: message,
+          };
+        }
+      },
+      [loadProfileAndRoles],
+    );
+
+
+  const sendSmsLoginCode =
+    useCallback(
+      async (phone: string) => {
+        if (
+          !isSupabaseConfigured
+        ) {
+          const message =
+            'Supabase is not configured yet.';
+
+          setAuthError(message);
+
+          return {
+            error: message,
+          };
+        }
+
+        setLoading(true);
+        setAuthError(null);
+
+        try {
+          const { error } =
+            await supabase.auth
+              .signInWithOtp({
+                phone:
+                  phone.trim(),
+                options: {
+                  shouldCreateUser:
+                    false,
+                },
+              });
+
+          if (error) {
+            throw error;
+          }
+
+          setAuthError(null);
+          setLoading(false);
+
+          return {
+            error: null,
+          };
+        } catch (error) {
+          const message =
+            friendlyAuthError(
+              error instanceof Error
+                ? error.message
+                : undefined,
+            );
+
+          setAuthError(message);
+          setLoading(false);
+
+          return {
+            error: message,
+          };
+        }
+      },
+      [],
+    );
+
+  const verifySmsLoginCode =
+    useCallback(
+      async (
+        phone: string,
+        token: string,
+      ) => {
+        if (
+          !isSupabaseConfigured
+        ) {
+          const message =
+            'Supabase is not configured yet.';
+
+          setAuthError(message);
+
+          return {
+            error: message,
+          };
+        }
+
+        setLoading(true);
+        setAuthError(null);
+
+        try {
+          const {
+            data,
+            error,
+          } =
+            await supabase.auth
+              .verifyOtp({
+                phone:
+                  phone.trim(),
+                token:
+                  token.trim(),
+                type: 'sms',
+              });
+
+          if (error) {
+            throw error;
+          }
+
+          if (
+            !data.session?.user
+          ) {
+            throw new Error(
+              'SitGuru did not receive a completed text-code session.',
+            );
+          }
+
+          setSession(
+            data.session,
+          );
+
+          await loadProfileAndRoles(
+            data.session.user,
+          );
+
+          setAuthError(null);
+          setLoading(false);
+
+          return {
+            error: null,
+          };
+        } catch (error) {
+          const message =
+            friendlyAuthError(
+              error instanceof Error
+                ? error.message
+                : undefined,
+            );
+
+          setAuthError(message);
+          setLoading(false);
+
+          return {
+            error: message,
+          };
+        }
+      },
+      [loadProfileAndRoles],
+    );
+
   const signUp =
     useCallback(
       async (
@@ -1557,6 +1909,10 @@ export function AuthProvider({
         profileLoading,
         profileError,
         signIn,
+        sendLoginCode,
+        verifyLoginCode,
+        sendSmsLoginCode,
+        verifySmsLoginCode,
         signInWithGoogle,
         signInWithApple,
         completeOAuthCallback,
@@ -1579,8 +1935,12 @@ export function AuthProvider({
         roles,
         session,
         signIn,
+        sendLoginCode,
+        sendSmsLoginCode,
         signInWithApple,
         signInWithGoogle,
+        verifyLoginCode,
+        verifySmsLoginCode,
         signOut,
         signUp,
         socialLoading,

@@ -1,28 +1,53 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
 import {
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  CircleDollarSign,
+  PawPrint,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react-native';
+import { useEffect, useMemo, useState } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
+import {
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 
-import SitGuruLogo from '@/components/SitGuruLogo';
+import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
-import { SitGuruColors } from '@/constants/colors';
+import { AppFonts } from '@/constants/fonts';
+import {
+  setThemePreference,
+  type SitGuruThemePreference,
+  useThemePreference,
+} from '@/hooks/use-color-scheme';
+import { useThemeMode } from '@/hooks/use-theme';
+import { useAuth } from '@/hooks/useAuth';
+import { resolveSupabaseStorageUrl } from '@/lib/storage';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 type BookingStep = 1 | 2 | 3 | 4 | 5 | 6;
 type CareMode = 'single' | 'overnight' | 'multi-day';
 type DateStatus = 'available' | 'limited' | 'busy';
 
+type RecordRow = Record<string, unknown>;
+
 type PetOption = {
   id: string;
   name: string;
-  type: 'Dog' | 'Cat' | 'Other';
+  type: string;
   emoji: string;
   description: string;
+  photoUrl: string | null;
 };
 
 type ServiceOption = {
@@ -94,13 +119,14 @@ const bookingSteps: {
   },
 ];
 
-const pets: PetOption[] = [
+const FALLBACK_PETS: PetOption[] = [
   {
     id: 'scout',
     name: 'Scout',
     type: 'Dog',
     emoji: '🐶',
     description: 'Friendly dog • 30-minute walk',
+    photoUrl: null,
   },
   {
     id: 'luna',
@@ -108,6 +134,7 @@ const pets: PetOption[] = [
     type: 'Cat',
     emoji: '🐱',
     description: 'Indoor cat • Feeding and litter notes',
+    photoUrl: null,
   },
   {
     id: 'add-pet',
@@ -115,8 +142,12 @@ const pets: PetOption[] = [
     type: 'Other',
     emoji: '+',
     description: 'Create or update a Pet Passport',
+    photoUrl: null,
   },
 ];
+
+const PET_TABLES = ['pets', 'pet_profiles', 'pet_passports'];
+const PET_OWNER_FIELDS = ['owner_id', 'pet_parent_id', 'user_id', 'created_by'];
 
 const services: ServiceOption[] = [
   {
@@ -192,6 +223,98 @@ const pawReportOptions = [
   'Care notes',
   'Visit timing',
 ];
+
+async function loadPetOptions(userId: string): Promise<PetOption[]> {
+  for (const table of PET_TABLES) {
+    for (const ownerField of PET_OWNER_FIELDS) {
+      const result = await supabase
+        .from(table)
+        .select('*')
+        .eq(ownerField, userId)
+        .limit(30);
+
+      if (!result.error && result.data?.length) {
+        return (result.data as RecordRow[])
+          .map(mapPetOption)
+          .filter((pet): pet is PetOption => Boolean(pet));
+      }
+    }
+  }
+
+  return [];
+}
+
+function mapPetOption(row: RecordRow, index: number): PetOption | null {
+  const name = firstString(row, ['name', 'pet_name', 'animal_name']);
+  if (!name) return null;
+
+  const species = firstString(row, ['species', 'animal_type', 'pet_type']);
+  const breed = firstString(row, ['breed', 'breed_name']);
+  const age = firstString(row, ['age_label', 'age']) || getPetAgeLabel(row);
+  const type = species || 'Other';
+
+  return {
+    id: firstString(row, ['id', 'pet_id']) || `pet-${index}`,
+    name,
+    type,
+    emoji: getPetEmoji(type),
+    description:
+      [breed, species, age].filter(Boolean).join(' • ') ||
+      'Pet Passport ready for care',
+    photoUrl: resolveSupabaseStorageUrl(
+      firstString(row, [
+        'photo_url',
+        'image_url',
+        'avatar_url',
+        'pet_photo_url',
+      ]),
+    ),
+  };
+}
+
+function getPetAgeLabel(row: RecordRow) {
+  const years = firstNumber(row, ['age_years', 'years_old']);
+  if (years !== null) {
+    const rounded = Math.max(0, Math.round(years));
+    return `${rounded} ${rounded === 1 ? 'year' : 'years'} old`;
+  }
+
+  return '';
+}
+
+function getPetEmoji(type: string) {
+  const normalized = type.toLowerCase();
+  if (normalized.includes('cat')) return '🐱';
+  if (normalized.includes('dog')) return '🐶';
+  return '🐾';
+}
+
+function firstString(record: RecordRow, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
+function firstNumber(record: RecordRow, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Number.parseFloat(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+function initials(name: string) {
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'PP';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
 
 function currency(value: number) {
   return `$${Math.max(0, Math.round(value)).toLocaleString('en-US')}`;
@@ -433,20 +556,43 @@ function getEstimate({
   };
 }
 
+const THEME_OPTIONS: Array<{
+  label: string;
+  value: SitGuruThemePreference;
+  icon: 'sun' | 'moon';
+}> = [
+  { label: 'Light', value: 'light', icon: 'sun' },
+  { label: 'Dark', value: 'dark', icon: 'moon' },
+];
+
 export default function RequestBookingScreen() {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 760;
+  const { user, profile } = useAuth();
+  const isWebPreview = Platform.OS === 'web';
+  const themeMode = useThemeMode();
+  const themePreference = useThemePreference();
+  const isDark = themeMode === 'dark';
+  const palette = getPalette(isDark);
+  const styles = createStyles(isDark);
 
   const [currentStep, setCurrentStep] = useState<BookingStep>(1);
   const [displayMonth, setDisplayMonth] = useState(monthStart(new Date()));
-  const calendarDays = useMemo(() => buildCalendarMonth(displayMonth), [displayMonth]);
-  const calendarWeeks = useMemo(() => buildCalendarWeeks(calendarDays), [calendarDays]);
+  const calendarDays = useMemo(
+    () => buildCalendarMonth(displayMonth),
+    [displayMonth],
+  );
+  const calendarWeeks = useMemo(
+    () => buildCalendarWeeks(calendarDays),
+    [calendarDays],
+  );
 
   const firstAvailable =
-    calendarDays.find((day) => sameMonth(day.date, displayMonth) && day.status !== 'busy') ||
-    calendarDays[0];
+    calendarDays.find(
+      (day) => sameMonth(day.date, displayMonth) && day.status !== 'busy',
+    ) || calendarDays[0];
 
+  const [petOptions, setPetOptions] = useState<PetOption[]>(FALLBACK_PETS);
   const [selectedPetId, setSelectedPetId] = useState('scout');
+  const [petLoadMessage, setPetLoadMessage] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState('dog-walking');
   const [startDateId, setStartDateId] = useState(firstAvailable.id);
   const [endDateId, setEndDateId] = useState('');
@@ -462,7 +608,73 @@ export default function RequestBookingScreen() {
   ]);
   const [notice, setNotice] = useState('');
 
-  const selectedPet = pets.find((pet) => pet.id === selectedPetId) || pets[0];
+  const profileRecord = (profile ?? {}) as RecordRow;
+  const userMetadata = (user?.user_metadata ?? {}) as RecordRow;
+  const petParentName =
+    firstString(profileRecord, ['full_name', 'display_name']) ||
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
+    firstString(userMetadata, ['full_name', 'name']) ||
+    user?.email?.split('@')[0] ||
+    'Pet Parent';
+  const petParentAvatarUrl = resolveSupabaseStorageUrl(
+    firstString(profileRecord, [
+      'avatar_url',
+      'photo_url',
+      'profile_photo_url',
+      'profile_image_url',
+    ]) || firstString(userMetadata, ['avatar_url', 'picture']),
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPets() {
+      if (!user?.id || !isSupabaseConfigured) {
+        return;
+      }
+
+      try {
+        const loadedPets = await loadPetOptions(user.id);
+
+        if (!active || loadedPets.length === 0) {
+          return;
+        }
+
+        const addPetOption = FALLBACK_PETS.find((pet) => pet.id === 'add-pet');
+        const nextOptions = addPetOption
+          ? [...loadedPets, addPetOption]
+          : loadedPets;
+
+        setPetOptions(nextOptions);
+        setPetLoadMessage('');
+        setSelectedPetId((currentId) => {
+          if (loadedPets.some((pet) => pet.id === currentId)) {
+            return currentId;
+          }
+
+          return (
+            loadedPets.find((pet) => pet.name.toLowerCase() === 'scout')?.id ??
+            loadedPets[0].id
+          );
+        });
+      } catch {
+        if (active) {
+          setPetLoadMessage(
+            'Pet Passport photos could not be refreshed. Showing the saved preview instead.',
+          );
+        }
+      }
+    }
+
+    void loadPets();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  const selectedPet =
+    petOptions.find((pet) => pet.id === selectedPetId) || petOptions[0];
   const selectedService =
     services.find((service) => service.id === selectedServiceId) || services[0];
   const activeStep =
@@ -490,7 +702,9 @@ export default function RequestBookingScreen() {
           ? 'day'
           : 'days';
   const timeOptions =
-    selectedService.mode === 'single' ? singleTimeOptions : overnightTimeOptions;
+    selectedService.mode === 'single'
+      ? singleTimeOptions
+      : overnightTimeOptions;
 
   function goBack() {
     setNotice('');
@@ -512,7 +726,7 @@ export default function RequestBookingScreen() {
     }
 
     setNotice(
-      'Request prepared. Next step: Booking Details. The Guru reviews availability and final price before payment.',
+      'Your request is ready to review in Booking Details. No payment has been charged and no booking is confirmed until a Guru accepts.',
     );
   }
 
@@ -566,7 +780,9 @@ export default function RequestBookingScreen() {
 
   function togglePawReport(item: string) {
     if (pawReportItems.includes(item)) {
-      setPawReportItems(pawReportItems.filter((currentItem) => currentItem !== item));
+      setPawReportItems(
+        pawReportItems.filter((currentItem) => currentItem !== item),
+      );
       return;
     }
 
@@ -581,20 +797,34 @@ export default function RequestBookingScreen() {
             <Text style={styles.estimateEyebrow}>Estimated total</Text>
             <Text style={styles.estimateTotal}>{currency(estimate.total)}</Text>
           </View>
-          <Text style={styles.estimateBadge}>Final after Guru accepts</Text>
+
+          <View style={styles.estimateBadge}>
+            <CircleDollarSign
+              color={palette.primary}
+              size={14}
+              strokeWidth={2.3}
+            />
+            <Text style={styles.estimateBadgeText}>Estimate only</Text>
+          </View>
         </View>
 
         <View style={styles.estimateRows}>
           <PriceRow
             label={`${selectedService.title} rate`}
             value={`${currency(estimate.adjustedRate)} / ${selectedService.rateUnit}`}
+            styles={styles}
           />
-          <PriceRow label="Duration" value={`${estimate.units} ${unitLabel}`} />
+          <PriceRow
+            label="Duration"
+            value={`${estimate.units} ${unitLabel}`}
+            styles={styles}
+          />
 
           {estimate.additionalPetTotal > 0 ? (
             <PriceRow
               label="Additional pet fee"
               value={currency(estimate.additionalPetTotal)}
+              styles={styles}
             />
           ) : null}
 
@@ -602,6 +832,7 @@ export default function RequestBookingScreen() {
             <SavingsRow
               label="Multi-pet savings"
               value={`-${currency(estimate.multiPetSavings)}`}
+              styles={styles}
             />
           ) : null}
 
@@ -609,6 +840,7 @@ export default function RequestBookingScreen() {
             <SavingsRow
               label="Long-stay savings"
               value={`-${currency(estimate.longStaySavings)}`}
+              styles={styles}
             />
           ) : null}
 
@@ -616,6 +848,7 @@ export default function RequestBookingScreen() {
             <SavingsRow
               label="PawPerks credit"
               value={`-${currency(estimate.pawPerksCredit)}`}
+              styles={styles}
             />
           ) : null}
 
@@ -623,12 +856,14 @@ export default function RequestBookingScreen() {
             <SavingsRow
               label="Referral credit"
               value={`-${currency(estimate.referralCredit)}`}
+              styles={styles}
             />
           ) : null}
         </View>
 
         <Text style={styles.estimateNote}>
-          Payment happens after Guru accepts. This estimate is not a charge. The Guru confirms availability and final pricing before payment. Manage payment later from Payments & Payouts.
+          No charge is made now. The Guru confirms availability and final
+          pricing before payment.
         </Text>
       </View>
     );
@@ -639,7 +874,7 @@ export default function RequestBookingScreen() {
       return (
         <View style={styles.stepBody}>
           <View style={styles.petList}>
-            {pets.map((pet) => {
+            {petOptions.map((pet) => {
               const selected = selectedPetId === pet.id;
 
               return (
@@ -647,66 +882,119 @@ export default function RequestBookingScreen() {
                   key={pet.id}
                   accessibilityRole="button"
                   onPress={() => choosePet(pet.id)}
-                  style={[styles.petCard, selected && styles.petCardActive]}
+                  style={({ pressed }) => [
+                    styles.petCard,
+                    selected && styles.petCardActive,
+                    pressed && styles.pressed,
+                  ]}
                 >
-                  <View style={styles.petAvatar}>
-                    <Text style={styles.petAvatarText}>{pet.emoji}</Text>
-                  </View>
+                  <AvatarImage
+                    fallback={pet.emoji}
+                    imageUrl={pet.photoUrl}
+                    palette={palette}
+                    size={50}
+                    style={styles.petAvatar}
+                  />
+
                   <View style={styles.petCopy}>
                     <Text style={styles.petName}>{pet.name}</Text>
-                    <Text style={styles.petDescription}>{pet.description}</Text>
+                    <Text style={styles.petDescription} numberOfLines={2}>
+                      {pet.description}
+                    </Text>
                   </View>
-                  <Text style={styles.petStatus}>{selected ? 'Selected' : 'Choose'}</Text>
+
+                  <View
+                    style={[
+                      styles.choiceIndicator,
+                      selected && styles.choiceIndicatorActive,
+                    ]}
+                  >
+                    {selected ? (
+                      <Text style={styles.choiceIndicatorText}>✓</Text>
+                    ) : (
+                      <ChevronRight
+                        color={palette.muted}
+                        size={16}
+                        strokeWidth={2.4}
+                      />
+                    )}
+                  </View>
                 </Pressable>
               );
             })}
           </View>
 
-          <View style={styles.counterCard}>
-            <Text style={styles.smallSectionTitle}>Additional pets</Text>
-            <View style={styles.counterRow}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setAdditionalPets(Math.max(0, additionalPets - 1))}
-                style={styles.counterButton}
-              >
-                <Text style={styles.counterButtonText}>-</Text>
-              </Pressable>
-              <View style={styles.counterValue}>
-                <Text style={styles.counterNumber}>{additionalPets}</Text>
-                <Text style={styles.counterLabel}>extra pets</Text>
+          <View style={styles.compactCard}>
+            <View style={styles.compactCardHeader}>
+              <View>
+                <Text style={styles.smallSectionTitle}>Additional pets</Text>
+                <Text style={styles.helperText}>
+                  Add pets included in this request.
+                </Text>
               </View>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setAdditionalPets(additionalPets + 1)}
-                style={styles.counterButton}
-              >
-                <Text style={styles.counterButtonText}>+</Text>
-              </Pressable>
+
+              <View style={styles.counterRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    setAdditionalPets(Math.max(0, additionalPets - 1))
+                  }
+                  style={styles.counterButton}
+                >
+                  <Text style={styles.counterButtonText}>−</Text>
+                </Pressable>
+
+                <Text style={styles.counterNumber}>{additionalPets}</Text>
+
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setAdditionalPets(additionalPets + 1)}
+                  style={styles.counterButton}
+                >
+                  <Text style={styles.counterButtonText}>+</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
 
-          <View style={styles.savingsCard}>
-            <Text style={styles.smallSectionTitle}>Pet Parent savings</Text>
-            <TogglePill
-              active={applyPawPerks}
-              label="Apply PawPerks credit"
-              onPress={() => setApplyPawPerks(!applyPawPerks)}
-            />
-            <TogglePill
-              active={applyReferralCredit}
-              label="Apply referral credit"
-              onPress={() => setApplyReferralCredit(!applyReferralCredit)}
-            />
+          <View style={styles.compactCard}>
+            <Text style={styles.smallSectionTitle}>Apply savings</Text>
+            <View style={styles.choiceGrid}>
+              <TogglePill
+                active={applyPawPerks}
+                label="PawPerks"
+                onPress={() => setApplyPawPerks(!applyPawPerks)}
+                styles={styles}
+              />
+              <TogglePill
+                active={applyReferralCredit}
+                label="Referral credit"
+                onPress={() => setApplyReferralCredit(!applyReferralCredit)}
+                styles={styles}
+              />
+            </View>
           </View>
 
-          <View style={styles.savingsCard}>
-            <Text style={styles.smallSectionTitle}>Pet Passport helper</Text>
-            <Text style={styles.helperText}>Need to add a pet or update Scout and Luna before requesting care?</Text>
-            <Pressable accessibilityRole="button" onPress={() => router.push('/pet-passports')} style={styles.helperButton}>
-              <Text style={styles.helperButtonText}>Manage Pet Passports</Text>
-            </Pressable>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/pet-passports')}
+            style={styles.passportCard}
+          >
+            <View style={styles.passportIcon}>
+              <PawPrint color={palette.primary} size={20} strokeWidth={2.3} />
+            </View>
+            <View style={styles.passportCopy}>
+              <Text style={styles.passportTitle}>Manage Pet Passports</Text>
+              <Text style={styles.passportText}>
+                Add a pet or update care details before sending the request.
+              </Text>
+            </View>
+            <ChevronRight
+              color={palette.primary}
+              size={18}
+              strokeWidth={2.4}
+            />
+          </Pressable>
 
           {renderEstimateCard()}
         </View>
@@ -725,46 +1013,65 @@ export default function RequestBookingScreen() {
                   key={service.id}
                   accessibilityRole="button"
                   onPress={() => chooseService(service)}
-                  style={[styles.serviceCard, selected && styles.serviceCardActive]}
+                  style={({ pressed }) => [
+                    styles.serviceCard,
+                    selected && styles.serviceCardActive,
+                    pressed && styles.pressed,
+                  ]}
                 >
                   <View style={styles.serviceHeader}>
-                    <Text
-                      style={[
-                        styles.serviceTitle,
-                        selected && styles.serviceTextActive,
-                      ]}
-                    >
-                      {service.title}
-                    </Text>
+                    <View style={styles.serviceIcon}>
+                      <PawPrint
+                        color={selected ? '#FFFFFF' : palette.primary}
+                        size={18}
+                        strokeWidth={2.3}
+                      />
+                    </View>
+
+                    <View style={styles.serviceCopy}>
+                      <Text
+                        style={[
+                          styles.serviceTitle,
+                          selected && styles.serviceTextActive,
+                        ]}
+                      >
+                        {service.title}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.serviceDescription,
+                          selected && styles.serviceDescriptionActive,
+                        ]}
+                      >
+                        {service.description}
+                      </Text>
+                    </View>
+
                     <Text
                       style={[
                         styles.serviceRate,
                         selected && styles.serviceTextActive,
                       ]}
                     >
-                      {currency(service.baseRate)} / {service.rateUnit}
+                      {currency(service.baseRate)}
                     </Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.serviceDescription,
-                      selected && styles.serviceTextActive,
-                    ]}
-                  >
-                    {service.description}
-                  </Text>
+
                   <Text
                     style={[
                       styles.serviceMeta,
-                      selected && styles.serviceTextActive,
+                      selected && styles.serviceDescriptionActive,
                     ]}
                   >
-                    Additional pet: +{currency(service.additionalPetRate)} / {service.rateUnit}
+                    per {service.rateUnit} • additional pet +
+                    {currency(service.additionalPetRate)}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
+
+          {renderEstimateCard()}
         </View>
       );
     }
@@ -773,31 +1080,34 @@ export default function RequestBookingScreen() {
       return (
         <View style={styles.stepBody}>
           <View style={styles.scheduleSummary}>
-            <Text style={styles.scheduleEyebrow}>Selected schedule</Text>
-            <Text style={styles.scheduleTitle}>{selectedRange}</Text>
-            <Text style={styles.scheduleText}>
-              {selectedService.title} • {estimate.units} {unitLabel} • {selectedTime}
-            </Text>
+            <CalendarDays color="#FFFFFF" size={23} strokeWidth={2.3} />
+            <View style={styles.scheduleCopy}>
+              <Text style={styles.scheduleEyebrow}>Selected schedule</Text>
+              <Text style={styles.scheduleTitle}>{selectedRange}</Text>
+              <Text style={styles.scheduleText}>
+                {selectedService.title} • {estimate.units} {unitLabel} •{' '}
+                {selectedTime}
+              </Text>
+            </View>
           </View>
-
-          {renderEstimateCard()}
 
           <View style={styles.calendarCard}>
             <View style={styles.calendarHeader}>
-              <Text style={styles.calendarTitle}>
-                {displayMonth.toLocaleDateString('en-US', {
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              </Text>
-              <View style={styles.monthControls}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setDisplayMonth((month) => addMonths(month, -1))}
-                  style={styles.monthButton}
-                >
-                  <Text style={styles.monthButtonText}>‹</Text>
-                </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setDisplayMonth((month) => addMonths(month, -1))}
+                style={styles.monthButton}
+              >
+                <Text style={styles.monthButtonText}>‹</Text>
+              </Pressable>
+
+              <View style={styles.calendarTitleWrap}>
+                <Text style={styles.calendarTitle}>
+                  {displayMonth.toLocaleDateString('en-US', {
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </Text>
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => {
@@ -805,26 +1115,26 @@ export default function RequestBookingScreen() {
                     setStartDateId(toDateId(todayStart()));
                     setEndDateId('');
                   }}
-                  style={styles.todayButton}
                 >
                   <Text style={styles.todayButtonText}>Today</Text>
                 </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setDisplayMonth((month) => addMonths(month, 1))}
-                  style={styles.monthButton}
-                >
-                  <Text style={styles.monthButtonText}>›</Text>
-                </Pressable>
               </View>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setDisplayMonth((month) => addMonths(month, 1))}
+                style={styles.monthButton}
+              >
+                <Text style={styles.monthButtonText}>›</Text>
+              </Pressable>
             </View>
 
             <Text style={styles.calendarHelp}>
               {selectedService.mode === 'single'
-                ? 'Tap one date. Prices are estimates.'
+                ? 'Choose one available date.'
                 : endDateId
-                  ? 'Range selected. Tap another date to start over.'
-                  : 'Tap start date, then end date.'}
+                  ? 'Date range selected. Tap another date to start over.'
+                  : 'Choose the start date, then the end date.'}
             </Text>
 
             <View style={styles.weekdayRow}>
@@ -846,10 +1156,6 @@ export default function RequestBookingScreen() {
                     const isStart = day.id === startDateId;
                     const isEnd = day.id === endDateId && Boolean(endDateId);
                     const outsideMonth = !sameMonth(day.date, displayMonth);
-                    const dayPrice =
-                      day.status === 'busy'
-                        ? null
-                        : selectedService.baseRate + day.priceAdjustment;
 
                     return (
                       <Pressable
@@ -876,25 +1182,18 @@ export default function RequestBookingScreen() {
                         </Text>
                         <Text
                           style={[
-                            styles.datePrice,
+                            styles.dateTag,
                             selected && styles.dateTextSelected,
                             day.status === 'busy' && styles.dateTextMuted,
                           ]}
+                          numberOfLines={1}
                         >
-                          {day.status === 'busy' ? 'Busy' : dayPrice ? currency(dayPrice) : '-'}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.dateTag,
-                            selected && styles.dateTextSelected,
-                          ]}
-                        >
-                          {isStart && selectedService.mode !== 'single'
-                            ? 'Start'
-                            : isEnd
-                              ? 'End'
-                              : isToday(day.date)
-                                ? 'Today'
+                          {day.status === 'busy'
+                            ? 'Busy'
+                            : isStart && selectedService.mode !== 'single'
+                              ? 'Start'
+                              : isEnd
+                                ? 'End'
                                 : day.label || ''}
                         </Text>
                       </Pressable>
@@ -905,7 +1204,7 @@ export default function RequestBookingScreen() {
             </View>
           </View>
 
-          <View style={styles.choiceSection}>
+          <View style={styles.compactCard}>
             <Text style={styles.smallSectionTitle}>Preferred time</Text>
             <View style={styles.choiceGrid}>
               {timeOptions.map((time) => (
@@ -914,10 +1213,13 @@ export default function RequestBookingScreen() {
                   active={selectedTime === time}
                   label={time}
                   onPress={() => setSelectedTime(time)}
+                  styles={styles}
                 />
               ))}
             </View>
           </View>
+
+          {renderEstimateCard()}
         </View>
       );
     }
@@ -931,6 +1233,8 @@ export default function RequestBookingScreen() {
             onChangeText={setCareNotes}
             placeholder="Food, water, potty, leash, medication, anxiety, routine, or special instructions."
             value={careNotes}
+            palette={palette}
+            styles={styles}
           />
           <Field
             label="Access notes"
@@ -938,10 +1242,15 @@ export default function RequestBookingScreen() {
             onChangeText={setAccessNotes}
             placeholder="Parking, gate code, apartment entry, key location, or arrival instructions."
             value={accessNotes}
+            palette={palette}
+            styles={styles}
           />
 
-          <View style={styles.choiceSection}>
-            <Text style={styles.smallSectionTitle}>PawReport updates requested</Text>
+          <View style={styles.compactCard}>
+            <Text style={styles.smallSectionTitle}>PawReport updates</Text>
+            <Text style={styles.helperText}>
+              Choose the updates you want during care.
+            </Text>
             <View style={styles.choiceGrid}>
               {pawReportOptions.map((item) => (
                 <TogglePill
@@ -949,6 +1258,7 @@ export default function RequestBookingScreen() {
                   active={pawReportItems.includes(item)}
                   label={item}
                   onPress={() => togglePawReport(item)}
+                  styles={styles}
                 />
               ))}
             </View>
@@ -961,16 +1271,40 @@ export default function RequestBookingScreen() {
       return (
         <View style={styles.stepBody}>
           <View style={styles.reviewCard}>
-            <Text style={styles.reviewEyebrow}>Review request</Text>
-            <ReviewRow label="Guru" value="Local Guru" />
-            <ReviewRow label="Pet" value={`${selectedPet.name} • ${selectedPet.type}`} />
-            <ReviewRow label="Service" value={selectedService.title} />
-            <ReviewRow label="Schedule" value={selectedRange} />
-            <ReviewRow label="Duration" value={`${estimate.units} ${unitLabel}`} />
-            <ReviewRow label="Time" value={selectedTime} />
+            <View style={styles.reviewHeader}>
+              <ShieldCheck color={palette.primary} size={20} strokeWidth={2.4} />
+              <View>
+                <Text style={styles.reviewEyebrow}>Review request</Text>
+                <Text style={styles.reviewTitle}>Everything look right?</Text>
+              </View>
+            </View>
+
+            <ReviewRow label="Guru" value="Selected Guru" styles={styles} />
+            <ReviewRow
+              label="Pet"
+              value={`${selectedPet.name} • ${selectedPet.type}`}
+              styles={styles}
+            />
+            <ReviewRow
+              label="Service"
+              value={selectedService.title}
+              styles={styles}
+            />
+            <ReviewRow
+              label="Schedule"
+              value={selectedRange}
+              styles={styles}
+            />
+            <ReviewRow
+              label="Duration"
+              value={`${estimate.units} ${unitLabel}`}
+              styles={styles}
+            />
+            <ReviewRow label="Time" value={selectedTime} styles={styles} />
             <ReviewRow
               label="Estimated price"
               value={`${currency(estimate.total)} • final after Guru accepts`}
+              styles={styles}
             />
             <ReviewRow
               label="Savings"
@@ -979,10 +1313,17 @@ export default function RequestBookingScreen() {
                   ? `${currency(estimate.totalSavings)} estimated savings`
                   : 'No savings applied'
               }
+              styles={styles}
             />
             <ReviewRow
               label="PawReport"
-              value={pawReportItems.length ? pawReportItems.join(', ') : 'Can be added later'}
+              value={
+                pawReportItems.length
+                  ? pawReportItems.join(', ')
+                  : 'Can be added later'
+              }
+              styles={styles}
+              last
             />
           </View>
 
@@ -993,18 +1334,31 @@ export default function RequestBookingScreen() {
 
     return (
       <View style={styles.stepBody}>
-        <View style={styles.successCard}>
-          <Text style={styles.successIcon}>✓</Text>
-          <Text style={styles.successTitle}>Ready to send.</Text>
-          <Text style={styles.successText}>
-            This request goes to the Guru for review. Payment happens later after the Guru accepts. Next step: review the Booking Details hub.
+        <View style={styles.readyCard}>
+          <View style={styles.readyIcon}>
+            <Sparkles color="#FFFFFF" size={24} strokeWidth={2.4} />
+          </View>
+          <Text style={styles.readyTitle}>Ready for Guru review</Text>
+          <Text style={styles.readyText}>
+            Your request is prepared. No payment is charged and the booking is
+            not confirmed until the Guru accepts.
           </Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push('/booking-details')}
-            style={styles.submitButton}
+            onPress={() =>
+              router.push({
+                pathname: '/booking-details',
+                params: {
+                  petId: selectedPet.id,
+                  petName: selectedPet.name,
+                  viewerRole: 'pet_parent',
+                },
+              })
+            }
+            style={styles.readyButton}
           >
-            <Text style={styles.submitButtonText}>Submit Request • View Booking Details</Text>
+            <Text style={styles.readyButtonText}>Open Booking Details</Text>
+            <ChevronRight color={palette.primary} size={18} strokeWidth={2.4} />
           </Pressable>
         </View>
       </View>
@@ -1012,145 +1366,276 @@ export default function RequestBookingScreen() {
   }
 
   return (
-    <SitGuruScreen scroll center={false} maxWidth={920}>
-      <View style={styles.page}>
-        <View style={styles.topBar}>
-          <SitGuruLogo size="small" variant="symbol" />
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/find-care')}
-            style={styles.topLinkButton}
+    <SitGuruScreen center={isWebPreview} maxWidth={620}>
+      <View
+        style={[
+          styles.previewCanvas,
+          !isWebPreview && styles.previewCanvasNative,
+        ]}
+      >
+        <View
+          style={[
+            styles.deviceFrame,
+            !isWebPreview && styles.deviceFrameNative,
+          ]}
+        >
+          {isWebPreview ? <View style={styles.deviceTopSpeaker} /> : null}
+
+          <View
+            style={[
+              styles.phoneShell,
+              !isWebPreview && styles.phoneShellNative,
+            ]}
           >
-            <Text style={styles.topLinkText}>Find Care</Text>
-          </Pressable>
-        </View>
+            <View style={styles.screen}>
+              {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
-        <View style={[styles.heroPanel, isWide && styles.heroPanelWide]}>
-          <View style={styles.heroCopy}>
-            <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>Pet Parent Booking Request</Text>
-            </View>
-            <Text style={styles.title}>Pet Parent Booking Request.</Text>
-            <Text style={styles.subtitle}>
-              Choose your pet, service, dates, savings, and notes. The Guru reviews before payment.
-            </Text>
-            <View style={styles.heroActions}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/guru-profile')}
-                style={styles.primaryButton}
+              <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
               >
-                <Text style={styles.primaryButtonText}>View Guru</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/conversation')}
-                style={styles.secondaryButton}
-              >
-                <Text style={styles.secondaryButtonText}>Message First</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/find-care')}
-                style={styles.secondaryButton}
-              >
-                <Text style={styles.secondaryButtonText}>Back to Search</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/payments')}
-                style={styles.secondaryButton}
-              >
-                <Text style={styles.secondaryButtonText}>Payments & Payouts</Text>
-              </Pressable>
-            </View>
-            <View style={styles.progressBlock}>
-              <View style={styles.progressTopRow}>
-                <Text style={styles.progressLabel}>Step {currentStep} of 6</Text>
-                <Text style={styles.progressPercent}>
-                  {Math.round((currentStep / bookingSteps.length) * 100)}%
-                </Text>
+                <View style={styles.header}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Go back"
+                    onPress={goBack}
+                    style={styles.headerButton}
+                  >
+                    <ChevronLeft
+                      color={palette.title}
+                      size={20}
+                      strokeWidth={2.5}
+                    />
+                  </Pressable>
+
+                  <View style={styles.headerCopy}>
+                    <Text style={styles.headerTitle}>Request Care</Text>
+                    <Text style={styles.headerSubtitle}>
+                      Step {currentStep} of {bookingSteps.length}
+                    </Text>
+                    <SitGuruRoleStatus compact role="pet_parent" />
+                  </View>
+
+                  <View style={styles.headerActions}>
+                    <View style={styles.modeToggle}>
+                      {THEME_OPTIONS.map((option) => {
+                        const active = themePreference === option.value;
+
+                        return (
+                          <Pressable
+                            key={option.value}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Switch to ${option.label} mode`}
+                            accessibilityState={{ selected: active }}
+                            onPress={() => setThemePreference(option.value)}
+                            style={[
+                              styles.modeButton,
+                              active && styles.modeButtonActive,
+                            ]}
+                          >
+                            <SitGuruIcon
+                              name={option.icon}
+                              size={15}
+                              color={
+                                active
+                                  ? option.value === 'light'
+                                    ? '#F3AA1F'
+                                    : isDark
+                                      ? '#F0CF62'
+                                      : palette.primary
+                                  : palette.muted
+                              }
+                              strokeWidth={2.4}
+                            />
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+
+                    <Pressable
+                      accessibilityLabel="Open Pet Parent profile"
+                      accessibilityRole="button"
+                      onPress={() => router.push('/account')}
+                      style={styles.profileButton}
+                    >
+                      <AvatarImage
+                        fallback={initials(petParentName)}
+                        imageUrl={petParentAvatarUrl}
+                        palette={palette}
+                        size={38}
+                      />
+                    </Pressable>
+                  </View>
+                </View>
+
+                <View style={styles.progressCard}>
+                  <View style={styles.progressCardTop}>
+                    <View style={styles.progressNumber}>
+                      <Text style={styles.progressNumberText}>{currentStep}</Text>
+                    </View>
+                    <View style={styles.progressCopy}>
+                      <Text style={styles.progressEyebrow}>CARE REQUEST</Text>
+                      <Text style={styles.progressTitle}>{activeStep.title}</Text>
+                      <Text style={styles.progressText}>
+                        {activeStep.description}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: progressWidth }]} />
+                  </View>
+                </View>
+
+                {petLoadMessage ? (
+                  <View style={styles.loadNotice}>
+                    <Text style={styles.loadNoticeText}>{petLoadMessage}</Text>
+                  </View>
+                ) : null}
+
+                <ScrollView
+                  horizontal
+                  contentContainerStyle={styles.stepRail}
+                  showsHorizontalScrollIndicator={false}
+                >
+                  {bookingSteps.map((step) => {
+                    const active = currentStep === step.step;
+                    const complete = step.step < currentStep;
+
+                    return (
+                      <Pressable
+                        key={step.step}
+                        accessibilityRole="button"
+                        onPress={() => {
+                          setNotice('');
+                          setCurrentStep(step.step);
+                        }}
+                        style={[
+                          styles.stepPill,
+                          active && styles.stepPillActive,
+                          complete && styles.stepPillComplete,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.stepPillNumber,
+                            active && styles.stepPillTextActive,
+                            complete && styles.stepPillTextComplete,
+                          ]}
+                        >
+                          {complete ? '✓' : step.step}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.stepPillText,
+                            active && styles.stepPillTextActive,
+                            complete && styles.stepPillTextComplete,
+                          ]}
+                        >
+                          {step.shortTitle}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
+                <View style={styles.activePanel}>{renderStepContent()}</View>
+
+                {notice ? (
+                  <View style={styles.noticeCard}>
+                    <Text style={styles.noticeText}>{notice}</Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.bottomSpacer} />
+              </ScrollView>
+
+              <View style={styles.bottomDock}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={goBack}
+                  style={styles.dockSecondaryButton}
+                >
+                  <Text style={styles.dockSecondaryText}>
+                    {currentStep === 1 ? 'Find Care' : 'Back'}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={goNext}
+                  style={styles.dockPrimaryButton}
+                >
+                  <Text style={styles.dockPrimaryText}>
+                    {currentStep === 6 ? 'Finish' : 'Continue'}
+                  </Text>
+                  <ChevronRight color="#FFFFFF" size={18} strokeWidth={2.5} />
+                </Pressable>
               </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: progressWidth }]} />
-              </View>
             </View>
           </View>
 
-          <View style={styles.heroVisualCard}>
-            <Text style={styles.heroVisualIcon}>📅</Text>
-            <Text style={styles.heroVisualTitle}>Booking calendar</Text>
-            <Text style={styles.heroVisualText}>
-              Pet Parents see estimated prices. Gurus confirm final availability and pricing.
-            </Text>
-          </View>
+          {isWebPreview ? <View style={styles.homeIndicator} /> : null}
         </View>
-
-        <View style={styles.stepRail}>
-          {bookingSteps.map((step) => {
-            const active = currentStep === step.step;
-            const complete = step.step < currentStep;
-
-            return (
-              <Pressable
-                key={step.step}
-                accessibilityRole="button"
-                onPress={() => setCurrentStep(step.step)}
-                style={[styles.stepPill, active && styles.stepPillActive]}
-              >
-                <Text style={[styles.stepPillText, active && styles.stepPillTextActive]}>
-                  {complete ? '✓ ' : ''}
-                  {step.shortTitle}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.activePanel}>
-          <View style={styles.stepHeader}>
-            <View>
-              <Text style={styles.stepEyebrow}>Step {activeStep.step}</Text>
-              <Text style={styles.stepTitle}>{activeStep.title}</Text>
-            </View>
-            <Text style={styles.stepBadge}>
-              {currentStep >= 5 ? 'Review' : 'Required'}
-            </Text>
-          </View>
-          <Text style={styles.stepDescription}>{activeStep.description}</Text>
-          {renderStepContent()}
-        </View>
-
-        {notice ? (
-          <View style={styles.noticeCard}>
-            <Text style={styles.noticeText}>{notice}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.bottomDockSpacer} />
-      </View>
-
-      <View style={styles.bottomDock}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={goBack}
-          style={styles.dockSecondaryButton}
-        >
-          <Text style={styles.dockSecondaryText}>
-            {currentStep === 1 ? 'Search' : 'Back'}
-          </Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={goNext}
-          style={styles.dockPrimaryButton}
-        >
-          <Text style={styles.dockPrimaryText}>
-            {currentStep === 6 ? 'Submit' : 'Continue'}
-          </Text>
-        </Pressable>
       </View>
     </SitGuruScreen>
+  );
+}
+
+function AvatarImage({
+  fallback,
+  imageUrl,
+  palette,
+  size,
+  style,
+}: {
+  fallback: string;
+  imageUrl?: string | null;
+  palette: ReturnType<typeof getPalette>;
+  size: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(imageUrl) && !imageFailed;
+  const isInitials = /^[A-Z0-9]{1,3}$/.test(fallback);
+
+  return (
+    <View
+      style={[
+        {
+          alignItems: 'center',
+          backgroundColor: palette.primarySoft,
+          borderColor: palette.borderStrong,
+          borderRadius: size / 2,
+          borderWidth: 1.5,
+          height: size,
+          justifyContent: 'center',
+          overflow: 'hidden',
+          width: size,
+        },
+        style,
+      ]}
+    >
+      {showImage ? (
+        <Image
+          onError={() => setImageFailed(true)}
+          resizeMode="cover"
+          source={{ uri: imageUrl as string }}
+          style={{ height: '100%', width: '100%' }}
+        />
+      ) : (
+        <Text
+          style={{
+            color: palette.primary,
+            fontFamily: AppFonts.extraBold,
+            fontSize: isInitials ? Math.max(11, size * 0.28) : size * 0.42,
+          }}
+        >
+          {fallback}
+        </Text>
+      )}
+    </View>
   );
 }
 
@@ -1158,18 +1643,26 @@ function TogglePill({
   active,
   label,
   onPress,
+  styles,
 }: {
   active: boolean;
   label: string;
   onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ selected: active }}
       onPress={onPress}
       style={[styles.togglePill, active && styles.togglePillActive]}
     >
-      <Text style={[styles.togglePillText, active && styles.togglePillTextActive]}>
+      <Text
+        style={[
+          styles.togglePillText,
+          active && styles.togglePillTextActive,
+        ]}
+      >
         {active ? '✓ ' : ''}
         {label}
       </Text>
@@ -1184,6 +1677,8 @@ function Field({
   multiline = false,
   value,
   onChangeText,
+  palette,
+  styles,
 }: {
   label: string;
   placeholder: string;
@@ -1191,6 +1686,8 @@ function Field({
   multiline?: boolean;
   value: string;
   onChangeText: (value: string) => void;
+  palette: ReturnType<typeof getPalette>;
+  styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -1200,7 +1697,7 @@ function Field({
         multiline={multiline}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={SitGuruColors.textSoft}
+        placeholderTextColor={palette.placeholder}
         style={[styles.input, multiline && styles.multilineInput]}
         value={value}
       />
@@ -1208,7 +1705,15 @@ function Field({
   );
 }
 
-function PriceRow({ label, value }: { label: string; value: string }) {
+function PriceRow({
+  label,
+  value,
+  styles,
+}: {
+  label: string;
+  value: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
   return (
     <View style={styles.priceRow}>
       <Text style={styles.priceLabel}>{label}</Text>
@@ -1217,7 +1722,15 @@ function PriceRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SavingsRow({ label, value }: { label: string; value: string }) {
+function SavingsRow({
+  label,
+  value,
+  styles,
+}: {
+  label: string;
+  value: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
   return (
     <View style={styles.savingsRow}>
       <Text style={styles.savingsLabel}>{label}</Text>
@@ -1226,848 +1739,1050 @@ function SavingsRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ReviewRow({ label, value }: { label: string; value: string }) {
+function ReviewRow({
+  label,
+  value,
+  styles,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  styles: ReturnType<typeof createStyles>;
+  last?: boolean;
+}) {
   return (
-    <View style={styles.reviewRow}>
+    <View style={[styles.reviewRow, last && styles.reviewRowLast]}>
       <Text style={styles.reviewLabel}>{label}</Text>
       <Text style={styles.reviewValue}>{value}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  page: {
-    gap: 18,
-    paddingBottom: 14,
-    paddingVertical: 4,
-  },
-  topBar: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  topLinkButton: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  topLinkText: {
-    color: SitGuruColors.primary,
-    fontSize: 13,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  heroPanel: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 34,
-    borderWidth: 1,
-    elevation: 4,
-    gap: 18,
-    padding: 18,
-  },
-  heroPanelWide: {
-    flexDirection: 'row',
-  },
-  heroCopy: {
-    flex: 1,
-    gap: 16,
-    justifyContent: 'center',
-  },
-  heroBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  heroBadgeText: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  title: {
-    color: SitGuruColors.text,
-    fontSize: 42,
-    fontWeight: '900',
-    letterSpacing: -1.1,
-    lineHeight: 45,
-  },
-  subtitle: {
-    color: SitGuruColors.textMuted,
-    fontSize: 17,
-    fontWeight: '700',
-    lineHeight: 25,
-  },
-  heroActions: {
-    gap: 10,
-  },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primary,
-    borderRadius: 999,
-    minHeight: 52,
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    minHeight: 52,
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-  },
-  secondaryButtonText: {
-    color: SitGuruColors.primary,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  progressBlock: {
-    gap: 8,
-  },
-  progressTopRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  progressLabel: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  progressPercent: {
-    color: SitGuruColors.text,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  progressTrack: {
-    backgroundColor: SitGuruColors.background,
-    borderRadius: 999,
-    height: 10,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    backgroundColor: SitGuruColors.primary,
-    borderRadius: 999,
-    height: '100%',
-  },
-  heroVisualCard: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 28,
-    borderWidth: 1,
-    flex: 1,
-    gap: 8,
-    justifyContent: 'center',
-    minHeight: 260,
-    padding: 22,
-  },
-  heroVisualIcon: {
-    fontSize: 42,
-  },
-  heroVisualTitle: {
-    color: SitGuruColors.text,
-    fontSize: 18,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  heroVisualText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  stepRail: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  stepPill: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    minHeight: 40,
-    justifyContent: 'center',
-    paddingHorizontal: 11,
-  },
-  stepPillActive: {
-    backgroundColor: SitGuruColors.primary,
-    borderColor: SitGuruColors.primary,
-  },
-  stepPillText: {
-    color: SitGuruColors.text,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  stepPillTextActive: {
-    color: '#FFFFFF',
-  },
-  activePanel: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 30,
-    borderWidth: 1,
-    elevation: 3,
-    gap: 14,
-    padding: 18,
-  },
-  stepHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  stepEyebrow: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  stepTitle: {
-    color: SitGuruColors.text,
-    fontSize: 29,
-    fontWeight: '900',
-    letterSpacing: -0.7,
-    lineHeight: 34,
-  },
-  stepBadge: {
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 999,
-    borderWidth: 1,
-    color: SitGuruColors.primary,
-    fontSize: 11,
-    fontWeight: '900',
-    overflow: 'hidden',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    textTransform: 'uppercase',
-  },
-  stepDescription: {
-    color: SitGuruColors.textMuted,
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  stepBody: {
-    gap: 12,
-  },
-  petList: {
-    gap: 10,
-  },
-  petCard: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 22,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    minHeight: 72,
-    padding: 14,
-  },
-  petCardActive: {
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-  },
-  petAvatar: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 54,
-    justifyContent: 'center',
-    width: 54,
-  },
-  petAvatarText: {
-    fontSize: 24,
-  },
-  petCopy: {
-    flex: 1,
-    gap: 3,
-  },
-  petName: {
-    color: SitGuruColors.text,
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  petDescription: {
-    color: SitGuruColors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  petStatus: {
-    color: SitGuruColors.primary,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  counterCard: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 22,
-    borderWidth: 1,
-    gap: 12,
-    padding: 14,
-  },
-  smallSectionTitle: {
-    color: SitGuruColors.text,
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  counterRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-  },
-  counterButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 52,
-    justifyContent: 'center',
-    width: 52,
-  },
-  counterButtonText: {
-    color: SitGuruColors.primary,
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  counterValue: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  counterNumber: {
-    color: SitGuruColors.text,
-    fontSize: 26,
-    fontWeight: '900',
-  },
-  counterLabel: {
-    color: SitGuruColors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  savingsCard: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 22,
-    borderWidth: 1,
-    gap: 10,
-    padding: 14,
-  },
-  togglePill: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    minHeight: 46,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  togglePillActive: {
-    backgroundColor: SitGuruColors.primary,
-    borderColor: SitGuruColors.primary,
-  },
-  togglePillText: {
-    color: SitGuruColors.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  togglePillTextActive: {
-    color: '#FFFFFF',
-  },
-  estimateCard: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 24,
-    borderWidth: 1,
-    elevation: 2,
-    gap: 12,
-    padding: 16,
-  },
-  estimateHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  estimateEyebrow: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  estimateTotal: {
-    color: SitGuruColors.text,
-    fontSize: 34,
-    fontWeight: '900',
-    letterSpacing: -1,
-    lineHeight: 39,
-  },
-  estimateBadge: {
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 999,
-    borderWidth: 1,
-    color: SitGuruColors.primary,
-    fontSize: 11,
-    fontWeight: '900',
-    overflow: 'hidden',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    textTransform: 'uppercase',
-  },
-  estimateRows: {
-    gap: 8,
-  },
-  priceRow: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'space-between',
-    padding: 11,
-  },
-  priceLabel: {
-    color: SitGuruColors.textMuted,
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  priceValue: {
-    color: SitGuruColors.text,
-    fontSize: 13,
-    fontWeight: '900',
-    textAlign: 'right',
-  },
-  savingsRow: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'space-between',
-    padding: 11,
-  },
-  savingsLabel: {
-    color: SitGuruColors.primary,
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  savingsValue: {
-    color: SitGuruColors.primary,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  estimateNote: {
-    color: SitGuruColors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  serviceList: {
-    gap: 10,
-  },
-  serviceCard: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 22,
-    borderWidth: 1,
-    gap: 8,
-    minHeight: 88,
-    padding: 14,
-  },
-  serviceCardActive: {
-    backgroundColor: SitGuruColors.primary,
-    borderColor: SitGuruColors.primary,
-  },
-  serviceHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  serviceTitle: {
-    color: SitGuruColors.text,
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  serviceRate: {
-    color: SitGuruColors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  serviceDescription: {
-    color: SitGuruColors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-  },
-  serviceMeta: {
-    color: SitGuruColors.text,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  serviceTextActive: {
-    color: '#FFFFFF',
-  },
-  scheduleSummary: {
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 24,
-    gap: 6,
-    padding: 16,
-  },
-  scheduleEyebrow: {
-    color: '#C9F26D',
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  scheduleTitle: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '900',
-    lineHeight: 27,
-  },
-  scheduleText: {
-    color: '#DCEFE2',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  calendarCard: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 24,
-    borderWidth: 1,
-    gap: 12,
-    padding: 14,
-  },
-  calendarHeader: {
-    gap: 10,
-  },
-  calendarTitle: {
-    color: SitGuruColors.text,
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  monthControls: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  monthButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 52,
-    justifyContent: 'center',
-    width: 52,
-  },
-  monthButtonText: {
-    color: SitGuruColors.primary,
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  todayButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 999,
-    borderWidth: 1,
-    flex: 1,
-    height: 52,
-    justifyContent: 'center',
-  },
-  todayButtonText: {
-    color: SitGuruColors.primary,
-    fontSize: 14,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  calendarHelp: {
-    color: SitGuruColors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-  },
-  weekdayRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  weekdayText: {
-    color: SitGuruColors.text,
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  calendarWeeks: {
-    gap: 6,
-  },
-  calendarWeek: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  dateCell: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    flex: 1,
-    minHeight: 92,
-    paddingHorizontal: 3,
-    paddingVertical: 8,
-  },
-  dateOutsideMonth: {
-    opacity: 0.42,
-  },
-  dateToday: {
-    borderColor: SitGuruColors.primary,
-    borderWidth: 2,
-  },
-  dateSelected: {
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-  },
-  dateEndpoint: {
-    backgroundColor: SitGuruColors.primary,
-    borderColor: SitGuruColors.primary,
-  },
-  dateBusy: {
-    backgroundColor: '#F4F0EC',
-    borderColor: '#E2D7CC',
-    opacity: 0.62,
-  },
-  dateDay: {
-    color: SitGuruColors.text,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  datePrice: {
-    color: SitGuruColors.primary,
-    fontSize: 11,
-    fontWeight: '900',
-    marginTop: 2,
-  },
-  dateTag: {
-    color: SitGuruColors.textSoft,
-    fontSize: 8,
-    fontWeight: '900',
-    marginTop: 2,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
-  dateTextSelected: {
-    color: '#FFFFFF',
-  },
-  dateTextMuted: {
-    color: SitGuruColors.textSoft,
-  },
-  choiceSection: {
-    gap: 9,
-  },
-  choiceGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  fieldWrap: {
-    gap: 7,
-  },
-  fieldLabel: {
-    color: SitGuruColors.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  input: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 18,
-    borderWidth: 1,
-    color: SitGuruColors.text,
-    fontSize: 15,
-    fontWeight: '800',
-    minHeight: 52,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  multilineInput: {
-    minHeight: 110,
-    textAlignVertical: 'top',
-  },
-  reviewCard: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 24,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  reviewEyebrow: {
-    backgroundColor: SitGuruColors.primaryDark,
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-    padding: 14,
-    textTransform: 'uppercase',
-  },
-  reviewRow: {
-    borderBottomColor: SitGuruColors.border,
-    borderBottomWidth: 1,
-    gap: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  reviewLabel: {
-    color: SitGuruColors.primary,
-    fontSize: 11,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  reviewValue: {
-    color: SitGuruColors.text,
-    fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 20,
-  },
-  successCard: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primaryDark,
-    borderRadius: 28,
-    gap: 9,
-    padding: 18,
-  },
-  successIcon: {
-    color: '#C9F26D',
-    fontSize: 38,
-    fontWeight: '900',
-  },
-  successTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  successText: {
-    color: '#DCEFE2',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-    textAlign: 'center',
-  },
-  submitButton: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    justifyContent: 'center',
-    marginTop: 4,
-    minHeight: 52,
-    paddingHorizontal: 18,
-    width: '100%',
-  },
-  submitButtonText: {
-    color: SitGuruColors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  noticeCard: {
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 12,
-  },
-  noticeText: {
-    color: SitGuruColors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 19,
-  },
-  helperText: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '700', lineHeight: 20 },
-  helperButton: { alignItems: 'center', backgroundColor: SitGuruColors.primary, borderRadius: 16, marginTop: 10, minHeight: 48, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 12 },
-  helperButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
-  bottomDockSpacer: {
-    height: 88,
-  },
-  bottomDock: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    bottom: 16,
-    elevation: 8,
-    flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
-    left: 16,
-    padding: 8,
-    position: 'absolute',
-    right: 16,
-  },
-  dockSecondaryButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 50,
-    minWidth: 92,
-    paddingHorizontal: 14,
-  },
-  dockSecondaryText: {
-    color: SitGuruColors.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  dockPrimaryButton: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primary,
-    borderRadius: 999,
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 50,
-    paddingHorizontal: 16,
-  },
-  dockPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-});
+function PhoneStatusBar({
+  styles,
+}: {
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.statusBar}>
+      <Text style={styles.statusTime}>9:41</Text>
+      <View style={styles.statusIcons}>
+        <View style={styles.signalBars}>
+          <View style={[styles.signalBar, { height: 5 }]} />
+          <View style={[styles.signalBar, { height: 7 }]} />
+          <View style={[styles.signalBar, { height: 9 }]} />
+        </View>
+        <Text style={styles.wifiText}>⌁</Text>
+        <View style={styles.batteryWrap}>
+          <View style={styles.batteryBody}>
+            <View style={styles.batteryFill} />
+          </View>
+          <View style={styles.batteryCap} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function getPalette(isDark: boolean) {
+  return {
+    background: isDark ? '#06140F' : '#FFF9F1',
+    surface: isDark ? '#0B2118' : '#FFFEFA',
+    surfaceSoft: isDark ? '#102D21' : '#FFF6E9',
+    border: isDark ? '#234B38' : '#EADDCB',
+    borderStrong: isDark ? '#2E6C4B' : '#CFE5D7',
+    title: isDark ? '#FFF5E8' : '#123F31',
+    text: isDark ? '#E8EEE9' : '#27483E',
+    muted: isDark ? '#9DB0A5' : '#738078',
+    placeholder: isDark ? '#7F9488' : '#9A9A90',
+    primary: isDark ? '#39D982' : '#087449',
+    primaryDark: isDark ? '#087A4C' : '#075D3B',
+    primarySoft: isDark ? '#123E2A' : '#E4F5E9',
+    shadow: '#000000',
+  };
+}
+
+function createStyles(isDark: boolean) {
+  const palette = getPalette(isDark);
+
+  return StyleSheet.create({
+    previewCanvas: {
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      minHeight: 930,
+      paddingHorizontal: 16,
+      paddingVertical: 22,
+      width: '100%',
+    },
+    previewCanvasNative: {
+      flex: 1,
+      minHeight: 0,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+    },
+    deviceFrame: {
+      backgroundColor: '#111713',
+      borderColor: '#2E3631',
+      borderRadius: 42,
+      borderWidth: 2,
+      maxWidth: 430,
+      overflow: 'hidden',
+      paddingBottom: 15,
+      paddingHorizontal: 8,
+      paddingTop: 10,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 20 },
+      shadowOpacity: 0.27,
+      shadowRadius: 28,
+      width: '100%',
+    },
+    deviceFrameNative: {
+      backgroundColor: 'transparent',
+      borderRadius: 0,
+      borderWidth: 0,
+      flex: 1,
+      maxWidth: '100%',
+      overflow: 'visible',
+      paddingBottom: 0,
+      paddingHorizontal: 0,
+      paddingTop: 0,
+      shadowOpacity: 0,
+    },
+    deviceTopSpeaker: {
+      alignSelf: 'center',
+      backgroundColor: '#303832',
+      borderRadius: 999,
+      height: 6,
+      marginBottom: 9,
+      width: 86,
+    },
+    phoneShell: {
+      backgroundColor: palette.background,
+      borderColor: palette.border,
+      borderRadius: 34,
+      borderWidth: 1,
+      height: 844,
+      overflow: 'hidden',
+      width: '100%',
+    },
+    phoneShellNative: {
+      borderRadius: 0,
+      borderWidth: 0,
+      flex: 1,
+      height: '100%',
+    },
+    screen: {
+      backgroundColor: palette.background,
+      flex: 1,
+      width: '100%',
+    },
+    homeIndicator: {
+      alignSelf: 'center',
+      backgroundColor: '#F3F1EA',
+      borderRadius: 999,
+      height: 5,
+      marginTop: 9,
+      width: 116,
+    },
+    statusBar: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      minHeight: 31,
+      paddingHorizontal: 16,
+      paddingTop: 7,
+    },
+    statusTime: {
+      color: palette.title,
+      fontFamily: AppFonts.bold,
+      fontSize: 12,
+    },
+    statusIcons: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 6,
+    },
+    signalBars: {
+      alignItems: 'flex-end',
+      flexDirection: 'row',
+      gap: 2,
+    },
+    signalBar: {
+      backgroundColor: palette.title,
+      borderRadius: 2,
+      width: 3,
+    },
+    wifiText: {
+      color: palette.title,
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+    },
+    batteryWrap: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 2,
+    },
+    batteryBody: {
+      borderColor: palette.title,
+      borderRadius: 3,
+      borderWidth: 1,
+      height: 9,
+      padding: 1,
+      width: 17,
+    },
+    batteryFill: {
+      backgroundColor: palette.title,
+      borderRadius: 2,
+      flex: 1,
+    },
+    batteryCap: {
+      backgroundColor: palette.title,
+      height: 4,
+      width: 2,
+    },
+    scrollContent: {
+      gap: 12,
+      paddingBottom: 116,
+      paddingHorizontal: 15,
+      paddingTop: 10,
+    },
+    header: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 10,
+    },
+    headerButton: {
+      alignItems: 'center',
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      height: 39,
+      justifyContent: 'center',
+      width: 39,
+    },
+    headerCopy: {
+      flex: 1,
+      gap: 1,
+    },
+    headerTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 20,
+      letterSpacing: -0.4,
+    },
+    headerSubtitle: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+    },
+    headerActions: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 6,
+    },
+    profileButton: {
+      borderRadius: 999,
+    },
+    modeToggle: {
+      alignItems: 'center',
+      backgroundColor: palette.surface,
+      borderColor: isDark ? '#B9831B' : '#F2822E',
+      borderRadius: 13,
+      borderWidth: 1.2,
+      flexDirection: 'row',
+      gap: 2,
+      padding: 2,
+    },
+    modeButton: {
+      alignItems: 'center',
+      borderRadius: 10,
+      height: 28,
+      justifyContent: 'center',
+      width: 31,
+    },
+    modeButtonActive: {
+      backgroundColor: isDark ? 'rgba(226,170,45,0.18)' : '#FFF4D8',
+    },
+    loadNotice: {
+      backgroundColor: palette.surfaceSoft,
+      borderColor: palette.border,
+      borderRadius: 14,
+      borderWidth: 1,
+      padding: 10,
+    },
+    loadNoticeText: {
+      color: palette.text,
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    progressCard: {
+      backgroundColor: isDark ? '#087A4C' : '#087F50',
+      borderRadius: 21,
+      gap: 12,
+      padding: 14,
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: isDark ? 0.26 : 0.13,
+      shadowRadius: 16,
+    },
+    progressCardTop: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      gap: 11,
+    },
+    progressNumber: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.16)',
+      borderRadius: 999,
+      height: 40,
+      justifyContent: 'center',
+      width: 40,
+    },
+    progressNumberText: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 18,
+    },
+    progressCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    progressEyebrow: {
+      color: 'rgba(255,255,255,0.76)',
+      fontFamily: AppFonts.bold,
+      fontSize: 8,
+      letterSpacing: 0.8,
+    },
+    progressTitle: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 18,
+      lineHeight: 22,
+    },
+    progressText: {
+      color: 'rgba(255,255,255,0.84)',
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    progressTrack: {
+      backgroundColor: 'rgba(255,255,255,0.18)',
+      borderRadius: 999,
+      height: 6,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 999,
+      height: '100%',
+    },
+    stepRail: {
+      gap: 7,
+      paddingRight: 4,
+    },
+    stepPill: {
+      alignItems: 'center',
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 15,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 5,
+      minHeight: 36,
+      paddingHorizontal: 10,
+    },
+    stepPillActive: {
+      backgroundColor: palette.primary,
+      borderColor: palette.primary,
+    },
+    stepPillComplete: {
+      backgroundColor: palette.primarySoft,
+      borderColor: palette.borderStrong,
+    },
+    stepPillNumber: {
+      color: palette.muted,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 9,
+    },
+    stepPillText: {
+      color: palette.text,
+      fontFamily: AppFonts.bold,
+      fontSize: 9,
+    },
+    stepPillTextActive: {
+      color: '#FFFFFF',
+    },
+    stepPillTextComplete: {
+      color: isDark ? '#BDF6D2' : palette.primaryDark,
+    },
+    activePanel: {
+      gap: 12,
+    },
+    stepBody: {
+      gap: 11,
+    },
+    petList: {
+      gap: 8,
+    },
+    petCard: {
+      alignItems: 'center',
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      minHeight: 72,
+      padding: 10,
+    },
+    petCardActive: {
+      backgroundColor: palette.primarySoft,
+      borderColor: palette.borderStrong,
+    },
+    petAvatar: {
+      alignItems: 'center',
+      backgroundColor: palette.surfaceSoft,
+      borderColor: palette.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      height: 47,
+      justifyContent: 'center',
+      width: 47,
+    },
+    petAvatarText: {
+      fontSize: 21,
+    },
+    petCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    petName: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 14,
+    },
+    petDescription: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    choiceIndicator: {
+      alignItems: 'center',
+      borderColor: palette.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      height: 27,
+      justifyContent: 'center',
+      width: 27,
+    },
+    choiceIndicatorActive: {
+      backgroundColor: palette.primary,
+      borderColor: palette.primary,
+    },
+    choiceIndicatorText: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 11,
+    },
+    compactCard: {
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      gap: 9,
+      padding: 12,
+    },
+    compactCardHeader: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    smallSectionTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 13,
+    },
+    helperText: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    counterRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 8,
+    },
+    counterButton: {
+      alignItems: 'center',
+      backgroundColor: palette.surfaceSoft,
+      borderColor: palette.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      height: 32,
+      justifyContent: 'center',
+      width: 32,
+    },
+    counterButtonText: {
+      color: palette.primary,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 17,
+    },
+    counterNumber: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 16,
+      minWidth: 18,
+      textAlign: 'center',
+    },
+    passportCard: {
+      alignItems: 'center',
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      padding: 11,
+    },
+    passportIcon: {
+      alignItems: 'center',
+      backgroundColor: palette.primarySoft,
+      borderRadius: 12,
+      height: 40,
+      justifyContent: 'center',
+      width: 40,
+    },
+    passportCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    passportTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 12,
+    },
+    passportText: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 9,
+      lineHeight: 13,
+    },
+    choiceGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 7,
+    },
+    togglePill: {
+      alignItems: 'center',
+      backgroundColor: palette.surfaceSoft,
+      borderColor: palette.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      justifyContent: 'center',
+      minHeight: 34,
+      paddingHorizontal: 10,
+    },
+    togglePillActive: {
+      backgroundColor: palette.primary,
+      borderColor: palette.primary,
+    },
+    togglePillText: {
+      color: palette.text,
+      fontFamily: AppFonts.bold,
+      fontSize: 9,
+    },
+    togglePillTextActive: {
+      color: '#FFFFFF',
+    },
+    estimateCard: {
+      backgroundColor: palette.surface,
+      borderColor: palette.borderStrong,
+      borderRadius: 19,
+      borderWidth: 1,
+      gap: 10,
+      padding: 12,
+    },
+    estimateHeader: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    estimateEyebrow: {
+      color: palette.primary,
+      fontFamily: AppFonts.bold,
+      fontSize: 8,
+      letterSpacing: 0.75,
+      textTransform: 'uppercase',
+    },
+    estimateTotal: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 25,
+      letterSpacing: -0.6,
+      lineHeight: 30,
+    },
+    estimateBadge: {
+      alignItems: 'center',
+      backgroundColor: palette.primarySoft,
+      borderRadius: 999,
+      flexDirection: 'row',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+    },
+    estimateBadgeText: {
+      color: palette.primary,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 8,
+    },
+    estimateRows: {
+      gap: 6,
+    },
+    priceRow: {
+      alignItems: 'center',
+      borderBottomColor: palette.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      justifyContent: 'space-between',
+      paddingBottom: 6,
+    },
+    priceLabel: {
+      color: palette.muted,
+      flex: 1,
+      fontFamily: AppFonts.medium,
+      fontSize: 9,
+    },
+    priceValue: {
+      color: palette.text,
+      fontFamily: AppFonts.bold,
+      fontSize: 9,
+      textAlign: 'right',
+    },
+    savingsRow: {
+      alignItems: 'center',
+      backgroundColor: palette.primarySoft,
+      borderRadius: 10,
+      flexDirection: 'row',
+      gap: 10,
+      justifyContent: 'space-between',
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+    },
+    savingsLabel: {
+      color: palette.primary,
+      flex: 1,
+      fontFamily: AppFonts.bold,
+      fontSize: 9,
+    },
+    savingsValue: {
+      color: palette.primary,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 9,
+    },
+    estimateNote: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 8,
+      lineHeight: 12,
+    },
+    serviceList: {
+      gap: 8,
+    },
+    serviceCard: {
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      gap: 7,
+      padding: 11,
+    },
+    serviceCardActive: {
+      backgroundColor: palette.primaryDark,
+      borderColor: palette.primaryDark,
+    },
+    serviceHeader: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 9,
+    },
+    serviceIcon: {
+      alignItems: 'center',
+      backgroundColor: palette.primarySoft,
+      borderRadius: 11,
+      height: 36,
+      justifyContent: 'center',
+      width: 36,
+    },
+    serviceCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    serviceTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 13,
+    },
+    serviceRate: {
+      color: palette.primary,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 12,
+    },
+    serviceDescription: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 9,
+      lineHeight: 13,
+    },
+    serviceDescriptionActive: {
+      color: 'rgba(255,255,255,0.78)',
+    },
+    serviceMeta: {
+      color: palette.text,
+      fontFamily: AppFonts.bold,
+      fontSize: 8,
+      paddingLeft: 45,
+    },
+    serviceTextActive: {
+      color: '#FFFFFF',
+    },
+    scheduleSummary: {
+      alignItems: 'center',
+      backgroundColor: palette.primaryDark,
+      borderRadius: 19,
+      flexDirection: 'row',
+      gap: 10,
+      padding: 12,
+    },
+    scheduleCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    scheduleEyebrow: {
+      color: 'rgba(255,255,255,0.72)',
+      fontFamily: AppFonts.bold,
+      fontSize: 8,
+      letterSpacing: 0.7,
+      textTransform: 'uppercase',
+    },
+    scheduleTitle: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 13,
+    },
+    scheduleText: {
+      color: 'rgba(255,255,255,0.8)',
+      fontFamily: AppFonts.medium,
+      fontSize: 9,
+      lineHeight: 13,
+    },
+    calendarCard: {
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 19,
+      borderWidth: 1,
+      gap: 10,
+      padding: 10,
+    },
+    calendarHeader: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    calendarTitleWrap: {
+      alignItems: 'center',
+      gap: 1,
+    },
+    calendarTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 14,
+    },
+    todayButtonText: {
+      color: palette.primary,
+      fontFamily: AppFonts.bold,
+      fontSize: 8,
+    },
+    monthButton: {
+      alignItems: 'center',
+      backgroundColor: palette.surfaceSoft,
+      borderColor: palette.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      height: 32,
+      justifyContent: 'center',
+      width: 32,
+    },
+    monthButtonText: {
+      color: palette.primary,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 21,
+      lineHeight: 22,
+    },
+    calendarHelp: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 8,
+      lineHeight: 12,
+      textAlign: 'center',
+    },
+    weekdayRow: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    weekdayText: {
+      color: palette.muted,
+      flex: 1,
+      fontFamily: AppFonts.bold,
+      fontSize: 8,
+      textAlign: 'center',
+    },
+    calendarWeeks: {
+      gap: 4,
+    },
+    calendarWeek: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    dateCell: {
+      alignItems: 'center',
+      backgroundColor: palette.surfaceSoft,
+      borderColor: palette.border,
+      borderRadius: 9,
+      borderWidth: 1,
+      flex: 1,
+      minHeight: 45,
+      paddingHorizontal: 1,
+      paddingVertical: 5,
+    },
+    dateOutsideMonth: {
+      opacity: 0.34,
+    },
+    dateToday: {
+      borderColor: palette.primary,
+      borderWidth: 1.5,
+    },
+    dateSelected: {
+      backgroundColor: palette.primarySoft,
+      borderColor: palette.primary,
+    },
+    dateEndpoint: {
+      backgroundColor: palette.primary,
+      borderColor: palette.primary,
+    },
+    dateBusy: {
+      opacity: 0.45,
+    },
+    dateDay: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 11,
+    },
+    dateTag: {
+      color: palette.muted,
+      fontFamily: AppFonts.bold,
+      fontSize: 6,
+      marginTop: 2,
+      textAlign: 'center',
+      textTransform: 'uppercase',
+    },
+    dateTextSelected: {
+      color: '#FFFFFF',
+    },
+    dateTextMuted: {
+      color: palette.placeholder,
+    },
+    fieldWrap: {
+      gap: 6,
+    },
+    fieldLabel: {
+      color: palette.title,
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+    },
+    input: {
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 17,
+      borderWidth: 1,
+      color: palette.text,
+      fontFamily: AppFonts.medium,
+      fontSize: 11,
+      minHeight: 48,
+      paddingHorizontal: 12,
+      paddingVertical: 11,
+    },
+    multilineInput: {
+      minHeight: 94,
+      textAlignVertical: 'top',
+    },
+    reviewCard: {
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 19,
+      borderWidth: 1,
+      overflow: 'hidden',
+    },
+    reviewHeader: {
+      alignItems: 'center',
+      backgroundColor: palette.primarySoft,
+      flexDirection: 'row',
+      gap: 9,
+      padding: 11,
+    },
+    reviewEyebrow: {
+      color: palette.primary,
+      fontFamily: AppFonts.bold,
+      fontSize: 8,
+      letterSpacing: 0.7,
+      textTransform: 'uppercase',
+    },
+    reviewTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 13,
+    },
+    reviewRow: {
+      borderBottomColor: palette.border,
+      borderBottomWidth: 1,
+      gap: 2,
+      paddingHorizontal: 11,
+      paddingVertical: 9,
+    },
+    reviewRowLast: {
+      borderBottomWidth: 0,
+    },
+    reviewLabel: {
+      color: palette.primary,
+      fontFamily: AppFonts.bold,
+      fontSize: 7,
+      letterSpacing: 0.55,
+      textTransform: 'uppercase',
+    },
+    reviewValue: {
+      color: palette.text,
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    readyCard: {
+      alignItems: 'center',
+      backgroundColor: palette.primaryDark,
+      borderRadius: 22,
+      gap: 8,
+      padding: 16,
+    },
+    readyIcon: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.16)',
+      borderRadius: 999,
+      height: 48,
+      justifyContent: 'center',
+      width: 48,
+    },
+    readyTitle: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 18,
+      textAlign: 'center',
+    },
+    readyText: {
+      color: 'rgba(255,255,255,0.82)',
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 15,
+      textAlign: 'center',
+    },
+    readyButton: {
+      alignItems: 'center',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 999,
+      flexDirection: 'row',
+      gap: 6,
+      justifyContent: 'center',
+      marginTop: 3,
+      minHeight: 42,
+      paddingHorizontal: 16,
+      width: '100%',
+    },
+    readyButtonText: {
+      color: palette.primary,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 11,
+    },
+    noticeCard: {
+      backgroundColor: palette.surfaceSoft,
+      borderColor: palette.borderStrong,
+      borderRadius: 15,
+      borderWidth: 1,
+      padding: 10,
+    },
+    noticeText: {
+      color: palette.text,
+      fontFamily: AppFonts.medium,
+      fontSize: 9,
+      lineHeight: 13,
+    },
+    pressed: {
+      opacity: 0.78,
+      transform: [{ scale: 0.99 }],
+    },
+    bottomSpacer: {
+      height: 18,
+    },
+    bottomDock: {
+      alignItems: 'center',
+      backgroundColor: isDark ? '#071A12' : '#FFFDF8',
+      borderColor: palette.border,
+      borderRadius: 21,
+      borderWidth: 1,
+      bottom: 8,
+      flexDirection: 'row',
+      gap: 8,
+      left: 10,
+      padding: 8,
+      position: 'absolute',
+      right: 10,
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: -7 },
+      shadowOpacity: isDark ? 0.26 : 0.08,
+      shadowRadius: 16,
+    },
+    dockSecondaryButton: {
+      alignItems: 'center',
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      justifyContent: 'center',
+      minHeight: 44,
+      minWidth: 88,
+      paddingHorizontal: 13,
+    },
+    dockSecondaryText: {
+      color: palette.text,
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+    },
+    dockPrimaryButton: {
+      alignItems: 'center',
+      backgroundColor: palette.primaryDark,
+      borderRadius: 999,
+      flex: 1,
+      flexDirection: 'row',
+      gap: 6,
+      justifyContent: 'center',
+      minHeight: 44,
+      paddingHorizontal: 14,
+    },
+    dockPrimaryText: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 12,
+    },
+  });
+}

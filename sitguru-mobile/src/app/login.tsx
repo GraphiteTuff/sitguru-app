@@ -4,13 +4,17 @@ import {
   ChevronLeft,
   Eye,
   EyeOff,
+  KeyRound,
   LockKeyhole,
   Mail,
+  Phone,
   ShieldCheck,
   UserPlus,
 } from 'lucide-react-native';
 import {
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -34,6 +38,11 @@ import { useAuth } from '@/hooks/useAuth';
 type SocialProvider =
   | 'google'
   | 'apple';
+
+type LoginMethod =
+  | 'password'
+  | 'email_code'
+  | 'sms_code';
 
 function normalizeLoginError(
   message: string,
@@ -62,6 +71,25 @@ function normalizeLoginError(
 
   if (
     normalized.includes(
+      'phone not confirmed',
+    )
+  ) {
+    return 'Confirm your mobile number before using text-message login.';
+  }
+
+  if (
+    normalized.includes(
+      'invalid phone',
+    ) ||
+    normalized.includes(
+      'phone number is invalid',
+    )
+  ) {
+    return 'Enter a valid mobile number and try again.';
+  }
+
+  if (
+    normalized.includes(
       'provider is not enabled',
     ) ||
     normalized.includes(
@@ -69,6 +97,45 @@ function normalizeLoginError(
     )
   ) {
     return 'That sign-in option is not available yet. Use another sign-in method.';
+  }
+
+  if (
+    normalized.includes(
+      'token has expired',
+    ) ||
+    normalized.includes(
+      'otp expired',
+    ) ||
+    normalized.includes(
+      'expired otp',
+    )
+  ) {
+    return 'That six-digit code has expired. Request a new code and try again.';
+  }
+
+  if (
+    normalized.includes(
+      'invalid token',
+    ) ||
+    normalized.includes(
+      'invalid otp',
+    ) ||
+    normalized.includes(
+      'token is invalid',
+    )
+  ) {
+    return 'That six-digit code is not valid. Check the email and enter the newest code.';
+  }
+
+  if (
+    normalized.includes(
+      'signups not allowed',
+    ) ||
+    normalized.includes(
+      'user not found',
+    )
+  ) {
+    return 'No existing SitGuru account could use that email code. Check the address or create an account.';
   }
 
   if (
@@ -92,6 +159,20 @@ function normalizeLoginError(
     return 'There were too many sign-in attempts. Wait a moment, then try again.';
   }
 
+  if (
+    normalized.includes(
+      'no existing sitguru account',
+    ) ||
+    normalized.includes(
+      'six-digit code',
+    ) ||
+    normalized.includes(
+      'supabase is not configured',
+    )
+  ) {
+    return message;
+  }
+
   return 'SitGuru could not sign you in. Please try again.';
 }
 
@@ -103,12 +184,85 @@ function providerName(
     : 'Apple';
 }
 
+function normalizePhoneNumber(
+  value: string,
+) {
+  const trimmed = value.trim();
+  const digits = trimmed.replace(/\D/g, '');
+
+  if (
+    trimmed.startsWith('+') &&
+    digits.length >= 8 &&
+    digits.length <= 15
+  ) {
+    return `+${digits}`;
+  }
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  if (
+    digits.length === 11 &&
+    digits.startsWith('1')
+  ) {
+    return `+${digits}`;
+  }
+
+  return '';
+}
+
+function formatPhoneInput(
+  value: string,
+) {
+  const hasPlus =
+    value.trim().startsWith('+');
+  const digits =
+    value.replace(/\D/g, '').slice(0, 15);
+
+  if (hasPlus) {
+    return digits
+      ? `+${digits}`
+      : '+';
+  }
+
+  if (digits.length <= 3) {
+    return digits;
+  }
+
+  if (digits.length <= 6) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  }
+
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  return `+${digits}`;
+}
+
+function maskPhoneNumber(
+  phone: string,
+) {
+  const digits = phone.replace(/\D/g, '');
+
+  if (digits.length < 4) {
+    return phone;
+  }
+
+  return `Text ending in ${digits.slice(-4)}`;
+}
+
 export default function LoginScreen() {
   const isWebPreview =
     Platform.OS === 'web';
 
   const {
     signIn,
+    sendLoginCode,
+    verifyLoginCode,
+    sendSmsLoginCode,
+    verifySmsLoginCode,
     signInWithGoogle,
     signInWithApple,
     loading,
@@ -117,7 +271,13 @@ export default function LoginScreen() {
     authError,
   } = useAuth();
 
+  const [loginMethod, setLoginMethod] =
+    useState<LoginMethod>('password');
+
   const [email, setEmail] =
+    useState('');
+
+  const [phone, setPhone] =
     useState('');
 
   const [password, setPassword] =
@@ -127,6 +287,27 @@ export default function LoginScreen() {
     passwordVisible,
     setPasswordVisible,
   ] = useState(false);
+
+  const [codeSent, setCodeSent] =
+    useState(false);
+
+  const [codeDigits, setCodeDigits] =
+    useState<string[]>([
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ]);
+
+  const [
+    resendSeconds,
+    setResendSeconds,
+  ] = useState(0);
+
+  const codeInputRefs =
+    useRef<Array<TextInput | null>>([]);
 
   const [message, setMessage] =
     useState<string | null>(
@@ -152,19 +333,119 @@ export default function LoginScreen() {
       [cleanEmail],
     );
 
+  const cleanPhone =
+    useMemo(
+      () =>
+        normalizePhoneNumber(
+          phone,
+        ),
+      [phone],
+    );
+
+  const phoneLooksValid =
+    Boolean(cleanPhone);
+
+  const code =
+    codeDigits.join('');
+
   const authBusy =
     loading ||
     Boolean(socialLoading);
 
+  const destinationLooksValid =
+    loginMethod === 'sms_code'
+      ? phoneLooksValid
+      : emailLooksValid;
+
   const canSubmit =
     isConfigured &&
     !authBusy &&
-    emailLooksValid &&
-    password.length >= 6;
+    destinationLooksValid &&
+    (loginMethod === 'password'
+      ? password.length >= 6
+      : codeSent
+        ? code.length === 6
+        : true);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setResendSeconds((current) =>
+        Math.max(0, current - 1),
+      );
+    }, 1_000);
+
+    return () => clearTimeout(timer);
+  }, [resendSeconds]);
 
   function clearNotices() {
     setMessage(null);
     setSuccessMessage(null);
+  }
+
+  function resetCodeEntry() {
+    setCodeDigits([
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ]);
+  }
+
+  function changeLoginMethod(
+    method: LoginMethod,
+  ) {
+    if (authBusy) {
+      return;
+    }
+
+    setLoginMethod(method);
+    clearNotices();
+
+    resetCodeEntry();
+    setCodeSent(false);
+    setResendSeconds(0);
+  }
+
+  function handleEmailChange(
+    value: string,
+  ) {
+    setEmail(value);
+    clearNotices();
+
+    if (
+      codeSent &&
+      loginMethod ===
+        'email_code'
+    ) {
+      setCodeSent(false);
+      setResendSeconds(0);
+      resetCodeEntry();
+    }
+  }
+
+  function handlePhoneChange(
+    value: string,
+  ) {
+    setPhone(
+      formatPhoneInput(value),
+    );
+    clearNotices();
+
+    if (
+      codeSent &&
+      loginMethod ===
+        'sms_code'
+    ) {
+      setCodeSent(false);
+      setResendSeconds(0);
+      resetCodeEntry();
+    }
   }
 
   async function handleLogin() {
@@ -226,6 +507,223 @@ export default function LoginScreen() {
     }, 300);
   }
 
+  async function handleSendCode() {
+    if (authBusy) {
+      return;
+    }
+
+    clearNotices();
+
+    if (
+      loginMethod ===
+      'email_code'
+    ) {
+      if (!emailLooksValid) {
+        setMessage(
+          'Enter the email address connected to your SitGuru account.',
+        );
+        return;
+      }
+
+      const result =
+        await sendLoginCode(
+          cleanEmail,
+        );
+
+      if (result.error) {
+        setMessage(
+          normalizeLoginError(
+            result.error,
+          ),
+        );
+        return;
+      }
+
+      setSuccessMessage(
+        `A six-digit login code was emailed to ${cleanEmail}.`,
+      );
+    } else if (
+      loginMethod ===
+      'sms_code'
+    ) {
+      if (!phoneLooksValid) {
+        setMessage(
+          'Enter a valid mobile number, including the country code when outside the United States.',
+        );
+        return;
+      }
+
+      const result =
+        await sendSmsLoginCode(
+          cleanPhone,
+        );
+
+      if (result.error) {
+        setMessage(
+          normalizeLoginError(
+            result.error,
+          ),
+        );
+        return;
+      }
+
+      setSuccessMessage(
+        `A six-digit login code was texted to the phone ending in ${cleanPhone.slice(-4)}.`,
+      );
+    } else {
+      return;
+    }
+
+    resetCodeEntry();
+    setCodeSent(true);
+    setResendSeconds(60);
+
+    setTimeout(() => {
+      codeInputRefs.current[0]?.focus();
+    }, 150);
+  }
+
+  async function handleVerifyCode() {
+    if (authBusy) {
+      return;
+    }
+
+    clearNotices();
+
+    if (
+      loginMethod ===
+        'email_code' &&
+      !emailLooksValid
+    ) {
+      setMessage(
+        'Enter a valid email address.',
+      );
+      return;
+    }
+
+    if (
+      loginMethod ===
+        'sms_code' &&
+      !phoneLooksValid
+    ) {
+      setMessage(
+        'Enter a valid mobile number.',
+      );
+      return;
+    }
+
+    if (code.length !== 6) {
+      setMessage(
+        'Enter the complete six-digit code.',
+      );
+      return;
+    }
+
+    const result =
+      loginMethod ===
+      'sms_code'
+        ? await verifySmsLoginCode(
+            cleanPhone,
+            code,
+          )
+        : await verifyLoginCode(
+            cleanEmail,
+            code,
+          );
+
+    if (result.error) {
+      setMessage(
+        normalizeLoginError(
+          result.error,
+        ),
+      );
+      return;
+    }
+
+    setSuccessMessage(
+      'Code verified. Opening your SitGuru account…',
+    );
+
+    setTimeout(() => {
+      router.replace(
+        '/role-selection',
+      );
+    }, 300);
+  }
+
+  function handleCodeChange(
+    index: number,
+    value: string,
+  ) {
+    const digits =
+      value.replace(/\D/g, '');
+
+    const next = [
+      ...codeDigits,
+    ];
+
+    if (!digits) {
+      next[index] = '';
+      setCodeDigits(next);
+      clearNotices();
+      return;
+    }
+
+    digits
+      .slice(0, 6 - index)
+      .split('')
+      .forEach((digit, offset) => {
+        next[index + offset] = digit;
+      });
+
+    setCodeDigits(next);
+    clearNotices();
+
+    const nextIndex =
+      index +
+      Math.min(
+        digits.length,
+        6 - index,
+      );
+
+    if (nextIndex < 6) {
+      codeInputRefs.current[
+        nextIndex
+      ]?.focus();
+    } else {
+      codeInputRefs.current[5]?.blur();
+    }
+  }
+
+  function handleCodeKeyPress(
+    index: number,
+    key: string,
+  ) {
+    if (
+      key === 'Backspace' &&
+      !codeDigits[index] &&
+      index > 0
+    ) {
+      codeInputRefs.current[
+        index - 1
+      ]?.focus();
+    }
+  }
+
+  async function handlePrimaryAction() {
+    if (loginMethod === 'password') {
+      await handleLogin();
+      return;
+    }
+
+    if (!codeSent) {
+      await handleSendCode();
+      return;
+    }
+
+    await handleVerifyCode();
+  }
+
   async function handleSocialLogin(
     provider: SocialProvider,
   ) {
@@ -258,6 +756,10 @@ export default function LoginScreen() {
           result.error,
         ),
       );
+      return;
+    }
+
+    if (Platform.OS === 'web') {
       return;
     }
 
@@ -574,8 +1076,8 @@ export default function LoginScreen() {
                         styles.dividerText
                       }
                     >
-                      or continue with
-                      email
+                      or choose a sign-in
+                      method
                     </Text>
 
                     <View
@@ -587,70 +1089,158 @@ export default function LoginScreen() {
 
                   <View
                     style={
-                      styles.fieldGroup
+                      styles.methodToggle
                     }
                   >
-                    <Text
-                      style={
-                        styles.fieldLabel
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{
+                        selected:
+                          loginMethod ===
+                          'password',
+                      }}
+                      disabled={authBusy}
+                      onPress={() =>
+                        changeLoginMethod(
+                          'password',
+                        )
                       }
+                      style={[
+                        styles.methodButton,
+                        loginMethod ===
+                          'password' &&
+                          styles.methodButtonActive,
+                      ]}
                     >
-                      Email address
-                    </Text>
+                      <LockKeyhole
+                        color={
+                          loginMethod ===
+                          'password'
+                            ? SitGuruColors.primary
+                            : SitGuruColors.textSoft
+                        }
+                        size={15}
+                        strokeWidth={2.3}
+                      />
 
-                    <View
-                      style={
-                        styles.inputShell
+                      <Text
+                        style={[
+                          styles.methodButtonText,
+                          loginMethod ===
+                            'password' &&
+                            styles.methodButtonTextActive,
+                        ]}
+                      >
+                        Password
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{
+                        selected:
+                          loginMethod ===
+                          'email_code',
+                      }}
+                      disabled={authBusy}
+                      onPress={() =>
+                        changeLoginMethod(
+                          'email_code',
+                        )
                       }
+                      style={[
+                        styles.methodButton,
+                        loginMethod ===
+                          'email_code' &&
+                          styles.methodButtonActive,
+                      ]}
                     >
                       <Mail
                         color={
-                          SitGuruColors.textSoft
+                          loginMethod ===
+                          'email_code'
+                            ? SitGuruColors.primary
+                            : SitGuruColors.textSoft
                         }
-                        size={19}
-                        strokeWidth={2.2}
+                        size={15}
+                        strokeWidth={2.3}
                       />
 
-                      <TextInput
-                        autoCapitalize="none"
-                        autoComplete="email"
-                        autoCorrect={
-                          false
+                      <Text
+                        style={[
+                          styles.methodButtonText,
+                          loginMethod ===
+                            'email_code' &&
+                            styles.methodButtonTextActive,
+                        ]}
+                      >
+                        Email code
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{
+                        selected:
+                          loginMethod ===
+                          'sms_code',
+                      }}
+                      disabled={authBusy}
+                      onPress={() =>
+                        changeLoginMethod(
+                          'sms_code',
+                        )
+                      }
+                      style={[
+                        styles.methodButton,
+                        loginMethod ===
+                          'sms_code' &&
+                          styles.methodButtonActive,
+                      ]}
+                    >
+                      <Phone
+                        color={
+                          loginMethod ===
+                          'sms_code'
+                            ? SitGuruColors.primary
+                            : SitGuruColors.textSoft
                         }
-                        editable={
-                          !authBusy
-                        }
-                        keyboardType="email-address"
-                        onChangeText={(
-                          value,
-                        ) => {
-                          setEmail(
-                            value,
-                          );
-                          clearNotices();
-                        }}
-                        placeholder="you@example.com"
-                        placeholderTextColor={
-                          SitGuruColors.textSoft
-                        }
-                        returnKeyType="next"
-                        style={
-                          styles.input
-                        }
-                        textContentType="emailAddress"
-                        value={email}
+                        size={15}
+                        strokeWidth={2.3}
                       />
-                    </View>
+
+                      <Text
+                        style={[
+                          styles.methodButtonText,
+                          loginMethod ===
+                            'sms_code' &&
+                            styles.methodButtonTextActive,
+                        ]}
+                      >
+                        Text code
+                      </Text>
+                    </Pressable>
                   </View>
 
-                  <View
+                  <Text
                     style={
-                      styles.fieldGroup
+                      styles.methodHelper
                     }
                   >
+                    {loginMethod ===
+                    'password'
+                      ? 'Use the email and password connected to your SitGuru account.'
+                      : loginMethod ===
+                          'email_code'
+                        ? 'Receive a one-time six-digit code by email.'
+                        : 'Receive a one-time six-digit code by text message.'}
+                  </Text>
+
+                  {loginMethod ===
+                  'sms_code' ? (
                     <View
                       style={
-                        styles.passwordLabelRow
+                        styles.fieldGroup
                       }
                     >
                       <Text
@@ -658,111 +1248,421 @@ export default function LoginScreen() {
                           styles.fieldLabel
                         }
                       >
-                        Password
+                        Mobile number
                       </Text>
 
-                      <Link
-                        href="/forgot-password"
+                      <View
                         style={
-                          styles.forgotLink
+                          styles.inputShell
                         }
                       >
-                        Forgot password?
-                      </Link>
-                    </View>
+                        <Phone
+                          color={
+                            SitGuruColors.textSoft
+                          }
+                          size={19}
+                          strokeWidth={2.2}
+                        />
 
+                        <TextInput
+                          autoComplete="tel"
+                          autoCorrect={false}
+                          editable={!authBusy}
+                          keyboardType="phone-pad"
+                          onChangeText={
+                            handlePhoneChange
+                          }
+                          onSubmitEditing={() => {
+                            if (!codeSent) {
+                              void handleSendCode();
+                            }
+                          }}
+                          placeholder="(215) 555-1234"
+                          placeholderTextColor={
+                            SitGuruColors.textSoft
+                          }
+                          returnKeyType={
+                            codeSent
+                              ? 'next'
+                              : 'send'
+                          }
+                          style={
+                            styles.input
+                          }
+                          textContentType="telephoneNumber"
+                          value={phone}
+                        />
+                      </View>
+                    </View>
+                  ) : (
                     <View
                       style={
-                        styles.inputShell
+                        styles.fieldGroup
                       }
                     >
-                      <LockKeyhole
-                        color={
-                          SitGuruColors.textSoft
-                        }
-                        size={19}
-                        strokeWidth={2.2}
-                      />
-
-                      <TextInput
-                        autoCapitalize="none"
-                        autoComplete="password"
-                        autoCorrect={
-                          false
-                        }
-                        editable={
-                          !authBusy
-                        }
-                        onChangeText={(
-                          value,
-                        ) => {
-                          setPassword(
-                            value,
-                          );
-                          clearNotices();
-                        }}
-                        onSubmitEditing={() =>
-                          void handleLogin()
-                        }
-                        placeholder="Enter your password"
-                        placeholderTextColor={
-                          SitGuruColors.textSoft
-                        }
-                        returnKeyType="go"
-                        secureTextEntry={
-                          !passwordVisible
-                        }
+                      <Text
                         style={
-                          styles.input
-                        }
-                        textContentType="password"
-                        value={password}
-                      />
-
-                      <Pressable
-                        accessibilityLabel={
-                          passwordVisible
-                            ? 'Hide password'
-                            : 'Show password'
-                        }
-                        accessibilityRole="button"
-                        hitSlop={10}
-                        onPress={() =>
-                          setPasswordVisible(
-                            (
-                              current,
-                            ) =>
-                              !current,
-                          )
-                        }
-                        style={
-                          styles.eyeButton
+                          styles.fieldLabel
                         }
                       >
-                        {passwordVisible ? (
-                          <EyeOff
-                            color={
-                              SitGuruColors.textMuted
+                        Email address
+                      </Text>
+
+                      <View
+                        style={
+                          styles.inputShell
+                        }
+                      >
+                        <Mail
+                          color={
+                            SitGuruColors.textSoft
+                          }
+                          size={19}
+                          strokeWidth={2.2}
+                        />
+
+                        <TextInput
+                          autoCapitalize="none"
+                          autoComplete="email"
+                          autoCorrect={false}
+                          editable={!authBusy}
+                          keyboardType="email-address"
+                          onChangeText={
+                            handleEmailChange
+                          }
+                          onSubmitEditing={() => {
+                            if (
+                              loginMethod ===
+                                'email_code' &&
+                              !codeSent
+                            ) {
+                              void handleSendCode();
                             }
-                            size={19}
-                            strokeWidth={
-                              2.2
-                            }
-                          />
-                        ) : (
-                          <Eye
-                            color={
-                              SitGuruColors.textMuted
-                            }
-                            size={19}
-                            strokeWidth={
-                              2.2
-                            }
-                          />
-                        )}
-                      </Pressable>
+                          }}
+                          placeholder="you@example.com"
+                          placeholderTextColor={
+                            SitGuruColors.textSoft
+                          }
+                          returnKeyType={
+                            loginMethod ===
+                              'email_code' &&
+                            !codeSent
+                              ? 'send'
+                              : 'next'
+                          }
+                          style={
+                            styles.input
+                          }
+                          textContentType="emailAddress"
+                          value={email}
+                        />
+                      </View>
                     </View>
-                  </View>
+                  )}
+
+                  {loginMethod ===
+                  'password' ? (
+                    <View
+                      style={
+                        styles.fieldGroup
+                      }
+                    >
+                      <View
+                        style={
+                          styles.passwordLabelRow
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.fieldLabel
+                          }
+                        >
+                          Password
+                        </Text>
+
+                        <Link
+                          href="/forgot-password"
+                          style={
+                            styles.forgotLink
+                          }
+                        >
+                          Forgot password?
+                        </Link>
+                      </View>
+
+                      <View
+                        style={
+                          styles.inputShell
+                        }
+                      >
+                        <LockKeyhole
+                          color={
+                            SitGuruColors.textSoft
+                          }
+                          size={19}
+                          strokeWidth={2.2}
+                        />
+
+                        <TextInput
+                          autoCapitalize="none"
+                          autoComplete="password"
+                          autoCorrect={
+                            false
+                          }
+                          editable={
+                            !authBusy
+                          }
+                          onChangeText={(
+                            value,
+                          ) => {
+                            setPassword(
+                              value,
+                            );
+                            clearNotices();
+                          }}
+                          onSubmitEditing={() =>
+                            void handleLogin()
+                          }
+                          placeholder="Enter your password"
+                          placeholderTextColor={
+                            SitGuruColors.textSoft
+                          }
+                          returnKeyType="go"
+                          secureTextEntry={
+                            !passwordVisible
+                          }
+                          style={
+                            styles.input
+                          }
+                          textContentType="password"
+                          value={password}
+                        />
+
+                        <Pressable
+                          accessibilityLabel={
+                            passwordVisible
+                              ? 'Hide password'
+                              : 'Show password'
+                          }
+                          accessibilityRole="button"
+                          hitSlop={10}
+                          onPress={() =>
+                            setPasswordVisible(
+                              (current) =>
+                                !current,
+                            )
+                          }
+                          style={
+                            styles.eyeButton
+                          }
+                        >
+                          {passwordVisible ? (
+                            <EyeOff
+                              color={
+                                SitGuruColors.textMuted
+                              }
+                              size={19}
+                              strokeWidth={2.2}
+                            />
+                          ) : (
+                            <Eye
+                              color={
+                                SitGuruColors.textMuted
+                              }
+                              size={19}
+                              strokeWidth={2.2}
+                            />
+                          )}
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : codeSent ? (
+                    <View
+                      style={
+                        styles.codeSection
+                      }
+                    >
+                      <View
+                        style={
+                          styles.codeLabelRow
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.fieldLabel
+                          }
+                        >
+                          Enter your code
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.codeEmail
+                          }
+                          numberOfLines={1}
+                        >
+                          {loginMethod ===
+                          'sms_code'
+                            ? maskPhoneNumber(
+                                cleanPhone,
+                              )
+                            : cleanEmail}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.codeRow
+                        }
+                      >
+                        {codeDigits.map(
+                          (digit, index) => (
+                            <TextInput
+                              key={index}
+                              ref={(input) => {
+                                codeInputRefs.current[
+                                  index
+                                ] = input;
+                              }}
+                              accessibilityLabel={`Digit ${
+                                index + 1
+                              } of six-digit login code`}
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              editable={!authBusy}
+                              keyboardType="number-pad"
+                              maxLength={6}
+                              onChangeText={(value) =>
+                                handleCodeChange(
+                                  index,
+                                  value,
+                                )
+                              }
+                              onKeyPress={({
+                                nativeEvent,
+                              }) =>
+                                handleCodeKeyPress(
+                                  index,
+                                  nativeEvent.key,
+                                )
+                              }
+                              onSubmitEditing={() => {
+                                if (
+                                  code.length ===
+                                  6
+                                ) {
+                                  void handleVerifyCode();
+                                }
+                              }}
+                              returnKeyType={
+                                index === 5
+                                  ? 'go'
+                                  : 'next'
+                              }
+                              selectTextOnFocus
+                              style={[
+                                styles.codeInput,
+                                digit &&
+                                  styles.codeInputFilled,
+                              ]}
+                              textContentType={
+                                index === 0
+                                  ? 'oneTimeCode'
+                                  : 'none'
+                              }
+                              value={digit}
+                            />
+                          ),
+                        )}
+                      </View>
+
+                      <View
+                        style={
+                          styles.resendRow
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.resendText
+                          }
+                        >
+                          Didn’t receive it?
+                        </Text>
+
+                        <Pressable
+                          accessibilityRole="button"
+                          disabled={
+                            authBusy ||
+                            resendSeconds > 0
+                          }
+                          onPress={() =>
+                            void handleSendCode()
+                          }
+                          style={
+                            styles.resendButton
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.resendButtonText,
+                              (authBusy ||
+                                resendSeconds >
+                                  0) &&
+                                styles.resendButtonTextDisabled,
+                            ]}
+                          >
+                            {resendSeconds > 0
+                              ? `Resend in ${resendSeconds}s`
+                              : 'Resend code'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <View
+                      style={
+                        styles.codeReadyCard
+                      }
+                    >
+                      <View
+                        style={
+                          styles.codeReadyIcon
+                        }
+                      >
+                        <KeyRound
+                          color={
+                            SitGuruColors.primary
+                          }
+                          size={20}
+                          strokeWidth={2.4}
+                        />
+                      </View>
+
+                      <View
+                        style={
+                          styles.codeReadyCopy
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.codeReadyTitle
+                          }
+                        >
+                          Password-free login
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.codeReadyText
+                          }
+                        >
+                          {loginMethod === 'sms_code'
+                            ? 'Tap Send Code and check your phone for a one-time six-digit text message.'
+                            : 'Tap Send Code and check your email for a one-time six-digit number.'}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
 
                   <Pressable
                     accessibilityRole="button"
@@ -772,7 +1672,7 @@ export default function LoginScreen() {
                     }}
                     disabled={!canSubmit}
                     onPress={() =>
-                      void handleLogin()
+                      void handlePrimaryAction()
                     }
                     style={({
                       pressed,
@@ -791,8 +1691,21 @@ export default function LoginScreen() {
                       }
                     >
                       {loading
-                        ? 'Signing in…'
-                        : 'Log In'}
+                        ? loginMethod ===
+                          'password'
+                          ? 'Signing in…'
+                          : codeSent
+                            ? 'Verifying…'
+                            : 'Sending code…'
+                        : loginMethod ===
+                            'password'
+                          ? 'Log In'
+                          : codeSent
+                            ? 'Verify & Log In'
+                            : loginMethod ===
+                                'sms_code'
+                              ? 'Text 6-Digit Code'
+                              : 'Email 6-Digit Code'}
                     </Text>
 
                     {!loading ? (
@@ -822,12 +1735,7 @@ export default function LoginScreen() {
                         styles.securityText
                       }
                     >
-                      Secure sessions keep
-                      you signed in. Face
-                      ID, Touch ID, or
-                      fingerprint unlock
-                      will be offered after
-                      setup.
+                      Use your password, an email code, a text-message code, Google, or Apple. Secure sessions keep you signed in after login.
                     </Text>
                   </View>
                 </View>
@@ -1297,6 +2205,62 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textTransform: 'uppercase',
   },
+  methodToggle: {
+    backgroundColor:
+      SitGuruColors.background,
+    borderColor:
+      SitGuruColors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+  },
+  methodButton: {
+    alignItems: 'center',
+    borderRadius: 12,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 4,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: 4,
+  },
+  methodButtonActive: {
+    backgroundColor:
+      SitGuruColors.surface,
+    borderColor:
+      SitGuruColors.primaryLight,
+    borderWidth: 1,
+    elevation: 1,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+  },
+  methodButtonText: {
+    color:
+      SitGuruColors.textSoft,
+    fontFamily: AppFonts.bold,
+    fontSize: 9,
+    textAlign: 'center',
+  },
+  methodButtonTextActive: {
+    color:
+      SitGuruColors.primary,
+  },
+  methodHelper: {
+    color:
+      SitGuruColors.textMuted,
+    fontFamily:
+      AppFonts.medium,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: -5,
+  },
   fieldGroup: {
     gap: 7,
   },
@@ -1343,6 +2307,122 @@ const styles = StyleSheet.create({
     height: 38,
     justifyContent: 'center',
     width: 34,
+  },
+  codeSection: {
+    gap: 9,
+  },
+  codeLabelRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent:
+      'space-between',
+  },
+  codeEmail: {
+    color:
+      SitGuruColors.textMuted,
+    flex: 1,
+    fontFamily:
+      AppFonts.medium,
+    fontSize: 10,
+    textAlign: 'right',
+  },
+  codeRow: {
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent:
+      'space-between',
+  },
+  codeInput: {
+    backgroundColor:
+      SitGuruColors.background,
+    borderColor:
+      SitGuruColors.border,
+    borderRadius: 13,
+    borderWidth: 1,
+    color: SitGuruColors.text,
+    flex: 1,
+    fontFamily:
+      AppFonts.extraBold,
+    fontSize: 21,
+    height: 52,
+    maxWidth: 48,
+    minWidth: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    textAlign: 'center',
+  },
+  codeInputFilled: {
+    backgroundColor:
+      SitGuruColors.surfaceSoft,
+    borderColor:
+      SitGuruColors.primary,
+  },
+  resendRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent:
+      'space-between',
+  },
+  resendText: {
+    color:
+      SitGuruColors.textMuted,
+    fontFamily:
+      AppFonts.medium,
+    fontSize: 11,
+  },
+  resendButton: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  resendButtonText: {
+    color:
+      SitGuruColors.primary,
+    fontFamily: AppFonts.bold,
+    fontSize: 11,
+  },
+  resendButtonTextDisabled: {
+    color:
+      SitGuruColors.textSoft,
+  },
+  codeReadyCard: {
+    alignItems: 'center',
+    backgroundColor:
+      SitGuruColors.surfaceSoft,
+    borderColor:
+      SitGuruColors.primaryLight,
+    borderRadius: 17,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 11,
+  },
+  codeReadyIcon: {
+    alignItems: 'center',
+    backgroundColor:
+      SitGuruColors.surface,
+    borderRadius: 12,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  codeReadyCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  codeReadyTitle: {
+    color: SitGuruColors.text,
+    fontFamily:
+      AppFonts.extraBold,
+    fontSize: 12,
+  },
+  codeReadyText: {
+    color:
+      SitGuruColors.textMuted,
+    fontFamily:
+      AppFonts.medium,
+    fontSize: 10,
+    lineHeight: 15,
   },
   loginButton: {
     alignItems: 'center',

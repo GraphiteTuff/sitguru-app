@@ -6,6 +6,8 @@ import {
   List,
   Map as MapIcon,
   MapPin,
+  PawPrint,
+  ShieldCheck,
   SlidersHorizontal,
   Star,
 } from "lucide-react-native";
@@ -108,6 +110,49 @@ function GuruAvatarImage({
       source={source}
       style={style}
     />
+  );
+}
+
+function GuruCardHeroImage({
+  photoUrl,
+  styles,
+}: {
+  photoUrl?: string | null;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [photoUrl]);
+
+  const source =
+    photoUrl && !imageFailed ? { uri: photoUrl } : SITGURU_FALLBACK_AVATAR;
+
+  return (
+    <View style={styles.guruProfilePhotoStage}>
+      <Image
+        accessibilityElementsHidden
+        blurRadius={Platform.OS === "web" ? 0 : 6}
+        onError={() => setImageFailed(true)}
+        resizeMode="cover"
+        source={source}
+        style={styles.guruProfilePhotoBackdrop}
+      />
+
+      <View
+        pointerEvents="none"
+        style={styles.guruProfilePhotoBackdropTint}
+      />
+
+      <Image
+        accessibilityLabel="Guru profile photo"
+        onError={() => setImageFailed(true)}
+        resizeMode="contain"
+        source={source}
+        style={styles.guruProfilePhoto}
+      />
+    </View>
   );
 }
 
@@ -1431,115 +1476,20 @@ export default function FindCareScreen() {
                     </View>
                   ) : (
                     <View style={styles.guruList}>
-                      {displayedGurus.map((guru, index) => {
-                        const name = getGuruDisplayName(guru);
-                        const photoUrl = resolveSupabaseStorageUrl(
-                          getGuruPhotoUrl(guru),
-                        );
-                        const chips = getGuruServices(guru).slice(0, 3);
-                        const rating = getGuruRatingLabel(guru);
-                        const rate = formatCompactRate(getGuruRateLabel(guru));
-                        const isFavorite = favoriteGuruIds.includes(
-                          String(guru.id),
-                        );
-                        const serviceMiles = getGuruServiceRadiusMiles(guru);
-                        const distanceLabel = getGuruDistanceLabel(
-                          guru,
-                          homeLocation,
-                          index,
-                        );
-
-                        return (
-                          <View key={guru.id} style={styles.guruCard}>
-                            <Pressable
-                              accessibilityRole="button"
-                              accessibilityLabel={`View ${name} profile`}
-                              onPress={() => handleViewProfile(guru)}
-                              style={styles.guruCardPrimary}
-                            >
-                              <View style={styles.guruListAvatarWrap}>
-                                <GuruAvatarImage
-                                  photoUrl={photoUrl}
-                                  style={styles.guruListAvatarImage}
-                                />
-                              </View>
-
-                              <View style={styles.guruCardBody}>
-                                <Text style={styles.guruName} numberOfLines={1}>
-                                  {name}
-                                </Text>
-
-                                <View style={styles.ratingRow}>
-                                  <Text style={styles.ratingValue}>
-                                    {rating}
-                                  </Text>
-                                  <Star
-                                    size={13}
-                                    color={palette.gold}
-                                    fill={palette.gold}
-                                    strokeWidth={2.1}
-                                  />
-                                </View>
-
-                                <Text
-                                  style={styles.guruMetaText}
-                                  numberOfLines={1}
-                                >
-                                  {getGuruLocationLabel(guru)} • {distanceLabel}
-                                </Text>
-
-                                <Text
-                                  style={styles.guruServiceText}
-                                  numberOfLines={1}
-                                >
-                                  {chips.map(shortenServiceLabel).join(" • ")}
-                                </Text>
-
-                                <View style={styles.serviceRadiusPill}>
-                                  <Text style={styles.serviceRadiusPillText}>
-                                    Serves up to {serviceMiles} miles
-                                  </Text>
-                                </View>
-                              </View>
-                            </Pressable>
-
-                            <View style={styles.guruCardRight}>
-                              <Pressable
-                                accessibilityRole="button"
-                                accessibilityLabel={
-                                  isFavorite
-                                    ? `Remove ${name} from favorite Gurus`
-                                    : `Save ${name} as a favorite Guru`
-                                }
-                                accessibilityState={{ selected: isFavorite }}
-                                hitSlop={10}
-                                onPress={() => handleToggleFavorite(guru)}
-                                style={[
-                                  styles.favoriteButton,
-                                  isFavorite && styles.favoriteButtonSaved,
-                                ]}
-                              >
-                                <Heart
-                                  size={20}
-                                  color={
-                                    isFavorite
-                                      ? palette.favoriteRed
-                                      : palette.favoriteRed
-                                  }
-                                  fill={
-                                    isFavorite
-                                      ? palette.favoriteRed
-                                      : "transparent"
-                                  }
-                                  strokeWidth={2.2}
-                                />
-                              </Pressable>
-
-                              <Text style={styles.guruRateText}>{rate}</Text>
-                            </View>
-                          </View>
-                        );
-                      })}
+                      {displayedGurus.map((guru, index) => (
+                        <GuruDiscoveryCard
+                          favoriteGuruIds={favoriteGuruIds}
+                          guru={guru}
+                          homeLocation={homeLocation}
+                          index={index}
+                          key={String(guru.id)}
+                          onBook={handleBookingAction}
+                          onFavorite={handleToggleFavorite}
+                          onView={handleViewProfile}
+                          palette={palette}
+                          styles={styles}
+                        />
+                      ))}
                     </View>
                   )}
                 </>
@@ -1756,6 +1706,187 @@ export default function FindCareScreen() {
         </View>
       </View>
     </SitGuruScreen>
+  );
+}
+
+
+function GuruDiscoveryCard({
+  favoriteGuruIds,
+  guru,
+  homeLocation,
+  index,
+  onBook,
+  onFavorite,
+  onView,
+  palette,
+  styles,
+}: {
+  favoriteGuruIds: string[];
+  guru: PublicGuruProfile;
+  homeLocation: HomeLocation | null;
+  index: number;
+  onBook: (guru: PublicGuruProfile) => void;
+  onFavorite: (guru: PublicGuruProfile) => void;
+  onView: (guru: PublicGuruProfile) => void;
+  palette: ReturnType<typeof getPalette>;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const name = getGuruDisplayName(guru);
+  const photoUrl = resolveSupabaseStorageUrl(getGuruPhotoUrl(guru));
+  const isFavorite = favoriteGuruIds.includes(String(guru.id));
+  const preview = isKnownPreviewGuru(guru);
+  const bookable = isGuruBookable(guru);
+  const chips = getGuruServices(guru).slice(0, 4);
+  const distanceLabel = getGuruDistanceLabel(guru, homeLocation, index);
+  const locationLabel = getGuruCityStateLabel(guru);
+  const ratingLabel = getGuruCardRatingLabel(guru);
+  const reviewCount = getGuruReviewCount(guru);
+  const rate = formatCompactRate(getGuruRateLabel(guru));
+  const badgeLabel = getGuruCardBadgeLabel(guru);
+  const trustLabel = getGuruCardTrustLabel(guru);
+  const bio = getGuruCardBio(guru);
+  const actionLabel = preview
+    ? "View Profile Preview"
+    : bookable
+      ? "Request Booking"
+      : "Message Guru";
+
+  return (
+    <View style={styles.guruProfileCard}>
+      <Pressable
+        accessibilityLabel={`View ${name} profile`}
+        accessibilityRole="button"
+        onPress={() => onView(guru)}
+        style={styles.guruProfilePhotoButton}
+      >
+        <GuruCardHeroImage photoUrl={photoUrl} styles={styles} />
+        <View pointerEvents="none" style={styles.guruProfilePhotoShade} />
+      </Pressable>
+
+      <Pressable
+        accessibilityLabel={
+          isFavorite
+            ? `Remove ${name} from favorite Gurus`
+            : `Save ${name} as a favorite Guru`
+        }
+        accessibilityRole="button"
+        accessibilityState={{ selected: isFavorite }}
+        hitSlop={8}
+        onPress={() => onFavorite(guru)}
+        style={[
+          styles.guruProfileFavoriteButton,
+          isFavorite && styles.guruProfileFavoriteButtonSaved,
+        ]}
+      >
+        <Heart
+          color={isFavorite ? palette.favoriteRed : "#123F31"}
+          fill={isFavorite ? palette.favoriteRed : "transparent"}
+          size={19}
+          strokeWidth={2.35}
+        />
+      </Pressable>
+
+      <View style={styles.guruProfilePanel}>
+        <View style={styles.guruProfileBadge}>
+          <Text style={styles.guruProfileBadgeText}>{badgeLabel}</Text>
+        </View>
+
+        <Pressable
+          accessibilityLabel={`Open ${name} profile details`}
+          accessibilityRole="button"
+          onPress={() => onView(guru)}
+          style={styles.guruProfileContentButton}
+        >
+          <View style={styles.guruProfileNameRow}>
+            <View style={styles.guruProfileNameCopy}>
+              <Text numberOfLines={1} style={styles.guruProfileName}>
+                {name}
+              </Text>
+              <Text numberOfLines={1} style={styles.guruProfileLocation}>
+                {locationLabel} • {distanceLabel}
+              </Text>
+            </View>
+
+            <Text numberOfLines={1} style={styles.guruProfileRate}>
+              {rate}
+            </Text>
+          </View>
+
+          <View style={styles.guruProfileRatingRow}>
+            <Star
+              color={palette.gold}
+              fill={palette.gold}
+              size={13}
+              strokeWidth={2.1}
+            />
+            <Text style={styles.guruProfileRatingValue}>{ratingLabel}</Text>
+            <Text style={styles.guruProfileReviewText}>
+              {reviewCount > 0
+                ? `${reviewCount.toLocaleString()} ${
+                    reviewCount === 1 ? "review" : "reviews"
+                  }`
+                : "New to SitGuru"}
+            </Text>
+          </View>
+
+          <View style={styles.guruProfileServices}>
+            {chips.map((chip, chipIndex) => (
+              <View
+                key={`${String(guru.id)}-${chip}-${chipIndex}`}
+                style={styles.guruProfileServicePill}
+              >
+                <PawPrint
+                  color="#D7EEDF"
+                  size={9}
+                  strokeWidth={2.5}
+                />
+                <Text numberOfLines={1} style={styles.guruProfileServiceText}>
+                  {shortenServiceLabel(chip)}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.guruProfileAboutBlock}>
+            <Text style={styles.guruProfileAboutLabel}>About</Text>
+            <Text numberOfLines={2} style={styles.guruProfileAboutText}>
+              {bio}
+            </Text>
+          </View>
+
+          <View style={styles.guruProfileTrustRow}>
+            <ShieldCheck
+              color="#78D990"
+              size={15}
+              strokeWidth={2.5}
+            />
+            <Text style={styles.guruProfileTrustText}>{trustLabel}</Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          accessibilityLabel={`${actionLabel} with ${name}`}
+          accessibilityRole="button"
+          onPress={() => onBook(guru)}
+          style={({ pressed }) => [
+            styles.guruProfileRequestButton,
+            !bookable && !preview && styles.guruProfileRequestButtonSecondary,
+            pressed && styles.guruProfileRequestButtonPressed,
+          ]}
+        >
+          <Text
+            style={[
+              styles.guruProfileRequestButtonText,
+              !bookable &&
+                !preview &&
+                styles.guruProfileRequestButtonTextSecondary,
+            ]}
+          >
+            {actionLabel}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -2797,6 +2928,122 @@ function getGuruDistanceLabel(
   }
 
   return `${index + 2} mi away`;
+}
+
+
+function getGuruCardRatingLabel(guru: PublicGuruProfile) {
+  const record = guru as Record<string, unknown>;
+  const rating = getFirstNumber(record, [
+    "rating_avg",
+    "average_rating",
+    "rating",
+    "review_rating",
+  ]);
+
+  if (rating !== null && rating > 0) {
+    return rating.toFixed(1);
+  }
+
+  const fallback = getGuruRatingLabel(guru);
+  const numericMatch = fallback.match(/[0-9]+(?:\.[0-9]+)?/);
+
+  return numericMatch?.[0] ?? "New";
+}
+
+function getGuruReviewCount(guru: PublicGuruProfile) {
+  const record = guru as Record<string, unknown>;
+  const reviewCount = getFirstNumber(record, [
+    "review_count",
+    "reviews_count",
+    "total_reviews",
+    "rating_count",
+  ]);
+
+  return Math.max(0, Math.round(reviewCount ?? 0));
+}
+
+function getGuruCardBadgeLabel(guru: PublicGuruProfile) {
+  if (isKnownPreviewGuru(guru)) {
+    return "Profile Preview";
+  }
+
+  const record = guru as Record<string, unknown>;
+  const rating = getFirstNumber(record, [
+    "rating_avg",
+    "average_rating",
+    "rating",
+    "review_rating",
+  ]);
+  const reviews = getGuruReviewCount(guru);
+
+  if ((rating ?? 0) >= 4.8 && reviews >= 5) {
+    return "Top Rated";
+  }
+
+  if (isGuruBookable(guru)) {
+    return "Booking Ready";
+  }
+
+  return "Local Guru";
+}
+
+function getGuruCardTrustLabel(guru: PublicGuruProfile) {
+  if (isKnownPreviewGuru(guru)) {
+    return "Local Guru profile preview";
+  }
+
+  const record = guru as Record<string, unknown>;
+  const backgroundCheckStatus = getFirstString(record, [
+    "background_check_status",
+    "background_status",
+    "check_status",
+  ]).toLowerCase();
+
+  const backgroundCheckPassed = [
+    record.background_checked,
+    record.is_background_checked,
+    record.background_check_complete,
+    record.background_check_passed,
+    record.background_check_verified,
+  ].some(
+    (value) =>
+      value === true ||
+      value === 1 ||
+      value === "1" ||
+      String(value).toLowerCase() === "true",
+  );
+
+  if (
+    backgroundCheckPassed ||
+    ["approved", "complete", "completed", "passed", "verified"].includes(
+      backgroundCheckStatus,
+    )
+  ) {
+    return "Background checked";
+  }
+
+  if (record.is_verified === true || record.verified === true) {
+    return "Identity verified";
+  }
+
+  return isGuruBookable(guru)
+    ? "Booking-ready SitGuru profile"
+    : "Trust details available on profile";
+}
+
+function getGuruCardBio(guru: PublicGuruProfile) {
+  const record = guru as Record<string, unknown>;
+
+  return (
+    getFirstString(record, [
+      "bio",
+      "about",
+      "description",
+      "profile_summary",
+      "headline",
+    ]) ||
+    "Reliable local pet care with thoughtful updates, clear communication, and routines tailored to each pet."
+  );
 }
 
 function formatCompactRate(rateLabel: string) {
@@ -4587,7 +4834,242 @@ function createStyles(isDark: boolean) {
     },
 
     guruList: {
+      gap: 14,
+    },
+    guruProfileCard: {
+      backgroundColor: isDark ? "#0A241B" : "#0D3026",
+      borderColor: isDark ? "#356B51" : "#D7D0C3",
+      borderRadius: 22,
+      borderWidth: 1,
+      overflow: "hidden",
+      shadowColor: "#000000",
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: isDark ? 0.34 : 0.16,
+      shadowRadius: 18,
+    },
+    guruProfilePhotoButton: {
+      backgroundColor: isDark ? "#0B241B" : "#E8EFEA",
+      height: 218,
+      overflow: "hidden",
+      position: "relative",
+      width: "100%",
+    },
+    guruProfilePhotoStage: {
+      backgroundColor: isDark ? "#0B241B" : "#E8EFEA",
+      flex: 1,
+      overflow: "hidden",
+      position: "relative",
+      width: "100%",
+    },
+    guruProfilePhotoBackdrop: {
+      ...StyleSheet.absoluteFill,
+      opacity: isDark ? 0.34 : 0.28,
+      transform: [{ scale: 1.08 }],
+    },
+    guruProfilePhotoBackdropTint: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: isDark
+        ? "rgba(5, 24, 17, 0.24)"
+        : "rgba(237, 244, 239, 0.18)",
+    },
+    guruProfilePhoto: {
+      ...StyleSheet.absoluteFill,
+    },
+    guruProfilePhotoShade: {
+      backgroundColor: "rgba(5, 29, 21, 0.12)",
+      bottom: 0,
+      height: 42,
+      left: 0,
+      position: "absolute",
+      right: 0,
+    },
+    guruProfileFavoriteButton: {
+      alignItems: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.96)",
+      borderColor: "rgba(18, 63, 49, 0.16)",
+      borderRadius: 999,
+      borderWidth: 1,
+      height: 36,
+      justifyContent: "center",
+      position: "absolute",
+      right: 11,
+      shadowColor: "#000000",
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.16,
+      shadowRadius: 7,
+      top: 11,
+      width: 36,
+      zIndex: 10,
+    },
+    guruProfileFavoriteButtonSaved: {
+      backgroundColor: "#FFF4F2",
+      borderColor: "#F4B7AF",
+    },
+    guruProfilePanel: {
+      backgroundColor: isDark ? "#0A2A20" : "#10352B",
+      gap: 9,
+      paddingBottom: 12,
+      paddingHorizontal: 13,
+      paddingTop: 18,
+      position: "relative",
+    },
+    guruProfileBadge: {
+      alignItems: "center",
+      backgroundColor: "#F3A631",
+      borderRadius: 7,
+      justifyContent: "center",
+      left: 13,
+      minHeight: 24,
+      paddingHorizontal: 9,
+      position: "absolute",
+      top: -12,
+      zIndex: 4,
+    },
+    guruProfileBadgeText: {
+      color: "#FFFFFF",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 8,
+      letterSpacing: 0.15,
+      textTransform: "uppercase",
+    },
+    guruProfileContentButton: {
       gap: 8,
+    },
+    guruProfileNameRow: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 10,
+      justifyContent: "space-between",
+    },
+    guruProfileNameCopy: {
+      flex: 1,
+      gap: 1,
+      minWidth: 0,
+    },
+    guruProfileName: {
+      color: "#FFFFFF",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 20,
+      letterSpacing: -0.45,
+      lineHeight: 23,
+    },
+    guruProfileLocation: {
+      color: "rgba(255, 255, 255, 0.76)",
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    guruProfileRate: {
+      color: "#DFF6E8",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 11,
+      lineHeight: 15,
+      marginTop: 2,
+      maxWidth: 78,
+      textAlign: "right",
+    },
+    guruProfileRatingRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 4,
+    },
+    guruProfileRatingValue: {
+      color: "#FFD15A",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 11,
+      lineHeight: 14,
+    },
+    guruProfileReviewText: {
+      color: "rgba(255, 255, 255, 0.72)",
+      fontFamily: AppFonts.medium,
+      fontSize: 9,
+      lineHeight: 13,
+    },
+    guruProfileServices: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    guruProfileServicePill: {
+      alignItems: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.06)",
+      borderColor: "rgba(255, 255, 255, 0.25)",
+      borderRadius: 999,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 4,
+      minHeight: 24,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    guruProfileServiceIcon: {
+      color: "#D7EEDF",
+    },
+    guruProfileServiceText: {
+      color: "#F1F7F3",
+      fontFamily: AppFonts.bold,
+      fontSize: 8,
+      lineHeight: 10,
+    },
+    guruProfileAboutBlock: {
+      gap: 2,
+    },
+    guruProfileAboutLabel: {
+      color: "#FFFFFF",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    guruProfileAboutText: {
+      color: "rgba(255, 255, 255, 0.76)",
+      fontFamily: AppFonts.medium,
+      fontSize: 9,
+      lineHeight: 13,
+    },
+    guruProfileTrustRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 5,
+    },
+    guruProfileTrustIcon: {
+      color: "#78D990",
+    },
+    guruProfileTrustText: {
+      color: "#C8EBD4",
+      fontFamily: AppFonts.bold,
+      fontSize: 9,
+      lineHeight: 12,
+    },
+    guruProfileRequestButton: {
+      alignItems: "center",
+      backgroundColor: "#2B8C5E",
+      borderColor: "#43A874",
+      borderRadius: 10,
+      borderWidth: 1,
+      justifyContent: "center",
+      minHeight: 42,
+      paddingHorizontal: 14,
+      shadowColor: "#000000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.16,
+      shadowRadius: 8,
+    },
+    guruProfileRequestButtonSecondary: {
+      backgroundColor: "transparent",
+      borderColor: "rgba(255, 255, 255, 0.38)",
+    },
+    guruProfileRequestButtonPressed: {
+      opacity: 0.84,
+      transform: [{ scale: 0.992 }],
+    },
+    guruProfileRequestButtonText: {
+      color: "#FFFFFF",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 11,
+      letterSpacing: 0.05,
+    },
+    guruProfileRequestButtonTextSecondary: {
+      color: "#E8F8EE",
     },
     guruCard: {
       alignItems: "stretch",

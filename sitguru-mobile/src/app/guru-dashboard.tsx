@@ -35,6 +35,7 @@ import {
 
 import RoleGate from '@/components/RoleGate';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
@@ -776,6 +777,9 @@ export default function GuruDashboardScreen() {
                           👋
                         </Text>
                       </Text>
+
+
+                      <SitGuruRoleStatus role="guru" />
 
                       {city || state ? (
                         <View

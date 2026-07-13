@@ -43,6 +43,7 @@ import {
 
 import RoleGate from '@/components/RoleGate';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
@@ -443,6 +444,8 @@ export default function AmbassadorDashboardScreen() {
                         Welcome back, {firstName}!{' '}
                         <Text style={styles.wave}>👋</Text>
                       </Text>
+
+                      <SitGuruRoleStatus role="ambassador" />
 
                       {location ? (
                         <View style={styles.locationRow}>

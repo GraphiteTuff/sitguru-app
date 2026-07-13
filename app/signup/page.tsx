@@ -500,6 +500,39 @@ async function ensureStarterAmbassadorProfile({
   );
 }
 
+
+async function provisionSignupAccount(payload: {
+  userId: string;
+  intent: AccountIntent;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  zipCode: string;
+  serviceArea: string;
+  ambassadorReferralCode?: string;
+  source: string;
+}) {
+  const response = await fetch("/api/auth/provision-signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const result = (await response.json().catch(() => null)) as
+    | { ok?: boolean; error?: string; message?: string }
+    | null;
+
+  if (!response.ok || !result?.ok) {
+    throw new Error(
+      result?.error ||
+        result?.message ||
+        "Your account was created, but SitGuru could not finish setting up your workspace. Please sign in again or contact SitGuru support.",
+    );
+  }
+
+  return result;
+}
+
 function SignupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -673,62 +706,17 @@ function SignupPageContent() {
       const userId = data.user?.id;
 
       if (userId) {
-        await ensureReferralCode(userId, cleanName, getRoleFromIntent(intent));
-        await ensureUserRole(userId, getRoleFromIntent(intent));
-        if (shouldCreatePetParentProfile(intent)) await ensureUserRole(userId, "customer");
-        if (shouldCreateGuruProfile(intent)) await ensureUserRole(userId, "guru");
-        if (intent === "ambassador") await ensureUserRole(userId, "ambassador");
-
-        if (shouldCreateGuruProfile(intent)) {
-          await ensureStarterGuruProfile({
-            userId,
-            fullName: cleanName,
-            email: cleanEmail,
-            zipCode: cleanZipCode,
-            serviceArea: serviceArea.trim() || cleanZipCode,
-            profileRole,
-            source: "sitguru_guru_signup_page",
-          });
-        } else if (intent === "ambassador") {
-          await ensureStarterAmbassadorProfile({
-            userId,
-            fullName: cleanName,
-            email: cleanEmail,
-            zipCode: cleanZipCode,
-            serviceArea: serviceArea.trim() || cleanZipCode,
-            source: "sitguru_ambassador_signup_page",
-          });
-        } else {
-          const { error: profileError } = await supabase.from("profiles").upsert({
-            id: userId,
-            full_name: cleanName,
-            first_name: firstName || null,
-            last_name: lastName || null,
-            email: cleanEmail,
-            role: profileRole,
-            account_type: profileRole,
-            source: "sitguru_signup_page",
-            zip_code: cleanZipCode,
-            service_area: serviceArea.trim() || cleanZipCode,
-            referral_code: buildReferralCode(userId, cleanName),
-            admin_status: "pending_setup",
-            profile_quality_status: "needs_setup",
-            is_public_visible: false,
-            is_bookable: false,
-            is_archived: false,
-            is_test_account: false,
-            missing_requirements: ["basic profile completion"],
-            updated_at: new Date().toISOString(),
-          });
-
-          if (profileError) {
-            throw new Error(`Profile setup failed: ${profileError.message}`);
-          }
-        }
-
-        await safelyAddUserRoles(userId, intent);
+        await provisionSignupAccount({
+          userId,
+          intent,
+          fullName: cleanName,
+          email: cleanEmail,
+          zipCode: cleanZipCode,
+          serviceArea: serviceArea.trim() || cleanZipCode,
+          ambassadorReferralCode: cleanAmbassadorReferralCode || undefined,
+          source: "sitguru_signup_page",
+        });
       }
-
       setMessage(
         shouldCreateGuruProfile(intent)
           ? "Account created. Please check your email, then continue to your Guru profile setup."
@@ -880,56 +868,17 @@ function SignupPageContent() {
       const userId = data.user?.id;
 
       if (userId) {
-        if (shouldCreateGuruProfile(intent)) {
-          await ensureStarterGuruProfile({
-            userId,
-            fullName: cleanName,
-            phone: normalizedPhone,
-            zipCode: cleanZipCode,
-            serviceArea: serviceArea.trim() || cleanZipCode,
-            profileRole,
-            source: "sitguru_guru_phone_signup",
-          });
-        } else if (intent === "ambassador") {
-          await ensureStarterAmbassadorProfile({
-            userId,
-            fullName: cleanName,
-            phone: normalizedPhone,
-            zipCode: cleanZipCode,
-            serviceArea: serviceArea.trim() || cleanZipCode,
-            source: "sitguru_ambassador_phone_signup",
-          });
-        } else {
-          const { error: profileError } = await supabase.from("profiles").upsert({
-            id: userId,
-            full_name: cleanName,
-            first_name: firstName || null,
-            last_name: lastName || null,
-            phone: normalizedPhone,
-            role: profileRole,
-            account_type: profileRole,
-            source: "sitguru_phone_signup",
-            zip_code: cleanZipCode,
-            service_area: serviceArea.trim() || cleanZipCode,
-            referral_code: buildReferralCode(userId, cleanName),
-            admin_status: "pending_setup",
-            profile_quality_status: "needs_setup",
-            is_public_visible: false,
-            is_bookable: false,
-            is_archived: false,
-            is_test_account: false,
-            missing_requirements: ["basic profile completion"],
-            updated_at: new Date().toISOString(),
-          });
-
-          if (profileError) {
-            throw new Error(`Profile setup failed: ${profileError.message}`);
-          }
-        }
-
-        await safelyAddUserRoles(userId, intent);
+        await provisionSignupAccount({
+          userId,
+          intent,
+          fullName: cleanName,
+          phone: normalizedPhone,
+          zipCode: cleanZipCode,
+          serviceArea: serviceArea.trim() || cleanZipCode,
+          ambassadorReferralCode: cleanAmbassadorReferralCode || undefined,
+          source: "sitguru_phone_signup",
+        });
       }
-
       router.push(redirectPath);
     } catch (caughtError) {
       setError(

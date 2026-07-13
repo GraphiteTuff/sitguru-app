@@ -38,6 +38,7 @@ import {
 
 import RoleGate from '@/components/RoleGate';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
@@ -497,6 +498,8 @@ export default function PetParentDashboardScreen() {
                 <Text style={styles.welcomeText}>
                   Welcome back, {firstName}! <Text style={styles.wave}>👋</Text>
                 </Text>
+
+                <SitGuruRoleStatus role="pet_parent" />
 
                 {profileLocation ? (
                   <View style={styles.locationRow}>

@@ -1,59 +1,41 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import {
-  Bell,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  CircleDollarSign,
-  Clock3,
-  Home,
-  MapPin,
-  MessageCircle,
-  PawPrint,
-  ShieldCheck,
-  Sparkles,
-  UserRound,
-  WalletCards,
+    Bell,
+    CalendarDays,
+    ChevronLeft,
+    ChevronRight,
+    CircleDollarSign,
+    Clock3,
+    Home,
+    MapPin,
+    MessageCircle,
+    PawPrint,
+    ShieldCheck,
+    Sparkles,
+    UserRound,
+    WalletCards,
 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
+import { useMemo, useState } from 'react';
 import {
-  Alert,
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Alert,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 
 import { SitGuruIcon } from '@/components/SitGuruIcon';
-import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
 import {
-  setThemePreference,
-  type SitGuruThemePreference,
-  useThemePreference,
+    setThemePreference,
+    type SitGuruThemePreference,
+    useThemePreference,
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
-import { useAuth } from '@/hooks/useAuth';
-import { resolveSupabaseStorageUrl } from '@/lib/storage';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
-
-type RecordRow = Record<string, unknown>;
-
-type PetDetail = {
-  id: string;
-  name: string;
-  species: string;
-  breed: string;
-  ageLabel: string;
-  photoUrl: string | null;
-  helper: string;
-};
 
 type BookingStatus =
   | 'Pending Guru Review'
@@ -131,19 +113,6 @@ const PRICE_ROWS = [
   },
 ];
 
-const PET_TABLES = ['pets', 'pet_profiles', 'pet_passports'];
-const PET_OWNER_FIELDS = ['owner_id', 'pet_parent_id', 'user_id', 'created_by'];
-
-const FALLBACK_PET: PetDetail = {
-  id: 'scout',
-  name: 'Scout',
-  species: 'Dog',
-  breed: '',
-  ageLabel: '4 years old',
-  photoUrl: null,
-  helper: 'Friendly, loves brisk walks, and prefers a quiet greeting.',
-};
-
 const CARE_NOTES = [
   {
     title: 'Feeding & water',
@@ -164,15 +133,6 @@ const CARE_NOTES = [
 ];
 
 export default function BookingDetailsScreen() {
-  const { bookingId, conversationId, guruId, petId, petName } =
-    useLocalSearchParams<{
-      bookingId?: string;
-      conversationId?: string;
-      guruId?: string;
-      petId?: string;
-      petName?: string;
-    }>();
-  const { user, profile } = useAuth();
   const isWebPreview = Platform.OS === 'web';
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
@@ -182,65 +142,6 @@ export default function BookingDetailsScreen() {
 
   const [selectedStatus, setSelectedStatus] =
     useState<BookingStatus>('Pending Guru Review');
-  const [selectedPet, setSelectedPet] = useState<PetDetail>(FALLBACK_PET);
-  const [petLoadMessage, setPetLoadMessage] = useState('');
-
-  const profileRecord = (profile ?? {}) as RecordRow;
-  const userMetadata = (user?.user_metadata ?? {}) as RecordRow;
-  const petParentName =
-    firstString(profileRecord, ['full_name', 'display_name']) ||
-    [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
-    firstString(userMetadata, ['full_name', 'name']) ||
-    user?.email?.split('@')[0] ||
-    'Pet Parent';
-  const petParentAvatarUrl = resolveSupabaseStorageUrl(
-    firstString(profileRecord, [
-      'avatar_url',
-      'photo_url',
-      'profile_photo_url',
-      'profile_image_url',
-    ]) || firstString(userMetadata, ['avatar_url', 'picture']),
-  );
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadPet() {
-      if (!user?.id || !isSupabaseConfigured) {
-        return;
-      }
-
-      try {
-        const pets = await loadPetDetails(user.id);
-        if (!active || pets.length === 0) return;
-
-        const requestedId = typeof petId === 'string' ? petId : '';
-        const requestedName =
-          typeof petName === 'string' ? petName.trim().toLowerCase() : '';
-
-        const matchingPet =
-          pets.find((pet) => pet.id === requestedId) ||
-          pets.find((pet) => pet.name.toLowerCase() === requestedName) ||
-          pets.find((pet) => pet.name.toLowerCase() === 'scout') ||
-          pets[0];
-
-        setSelectedPet(matchingPet);
-        setPetLoadMessage('');
-      } catch {
-        if (active) {
-          setPetLoadMessage(
-            'Scout’s Pet Passport photo could not be refreshed. Showing the saved fallback instead.',
-          );
-        }
-      }
-    }
-
-    void loadPet();
-
-    return () => {
-      active = false;
-    };
-  }, [petId, petName, user?.id]);
 
   const activeStatusIndex = STATUS_STEPS.findIndex(
     (step) => step.label === selectedStatus,
@@ -306,31 +207,6 @@ export default function BookingDetailsScreen() {
     );
   }
 
-  function openConversation(viewerRole: 'pet_parent' | 'guru' = 'pet_parent') {
-    router.push({
-      pathname: '/conversation',
-      params: {
-        viewerRole,
-        ...(typeof bookingId === 'string' && bookingId ? { bookingId } : {}),
-        ...(typeof conversationId === 'string' && conversationId
-          ? { conversationId }
-          : {}),
-        ...(typeof guruId === 'string' && guruId ? { guruId } : {}),
-        ...(selectedPet.id ? { petId: selectedPet.id } : {}),
-        ...(selectedPet.name ? { petName: selectedPet.name } : {}),
-      },
-    });
-  }
-
-  function openPrimaryAction() {
-    if (primaryAction.route === '/conversation') {
-      openConversation();
-      return;
-    }
-
-    router.push(primaryAction.route);
-  }
-
   return (
     <SitGuruScreen center={isWebPreview} maxWidth={620}>
       <View
@@ -379,8 +255,7 @@ export default function BookingDetailsScreen() {
 
                   <View style={styles.headerCopy}>
                     <Text style={styles.headerTitle}>Booking Details</Text>
-                    <Text style={styles.headerSubtitle}>{selectedPet.name} • Dog Walking</Text>
-                    <SitGuruRoleStatus compact role="pet_parent" />
+                    <Text style={styles.headerSubtitle}>Scout • Dog Walking</Text>
                   </View>
 
                   <View style={styles.headerActions}>
@@ -434,20 +309,6 @@ export default function BookingDetailsScreen() {
                         strokeWidth={2.3}
                       />
                     </Pressable>
-
-                    <Pressable
-                      accessibilityLabel="Open Pet Parent profile"
-                      accessibilityRole="button"
-                      onPress={() => router.push('/account')}
-                      style={styles.profileButton}
-                    >
-                      <AvatarImage
-                        fallback={initials(petParentName)}
-                        imageUrl={petParentAvatarUrl}
-                        palette={palette}
-                        size={38}
-                      />
-                    </Pressable>
                   </View>
                 </View>
 
@@ -464,16 +325,12 @@ export default function BookingDetailsScreen() {
                   </View>
 
                   <View style={styles.summaryMainRow}>
-                    <AvatarImage
-                      fallback={getPetEmoji(selectedPet.species)}
-                      imageUrl={selectedPet.photoUrl}
-                      palette={palette}
-                      size={50}
-                      style={styles.summaryPetAvatar}
-                    />
+                    <View style={styles.summaryPetAvatar}>
+                      <Text style={styles.summaryPetEmoji}>🐶</Text>
+                    </View>
 
                     <View style={styles.summaryCopy}>
-                      <Text style={styles.summaryPet}>{selectedPet.name}</Text>
+                      <Text style={styles.summaryPet}>Scout</Text>
                       <Text style={styles.summaryService}>
                         Dog Walking • Today • 12:30 PM
                       </Text>
@@ -499,12 +356,6 @@ export default function BookingDetailsScreen() {
                     No payment is charged until the Guru accepts and the final amount is confirmed.
                   </Text>
                 </View>
-
-                {petLoadMessage ? (
-                  <View style={styles.loadNotice}>
-                    <Text style={styles.loadNoticeText}>{petLoadMessage}</Text>
-                  </View>
-                ) : null}
 
                 <View style={styles.statusCard}>
                   <View style={styles.sectionHeadingRow}>
@@ -543,8 +394,8 @@ export default function BookingDetailsScreen() {
                               <Text
                                 style={[
                                   styles.statusDotText,
-                                  complete && styles.statusDotTextComplete,
-                                  active && styles.statusDotTextActive,
+                                  (complete || active) &&
+                                    styles.statusDotTextActive,
                                 ]}
                               >
                                 {complete ? '✓' : index + 1}
@@ -583,7 +434,7 @@ export default function BookingDetailsScreen() {
 
                 <Pressable
                   accessibilityRole="button"
-                  onPress={openPrimaryAction}
+                  onPress={() => router.push(primaryAction.route)}
                   style={({ pressed }) => [
                     styles.primaryActionCard,
                     pressed && styles.primaryActionPressed,
@@ -622,7 +473,7 @@ export default function BookingDetailsScreen() {
                       />
                     }
                     label="Message"
-                    onPress={openConversation}
+                    onPress={() => router.push('/conversation')}
                     styles={styles}
                   />
 
@@ -679,16 +530,10 @@ export default function BookingDetailsScreen() {
                   title="Pet"
                 >
                   <ProfileRow
-                    avatar={getPetEmoji(selectedPet.species)}
-                    detail={
-                      [selectedPet.species, selectedPet.breed, selectedPet.ageLabel]
-                        .filter(Boolean)
-                        .join(' • ') || 'Pet Passport'
-                    }
-                    helper={selectedPet.helper}
-                    imageUrl={selectedPet.photoUrl}
-                    name={selectedPet.name}
-                    palette={palette}
+                    avatar="🐶"
+                    detail="Dog • Medium • 4 years old"
+                    helper="Friendly, loves brisk walks, and prefers a quiet greeting."
+                    name="Scout"
                     styles={styles}
                   />
 
@@ -718,7 +563,6 @@ export default function BookingDetailsScreen() {
                     detail="Jordan P. • Near Quakertown"
                     helper="Background checked • SitGuru communication enabled"
                     name="Jordan P."
-                    palette={palette}
                     styles={styles}
                   />
 
@@ -731,7 +575,7 @@ export default function BookingDetailsScreen() {
                     />
                     <ActionButton
                       label="Message"
-                      onPress={openConversation}
+                      onPress={() => router.push('/conversation')}
                       styles={styles}
                     />
                   </View>
@@ -961,7 +805,7 @@ export default function BookingDetailsScreen() {
                     />
                     <ActionButton
                       label="Message Pet Parent"
-                      onPress={() => openConversation('guru')}
+                      onPress={() => router.push('/conversation')}
                       styles={styles}
                     />
                     <ActionButton
@@ -1045,7 +889,7 @@ export default function BookingDetailsScreen() {
                     />
                   }
                   label="Messages"
-                  onPress={openConversation}
+                  onPress={() => router.push('/conversation')}
                   styles={styles}
                 />
 
@@ -1215,29 +1059,21 @@ function ProfileRow({
   badge,
   detail,
   helper,
-  imageUrl,
   name,
-  palette,
   styles,
 }: {
   avatar: string;
   badge?: string;
   detail: string;
   helper: string;
-  imageUrl?: string | null;
   name: string;
-  palette: ReturnType<typeof getPalette>;
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <View style={styles.profileRow}>
-      <AvatarImage
-        fallback={avatar}
-        imageUrl={imageUrl}
-        palette={palette}
-        size={58}
-        style={styles.avatar}
-      />
+      <View style={styles.avatar}>
+        <Text style={styles.avatarEmoji}>{avatar}</Text>
+      </View>
       <View style={styles.profileCopy}>
         <Text style={styles.profileName}>{name}</Text>
         <Text style={styles.profileMeta}>{detail}</Text>
@@ -1367,159 +1203,6 @@ function BottomNavItem({
         {label}
       </Text>
     </Pressable>
-  );
-}
-
-async function loadPetDetails(userId: string): Promise<PetDetail[]> {
-  for (const table of PET_TABLES) {
-    for (const ownerField of PET_OWNER_FIELDS) {
-      const result = await supabase
-        .from(table)
-        .select('*')
-        .eq(ownerField, userId)
-        .limit(30);
-
-      if (!result.error && result.data?.length) {
-        return (result.data as RecordRow[])
-          .map(mapPetDetail)
-          .filter((pet): pet is PetDetail => Boolean(pet));
-      }
-    }
-  }
-
-  return [];
-}
-
-function mapPetDetail(row: RecordRow, index: number): PetDetail | null {
-  const name = firstString(row, ['name', 'pet_name', 'animal_name']);
-  if (!name) return null;
-
-  const species = firstString(row, ['species', 'animal_type', 'pet_type']);
-  const breed = firstString(row, ['breed', 'breed_name']);
-  const ageLabel = firstString(row, ['age_label', 'age']) || getPetAgeLabel(row);
-  const helper =
-    firstString(row, [
-      'care_notes',
-      'routine_notes',
-      'behavior_notes',
-      'bio',
-      'description',
-    ]) || 'Pet Passport care details are ready for the Guru to review.';
-
-  return {
-    id: firstString(row, ['id', 'pet_id']) || `pet-${index}`,
-    name,
-    species,
-    breed,
-    ageLabel,
-    photoUrl: resolveSupabaseStorageUrl(
-      firstString(row, [
-        'photo_url',
-        'image_url',
-        'avatar_url',
-        'pet_photo_url',
-      ]),
-    ),
-    helper,
-  };
-}
-
-function getPetAgeLabel(row: RecordRow) {
-  const years = firstNumber(row, ['age_years', 'years_old']);
-  if (years !== null) {
-    const rounded = Math.max(0, Math.round(years));
-    return `${rounded} ${rounded === 1 ? 'year' : 'years'} old`;
-  }
-  return '';
-}
-
-function firstString(record: RecordRow, keys: string[]) {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
-  }
-  return '';
-}
-
-function firstNumber(record: RecordRow, keys: string[]) {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === 'number' && Number.isFinite(value)) return value;
-    if (typeof value === 'string') {
-      const parsed = Number.parseFloat(value);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-  }
-  return null;
-}
-
-function getPetEmoji(species: string) {
-  const normalized = species.toLowerCase();
-  if (normalized.includes('cat')) return '🐱';
-  if (normalized.includes('dog')) return '🐶';
-  return '🐾';
-}
-
-function initials(name: string) {
-  const parts = name.split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return 'PP';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
-function AvatarImage({
-  fallback,
-  imageUrl,
-  palette,
-  size,
-  style,
-}: {
-  fallback: string;
-  imageUrl?: string | null;
-  palette: ReturnType<typeof getPalette>;
-  size: number;
-  style?: StyleProp<ViewStyle>;
-}) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const showImage = Boolean(imageUrl) && !imageFailed;
-  const isInitials = /^[A-Z0-9]{1,3}$/.test(fallback);
-
-  return (
-    <View
-      style={[
-        {
-          alignItems: 'center',
-          backgroundColor: palette.primarySoft,
-          borderColor: palette.borderStrong,
-          borderRadius: size / 2,
-          borderWidth: 1.5,
-          height: size,
-          justifyContent: 'center',
-          overflow: 'hidden',
-          width: size,
-        },
-        style,
-      ]}
-    >
-      {showImage ? (
-        <Image
-          onError={() => setImageFailed(true)}
-          resizeMode="cover"
-          source={{ uri: imageUrl as string }}
-          style={{ height: '100%', width: '100%' }}
-        />
-      ) : (
-        <Text
-          style={{
-            color: palette.primary,
-            fontFamily: AppFonts.extraBold,
-            fontSize: isInitials ? Math.max(11, size * 0.28) : size * 0.42,
-          }}
-        >
-          {fallback}
-        </Text>
-      )}
-    </View>
   );
 }
 
@@ -1718,9 +1401,6 @@ function createStyles(isDark: boolean) {
       fontSize: 9,
       marginTop: 1,
     },
-    profileButton: {
-      borderRadius: 999,
-    },
     headerActions: {
       alignItems: 'center',
       flexDirection: 'row',
@@ -1786,9 +1466,12 @@ function createStyles(isDark: boolean) {
       gap: 10,
     },
     summaryPetAvatar: {
+      alignItems: 'center',
       backgroundColor: 'rgba(255,255,255,0.15)',
-      borderColor: 'rgba(255,255,255,0.35)',
       borderRadius: 16,
+      height: 50,
+      justifyContent: 'center',
+      width: 50,
     },
     summaryPetEmoji: {
       fontSize: 26,
@@ -1840,19 +1523,6 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.medium,
       fontSize: 8,
       lineHeight: 12,
-    },
-    loadNotice: {
-      backgroundColor: palette.surfaceSoft,
-      borderColor: palette.border,
-      borderRadius: 14,
-      borderWidth: 1,
-      padding: 10,
-    },
-    loadNoticeText: {
-      color: palette.text,
-      fontFamily: AppFonts.medium,
-      fontSize: 10,
-      lineHeight: 14,
     },
     statusCard: {
       backgroundColor: palette.surface,
@@ -1927,9 +1597,6 @@ function createStyles(isDark: boolean) {
       color: palette.muted,
       fontFamily: AppFonts.extraBold,
       fontSize: 9,
-    },
-    statusDotTextComplete: {
-      color: palette.primary,
     },
     statusDotTextActive: {
       color: '#FFFFFF',
@@ -2078,9 +1745,14 @@ function createStyles(isDark: boolean) {
       gap: 11,
     },
     avatar: {
+      alignItems: 'center',
       backgroundColor: palette.surfaceSoft,
       borderColor: palette.borderStrong,
       borderRadius: 18,
+      borderWidth: 1,
+      height: 58,
+      justifyContent: 'center',
+      width: 58,
     },
     avatarEmoji: {
       fontSize: 29,
