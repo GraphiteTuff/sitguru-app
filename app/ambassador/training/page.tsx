@@ -24,12 +24,11 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-const AMBASSADOR_TRAINING_HREF = "/ambassador/training";
+const AMBASSADOR_TRAINING_HREF = "/ambassador/dashboard/training";
 const AMBASSADOR_DASHBOARD_HREF = "/ambassador/dashboard";
-const AMBASSADOR_MESSAGES_HREF = "/ambassador/messages";
+const AMBASSADOR_MESSAGES_HREF = "/ambassador/dashboard/messages";
 const AMBASSADOR_ACADEMY_TYPE = "ambassador";
 const AMBASSADOR_BADGE_TITLE = "SitGuru Ambassador Badge";
-const EXPECTED_AMBASSADOR_MATERIALS = 4;
 
 type AmbassadorRecord = {
   id: string;
@@ -47,6 +46,7 @@ type AmbassadorRecord = {
   referral_status?: string | null;
   onboarding_status?: string | null;
   training_status?: string | null;
+  training_percent?: number | null;
   onboarding_step?: number | null;
   onboarding_percent?: number | null;
   training_completed_at?: string | null;
@@ -370,23 +370,64 @@ async function getLoggedInAmbassador() {
 
   const userEmail = asString(user.email).toLowerCase();
 
-  const { data: ambassador, error: ambassadorError } = await supabaseAdmin
-    .from("ambassadors")
-    .select("*")
-    .or(
-      `user_id.eq.${user.id},login_email.eq.${userEmail},contact_email.eq.${userEmail},email.eq.${userEmail}`,
-    )
-    .eq("dashboard_enabled", true)
-    .eq("login_enabled", true)
-    .neq("status", "archived")
-    .maybeSingle();
+  const { data: ambassadorByUserId, error: ambassadorByUserIdError } =
+    await supabaseAdmin
+      .from("ambassadors")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-  if (ambassadorError || !ambassador) {
+  if (ambassadorByUserIdError) {
+    console.error(
+      "Ambassador training lookup by user ID failed:",
+      ambassadorByUserIdError.message,
+    );
+  }
+
+  let ambassador = ambassadorByUserId as AmbassadorRecord | null;
+
+  if (!ambassador && userEmail) {
+    const emailColumns = ["login_email", "contact_email", "email"] as const;
+
+    for (const column of emailColumns) {
+      const { data, error: emailLookupError } = await supabaseAdmin
+        .from("ambassadors")
+        .select("*")
+        .eq(column, userEmail)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (emailLookupError) {
+        console.error(
+          `Ambassador training lookup by ${column} failed:`,
+          emailLookupError.message,
+        );
+        continue;
+      }
+
+      if (data) {
+        ambassador = data as AmbassadorRecord;
+        break;
+      }
+    }
+  }
+
+  const status = asString(ambassador?.status).toLowerCase();
+  const workspaceAllowed =
+    Boolean(ambassador?.id) &&
+    ambassador?.dashboard_enabled === true &&
+    ambassador?.login_enabled === true &&
+    status !== "archived" &&
+    status !== "inactive" &&
+    status !== "not_a_fit";
+
+  if (!ambassador || !workspaceAllowed) {
     await supabase.auth.signOut();
     redirect("/ambassador/login?error=restricted");
   }
 
-  return ambassador as AmbassadorRecord;
+  return ambassador;
 }
 
 async function getAmbassadorTrainingSetup() {
@@ -420,24 +461,54 @@ async function getAmbassadorTrainingSetup() {
   };
 }
 
+async function getActiveAmbassadorTrainingStep(trainingStepId: string) {
+  if (!trainingStepId) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from("ambassador_training_steps")
+    .select("*")
+    .eq("id", trainingStepId)
+    .eq("academy_type", AMBASSADOR_ACADEMY_TYPE)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "Unable to verify Ambassador training step:",
+      error.message,
+    );
+    return null;
+  }
+
+  return (data || null) as TrainingStep | null;
+}
+
 async function startTrainingAction(formData: FormData) {
   "use server";
 
   const ambassador = await getLoggedInAmbassador();
-  const orientationStepId = asString(formData.get("orientation_step_id"));
+  const trainingStepId =
+    asString(formData.get("training_step_id")) ||
+    asString(formData.get("orientation_step_id"));
 
-  if (!orientationStepId) {
+  if (!trainingStepId) {
     redirect(`${AMBASSADOR_TRAINING_HREF}?error=missing_step`);
+  }
+
+  const trainingStep = await getActiveAmbassadorTrainingStep(trainingStepId);
+
+  if (!trainingStep) {
+    redirect(`${AMBASSADOR_TRAINING_HREF}?error=invalid_step`);
   }
 
   const now = new Date().toISOString();
 
-  const { error } = await supabaseAdmin
+  const { error: progressError } = await supabaseAdmin
     .from("ambassador_training_progress")
     .upsert(
       {
         ambassador_id: ambassador.id,
-        training_step_id: orientationStepId,
+        training_step_id: trainingStep.id,
         status: "in_progress",
         started_at: now,
         updated_at: now,
@@ -447,12 +518,40 @@ async function startTrainingAction(formData: FormData) {
       },
     );
 
-  if (error) {
-    console.warn("Unable to start Ambassador training:", error);
+  if (progressError) {
+    console.error(
+      "Unable to start Ambassador training:",
+      progressError.message,
+    );
+    redirect(`${AMBASSADOR_TRAINING_HREF}?error=start_failed`);
   }
+
+  const { error: ambassadorUpdateError } = await supabaseAdmin
+    .from("ambassadors")
+    .update({
+      training_status: "In Progress",
+      training_percent: Math.max(
+        0,
+        Math.min(99, asNumber(ambassador.training_percent) || 25),
+      ),
+      updated_at: now,
+    })
+    .eq("id", ambassador.id);
 
   revalidatePath(AMBASSADOR_TRAINING_HREF);
   revalidatePath(AMBASSADOR_DASHBOARD_HREF);
+  revalidatePath(`/admin/ambassadors/${ambassador.id}`);
+
+  if (ambassadorUpdateError) {
+    console.error(
+      "Ambassador training started, but summary sync failed:",
+      ambassadorUpdateError.message,
+    );
+    redirect(
+      `${AMBASSADOR_TRAINING_HREF}?warning=start_summary_sync_failed`,
+    );
+  }
+
   redirect(`${AMBASSADOR_TRAINING_HREF}?started=success`);
 }
 
@@ -460,12 +559,20 @@ async function completeTrainingAction(formData: FormData) {
   "use server";
 
   const ambassador = await getLoggedInAmbassador();
-  const orientationStepId = asString(formData.get("orientation_step_id"));
+  const trainingStepId =
+    asString(formData.get("training_step_id")) ||
+    asString(formData.get("orientation_step_id"));
   const acknowledgment = asString(formData.get("acknowledgment"));
   const signatureName = asString(formData.get("signature_name"));
 
-  if (!orientationStepId) {
+  if (!trainingStepId) {
     redirect(`${AMBASSADOR_TRAINING_HREF}?error=missing_step`);
+  }
+
+  const trainingStep = await getActiveAmbassadorTrainingStep(trainingStepId);
+
+  if (!trainingStep) {
+    redirect(`${AMBASSADOR_TRAINING_HREF}?error=invalid_step`);
   }
 
   if (acknowledgment !== "yes") {
@@ -478,12 +585,12 @@ async function completeTrainingAction(formData: FormData) {
 
   const now = new Date().toISOString();
 
-  const { error } = await supabaseAdmin
+  const { error: progressError } = await supabaseAdmin
     .from("ambassador_training_progress")
     .upsert(
       {
         ambassador_id: ambassador.id,
-        training_step_id: orientationStepId,
+        training_step_id: trainingStep.id,
         status: "completed",
         started_at: now,
         completed_at: now,
@@ -499,17 +606,19 @@ async function completeTrainingAction(formData: FormData) {
       },
     );
 
-  if (error) {
-    console.warn("Unable to complete Ambassador training:", error);
+  if (progressError) {
+    console.error(
+      "Unable to complete Ambassador training:",
+      progressError.message,
+    );
     redirect(`${AMBASSADOR_TRAINING_HREF}?error=save_failed`);
   }
 
-  await supabaseAdmin
+  const { error: ambassadorUpdateError } = await supabaseAdmin
     .from("ambassadors")
     .update({
-      onboarding_step: EXPECTED_AMBASSADOR_MATERIALS,
-      onboarding_percent: 100,
       training_status: "Completed",
+      training_percent: 100,
       training_completed_at: now,
       certification_signed_at: now,
       certification_name: signatureName,
@@ -518,27 +627,56 @@ async function completeTrainingAction(formData: FormData) {
     .eq("id", ambassador.id);
 
   revalidatePath(AMBASSADOR_TRAINING_HREF);
-  revalidatePath("/ambassador/dashboard/training");
   revalidatePath(AMBASSADOR_DASHBOARD_HREF);
+  revalidatePath(`/admin/ambassadors/${ambassador.id}`);
+  revalidatePath("/admin/ambassadors");
+
+  if (ambassadorUpdateError) {
+    console.error(
+      "Training completion saved, but Ambassador summary sync failed:",
+      ambassadorUpdateError.message,
+    );
+    redirect(
+      `${AMBASSADOR_TRAINING_HREF}?warning=completion_summary_sync_failed`,
+    );
+  }
+
   redirect(`${AMBASSADOR_TRAINING_HREF}?success=completed`);
 }
 
-function getPageMessage(searchParams: Record<string, string | string[] | undefined>) {
+function getPageMessage(
+  searchParams: Record<string, string | string[] | undefined>,
+) {
   const error = asString(searchParams.error);
   const success = asString(searchParams.success);
   const started = asString(searchParams.started);
+  const warning = asString(searchParams.warning);
 
   if (success === "completed") {
     return {
       type: "success" as const,
-      text: "Ambassador training completed. Your SitGuru Ambassador Badge is now unlocked.",
+      text: "Ambassador training was saved successfully. Your SitGuru Ambassador Badge is now unlocked.",
     };
   }
 
   if (started === "success") {
     return {
       type: "success" as const,
-      text: "Training started. Review the Ambassador Academy materials, then complete the final certification.",
+      text: "Training progress was saved. Review the Ambassador Academy materials, then complete the final certification.",
+    };
+  }
+
+  if (warning === "start_summary_sync_failed") {
+    return {
+      type: "warning" as const,
+      text: "Training was started, but the dashboard summary could not be updated. Your progress record is saved. Please refresh, then message SitGuru if the dashboard status remains unchanged.",
+    };
+  }
+
+  if (warning === "completion_summary_sync_failed") {
+    return {
+      type: "warning" as const,
+      text: "Your signed training completion was saved, but the Ambassador summary could not be updated. Please message SitGuru so the dashboard and Admin status can be synchronized.",
     };
   }
 
@@ -556,10 +694,24 @@ function getPageMessage(searchParams: Record<string, string | string[] | undefin
     };
   }
 
+  if (error === "start_failed") {
+    return {
+      type: "error" as const,
+      text: "We could not save the start of your Ambassador training. Please try again or message SitGuru.",
+    };
+  }
+
   if (error === "save_failed") {
     return {
       type: "error" as const,
       text: "We could not save your Ambassador training completion. Please try again or message SitGuru.",
+    };
+  }
+
+  if (error === "invalid_step") {
+    return {
+      type: "error" as const,
+      text: "That Ambassador training step is inactive or no longer available. Refresh the page or message SitGuru.",
     };
   }
 
@@ -665,7 +817,9 @@ export default async function AmbassadorTrainingPage({ searchParams }: PageProps
             className={`rounded-[24px] border p-4 text-sm font-bold leading-6 ${
               pageMessage.type === "success"
                 ? "border-green-100 bg-green-50 text-green-900"
-                : "border-red-100 bg-red-50 text-red-800"
+                : pageMessage.type === "warning"
+                  ? "border-amber-200 bg-amber-50 text-amber-900"
+                  : "border-red-100 bg-red-50 text-red-800"
             }`}
           >
             {pageMessage.text}
@@ -781,7 +935,7 @@ export default async function AmbassadorTrainingPage({ searchParams }: PageProps
 
         {orientationStep?.id && !trainingStarted ? (
           <form action={startTrainingAction}>
-            <input type="hidden" name="orientation_step_id" value={orientationStep.id} />
+            <input type="hidden" name="training_step_id" value={orientationStep.id} />
             <button
               type="submit"
               className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
@@ -833,7 +987,7 @@ export default async function AmbassadorTrainingPage({ searchParams }: PageProps
                 </div>
               ) : (
                 <form action={completeTrainingAction} className="grid gap-3">
-                  <input type="hidden" name="orientation_step_id" value={orientationStep.id} />
+                  <input type="hidden" name="training_step_id" value={orientationStep.id} />
 
                   <label className="flex items-start gap-3 rounded-2xl border border-green-100 bg-white p-3">
                     <input
@@ -870,8 +1024,8 @@ export default async function AmbassadorTrainingPage({ searchParams }: PageProps
               )
             ) : (
               <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-900">
-                Ambassador Academy orientation has not been created yet. Message
-                SitGuru or ask an admin to create the Ambassador Academy Orientation.
+                An active Ambassador Academy training step has not been created yet. Message
+                SitGuru or ask an admin to publish the Ambassador training step.
               </div>
             )}
           </DashboardCard>

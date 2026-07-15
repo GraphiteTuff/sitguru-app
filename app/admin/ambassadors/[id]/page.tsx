@@ -48,6 +48,9 @@ type AmbassadorRow = {
   internal_role: string | null;
   source: string | null;
   status: string | null;
+  referral_status: string | null;
+  dashboard_enabled: boolean | null;
+  login_enabled: boolean | null;
   referral_code: string | null;
   referral_link: string | null;
   city: string | null;
@@ -304,6 +307,132 @@ function isArchivedAmbassador(ambassador: AmbassadorRow) {
   return ambassador.status === "archived" || Boolean(ambassador.archived_at);
 }
 
+type AmbassadorStatusAccess = {
+  dashboardEnabled: boolean;
+  loginEnabled: boolean;
+  referralStatus: "pending" | "active" | "paused" | "inactive" | "archived";
+};
+
+function getAmbassadorStatusAccess(
+  nextStatus: string,
+): AmbassadorStatusAccess {
+  if (nextStatus === "active") {
+    return {
+      dashboardEnabled: true,
+      loginEnabled: true,
+      referralStatus: "active",
+    };
+  }
+
+  if (nextStatus === "paused") {
+    return {
+      dashboardEnabled: true,
+      loginEnabled: true,
+      referralStatus: "paused",
+    };
+  }
+
+  if (nextStatus === "archived") {
+    return {
+      dashboardEnabled: false,
+      loginEnabled: false,
+      referralStatus: "archived",
+    };
+  }
+
+  if (nextStatus === "inactive" || nextStatus === "not_a_fit") {
+    return {
+      dashboardEnabled: false,
+      loginEnabled: false,
+      referralStatus: "inactive",
+    };
+  }
+
+  return {
+    dashboardEnabled: true,
+    loginEnabled: true,
+    referralStatus: "pending",
+  };
+}
+
+async function applyAmbassadorStatusUpdate({
+  supabase,
+  ambassadorId,
+  nextStatus,
+  archivedReason,
+}: {
+  supabase: SupabaseServerClient;
+  ambassadorId: string;
+  nextStatus: string;
+  archivedReason: string;
+}) {
+  const { data: ambassadorRecord, error: ambassadorLookupError } =
+    await supabase
+      .from("ambassadors")
+      .select("user_id")
+      .eq("id", ambassadorId)
+      .maybeSingle();
+
+  if (ambassadorLookupError) {
+    throw new Error(ambassadorLookupError.message);
+  }
+
+  if (!ambassadorRecord) {
+    throw new Error("Ambassador record was not found.");
+  }
+
+  const now = new Date().toISOString();
+  const access = getAmbassadorStatusAccess(nextStatus);
+
+  const updatePayload = {
+    status: nextStatus,
+    referral_status: access.referralStatus,
+    dashboard_enabled: access.dashboardEnabled,
+    login_enabled: access.loginEnabled,
+    archived_at: nextStatus === "archived" ? now : null,
+    archived_reason: nextStatus === "archived" ? archivedReason : null,
+    updated_at: now,
+    ...(nextStatus === "active" ? { activated_at: now } : {}),
+  };
+
+  const { error: updateError } = await supabase
+    .from("ambassadors")
+    .update(updatePayload)
+    .eq("id", ambassadorId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  if (
+    ambassadorRecord.user_id &&
+    access.dashboardEnabled &&
+    access.loginEnabled
+  ) {
+    const { error: roleError } = await supabase.from("user_roles").upsert(
+      {
+        user_id: ambassadorRecord.user_id,
+        role: "ambassador",
+        updated_at: now,
+      },
+      {
+        onConflict: "user_id,role",
+      },
+    );
+
+    if (roleError) {
+      throw new Error(
+        `Ambassador status was updated, but workspace role synchronization failed: ${roleError.message}`,
+      );
+    }
+  }
+
+  return {
+    now,
+    access,
+  };
+}
+
 async function getActivationCompletionSummary(
   supabase: SupabaseServerClient,
   ambassadorId: string,
@@ -405,33 +534,13 @@ async function updateAmbassadorStatus(
     }
   }
 
-  const now = new Date().toISOString();
-
-  const updatePayload =
-    nextStatus === "archived"
-      ? {
-          status: "archived",
-          archived_at: now,
-          archived_reason:
-            "Archived from Ambassador detail status control. Retained for applicant and contractor recordkeeping.",
-          updated_at: now,
-        }
-      : {
-          status: nextStatus,
-          archived_at: null,
-          archived_reason: null,
-          updated_at: now,
-          ...(nextStatus === "active" ? { activated_at: now } : {}),
-        };
-
-  const { error } = await supabase
-    .from("ambassadors")
-    .update(updatePayload)
-    .eq("id", ambassadorId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  const { access } = await applyAmbassadorStatusUpdate({
+    supabase,
+    ambassadorId,
+    nextStatus,
+    archivedReason:
+      "Archived from Ambassador detail status control. Retained for applicant and contractor recordkeeping.",
+  });
 
   await supabase.from("ambassador_activity_log").insert({
     ambassador_id: ambassadorId,
@@ -442,7 +551,9 @@ async function updateAmbassadorStatus(
         : `Status updated to ${prettyStatus(nextStatus)}`,
     activity_notes: `Updated by ${
       user.email || "Super Admin"
-    } from the Ambassador detail page.`,
+    } from the Ambassador detail page. Workspace access: ${
+      access.dashboardEnabled && access.loginEnabled ? "enabled" : "disabled"
+    }. Referral status: ${prettyStatus(access.referralStatus)}.`,
     created_by: user.id,
   });
 
@@ -475,6 +586,14 @@ async function updateAmbassadorPipelineStatus(formData: FormData) {
     redirect("/admin/ambassadors");
   }
 
+  const isAllowedStatus = AMBASSADOR_STATUSES.some(
+    (status) => status.value === nextStatus,
+  );
+
+  if (!isAllowedStatus) {
+    throw new Error("Invalid Ambassador status.");
+  }
+
   if (nextStatus === "active") {
     const completion = await getActivationCompletionSummary(
       supabase,
@@ -486,33 +605,13 @@ async function updateAmbassadorPipelineStatus(formData: FormData) {
     }
   }
 
-  const now = new Date().toISOString();
-
-  const updatePayload =
-    nextStatus === "archived"
-      ? {
-          status: "archived",
-          archived_at: now,
-          archived_reason:
-            "Archived from Ambassador detail quick action. Retained for applicant and contractor recordkeeping.",
-          updated_at: now,
-        }
-      : {
-          status: nextStatus,
-          archived_at: null,
-          archived_reason: null,
-          updated_at: now,
-          ...(nextStatus === "active" ? { activated_at: now } : {}),
-        };
-
-  const { error } = await supabase
-    .from("ambassadors")
-    .update(updatePayload)
-    .eq("id", ambassadorId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  const { access } = await applyAmbassadorStatusUpdate({
+    supabase,
+    ambassadorId,
+    nextStatus,
+    archivedReason:
+      "Archived from Ambassador detail quick action. Retained for applicant and contractor recordkeeping.",
+  });
 
   await supabase.from("ambassador_activity_log").insert({
     ambassador_id: ambassadorId,
@@ -523,7 +622,9 @@ async function updateAmbassadorPipelineStatus(formData: FormData) {
         : `Ambassador status updated to ${prettyStatus(nextStatus)}`,
     activity_notes: `${ambassadorName} was updated by ${
       user.email || "Super Admin"
-    } from the Ambassador detail quick actions.`,
+    } from the Ambassador detail quick actions. Workspace access: ${
+      access.dashboardEnabled && access.loginEnabled ? "enabled" : "disabled"
+    }. Referral status: ${prettyStatus(access.referralStatus)}.`,
     created_by: user.id,
   });
 
@@ -1673,7 +1774,7 @@ function AdminNotice({
       <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900">
         <p className="font-black">Ambassador updated</p>
         <p className="mt-1 text-sm font-semibold leading-6">
-          The Ambassador status was saved successfully.
+          The Ambassador status, referral availability, and workspace access were saved successfully.
         </p>
       </section>
     );

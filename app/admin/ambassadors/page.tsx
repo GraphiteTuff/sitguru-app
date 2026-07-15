@@ -20,6 +20,7 @@ import {
   PlayCircle,
   RotateCcw,
   Send,
+  Share2,
   ShieldCheck,
   Sparkles,
   Target,
@@ -97,6 +98,23 @@ type AmbassadorSummaryRow = {
   ambassador_points?: number | null;
   ambassador_rank?: string | null;
   last_activity_at?: string | null;
+  social_signups?: number | null;
+  facebook_signups?: number | null;
+  instagram_signups?: number | null;
+  tiktok_signups?: number | null;
+  x_signups?: number | null;
+  youtube_signups?: number | null;
+  onboarding_packet_status?: string | null;
+  onboarding_packet_submitted_at?: string | null;
+  onboarding_packet_reviewed_at?: string | null;
+  stripe_account_id?: string | null;
+  stripe_connect_account_id?: string | null;
+  stripe_onboarding_complete?: boolean | null;
+  stripe_payouts_enabled?: boolean | null;
+  payouts_enabled?: boolean | null;
+  charges_enabled?: boolean | null;
+  payout_ready?: boolean | null;
+  payout_blockers?: string[];
 };
 
 type AmbassadorDetailRow = {
@@ -118,6 +136,12 @@ type AmbassadorDetailRow = {
   dashboard_enabled?: boolean | null;
   login_enabled?: boolean | null;
   payout_status?: string | null;
+  stripe_account_id?: string | null;
+  stripe_connect_account_id?: string | null;
+  stripe_onboarding_complete?: boolean | null;
+  stripe_payouts_enabled?: boolean | null;
+  payouts_enabled?: boolean | null;
+  charges_enabled?: boolean | null;
 };
 
 type AmbassadorRegistryFilters = {
@@ -162,6 +186,12 @@ type OperationalMetrics = {
   readyRewards: number;
   paidRewards: number;
   totalEarned: number;
+  socialSignups: number;
+  facebookSignups: number;
+  instagramSignups: number;
+  tiktokSignups: number;
+  xSignups: number;
+  youtubeSignups: number;
   lastActivityAt: string | null;
 };
 
@@ -359,30 +389,157 @@ function normalizeLeadStage(value: string) {
   return "new";
 }
 
-function rowMatchesOwner(
-  row: GenericRow,
-  ambassadorId?: string | null,
-  userId?: string | null,
-) {
-  const ownerValues = uniqueStrings([
-    firstString(row, ["ambassador_id"]),
-    firstString(row, ["referrer_id"]),
-    firstString(row, ["user_id"]),
-    firstString(row, ["owner_id"]),
-    firstString(row, ["created_by"]),
-    firstString(row, ["profile_id"]),
+function dedupeRowsById(rows: GenericRow[]) {
+  const seen = new Set<string>();
+
+  return rows.filter((row, index) => {
+    const id =
+      firstString(row, ["id"]) ||
+      `${firstString(row, ["ambassador_id"])}:${index}`;
+
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function normalizeReferralType(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+  if (
+    ["pet_parent", "customer", "pet_owner", "owner"].includes(normalized)
+  ) {
+    return "pet_parent";
+  }
+
+  if (
+    ["guru", "provider", "sitter", "walker", "caregiver"].includes(normalized)
+  ) {
+    return "guru";
+  }
+
+  if (
+    ["business", "partner", "community", "organization"].includes(normalized)
+  ) {
+    return "business";
+  }
+
+  return normalized;
+}
+
+function normalizePlatform(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (
+    normalized === "twitter" ||
+    normalized === "twitter/x" ||
+    normalized === "x.com"
+  ) {
+    return "x";
+  }
+
+  if (normalized === "facebook.com") return "facebook";
+  if (normalized === "instagram.com") return "instagram";
+  if (normalized === "tiktok.com") return "tiktok";
+  if (normalized === "youtube.com") return "youtube";
+
+  return normalized;
+}
+
+function getCanonicalRewardBucket(row: GenericRow) {
+  const status = firstString(row, ["status"]).toLowerCase();
+  const payoutStatus = firstString(row, ["payout_status", "financial_status"]).toLowerCase();
+
+  const excluded = new Set([
+    "rejected",
+    "ineligible",
+    "void",
+    "voided",
+    "cancelled",
+    "canceled",
+    "refunded",
+    "chargeback",
+    "reversed",
   ]);
 
-  return ownerValues.some(
-    (value) => value === ambassadorId || value === userId,
+  if (excluded.has(status) || excluded.has(payoutStatus)) {
+    return "excluded";
+  }
+
+  const paid = new Set(["paid", "payout_paid", "payout_completed", "settled"]);
+
+  if (
+    Boolean(firstString(row, ["paid_at"])) ||
+    paid.has(status) ||
+    paid.has(payoutStatus)
+  ) {
+    return "paid";
+  }
+
+  const ready = new Set([
+    "ready_for_payout",
+    "queued_for_payout",
+    "queued",
+  ]);
+
+  if (ready.has(status) || ready.has(payoutStatus)) {
+    return "ready";
+  }
+
+  const approved = new Set(["approved", "approved_unpaid", "payable"]);
+
+  if (approved.has(status) || approved.has(payoutStatus)) {
+    return "approved";
+  }
+
+  return "pending";
+}
+
+function getCanonicalSocialPlatform(row: GenericRow) {
+  const platform = normalizePlatform(
+    firstString(row, ["platform", "utm_source"]),
   );
+
+  if (
+    ["facebook", "instagram", "tiktok", "x", "youtube"].includes(platform)
+  ) {
+    return platform;
+  }
+
+  const source = normalizePlatform(
+    firstString(row, ["source", "referral_source", "utm_source"]),
+  );
+
+  if (
+    ["facebook", "instagram", "tiktok", "x", "youtube"].includes(source)
+  ) {
+    return source;
+  }
+
+  return "";
+}
+
+function isCanonicalSocialReferral(row: GenericRow) {
+  if (getCanonicalSocialPlatform(row)) return true;
+
+  const source = firstString(row, [
+    "source",
+    "referral_source",
+    "utm_source",
+  ]).toLowerCase();
+  const medium = firstString(row, [
+    "medium",
+    "referral_medium",
+    "utm_medium",
+  ]).toLowerCase();
+
+  return source.includes("social") || medium.includes("social");
 }
 
 function buildOperationalMetrics({
   ambassadorId,
-  userId,
-  referralRows,
   leadRows,
+  referralRows,
   rewardRows,
   activityRows,
 }: {
@@ -393,57 +550,102 @@ function buildOperationalMetrics({
   rewardRows: GenericRow[];
   activityRows: GenericRow[];
 }): OperationalMetrics {
-  const referrals = referralRows.filter((row) =>
-    rowMatchesOwner(row, ambassadorId, userId),
+  if (!ambassadorId) {
+    return {
+      referralClicks: 0,
+      qualifiedReferrals: 0,
+      petParentSignups: 0,
+      guruSignups: 0,
+      businessSignups: 0,
+      communityLeads: 0,
+      completedBookings: 0,
+      leadNew: 0,
+      leadContacted: 0,
+      leadInterested: 0,
+      leadApplied: 0,
+      leadActive: 0,
+      pendingRewards: 0,
+      approvedRewards: 0,
+      readyRewards: 0,
+      paidRewards: 0,
+      totalEarned: 0,
+      socialSignups: 0,
+      facebookSignups: 0,
+      instagramSignups: 0,
+      tiktokSignups: 0,
+      xSignups: 0,
+      youtubeSignups: 0,
+      lastActivityAt: null,
+    };
+  }
+
+  const referrals = dedupeRowsById(
+    referralRows.filter(
+      (row) => firstString(row, ["ambassador_id"]) === ambassadorId,
+    ),
   );
-  const leads = leadRows.filter((row) =>
-    rowMatchesOwner(row, ambassadorId, userId),
+  const leads = dedupeRowsById(
+    leadRows.filter(
+      (row) => firstString(row, ["ambassador_id"]) === ambassadorId,
+    ),
   );
-  const rewards = rewardRows.filter((row) =>
-    rowMatchesOwner(row, ambassadorId, userId),
+  const rewards = dedupeRowsById(
+    rewardRows.filter(
+      (row) => firstString(row, ["ambassador_id"]) === ambassadorId,
+    ),
   );
-  const activities = activityRows.filter((row) =>
-    rowMatchesOwner(row, ambassadorId, userId),
+  const activities = dedupeRowsById(
+    activityRows.filter(
+      (row) => firstString(row, ["ambassador_id"]) === ambassadorId,
+    ),
   );
 
   const referralClicks = referrals.reduce((sum, row) => {
-    const type = firstString(row, ["event_type", "type", "status"]).toLowerCase();
-    const savedCount = firstNumber(row, ["clicks", "link_clicks", "click_count"]);
-    return sum + Math.max(0, savedCount || (type.includes("click") ? 1 : 0));
+    const eventType = firstString(row, ["event_type", "type"]).toLowerCase();
+    const savedCount = firstNumber(row, [
+      "clicks",
+      "link_clicks",
+      "click_count",
+    ]);
+
+    return sum + Math.max(0, savedCount || (eventType.includes("click") ? 1 : 0));
   }, 0);
 
-  const qualifiedReferrals = referrals.reduce((sum, row) => {
-    const status = firstString(row, ["status", "referral_status", "qualification_status"]).toLowerCase();
-    const qualified = firstBoolean(row, ["qualified", "is_qualified", "approved"]);
-    const savedCount = firstNumber(row, ["qualified_count", "approved_count"]);
+  const qualifiedReferrals = referrals.filter((row) => {
+    const status = firstString(row, [
+      "status",
+      "referral_status",
+      "qualification_status",
+    ]).toLowerCase();
+    const qualified = firstBoolean(row, [
+      "qualified",
+      "is_qualified",
+      "approved",
+    ]);
 
-    if (savedCount > 0) return sum + savedCount;
-    if (qualified === true) return sum + 1;
-    return sum + (["qualified", "approved", "converted"].includes(status) ? 1 : 0);
-  }, 0);
-
-  const referralTypeCount = (terms: string[]) =>
-    referrals.filter((row) => {
-      const type = firstString(row, [
-        "referral_type",
-        "lead_type",
-        "type",
-        "category",
-      ]).toLowerCase();
-      return terms.some((term) => type.includes(term));
-    }).length;
-
-  const petParentSignups = referralTypeCount(["pet_parent", "pet parent", "customer"]);
-  const guruSignups = referralTypeCount(["guru", "sitter", "caregiver"]);
-  const businessSignups = referralTypeCount(["business", "partner"]);
-  const communityLeads = [...referrals, ...leads].filter((row) => {
-    const type = firstString(row, ["lead_type", "referral_type", "type", "category"]).toLowerCase();
-    return type.includes("community") || type.includes("neighborhood") || type.includes("campus");
+    return (
+      qualified === true ||
+      ["qualified", "approved", "converted", "active"].includes(status)
+    );
   }).length;
 
+  const countReferralType = (type: "pet_parent" | "guru" | "business") =>
+    referrals.filter(
+      (row) =>
+        normalizeReferralType(
+          firstString(row, ["referral_type", "type", "category"]),
+        ) === type,
+    ).length;
+
   const completedBookings = referrals.filter((row) => {
-    const status = firstString(row, ["booking_status", "status"]).toLowerCase();
-    return ["booking_completed", "completed", "complete"].includes(status) || Boolean(firstString(row, ["completed_booking_at"]));
+    const bookingStatus = firstString(row, ["booking_status"]).toLowerCase();
+    const status = firstString(row, ["status"]).toLowerCase();
+
+    return (
+      Boolean(firstString(row, ["completed_booking_at"])) ||
+      ["booking_completed", "completed"].includes(bookingStatus) ||
+      status === "booking_completed"
+    );
   }).length;
 
   const leadCounts = {
@@ -461,39 +663,73 @@ function buildOperationalMetrics({
     leadCounts[stage] += 1;
   });
 
-  const rewardAmountByStatus = (statuses: string[]) =>
-    rewards
-      .filter((row) =>
-        statuses.includes(
-          firstString(row, ["status", "financial_status"]).toLowerCase(),
-        ),
+  const communityLeads = leads.filter((row) => {
+    const type = firstString(row, [
+      "lead_type",
+      "type",
+      "category",
+    ]).toLowerCase();
+
+    return (
+      type.includes("community") ||
+      type.includes("neighborhood") ||
+      type.includes("campus")
+    );
+  }).length;
+
+  const rewardTotals = {
+    pending: 0,
+    approved: 0,
+    ready: 0,
+    paid: 0,
+  };
+
+  rewards.forEach((row) => {
+    const bucket = getCanonicalRewardBucket(row);
+    const amount = Math.max(
+      0,
+      firstNumber(row, ["amount", "reward_amount", "payout_amount"]),
+    );
+
+    if (bucket === "pending") rewardTotals.pending += amount;
+    if (bucket === "approved") rewardTotals.approved += amount;
+    if (bucket === "ready") rewardTotals.ready += amount;
+    if (bucket === "paid") rewardTotals.paid += amount;
+  });
+
+  const socialReferrals = referrals.filter(isCanonicalSocialReferral);
+  const platformCount = (platform: string) =>
+    socialReferrals.filter(
+      (row) => getCanonicalSocialPlatform(row) === platform,
+    ).length;
+
+  const lastActivityAt =
+    [
+      ...activities,
+      ...referrals,
+      ...rewards,
+      ...leads,
+    ]
+      .map((row) =>
+        firstString(row, [
+          "created_at",
+          "updated_at",
+          "paid_at",
+          "approved_at",
+          "qualified_at",
+        ]),
       )
-      .reduce(
-        (sum, row) =>
-          sum + Math.max(0, firstNumber(row, ["amount", "reward_amount"])),
-        0,
-      );
-
-  const pendingRewards = rewardAmountByStatus(["pending", "pending_review"]);
-  const approvedRewards = rewardAmountByStatus(["approved"]);
-  const readyRewards = rewardAmountByStatus(["ready_for_payout", "queued"]);
-  const paidRewards = rewardAmountByStatus(["paid"]);
-  const totalEarned = rewards.reduce(
-    (sum, row) => sum + Math.max(0, firstNumber(row, ["amount", "reward_amount"])),
-    0,
-  );
-
-  const lastActivityAt = activities
-    .map((row) => firstString(row, ["created_at", "updated_at"]))
-    .filter(Boolean)
-    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
+      .filter(Boolean)
+      .sort(
+        (a, b) => new Date(b).getTime() - new Date(a).getTime(),
+      )[0] || null;
 
   return {
     referralClicks,
     qualifiedReferrals,
-    petParentSignups,
-    guruSignups,
-    businessSignups,
+    petParentSignups: countReferralType("pet_parent"),
+    guruSignups: countReferralType("guru"),
+    businessSignups: countReferralType("business"),
     communityLeads,
     completedBookings,
     leadNew: leadCounts.new,
@@ -501,12 +737,139 @@ function buildOperationalMetrics({
     leadInterested: leadCounts.interested,
     leadApplied: leadCounts.applied,
     leadActive: leadCounts.active,
-    pendingRewards,
-    approvedRewards,
-    readyRewards,
-    paidRewards,
-    totalEarned,
+    pendingRewards: rewardTotals.pending,
+    approvedRewards: rewardTotals.approved,
+    readyRewards: rewardTotals.ready,
+    paidRewards: rewardTotals.paid,
+    totalEarned:
+      rewardTotals.approved +
+      rewardTotals.ready +
+      rewardTotals.paid,
+    socialSignups: socialReferrals.length,
+    facebookSignups: platformCount("facebook"),
+    instagramSignups: platformCount("instagram"),
+    tiktokSignups: platformCount("tiktok"),
+    xSignups: platformCount("x"),
+    youtubeSignups: platformCount("youtube"),
     lastActivityAt,
+  };
+}
+
+function getCanonicalTrainingSummary({
+  ambassadorId,
+  trainingStepRows,
+  trainingProgressRows,
+}: {
+  ambassadorId: string;
+  trainingStepRows: GenericRow[];
+  trainingProgressRows: GenericRow[];
+}) {
+  const activeRequiredSteps = dedupeRowsById(trainingStepRows).filter((row) => {
+    const isActive = firstBoolean(row, ["is_active"]);
+    const isRequired = firstBoolean(row, ["is_required"]);
+
+    return isActive !== false && isRequired !== false;
+  });
+
+  const progressRows = dedupeRowsById(
+    trainingProgressRows.filter(
+      (row) => firstString(row, ["ambassador_id"]) === ambassadorId,
+    ),
+  );
+  const progressByStep = new Map(
+    progressRows.map((row) => [
+      firstString(row, ["training_step_id"]),
+      row,
+    ]),
+  );
+
+  const completedRequired = activeRequiredSteps.filter((step) => {
+    const progress = progressByStep.get(firstString(step, ["id"]));
+    const status = firstString(progress, ["status"]).toLowerCase();
+
+    return (
+      Boolean(firstString(progress, ["completed_at"])) ||
+      ["complete", "completed", "approved"].includes(status)
+    );
+  }).length;
+
+  const requiredCount = activeRequiredSteps.length;
+  const percent = requiredCount
+    ? Math.round((completedRequired / requiredCount) * 100)
+    : 0;
+  const started = progressRows.some(
+    (row) =>
+      Boolean(firstString(row, ["started_at", "completed_at"])) ||
+      Boolean(firstString(row, ["status"])),
+  );
+
+  return {
+    percent,
+    status:
+      requiredCount > 0 && completedRequired >= requiredCount
+        ? "complete"
+        : started
+          ? "in_progress"
+          : "not_started",
+  };
+}
+
+function getCanonicalOnboardingSummary({
+  ambassadorId,
+  onboardingRows,
+}: {
+  ambassadorId: string;
+  onboardingRows: GenericRow[];
+}) {
+  const matchingRows = dedupeRowsById(
+    onboardingRows.filter(
+      (row) => firstString(row, ["ambassador_id"]) === ambassadorId,
+    ),
+  ).sort((a, b) => {
+    const aTime = new Date(
+      firstString(a, ["updated_at", "submitted_at", "created_at"]) || 0,
+    ).getTime();
+    const bTime = new Date(
+      firstString(b, ["updated_at", "submitted_at", "created_at"]) || 0,
+    ).getTime();
+
+    return bTime - aTime;
+  });
+
+  const row = matchingRows[0];
+
+  return {
+    status: row ? firstString(row, ["status"]) || "not_started" : "not_started",
+    submittedAt: row ? firstString(row, ["submitted_at"]) || null : null,
+    reviewedAt: row ? firstString(row, ["reviewed_at"]) || null : null,
+  };
+}
+
+function getCanonicalPayoutReadiness(detail?: AmbassadorDetailRow) {
+  const accountId =
+    asString(detail?.stripe_account_id) ||
+    asString(detail?.stripe_connect_account_id);
+  const onboardingComplete =
+    detail?.stripe_onboarding_complete === true;
+  const payoutsEnabled =
+    detail?.stripe_payouts_enabled === true ||
+    detail?.payouts_enabled === true;
+  const blockers: string[] = [];
+
+  if (!accountId) blockers.push("Stripe account missing");
+  if (!onboardingComplete) blockers.push("Stripe onboarding incomplete");
+  if (!payoutsEnabled) blockers.push("Stripe payouts disabled");
+
+  return {
+    accountId,
+    onboardingComplete,
+    payoutsEnabled,
+    chargesEnabled: detail?.charges_enabled === true,
+    ready:
+      Boolean(accountId) &&
+      onboardingComplete &&
+      payoutsEnabled,
+    blockers,
   };
 }
 
@@ -657,6 +1020,9 @@ function buildUnifiedAmbassadorRows({
   leadRows,
   rewardRows,
   activityRows,
+  trainingStepRows,
+  trainingProgressRows,
+  onboardingRows,
 }: {
   summaryRows: AmbassadorSummaryRow[];
   detailRows: AmbassadorDetailRow[];
@@ -667,6 +1033,9 @@ function buildUnifiedAmbassadorRows({
   leadRows: GenericRow[];
   rewardRows: GenericRow[];
   activityRows: GenericRow[];
+  trainingStepRows: GenericRow[];
+  trainingProgressRows: GenericRow[];
+  onboardingRows: GenericRow[];
 }) {
   const detailMap = new Map(detailRows.map((row) => [row.id, row]));
   const profileByUserId = new Map<string, GenericRow>();
@@ -755,6 +1124,16 @@ function buildUnifiedAmbassadorRows({
       rewardRows,
       activityRows,
     });
+    const trainingSummary = getCanonicalTrainingSummary({
+      ambassadorId: row.ambassador_id,
+      trainingStepRows,
+      trainingProgressRows,
+    });
+    const onboardingSummary = getCanonicalOnboardingSummary({
+      ambassadorId: row.ambassador_id,
+      onboardingRows,
+    });
+    const payoutReadiness = getCanonicalPayoutReadiness(detail);
     const status = detail?.status || row.status || "new";
     const dashboardEnabled = detail?.dashboard_enabled ?? null;
     const loginEnabled = detail?.login_enabled ?? null;
@@ -791,10 +1170,33 @@ function buildUnifiedAmbassadorRows({
       archived_at: detail?.archived_at || row.archived_at || null,
       archived_reason: detail?.archived_reason || row.archived_reason || null,
       onboarding_step: detail?.onboarding_step ?? null,
-      onboarding_percent: detail?.onboarding_percent ?? numberValue(row.training_percent),
+      onboarding_percent:
+        onboardingSummary.status === "approved" ||
+        onboardingSummary.status === "complete" ||
+        onboardingSummary.status === "completed"
+          ? 100
+          : onboardingSummary.status === "submitted" ||
+              onboardingSummary.status === "pending_review" ||
+              onboardingSummary.status === "in_review"
+            ? 75
+            : 0,
+      onboarding_packet_status: onboardingSummary.status,
+      onboarding_packet_submitted_at: onboardingSummary.submittedAt,
+      onboarding_packet_reviewed_at: onboardingSummary.reviewedAt,
+      training_status: trainingSummary.status,
+      training_percent: trainingSummary.percent,
       dashboard_enabled: dashboardEnabled,
       login_enabled: loginEnabled,
       payout_status: detail?.payout_status || null,
+      stripe_account_id: payoutReadiness.accountId || null,
+      stripe_connect_account_id:
+        asString(detail?.stripe_connect_account_id) || null,
+      stripe_onboarding_complete: payoutReadiness.onboardingComplete,
+      stripe_payouts_enabled: payoutReadiness.payoutsEnabled,
+      payouts_enabled: payoutReadiness.payoutsEnabled,
+      charges_enabled: payoutReadiness.chargesEnabled,
+      payout_ready: payoutReadiness.ready,
+      payout_blockers: payoutReadiness.blockers,
       workspace_exists: true,
       signup_intent:
         firstString(metadata, ["account_intent", "signup_role", "role"]) ||
@@ -811,9 +1213,9 @@ function buildUnifiedAmbassadorRows({
       attention_items: attentionItems,
       auth_created_at: authUser?.created_at || null,
       profile_updated_at: firstString(profile, ["updated_at"]) || null,
-      referral_clicks: Math.max(numberValue(row.referral_clicks), metrics.referralClicks),
-      qualified_referrals: Math.max(numberValue(row.qualified_referrals), metrics.qualifiedReferrals),
-      community_leads: Math.max(numberValue(row.community_leads), metrics.communityLeads),
+      referral_clicks: metrics.referralClicks,
+      qualified_referrals: metrics.qualifiedReferrals,
+      community_leads: metrics.communityLeads,
       lead_new: metrics.leadNew,
       lead_contacted: metrics.leadContacted,
       lead_interested: metrics.leadInterested,
@@ -822,16 +1224,22 @@ function buildUnifiedAmbassadorRows({
       ambassador_points: points,
       ambassador_rank: getRankFromPoints(points),
       last_activity_at: metrics.lastActivityAt,
-      pet_parent_signups: Math.max(numberValue(row.pet_parent_signups), metrics.petParentSignups),
-      guru_signups: Math.max(numberValue(row.guru_signups), metrics.guruSignups),
-      business_signups: Math.max(numberValue(row.business_signups), metrics.businessSignups),
-      completed_bookings: Math.max(numberValue(row.completed_bookings), metrics.completedBookings),
-      pending_rewards: Math.max(numberValue(row.pending_rewards), metrics.pendingRewards),
-      approved_rewards: Math.max(numberValue(row.approved_rewards), metrics.approvedRewards),
-      ready_for_payout_rewards: Math.max(numberValue(row.ready_for_payout_rewards), metrics.readyRewards),
-      paid_rewards: Math.max(numberValue(row.paid_rewards), metrics.paidRewards),
-      total_earned: Math.max(numberValue(row.total_earned), metrics.totalEarned),
-      total_paid: Math.max(numberValue(row.total_paid), metrics.paidRewards),
+      pet_parent_signups: metrics.petParentSignups,
+      guru_signups: metrics.guruSignups,
+      business_signups: metrics.businessSignups,
+      completed_bookings: metrics.completedBookings,
+      pending_rewards: metrics.pendingRewards,
+      approved_rewards: metrics.approvedRewards,
+      ready_for_payout_rewards: metrics.readyRewards,
+      paid_rewards: metrics.paidRewards,
+      total_earned: metrics.totalEarned,
+      total_paid: metrics.paidRewards,
+      social_signups: metrics.socialSignups,
+      facebook_signups: metrics.facebookSignups,
+      instagram_signups: metrics.instagramSignups,
+      tiktok_signups: metrics.tiktokSignups,
+      x_signups: metrics.xSignups,
+      youtube_signups: metrics.youtubeSignups,
     } satisfies AmbassadorSummaryRow;
   });
 
@@ -911,6 +1319,7 @@ function buildUnifiedAmbassadorRows({
       ),
     );
     const metrics = buildOperationalMetrics({
+      ambassadorId: null,
       userId,
       referralRows,
       leadRows,
@@ -1016,6 +1425,23 @@ function buildUnifiedAmbassadorRows({
       ambassador_points: points,
       ambassador_rank: getRankFromPoints(points),
       last_activity_at: metrics.lastActivityAt,
+      social_signups: 0,
+      facebook_signups: 0,
+      instagram_signups: 0,
+      tiktok_signups: 0,
+      x_signups: 0,
+      youtube_signups: 0,
+      onboarding_packet_status: "workspace_missing",
+      onboarding_packet_submitted_at: null,
+      onboarding_packet_reviewed_at: null,
+      stripe_account_id: null,
+      stripe_connect_account_id: null,
+      stripe_onboarding_complete: false,
+      stripe_payouts_enabled: false,
+      payouts_enabled: false,
+      charges_enabled: false,
+      payout_ready: false,
+      payout_blockers: ["Ambassador workspace missing"],
     });
   });
 
@@ -1353,6 +1779,15 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
       group: "Performance",
     },
     {
+      label: "Social Signups",
+      value: rows
+        .reduce((sum, row) => sum + numberValue(row.social_signups), 0)
+        .toLocaleString(),
+      subtext: "Canonical social referrals across official channels",
+      icon: Share2,
+      group: "Performance",
+    },
+    {
       label: "Pending Rewards",
       value: currency(
         rows.reduce((sum, row) => sum + numberValue(row.pending_rewards), 0),
@@ -1389,6 +1824,15 @@ function buildAdminCards(rows: AmbassadorSummaryRow[]) {
       ),
       subtext: "Rewards already paid",
       icon: Wallet,
+      group: "Rewards",
+    },
+    {
+      label: "Payout-Ready Ambassadors",
+      value: rows
+        .filter((row) => row.payout_ready === true)
+        .length.toLocaleString(),
+      subtext: "Stripe account, onboarding, and payouts enabled",
+      icon: ShieldCheck,
       group: "Rewards",
     },
   ];
@@ -1667,7 +2111,7 @@ function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+      <div className="mt-5 grid gap-3 sm:grid-cols-4">
         <CompactMetric
           label="Parents"
           value={numberValue(ambassador.pet_parent_signups)}
@@ -1679,6 +2123,10 @@ function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
         <CompactMetric
           label="Business"
           value={numberValue(ambassador.business_signups)}
+        />
+        <CompactMetric
+          label="Social"
+          value={numberValue(ambassador.social_signups)}
         />
       </div>
 
@@ -1726,6 +2174,18 @@ function AmbassadorCard({ ambassador }: { ambassador: AmbassadorSummaryRow }) {
 
           <p className="mt-3 text-xs font-semibold text-slate-500">
             {prettyStatus(ambassador.training_status)}
+          </p>
+          <p className="mt-2 text-xs font-semibold text-slate-500">
+            Onboarding: {prettyStatus(ambassador.onboarding_packet_status)}
+          </p>
+          <p
+            className={`mt-2 text-xs font-black ${
+              ambassador.payout_ready ? "text-emerald-700" : "text-amber-700"
+            }`}
+          >
+            {ambassador.payout_ready
+              ? "Payout setup ready"
+              : "Payout setup incomplete"}
           </p>
 
           {ambassador.ambassador_photo_path ? (
@@ -1965,6 +2425,10 @@ function filterAmbassadorsForRegistry(
       ambassador.assigned_roles?.join(" "),
       ambassador.attention_items?.join(" "),
       ambassador.ambassador_rank,
+      ambassador.onboarding_packet_status,
+      ambassador.payout_ready ? "payout ready" : "payout incomplete",
+      ambassador.payout_blockers?.join(" "),
+      numberValue(ambassador.social_signups) > 0 ? "social referrals" : "",
     ]
       .filter(Boolean)
       .join(" ")
@@ -2701,6 +3165,10 @@ function AmbassadorRegistryTable({
                         <p>{numberValue(ambassador.community_leads)} Community leads</p>
                         <p>{numberValue(ambassador.referral_clicks)} Link clicks</p>
                         <p>{numberValue(ambassador.qualified_referrals)} Qualified</p>
+                        <p>{numberValue(ambassador.social_signups)} Social signups</p>
+                        <p className="mt-1 text-[11px] font-bold text-slate-500">
+                          FB {numberValue(ambassador.facebook_signups)} · IG {numberValue(ambassador.instagram_signups)} · TikTok {numberValue(ambassador.tiktok_signups)} · X {numberValue(ambassador.x_signups)} · YouTube {numberValue(ambassador.youtube_signups)}
+                        </p>
                         <p className="mt-1 font-black text-[#102819]">
                           {referralTotal} signup records
                         </p>
@@ -2716,10 +3184,25 @@ function AmbassadorRegistryTable({
                       </p>
                       <div className="mt-2 text-xs font-bold leading-5 text-slate-600">
                         <p>Pending: {currency(ambassador.pending_rewards)}</p>
+                        <p>Approved: {currency(ambassador.approved_rewards)}</p>
                         <p>Ready: {currency(ambassador.ready_for_payout_rewards)}</p>
                         <p>Paid: {currency(ambassador.paid_rewards)}</p>
                         <p className="mt-1 font-black text-[#102819]">
                           {currency(rewardsTotal)} total
+                        </p>
+                        <p
+                          className={`mt-2 text-[11px] font-black ${
+                            ambassador.payout_ready
+                              ? "text-emerald-700"
+                              : "text-amber-700"
+                          }`}
+                        >
+                          {ambassador.payout_ready
+                            ? "Payout setup ready"
+                            : `Payout blockers: ${
+                                ambassador.payout_blockers?.join(", ") ||
+                                "Setup incomplete"
+                              }`}
                         </p>
                       </div>
                     </div>
@@ -2799,6 +3282,9 @@ export default async function AdminAmbassadorsPage({
     leadRows,
     rewardRows,
     activityRows,
+    trainingStepRows,
+    trainingProgressRows,
+    onboardingRows,
   ] = await Promise.all([
     loadAllAuthUsers(),
     loadOptionalAdminRows("profiles"),
@@ -2807,6 +3293,9 @@ export default async function AdminAmbassadorsPage({
     loadOptionalAdminRows("ambassador_leads"),
     loadOptionalAdminRows("ambassador_rewards"),
     loadOptionalAdminRows("ambassador_activity_log"),
+    loadOptionalAdminRows("ambassador_training_steps"),
+    loadOptionalAdminRows("ambassador_training_progress"),
+    loadOptionalAdminRows("ambassador_onboarding_packets"),
   ]);
 
   let detailRows: AmbassadorDetailRow[] = [];
@@ -2819,9 +3308,7 @@ export default async function AdminAmbassadorsPage({
     if (realAmbassadorIds.length > 0) {
       const { data: detailData, error: detailError } = await supabaseAdmin
         .from("ambassadors")
-        .select(
-          "id, display_name, ambassador_type, tier, status, referral_code, guru_referral_url, ambassador_photo_url, ambassador_photo_path, photo_approved, photo_uploaded_at, archived_at, archived_reason, onboarding_step, onboarding_percent, dashboard_enabled, login_enabled, payout_status",
-        )
+        .select("*")
         .in("id", realAmbassadorIds);
 
       if (detailError) {
@@ -2842,6 +3329,9 @@ export default async function AdminAmbassadorsPage({
     leadRows,
     rewardRows,
     activityRows,
+    trainingStepRows,
+    trainingProgressRows,
+    onboardingRows,
   });
 
   const registryFilters = buildRegistryFilters(resolvedSearchParams);
@@ -2922,7 +3412,8 @@ export default async function AdminAmbassadorsPage({
                 View every Ambassador in one clean registry. Track onboarding,
                 training, referral codes, Pet Parent and Guru referrals, rewards,
                 payout readiness, direct messages, admin dashboard access,
-                signup provisioning, role health, and mobile-aligned activity.
+                signup provisioning, role health, canonical social attribution,
+                onboarding packets, training progress, and Stripe payout readiness.
                 {photoApprovedCount > 0
                   ? ` ${photoApprovedCount} Ambassador photos are approved.`
                   : ""}

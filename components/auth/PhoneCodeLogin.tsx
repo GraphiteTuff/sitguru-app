@@ -12,7 +12,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import TurnstileWidget from "@/components/TurnstileWidget";
 
-type PhoneLoginRole = "customer" | "guru";
+type PhoneLoginRole = "customer" | "guru" | "ambassador";
 type ProfileRole = "customer" | "guru" | "both";
 
 type PhoneCodeLoginProps = {
@@ -38,12 +38,32 @@ function getSafeRedirectPath(
     if (!decoded.startsWith("/")) return fallback;
     if (decoded.startsWith("//")) return fallback;
     if (decoded.includes("://")) return fallback;
+    if (decoded.includes("\\")) return fallback;
+    if (decoded.startsWith("/admin")) return fallback;
+    if (decoded.startsWith("/auth/")) return fallback;
+    if (decoded.startsWith("/signup")) return fallback;
 
-    if (role === "customer" && decoded.startsWith("/guru")) {
+    if (
+      role === "customer" &&
+      (decoded.startsWith("/guru") || decoded.startsWith("/ambassador"))
+    ) {
       return fallback;
     }
 
-    if (role === "guru" && decoded.startsWith("/customer")) {
+    if (
+      role === "guru" &&
+      (decoded.startsWith("/customer") || decoded.startsWith("/ambassador"))
+    ) {
+      return fallback;
+    }
+
+    if (
+      role === "ambassador" &&
+      !(
+        decoded.startsWith("/ambassador/") ||
+        decoded === "/login/route?preferred=ambassador"
+      )
+    ) {
       return fallback;
     }
 
@@ -102,11 +122,43 @@ function isProbablyValidE164Phone(value: string) {
 }
 
 function getRoleLabel(role: PhoneLoginRole) {
+  if (role === "ambassador") return "Ambassador";
   return role === "guru" ? "Future Guru" : "Pet Parent";
 }
 
 function getRequestedProfileRole(role: PhoneLoginRole): ProfileRole {
   return role === "guru" ? "guru" : "customer";
+}
+
+function getRoleFromNextPath(
+  nextPath: string,
+  fallbackRole: PhoneLoginRole,
+): PhoneLoginRole {
+  const normalized = nextPath.trim().toLowerCase();
+
+  if (
+    normalized.startsWith("/ambassador/") ||
+    normalized.includes("preferred=ambassador")
+  ) {
+    return "ambassador";
+  }
+
+  if (
+    normalized.startsWith("/guru/") ||
+    normalized.includes("preferred=guru")
+  ) {
+    return "guru";
+  }
+
+  if (
+    normalized.startsWith("/customer/") ||
+    normalized.includes("preferred=pet_parent") ||
+    normalized.includes("preferred=customer")
+  ) {
+    return "customer";
+  }
+
+  return fallbackRole;
 }
 
 function getMergedProfileRole(
@@ -131,9 +183,13 @@ function getMergedProfileRole(
 }
 
 function getDefaultPath(role: PhoneLoginRole) {
+  if (role === "ambassador") {
+    return "/login/route?preferred=ambassador";
+  }
+
   return role === "guru"
-    ? "/guru/dashboard/profile"
-    : "/customer/dashboard/profile";
+    ? "/login/route?preferred=guru"
+    : "/login/route?preferred=pet_parent";
 }
 
 
@@ -184,11 +240,15 @@ export default function PhoneCodeLogin({
 }: PhoneCodeLoginProps) {
   const router = useRouter();
 
-  const fallbackPath = getDefaultPath(role);
+  const effectiveRole = useMemo(
+    () => getRoleFromNextPath(nextPath, role),
+    [nextPath, role],
+  );
+  const fallbackPath = getDefaultPath(effectiveRole);
 
   const safeNextPath = useMemo(
-    () => getSafeRedirectPath(nextPath, fallbackPath, role),
-    [nextPath, fallbackPath, role],
+    () => getSafeRedirectPath(nextPath, fallbackPath, effectiveRole),
+    [nextPath, fallbackPath, effectiveRole],
   );
 
   const [phone, setPhone] = useState("");
@@ -203,8 +263,9 @@ export default function PhoneCodeLogin({
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
-  const roleLabel = accessLabel || getRoleLabel(role);
-  const requestedProfileRole = getRequestedProfileRole(role);
+  const roleLabel = accessLabel || getRoleLabel(effectiveRole);
+  const requestedProfileRole = getRequestedProfileRole(effectiveRole);
+  const canCreateUser = allowCreateUser && effectiveRole !== "ambassador";
 
   const handleTurnstileVerify = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -245,14 +306,21 @@ export default function PhoneCodeLogin({
     const { error } = await supabase.auth.signInWithOtp({
       phone: phoneToSend,
       options: {
-        shouldCreateUser: allowCreateUser,
+        shouldCreateUser: canCreateUser,
         captchaToken: turnstileToken,
         data: {
-          role: requestedProfileRole,
-          account_type: requestedProfileRole,
+          role:
+            effectiveRole === "ambassador"
+              ? "ambassador"
+              : requestedProfileRole,
+          account_type:
+            effectiveRole === "ambassador"
+              ? "ambassador"
+              : requestedProfileRole,
           signup_method: "phone",
-          signup_role: role,
-          source: allowCreateUser ? "phone_signup" : "phone_login",
+          signup_role: effectiveRole,
+          source: canCreateUser ? "phone_signup" : "phone_login",
+          preferred_workspace: effectiveRole,
         },
       },
     });
@@ -282,7 +350,9 @@ export default function PhoneCodeLogin({
     setIsSending(false);
 
     if (error) {
-      setErrorMessage(getPhoneLoginErrorMessage(error.message || "", allowCreateUser));
+      setErrorMessage(
+        getPhoneLoginErrorMessage(error.message || "", canCreateUser),
+      );
       return;
     }
 
@@ -313,7 +383,7 @@ export default function PhoneCodeLogin({
       setErrorMessage(
         getPhoneLoginErrorMessage(
           error.message || "We could not send a new SitGuru code. Please try again.",
-          allowCreateUser,
+          canCreateUser,
         ),
       );
       return;
@@ -411,7 +481,7 @@ export default function PhoneCodeLogin({
       const userId = data.user?.id;
       const userEmail = data.user?.email || null;
 
-      if (userId && allowCreateUser) {
+      if (userId && canCreateUser) {
         await syncProfileAfterPhoneLogin(userId, userEmail);
       }
     } catch (profileError) {
@@ -472,6 +542,14 @@ export default function PhoneCodeLogin({
         </div>
       </div>
 
+      {effectiveRole === "ambassador" ? (
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold leading-6 text-emerald-900">
+          Use the mobile number already connected to your SitGuru account.
+          New Ambassador accounts must be created through the Ambassador signup
+          flow before phone login can be used.
+        </div>
+      ) : null}
+
       {!codeSent ? (
         <form onSubmit={handleSendCode} className="mt-5 space-y-4">
           <div className="space-y-2">
@@ -523,7 +601,7 @@ export default function PhoneCodeLogin({
           </div>
 
           <TurnstileWidget
-            action={`${role}_phone_code_login`}
+            action={`${effectiveRole}_phone_code_login`}
             resetKey={turnstileResetKey}
             onVerify={handleTurnstileVerify}
             onExpire={handleTurnstileExpire}
@@ -639,7 +717,7 @@ export default function PhoneCodeLogin({
           </button>
 
           <TurnstileWidget
-            action={`${role}_phone_code_resend`}
+            action={`${effectiveRole}_phone_code_resend`}
             resetKey={turnstileResetKey}
             onVerify={handleTurnstileVerify}
             onExpire={handleTurnstileExpire}

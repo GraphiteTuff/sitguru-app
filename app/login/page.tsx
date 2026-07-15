@@ -89,6 +89,34 @@ function getDefaultDashboardForAudience(audience: LoginAudience) {
   return "/login/route";
 }
 
+function isAudienceCompatiblePath(
+  path: string,
+  audience: LoginAudience,
+) {
+  if (audience === "ambassador") {
+    return (
+      path.startsWith("/ambassador/") ||
+      path === "/login/route?preferred=ambassador"
+    );
+  }
+
+  if (audience === "guru") {
+    return (
+      path.startsWith("/guru/") ||
+      path === "/login/route?preferred=guru"
+    );
+  }
+
+  if (audience === "pet_parent") {
+    return (
+      path.startsWith("/customer/") ||
+      path === "/login/route?preferred=pet_parent"
+    );
+  }
+
+  return true;
+}
+
 function getSafeNextPath(nextValue: string | null, audience: LoginAudience) {
   const fallback = getDefaultDashboardForAudience(audience);
 
@@ -101,6 +129,9 @@ function getSafeNextPath(nextValue: string | null, audience: LoginAudience) {
     if (decoded.startsWith("//")) return fallback;
     if (decoded.includes("://")) return fallback;
     if (decoded.startsWith("/admin")) return fallback;
+    if (decoded.startsWith("/auth/")) return fallback;
+    if (decoded.startsWith("/signup")) return fallback;
+    if (!isAudienceCompatiblePath(decoded, audience)) return fallback;
 
     return decoded;
   } catch {
@@ -108,8 +139,49 @@ function getSafeNextPath(nextValue: string | null, audience: LoginAudience) {
   }
 }
 
-function getPhoneAccessLabel() {
+function getPhoneAccessLabel(audience: LoginAudience) {
+  if (audience === "ambassador") return "Ambassador account";
+  if (audience === "guru") return "Guru account";
+  if (audience === "pet_parent") return "Pet Parent account";
   return "Existing SitGuru account";
+}
+
+function getAudienceTitle(audience: LoginAudience) {
+  if (audience === "ambassador") return "Ambassador login";
+  if (audience === "guru") return "Guru login";
+  if (audience === "pet_parent") return "Pet Parent login";
+  return "Log in or join";
+}
+
+function getAudienceDescription(audience: LoginAudience) {
+  if (audience === "ambassador") {
+    return "Use your SitGuru account to open referrals, training, rewards, outreach, and Ambassador support.";
+  }
+
+  if (audience === "guru") {
+    return "Use your SitGuru account to manage services, requests, bookings, messages, and earnings.";
+  }
+
+  if (audience === "pet_parent") {
+    return "Use your SitGuru account to manage pets, bookings, messages, PawPerks, and care details.";
+  }
+
+  return "Use one SitGuru account for Pet Parent, Guru, and Ambassador dashboards.";
+}
+
+function getAmbassadorSignupHref() {
+  const params = new URLSearchParams({
+    role: "ambassador",
+    program: "community",
+    source: "login_page",
+    platform: "web",
+    campaign: "ambassador_login_signup",
+    utm_source: "sitguru",
+    utm_medium: "login_page",
+    utm_campaign: "ambassador_login_signup",
+  });
+
+  return `/signup?${params.toString()}`;
 }
 
 function getEmailTurnstileAction(audience: LoginAudience) {
@@ -145,8 +217,14 @@ function LoginPageContent() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
-  const errorMessage = decodeMessage(searchParams.get("error"));
-  const phoneAccessLabel = getPhoneAccessLabel();
+  const errorMessage = decodeMessage(
+    searchParams.get("error") ||
+      searchParams.get("message") ||
+      searchParams.get("auth_error"),
+  );
+  const phoneAccessLabel = getPhoneAccessLabel(requestedAudience);
+  const audienceTitle = getAudienceTitle(requestedAudience);
+  const audienceDescription = getAudienceDescription(requestedAudience);
 
   const handleTurnstileVerify = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -248,12 +326,11 @@ function LoginPageContent() {
             </div>
 
             <h2 className="mt-4 text-4xl font-black leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-5xl">
-              Log in or join.
+              {audienceTitle}.
             </h2>
 
             <p className="mt-3 text-sm font-semibold leading-6 text-slate-600 sm:text-base">
-              Use one SitGuru account for Pet Parent, Guru, and Ambassador
-              dashboards.
+              {audienceDescription}
             </p>
           </div>
 
@@ -298,39 +375,35 @@ function LoginPageContent() {
           </div>
 
           {loginMethod === "phone" ? (
-            requestedAudience === "ambassador" ? (
-              <div className="mt-5 rounded-[1.5rem] border border-emerald-100 bg-emerald-50 p-5">
-                <p className="text-lg font-black text-slate-950">
-                  Ambassador login
-                </p>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
-                  Ambassador phone login is moving into the unified login flow.
-                  Use the Ambassador portal for now.
-                </p>
-                <Link
-                  href="/ambassador/login"
-                  className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
-                >
-                  Open Ambassador Login
-                </Link>
-              </div>
-            ) : (
-              <div className="mt-5">
-                <PhoneCodeLogin
-                  role={requestedAudience === "guru" ? "guru" : "customer"}
-                  nextPath={nextPath}
-                  heading="Continue with phone"
-                  description="We’ll text you a secure 6-digit code."
-                  submitLabel="Send code"
-                  verifyLabel="Verify & continue"
-                  accessLabel={phoneAccessLabel}
-                  compact
-                />
-              </div>
-            )
+            <div className="mt-5">
+              <PhoneCodeLogin
+                role={requestedAudience === "guru" ? "guru" : "customer"}
+                nextPath={nextPath}
+                heading={
+                  requestedAudience === "ambassador"
+                    ? "Continue to your Ambassador workspace"
+                    : "Continue with phone"
+                }
+                description="We’ll text you a secure 6-digit code."
+                submitLabel="Send code"
+                verifyLabel="Verify & continue"
+                accessLabel={phoneAccessLabel}
+                compact
+              />
+            </div>
           ) : (
             <form action={login} className="mt-5 space-y-4">
               <input type="hidden" name="next" value={nextPath} />
+              <input
+                type="hidden"
+                name="role"
+                value={requestedAudience === "one" ? "" : requestedAudience}
+              />
+              <input
+                type="hidden"
+                name="preferred"
+                value={requestedAudience === "one" ? "" : requestedAudience}
+              />
               <input type="hidden" name="mode" value="email" />
               <input
                 type="hidden"
@@ -439,8 +512,8 @@ function LoginPageContent() {
               Multiple roles? No problem.
             </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-              After login, SitGuru will take you to the right dashboard. Account
-              switching comes next.
+              After login, SitGuru verifies each workspace connected to your
+              account and sends you to the requested dashboard.
             </p>
           </div>
 
@@ -460,7 +533,7 @@ function LoginPageContent() {
             </Link>
 
             <Link
-              href="/ambassadors"
+              href={getAmbassadorSignupHref()}
               className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-xs font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50"
             >
               Become an Ambassador

@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
@@ -99,12 +100,108 @@ type DeliveryResult = {
   warnings: string[];
 };
 
+type SavedMessageRow = {
+  id: string;
+  conversation_id?: string | null;
+  sender_id?: string | null;
+  recipient_id?: string | null;
+  content?: string | null;
+  body?: string | null;
+  topic?: string | null;
+  created_at?: string | null;
+};
+
+type MessageRoleContext = "customer" | "guru" | "ambassador" | "admin";
+
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
 function safeBoolean(value: unknown) {
   return value === true || safeString(value).toLowerCase() === "true";
+}
+
+function normalizeClientMessageKey(value: unknown) {
+  const clean = safeString(value);
+
+  if (!clean || clean.length > 200) return "";
+
+  return clean;
+}
+
+function getClientMessageKey(
+  req: NextRequest,
+  body: Record<string, unknown> | null,
+) {
+  const headerKey = normalizeClientMessageKey(
+    req.headers.get("idempotency-key"),
+  );
+  const bodyKey = normalizeClientMessageKey(body?.clientMessageId);
+
+  if (headerKey && bodyKey && headerKey !== bodyKey) {
+    throw new Error(
+      "The message request identifiers did not match. Please refresh and try again.",
+    );
+  }
+
+  return headerKey || bodyKey;
+}
+
+function createDeterministicMessageId(userId: string, clientMessageKey: string) {
+  if (!clientMessageKey) return randomUUID();
+
+  const digest = createHash("sha256")
+    .update(`${userId}:${clientMessageKey}`)
+    .digest();
+
+  const bytes = Buffer.from(digest.subarray(0, 16));
+
+  // RFC 4122-compatible deterministic UUID. The client key is namespaced
+  // to the authenticated user so separate users cannot collide.
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = bytes.toString("hex");
+
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20),
+  ].join("-");
+}
+
+function getRequestedRoleContext(
+  req: NextRequest,
+  body: Record<string, unknown> | null,
+): MessageRoleContext | "" {
+  const value =
+    safeString(body?.roleContext) ||
+    safeString(req.headers.get("x-sitguru-role-context"));
+  const normalized = normalizeRole(value);
+
+  if (
+    normalized === "customer" ||
+    normalized === "guru" ||
+    normalized === "ambassador" ||
+    normalized === "admin"
+  ) {
+    return normalized;
+  }
+
+  return "";
+}
+
+function getMessageSource(
+  req: NextRequest,
+  body: Record<string, unknown> | null,
+) {
+  return (
+    safeString(body?.source) ||
+    safeString(req.headers.get("x-sitguru-message-source")) ||
+    "message_send_api"
+  ).slice(0, 120);
 }
 
 function normalizeRole(role?: string | null) {
@@ -153,12 +250,49 @@ function getBaseUrl() {
   return raw.replace(/\/+$/, "");
 }
 
-function buildThreadHref(conversationId: string) {
-  return `/messages/${conversationId}`;
+function getDashboardHref(role?: string | null) {
+  const normalizedRole = normalizeRole(role);
+
+  if (normalizedRole === "guru") return "/guru/dashboard";
+  if (normalizedRole === "ambassador") return "/ambassador/dashboard";
+  if (normalizedRole === "admin") return "/admin";
+
+  return "/customer/dashboard";
 }
 
-function buildPublicThreadUrl(conversationId: string) {
-  return `${getBaseUrl()}${buildThreadHref(conversationId)}`;
+function buildThreadHref(
+  conversationId: string,
+  role?: string | null,
+  source = "message_notification",
+) {
+  const normalizedRole = normalizeRole(role);
+  const query = new URLSearchParams();
+
+  if (
+    normalizedRole === "customer" ||
+    normalizedRole === "guru" ||
+    normalizedRole === "ambassador" ||
+    normalizedRole === "admin"
+  ) {
+    query.set("role", normalizedRole);
+    query.set("returnTo", getDashboardHref(normalizedRole));
+  }
+
+  query.set("source", source);
+
+  return `/messages/${conversationId}?${query.toString()}`;
+}
+
+function buildPublicThreadUrl(
+  conversationId: string,
+  role?: string | null,
+  source = "message_notification",
+) {
+  return `${getBaseUrl()}${buildThreadHref(
+    conversationId,
+    role,
+    source,
+  )}`;
 }
 
 function getSupportFromEmail() {
@@ -392,11 +526,11 @@ async function resolveRole(params: {
   conversation?: ConversationRow | null;
   preferredRole?: string | null;
 }) {
-  const preferredRole = normalizeRole(params.preferredRole);
-  if (preferredRole && preferredRole !== "user") return preferredRole;
-
   const participantRole = normalizeRole(params.participantRole);
   if (participantRole && participantRole !== "user") return participantRole;
+
+  const preferredRole = normalizeRole(params.preferredRole);
+  if (preferredRole && preferredRole !== "user") return preferredRole;
 
   const profile = await getProfile(params.userId);
   const profileRole = normalizeRole(
@@ -687,12 +821,17 @@ async function createNotification(params: {
   recipient: RecipientContact;
   conversationId: string;
   preview: string;
+  source: string;
 }) {
   try {
     if (!params.recipient.userId) return false;
 
     const now = new Date().toISOString();
-    const href = buildThreadHref(params.conversationId);
+    const href = buildThreadHref(
+      params.conversationId,
+      params.recipient.role,
+      params.source,
+    );
 
     const { error } = await supabaseAdmin.from("notifications").insert({
       user_id: params.recipient.userId,
@@ -722,6 +861,7 @@ async function sendRecipientEmail(params: {
   recipient: RecipientContact;
   senderName: string;
   conversationId: string;
+  source: string;
 }) {
   try {
     const apiKey = safeString(process.env.RESEND_API_KEY);
@@ -730,7 +870,11 @@ async function sendRecipientEmail(params: {
     if (!apiKey || !toEmail) return false;
 
     const resend = new Resend(apiKey);
-    const threadUrl = buildPublicThreadUrl(params.conversationId);
+    const threadUrl = buildPublicThreadUrl(
+      params.conversationId,
+      params.recipient.role,
+      params.source,
+    );
     const recipientName = escapeHtml(params.recipient.name || "there");
     const senderName = escapeHtml(params.senderName || "SitGuru");
 
@@ -792,6 +936,7 @@ async function sendRecipientSms(params: {
   recipient: RecipientContact;
   senderName: string;
   conversationId: string;
+  source: string;
 }) {
   try {
     const accountSid = safeString(process.env.TWILIO_ACCOUNT_SID);
@@ -804,7 +949,11 @@ async function sendRecipientSms(params: {
       return false;
     }
 
-    const threadUrl = buildPublicThreadUrl(params.conversationId);
+    const threadUrl = buildPublicThreadUrl(
+      params.conversationId,
+      params.recipient.role,
+      params.source,
+    );
     const body = new URLSearchParams({
       To: toPhone,
       Body: `SitGuru: You have a new message from ${params.senderName || "SitGuru"}. Log in to view and reply: ${threadUrl}`,
@@ -845,6 +994,9 @@ async function auditMessageSend(params: {
   actorId: string;
   actorEmail: string | null;
   conversationId: string;
+  messageId: string;
+  clientMessageKey: string;
+  source: string;
   recipient: RecipientContact;
   delivery: DeliveryResult;
   createdNewConversation: boolean;
@@ -858,6 +1010,9 @@ async function auditMessageSend(params: {
       target_type: "conversation",
       target_id: params.conversationId,
       metadata: {
+        message_id: params.messageId,
+        client_message_key_present: Boolean(params.clientMessageKey),
+        source: params.source,
         recipient_user_id: params.recipient.userId,
         recipient_role: params.recipient.role,
         recipient_email_available: Boolean(params.recipient.email),
@@ -1021,6 +1176,7 @@ async function loadExistingConversationContext(params: {
   conversationId: string;
   currentUserId: string;
   body: Record<string, unknown> | null;
+  preferredRole?: string | null;
 }): Promise<DirectConversationContext> {
   const [{ data: conversation, error: conversationError }, participants] = await Promise.all([
     supabaseAdmin
@@ -1046,6 +1202,7 @@ async function loadExistingConversationContext(params: {
     userId: params.currentUserId,
     participantRole,
     conversation,
+    preferredRole: params.preferredRole,
   });
 
   const allowedUserIds = new Set(
@@ -1057,7 +1214,7 @@ async function loadExistingConversationContext(params: {
     ].filter(Boolean),
   );
 
-  if (!allowedUserIds.has(params.currentUserId) && !isAdminRole(currentUserRole)) {
+  if (!allowedUserIds.has(params.currentUserId)) {
     throw new Error("You do not have access to this message thread.");
   }
 
@@ -1124,7 +1281,8 @@ async function loadNewConversationContext(params: {
     recipient.name = resolvedRecipient.nameHint;
   }
 
-  const { conversation } = await ensureDirectConversation({
+  const { conversation, createdNewConversation } =
+    await ensureDirectConversation({
     body: params.body,
     currentUserId: params.currentUserId,
     currentUserRole: params.currentUserRole,
@@ -1137,7 +1295,59 @@ async function loadNewConversationContext(params: {
     conversation,
     recipient,
     currentUserRole: params.currentUserRole,
+    createdNewConversation,
   };
+}
+
+async function getExistingIdempotentMessage(messageId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("messages")
+    .select(
+      "id,conversation_id,sender_id,recipient_id,content,body,topic,created_at",
+    )
+    .eq("id", messageId)
+    .maybeSingle<SavedMessageRow>();
+
+  if (error) {
+    console.error(
+      "Idempotent message lookup failed:",
+      error.message,
+    );
+    return null;
+  }
+
+  return data || null;
+}
+
+function isDuplicateInsertError(
+  error?: { code?: string; message?: string } | null,
+) {
+  const code = safeString(error?.code);
+  const message = safeString(error?.message).toLowerCase();
+
+  return code === "23505" || message.includes("duplicate key");
+}
+
+function matchesIdempotentMessage({
+  existingMessage,
+  conversationId,
+  senderId,
+  messageText,
+  topic,
+}: {
+  existingMessage: SavedMessageRow;
+  conversationId: string;
+  senderId: string;
+  messageText: string;
+  topic: string;
+}) {
+  return (
+    safeString(existingMessage.conversation_id) === conversationId &&
+    safeString(existingMessage.sender_id) === senderId &&
+    (safeString(existingMessage.content) ||
+      safeString(existingMessage.body)) === messageText &&
+    safeString(existingMessage.topic) === topic
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -1169,7 +1379,17 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
     const conversationId = safeString(body?.conversationId);
     const messageText = getMessageText(body);
-    const topic = safeString(body?.topic) || safeString(body?.subject) || "direct_message";
+    const topic =
+      safeString(body?.topic) ||
+      safeString(body?.subject) ||
+      "direct_message";
+    const clientMessageKey = getClientMessageKey(req, body);
+    const requestedRoleContext = getRequestedRoleContext(req, body);
+    const messageSource = getMessageSource(req, body);
+    const messageId = createDeterministicMessageId(
+      user.id,
+      clientMessageKey,
+    );
 
     if (!messageText || messageText.length < 1) {
       return NextResponse.json(
@@ -1196,9 +1416,15 @@ export async function POST(req: NextRequest) {
         conversationId,
         currentUserId: user.id,
         body,
+        preferredRole: requestedRoleContext,
       });
     } else {
-      const { conversation, recipient, currentUserRole } = await loadNewConversationContext({
+      const {
+        conversation,
+        recipient,
+        currentUserRole,
+        createdNewConversation: didCreateConversation,
+      } = await loadNewConversationContext({
         body,
         currentUserId: user.id,
         currentUserRole: baseCurrentUserRole,
@@ -1208,7 +1434,7 @@ export async function POST(req: NextRequest) {
       });
 
       context = { conversation, recipient, currentUserRole };
-      createdNewConversation = true;
+      createdNewConversation = didCreateConversation;
     }
 
     const { conversation, recipient, currentUserRole } = context;
@@ -1227,13 +1453,17 @@ export async function POST(req: NextRequest) {
     const { data: messageRow, error: messageError } = await supabaseAdmin
       .from("messages")
       .insert({
+        id: messageId,
         conversation_id: conversation.id,
         sender_id: user.id,
         recipient_id: recipient.userId,
         sender_role: currentUserRole,
         recipient_role: recipient.role,
         sender_name_snapshot: senderName,
-        sender_email_snapshot: safeString(user.email) || safeString(senderProfile?.email) || null,
+        sender_email_snapshot:
+          safeString(user.email) ||
+          safeString(senderProfile?.email) ||
+          null,
         sender_phone_snapshot: null,
         sender_role_snapshot: currentUserRole,
         recipient_name_snapshot: recipient.name,
@@ -1243,7 +1473,9 @@ export async function POST(req: NextRequest) {
         content: messageText,
         body: messageText,
         topic,
-        message_type: isAdminRole(currentUserRole) ? `direct_${recipient.role}` : `direct_${currentUserRole}`,
+        message_type: isAdminRole(currentUserRole)
+          ? `direct_${recipient.role}`
+          : `direct_${currentUserRole}`,
         status: "unread",
         is_read: false,
         created_at: now,
@@ -1253,6 +1485,54 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (messageError || !messageRow?.id) {
+      if (isDuplicateInsertError(messageError)) {
+        const existingMessage =
+          await getExistingIdempotentMessage(messageId);
+
+        if (
+          existingMessage &&
+          matchesIdempotentMessage({
+            existingMessage,
+            conversationId: conversation.id,
+            senderId: user.id,
+            messageText,
+            topic,
+          })
+        ) {
+          delivery.messageSaved = true;
+          delivery.recipientFound = Boolean(recipient.userId);
+          delivery.warnings.push(
+            "Duplicate send prevented. SitGuru reused the message already saved for this request and did not repeat notifications, email, or SMS.",
+          );
+
+          return NextResponse.json({
+            ok: true,
+            messageId: existingMessage.id,
+            conversationId: conversation.id,
+            createdNewConversation: false,
+            deduplicated: true,
+            recipient: {
+              userId: recipient.userId,
+              role: recipient.role,
+              name: recipient.name,
+              emailAvailable: Boolean(recipient.email),
+              phoneAvailable: Boolean(recipient.phone),
+            },
+            delivery,
+          });
+        }
+
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "This message request identifier was already used for different content. Refresh the page before sending again.",
+            delivery,
+          },
+          { status: 409 },
+        );
+      }
+
       return NextResponse.json(
         {
           ok: false,
@@ -1265,7 +1545,7 @@ export async function POST(req: NextRequest) {
 
     delivery.messageSaved = true;
 
-    await supabaseAdmin
+    const { error: conversationUpdateError } = await supabaseAdmin
       .from("conversations")
       .update({
         topic,
@@ -1277,7 +1557,19 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", conversation.id);
 
-    await supabaseAdmin.from("conversation_participants").upsert(
+    if (conversationUpdateError) {
+      delivery.warnings.push(
+        "The message was saved, but the conversation preview could not be updated.",
+      );
+      console.error(
+        "Conversation message summary update failed:",
+        conversationUpdateError.message,
+      );
+    }
+
+    const { error: participantSyncError } = await supabaseAdmin
+      .from("conversation_participants")
+      .upsert(
       [
         {
           conversation_id: conversation.id,
@@ -1300,10 +1592,21 @@ export async function POST(req: NextRequest) {
       },
     );
 
+    if (participantSyncError) {
+      delivery.warnings.push(
+        "The message was saved, but conversation participants could not be synchronized.",
+      );
+      console.error(
+        "Conversation participant synchronization failed:",
+        participantSyncError.message,
+      );
+    }
+
     delivery.notificationCreated = await createNotification({
       recipient,
       conversationId: conversation.id,
       preview,
+      source: messageSource,
     });
 
     if (!delivery.notificationCreated) {
@@ -1314,6 +1617,7 @@ export async function POST(req: NextRequest) {
       recipient,
       senderName,
       conversationId: conversation.id,
+      source: messageSource,
     });
 
     if (!delivery.emailSent) {
@@ -1328,6 +1632,7 @@ export async function POST(req: NextRequest) {
       recipient,
       senderName,
       conversationId: conversation.id,
+      source: messageSource,
     });
 
     if (!delivery.smsSent) {
@@ -1340,8 +1645,12 @@ export async function POST(req: NextRequest) {
 
     await auditMessageSend({
       actorId: user.id,
-      actorEmail: user.email || safeString(senderProfile?.email) || null,
+      actorEmail:
+        user.email || safeString(senderProfile?.email) || null,
       conversationId: conversation.id,
+      messageId: messageRow.id,
+      clientMessageKey,
+      source: messageSource,
       recipient,
       delivery,
       createdNewConversation,
@@ -1352,6 +1661,7 @@ export async function POST(req: NextRequest) {
       messageId: messageRow.id,
       conversationId: conversation.id,
       createdNewConversation,
+      deduplicated: false,
       recipient: {
         userId: recipient.userId,
         role: recipient.role,
@@ -1366,11 +1676,13 @@ export async function POST(req: NextRequest) {
 
     const message = error instanceof Error ? error.message : "Unable to send message.";
     const status =
-      message.includes("not found") || message.includes("could not find")
-        ? 404
-        : message.includes("access") || message.includes("cannot")
-          ? 403
-          : 500;
+      message.includes("request identifiers did not match")
+        ? 400
+        : message.includes("not found") || message.includes("could not find")
+          ? 404
+          : message.includes("access") || message.includes("cannot")
+            ? 403
+            : 500;
 
     return NextResponse.json(
       {

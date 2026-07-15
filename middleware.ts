@@ -27,12 +27,29 @@ function isGuruLoginPath(pathname: string) {
   return pathname === "/guru/login" || pathname === "/guru/signup";
 }
 
+function isAmbassadorLoginPath(pathname: string) {
+  return (
+    pathname === "/ambassador/login" ||
+    pathname === "/ambassador/signup"
+  );
+}
+
 function isProtectedAdminPath(pathname: string) {
   return isAdminPath(pathname) && !isAdminLoginPath(pathname);
 }
 
 function isProtectedGuruDashboardPath(pathname: string) {
-  return pathname === "/guru/dashboard" || pathname.startsWith("/guru/dashboard/");
+  return (
+    pathname === "/guru/dashboard" ||
+    pathname.startsWith("/guru/dashboard/")
+  );
+}
+
+function isProtectedAmbassadorDashboardPath(pathname: string) {
+  return (
+    pathname === "/ambassador/dashboard" ||
+    pathname.startsWith("/ambassador/dashboard/")
+  );
 }
 
 function isPasswordRecoveryPath(pathname: string) {
@@ -106,6 +123,27 @@ function isCustomerRole(role: string | null | undefined) {
     "pet-owner",
     "pet owner",
     "parent",
+  ].includes(normalized);
+}
+
+function isAmbassadorRole(role: string | null | undefined) {
+  const normalized = normalizeValue(role);
+
+  return [
+    "ambassador",
+    "ambassadors",
+    "student_ambassador",
+    "student-ambassador",
+    "community_ambassador",
+    "community-ambassador",
+    "military_ambassador",
+    "military-ambassador",
+    "veteran_ambassador",
+    "veteran-ambassador",
+    "partner",
+    "rep",
+    "representative",
+    "sitguru_rep",
   ].includes(normalized);
 }
 
@@ -225,8 +263,15 @@ export async function middleware(request: NextRequest) {
   const requiresAdminAccess = isProtectedAdminPath(pathname);
   const requiresGuruAccess =
     isProtectedGuruDashboardPath(pathname) && !isGuruLoginPath(pathname);
+  const requiresAmbassadorAccess =
+    isProtectedAmbassadorDashboardPath(pathname) &&
+    !isAmbassadorLoginPath(pathname);
 
-  if (!requiresAdminAccess && !requiresGuruAccess) {
+  if (
+    !requiresAdminAccess &&
+    !requiresGuruAccess &&
+    !requiresAmbassadorAccess
+  ) {
     return NextResponse.next();
   }
 
@@ -251,6 +296,16 @@ export async function middleware(request: NextRequest) {
         makeRedirectUrl({
           request,
           pathname: "/admin/login",
+          nextPath: pathname,
+        }),
+      );
+    }
+
+    if (requiresAmbassadorAccess) {
+      return NextResponse.redirect(
+        makeRedirectUrl({
+          request,
+          pathname: "/ambassador/login",
           nextPath: pathname,
         }),
       );
@@ -288,36 +343,41 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  if (requiresGuruAccess && isSuperUser) {
+  if ((requiresGuruAccess || requiresAmbassadorAccess) && isSuperUser) {
     return responseRef.current;
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, email, role")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [{ data: profile }, { data: roleRows }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, email, role, account_type")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id),
+  ]);
 
-  const profileRole = String(profile?.role || "").toLowerCase();
-
-  const { data: roleRows } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", user.id);
+  const profileRole = normalizeValue(profile?.role);
+  const profileAccountType = normalizeValue(profile?.account_type);
 
   const roles = (roleRows || [])
-    .map((row) => String(row.role || "").trim().toLowerCase())
+    .map((row) => normalizeValue(row.role))
     .filter(Boolean);
 
-  const hasGuruRole =
-    isGuruRole(profileRole) ||
-    isBothRole(profileRole) ||
-    roles.some((role) => isGuruRole(role) || isBothRole(role));
+  if (profileRole) roles.push(profileRole);
+  if (profileAccountType) roles.push(profileAccountType);
 
-  const hasCustomerRole =
-    isCustomerRole(profileRole) ||
-    isBothRole(profileRole) ||
-    roles.some((role) => isCustomerRole(role) || isBothRole(role));
+  const hasGuruRole = roles.some(
+    (role) => isGuruRole(role) || isBothRole(role),
+  );
+
+  const hasCustomerRole = roles.some(
+    (role) => isCustomerRole(role) || isBothRole(role),
+  );
+
+  const hasAmbassadorRoleValue = roles.some(isAmbassadorRole);
 
   let hasGuruRow = false;
 
@@ -344,6 +404,33 @@ export async function middleware(request: NextRequest) {
     );
 
     return NextResponse.redirect(applicationUrl);
+  }
+
+  if (requiresAmbassadorAccess) {
+    const { data: ambassadorRow } = await supabase
+      .from("ambassadors")
+      .select("id, dashboard_enabled, login_enabled, status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const ambassadorStatus = normalizeValue(ambassadorRow?.status);
+    const hasUsableAmbassadorWorkspace =
+      Boolean(ambassadorRow?.id) &&
+      ambassadorRow?.dashboard_enabled === true &&
+      ambassadorRow?.login_enabled === true &&
+      ambassadorStatus !== "archived";
+
+    if (!hasAmbassadorRoleValue || !hasUsableAmbassadorWorkspace) {
+      return NextResponse.redirect(
+        makeRedirectUrl({
+          request,
+          pathname: "/ambassador/login",
+          nextPath: pathname,
+          error:
+            "Your Ambassador workspace is not available yet. Please contact SitGuru support if you believe this is an error.",
+        }),
+      );
+    }
   }
 
   return responseRef.current;

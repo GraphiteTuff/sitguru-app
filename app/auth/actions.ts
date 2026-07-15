@@ -51,6 +51,19 @@ function normalizeRole(role: string) {
 function getRedirectPathFromRoles(roles: string[]): string {
   const normalizedRoles = roles.map(normalizeRole);
 
+  if (normalizedRoles.includes("admin")) {
+    return "/admin";
+  }
+
+  if (
+    normalizedRoles.includes("ambassador") ||
+    normalizedRoles.includes("ambassadors") ||
+    normalizedRoles.includes("representative") ||
+    normalizedRoles.includes("sitguru_rep")
+  ) {
+    return "/ambassador/dashboard";
+  }
+
   if (
     normalizedRoles.includes("guru") ||
     normalizedRoles.includes("sitter") ||
@@ -61,14 +74,11 @@ function getRedirectPathFromRoles(roles: string[]): string {
     return "/guru/dashboard";
   }
 
-  if (normalizedRoles.includes("admin")) {
-    return "/admin";
-  }
-
   return "/customer/dashboard";
 }
 
 type LoginMode = "phone" | "email";
+type LoginAudience = "one" | "pet_parent" | "guru" | "ambassador" | "admin";
 
 function getLoginMode(value: FormDataEntryValue | null): LoginMode {
   const normalized =
@@ -85,24 +95,189 @@ function getLoginMode(value: FormDataEntryValue | null): LoginMode {
   return "phone";
 }
 
-function getLoginPageFromNext(next: string, mode: LoginMode): string {
-  if (next.startsWith("/admin")) return "/admin/login";
+function getLoginAudience(
+  value: FormDataEntryValue | null,
+): LoginAudience {
+  const normalized =
+    typeof value === "string" ? value.trim().toLowerCase() : "";
+
+  if (
+    normalized === "pet_parent" ||
+    normalized === "pet-parent" ||
+    normalized === "customer" ||
+    normalized === "pet_owner" ||
+    normalized === "parent"
+  ) {
+    return "pet_parent";
+  }
+
+  if (
+    normalized === "guru" ||
+    normalized === "future_guru" ||
+    normalized === "future-guru" ||
+    normalized === "provider" ||
+    normalized === "sitter" ||
+    normalized === "walker" ||
+    normalized === "caretaker"
+  ) {
+    return "guru";
+  }
+
+  if (
+    normalized === "ambassador" ||
+    normalized === "ambassadors" ||
+    normalized === "rep" ||
+    normalized === "representative" ||
+    normalized === "sitguru_rep"
+  ) {
+    return "ambassador";
+  }
+
+  if (
+    normalized === "admin" ||
+    normalized === "owner" ||
+    normalized === "super_admin" ||
+    normalized === "superuser"
+  ) {
+    return "admin";
+  }
+
+  return "one";
+}
+
+function getRequestedLoginAudience(formData: FormData): LoginAudience {
+  const preferred = cleanFormValue(formData.get("preferred"));
+
+  if (preferred) {
+    return getLoginAudience(preferred);
+  }
+
+  return getLoginAudience(formData.get("role"));
+}
+
+function getDefaultDashboardForAudience(audience: LoginAudience) {
+  if (audience === "pet_parent") {
+    return "/login/route?preferred=pet_parent";
+  }
+
+  if (audience === "guru") {
+    return "/login/route?preferred=guru";
+  }
+
+  if (audience === "ambassador") {
+    return "/login/route?preferred=ambassador";
+  }
+
+  if (audience === "admin") {
+    return "/login/route?preferred=admin";
+  }
+
+  return "/login/route";
+}
+
+function isSafeInternalPath(path: string): boolean {
+  return (
+    path.startsWith("/") &&
+    !path.startsWith("//") &&
+    !path.includes("://") &&
+    !path.includes("\\")
+  );
+}
+
+function isPreferredRouteForAudience(
+  path: string,
+  audience: LoginAudience,
+) {
+  if (!path.startsWith("/login/route")) {
+    return false;
+  }
+
+  const queryIndex = path.indexOf("?");
+  const params = new URLSearchParams(
+    queryIndex >= 0 ? path.slice(queryIndex + 1) : "",
+  );
+  const preferred = getLoginAudience(params.get("preferred"));
+
+  return preferred === audience;
+}
+
+function isAudienceCompatiblePath(
+  path: string,
+  audience: LoginAudience,
+) {
+  if (audience === "one") {
+    return !path.startsWith("/admin");
+  }
+
+  if (audience === "pet_parent") {
+    return (
+      path.startsWith("/customer/") ||
+      isPreferredRouteForAudience(path, "pet_parent")
+    );
+  }
+
+  if (audience === "guru") {
+    return (
+      path.startsWith("/guru/") ||
+      isPreferredRouteForAudience(path, "guru")
+    );
+  }
+
+  if (audience === "ambassador") {
+    return (
+      path.startsWith("/ambassador/") ||
+      isPreferredRouteForAudience(path, "ambassador")
+    );
+  }
+
+  return (
+    path === "/admin" ||
+    path.startsWith("/admin/") ||
+    isPreferredRouteForAudience(path, "admin")
+  );
+}
+
+function getSafeNextPath(
+  value: FormDataEntryValue | null,
+  fallback: string,
+  audience: LoginAudience,
+) {
+  const raw = typeof value === "string" ? value.trim() : "";
+
+  if (!raw || !isSafeInternalPath(raw)) {
+    return fallback;
+  }
+
+  if (
+    raw.startsWith("/auth/") ||
+    raw.startsWith("/signup") ||
+    !isAudienceCompatiblePath(raw, audience)
+  ) {
+    return fallback;
+  }
+
+  return raw;
+}
+
+function getLoginPageFromNext(
+  next: string,
+  mode: LoginMode,
+  audience: LoginAudience,
+): string {
+  if (audience === "admin" || next.startsWith("/admin")) {
+    return "/admin/login";
+  }
 
   const params = new URLSearchParams();
   params.set("mode", mode);
 
+  if (audience !== "one") {
+    params.set("role", audience);
+  }
+
+  params.set("next", next);
+
   return `/login?${params.toString()}`;
-}
-
-function isSafeInternalPath(path: string): boolean {
-  return path.startsWith("/") && !path.startsWith("//");
-}
-
-function getSafeNextPath(value: FormDataEntryValue | null, fallback: string) {
-  const raw = typeof value === "string" ? value.trim() : "";
-  if (!raw) return fallback;
-  if (!isSafeInternalPath(raw)) return fallback;
-  return raw;
 }
 
 function redirectWithError(loginPage: string, message: string): never {
@@ -138,7 +313,11 @@ function getEmailTurnstileActionFromNext(next: string) {
   return "sitguru_one_email_login";
 }
 
-function getEmailTurnstileAction(formData: FormData, next: string) {
+function getEmailTurnstileAction(
+  formData: FormData,
+  next: string,
+  audience: LoginAudience,
+) {
   const rawAction = cleanFormValue(formData.get("turnstileAction"));
 
   const allowedActions = new Set([
@@ -150,6 +329,18 @@ function getEmailTurnstileAction(formData: FormData, next: string) {
 
   if (allowedActions.has(rawAction)) {
     return rawAction;
+  }
+
+  if (audience === "guru") {
+    return "guru_email_login";
+  }
+
+  if (audience === "ambassador") {
+    return "ambassador_email_login";
+  }
+
+  if (audience === "pet_parent") {
+    return "pet_parent_email_login";
   }
 
   return getEmailTurnstileActionFromNext(next);
@@ -546,9 +737,23 @@ export async function login(formData: FormData) {
   // if an older form did not send a hidden mode value.
   const loginMode: LoginMode = "email";
 
-  const next = getSafeNextPath(formData.get("next"), "/login/route");
-  const fallbackLoginPage = getLoginPageFromNext(next, loginMode);
-  const expectedTurnstileAction = getEmailTurnstileAction(formData, next);
+  const loginAudience = getRequestedLoginAudience(formData);
+  const defaultNext = getDefaultDashboardForAudience(loginAudience);
+  const next = getSafeNextPath(
+    formData.get("next"),
+    defaultNext,
+    loginAudience,
+  );
+  const fallbackLoginPage = getLoginPageFromNext(
+    next,
+    loginMode,
+    loginAudience,
+  );
+  const expectedTurnstileAction = getEmailTurnstileAction(
+    formData,
+    next,
+    loginAudience,
+  );
 
   if (!email || !password) {
     redirectWithError(fallbackLoginPage, "Email and password are required");
@@ -578,55 +783,7 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-
-  if (next && isSafeInternalPath(next)) {
-    redirect(next);
-  }
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    redirectWithError(fallbackLoginPage, "Unable to load user");
-  }
-
-  const userId = user.id;
-  const roleSet = new Set<string>();
-
-  const { data: roleRows } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
-
-  for (const row of roleRows || []) {
-    if (typeof row.role === "string" && row.role.trim()) {
-      roleSet.add(normalizeRole(row.role));
-    }
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (profile?.role && typeof profile.role === "string") {
-    roleSet.add(normalizeRole(profile.role));
-  }
-
-  const { data: guruRow } = await supabase
-    .from("gurus")
-    .select("id")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (guruRow?.id) {
-    roleSet.add("guru");
-  }
-
-  redirect(getRedirectPathFromRoles([...roleSet]));
+  redirect(next);
 }
 
 export async function logout() {

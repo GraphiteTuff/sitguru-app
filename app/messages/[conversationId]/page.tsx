@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { X } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -74,6 +75,9 @@ type ConversationParticipantRow = {
   role?: string | null;
 };
 
+type SearchParamValue = string | string[] | undefined;
+type MessageSearchParams = Record<string, SearchParamValue>;
+
 function normalizeRole(role?: string | null) {
   const value = String(role || "").trim().toLowerCase();
 
@@ -92,6 +96,7 @@ function getReadableRole(role?: string | null) {
 
   if (normalized === "admin") return "Admin";
   if (normalized === "guru") return "Guru";
+  if (normalized === "ambassador") return "Ambassador";
   if (normalized === "customer") return "Pet Parent";
 
   return "User";
@@ -272,10 +277,84 @@ function getDashboardHref(role?: string | null) {
   return "/customer/dashboard";
 }
 
+function getFirstParam(value: SearchParamValue) {
+  return Array.isArray(value) ? value[0] || "" : value || "";
+}
+
+function isSafeInternalPath(value: string) {
+  return (
+    value.startsWith("/") &&
+    !value.startsWith("//") &&
+    !value.includes("://") &&
+    !value.includes("\\")
+  );
+}
+
+function getSafeReturnPath(
+  value: SearchParamValue,
+  role?: string | null,
+) {
+  const fallback = getDashboardHref(role);
+  const requested = String(getFirstParam(value) || "").trim();
+  const normalizedRole = normalizeRole(role);
+
+  if (!requested || !isSafeInternalPath(requested)) {
+    return fallback;
+  }
+
+  if (
+    normalizedRole === "ambassador" &&
+    !requested.startsWith("/ambassador/")
+  ) {
+    return fallback;
+  }
+
+  if (normalizedRole === "guru" && !requested.startsWith("/guru/")) {
+    return fallback;
+  }
+
+  if (
+    normalizedRole === "customer" &&
+    !requested.startsWith("/customer/")
+  ) {
+    return fallback;
+  }
+
+  if (normalizedRole === "admin" && !requested.startsWith("/admin")) {
+    return fallback;
+  }
+
+  return requested;
+}
+
+function buildConversationHref({
+  conversationId,
+  role,
+  source,
+  returnTo,
+  hash,
+}: {
+  conversationId: string;
+  role: string;
+  source: string;
+  returnTo: string;
+  hash?: string;
+}) {
+  const query = new URLSearchParams();
+  query.set("role", role);
+  query.set("source", source);
+  query.set("returnTo", returnTo);
+
+  return `/messages/${conversationId}?${query.toString()}${
+    hash ? `#${hash}` : ""
+  }`;
+}
+
 function getConversationLabel(role?: string | null) {
   const normalizedRole = normalizeRole(role);
 
   if (normalizedRole === "guru") return "Guru Conversation";
+  if (normalizedRole === "ambassador") return "Ambassador Conversation";
   if (normalizedRole === "admin") return "Admin Support";
   if (normalizedRole === "customer") return "Pet Parent Conversation";
 
@@ -336,6 +415,15 @@ function getSmsBubbleClasses({
       };
     }
 
+    if (sender === "ambassador") {
+      return {
+        bubble:
+          "bg-teal-600 text-white rounded-[1.35rem] rounded-br-md shadow-[0_8px_18px_rgba(13,148,136,0.22)]",
+        meta: "text-teal-700",
+        body: "text-white",
+      };
+    }
+
     return {
       bubble:
         "bg-emerald-500 text-white rounded-[1.35rem] rounded-br-md shadow-[0_8px_18px_rgba(16,185,129,0.22)]",
@@ -367,6 +455,15 @@ function getSmsBubbleClasses({
       bubble:
         "bg-blue-600 text-white rounded-[1.35rem] rounded-bl-md shadow-[0_8px_18px_rgba(37,99,235,0.18)]",
       meta: "text-blue-700",
+      body: "text-white",
+    };
+  }
+
+  if (sender === "ambassador") {
+    return {
+      bubble:
+        "bg-teal-600 text-white rounded-[1.35rem] rounded-bl-md shadow-[0_8px_18px_rgba(13,148,136,0.18)]",
+      meta: "text-teal-700",
       body: "text-white",
     };
   }
@@ -422,9 +519,7 @@ function Avatar({
 }
 
 function SitGuruQuickReplyBox({
-  conversationId,
   currentUserId,
-  currentTopic,
   otherName,
   otherRole,
   otherImageUrl,
@@ -432,10 +527,10 @@ function SitGuruQuickReplyBox({
   currentUserImageUrl,
   messages,
   inboxHref,
+  closeHref,
+  fullThreadHref,
 }: {
-  conversationId: string;
   currentUserId: string;
-  currentTopic: string;
   otherName: string;
   otherRole: string;
   otherImageUrl?: string | null;
@@ -443,6 +538,8 @@ function SitGuruQuickReplyBox({
   currentUserImageUrl?: string | null;
   messages: MessageRow[];
   inboxHref: string;
+  closeHref: string;
+  fullThreadHref: string;
 }) {
   const recentMessages = messages.slice(-3);
 
@@ -473,12 +570,23 @@ function SitGuruQuickReplyBox({
             </div>
           </div>
 
-          <Link
-            href={inboxHref}
-            className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-700 transition hover:bg-emerald-50"
-          >
-            Inbox
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href={inboxHref}
+              className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-700 transition hover:bg-emerald-50"
+            >
+              Inbox
+            </Link>
+
+            <Link
+              href={closeHref}
+              aria-label="Close SitGuru Quick Chat"
+              title="Close quick chat"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+            >
+              <X className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -533,16 +641,16 @@ function SitGuruQuickReplyBox({
       </div>
 
       <div id="quick-reply" className="border-t border-emerald-100 bg-slate-50 p-4">
-        <MessageThreadComposer
-          conversationId={conversationId}
-          currentUserId={currentUserId}
-          currentTopic={currentTopic}
-        />
+        <p className="text-xs font-bold leading-5 text-slate-600">
+          Reply from the full composer below. SitGuru keeps one active message
+          form per thread to prevent accidental duplicate sends.
+        </p>
+
         <Link
-          href={`/messages/${conversationId}#reply`}
+          href={fullThreadHref}
           className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-700 transition hover:bg-emerald-50"
         >
-          Open full message thread
+          Go to reply box
         </Link>
       </div>
     </aside>
@@ -593,17 +701,19 @@ export default async function MessageConversationPage({
     conversationid?: string;
     id?: string;
   }>;
-  searchParams?: Promise<{
-    role?: string;
-    as?: string;
-    contextRole?: string;
-  }>;
+  searchParams?: Promise<MessageSearchParams>;
 }) {
   const routeParams = await params;
   const queryParams = searchParams ? await searchParams : {};
   const requestedRoleContext = normalizeRole(
-    queryParams.role || queryParams.as || queryParams.contextRole || "",
+    getFirstParam(queryParams.role) ||
+      getFirstParam(queryParams.as) ||
+      getFirstParam(queryParams.contextRole) ||
+      "",
   );
+  const requestedSource =
+    String(getFirstParam(queryParams.source) || "").trim() ||
+    "message_thread";
   const conversationId =
     routeParams.conversationId || routeParams.conversationid || routeParams.id || "";
 
@@ -619,7 +729,28 @@ export default async function MessageConversationPage({
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    redirect("/customer/login");
+    const loginRole =
+      requestedRoleContext === "ambassador"
+        ? "ambassador"
+        : requestedRoleContext === "guru"
+          ? "guru"
+          : "pet_parent";
+    const loginParams = new URLSearchParams();
+    loginParams.set("mode", "phone");
+    loginParams.set("role", loginRole);
+    loginParams.set(
+      "next",
+      buildConversationHref({
+        conversationId,
+        role: requestedRoleContext || "customer",
+        source: requestedSource,
+        returnTo:
+          String(getFirstParam(queryParams.returnTo) || "").trim() ||
+          getDashboardHref(requestedRoleContext || "customer"),
+      }),
+    );
+
+    redirect(`/login?${loginParams.toString()}`);
   }
 
   const { data: conversation, error: conversationError } = await supabaseAdmin
@@ -673,7 +804,7 @@ export default async function MessageConversationPage({
   );
 
   if (!allowedUserIds.has(user.id)) {
-    redirect("/customer/dashboard");
+    redirect(getDashboardHref(requestedRoleContext || "customer"));
   }
 
   const profileIds = Array.from(
@@ -746,6 +877,18 @@ export default async function MessageConversationPage({
           : ""),
   );
 
+  const returnTo = getSafeReturnPath(
+    queryParams.returnTo,
+    currentUserRole,
+  );
+  const fullThreadHref = buildConversationHref({
+    conversationId,
+    role: currentUserRole || "customer",
+    source: requestedSource,
+    returnTo,
+    hash: "reply",
+  });
+
   const inboxHref =
     currentUserRole === "guru"
       ? "/guru/dashboard/messages?role=guru"
@@ -788,7 +931,7 @@ export default async function MessageConversationPage({
 
   const topic = String(conversation.topic || subject || "Other").trim();
   const status = String(conversation.status || "open").trim();
-  const dashboardHref = getDashboardHref(currentUserRole);
+  const dashboardHref = returnTo;
   const conversationLabel = getConversationLabel(otherRole);
 
   const lastActivity =
@@ -1085,9 +1228,7 @@ export default async function MessageConversationPage({
       </section>
 
       <SitGuruQuickReplyBox
-        conversationId={conversation.id}
         currentUserId={user.id}
-        currentTopic={topic}
         otherName={otherName}
         otherRole={otherRole}
         otherImageUrl={otherImageUrl}
@@ -1098,6 +1239,8 @@ export default async function MessageConversationPage({
         })}
         messages={safeMessages}
         inboxHref={inboxHref}
+        closeHref={returnTo}
+        fullThreadHref={fullThreadHref}
       />
     </main>
   );

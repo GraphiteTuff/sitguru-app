@@ -25,6 +25,16 @@ type AccountIntent = "pet_parent" | "guru" | "ambassador" | "both";
 type SignupProfileRole = "customer" | "guru" | "ambassador" | "both";
 type SignupMode = "email" | "phone";
 
+type SignupTracking = {
+  program: string;
+  source: string;
+  platform: string;
+  campaign: string;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+};
+
 const accountOptions: {
   key: AccountIntent;
   title: string;
@@ -202,6 +212,43 @@ function normalizeAmbassadorReferralCode(value: string) {
   return value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
 }
 
+function normalizeTrackingValue(value: string | null) {
+  return (value || "").trim().slice(0, 160);
+}
+
+function buildAuthCallbackUrl({
+  origin,
+  nextPath,
+  intent,
+  ambassadorReferralCode,
+  tracking,
+}: {
+  origin: string;
+  nextPath: string;
+  intent: AccountIntent;
+  ambassadorReferralCode: string;
+  tracking: SignupTracking;
+}) {
+  const params = new URLSearchParams({
+    next: nextPath,
+    intent,
+  });
+
+  if (ambassadorReferralCode) {
+    params.set("ambassador_referral_code", ambassadorReferralCode);
+  }
+
+  if (tracking.program) params.set("program", tracking.program);
+  if (tracking.source) params.set("source", tracking.source);
+  if (tracking.platform) params.set("platform", tracking.platform);
+  if (tracking.campaign) params.set("campaign", tracking.campaign);
+  if (tracking.utmSource) params.set("utm_source", tracking.utmSource);
+  if (tracking.utmMedium) params.set("utm_medium", tracking.utmMedium);
+  if (tracking.utmCampaign) params.set("utm_campaign", tracking.utmCampaign);
+
+  return `${origin}/auth/callback?${params.toString()}`;
+}
+
 function getRedirectPath(intent: AccountIntent) {
   if (intent === "guru" || intent === "both") return "/guru/dashboard/profile";
   if (intent === "ambassador") return "/ambassador/dashboard";
@@ -222,284 +269,9 @@ function getProfileRoleFromIntent(intent: AccountIntent): SignupProfileRole {
   return "customer";
 }
 
-function getRoleFromIntent(intent: AccountIntent): SignupProfileRole {
-  return getProfileRoleFromIntent(intent);
-}
-
-function getUserRolesFromIntent(intent: AccountIntent) {
-  if (intent === "both") return ["customer", "guru"] as const;
-  return [getProfileRoleFromIntent(intent)] as const;
-}
-
 function shouldCreateGuruProfile(intent: AccountIntent) {
   return intent === "guru" || intent === "both";
 }
-
-function shouldCreatePetParentProfile(intent: AccountIntent) {
-  return intent === "pet_parent" || intent === "both";
-}
-
-function buildReferralCode(userId: string, fullName: string) {
-  const nameCode = fullName
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 8);
-  const uniqueUserCode = userId.replace(/-/g, "").toUpperCase();
-
-  return `${nameCode || "SITGURU"}-${uniqueUserCode}`;
-}
-
-async function ensureUserRole(userId: string, role: string) {
-  await supabase.from("user_roles").upsert(
-    {
-      user_id: userId,
-      role,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,role" },
-  );
-}
-
-async function ensureReferralCode(userId: string, fullName: string, role: string) {
-  const code = buildReferralCode(userId, fullName);
-
-  await supabase.from("pawperks_account_referral_codes").upsert(
-    {
-      account_id: userId,
-      code,
-      program: role === "guru" ? "guru" : role === "ambassador" ? "ambassador" : "pet_parent",
-      status: "active",
-      metadata: { source: "signup", role },
-    },
-    { onConflict: "account_id" },
-  );
-
-  return code;
-}
-
-function buildStarterGuruName(fullName: string, fallback = "New SitGuru") {
-  const cleanName = fullName.trim();
-
-  return cleanName || fallback;
-}
-
-function buildStarterGuruSlug(userId: string, fullName: string) {
-  const baseSlug = fullName
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-
-  return baseSlug || `guru-${userId.slice(0, 8)}`;
-}
-
-async function ensureStarterGuruProfile({
-  userId,
-  fullName,
-  email,
-  phone,
-  zipCode,
-  serviceArea,
-  profileRole,
-  source,
-}: {
-  userId: string;
-  fullName: string;
-  email?: string;
-  phone?: string;
-  zipCode?: string;
-  serviceArea?: string;
-  profileRole: SignupProfileRole;
-  source: string;
-}) {
-  const now = new Date().toISOString();
-  const displayName = buildStarterGuruName(fullName);
-  const { firstName, lastName } = getNameParts(displayName);
-  const slug = buildStarterGuruSlug(userId, displayName);
-
-  const { error: profileError } = await supabase.from("profiles").upsert({
-    id: userId,
-    full_name: displayName,
-    first_name: firstName || null,
-    last_name: lastName || null,
-    email: email?.trim() || null,
-    phone: phone?.trim() || null,
-    role: profileRole,
-    account_type: profileRole,
-    source,
-    zip_code: zipCode?.trim() || null,
-    service_area: serviceArea?.trim() || null,
-    admin_status: "pending_setup",
-    profile_quality_status: "needs_setup",
-    is_public_visible: false,
-    is_bookable: false,
-    is_archived: false,
-    is_test_account: false,
-    missing_requirements: ["basic profile completion"],
-    updated_at: now,
-  });
-
-  if (profileError) {
-    throw new Error(`Profile setup failed: ${profileError.message}`);
-  }
-
-  const { data: existingGuru, error: existingGuruError } = await supabase
-    .from("gurus")
-    .select("id")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (existingGuruError) {
-    throw new Error(`Guru profile lookup failed: ${existingGuruError.message}`);
-  }
-
-  const starterGuruPayload = {
-    user_id: userId,
-    display_name: displayName,
-    full_name: displayName,
-    slug,
-    zip_code: zipCode?.trim() || null,
-    service_area: serviceArea?.trim() || null,
-    is_public: false,
-    booking_status: "not_listed",
-    application_status: "pending",
-    admin_status: "pending_setup",
-    profile_quality_status: "needs_setup",
-    is_public_visible: false,
-    is_bookable: false,
-    is_archived: false,
-    is_test_account: false,
-    missing_requirements: [
-      "services offered",
-      "rates/pricing",
-      "availability",
-      "bio/about",
-      "profile photo",
-      "admin approved",
-    ],
-    onboarding_completed: false,
-    profile_completed: false,
-    updated_at: now,
-  };
-
-  if (existingGuru?.id) {
-    const { error: guruUpdateError } = await supabase
-      .from("gurus")
-      .update(starterGuruPayload)
-      .eq("user_id", userId);
-
-    if (guruUpdateError) {
-      throw new Error(`Guru profile update failed: ${guruUpdateError.message}`);
-    }
-
-    return;
-  }
-
-  const { error: guruInsertError } = await supabase.from("gurus").insert({
-    ...starterGuruPayload,
-    created_at: now,
-  });
-
-  if (guruInsertError) {
-    throw new Error(`Guru profile creation failed: ${guruInsertError.message}`);
-  }
-}
-
-async function safelyAddUserRoles(userId: string, intent: AccountIntent) {
-  const roles = getUserRolesFromIntent(intent);
-
-  await Promise.all(
-    roles.map(async (role) => {
-      try {
-        const { error } = await supabase.from("user_roles").upsert(
-          {
-            user_id: userId,
-            role,
-          },
-          {
-            onConflict: "user_id,role",
-          },
-        );
-
-        if (error && error.code !== "23505") {
-          console.warn("Signup user_roles sync skipped:", error.message);
-        }
-      } catch (error) {
-        console.warn("Signup user_roles sync skipped:", error);
-      }
-    }),
-  );
-}
-
-async function ensureStarterAmbassadorProfile({
-  userId,
-  fullName,
-  email,
-  phone,
-  zipCode,
-  serviceArea,
-  source,
-}: {
-  userId: string;
-  fullName: string;
-  email?: string;
-  phone?: string;
-  zipCode?: string;
-  serviceArea?: string;
-  source: string;
-}) {
-  const now = new Date().toISOString();
-  const displayName = buildStarterGuruName(fullName, "SitGuru Ambassador");
-  const { firstName, lastName } = getNameParts(displayName);
-  const referralCode = await ensureReferralCode(userId, displayName, "ambassador");
-
-  await supabase.from("profiles").upsert({
-    id: userId,
-    full_name: displayName,
-    first_name: firstName || null,
-    last_name: lastName || null,
-    email: email?.trim() || null,
-    phone: phone?.trim() || null,
-    role: "ambassador",
-    source,
-    zip_code: zipCode?.trim() || null,
-    service_area: serviceArea?.trim() || null,
-    referral_code: referralCode,
-    updated_at: now,
-  });
-
-  await supabase.from("ambassadors").upsert(
-    {
-      user_id: userId,
-      full_name: displayName,
-      email: email?.trim() || null,
-      contact_email: email?.trim() || null,
-      phone: phone?.trim() || null,
-      referral_code: referralCode,
-      status: "pending",
-      referral_status: "pending",
-      admin_status: "application_received",
-      profile_quality_status: "application_received",
-      is_public_visible: false,
-      is_bookable: false,
-      is_archived: false,
-      is_test_account: false,
-      missing_requirements: ["admin approved", "training completion"],
-      onboarding_status: "started",
-      training_status: "not_started",
-      dashboard_enabled: false,
-      login_enabled: true,
-      dashboard_slug: buildStarterGuruSlug(userId, displayName),
-      base_zip_code: zipCode?.trim() || null,
-      service_area: serviceArea?.trim() || null,
-      updated_at: now,
-    },
-    { onConflict: "user_id" },
-  );
-}
-
 
 async function provisionSignupAccount(payload: {
   userId: string;
@@ -512,14 +284,37 @@ async function provisionSignupAccount(payload: {
   ambassadorReferralCode?: string;
   source: string;
 }) {
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (sessionError) {
+    console.warn("Signup session lookup failed before provisioning:", sessionError);
+  }
+
+  const headers = new Headers({
+    "Content-Type": "application/json",
+  });
+
+  if (session?.access_token) {
+    headers.set("Authorization", `Bearer ${session.access_token}`);
+  }
+
   const response = await fetch("/api/auth/provision-signup", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload),
   });
 
   const result = (await response.json().catch(() => null)) as
-    | { ok?: boolean; error?: string; message?: string }
+    | {
+        ok?: boolean;
+        error?: string;
+        message?: string;
+        workspaceReady?: boolean;
+        referralCode?: string | null;
+      }
     | null;
 
   if (!response.ok || !result?.ok) {
@@ -527,6 +322,12 @@ async function provisionSignupAccount(payload: {
       result?.error ||
         result?.message ||
         "Your account was created, but SitGuru could not finish setting up your workspace. Please sign in again or contact SitGuru support.",
+    );
+  }
+
+  if (payload.intent === "ambassador" && result.workspaceReady !== true) {
+    throw new Error(
+      "Your account was created, but the Ambassador workspace could not be verified. Please sign in again or contact SitGuru support.",
     );
   }
 
@@ -548,6 +349,20 @@ function SignupPageContent() {
     if (role === "both") return "both";
 
     return "pet_parent";
+  }, [searchParams]);
+
+  const signupTracking = useMemo<SignupTracking>(() => {
+    return {
+      program: normalizeTrackingValue(searchParams.get("program")),
+      source: normalizeTrackingValue(
+        searchParams.get("source") || searchParams.get("referral_source"),
+      ),
+      platform: normalizeTrackingValue(searchParams.get("platform")),
+      campaign: normalizeTrackingValue(searchParams.get("campaign")),
+      utmSource: normalizeTrackingValue(searchParams.get("utm_source")),
+      utmMedium: normalizeTrackingValue(searchParams.get("utm_medium")),
+      utmCampaign: normalizeTrackingValue(searchParams.get("utm_campaign")),
+    };
   }, [searchParams]);
 
   const [intent, setIntent] = useState<AccountIntent>(startingIntent);
@@ -577,7 +392,10 @@ function SignupPageContent() {
 
   const redirectPath = getRedirectPath(intent);
   const intentLabel = getIntentLabel(intent);
-  const needsServiceArea = intent === "guru" || intent === "both" || intent === "ambassador";
+  const needsServiceArea =
+    intent === "guru" || intent === "both" || intent === "ambassador";
+  const emailSignupSource = signupTracking.source || "sitguru_signup_page";
+  const phoneSignupSource = signupTracking.source || "sitguru_phone_signup";
 
   function resetAlerts() {
     setError("");
@@ -609,11 +427,15 @@ function SignupPageContent() {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(
-            redirectPath,
-          )}&intent=${intent}&ambassador_referral_code=${encodeURIComponent(
-            normalizeAmbassadorReferralCode(ambassadorReferralCode),
-          )}`,
+          redirectTo: buildAuthCallbackUrl({
+            origin,
+            nextPath: redirectPath,
+            intent,
+            ambassadorReferralCode: normalizeAmbassadorReferralCode(
+              ambassadorReferralCode,
+            ),
+            tracking: signupTracking,
+          }),
           queryParams: {
             prompt: "select_account",
           },
@@ -681,9 +503,13 @@ function SignupPageContent() {
         email: cleanEmail,
         password,
         options: {
-          emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(
-            redirectPath,
-          )}&intent=${intent}`,
+          emailRedirectTo: buildAuthCallbackUrl({
+            origin,
+            nextPath: redirectPath,
+            intent,
+            ambassadorReferralCode: cleanAmbassadorReferralCode,
+            tracking: signupTracking,
+          }),
           data: {
             full_name: cleanName,
             first_name: firstName,
@@ -692,11 +518,18 @@ function SignupPageContent() {
             account_type: profileRole,
             signup_role: profileRole,
             account_intent: intent,
-            signup_source: "sitguru_signup_page",
+            signup_source: emailSignupSource,
             signup_status: "pending_email_verification",
             zip_code: cleanZipCode,
             service_area: serviceArea.trim() || cleanZipCode,
             ambassador_referral_code: cleanAmbassadorReferralCode || null,
+            ambassador_program: signupTracking.program || null,
+            referral_source: signupTracking.source || null,
+            referral_platform: signupTracking.platform || null,
+            referral_campaign: signupTracking.campaign || null,
+            utm_source: signupTracking.utmSource || null,
+            utm_medium: signupTracking.utmMedium || null,
+            utm_campaign: signupTracking.utmCampaign || null,
           },
         },
       });
@@ -714,13 +547,15 @@ function SignupPageContent() {
           zipCode: cleanZipCode,
           serviceArea: serviceArea.trim() || cleanZipCode,
           ambassadorReferralCode: cleanAmbassadorReferralCode || undefined,
-          source: "sitguru_signup_page",
+          source: emailSignupSource,
         });
       }
       setMessage(
-        shouldCreateGuruProfile(intent)
-          ? "Account created. Please check your email, then continue to your Guru profile setup."
-          : "Account created. Please check your email to confirm your SitGuru account.",
+        intent === "ambassador"
+          ? "Your Ambassador account and workspace were created. Please check your email to confirm your SitGuru account and continue onboarding."
+          : shouldCreateGuruProfile(intent)
+            ? "Account created. Please check your email, then continue to your Guru profile setup."
+            : "Account created. Please check your email to confirm your SitGuru account.",
       );
     } catch (caughtError) {
       setError(
@@ -778,11 +613,18 @@ function SignupPageContent() {
             account_type: profileRole,
             signup_role: profileRole,
             account_intent: intent,
-            signup_source: "sitguru_phone_signup",
+            signup_source: phoneSignupSource,
             signup_status: "pending_phone_verification",
             zip_code: cleanZipCode,
             service_area: serviceArea.trim() || cleanZipCode,
             ambassador_referral_code: cleanAmbassadorReferralCode || null,
+            ambassador_program: signupTracking.program || null,
+            referral_source: signupTracking.source || null,
+            referral_platform: signupTracking.platform || null,
+            referral_campaign: signupTracking.campaign || null,
+            utm_source: signupTracking.utmSource || null,
+            utm_medium: signupTracking.utmMedium || null,
+            utm_campaign: signupTracking.utmCampaign || null,
           },
         },
       });
@@ -858,10 +700,18 @@ function SignupPageContent() {
           account_type: profileRole,
           signup_role: profileRole,
           account_intent: intent,
+          signup_source: phoneSignupSource,
           signup_status: "phone_verified",
           zip_code: cleanZipCode,
           service_area: serviceArea.trim() || cleanZipCode,
           ambassador_referral_code: cleanAmbassadorReferralCode || null,
+          ambassador_program: signupTracking.program || null,
+          referral_source: signupTracking.source || null,
+          referral_platform: signupTracking.platform || null,
+          referral_campaign: signupTracking.campaign || null,
+          utm_source: signupTracking.utmSource || null,
+          utm_medium: signupTracking.utmMedium || null,
+          utm_campaign: signupTracking.utmCampaign || null,
         },
       });
 
@@ -876,7 +726,7 @@ function SignupPageContent() {
           zipCode: cleanZipCode,
           serviceArea: serviceArea.trim() || cleanZipCode,
           ambassadorReferralCode: cleanAmbassadorReferralCode || undefined,
-          source: "sitguru_phone_signup",
+          source: phoneSignupSource,
         });
       }
       router.push(redirectPath);

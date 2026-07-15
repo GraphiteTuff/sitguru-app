@@ -11,6 +11,7 @@ type ConversationRow = {
   guru_id?: string | null;
   booking_id?: string | null;
   subject?: string | null;
+  topic?: string | null;
   status?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -46,7 +47,14 @@ type AmbassadorRow = {
   email?: string | null;
   login_email?: string | null;
   contact_email?: string | null;
+  dashboard_enabled?: boolean | null;
+  login_enabled?: boolean | null;
+  status?: string | null;
 };
+
+type SearchParamValue = string | string[] | undefined;
+
+type AdminMessageSearchParams = Record<string, SearchParamValue>;
 
 function normalizeRoleValue(role?: string | null) {
   const value = String(role || "").trim().toLowerCase();
@@ -64,18 +72,6 @@ function normalizeRoleValue(role?: string | null) {
 
 function cleanText(value?: string | null) {
   return String(value || "").trim();
-}
-
-function getDisplayName(
-  profile: ProfileRow | null,
-  fallbackEmail?: string | null,
-) {
-  return (
-    cleanText(profile?.full_name) ||
-    cleanText([profile?.first_name].filter(Boolean).join(" ")) ||
-    cleanText(fallbackEmail) ||
-    "SitGuru User"
-  );
 }
 
 function getDashboardHref(role?: string | null) {
@@ -141,10 +137,90 @@ function hasRoleValue(values: string[], wantedRole: MessageRoleContext) {
   return false;
 }
 
-function buildThreadRedirect(conversationId: string, roleContext: MessageRoleContext) {
-  return `/messages/${conversationId}?role=${encodeURIComponent(roleContext)}`;
+function getFirstParam(value: SearchParamValue) {
+  return Array.isArray(value) ? value[0] || "" : value || "";
 }
 
+function isSafeInternalPath(value: string) {
+  return (
+    value.startsWith("/") &&
+    !value.startsWith("//") &&
+    !value.includes("://") &&
+    !value.includes("\\")
+  );
+}
+
+function getDefaultReturnPath(roleContext: MessageRoleContext) {
+  if (roleContext === "guru") return "/guru/dashboard";
+  if (roleContext === "ambassador") return "/ambassador/dashboard";
+  if (roleContext === "admin") return "/admin";
+
+  return "/customer/dashboard";
+}
+
+function getSafeReturnPath(
+  value: SearchParamValue,
+  roleContext: MessageRoleContext,
+) {
+  const requestedPath = cleanText(getFirstParam(value));
+  const fallback = getDefaultReturnPath(roleContext);
+
+  if (!requestedPath || !isSafeInternalPath(requestedPath)) {
+    return fallback;
+  }
+
+  if (
+    roleContext === "ambassador" &&
+    !requestedPath.startsWith("/ambassador/")
+  ) {
+    return fallback;
+  }
+
+  if (roleContext === "guru" && !requestedPath.startsWith("/guru/")) {
+    return fallback;
+  }
+
+  if (
+    roleContext === "customer" &&
+    !requestedPath.startsWith("/customer/")
+  ) {
+    return fallback;
+  }
+
+  if (roleContext === "admin" && !requestedPath.startsWith("/admin")) {
+    return fallback;
+  }
+
+  return requestedPath;
+}
+
+function buildThreadRedirect({
+  conversationId,
+  roleContext,
+  source,
+  returnTo,
+}: {
+  conversationId: string;
+  roleContext: MessageRoleContext;
+  source?: string;
+  returnTo?: string;
+}) {
+  const query = new URLSearchParams();
+  query.set("role", roleContext);
+  query.set(
+    "source",
+    cleanText(source) ||
+      (roleContext === "ambassador"
+        ? "ambassador_dashboard"
+        : "admin_support"),
+  );
+  query.set(
+    "returnTo",
+    returnTo || getDefaultReturnPath(roleContext),
+  );
+
+  return `/messages/${conversationId}?${query.toString()}`;
+}
 
 function isDuplicateDirectThreadError(error?: { code?: string; message?: string } | null) {
   const code = String(error?.code || "").trim();
@@ -217,47 +293,219 @@ async function findExistingAmbassadorAdminConversation({
   participantUserId: string;
   adminUserId: string;
 }) {
-  const { data: ambassadorParticipantRows } = await supabaseAdmin
-    .from("conversation_participants")
-    .select("conversation_id")
-    .eq("user_id", participantUserId)
-    .limit(100);
+  const { data: participantRows, error: participantError } =
+    await supabaseAdmin
+      .from("conversation_participants")
+      .select("conversation_id,user_id")
+      .eq("user_id", participantUserId)
+      .limit(200);
+
+  if (participantError) {
+    console.error(
+      "Ambassador support participant lookup failed:",
+      participantError.message,
+    );
+    return null;
+  }
 
   const possibleConversationIds = Array.from(
     new Set(
-      ((ambassadorParticipantRows || []) as Array<{ conversation_id?: string | null }>)
-        .map((row) => String(row.conversation_id || "").trim())
+      (
+        (participantRows || []) as Array<{
+          conversation_id?: string | null;
+          user_id?: string | null;
+        }>
+      )
+        .map((row) => cleanText(row.conversation_id))
         .filter(Boolean),
     ),
   );
 
   if (possibleConversationIds.length === 0) return null;
 
-  const { data: adminParticipantRows } = await supabaseAdmin
-    .from("conversation_participants")
-    .select("conversation_id")
-    .eq("user_id", adminUserId)
-    .in("conversation_id", possibleConversationIds)
-    .limit(100);
+  const { data: sharedParticipantRows, error: sharedParticipantError } =
+    await supabaseAdmin
+      .from("conversation_participants")
+      .select("conversation_id,user_id")
+      .in("conversation_id", possibleConversationIds)
+      .limit(500);
 
-  const sharedConversationIds = Array.from(
-    new Set(
-      ((adminParticipantRows || []) as Array<{ conversation_id?: string | null }>)
-        .map((row) => String(row.conversation_id || "").trim())
-        .filter(Boolean),
-    ),
+  if (sharedParticipantError) {
+    console.error(
+      "Ambassador support shared participant lookup failed:",
+      sharedParticipantError.message,
+    );
+    return null;
+  }
+
+  const participantSets = new Map<string, Set<string>>();
+
+  for (const row of (sharedParticipantRows || []) as Array<{
+    conversation_id?: string | null;
+    user_id?: string | null;
+  }>) {
+    const conversationId = cleanText(row.conversation_id);
+    const userId = cleanText(row.user_id);
+
+    if (!conversationId || !userId) continue;
+
+    const users = participantSets.get(conversationId) || new Set<string>();
+    users.add(userId);
+    participantSets.set(conversationId, users);
+  }
+
+  const exactDirectConversationIds = possibleConversationIds.filter(
+    (conversationId) => {
+      const users = participantSets.get(conversationId);
+
+      return (
+        users?.size === 2 &&
+        users.has(participantUserId) &&
+        users.has(adminUserId)
+      );
+    },
   );
 
-  if (sharedConversationIds.length === 0) return null;
+  if (exactDirectConversationIds.length === 0) return null;
 
-  const { data: conversations } = await supabaseAdmin
-    .from("conversations")
-    .select("*")
-    .in("id", sharedConversationIds)
-    .order("updated_at", { ascending: false })
-    .limit(1);
+  const { data: conversations, error: conversationsError } =
+    await supabaseAdmin
+      .from("conversations")
+      .select("*")
+      .in("id", exactDirectConversationIds)
+      .in("topic", ["ambassador_support", "admin_support"])
+      .order("updated_at", { ascending: false })
+      .limit(1);
+
+  if (conversationsError) {
+    console.error(
+      "Ambassador support conversation lookup failed:",
+      conversationsError.message,
+    );
+    return null;
+  }
 
   return ((conversations || []) as ConversationRow[])[0] || null;
+}
+
+async function findRequestedAdminSupportConversation({
+  conversationId,
+  participantUserId,
+  adminUserId,
+}: {
+  conversationId: string;
+  participantUserId: string;
+  adminUserId: string;
+}) {
+  if (!conversationId) return null;
+
+  const { data: participantRows, error: participantError } =
+    await supabaseAdmin
+      .from("conversation_participants")
+      .select("user_id")
+      .eq("conversation_id", conversationId)
+      .in("user_id", [participantUserId, adminUserId]);
+
+  if (participantError) {
+    console.error(
+      "Requested support conversation participant check failed:",
+      participantError.message,
+    );
+    return null;
+  }
+
+  const userIds = new Set(
+    ((participantRows || []) as Array<{ user_id?: string | null }>)
+      .map((row) => cleanText(row.user_id))
+      .filter(Boolean),
+  );
+
+  if (
+    !userIds.has(participantUserId) ||
+    !userIds.has(adminUserId)
+  ) {
+    return null;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("conversations")
+    .select("*")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "Requested support conversation lookup failed:",
+      error.message,
+    );
+    return null;
+  }
+
+  return (data || null) as ConversationRow | null;
+}
+
+async function getAmbassadorAccessForUser(
+  userId: string,
+  email?: string | null,
+) {
+  const { data: byUserId, error: userIdError } = await supabaseAdmin
+    .from("ambassadors")
+    .select(
+      "id,user_id,email,login_email,contact_email,dashboard_enabled,login_enabled,status",
+    )
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (userIdError) {
+    console.error(
+      "Ambassador message access lookup by user ID failed:",
+      userIdError.message,
+    );
+  }
+
+  let ambassador = byUserId as AmbassadorRow | null;
+  const cleanEmail = cleanText(email).toLowerCase();
+
+  if (!ambassador && cleanEmail) {
+    const emailColumns = ["login_email", "contact_email", "email"] as const;
+
+    for (const column of emailColumns) {
+      const { data, error } = await supabaseAdmin
+        .from("ambassadors")
+        .select(
+          "id,user_id,email,login_email,contact_email,dashboard_enabled,login_enabled,status",
+        )
+        .eq(column, cleanEmail)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error(
+          `Ambassador message access lookup by ${column} failed:`,
+          error.message,
+        );
+        continue;
+      }
+
+      if (data) {
+        ambassador = data as AmbassadorRow;
+        break;
+      }
+    }
+  }
+
+  if (!ambassador) return null;
+
+  const status = cleanText(ambassador.status).toLowerCase();
+  const isAllowed =
+    ambassador.dashboard_enabled === true &&
+    ambassador.login_enabled === true &&
+    status !== "archived" &&
+    status !== "inactive" &&
+    status !== "not_a_fit";
+
+  return isAllowed ? ambassador : null;
 }
 
 async function getGuruRecordForConfirmedGuru(
@@ -309,30 +557,34 @@ async function addParticipantIfMissing(
   userId: string,
   role: string,
 ) {
-  const safeConversationId = String(conversationId || "").trim();
-  const safeUserId = String(userId || "").trim();
-  const safeRole = String(role || "").trim().toLowerCase();
+  const safeConversationId = cleanText(conversationId);
+  const safeUserId = cleanText(userId);
+  const safeRole = cleanText(role).toLowerCase();
 
   if (!safeConversationId || !safeUserId) return;
 
-  const existing = await supabaseAdmin
+  const { error } = await supabaseAdmin
     .from("conversation_participants")
-    .select("conversation_id, user_id")
-    .eq("conversation_id", safeConversationId)
-    .eq("user_id", safeUserId)
-    .maybeSingle();
+    .upsert(
+      {
+        conversation_id: safeConversationId,
+        user_id: safeUserId,
+        role: safeRole || null,
+        is_muted: false,
+        is_archived: false,
+      },
+      {
+        onConflict: "conversation_id,user_id",
+        ignoreDuplicates: false,
+      },
+    );
 
-  if (!existing.error && existing.data) {
-    return;
+  if (error) {
+    console.error(
+      "Unable to synchronize conversation participant:",
+      error.message,
+    );
   }
-
-  await supabaseAdmin.from("conversation_participants").insert({
-    conversation_id: safeConversationId,
-    user_id: safeUserId,
-    role: safeRole || null,
-    is_muted: false,
-    is_archived: false,
-  });
 }
 
 async function updateParticipantRole({
@@ -352,38 +604,6 @@ async function updateParticipantRole({
     })
     .eq("conversation_id", conversationId)
     .eq("user_id", userId);
-}
-
-async function createStarterMessageIfMissing({
-  conversationId,
-  adminUserId,
-  participantDisplayName,
-}: {
-  conversationId: string;
-  adminUserId: string;
-  participantDisplayName: string;
-}) {
-  const existingMessages = await supabaseAdmin
-    .from("messages")
-    .select("id")
-    .eq("conversation_id", conversationId)
-    .limit(1);
-
-  if (!existingMessages.error && existingMessages.data?.length) {
-    return;
-  }
-
-  const message = `Hi ${participantDisplayName}, you are connected with SitGuru Admin Support. How can we help with your account, booking, pets, PawPerks, or care questions?`;
-
-  await supabaseAdmin.from("messages").insert({
-    conversation_id: conversationId,
-    sender_id: adminUserId,
-    recipient_id: null,
-    topic: "admin_support",
-    content: message,
-    body: message,
-    created_at: new Date().toISOString(),
-  });
 }
 
 async function createNotificationIfPossible({
@@ -414,21 +634,32 @@ async function createNotificationIfPossible({
 export default async function AdminMessageEntryPage({
   searchParams,
 }: {
-  searchParams?: Promise<{
-    pet?: string;
-    petId?: string;
-    petName?: string;
-    booking_id?: string;
-    bookingId?: string;
-    role?: string;
-    as?: string;
-    contextRole?: string;
-  }>;
+  searchParams?: Promise<AdminMessageSearchParams>;
 }) {
   const params = (await searchParams) || {};
 
-  const petName = cleanText(params.petName || params.pet);
-  const bookingId = cleanText(params.booking_id || params.bookingId);
+  const petName = cleanText(
+    getFirstParam(params.petName) || getFirstParam(params.pet),
+  );
+  const bookingId = cleanText(
+    getFirstParam(params.booking_id) || getFirstParam(params.bookingId),
+  );
+  const requestedConversationId = cleanText(
+    getFirstParam(params.conversation_id) ||
+      getFirstParam(params.conversationId) ||
+      getFirstParam(params.conversation),
+  );
+  const requestedRoleContext = normalizeMessageRoleContext(
+    getFirstParam(params.role) ||
+      getFirstParam(params.as) ||
+      getFirstParam(params.contextRole),
+  );
+  const loginRole =
+    requestedRoleContext === "ambassador"
+      ? "ambassador"
+      : requestedRoleContext === "guru"
+        ? "guru"
+        : "pet_parent";
 
   const supabase = await createClient();
 
@@ -438,28 +669,38 @@ export default async function AdminMessageEntryPage({
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    redirect("/customer/login");
+    const loginParams = new URLSearchParams();
+    loginParams.set("mode", "phone");
+    loginParams.set("role", loginRole);
+    loginParams.set(
+      "next",
+      `/messages/admin?role=${encodeURIComponent(
+        requestedRoleContext || "customer",
+      )}`,
+    );
+
+    redirect(`/login?${loginParams.toString()}`);
   }
 
-  const [currentProfileResult, userRolesResult, guruAccessResult, ambassadorAccessResult] =
-    await Promise.all([
-      supabaseAdmin
-        .from("profiles")
-        .select("id, role, account_type, created_at, first_name, full_name, email")
-        .eq("id", user.id)
-        .maybeSingle(),
-      supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
-      supabaseAdmin.from("gurus").select("id,user_id,email").eq("user_id", user.id).limit(1),
-      supabaseAdmin
-        .from("ambassadors")
-        .select("id,user_id,email,login_email,contact_email")
-        .or(
-          `user_id.eq.${user.id},email.eq.${String(user.email || "").toLowerCase()},login_email.eq.${String(
-            user.email || "",
-          ).toLowerCase()},contact_email.eq.${String(user.email || "").toLowerCase()}`,
-        )
-        .limit(1),
-    ]);
+  const [
+    currentProfileResult,
+    userRolesResult,
+    guruAccessResult,
+    ambassadorAccess,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("profiles")
+      .select("id, role, account_type, created_at, first_name, full_name, email")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
+    supabaseAdmin
+      .from("gurus")
+      .select("id,user_id,email")
+      .eq("user_id", user.id)
+      .limit(1),
+    getAmbassadorAccessForUser(user.id, user.email),
+  ]);
 
   const currentProfile = (currentProfileResult.data ?? null) as ProfileRow | null;
   const userRoleRows = (userRolesResult.data || []) as UserRoleRow[];
@@ -469,15 +710,10 @@ export default async function AdminMessageEntryPage({
     ...userRoleRows.map((row) => row.role || ""),
   ].filter(Boolean);
 
-  const requestedRoleContext = normalizeMessageRoleContext(
-    params.role || params.as || params.contextRole,
-  );
-
   const hasGuruAccess =
     hasRoleValue(roleValues, "guru") || Boolean((guruAccessResult.data || []).length);
   const hasAmbassadorAccess =
-    hasRoleValue(roleValues, "ambassador") ||
-    Boolean((ambassadorAccessResult.data || []).length);
+    hasRoleValue(roleValues, "ambassador") || Boolean(ambassadorAccess);
   const hasCustomerAccess =
     hasRoleValue(roleValues, "customer") ||
     (!hasGuruAccess && !hasAmbassadorAccess) ||
@@ -498,8 +734,6 @@ export default async function AdminMessageEntryPage({
     requestedRoleContext && allowedRoleContexts.has(requestedRoleContext)
       ? requestedRoleContext
       : fallbackRoleContext;
-
-  const participantDisplayName = getDisplayName(currentProfile, user.email);
 
   const adminProfile = await getPrimaryAdminProfile();
 
@@ -533,8 +767,19 @@ export default async function AdminMessageEntryPage({
       : "customer";
 
   const dashboardHref = getDashboardHref(currentUserRole);
+  const returnTo = getSafeReturnPath(params.returnTo, currentUserRole);
+  const messageSource =
+    cleanText(getFirstParam(params.source)) ||
+    (isAmbassadorUser ? "ambassador_dashboard" : "admin_support");
 
-  const existingConversation = isAmbassadorUser
+  const requestedConversation =
+    await findRequestedAdminSupportConversation({
+      conversationId: requestedConversationId,
+      participantUserId,
+      adminUserId,
+    });
+
+  const existingConversation = requestedConversation || (isAmbassadorUser
     ? await findExistingAmbassadorAdminConversation({
         participantUserId,
         adminUserId,
@@ -543,7 +788,7 @@ export default async function AdminMessageEntryPage({
         participantUserId,
         adminUserId,
         isGuruUser,
-      });
+      }));
 
   if (existingConversation?.id) {
     /**
@@ -584,13 +829,15 @@ export default async function AdminMessageEntryPage({
       role: "admin",
     });
 
-    await createStarterMessageIfMissing({
-      conversationId: existingConversation.id,
-      adminUserId,
-      participantDisplayName,
-    });
 
-    redirect(buildThreadRedirect(existingConversation.id, participantRole as MessageRoleContext));
+    redirect(
+      buildThreadRedirect({
+        conversationId: existingConversation.id,
+        roleContext: participantRole as MessageRoleContext,
+        source: messageSource,
+        returnTo,
+      }),
+    );
   }
 
   const nowIso = new Date().toISOString();
@@ -636,6 +883,7 @@ export default async function AdminMessageEntryPage({
       .single();
 
   let conversationToUse = (insertedConversation ?? null) as ConversationRow | null;
+  const createdNewConversation = Boolean(insertedConversation?.id);
 
   if (insertConversationError || !conversationToUse?.id) {
     const recoveredConversation = isDuplicateDirectThreadError(
@@ -702,18 +950,22 @@ export default async function AdminMessageEntryPage({
     role: "admin",
   });
 
-  await createStarterMessageIfMissing({
+
+  const threadHref = buildThreadRedirect({
     conversationId: conversationToUse.id,
-    adminUserId,
-    participantDisplayName,
+    roleContext: participantRole as MessageRoleContext,
+    source: messageSource,
+    returnTo,
   });
 
-  await createNotificationIfPossible({
-    userId: participantUserId,
-    title: "SitGuru Admin message thread started",
-    body: "SitGuru Admin Support is ready to help.",
-    href: buildThreadRedirect(conversationToUse.id, participantRole as MessageRoleContext),
-  });
+  if (createdNewConversation) {
+    await createNotificationIfPossible({
+      userId: participantUserId,
+      title: "SitGuru Admin support is ready",
+      body: "Your private SitGuru Admin Support conversation is open.",
+      href: threadHref,
+    });
+  }
 
-  redirect(buildThreadRedirect(conversationToUse.id, participantRole as MessageRoleContext));
+  redirect(threadHref);
 }

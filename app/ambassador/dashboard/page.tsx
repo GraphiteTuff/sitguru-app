@@ -17,6 +17,7 @@ import {
   PlayCircle,
   QrCode,
   ShieldCheck,
+  Share2,
   Sparkles,
   UserRound,
   Users,
@@ -50,6 +51,15 @@ type AmbassadorRecord = {
   created_at?: string | null;
   updated_at?: string | null;
   last_login_at?: string | null;
+  stripe_account_id?: string | null;
+  stripe_onboarding_complete?: boolean | null;
+  stripe_charges_enabled?: boolean | null;
+  stripe_payouts_enabled?: boolean | null;
+  payout_status?: string | null;
+  payout_method?: string | null;
+  tax_info_status?: string | null;
+  ready_for_payout_at?: string | null;
+  terms_accepted_at?: string | null;
   avatar_url?: string | null;
   profile_photo_url?: string | null;
   photo_url?: string | null;
@@ -74,10 +84,32 @@ type DashboardAccess = {
 type ReferralStats = {
   petParentSignups: number;
   guruSignups: number;
+  businessSignups: number;
   completedBookings: number;
   pendingRewards: number;
   approvedRewards: number;
+  readyRewards: number;
   paidRewards: number;
+};
+
+type TrainingProgressSummary = {
+  label: string;
+  percent: number;
+  completedRequired: number;
+  requiredCount: number;
+  complete: boolean;
+};
+
+type PayoutReadinessSummary = {
+  ready: boolean;
+  statusLabel: string;
+  completedCount: number;
+  totalCount: number;
+  items: {
+    label: string;
+    complete: boolean;
+    detail: string;
+  }[];
 };
 
 type AmbassadorOnboardingPacketDisplay = {
@@ -401,13 +433,33 @@ function getReferralUrl({
   referralCode: string;
   type: "pet-parent" | "guru";
 }) {
-  const encodedCode = encodeURIComponent(referralCode);
-  const fallbackPath =
-    type === "pet-parent"
-      ? `/signup?role=pet_parent&ambassador_code=${encodedCode}&ref=${encodedCode}&next=/customer/dashboard`
-      : `/signup?role=guru&ambassador_code=${encodedCode}&ref=${encodedCode}&next=/guru/dashboard`;
+  const role = type === "pet-parent" ? "pet_parent" : "guru";
+  const nextPath =
+    type === "pet-parent" ? "/customer/dashboard" : "/guru/dashboard";
 
-  return normalizeUrl(asString(storedUrl), fallbackPath);
+  const fallbackPath = `/signup?role=${role}`;
+
+  const baseUrl = normalizeUrl(asString(storedUrl), fallbackPath);
+  const url = new URL(baseUrl);
+
+  url.searchParams.set("role", role);
+  url.searchParams.set("ambassador_referral_code", referralCode);
+  url.searchParams.set("ambassador_code", referralCode);
+  url.searchParams.set("ref", referralCode);
+  url.searchParams.set("source", "ambassador_dashboard");
+  url.searchParams.set("program", "ambassador");
+  url.searchParams.set("platform", "web");
+  url.searchParams.set("utm_source", "sitguru_ambassador");
+  url.searchParams.set("utm_medium", "referral");
+  url.searchParams.set(
+    "utm_campaign",
+    type === "pet-parent"
+      ? "ambassador_pet_parent_referral"
+      : "ambassador_guru_referral",
+  );
+  url.searchParams.set("next", nextPath);
+
+  return url.toString();
 }
 
 async function signOutAction() {
@@ -417,27 +469,6 @@ async function signOutAction() {
   await supabase.auth.signOut();
 
   redirect("/ambassador/login");
-}
-
-async function safeCount(table: string, filters: Record<string, string>) {
-  try {
-    let query = supabaseAdmin.from(table).select("id", {
-      count: "exact",
-      head: true,
-    });
-
-    Object.entries(filters).forEach(([key, value]) => {
-      query = query.eq(key, value);
-    });
-
-    const { count, error } = await query;
-
-    if (error) return 0;
-
-    return count || 0;
-  } catch {
-    return 0;
-  }
 }
 
 async function safeReferralCount({
@@ -473,50 +504,21 @@ async function safeReferralCount({
         if (id) matchingIds.add(id);
       });
     } catch {
-      // Some live tables may not have every referral column yet. Skip safely.
+      // Older live tables may not have every referral column. Skip safely.
     }
   }
 
   return matchingIds.size;
 }
 
-async function safeRewardSum(referralCode: string, status: string) {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("ambassador_rewards")
-      .select("amount, reward_amount, payout_amount, status")
-      .eq("referral_code", referralCode)
-      .eq("status", status)
-      .limit(1000);
-
-    if (error || !Array.isArray(data)) return 0;
-
-    return data.reduce((sum, row: AnyRow) => {
-      return (
-        sum +
-        (asNumber(row.amount) ||
-          asNumber(row.reward_amount) ||
-          asNumber(row.payout_amount))
-      );
-    }, 0);
-  } catch {
-    return 0;
-  }
-}
-
-async function getReferralStats(referralCode: string): Promise<ReferralStats> {
-  const [
-    petParentSignups,
-    guruSignups,
-    completedBookings,
-    pendingRewards,
-    approvedRewards,
-    paidRewards,
-  ] = await Promise.all([
+async function getLegacyReferralStats(
+  referralCode: string,
+): Promise<ReferralStats> {
+  const [petParentSignups, guruSignups, completedBookings] = await Promise.all([
     safeReferralCount({
       table: "profiles",
       referralCode,
-      referralColumns: ["ambassador_referral_code", "referral_code"],
+      referralColumns: ["ambassador_referral_code"],
     }),
     safeReferralCount({
       table: "guru_applications",
@@ -529,18 +531,237 @@ async function getReferralStats(referralCode: string): Promise<ReferralStats> {
       referralColumns: ["ambassador_referral_code", "referral_code"],
       extraFilters: { status: "completed" },
     }),
-    safeRewardSum(referralCode, "pending"),
-    safeRewardSum(referralCode, "approved"),
-    safeRewardSum(referralCode, "paid"),
   ]);
 
   return {
     petParentSignups,
     guruSignups,
+    businessSignups: 0,
     completedBookings,
-    pendingRewards,
-    approvedRewards,
-    paidRewards,
+    pendingRewards: 0,
+    approvedRewards: 0,
+    readyRewards: 0,
+    paidRewards: 0,
+  };
+}
+
+async function getCanonicalReferralStats(
+  ambassadorId: string,
+): Promise<ReferralStats | null> {
+  try {
+    const [referralResult, rewardResult] = await Promise.all([
+      supabaseAdmin
+        .from("ambassador_referrals")
+        .select("id, referral_type, status, booking_status")
+        .eq("ambassador_id", ambassadorId)
+        .limit(5000),
+      supabaseAdmin
+        .from("ambassador_rewards")
+        .select("amount, status, financial_status")
+        .eq("ambassador_id", ambassadorId)
+        .limit(5000),
+    ]);
+
+    if (referralResult.error || rewardResult.error) {
+      return null;
+    }
+
+    const referrals = (referralResult.data || []) as AnyRow[];
+    const rewards = (rewardResult.data || []) as AnyRow[];
+
+    const rewardSum = (statuses: string[]) =>
+      rewards
+        .filter((row) => {
+          const status = asString(row.status).toLowerCase();
+          const financialStatus = asString(row.financial_status).toLowerCase();
+
+          return statuses.includes(status) || statuses.includes(financialStatus);
+        })
+        .reduce((sum, row) => sum + asNumber(row.amount), 0);
+
+    return {
+      petParentSignups: referrals.filter(
+        (row) => asString(row.referral_type).toLowerCase() === "pet_parent",
+      ).length,
+      guruSignups: referrals.filter(
+        (row) => asString(row.referral_type).toLowerCase() === "guru",
+      ).length,
+      businessSignups: referrals.filter(
+        (row) => asString(row.referral_type).toLowerCase() === "business",
+      ).length,
+      completedBookings: referrals.filter((row) =>
+        ["booking_completed", "completed"].includes(
+          asString(row.booking_status).toLowerCase(),
+        ),
+      ).length,
+      pendingRewards: rewardSum(["pending", "pending_review"]),
+      approvedRewards: rewardSum(["approved"]),
+      readyRewards: rewardSum(["ready_for_payout"]),
+      paidRewards: rewardSum(["paid"]),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function getReferralStats({
+  ambassadorId,
+  referralCode,
+}: {
+  ambassadorId: string;
+  referralCode: string;
+}): Promise<ReferralStats> {
+  const canonical = await getCanonicalReferralStats(ambassadorId);
+
+  if (canonical) {
+    return canonical;
+  }
+
+  return getLegacyReferralStats(referralCode);
+}
+
+async function getTrainingProgressSummary({
+  ambassadorId,
+  fallbackStatus,
+}: {
+  ambassadorId: string;
+  fallbackStatus: string;
+}): Promise<TrainingProgressSummary> {
+  try {
+    const [stepsResult, progressResult] = await Promise.all([
+      supabaseAdmin
+        .from("ambassador_training_steps")
+        .select("id, is_required, is_active")
+        .eq("is_active", true),
+      supabaseAdmin
+        .from("ambassador_training_progress")
+        .select("training_step_id, status, started_at, completed_at")
+        .eq("ambassador_id", ambassadorId),
+    ]);
+
+    if (stepsResult.error || progressResult.error) {
+      throw stepsResult.error || progressResult.error;
+    }
+
+    const requiredSteps = ((stepsResult.data || []) as AnyRow[]).filter(
+      (step) => step.is_required !== false,
+    );
+    const progressRows = (progressResult.data || []) as AnyRow[];
+    const progressByStep = new Map(
+      progressRows.map((row) => [asString(row.training_step_id), row]),
+    );
+
+    const completedRequired = requiredSteps.filter((step) => {
+      const progress = progressByStep.get(asString(step.id));
+      const status = asString(progress?.status).toLowerCase();
+
+      return Boolean(
+        progress?.completed_at ||
+          status === "complete" ||
+          status === "completed" ||
+          status === "approved",
+      );
+    }).length;
+
+    const requiredCount = requiredSteps.length;
+    const percent = requiredCount
+      ? Math.round((completedRequired / requiredCount) * 100)
+      : 0;
+    const complete = requiredCount > 0 && completedRequired >= requiredCount;
+    const hasStarted = progressRows.some(
+      (row) => row.started_at || asString(row.status),
+    );
+
+    return {
+      label: complete
+        ? "Complete"
+        : hasStarted
+          ? `In Progress (${percent}%)`
+          : fallbackStatus || "Not Started",
+      percent,
+      completedRequired,
+      requiredCount,
+      complete,
+    };
+  } catch {
+    const normalized = fallbackStatus.toLowerCase();
+    const complete =
+      normalized.includes("complete") ||
+      normalized.includes("approved") ||
+      normalized.includes("done");
+
+    return {
+      label: fallbackStatus || "Not Started",
+      percent: complete ? 100 : 0,
+      completedRequired: complete ? 1 : 0,
+      requiredCount: 1,
+      complete,
+    };
+  }
+}
+
+function getPayoutReadiness(
+  ambassador: AmbassadorRecord,
+): PayoutReadinessSummary {
+  const taxStatus = asString(ambassador.tax_info_status).toLowerCase();
+  const payoutStatus = asString(ambassador.payout_status);
+  const items = [
+    {
+      label: "Terms accepted",
+      complete: Boolean(ambassador.terms_accepted_at),
+      detail: ambassador.terms_accepted_at
+        ? `Accepted ${formatDate(ambassador.terms_accepted_at)}`
+        : "Complete the Ambassador terms before rewards can be paid.",
+    },
+    {
+      label: "Stripe account",
+      complete: Boolean(asString(ambassador.stripe_account_id)),
+      detail: ambassador.stripe_account_id
+        ? "Stripe Connect account is linked."
+        : "Stripe Connect has not been linked yet.",
+    },
+    {
+      label: "Stripe onboarding",
+      complete: ambassador.stripe_onboarding_complete === true,
+      detail:
+        ambassador.stripe_onboarding_complete === true
+          ? "Stripe onboarding is complete."
+          : "Stripe onboarding still needs attention.",
+    },
+    {
+      label: "Payouts enabled",
+      complete: ambassador.stripe_payouts_enabled === true,
+      detail:
+        ambassador.stripe_payouts_enabled === true
+          ? "Stripe payouts are enabled."
+          : "Stripe payouts are not enabled yet.",
+    },
+    {
+      label: "Tax information",
+      complete: Boolean(taxStatus && taxStatus !== "not_started"),
+      detail: taxStatus
+        ? `Tax status: ${taxStatus.replace(/_/g, " ")}`
+        : "Tax information has not been started.",
+    },
+    {
+      label: "Payout method",
+      complete: Boolean(asString(ambassador.payout_method)),
+      detail: ambassador.payout_method
+        ? `Method: ${ambassador.payout_method}`
+        : "No payout method is saved.",
+    },
+  ];
+
+  const completedCount = items.filter((item) => item.complete).length;
+  const ready = items.every((item) => item.complete);
+
+  return {
+    ready,
+    statusLabel:
+      payoutStatus || (ready ? "Ready for payout" : "Setup incomplete"),
+    completedCount,
+    totalCount: items.length,
+    items,
   };
 }
 
@@ -558,18 +779,52 @@ export default async function AmbassadorDashboardPage() {
 
   const userEmail = asString(user.email).toLowerCase();
 
-  const { data: ambassador, error: ambassadorError } = await supabaseAdmin
-    .from("ambassadors")
-    .select("*")
-    .or(
-      `user_id.eq.${user.id},login_email.eq.${userEmail},contact_email.eq.${userEmail},email.eq.${userEmail}`,
-    )
-    .eq("dashboard_enabled", true)
-    .eq("login_enabled", true)
-    .neq("status", "archived")
-    .maybeSingle();
+  const { data: ambassadorByUserId, error: ambassadorByUserIdError } =
+    await supabaseAdmin
+      .from("ambassadors")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-  if (ambassadorError || !ambassador) {
+  if (ambassadorByUserIdError) {
+    console.error(
+      "Ambassador workspace lookup by user ID failed:",
+      ambassadorByUserIdError.message,
+    );
+  }
+
+  let ambassador = ambassadorByUserId as AmbassadorRecord | null;
+
+  if (!ambassador && userEmail) {
+    const { data: ambassadorByEmail, error: ambassadorByEmailError } =
+      await supabaseAdmin
+        .from("ambassadors")
+        .select("*")
+        .or(
+          `login_email.eq.${userEmail},contact_email.eq.${userEmail},email.eq.${userEmail}`,
+        )
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (ambassadorByEmailError) {
+      console.error(
+        "Ambassador workspace lookup by email failed:",
+        ambassadorByEmailError.message,
+      );
+    }
+
+    ambassador = ambassadorByEmail as AmbassadorRecord | null;
+  }
+
+  const ambassadorStatus = asString(ambassador?.status).toLowerCase();
+  const hasWorkspaceAccess =
+    Boolean(ambassador?.id) &&
+    ambassador?.dashboard_enabled === true &&
+    ambassador?.login_enabled === true &&
+    ambassadorStatus !== "archived";
+
+  if (!ambassador || !hasWorkspaceAccess) {
     await supabase.auth.signOut();
     redirect("/ambassador/login?error=restricted");
   }
@@ -586,7 +841,7 @@ export default async function AmbassadorDashboardPage() {
     supabaseAdmin.from("gurus").select("id").eq("user_id", user.id).limit(1),
   ]);
 
-  const ambassadorRecord = ambassador as AmbassadorRecord;
+  const ambassadorRecord = ambassador;
   const profile = (profileResult.data || null) as ProfileRow | null;
   const roleValues = new Set<string>();
 
@@ -643,13 +898,22 @@ export default async function AmbassadorDashboardPage() {
       process.env.NEXT_PUBLIC_AMBASSADOR_MOTIVATION_VIDEO_URL ||
       "/videos/sitguru-ambassador-promo.mp4",
   );
-  const [stats, onboardingPacket] = await Promise.all([
-    getReferralStats(referralCode),
+  const [stats, onboardingPacket, trainingProgress] = await Promise.all([
+    getReferralStats({
+      ambassadorId: ambassadorRecord.id,
+      referralCode,
+    }),
     getAmbassadorOnboardingPacketDisplay(
-      asString(ambassadorRecord.id),
+      ambassadorRecord.id,
       ambassadorRecord.user_id || user.id,
     ),
+    getTrainingProgressSummary({
+      ambassadorId: ambassadorRecord.id,
+      fallbackStatus:
+        asString(ambassadorRecord.training_status) || "Not Started",
+    }),
   ]);
+  const payoutReadiness = getPayoutReadiness(ambassadorRecord);
 
   const onboardingCtaLabel =
     onboardingPacket.status === "complete"
@@ -741,6 +1005,17 @@ export default async function AmbassadorDashboardPage() {
                   <ArrowRight size={17} />
                 </Link>
 
+                <Link
+                  href="/ambassador/dashboard/social"
+                  className="flex min-h-14 items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-black text-emerald-900 transition hover:bg-emerald-100"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Share2 size={17} />
+                    Social Center
+                  </span>
+                  <ArrowRight size={17} />
+                </Link>
+
                 <form action={signOutAction}>
                   <button
                     type="submit"
@@ -757,12 +1032,54 @@ export default async function AmbassadorDashboardPage() {
 
         <AmbassadorProgressPanel
           onboardingPacket={onboardingPacket}
-          trainingStatus={
-            asString(ambassadorRecord.training_status) || "Not Started"
-          }
+          trainingProgress={trainingProgress}
           referralCode={referralCode}
           stats={stats}
         />
+
+        <section>
+          <DashboardCard>
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+              <SectionHeader
+                icon={<Share2 size={22} />}
+                title="Ambassador Social Center"
+                detail="Open your official @SitGuruOfficial channels, use platform-specific tracked signup links and QR codes, and monitor canonical Facebook, Instagram, TikTok, X, and YouTube referral activity."
+              />
+
+              <Link
+                href="/ambassador/dashboard/social"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+              >
+                Open Social Center
+                <ArrowRight size={17} />
+              </Link>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              {["Facebook", "Instagram", "TikTok", "X", "YouTube"].map(
+                (platform) => (
+                  <div
+                    key={platform}
+                    className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3"
+                  >
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
+                      {platform}
+                    </p>
+                    <p className="mt-1 text-sm font-black text-green-950">
+                      @SitGuruOfficial
+                    </p>
+                  </div>
+                ),
+              )}
+            </div>
+
+            <p className="mt-4 text-xs font-bold leading-5 text-slate-600">
+              Social signup milestones remain separate from approved and paid
+              rewards. SitGuru creates and reviews canonical reward records
+              before social activity becomes confirmed earnings.
+            </p>
+          </DashboardCard>
+        </section>
 
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.75fr)]">
           <DashboardCard>
@@ -826,8 +1143,8 @@ export default async function AmbassadorDashboardPage() {
           <StatCard
             icon={<BadgeCheck size={20} />}
             label="Approved"
-            value={money(stats.approvedRewards)}
-            detail="Approved unpaid"
+            value={money(stats.approvedRewards + stats.readyRewards)}
+            detail="Approved / ready"
           />
           <StatCard
             icon={<DollarSign size={20} />}
@@ -837,39 +1154,141 @@ export default async function AmbassadorDashboardPage() {
           />
         </section>
 
+        <section className="grid gap-4 lg:grid-cols-2">
+          <DashboardCard>
+            <SectionHeader
+              icon={<DollarSign size={22} />}
+              title="Payout Readiness"
+              detail="Rewards can be tracked before payout setup is complete, but payment remains protected until every required payout item is ready."
+            />
+
+            <div className="mt-5 flex flex-col gap-4 rounded-[24px] border border-green-100 bg-green-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
+                  Current Status
+                </p>
+                <p className="mt-1 text-2xl font-black text-green-950">
+                  {payoutReadiness.statusLabel}
+                </p>
+                <p className="mt-1 text-sm font-bold text-slate-600">
+                  {payoutReadiness.completedCount}/{payoutReadiness.totalCount} payout requirements complete
+                </p>
+              </div>
+              <span
+                className={`inline-flex rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.12em] ${
+                  payoutReadiness.ready
+                    ? "bg-green-800 text-white"
+                    : "bg-amber-100 text-amber-900"
+                }`}
+              >
+                {payoutReadiness.ready ? "Ready" : "Setup Needed"}
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {payoutReadiness.items.map((item) => (
+                <div
+                  key={item.label}
+                  className={`rounded-2xl border p-4 ${
+                    item.complete
+                      ? "border-green-100 bg-green-50"
+                      : "border-amber-100 bg-amber-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-black text-green-950">
+                      {item.label}
+                    </p>
+                    <span
+                      className={`h-3 w-3 rounded-full ${
+                        item.complete ? "bg-green-600" : "bg-amber-500"
+                      }`}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs font-bold leading-5 text-slate-600">
+                    {item.detail}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </DashboardCard>
+
+          <DashboardCard>
+            <SectionHeader
+              icon={<BadgeCheck size={22} />}
+              title="Verified Referral Tracking"
+              detail="This dashboard now reads the same Ambassador referral and reward records used by SitGuru Admin."
+            />
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
+                  Pet Parents
+                </p>
+                <p className="mt-1 text-3xl font-black text-green-950">
+                  {stats.petParentSignups}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
+                  Gurus
+                </p>
+                <p className="mt-1 text-3xl font-black text-green-950">
+                  {stats.guruSignups}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
+                  Businesses
+                </p>
+                <p className="mt-1 text-3xl font-black text-green-950">
+                  {stats.businessSignups}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
+                  Completed Bookings
+                </p>
+                <p className="mt-1 text-3xl font-black text-green-950">
+                  {stats.completedBookings}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-green-100 bg-white p-4 text-sm font-bold leading-6 text-slate-600">
+              Referral code <span className="font-black text-green-950">{referralCode}</span> is carried through signup source, program, platform, and UTM tracking on both referral links.
+            </div>
+          </DashboardCard>
+        </section>
+
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)]">
           <DashboardCard>
             <SectionHeader
               icon={<DollarSign size={22} />}
-              title="Verified Rewards Structure"
+              title="Verified Reward Activity"
               detail="Ambassadors should always know how verified rewards may be earned and what SitGuru reviews before approval."
             />
 
             <div className="mt-5 grid gap-3">
               <RewardStructureRow
-                label="Pet Parent first completed booking"
-                value="20% of SitGuru share, max $3"
-                detail="Earned after the referred Pet Parent completes a qualifying booking."
+                label="Pending review"
+                value={money(stats.pendingRewards)}
+                detail="Tracked rewards waiting for SitGuru review."
               />
               <RewardStructureRow
-                label="Referred Guru approved / bookable"
-                value="$5"
-                detail="Earned when a referred Guru becomes approved and bookable."
+                label="Approved"
+                value={money(stats.approvedRewards)}
+                detail="Approved rewards that have not moved to payout yet."
               />
               <RewardStructureRow
-                label="Referred Guru first completed booking"
-                value="$10"
-                detail="Earned after that referred Guru completes their first qualifying booking."
+                label="Ready for payout"
+                value={money(stats.readyRewards)}
+                detail="Approved rewards currently queued for payout."
               />
               <RewardStructureRow
-                label="Max per referred Guru"
-                value="$15"
-                detail="Keeps rewards simple, fair, and tied to useful SitGuru activity."
-              />
-              <RewardStructureRow
-                label="Social growth milestones"
-                value="25 = $10 · 50 = $25 · 100 = $50"
-                detail="Based on verified social media-driven signups connected to @SitGuruOfficial and your referral code."
+                label="Paid"
+                value={money(stats.paidRewards)}
+                detail="Rewards already recorded as paid."
               />
             </div>
 
@@ -877,106 +1296,55 @@ export default async function AmbassadorDashboardPage() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-green-700">
-                    Starter earning scenarios
+                    Live verified activity
                   </p>
                   <h3 className="mt-1 text-xl font-black text-green-950">
-                    Legit referrals can add up fast.
+                    Rewards shown here come from SitGuru records.
                   </h3>
                   <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                    These are starter examples for Ambassadors who bring in real
-                    Pet Parents, future Gurus, and verified social activity. The
-                    best Pet Parent referrals complete their profile, add
-                    photos, verify email/phone, and complete a qualifying first
-                    booking.
+                    Referral counts and reward totals are read from the same
+                    Ambassador referral and reward records used by SitGuru
+                    Admin. No projected or guaranteed earnings are included.
                   </p>
                 </div>
                 <span className="inline-flex shrink-0 rounded-full bg-green-800 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white">
-                  Example only
+                  Admin Verified
                 </span>
               </div>
 
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <ProjectionExampleCard
-                  title="10 confirmed Pet Parents"
-                  value="Up to $30"
-                  detail="At the $3 max per qualifying first completed booking. Strong referrals include profile completion, email/phone, and photos."
+                  title="Tracked referrals"
+                  value={String(
+                    stats.petParentSignups +
+                      stats.guruSignups +
+                      stats.businessSignups
+                  )}
+                  detail="Pet Parent, Guru, and business referrals connected to this Ambassador record."
                 />
                 <ProjectionExampleCard
-                  title="30 confirmed Pet Parents"
-                  value="Up to $90"
-                  detail="A local push through friends, groups, events, and pet businesses can become meaningful once bookings qualify."
+                  title="Completed bookings"
+                  value={String(stats.completedBookings)}
+                  detail="Referral-linked bookings recorded as completed."
                 />
                 <ProjectionExampleCard
-                  title="50 confirmed Pet Parents"
-                  value="Up to $150"
-                  detail="This is why quality matters: real Pet Parents with completed profiles are more likely to book and qualify."
+                  title="Approved and ready"
+                  value={money(stats.approvedRewards + stats.readyRewards)}
+                  detail="Approved rewards, including amounts currently ready for payout."
                 />
                 <ProjectionExampleCard
-                  title="100 confirmed Pet Parents"
-                  value="Up to $300"
-                  detail="A strong community campaign can create long-term SitGuru growth while keeping rewards tied to verified activity."
-                />
-              </div>
-
-              <div className="mt-4 rounded-2xl border border-green-100 bg-white p-4 shadow-sm">
-                <p className="text-sm font-black text-green-950">
-                  Confirmed Pet Parent examples
-                </p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                  {[
-                    ["10", "Up to $30"],
-                    ["20", "Up to $60"],
-                    ["30", "Up to $90"],
-                    ["50", "Up to $150"],
-                    ["100", "Up to $300"],
-                  ].map(([count, value]) => (
-                    <div
-                      key={count}
-                      className="rounded-2xl bg-green-50 px-3 py-3 text-center ring-1 ring-green-100"
-                    >
-                      <p className="text-2xl font-black text-green-950">
-                        {count}
-                      </p>
-                      <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-green-700">
-                        Pet Parents
-                      </p>
-                      <p className="mt-2 text-sm font-black text-green-900">
-                        {value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-3 text-xs font-bold leading-5 text-slate-600">
-                  Based on the current Pet Parent reward example: 20% of SitGuru
-                  share, max $3, after a referred Pet Parent completes a
-                  qualifying booking. Profile completion alone helps quality,
-                  but payout still depends on verified qualifying activity.
-                </p>
-              </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <ProjectionExampleCard
-                  title="2 qualified Gurus per week"
-                  value="Up to $30/week"
-                  detail="That can equal about $130/month or about $1,560/year if repeated consistently."
-                />
-                <ProjectionExampleCard
-                  title="100 verified social signups per month"
-                  value="Up to $50/month"
-                  detail="A strong social push tied to @SitGuruOfficial and your referral code can equal about $600/year."
-                />
-                <ProjectionExampleCard
-                  title="Growth stack example"
-                  value="Up to $245/month"
-                  detail="Example: 4 qualified Gurus, 45 qualifying Pet Parent bookings, and 100 verified social signups in a month."
+                  title="Paid to date"
+                  value={money(stats.paidRewards)}
+                  detail="Rewards recorded as paid in SitGuru."
                 />
               </div>
             </div>
 
             <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-950">
-              Rewards are reviewed by SitGuru. These are examples, not
-              guaranteed earnings. Fake, duplicate, self-created, canceled,
-              refunded, or unverifiable activity does not qualify.
+              Reward eligibility and amounts are controlled by SitGuru Admin
+              records and the approved Ambassador program terms. Fake,
+              duplicate, self-created, canceled, refunded, or unverifiable
+              activity does not qualify.
             </div>
           </DashboardCard>
 
@@ -1101,8 +1469,9 @@ export default async function AmbassadorDashboardPage() {
             />
             <div className="mt-4 grid gap-3">
               <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
-                {stats.petParentSignups + stats.guruSignups} total referred
-                signups
+                {stats.petParentSignups +
+                  stats.guruSignups +
+                  stats.businessSignups} total referred signups
               </div>
               <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
                 {stats.completedBookings} completed referral bookings
@@ -1121,7 +1490,8 @@ export default async function AmbassadorDashboardPage() {
                 Pending: {money(stats.pendingRewards)}
               </div>
               <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
-                Approved: {money(stats.approvedRewards)}
+                Approved / ready:{" "}
+                {money(stats.approvedRewards + stats.readyRewards)}
               </div>
               <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
                 Paid: {money(stats.paidRewards)}
@@ -1457,7 +1827,7 @@ export default async function AmbassadorDashboardPage() {
                 <ArrowRight size={17} />
               </Link>
               <span className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-900">
-                {asString(ambassadorRecord.training_status) || "Not Started"}
+                {trainingProgress.label}
               </span>
             </div>
           </DashboardCard>
@@ -1484,18 +1854,21 @@ export default async function AmbassadorDashboardPage() {
 
 function AmbassadorProgressPanel({
   onboardingPacket,
-  trainingStatus,
+  trainingProgress,
   referralCode,
   stats,
 }: {
   onboardingPacket: AmbassadorOnboardingPacketDisplay;
-  trainingStatus: string;
+  trainingProgress: TrainingProgressSummary;
   referralCode: string;
   stats: ReferralStats;
 }) {
-  const normalizedTraining = trainingStatus.trim().toLowerCase();
   const hasReferralActivity =
-    stats.petParentSignups + stats.guruSignups + stats.completedBookings > 0;
+    stats.petParentSignups +
+      stats.guruSignups +
+      stats.businessSignups +
+      stats.completedBookings >
+    0;
 
   const steps = [
     {
@@ -1516,12 +1889,12 @@ function AmbassadorProgressPanel({
     },
     {
       label: "Training",
-      value: trainingStatus,
-      complete:
-        normalizedTraining.includes("complete") ||
-        normalizedTraining.includes("approved") ||
-        normalizedTraining.includes("done"),
-      helper: "Complete training before full active status.",
+      value: trainingProgress.label,
+      complete: trainingProgress.complete,
+      helper:
+        trainingProgress.requiredCount > 0
+          ? `${trainingProgress.completedRequired}/${trainingProgress.requiredCount} required training steps complete.`
+          : "No required training steps are currently configured.",
     },
     {
       label: "Referral Activity",

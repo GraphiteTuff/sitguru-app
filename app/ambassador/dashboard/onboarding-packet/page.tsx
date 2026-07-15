@@ -27,6 +27,19 @@ export const dynamic = "force-dynamic";
 const AGREEMENT_VERSION = "sitguru-ambassador-onboarding-packet-v1-2026";
 const DOCUMENT_BUCKET = "ambassador-onboarding-documents";
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const ALLOWED_UPLOAD_EXTENSIONS = new Set([
+  "pdf",
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+]);
+const ALLOWED_UPLOAD_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -41,6 +54,9 @@ type AmbassadorRecord = {
   dashboard_enabled?: boolean | null;
   login_enabled?: boolean | null;
   status?: string | null;
+  onboarding_status?: string | null;
+  terms_accepted_at?: string | null;
+  updated_at?: string | null;
 };
 
 type AmbassadorOnboardingPacketRow = {
@@ -141,43 +157,117 @@ function statusClasses(status: string | null | undefined) {
 async function getAmbassadorForUser(userId: string, email?: string | null) {
   const cleanEmail = asString(email).toLowerCase();
 
-  const { data, error } = await supabaseAdmin
-    .from("ambassadors")
-    .select("*")
-    .or(
-      `user_id.eq.${userId},login_email.eq.${cleanEmail},contact_email.eq.${cleanEmail},email.eq.${cleanEmail}`,
-    )
-    .eq("dashboard_enabled", true)
-    .eq("login_enabled", true)
-    .neq("status", "archived")
-    .maybeSingle();
+  const { data: ambassadorByUserId, error: userIdError } =
+    await supabaseAdmin
+      .from("ambassadors")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
 
-  if (error || !data) return null;
-  return data as AmbassadorRecord;
+  if (userIdError) {
+    console.error(
+      "Ambassador onboarding lookup by user ID failed:",
+      userIdError.message,
+    );
+  }
+
+  let ambassador = ambassadorByUserId as AmbassadorRecord | null;
+
+  if (!ambassador && cleanEmail) {
+    const emailColumns = ["login_email", "contact_email", "email"] as const;
+
+    for (const column of emailColumns) {
+      const { data, error } = await supabaseAdmin
+        .from("ambassadors")
+        .select("*")
+        .eq(column, cleanEmail)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error(
+          `Ambassador onboarding lookup by ${column} failed:`,
+          error.message,
+        );
+        continue;
+      }
+
+      if (data) {
+        ambassador = data as AmbassadorRecord;
+        break;
+      }
+    }
+  }
+
+  const status = asString(ambassador?.status).toLowerCase();
+  const workspaceAllowed =
+    Boolean(ambassador?.id) &&
+    ambassador?.dashboard_enabled === true &&
+    ambassador?.login_enabled === true &&
+    status !== "archived" &&
+    status !== "inactive" &&
+    status !== "not_a_fit";
+
+  return workspaceAllowed ? ambassador : null;
 }
 
-async function uploadAmbassadorDocument({
-  supabase,
-  ambassadorId,
-  userId,
-  packetId,
-  file,
-  documentType,
-}: {
-  supabase: Awaited<ReturnType<typeof createClient>>;
-  ambassadorId: string;
-  userId: string;
-  packetId: string;
-  file: File | null;
-  documentType: string;
-}) {
-  if (!file || file.size <= 0) return;
+function getFileExtension(fileName: string) {
+  const cleanName = fileName.trim().toLowerCase();
+  const extension = cleanName.includes(".")
+    ? cleanName.split(".").pop() || ""
+    : "";
+
+  return extension;
+}
+
+function validateAmbassadorDocument(file: File, documentType: string) {
+  if (file.size <= 0) {
+    return;
+  }
 
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new Error(
       `${file.name} is too large. Please upload a file smaller than 8 MB.`,
     );
   }
+
+  const extension = getFileExtension(file.name);
+  const mimeType = asString(file.type).toLowerCase();
+
+  if (!ALLOWED_UPLOAD_EXTENSIONS.has(extension)) {
+    throw new Error(
+      `${file.name} is not an approved file type. Upload PDF, JPG, PNG, or WEBP only.`,
+    );
+  }
+
+  if (mimeType && !ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
+    throw new Error(
+      `${file.name} has an unsupported file format. Upload PDF, JPG, PNG, or WEBP only.`,
+    );
+  }
+
+  if (!documentType) {
+    throw new Error("The requested Ambassador document type is missing.");
+  }
+}
+
+async function uploadAmbassadorDocument({
+  ambassadorId,
+  userId,
+  packetId,
+  file,
+  documentType,
+}: {
+  ambassadorId: string;
+  userId: string;
+  packetId: string;
+  file: File | null;
+  documentType: string;
+}) {
+  if (!file || file.size <= 0) return null;
+
+  validateAmbassadorDocument(file, documentType);
 
   const safeFileName =
     file.name
@@ -187,8 +277,9 @@ async function uploadAmbassadorDocument({
 
   const storagePath = `${userId}/${packetId}/${documentType}-${Date.now()}-${safeFileName}`;
   const fileBuffer = Buffer.from(await file.arrayBuffer());
+  const now = new Date().toISOString();
 
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await supabaseAdmin.storage
     .from(DOCUMENT_BUCKET)
     .upload(storagePath, fileBuffer, {
       cacheControl: "3600",
@@ -196,9 +287,11 @@ async function uploadAmbassadorDocument({
       upsert: false,
     });
 
-  if (uploadError) throw new Error(uploadError.message);
+  if (uploadError) {
+    throw new Error(uploadError.message);
+  }
 
-  const { error: insertError } = await supabase
+  const { error: insertError } = await supabaseAdmin
     .from("ambassador_onboarding_documents")
     .insert({
       ambassador_id: ambassadorId,
@@ -211,12 +304,27 @@ async function uploadAmbassadorDocument({
       storage_bucket: DOCUMENT_BUCKET,
       storage_path: storagePath,
       status: "submitted",
-      submitted_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      submitted_at: now,
+      created_at: now,
+      updated_at: now,
     });
 
-  if (insertError) throw new Error(insertError.message);
+  if (insertError) {
+    const { error: cleanupError } = await supabaseAdmin.storage
+      .from(DOCUMENT_BUCKET)
+      .remove([storagePath]);
+
+    if (cleanupError) {
+      console.error(
+        "Unable to clean up failed Ambassador document upload:",
+        cleanupError.message,
+      );
+    }
+
+    throw new Error(insertError.message);
+  }
+
+  return storagePath;
 }
 
 async function submitAmbassadorOnboardingPacket(formData: FormData) {
@@ -279,7 +387,7 @@ async function submitAmbassadorOnboardingPacket(formData: FormData) {
   const userAgent = requestHeaders.get("user-agent") || null;
   const now = new Date().toISOString();
 
-  const payload = {
+  const packetPayload = {
     ambassador_id: ambassador.id,
     user_id: user.id,
     legal_name: legalName,
@@ -294,59 +402,124 @@ async function submitAmbassadorOnboardingPacket(formData: FormData) {
     final_certification_acknowledged: finalCertificationAcknowledged,
     status: "submitted",
     submitted_at: now,
+    reviewed_at: null,
+    reviewed_by: null,
+    admin_notes: null,
     ip_address: ipAddress,
     user_agent: userAgent,
     updated_at: now,
   };
 
-  const { data: existingPacket } = await supabase
-    .from("ambassador_onboarding_packets")
-    .select("id")
-    .eq("ambassador_id", ambassador.id)
-    .maybeSingle();
+  const { data: existingPacket, error: existingPacketError } =
+    await supabaseAdmin
+      .from("ambassador_onboarding_packets")
+      .select("id")
+      .eq("ambassador_id", ambassador.id)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  let packetId = existingPacket?.id || "";
+  if (existingPacketError) {
+    console.error(
+      "Unable to load existing Ambassador onboarding packet:",
+      existingPacketError.message,
+    );
+    redirect(
+      "/ambassador/dashboard/onboarding-packet?error=packet_lookup_failed",
+    );
+  }
+
+  let packetId = asString(existingPacket?.id);
 
   if (packetId) {
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from("ambassador_onboarding_packets")
-      .update(payload)
-      .eq("id", packetId);
+      .update(packetPayload)
+      .eq("id", packetId)
+      .eq("ambassador_id", ambassador.id);
 
-    if (updateError) throw new Error(updateError.message);
+    if (updateError) {
+      console.error(
+        "Unable to update Ambassador onboarding packet:",
+        updateError.message,
+      );
+      redirect("/ambassador/dashboard/onboarding-packet?error=save_failed");
+    }
   } else {
-    const { data: insertedPacket, error: insertError } = await supabase
+    const { data: insertedPacket, error: insertError } = await supabaseAdmin
       .from("ambassador_onboarding_packets")
-      .insert({ ...payload, created_at: now })
+      .insert({ ...packetPayload, created_at: now })
       .select("id")
       .single();
 
-    if (insertError) throw new Error(insertError.message);
+    if (insertError || !insertedPacket?.id) {
+      console.error(
+        "Unable to create Ambassador onboarding packet:",
+        insertError?.message || "Missing packet ID",
+      );
+      redirect("/ambassador/dashboard/onboarding-packet?error=save_failed");
+    }
+
     packetId = insertedPacket.id;
   }
 
-  await uploadAmbassadorDocument({
-    supabase,
-    ambassadorId: ambassador.id,
-    userId: user.id,
-    packetId,
-    file: formData.get("program_document") as File | null,
-    documentType: "program_or_affiliation_document",
-  });
+  try {
+    await uploadAmbassadorDocument({
+      ambassadorId: ambassador.id,
+      userId: user.id,
+      packetId,
+      file: formData.get("program_document") as File | null,
+      documentType: "program_or_affiliation_document",
+    });
 
-  await uploadAmbassadorDocument({
-    supabase,
-    ambassadorId: ambassador.id,
-    userId: user.id,
-    packetId,
-    file: formData.get("special_agreement") as File | null,
-    documentType: "special_or_hourly_agreement",
-  });
+    await uploadAmbassadorDocument({
+      ambassadorId: ambassador.id,
+      userId: user.id,
+      packetId,
+      file: formData.get("special_agreement") as File | null,
+      documentType: "special_or_hourly_agreement",
+    });
+  } catch (documentError) {
+    console.error(
+      "Ambassador packet saved, but document upload failed:",
+      documentError,
+    );
+
+    revalidatePath("/ambassador/dashboard");
+    revalidatePath("/ambassador/dashboard/onboarding-packet");
+    revalidatePath(`/admin/ambassadors/${ambassador.id}`);
+
+    redirect(
+      "/ambassador/dashboard/onboarding-packet?warning=document_upload_failed",
+    );
+  }
+
+  const { error: ambassadorUpdateError } = await supabaseAdmin
+    .from("ambassadors")
+    .update({
+      onboarding_status: "submitted",
+      terms_accepted_at: ambassador.terms_accepted_at || now,
+      updated_at: now,
+    })
+    .eq("id", ambassador.id);
 
   revalidatePath("/ambassador/dashboard");
   revalidatePath("/ambassador/dashboard/onboarding-packet");
+  revalidatePath("/admin/ambassadors");
+  revalidatePath(`/admin/ambassadors/${ambassador.id}`);
 
-  if (nextAction === "dashboard") {
+  if (ambassadorUpdateError) {
+    console.error(
+      "Ambassador packet saved, but Ambassador summary sync failed:",
+      ambassadorUpdateError.message,
+    );
+
+    redirect(
+      "/ambassador/dashboard/onboarding-packet?warning=summary_sync_failed",
+    );
+  }
+
+  if (nextAction === "dashboard" || nextAction === "payouts") {
     redirect("/ambassador/dashboard?onboarding=submitted");
   }
 
@@ -489,6 +662,7 @@ export default async function AmbassadorOnboardingPacketPage({
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const submitted = getFirstSearchParam(resolvedSearchParams, "submitted");
   const errorStatus = getFirstSearchParam(resolvedSearchParams, "error");
+  const warningStatus = getFirstSearchParam(resolvedSearchParams, "warning");
 
   const supabase = await createClient();
   const {
@@ -501,7 +675,7 @@ export default async function AmbassadorOnboardingPacketPage({
   const ambassador = await getAmbassadorForUser(user.id, user.email);
   if (!ambassador) redirect("/ambassador/login?error=restricted");
 
-  const { data: packetData, error: packetError } = await supabase
+  const { data: packetData, error: packetError } = await supabaseAdmin
     .from("ambassador_onboarding_packets")
     .select("*")
     .eq("ambassador_id", ambassador.id)
@@ -509,7 +683,7 @@ export default async function AmbassadorOnboardingPacketPage({
 
   const packet = packetData as AmbassadorOnboardingPacketRow | null;
 
-  const { data: documentsData } = await supabase
+  const { data: documentsData } = await supabaseAdmin
     .from("ambassador_onboarding_documents")
     .select("*")
     .eq("ambassador_id", ambassador.id)
@@ -565,6 +739,54 @@ export default async function AmbassadorOnboardingPacketPage({
                   </p>
                   <p className="mt-1 text-sm font-bold leading-6 !text-emerald-800">
                     SitGuru received your Ambassador onboarding packet and will review it.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {warningStatus === "document_upload_failed" ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-amber-700" />
+                <div>
+                  <p className="text-base font-black !text-amber-950">
+                    Packet saved, document upload needs attention
+                  </p>
+                  <p className="mt-1 text-sm font-bold leading-6 !text-amber-900">
+                    Your acknowledgments and signature were saved, but one of the optional documents could not be uploaded. Review the file type and size, then try the upload again.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {warningStatus === "summary_sync_failed" ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-amber-700" />
+                <div>
+                  <p className="text-base font-black !text-amber-950">
+                    Packet saved, dashboard status needs synchronization
+                  </p>
+                  <p className="mt-1 text-sm font-bold leading-6 !text-amber-900">
+                    SitGuru received your signed packet, but the Ambassador summary could not be updated. Message SitGuru if the dashboard status does not refresh.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {["save_failed", "packet_lookup_failed"].includes(errorStatus) ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-rose-700" />
+                <div>
+                  <p className="text-base font-black !text-rose-900">
+                    Ambassador packet was not saved
+                  </p>
+                  <p className="mt-1 text-sm font-bold leading-6 !text-rose-800">
+                    We could not save your onboarding packet. Please try again. Do not assume the packet was submitted unless you see a green confirmation.
                   </p>
                 </div>
               </div>
@@ -840,7 +1062,7 @@ export default async function AmbassadorOnboardingPacketPage({
                 Dashboard
               </Link>
               <Link
-                href="/ambassador/messages"
+                href="/ambassador/dashboard/messages?support=admin&role=ambassador"
                 className="flex min-h-[48px] items-center justify-center rounded-[1rem] border border-emerald-200 bg-white px-4 py-3 text-sm font-black !text-emerald-800 hover:bg-emerald-50"
               >
                 Message SitGuru

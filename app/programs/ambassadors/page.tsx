@@ -1,829 +1,1340 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
+  BadgeCheck,
   CheckCircle2,
+  ClipboardCheck,
+  Gift,
   GraduationCap,
-  HandHeart,
-  Medal,
+  Handshake,
+  HeartHandshake,
+  Megaphone,
+  MessageCircleHeart,
   PawPrint,
+  Radio,
   Scissors,
   ShieldCheck,
+  Sparkles,
+  Star,
   Stethoscope,
   Trophy,
   UsersRound,
 } from "lucide-react";
 
-type AmbassadorCardItem = {
-  key: string;
-  eyebrow: string;
-  title: string;
-  tagline: string;
-  description: string;
-  image: string;
-  imageAlt: string;
-  imagePosition?: string;
-  icon: LucideIcon;
-  bestFor: string[];
-  howTheyHelp: string[];
-  href: string;
-  cta: string;
-};
+const primaryAmbassadorPaths = [
+  {
+    title: "Student Ambassadors",
+    eyebrow: "Student Hire",
+    description:
+      "Students can help SitGuru grow across campuses, clubs, sports teams, classmates, friends, family, and local communities while building real-world marketing, leadership, and referral experience.",
+    icon: <GraduationCap size={24} />,
+    image: "/images/ambassadors/student-ambassador2.jpg",
+    imageAlt: "Student Ambassador with a dog",
+    imagePosition: "center 35%",
+    highlights: [
+      "Campus awareness",
+      "Student groups",
+      "Social sharing",
+      "Resume-friendly experience",
+      "Local pet care referrals",
+    ],
+  },
+  {
+    title: "Community Ambassadors",
+    eyebrow: "Community Hire",
+    description:
+      "Community Ambassadors help introduce SitGuru to neighborhoods, local groups, pet families, small businesses, friends, family, and trusted referral circles.",
+    icon: <UsersRound size={24} />,
+    image: "/images/ambassadors/rescue-shelter-ambassador2.jpg",
+    imageAlt: "Community Ambassador helping local pet families discover SitGuru",
+    imagePosition: "center 35%",
+    highlights: [
+      "Neighborhood reach",
+      "Local referrals",
+      "Pet Parent introductions",
+      "Small business connections",
+      "Community trust",
+    ],
+  },
+  {
+    title: "Military & Veteran Ambassadors",
+    eyebrow: "Military Hire",
+    description:
+      "Veterans, military spouses, Guard and Reserve members, transitioning service members, and military-connected advocates can help SitGuru reach trusted local networks and mission-driven communities.",
+    icon: <ShieldCheck size={24} />,
+    image: "/images/ambassadors/veteran-military-ambassador.jpg",
+    imageAlt: "Veteran and military-connected SitGuru Ambassador",
+    imagePosition: "center 35%",
+    highlights: [
+      "Veteran-friendly outreach",
+      "Military spouse networks",
+      "PA CareerLink alignment",
+      "Local leadership",
+      "Mission-driven growth",
+    ],
+  },
+];
 
-const ambassadorCards: AmbassadorCardItem[] = [
+const ambassadorTypes = [
   {
-    key: "vet-tech",
-    eyebrow: "Guide the Pack",
+    title: "Guru Ambassadors",
+    eyebrow: "Trusted service voices",
+    description:
+      "Experienced or aspiring Gurus who help represent SitGuru, share the brand, refer new users, and support local trust in pet care.",
+    icon: <PawPrint size={24} />,
+    image: "/images/ambassadors/guru-ambassador2.jpg",
+    imageAlt: "SitGuru Guru Ambassador with a dog",
+    imagePosition: "center 35%",
+    examples: [
+      "Active Gurus",
+      "Referral leaders",
+      "Pet care advocates",
+      "Local service voices",
+      "Trusted community helpers",
+    ],
+  },
+  {
+    title: "Student Ambassadors",
+    eyebrow: "Campus energy",
+    description:
+      "High school, college, and university students who help spread SitGuru across campuses, clubs, student groups, sports teams, friends and family, and local communities.",
+    icon: <GraduationCap size={24} />,
+    image: "/images/ambassadors/student-ambassador2.jpg",
+    imageAlt: "Student Ambassador with a dog",
+    imagePosition: "center 35%",
+    examples: [
+      "Campus promoters",
+      "Student groups",
+      "Club leaders",
+      "Athletes",
+      "Social students",
+    ],
+  },
+  {
     title: "Vet Tech Ambassadors",
-    tagline: "Trusted pet care guidance from the clinic side.",
+    eyebrow: "Clinic-side trust",
     description:
-      "Vet Techs are trusted by Pet Parents during some of the most important pet care conversations. As a SitGuru Ambassador, you can help families find dependable care beyond the clinic while helping responsible animal lovers discover a path to become Gurus.",
+      "Vet Techs and veterinary team members can help Pet Parents, friends and family discover dependable care beyond the clinic while encouraging responsible animal lovers to become Gurus.",
+    icon: <Stethoscope size={24} />,
     image: "/images/ambassadors/vet-tech-ambassador3.jpg",
-    imageAlt: "Vet professional with a dog in a clinic",
+    imageAlt: "Vet Tech Ambassador with pets",
     imagePosition: "center 35%",
-    icon: Stethoscope,
-    bestFor: [
+    examples: [
       "Vet Techs",
-      "Veterinary assistants",
-      "Animal clinic staff",
-      "Pet care professionals in medical settings",
+      "Vet assistants",
+      "Animal clinic teams",
+      "Medical pet care voices",
+      "Trusted support staff",
     ],
-    howTheyHelp: [
-      "Share SitGuru with Pet Parents who need trusted everyday support",
-      "Encourage responsible pet lovers to become Gurus",
-      "Help families feel confident when they need care outside the clinic",
-      "Strengthen the local pet care community",
-    ],
-    href: "/programs/ambassadors/apply?type=vet-tech",
-    cta: "Join as Vet Tech Ambassador",
   },
   {
-    key: "veterinarian",
-    eyebrow: "Strengthen the Pack",
     title: "Veterinarian Ambassadors",
-    tagline: "A trusted local voice for Pet Parents.",
+    eyebrow: "Professional pet guidance",
     description:
-      "Veterinarians understand how much trust matters in pet care. SitGuru gives you a community-centered way to help Pet Parents find reliable support for walks, visits, routines, travel, and peace of mind.",
+      "Veterinarians and clinic leaders can help Pet Parents, friends and family connect with a trusted pet care community built around safety, support, and local relationships.",
+    icon: <ShieldCheck size={24} />,
     image: "/images/ambassadors/veterinarian-ambassador2.jpg",
-    imageAlt: "Veterinarian with pet owner and dog",
+    imageAlt: "Veterinarian Ambassador with a pet",
     imagePosition: "center 35%",
-    icon: ShieldCheck,
-    bestFor: [
+    examples: [
       "Veterinarians",
-      "Animal hospital leaders",
-      "Clinic owners",
-      "Veterinary community advocates",
+      "Clinic leaders",
+      "Animal hospitals",
+      "Wellness advocates",
+      "Trusted local experts",
     ],
-    howTheyHelp: [
-      "Introduce SitGuru as a trusted pet care community",
-      "Help Pet Parents find reliable care options",
-      "Encourage qualified animal lovers to apply as Gurus",
-      "Support families before, during, and after pet care needs arise",
-    ],
-    href: "/programs/ambassadors/apply?type=veterinarian",
-    cta: "Become a Veterinarian Ambassador",
   },
   {
-    key: "trainer",
-    eyebrow: "Shape the Pack",
     title: "Trainer Ambassadors",
-    tagline: "Build trust, routine, and support through training.",
+    eyebrow: "Routine and confidence",
     description:
-      "Trainers help pets and Pet Parents build structure, confidence, and better routines. SitGuru Ambassadors can help families keep that progress going with dependable local care between training sessions.",
+      "Trainers help pets, Pet Parents, friends and family build structure. SitGuru Ambassadors can help families keep that progress going with reliable local care.",
+    icon: <PawPrint size={24} />,
     image: "/images/ambassadors/trainer-ambassador2.jpg",
-    imageAlt: "Dog trainer with dog and owner",
-    imagePosition: "center 32%",
-    icon: PawPrint,
-    bestFor: [
+    imageAlt: "Dog Trainer Ambassador with a dog",
+    imagePosition: "center 35%",
+    examples: [
       "Dog trainers",
       "Obedience instructors",
       "Behavior specialists",
-      "Training facility teams",
+      "Training teams",
+      "Pet routine coaches",
     ],
-    howTheyHelp: [
-      "Refer families who need consistent pet care support",
-      "Encourage better routines between training sessions",
-      "Help experienced pet people become Gurus",
-      "Grow a more dependable local care network",
-    ],
-    href: "/programs/ambassadors/apply?type=trainer",
-    cta: "Join as Trainer Ambassador",
   },
   {
-    key: "groomer",
-    eyebrow: "Connect the Pack",
     title: "Groomer Ambassadors",
-    tagline: "Trusted regular touchpoints with Pet Parents.",
+    eyebrow: "Regular Pet Parent connection",
     description:
-      "Groomers see Pet Parents regularly and often hear when families need extra help. SitGuru gives groomers a way to connect families with trusted care while helping grow a stronger pet community.",
+      "Groomers often have trusted relationships with Pet Parents, friends and family. SitGuru gives groomers a warm way to connect families with dependable care.",
+    icon: <Scissors size={24} />,
     image: "/images/ambassadors/groomer-ambassador2.jpg",
-    imageAlt: "Groomer with happy dog",
+    imageAlt: "Groomer Ambassador with a dog",
     imagePosition: "center 35%",
-    icon: Scissors,
-    bestFor: [
+    examples: [
       "Dog groomers",
       "Cat groomers",
-      "Pet salon teams",
+      "Pet salons",
+      "Grooming teams",
       "Pet care professionals",
     ],
-    howTheyHelp: [
-      "Share SitGuru with busy Pet Parents",
-      "Refer families who need sitting, visits, or walks",
-      "Encourage animal-loving people to become Gurus",
-      "Help Pet Parents stay connected to reliable care",
-    ],
-    href: "/programs/ambassadors/apply?type=groomer",
-    cta: "Become a Groomer Ambassador",
   },
   {
-    key: "student",
-    eyebrow: "Grow the Pack",
-    title: "Student Ambassadors",
-    tagline: "Campus and community energy that spreads trust.",
-    description:
-      "Students are connected through campuses, apartments, clubs, teams, classmates, and social circles. Student Ambassadors can help SitGuru grow while helping friends and local Pet Parents discover flexible pet care opportunities.",
-    image: "/images/ambassadors/student-ambassador2.jpg",
-    imageAlt: "Student with dog outdoors",
-    imagePosition: "center 32%",
-    icon: GraduationCap,
-    bestFor: [
-      "College students",
-      "High school seniors 18+",
-      "Student leaders",
-      "Campus community members",
-    ],
-    howTheyHelp: [
-      "Share SitGuru on campus and in student communities",
-      "Refer students who want flexible pet care work",
-      "Introduce Pet Parents to trusted local care",
-      "Help build a pet-friendly community around school and home",
-    ],
-    href: "/programs/ambassadors/apply?type=student",
-    cta: "Become a Student Ambassador",
-  },
-  {
-    key: "veteran-military",
-    eyebrow: "Serve the Pack",
     title: "Veteran Ambassadors",
-    tagline: "Military-connected trust and community connection.",
+    eyebrow: "Mission-driven reach",
     description:
-      "Veterans, military spouses, Guard, Reserve, and military-connected families understand service, trust, and responsibility. SitGuru gives military-connected Ambassadors a meaningful way to support Pet Parents and grow trusted local care.",
+      "Veterans, military spouses, military-connected advocates, Guard and Reserve members, and transition-minded leaders can help SitGuru reach military families, friends, and communities.",
+    icon: <ShieldCheck size={24} />,
     image: "/images/ambassadors/veteran-military-ambassador.jpg",
-    imageAlt: "Military-connected person with dog",
-    imagePosition: "center 32%",
-    icon: Medal,
-    bestFor: [
+    imageAlt: "Veteran and military-connected SitGuru Ambassador",
+    imagePosition: "center 35%",
+    examples: [
       "Veterans",
       "Military spouses",
-      "Guard and Reserve members",
-      "Approved SkillBridge applicants",
-      "Military-connected community leaders",
+      "Transition advocates",
+      "Guard and Reserve networks",
+      "Military community voices",
     ],
-    howTheyHelp: [
-      "Refer military-connected families who need pet care",
-      "Help trusted veterans and spouses explore Guru opportunities",
-      "Share SitGuru through military and veteran communities",
-      "Support families with dependable local care connections",
-    ],
-    href: "/programs/ambassadors/apply?type=veteran-military",
-    cta: "Join as Veteran Ambassador",
   },
   {
-    key: "rescue-shelter",
-    eyebrow: "Protect the Pack",
     title: "Rescue & Shelter Ambassadors",
-    tagline: "Support adopters, fosters, and local pet care networks.",
+    eyebrow: "Animal welfare connection",
     description:
-      "Rescue and shelter advocates already care deeply about animal wellbeing. SitGuru Ambassadors can help adopters, volunteers, fosters, and Pet Parents find trusted support after adoption and throughout pet ownership.",
+      "Rescue and shelter advocates can help adopters, fosters, volunteers, Pet Parents, friends and family discover trusted support throughout pet ownership.",
+    icon: <HeartHandshake size={24} />,
     image: "/images/ambassadors/rescue-shelter-ambassador2.jpg",
-    imageAlt: "Rescue volunteer with dog and cat",
+    imageAlt: "Rescue and Shelter Ambassador with a pet",
     imagePosition: "center 35%",
-    icon: HandHeart,
-    bestFor: [
+    examples: [
       "Shelter volunteers",
       "Rescue advocates",
       "Foster families",
       "Animal welfare supporters",
+      "Adoption communities",
     ],
-    howTheyHelp: [
-      "Share SitGuru with adopters and Pet Parents",
-      "Encourage trusted animal lovers to become Gurus",
-      "Promote responsible pet care in the community",
-      "Help families keep pets supported at home",
-    ],
-    href: "/programs/ambassadors/apply?type=rescue-shelter",
-    cta: "Become a Rescue Ambassador",
-  },
-  {
-    key: "guru",
-    eyebrow: "Build the Pack",
-    title: "Guru Ambassadors",
-    tagline: "Experienced caregivers helping grow trusted care.",
-    description:
-      "Existing Gurus can become some of SitGuru’s strongest Ambassadors. You understand what Pet Parents need, what makes a great Guru, and how trusted local care can make a real difference.",
-    image: "/images/ambassadors/guru-ambassador2.jpg",
-    imageAlt: "Guru walking with dog",
-    imagePosition: "center 35%",
-    icon: UsersRound,
-    bestFor: [
-      "Existing SitGuru Gurus",
-      "Experienced pet sitters",
-      "Dog walkers",
-      "Trusted local caregivers",
-    ],
-    howTheyHelp: [
-      "Refer responsible pet lovers who may become Gurus",
-      "Refer Pet Parents who need reliable local care",
-      "Share SitGuru in neighborhoods and local groups",
-      "Help strengthen service coverage in your area",
-    ],
-    href: "/programs/ambassadors/apply?type=guru",
-    cta: "Become a Guru Ambassador",
   },
 ];
 
-function SectionEyebrow({ children }: { children: ReactNode }) {
+const benefits = [
+  "Help more pet families discover trusted local pet care.",
+  "Support student, community, and military-friendly growth in your area.",
+  "Share SitGuru through friends, family, campus groups, neighborhoods, pet care circles, military networks, and social communities.",
+  "Refer future Gurus, Pet Parents, partners, and community supporters.",
+  "Build leadership, local visibility, and real-world community engagement around a pet-friendly brand.",
+  "Grow with SitGuru through referrals, commission-based opportunities, recognition, local outreach, and Ambassador opportunities. Hourly opportunities are rare and separately approved by SitGuru in writing.",
+];
+
+const howItWorks = [
+  {
+    step: "01",
+    title: "Choose your path",
+    description:
+      "Start with the Ambassador path that fits you best: Student Hire, Community Hire, or Military Hire. SitGuru can also route pet professionals and local advocates into the right fit.",
+  },
+  {
+    step: "02",
+    title: "Tell us your reach",
+    description:
+      "Share where you have connection — campus, neighborhood, military community, clinic, grooming salon, training network, pet groups, events, social media, or local circles.",
+  },
+  {
+    step: "03",
+    title: "Share SitGuru",
+    description:
+      "Ambassadors help promote SitGuru through trusted referrals, social posts, community conversations, QR codes, events, campus sharing, professional circles, and local introductions. The program is generally referral-based and commission-based, with hourly opportunities only by rare SitGuru-approved exception.",
+  },
+  {
+    step: "04",
+    title: "Help the Pack grow",
+    description:
+      "As SitGuru expands, Ambassadors can support local campaigns, Pet Parent awareness, Guru recruiting, partner introductions, and community visibility.",
+  },
+];
+
+const ambassadorActivities = [
+  "Share SitGuru with Pet Parents",
+  "Share with friends and family",
+  "Refer future Pet Gurus",
+  "Promote Student Hire",
+  "Promote Community Hire",
+  "Promote Military Hire",
+  "Spread campus awareness",
+  "Support community events",
+  "Introduce local partners",
+  "Create social content",
+  "Use QR and referral links",
+  "Help grow trusted referrals",
+  "Commission/referral focused",
+];
+
+
+const packLeaderGrowth = [
+  "Referred Gurus",
+  "Referred Pet Parents",
+  "Local partners",
+  "Community awareness",
+  "Qualified bookings",
+];
+
+const packLeaderTracking = [
+  "Referral source",
+  "Ambassador type",
+  "Local campaign",
+  "Booking conversion",
+  "Pack Leader eligibility",
+];
+
+const trustPoints = [
+  {
+    title: "People-powered growth",
+    description:
+      "Ambassadors help SitGuru grow through real relationships, trusted recommendations, friends and family sharing, and community connection.",
+    icon: <UsersRound size={22} />,
+  },
+  {
+    title: "Clear, honest promotion",
+    description:
+      "Ambassadors should share SitGuru accurately, professionally, and in a way that builds trust with Pet Parents, Gurus, friends, family, and partners.",
+    icon: <ClipboardCheck size={22} />,
+  },
+  {
+    title: "Community-first brand",
+    description:
+      "SitGuru is built around pet families, local service, flexible opportunities, and trusted community reach.",
+    icon: <HeartHandshake size={22} />,
+  },
+];
+
+const faqs = [
+  {
+    question: "Who is the Ambassador Program for?",
+    answer:
+      "The Ambassador Program is for students, community advocates, veterans, military spouses, Gurus, Vet Techs, veterinarians, trainers, groomers, rescue advocates, campus leaders, friends, family, and trusted local voices who want to help represent and grow SitGuru.",
+  },
+  {
+    question: "Is this the same as becoming a Guru?",
+    answer:
+      "No. Becoming a Guru is for people who want to provide pet care services. The Ambassador Program is for people who want to help promote, refer, represent, and grow SitGuru. Some people may do both.",
+  },
+  {
+    question: "Is this the same as the Affiliate Program?",
+    answer:
+      "Not exactly. Affiliates are usually promotional channels, creators, influencers, bloggers, or marketers. Ambassadors are people-based advocates who represent SitGuru in communities, campuses, neighborhoods, professional circles, friends and family networks, and personal networks.",
+  },
+  {
+    question: "Can PA CareerLink, schools, or local groups share this?",
+    answer:
+      "Yes. The Ambassador Program can support student, community, and military-friendly outreach. SitGuru can use this page as a simple destination for local partners, PA CareerLink contacts, campus groups, and community organizations that want to share the opportunity.",
+  },
+];
+
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
   return (
-    <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
+    <div className="mx-auto max-w-4xl text-center">
+      <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
+        {eyebrow}
+      </p>
+      <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">
+        {title}
+      </h2>
+      <p className="mt-4 text-base font-semibold leading-7 text-slate-600">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function IconBadge({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-800 text-white shadow-sm">
       {children}
-    </p>
+    </div>
   );
 }
 
 function Pill({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex rounded-full border border-green-200 bg-white px-3 py-1 text-xs font-black text-green-900">
+    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
       {children}
     </span>
   );
 }
 
-function BulletList({ title, items }: { title: string; items: string[] }) {
-  return (
-    <div className="rounded-[22px] border border-[#dfe8df] bg-[#f8faf7] p-4">
-      <h4 className="text-xs font-black uppercase tracking-[0.12em] text-green-800">
-        {title}
-      </h4>
+function buildAmbassadorSignupHref({
+  program = "community",
+  campaign = "ambassador_program",
+  placement,
+}: {
+  program?: string;
+  campaign?: string;
+  placement: string;
+}) {
+  const params = new URLSearchParams({
+    role: "ambassador",
+    program,
+    source: "ambassador_program_page",
+    platform: "web",
+    campaign,
+    utm_source: "sitguru",
+    utm_medium: "ambassador_program",
+    utm_campaign: campaign,
+    utm_content: placement,
+  });
 
-      <ul className="mt-3 space-y-2">
-        {items.map((item) => (
-          <li
-            key={item}
-            className="flex items-start gap-2 text-sm font-semibold leading-6 text-slate-700"
-          >
-            <CheckCircle2 className="mt-1 shrink-0 text-green-700" size={15} />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+  return `/signup?${params.toString()}`;
 }
 
-function AmbassadorCard({
-  item,
-  priority = false,
-}: {
-  item: AmbassadorCardItem;
-  priority?: boolean;
-}) {
-  const Icon = item.icon;
-
-  return (
-    <article className="overflow-hidden rounded-[28px] border border-[#d9e7db] bg-white shadow-sm">
-      <div className="relative h-[300px] overflow-hidden bg-green-50 sm:h-[340px]">
-        <Image
-          src={item.image}
-          alt={item.imageAlt}
-          fill
-          priority={priority}
-          sizes="(max-width: 1024px) 100vw, 50vw"
-          className="object-cover"
-          style={{ objectPosition: item.imagePosition || "center center" }}
-        />
-
-        <div className="absolute left-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/80 bg-white/95 text-green-900 shadow-sm backdrop-blur">
-          <Icon size={18} />
-        </div>
-
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-5 pb-5 pt-20">
-          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD54A] drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">
-            {item.eyebrow}
-          </p>
-
-          <div className="inline-flex max-w-full rounded-2xl border border-white/80 bg-white/95 px-4 py-2 shadow-lg shadow-black/25 backdrop-blur">
-            <h3 className="text-[22px] font-black leading-tight text-green-950 sm:text-[26px]">
-              {item.title}
-            </h3>
-          </div>
-
-          <p className="mt-2 text-sm font-bold leading-snug text-white/95 drop-shadow-[0_1px_6px_rgba(0,0,0,0.95)]">
-            {item.tagline}
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-4 p-5">
-        <p className="text-sm font-semibold leading-7 text-slate-700">
-          {item.description}
-        </p>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <BulletList title="Best fit for" items={item.bestFor} />
-          <BulletList title="How you help" items={item.howTheyHelp} />
-        </div>
-
-        <Link
-          href={item.href}
-          className="inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
-        >
-          {item.cta}
-          <ArrowRight size={16} />
-        </Link>
-      </div>
-    </article>
-  );
+function getPrimaryAmbassadorProgram(title: string) {
+  if (title.startsWith("Student")) return "student";
+  if (title.startsWith("Military")) return "military";
+  return "community";
 }
 
 export default function AmbassadorProgramPage() {
   return (
-    <main className="min-h-screen bg-[#f7faf7]">
-      <section className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="rounded-[28px] border border-[#cfe2d2] bg-[#f4f9f5] p-5 sm:p-6">
-          <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
-            <div>
-              <SectionEyebrow>SitGuru Ambassador Program</SectionEyebrow>
-
-              <h1 className="mt-1 max-w-4xl text-4xl font-black leading-[0.95] tracking-tight text-slate-950 sm:text-5xl">
-                Together, we grow the Pack.
-              </h1>
-
-              <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-                SitGuru is more than a pet care service. We are building a pet
-                care community where Pet Parents, Gurus, students,
-                veterinarians, Vet Techs, trainers, groomers, rescue advocates,
-                veterans, and local supporters can grow together. Ambassadors
-                help families find trusted care, help great people become Gurus,
-                and help local communities feel more connected around the pets
-                they love.
-              </p>
-
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/programs/ambassadors/apply"
-                  className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-green-800 px-6 py-4 text-sm font-black text-white shadow-lg shadow-green-900/10 transition hover:bg-green-900"
-                >
-                  Become an Ambassador
-                  <ArrowRight size={17} />
-                </Link>
-
-                <Link
-                  href="/programs"
-                  className="inline-flex min-h-[52px] items-center justify-center rounded-2xl border border-green-200 bg-white px-6 py-4 text-sm font-black text-green-900 transition hover:bg-green-50"
-                >
-                  Explore SitGuru Programs
-                </Link>
-              </div>
+    <main className="min-h-screen bg-[#fbfaf6] text-slate-950">
+      <section className="overflow-hidden border-b border-emerald-100 bg-white">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-10 lg:py-20">
+          <div className="flex flex-col justify-center">
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-emerald-800">
+              <Sparkles size={15} />
+              SitGuru Ambassador Program
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-[22px] border border-[#dce9df] bg-white p-4">
-                <SectionEyebrow>Why join?</SectionEyebrow>
+            <h1 className="mt-6 text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">
+              Help SitGuru grow through trusted people, local communities, and
+              pet-loving connections.
+            </h1>
 
-                <ul className="mt-3 space-y-2">
+            <p className="mt-6 max-w-3xl text-lg font-semibold leading-8 text-slate-600">
+              SitGuru Ambassadors help introduce Pet Parents, future Pet Gurus,
+              students, local partners, military-connected families, friends,
+              family, and community groups to a trusted pet care marketplace
+              built around real relationships.
+            </p>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href={buildAmbassadorSignupHref({
+                  program: "community",
+                  campaign: "ambassador_program_general",
+                  placement: "hero_primary",
+                })}
+                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-6 py-4 text-sm font-black text-white shadow-lg shadow-emerald-950/15 transition hover:bg-emerald-900"
+              >
+                Join the Ambassador Program
+                <ArrowRight size={17} />
+              </Link>
+
+              <Link
+                href="/programs"
+                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-6 py-4 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+              >
+                Explore SitGuru Programs
+                <ArrowRight size={17} />
+              </Link>
+            </div>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              {primaryAmbassadorPaths.map((path) => (
+                <div
+                  key={path.eyebrow}
+                  className="rounded-2xl border border-emerald-100 bg-[#f8fff9] p-4 shadow-sm"
+                >
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                    {path.eyebrow}
+                  </p>
+                  <p className="mt-1 text-sm font-black text-slate-950">
+                    {path.title}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Pill>Student Hire</Pill>
+              <Pill>Community Hire</Pill>
+              <Pill>Military Hire</Pill>
+              <Pill>Referral growth</Pill>
+              <Pill>QR sharing</Pill>
+              <Pill>Local awareness</Pill>
+              <Pill>Pet Parent introductions</Pill>
+              <Pill>Future Guru referrals</Pill>
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-emerald-200/50 blur-3xl" />
+            <div className="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-amber-200/60 blur-3xl" />
+
+            <div className="relative rounded-[2rem] border border-emerald-100 bg-[#f8fff9] p-5 shadow-2xl shadow-emerald-950/10">
+              <div className="overflow-hidden rounded-[1.5rem] bg-white shadow-sm">
+                <div className="relative aspect-[16/11] w-full overflow-hidden sm:aspect-[16/10] lg:aspect-[16/11]">
+                  <Image
+                    src="/images/ambassadors/guru-ambassador2.jpg"
+                    alt="SitGuru Ambassador helping connect pet families with trusted care"
+                    fill
+                    priority
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    className="object-cover"
+                    style={{ objectPosition: "center 35%" }}
+                  />
+
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
+
+                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                    <div className="max-w-[92%] rounded-3xl border border-white/20 bg-black/60 p-4 shadow-2xl backdrop-blur-sm">
+                      <p
+                        className="text-xs font-black uppercase tracking-[0.18em]"
+                        style={{
+                          color: "#d1fae5",
+                          WebkitTextFillColor: "#d1fae5",
+                          textShadow: "0 2px 8px rgba(0,0,0,0.85)",
+                        }}
+                      >
+                        Community voices matter
+                      </p>
+
+                      <h2
+                        className="mt-2 text-2xl font-black leading-tight sm:text-3xl"
+                        style={{
+                          color: "#ffffff",
+                          WebkitTextFillColor: "#ffffff",
+                          textShadow: "0 3px 12px rgba(0,0,0,0.95)",
+                        }}
+                      >
+                        Help SitGuru grow where people already trust you.
+                      </h2>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 p-5 sm:grid-cols-2">
                   {[
-                    "Help Pet Parents find trusted local care",
-                    "Encourage responsible pet lovers to become Gurus",
-                    "Support a community-first pet care network",
-                    "Earn recognition as the Pack grows",
-                    "Be part of something bigger than a booking",
-                  ].map((item) => (
-                    <li
-                      key={item}
-                      className="flex items-start gap-2 text-sm font-semibold text-slate-700"
+                    [
+                      "Share",
+                      "Tell Pet Parents, friends, family, and future Gurus about SitGuru.",
+                    ],
+                    ["Refer", "Help trusted people discover the right SitGuru path."],
+                    ["Represent", "Support SitGuru in your community."],
+                    ["Grow", "Build local reach through real relationships."],
+                  ].map(([title, description]) => (
+                    <div
+                      key={title}
+                      className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4"
                     >
-                      <CheckCircle2
-                        className="mt-0.5 shrink-0 text-green-700"
-                        size={15}
-                      />
-                      <span>{item}</span>
-                    </li>
+                      <p className="text-sm font-black text-emerald-950">
+                        {title}
+                      </p>
+                      <p className="mt-1 text-xs font-bold leading-5 text-emerald-800">
+                        {description}
+                      </p>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
 
-              <div className="rounded-[22px] border border-[#dce9df] bg-white p-4">
-                <SectionEyebrow>What makes SitGuru different?</SectionEyebrow>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <div className="rounded-2xl bg-emerald-800 p-4 text-white">
+                  <GraduationCap size={22} />
+                  <p className="mt-3 text-2xl font-black">Student</p>
+                  <p className="mt-1 text-xs font-bold text-emerald-50">
+                    Share SitGuru through campus, clubs, and social circles.
+                  </p>
+                </div>
 
-                <ul className="mt-3 space-y-2">
-                  {[
-                    "Community-first, not just transaction-first",
-                    "Built around trust, pets, families, and local connection",
-                    "Designed to grow Gurus and Pet Parents together",
-                    "Welcoming to students, veterans, and pet professionals",
-                    "Focused on real relationships, not just quick bookings",
-                  ].map((item) => (
-                    <li
-                      key={item}
-                      className="flex items-start gap-2 text-sm font-semibold text-slate-700"
-                    >
-                      <CheckCircle2
-                        className="mt-0.5 shrink-0 text-green-700"
-                        size={15}
-                      />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="rounded-2xl bg-slate-950 p-4 text-white">
+                  <UsersRound size={22} />
+                  <p className="mt-3 text-2xl font-black">Community</p>
+                  <p className="mt-1 text-xs font-bold text-slate-200">
+                    Help pet families discover trusted local care.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-amber-400 p-4 text-slate-950">
+                  <ShieldCheck size={22} />
+                  <p className="mt-3 text-2xl font-black">Military</p>
+                  <p className="mt-1 text-xs font-bold text-amber-950">
+                    Support mission-driven, military-friendly outreach.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1500px] px-4 pb-8 sm:px-6 lg:px-8">
-        <div className="rounded-[30px] border border-[#cfe2d2] bg-white p-5 sm:p-6">
-          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <SectionEyebrow>Ambassador paths</SectionEyebrow>
 
-              <h2 className="mt-1 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-                Choose how you want to Lead the Pack.
-              </h2>
+      <section className="bg-[#fbfaf6] px-5 py-14 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-xl shadow-emerald-950/5 sm:p-7 lg:p-8">
+            <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+              <div>
+                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-emerald-800 shadow-sm">
+                  <Radio size={15} />
+                  Ambassador video
+                </div>
 
-              <p className="mt-3 max-w-4xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-                Every Ambassador brings something meaningful to SitGuru. Choose
-                the path that best matches your experience, your relationships,
-                and the way you want to help Pet Parents, Gurus, and local pet
-                care families grow together.
-              </p>
+                <h2 className="mt-5 text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">
+                  Help Pets, Help Neighbors — Become a SitGuru Ambassador Today
+                </h2>
+
+                <p className="mt-5 text-base font-semibold leading-7 text-slate-600 sm:text-lg sm:leading-8">
+                  SitGuru Ambassadors help grow trusted local pet care by
+                  connecting Pet Parents, future Gurus, community partners,
+                  students, military-connected families, and local pet lovers
+                  with the SitGuru Pet Community.
+                </p>
+
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                  <Link
+                    href={buildAmbassadorSignupHref({
+                      program: "community",
+                      campaign: "ambassador_program_video",
+                      placement: "video_primary",
+                    })}
+                    className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-6 py-4 text-sm font-black text-white shadow-lg shadow-emerald-950/15 transition hover:bg-emerald-900"
+                  >
+                    Apply as an Ambassador
+                    <ArrowRight size={17} />
+                  </Link>
+
+                  <Link
+                    href="#ambassador-paths"
+                    className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-6 py-4 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+                  >
+                    Explore Ambassador Programs
+                    <ArrowRight size={17} />
+                  </Link>
+                </div>
+
+                <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                  {[
+                    "Promote trusted local pet care",
+                    "Support Pet Parents and Gurus",
+                    "Build community connections",
+                    "Help grow the SitGuru Pet Community",
+                  ].map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white/90 px-4 py-3 text-sm font-black text-slate-700 shadow-sm"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                        ✓
+                      </span>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-950 shadow-2xl shadow-emerald-950/10">
+                <video
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="aspect-video w-full bg-slate-950 object-cover"
+                >
+                  <source
+                    src="/videos/sitguru-ambassador-promo.mp4"
+                    type="video/mp4"
+                  />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
             </div>
-
-            <Link
-              href="/programs/ambassadors/apply"
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
-            >
-              Apply Now
-              <ArrowRight size={16} />
-            </Link>
           </div>
+        </div>
+      </section>
 
-          <div className="grid gap-5 lg:grid-cols-2">
-            {ambassadorCards.map((item, index) => (
-              <AmbassadorCard key={item.key} item={item} priority={index < 2} />
+      <section
+        className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10"
+        id="ambassador-paths"
+      >
+        <SectionHeader
+          eyebrow="Ambassador paths"
+          title="Choose the path that matches your community."
+          description="SitGuru keeps the Ambassador Program simple: students help grow campus and social awareness, community voices help grow local trust, and military-connected advocates help reach veteran and military family networks."
+        />
+
+        <div className="mt-10 grid gap-5 lg:grid-cols-3">
+          {primaryAmbassadorPaths.map((path) => (
+            <div
+              key={path.title}
+              className="group overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-sm transition hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-950/10"
+            >
+              <div className="relative aspect-[16/10] w-full overflow-hidden bg-emerald-50">
+                <Image
+                  src={path.image}
+                  alt={path.imageAlt}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 33vw"
+                  className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                  style={{ objectPosition: path.imagePosition }}
+                />
+                <div className="absolute left-4 top-4">
+                  <IconBadge>{path.icon}</IconBadge>
+                </div>
+                <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/20 bg-black/55 p-4 backdrop-blur-sm">
+                  <p
+                    className="text-xs font-black uppercase tracking-[0.16em]"
+                    style={{
+                      color: "#d1fae5",
+                      WebkitTextFillColor: "#d1fae5",
+                    }}
+                  >
+                    {path.eyebrow}
+                  </p>
+                  <h3
+                    className="mt-1 text-2xl font-black"
+                    style={{
+                      color: "#ffffff",
+                      WebkitTextFillColor: "#ffffff",
+                    }}
+                  >
+                    {path.title}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="p-6">
+                <p className="text-sm font-semibold leading-6 text-slate-600">
+                  {path.description}
+                </p>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {path.highlights.map((highlight) => (
+                    <span
+                      key={highlight}
+                      className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800"
+                    >
+                      {highlight}
+                    </span>
+                  ))}
+                </div>
+
+                <Link
+                  href={buildAmbassadorSignupHref({
+                    program: getPrimaryAmbassadorProgram(path.title),
+                    campaign: `ambassador_program_${getPrimaryAmbassadorProgram(
+                      path.title,
+                    )}`,
+                    placement: `primary_path_${getPrimaryAmbassadorProgram(
+                      path.title,
+                    )}`,
+                  })}
+                  className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-900"
+                >
+                  Start this path
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-white py-14">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+          <SectionHeader
+            eyebrow="Why become an Ambassador"
+            title="Ambassadors help SitGuru grow through real trust, local reach, and personal connection."
+            description="The best Ambassadors are people who naturally share, refer, encourage, and connect. SitGuru gives them a pet-friendly brand that is easy to talk about and meaningful to friends, family, and communities."
+          />
+
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {benefits.map((benefit) => (
+              <div
+                key={benefit}
+                className="rounded-[1.5rem] border border-emerald-100 bg-[#fbfaf6] p-5 shadow-sm"
+              >
+                <div className="flex gap-3">
+                  <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-700" />
+                  <p className="text-sm font-bold leading-6 text-slate-700">
+                    {benefit}
+                  </p>
+                </div>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1500px] px-4 pb-8 sm:px-6 lg:px-8">
-        <div className="rounded-[30px] border border-[#d9e7db] bg-white p-6">
-          <div className="grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-center">
-            <div>
-              <SectionEyebrow>More than a service</SectionEyebrow>
-
-              <h2 className="mt-1 text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl">
-                SitGuru is a pet community built on trust.
-              </h2>
-
-              <p className="mt-4 text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-                Many platforms focus only on the booking. SitGuru is different.
-                We want Pet Parents to feel supported, Gurus to feel valued, and
-                Ambassadors to feel proud of the community they help grow.
-              </p>
-
-              <p className="mt-4 text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-                When you join as an Ambassador, you are helping build a trusted
-                network for real families, real pets, and real local care needs.
-                You are not just sharing a link. You are helping connect people
-                who care.
-              </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-[24px] border border-green-100 bg-[#f8faf7] p-5">
-                <h3 className="text-lg font-black text-green-950">
-                  For Pet Parents
-                </h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
-                  Help families find local Gurus they can trust for walks,
-                  visits, sitting, routines, travel, and everyday support.
-                </p>
-              </div>
-
-              <div className="rounded-[24px] border border-green-100 bg-[#f8faf7] p-5">
-                <h3 className="text-lg font-black text-green-950">
-                  For Gurus
-                </h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
-                  Help responsible pet lovers discover flexible opportunities to
-                  care for pets and serve families in their area.
-                </p>
-              </div>
-
-              <div className="rounded-[24px] border border-green-100 bg-[#f8faf7] p-5">
-                <h3 className="text-lg font-black text-green-950">
-                  For Communities
-                </h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
-                  Help build stronger local pet care networks through trust,
-                  referrals, relationships, and shared love for animals.
-                </p>
-              </div>
-
-              <div className="rounded-[24px] border border-green-100 bg-[#f8faf7] p-5">
-                <h3 className="text-lg font-black text-green-950">
-                  For Ambassadors
-                </h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
-                  Help grow SitGuru, earn recognition, and become part of a
-                  mission-driven Pack that values your voice and connections.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-[1500px] px-4 pb-8 sm:px-6 lg:px-8">
-        <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-[30px] border border-[#d9e7db] bg-white p-6">
-            <SectionEyebrow>Cat care matters too</SectionEyebrow>
-
-            <h2 className="mt-1 text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl">
-              Trusted support for dogs, cats, and every pet in the Pack.
+      <section className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
+        <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">
+              What Ambassadors can do
+            </p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">
+              Simple, social, local ways to help SitGuru grow.
             </h2>
-
-            <p className="mt-4 text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-              Many Pet Parents need care for cats, senior pets, special
-              routines, multi-pet homes, and animals who need patient, reliable
-              support. SitGuru Ambassadors help spread the word that trusted pet
-              care is for the whole household, not just dog walking.
+            <p className="mt-5 text-base font-semibold leading-7 text-slate-600">
+              Ambassadors can support SitGuru through friends and family
+              referrals, local conversations, campus energy, social posts,
+              community groups, professional care networks, pet-friendly events,
+              QR code sharing, and introductions to future Gurus, Pet Parents,
+              partners, and affiliates.
             </p>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Pill>Cat care support</Pill>
-              <Pill>Senior pets</Pill>
-              <Pill>Daily routines</Pill>
-              <Pill>Multi-pet homes</Pill>
-              <Pill>Trusted visits</Pill>
+            <div className="mt-8 overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-sm">
+              <div className="relative aspect-[16/10] w-full overflow-hidden">
+                <Image
+                  src="/images/ambassadors/rescue-shelter-ambassador2.jpg"
+                  alt="SitGuru grows through trusted people and pet-loving communities"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 45vw"
+                  className="object-cover"
+                  style={{ objectPosition: "center 35%" }}
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/65 via-transparent to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-5">
+                  <p className="text-sm font-black text-white">
+                    SitGuru grows through trusted people, friends, family, and
+                    pet-loving communities.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[30px] border border-[#d9e7db] bg-white shadow-sm">
-            <div className="relative h-full min-h-[330px] bg-green-50">
-              <Image
-                src="/images/ambassadors/cat-care-trust.jpg"
-                alt="Cat care support in a veterinary setting"
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover"
-                style={{ objectPosition: "center 35%" }}
-              />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {ambassadorActivities.map((activity) => (
+              <div
+                key={activity}
+                className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm"
+              >
+                <div className="flex gap-3">
+                  <MessageCircleHeart className="mt-0.5 shrink-0 text-emerald-700" />
+                  <p className="text-sm font-black leading-6 text-slate-800">
+                    {activity}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-5 pb-5 pt-20">
-                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#FFD54A] drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">
-                  Trusted care for every companion
+      <section className="bg-[linear-gradient(180deg,#eef8f1_0%,#f8fbf8_100%)] py-14">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+          <SectionHeader
+            eyebrow="How it works"
+            title="A simple path from supporter to SitGuru Ambassador."
+            description="The Ambassador Program is designed to be flexible for people who want to help promote, refer, represent, and grow SitGuru with friends, family, local organizations, campuses, and their own communities."
+          />
+
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {howItWorks.map((item) => (
+              <div
+                key={item.step}
+                className="rounded-[1.5rem] border border-emerald-100 bg-white p-6 shadow-sm"
+              >
+                <p className="text-sm font-black text-emerald-700">
+                  {item.step}
                 </p>
+                <h3 className="mt-2 text-2xl font-black text-slate-950">
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+                  {item.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-                <div className="inline-flex max-w-full rounded-2xl border border-white/80 bg-white/95 px-4 py-2 shadow-lg shadow-black/25 backdrop-blur">
-                  <h3 className="text-2xl font-black leading-tight text-green-950 sm:text-3xl">
-                    Dogs, cats, and every pet in between.
-                  </h3>
+      <section className="bg-white py-14">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+          <SectionHeader
+            eyebrow="More Ambassador voices"
+            title="Pet professionals, Gurus, rescues, and referral leaders can all help SitGuru grow."
+            description="Student, Community, and Military Hire are the main program paths. These additional Ambassador voices help SitGuru reach more trusted pet care circles."
+          />
+
+          <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {ambassadorTypes.map((type) => (
+              <div
+                key={type.title}
+                className="group overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-[#fbfaf6] shadow-sm transition hover:-translate-y-1 hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-lg"
+              >
+                <div className="relative aspect-[16/10] w-full overflow-hidden bg-emerald-50 sm:aspect-[16/9] xl:aspect-[16/10]">
+                  <Image
+                    src={type.image}
+                    alt={type.imageAlt}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+                    className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                    style={{ objectPosition: type.imagePosition }}
+                  />
+                  <div className="absolute left-4 top-4">
+                    <IconBadge>{type.icon}</IconBadge>
+                  </div>
                 </div>
 
-                <p className="mt-2 text-sm font-bold text-white/95 drop-shadow-[0_1px_6px_rgba(0,0,0,0.95)]">
-                  Trusted SitGuru support for dogs, cats, seniors, routines, and
-                  multi-pet homes.
-                </p>
+                <div className="p-5">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                    {type.eyebrow}
+                  </p>
+
+                  <h3 className="mt-2 text-xl font-black text-slate-950">
+                    {type.title}
+                  </h3>
+
+                  <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+                    {type.description}
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {type.examples.map((example) => (
+                      <span
+                        key={example}
+                        className="rounded-full border border-white bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm"
+                      >
+                        {example}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+
+      <section
+        className="py-14"
+        style={{
+          background:
+            "linear-gradient(135deg, #14532d 0%, #166534 46%, #047857 100%)",
+          color: "#ffffff",
+        }}
+      >
+        <div className="mx-auto grid max-w-7xl gap-8 px-5 sm:px-8 lg:grid-cols-[0.95fr_1.05fr] lg:px-10">
+          <div className="flex flex-col justify-center">
+            <p
+              className="text-xs font-black uppercase tracking-[0.22em]"
+              style={{
+                color: "#ffffff",
+                WebkitTextFillColor: "#ffffff",
+              }}
+            >
+              Pack Leader Recognition
+            </p>
+
+            <h2
+              className="mt-3 text-3xl font-black tracking-tight text-white sm:text-5xl"
+              style={{
+                color: "#ffffff",
+                WebkitTextFillColor: "#ffffff",
+                textShadow: "0 2px 10px rgba(0,0,0,0.22)",
+              }}
+            >
+              <span
+                className="text-white"
+                style={{
+                  color: "#ffffff",
+                  WebkitTextFillColor: "#ffffff",
+                }}
+              >
+                Top Ambassadors should be rewarded, recognized, and celebrated.
+              </span>
+            </h2>
+
+            <p
+              className="mt-5 max-w-3xl text-base font-semibold leading-7 sm:text-lg"
+              style={{
+                color: "#f0fdf4",
+                WebkitTextFillColor: "#f0fdf4",
+              }}
+            >
+              Ambassadors who help SitGuru grow can be recognized for the real
+              value they bring to the community. With consent, standout
+              Ambassadors may be featured as Pack Leaders across SitGuru
+              community highlights, social content, and future recognition
+              spaces.
+            </p>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href={buildAmbassadorSignupHref({
+                  program: "community",
+                  campaign: "ambassador_program_pack_leader",
+                  placement: "pack_leader_primary",
+                })}
+                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-sm font-black text-emerald-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-50"
+              >
+                Become an Ambassador
+                <Handshake size={17} />
+              </Link>
+
+              <Link
+                href="#ambassador-paths"
+                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/10 px-6 py-4 text-sm font-black text-white shadow-sm backdrop-blur-sm transition hover:bg-white/15"
+              >
+                See Ambassador Roles
+                <ArrowRight size={17} />
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="rounded-[1.75rem] border border-white/80 bg-white p-6 shadow-xl shadow-emerald-950/15">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-800">
+                What Ambassadors can help grow
+              </p>
+
+              <div className="mt-5 space-y-4">
+                {packLeaderGrowth.map((item) => (
+                  <div key={item} className="flex gap-3">
+                    <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-700" />
+                    <p className="text-base font-black text-slate-700">{item}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-white/80 bg-white p-6 shadow-xl shadow-emerald-950/15">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-800">
+                What SitGuru can track
+              </p>
+
+              <div className="mt-5 space-y-4">
+                {packLeaderTracking.map((item) => (
+                  <div key={item} className="flex gap-3">
+                    <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-700" />
+                    <p className="text-base font-black text-slate-700">{item}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1500px] px-4 pb-8 sm:px-6 lg:px-8">
-        <div className="rounded-[30px] bg-green-900 p-6 text-white">
-          <div className="grid gap-5 lg:grid-cols-[1.1fr_0.95fr_0.95fr]">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-green-200">
-                Grow with SitGuru
+      <section className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
+        <div className="grid gap-5 lg:grid-cols-3">
+          {trustPoints.map((point) => (
+            <div
+              key={point.title}
+              className="rounded-[1.75rem] border border-emerald-100 bg-white p-6 shadow-sm"
+            >
+              <IconBadge>{point.icon}</IconBadge>
+              <h3 className="mt-5 text-2xl font-black text-slate-950">
+                {point.title}
+              </h3>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+                {point.description}
               </p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-              <h2 className="mt-1 text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl">
-                Refer. Support. Earn recognition.
+      <section
+        className="py-14"
+        style={{
+          background:
+            "linear-gradient(135deg, #022c22 0%, #064e3b 48%, #0f766e 100%)",
+          color: "#ffffff",
+        }}
+      >
+        <div className="mx-auto grid max-w-7xl gap-8 px-5 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:px-10">
+          <div>
+            <p
+              className="text-xs font-black uppercase tracking-[0.22em]"
+              style={{
+                color: "#bbf7d0",
+                WebkitTextFillColor: "#bbf7d0",
+              }}
+            >
+              Program clarity
+            </p>
+
+            <h2
+              className="mt-3 text-3xl font-black tracking-tight sm:text-5xl"
+              style={{
+                color: "#ffffff",
+                WebkitTextFillColor: "#ffffff",
+              }}
+            >
+              Ambassadors represent. Affiliates promote. Partners collaborate.
+            </h2>
+
+            <p
+              className="mt-5 text-base font-semibold leading-7"
+              style={{
+                color: "#ecfdf5",
+                WebkitTextFillColor: "#ecfdf5",
+              }}
+            >
+              SitGuru has multiple growth pathways, but each one serves a
+              different purpose. Ambassadors are people-based advocates who help
+              spread SitGuru through trust, referrals, friends and family,
+              campus energy, professional relationships, community reach, and
+              local leadership.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            {[
+              [
+                "Ambassadors",
+                "Students, community advocates, military-connected advocates, Gurus, pet professionals, friends, family, and local referral leaders.",
+                <Gift key="ambassador" size={22} />,
+              ],
+              [
+                "Affiliates",
+                "Creators, influencers, bloggers, promoters, and content channels.",
+                <Megaphone key="affiliate" size={22} />,
+              ],
+              [
+                "Partners",
+                "Organizations, schools, pet care businesses, nonprofits, brands, and community groups.",
+                <Handshake key="partner" size={22} />,
+              ],
+            ].map(([title, description, icon]) => (
+              <div
+                key={String(title)}
+                className="rounded-[1.5rem] border p-5 shadow-sm"
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.12)",
+                  borderColor: "rgba(255,255,255,0.22)",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#bbf7d0",
+                  }}
+                >
+                  {icon}
+                </div>
+
+                <h3
+                  className="mt-4 text-xl font-black"
+                  style={{
+                    color: "#ffffff",
+                    WebkitTextFillColor: "#ffffff",
+                  }}
+                >
+                  {title}
+                </h3>
+
+                <p
+                  className="mt-2 text-sm font-semibold leading-6"
+                  style={{
+                    color: "#ecfdf5",
+                    WebkitTextFillColor: "#ecfdf5",
+                  }}
+                >
+                  {description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
+        <SectionHeader
+          eyebrow="Questions"
+          title="Ambassador Program FAQ"
+          description="A few quick answers to help students, community advocates, military-connected leaders, pet professionals, friends, family, and local referral voices understand where the Ambassador Program fits."
+        />
+
+        <div className="mt-10 grid gap-4 lg:grid-cols-2">
+          {faqs.map((faq) => (
+            <div
+              key={faq.question}
+              className="rounded-[1.5rem] border border-emerald-100 bg-white p-6 shadow-sm"
+            >
+              <h3 className="text-lg font-black text-slate-950">
+                {faq.question}
+              </h3>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+                {faq.answer}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section
+        id="join-ambassador-program"
+        className="mx-auto max-w-7xl px-5 pb-14 sm:px-8 lg:px-10"
+      >
+        <div className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-xl shadow-emerald-950/5">
+          <div className="grid gap-0 lg:grid-cols-[1fr_0.9fr]">
+            <div className="p-6 sm:p-8 lg:p-10">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-emerald-800">
+                <Trophy size={15} />
+                Join the Ambassador Program
+              </div>
+
+              <h2 className="mt-5 text-3xl font-black tracking-tight text-slate-950 sm:text-5xl">
+                Help SitGuru grow through referrals, commission-based opportunities, community trust, and
+                pet-friendly local energy.
               </h2>
 
-              <p className="mt-4 text-sm font-semibold leading-7 text-green-50/95 sm:text-base">
-                Ambassadors help SitGuru grow by introducing the Pack to people
-                who already care about pets, families, trust, and community.
-                Your referrals can help more Pet Parents find care, more Gurus
-                find opportunity, and more communities build dependable pet care
-                support.
+              <p className="mt-5 text-base font-semibold leading-7 text-slate-600">
+                If you are a student, community advocate, military-connected
+                advocate, Guru, Vet Tech, veterinarian, trainer, groomer, rescue
+                advocate, campus leader, referral leader, friend, family member,
+                or pet-loving local voice, the SitGuru Ambassador Program may be
+                a strong fit.
               </p>
 
-              <div className="mt-5 flex flex-wrap gap-3">
+              <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                {[
+                  "Student Ambassadors",
+                  "Community Ambassadors",
+                  "Military and Veteran Ambassadors",
+                  "Guru and pet care voices",
+                  "Vet Tech and veterinarian voices",
+                  "Trainer and groomer connections",
+                  "Rescue and shelter advocates",
+                  "Friends and family referrals",
+                  "Campus and local awareness",
+                  "Pet Parent introductions",
+                  "Future Guru referrals",
+                  "Partner and affiliate introductions",
+                ].map((item) => (
+                  <div key={item} className="flex gap-2">
+                    <BadgeCheck className="mt-0.5 shrink-0 text-emerald-700" />
+                    <p className="text-sm font-bold text-slate-700">{item}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
-                  href="/programs/ambassadors/apply"
-                  className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-black text-green-900 transition hover:bg-green-50"
+                  href={buildAmbassadorSignupHref({
+                    program: "community",
+                    campaign: "ambassador_program_join",
+                    placement: "join_section_primary",
+                  })}
+                  className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-6 py-4 text-sm font-black text-white shadow-lg shadow-emerald-950/15 transition hover:bg-emerald-900"
                 >
-                  Become an Ambassador
+                  Create Ambassador Account
+                  <ArrowRight size={17} />
                 </Link>
 
                 <Link
                   href="/programs"
-                  className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/15"
+                  className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-6 py-4 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
                 >
-                  Explore All Programs
+                  Explore Programs
+                  <ArrowRight size={17} />
                 </Link>
               </div>
             </div>
 
-            <div className="rounded-[24px] bg-white p-5 text-slate-900">
-              <h3 className="text-sm font-black uppercase tracking-[0.12em] text-green-800">
-                Ambassador benefits
-              </h3>
+            <div className="bg-[#f8fff9] p-6 sm:p-8 lg:p-10">
+              <div className="overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-sm">
+                <div className="relative aspect-[16/10] w-full overflow-hidden">
+                  <Image
+                    src="/images/ambassadors/vet-tech-ambassador3.jpg"
+                    alt="Trusted people with real community reach"
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 45vw"
+                    className="object-cover"
+                    style={{ objectPosition: "center 35%" }}
+                    loading="lazy"
+                  />
+                </div>
 
-              <ul className="mt-3 space-y-2">
-                {[
-                  "Be part of a pet care community with a mission",
-                  "Help people you know find trusted pet care",
-                  "Support flexible opportunities for future Gurus",
-                  "Earn recognition as your local Pack grows",
-                  "Help build something meaningful in your area",
-                ].map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-2 text-sm font-semibold leading-6 text-slate-700"
-                  >
-                    <CheckCircle2
-                      className="mt-0.5 shrink-0 text-green-700"
-                      size={15}
-                    />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                <div className="p-6">
+                  <Star className="text-emerald-800" size={34} />
 
-            <div className="rounded-[24px] bg-white p-5 text-slate-900">
-              <h3 className="text-sm font-black uppercase tracking-[0.12em] text-green-800">
-                Ways to grow the Pack
-              </h3>
+                  <h3 className="mt-5 text-2xl font-black text-slate-950">
+                    Built for trusted people with real community reach.
+                  </h3>
 
-              <ul className="mt-3 space-y-2">
-                {[
-                  "Share SitGuru with Pet Parents",
-                  "Invite responsible pet lovers to become Gurus",
-                  "Introduce SitGuru in local pet communities",
-                  "Support students, veterans, and pet professionals",
-                  "Celebrate trusted care in your neighborhood",
-                ].map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-2 text-sm font-semibold leading-6 text-slate-700"
-                  >
-                    <CheckCircle2
-                      className="mt-0.5 shrink-0 text-green-700"
-                      size={15}
-                    />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
+                  <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+                    Ambassadors can help SitGuru grow by sharing the brand,
+                    referring Pet Parents, encouraging future Gurus, supporting
+                    student, community, and military-friendly programs, and
+                    helping SitGuru become visible with friends, family, and
+                    trusted local spaces.
+                  </p>
 
-      <section className="mx-auto max-w-[1500px] px-4 pb-12 sm:px-6 lg:px-8">
-        <div className="rounded-[30px] border border-[#d9e7db] bg-white p-6">
-          <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr_0.85fr]">
-            <div>
-              <SectionEyebrow>Recognition</SectionEyebrow>
-
-              <h2 className="mt-1 text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl">
-                Great Ambassadors deserve to be celebrated.
-              </h2>
-
-              <p className="mt-4 text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-                SitGuru believes community growth should be visible. As the Pack
-                grows, top Ambassadors may be recognized for helping Pet
-                Parents, Gurus, and local communities connect through trusted
-                pet care.
-              </p>
-
-              <p className="mt-4 text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-                Recognition may include Pack Leader highlights, community
-                spotlights, badges, social features, and other SitGuru
-                Ambassador opportunities based on program availability and
-                eligibility.
-              </p>
-            </div>
-
-            <div className="rounded-[24px] border border-[#dfe8df] bg-[#f8faf7] p-5">
-              <h3 className="text-sm font-black uppercase tracking-[0.12em] text-green-800">
-                You can be known for
-              </h3>
-
-              <ul className="mt-3 space-y-2">
-                {[
-                  "Helping Pet Parents find trusted care",
-                  "Supporting new Gurus",
-                  "Growing local pet care awareness",
-                  "Creating community connections",
-                  "Helping SitGuru reach more families",
-                ].map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-2 text-sm font-semibold leading-6 text-slate-700"
-                  >
-                    <CheckCircle2
-                      className="mt-0.5 shrink-0 text-green-700"
-                      size={15}
-                    />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="rounded-[24px] border border-[#dfe8df] bg-[#f8faf7] p-5">
-              <h3 className="text-sm font-black uppercase tracking-[0.12em] text-green-800">
-                Recognition examples
-              </h3>
-
-              <ul className="mt-3 space-y-2">
-                {[
-                  "Pack Leader",
-                  "Community Connector",
-                  "Student Ambassador",
-                  "Veterinary Ambassador",
-                  "Local Growth Champion",
-                ].map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-2 text-sm font-semibold leading-6 text-slate-700"
-                  >
-                    <CheckCircle2
-                      className="mt-0.5 shrink-0 text-green-700"
-                      size={15}
-                    />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
+                  <div className="mt-6 space-y-3">
+                    {[
+                      [
+                        "Student Hire",
+                        "Spread SitGuru through campus and social circles.",
+                      ],
+                      [
+                        "Community Hire",
+                        "Help local pet families discover SitGuru.",
+                      ],
+                      [
+                        "Military Hire",
+                        "Support veteran and military-connected awareness.",
+                      ],
+                      ["Gurus", "Represent the brand and refer trusted people."],
+                      [
+                        "Pet professionals",
+                        "Help Pet Parents discover dependable support.",
+                      ],
+                      [
+                        "Friends and family",
+                        "Share SitGuru with people who already trust you.",
+                      ],
+                      [
+                        "Referral leaders",
+                        "Introduce Pet Parents, Gurus, and partners.",
+                      ],
+                    ].map(([title, description]) => (
+                      <div
+                        key={title}
+                        className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4"
+                      >
+                        <p className="text-sm font-black text-emerald-950">
+                          {title}
+                        </p>
+                        <p className="mt-1 text-xs font-bold leading-5 text-emerald-800">
+                          {description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="mt-5 rounded-[22px] border border-amber-300 bg-amber-50 p-4">
-            <p className="text-sm font-bold leading-6 text-amber-950">
-              Ambassador rewards, commissions, recognition, program eligibility,
-              and public features may vary and are not guaranteed. SitGuru will
-              always seek permission before publicly featuring an Ambassador’s
-              name, photo, story, or performance highlights.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-[1500px] px-4 pb-12 sm:px-6 lg:px-8">
-        <div className="rounded-[30px] border border-green-100 bg-gradient-to-br from-green-900 via-green-800 to-emerald-700 p-6 text-center text-white shadow-sm sm:p-8">
-          <div className="mx-auto max-w-3xl">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-green-900">
-              <Trophy size={26} />
-            </div>
-
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-green-100">
-              Ready to help SitGuru grow?
-            </p>
-
-            <h2 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
-              Become a SitGuru Ambassador.
-            </h2>
-
-            <p className="mt-3 text-sm font-semibold leading-7 text-green-50 sm:text-base">
-              Help Pet Parents find trusted care, help great people become
-              Gurus, and help SitGuru grow a stronger pet care community in your
-              area.
-            </p>
-
-            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-              <Link
-                href="/programs/ambassadors/apply"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-sm font-black text-green-950 shadow-lg transition hover:bg-green-50"
-              >
-                Apply to Lead the Pack
-                <ArrowRight size={18} />
-              </Link>
+          <div className="border-t border-emerald-100 bg-[#fbfaf6] p-5 sm:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-black text-slate-950">
+                  Sharing from PA CareerLink, a college group, or a local
+                  community page?
+                </p>
+                <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
+                  Send people directly to this page so they can choose the
+                  Ambassador path that fits them best.
+                </p>
+              </div>
 
               <Link
-                href="/programs"
-                className="inline-flex items-center justify-center rounded-2xl border border-white/30 bg-white/10 px-6 py-4 text-sm font-black text-white transition hover:bg-white/15"
+                href="#ambassador-paths"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
               >
-                View All Programs
+                View Ambassador paths
+                <ArrowRight size={16} />
               </Link>
             </div>
           </div>
