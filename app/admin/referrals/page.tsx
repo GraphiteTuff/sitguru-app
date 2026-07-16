@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import {
+  Activity,
   Archive,
   ArrowRight,
   BadgeDollarSign,
@@ -17,7 +18,9 @@ import {
   Megaphone,
   MousePointerClick,
   Plus,
+  QrCode,
   ReceiptText,
+  ScanLine,
   Search,
   ShieldCheck,
   Sparkles,
@@ -112,6 +115,83 @@ type ReferralActivity = {
   updated_at?: string | null;
 };
 
+type CanonicalReferralCode = {
+  id: string;
+  code?: string | null;
+  normalized_code?: string | null;
+  user_id?: string | null;
+  owner_type?: string | null;
+  primary_role?: string | null;
+  owner_display_name?: string | null;
+  owner_email?: string | null;
+  program_context?: string | null;
+  program_type?: string | null;
+  campaign_type?: string | null;
+  legacy_source_table?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+};
+
+type CanonicalRelationship = {
+  id: string;
+  referral_code?: string | null;
+  referrer_user_id?: string | null;
+  referrer_role?: string | null;
+  referrer_display_name?: string | null;
+  referred_user_id?: string | null;
+  referred_role?: string | null;
+  referred_display_name?: string | null;
+  referred_email?: string | null;
+  source?: string | null;
+  platform?: string | null;
+  medium?: string | null;
+  campaign?: string | null;
+  status?: string | null;
+  referral_stage?: string | null;
+  signup_at?: string | null;
+  activated_at?: string | null;
+  qualified_at?: string | null;
+  first_booking_at?: string | null;
+  reward_status?: string | null;
+  reward_amount?: number | null;
+  reward_payment_reference?: string | null;
+  code_owner_type?: string | null;
+  code_owner_primary_role?: string | null;
+  code_owner_display_name?: string | null;
+  code_owner_email?: string | null;
+  tracked_link_visits?: number | null;
+  tracked_qr_scans?: number | null;
+  created_at?: string | null;
+};
+
+type CanonicalEvent = {
+  id: string;
+  submitted_code?: string | null;
+  event_type?: string | null;
+  referred_name?: string | null;
+  referred_email?: string | null;
+  referred_role_at_signup?: string | null;
+  source?: string | null;
+  platform?: string | null;
+  medium?: string | null;
+  campaign?: string | null;
+  landing_page?: string | null;
+  conversion_stage?: string | null;
+  conversion_status?: string | null;
+  occurred_at?: string | null;
+  created_at?: string | null;
+};
+
+type ReferralAuditRow = {
+  id: string;
+  relationship_id?: string | null;
+  actor_source?: string | null;
+  operation?: string | null;
+  old_record?: DbRow | null;
+  new_record?: DbRow | null;
+  created_at?: string | null;
+};
+
 type ProgramCard = {
   title: string;
   description: string;
@@ -184,6 +264,7 @@ const statusOptions = [
 ];
 
 const payoutStatusOptions = [
+  { value: "not_evaluated", label: "Not Evaluated" },
   { value: "not_eligible", label: "Not Eligible" },
   { value: "pending_review", label: "Pending Review" },
   { value: "eligible", label: "Eligible" },
@@ -271,6 +352,95 @@ function formatDate(value?: string | null) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "—";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function titleCase(value: unknown) {
+  const text = asString(value)
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text) return "—";
+  return text.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function safeJsonPreview(value: unknown) {
+  if (!value) return "No additional details";
+
+  try {
+    const output = JSON.stringify(value);
+    return output.length > 240 ? `${output.slice(0, 237)}...` : output;
+  } catch {
+    return "Details could not be displayed";
+  }
+}
+
+function canonicalCodeLabel(code: CanonicalReferralCode) {
+  return code.normalized_code || code.code || "—";
+}
+
+function canonicalOwnerLabel(code: CanonicalReferralCode) {
+  return (
+    code.owner_display_name ||
+    code.owner_email ||
+    code.user_id ||
+    "Owner needs review"
+  );
+}
+
+function relationshipReferrerLabel(relationship: CanonicalRelationship) {
+  return (
+    relationship.referrer_display_name ||
+    relationship.code_owner_display_name ||
+    relationship.code_owner_email ||
+    relationship.referrer_user_id ||
+    "Referrer needs review"
+  );
+}
+
+function relationshipReferredLabel(relationship: CanonicalRelationship) {
+  return (
+    relationship.referred_display_name ||
+    relationship.referred_email ||
+    relationship.referred_user_id ||
+    "Referred member"
+  );
+}
+
+function isCanonicalCodeMatch(code: CanonicalReferralCode, search: string) {
+  if (!search) return true;
+
+  return [
+    code.code,
+    code.normalized_code,
+    code.owner_type,
+    code.primary_role,
+    code.owner_display_name,
+    code.owner_email,
+    code.program_context,
+    code.program_type,
+    code.campaign_type,
+    code.legacy_source_table,
+    code.status,
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(search.toLowerCase());
 }
 
 function getParam(
@@ -385,7 +555,14 @@ async function getReferralData(
   const status = getParam(params, "status");
   const payout = getParam(params, "payout");
 
-  const [codesResult, activityResult] = await Promise.all([
+  const [
+    codesResult,
+    activityResult,
+    canonicalCodesResult,
+    relationshipsResult,
+    eventsResult,
+    auditResult,
+  ] = await Promise.all([
     supabaseAdmin
       .from("referral_codes")
       .select("*")
@@ -396,6 +573,26 @@ async function getReferralData(
       .select("*")
       .order("created_at", { ascending: false })
       .limit(1000),
+    supabaseAdmin
+      .from("pawperks_account_referral_codes")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5000),
+    supabaseAdmin
+      .from("admin_referral_tracking")
+      .select("*")
+      .order("signup_at", { ascending: false })
+      .limit(5000),
+    supabaseAdmin
+      .from("pawperks_referral_events")
+      .select("*")
+      .order("occurred_at", { ascending: false })
+      .limit(10000),
+    supabaseAdmin
+      .from("pawperks_referral_audit_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(500),
   ]);
 
   const codes = ((codesResult.data || []) as ReferralCode[]).filter((code) => {
@@ -409,6 +606,22 @@ async function getReferralData(
 
   const allCodes = ((codesResult.data || []) as ReferralCode[]) || [];
   const activities = ((activityResult.data || []) as ReferralActivity[]) || [];
+  const allCanonicalCodes =
+    ((canonicalCodesResult.data || []) as CanonicalReferralCode[]) || [];
+  const canonicalCodes = allCanonicalCodes.filter((code) => {
+    const matchesSearch = isCanonicalCodeMatch(code, q);
+    const matchesProgram =
+      !program ||
+      code.program_type === program ||
+      code.program_context === program ||
+      code.campaign_type === program;
+    const matchesStatus = !status || code.status === status;
+    return matchesSearch && matchesProgram && matchesStatus;
+  });
+  const relationships =
+    ((relationshipsResult.data || []) as CanonicalRelationship[]) || [];
+  const events = ((eventsResult.data || []) as CanonicalEvent[]) || [];
+  const audits = ((auditResult.data || []) as ReferralAuditRow[]) || [];
 
   const metrics = {
     totalCodes: allCodes.length,
@@ -433,7 +646,10 @@ async function getReferralData(
         code.program_type || "",
       ),
     ).length,
-    usageCount: allCodes.reduce((sum, code) => sum + asNumber(code.usage_count), 0),
+    usageCount: allCodes.reduce(
+      (sum, code) => sum + asNumber(code.usage_count),
+      0,
+    ),
     convertedCount: allCodes.reduce(
       (sum, code) => sum + asNumber(code.converted_count),
       0,
@@ -442,16 +658,55 @@ async function getReferralData(
       (sum, code) => sum + asNumber(code.approved_count),
       0,
     ),
-    bookings: allCodes.reduce((sum, code) => sum + asNumber(code.booking_count), 0),
-    revenue: allCodes.reduce((sum, code) => sum + asNumber(code.revenue_amount), 0),
+    bookings: allCodes.reduce(
+      (sum, code) => sum + asNumber(code.booking_count),
+      0,
+    ),
+    revenue: allCodes.reduce(
+      (sum, code) => sum + asNumber(code.revenue_amount),
+      0,
+    ),
     pendingPayouts: allCodes.filter(isPayoutOpen).length,
-    paidPayouts: allCodes.filter((code) => code.payout_status === "paid").length,
+    paidPayouts: allCodes.filter(
+      (code) => code.payout_status === "paid",
+    ).length,
+  };
+
+  const canonicalMetrics = {
+    totalCodes: allCanonicalCodes.length,
+    activeCodes: allCanonicalCodes.filter(
+      (code) => (code.status || "active") === "active",
+    ).length,
+    relationships: relationships.length,
+    linkVisits: events.filter((event) => event.event_type === "link_visit").length,
+    qrScans: events.filter((event) => event.event_type === "qr_scan").length,
+    signupCaptures: events.filter(
+      (event) => event.event_type === "signup_capture",
+    ).length,
+    qualified: relationships.filter(
+      (relationship) =>
+        relationship.status === "qualified" || Boolean(relationship.qualified_at),
+    ).length,
+    completedBookings: relationships.filter((relationship) =>
+      Boolean(relationship.first_booking_at),
+    ).length,
+    rewardReview: relationships.filter((relationship) =>
+      ["pending_review", "eligible", "approved", "manual_review"].includes(
+        relationship.reward_status || "",
+      ),
+    ).length,
+    paidRewards: relationships.filter(
+      (relationship) =>
+        relationship.reward_status === "paid" &&
+        Boolean(relationship.reward_payment_reference),
+    ).length,
   };
 
   const programCards: ProgramCard[] = [
     {
       title: "Guru Referral Program",
-      description: "Track Guru leads, new Guru signup codes, approvals, and bookable activation.",
+      description:
+        "Track Guru leads, new Guru signup codes, approvals, and bookable activation.",
       href: adminRoutes.gurus,
       icon: UserPlus,
       count: metrics.guruCodes,
@@ -460,7 +715,8 @@ async function getReferralData(
     },
     {
       title: "Pet Parent / PetPerks",
-      description: "Track Pet Parent signup codes, PetPerks, and customer referral activity.",
+      description:
+        "Track Pet Parent signup codes, PetPerks, and customer referral activity.",
       href: adminRoutes.petParents,
       icon: Gift,
       count: metrics.petParentCodes,
@@ -469,7 +725,8 @@ async function getReferralData(
     },
     {
       title: "Ambassador Referrals",
-      description: "Track ambassador codes, outreach links, signups, and future commission review.",
+      description:
+        "Track Ambassador codes, outreach links, signups, and future commission review.",
       href: adminRoutes.ambassadors,
       icon: HeartHandshake,
       count: metrics.ambassadorCodes,
@@ -478,7 +735,8 @@ async function getReferralData(
     },
     {
       title: "Partners / Clinics",
-      description: "Track partner, clinic, PetPerks, and local business referral codes.",
+      description:
+        "Track partner, clinic, PetPerks, and local business referral codes.",
       href: adminRoutes.partners,
       icon: ShieldCheck,
       count: metrics.partnerCodes,
@@ -487,20 +745,22 @@ async function getReferralData(
     },
     {
       title: "Applications / Signups",
-      description: "Review who used a code and where they are in the conversion stage.",
+      description:
+        "Review who used a code and where they are in the conversion stage.",
       href: adminRoutes.applications,
       icon: ClipboardList,
-      count: metrics.convertedCount,
-      detail: "Converted signups",
+      count: canonicalMetrics.relationships,
+      detail: "Canonical relationships",
       tone: "amber",
     },
     {
       title: "Payout Accountability",
-      description: "Review eligible, approved, paid, declined, and manual payout records.",
+      description:
+        "Review eligible, approved, paid, declined, and manual payout records.",
       href: adminRoutes.payouts,
       icon: HandCoins,
-      count: metrics.pendingPayouts,
-      detail: "Payouts needing review",
+      count: canonicalMetrics.rewardReview,
+      detail: "Rewards needing review",
       tone: "rose",
     },
   ];
@@ -510,16 +770,31 @@ async function getReferralData(
     allCodes,
     activities,
     metrics,
+    canonicalCodes,
+    allCanonicalCodes,
+    relationships,
+    events,
+    audits,
+    canonicalMetrics,
     programCards,
-    filters: {
-      q,
-      program,
-      status,
-      payout,
-    },
+    filters: { q, program, status, payout },
     warnings: [
       codesResult.error ? `referral_codes: ${codesResult.error.message}` : "",
-      activityResult.error ? `referral_activity: ${activityResult.error.message}` : "",
+      activityResult.error
+        ? `referral_activity: ${activityResult.error.message}`
+        : "",
+      canonicalCodesResult.error
+        ? `pawperks_account_referral_codes: ${canonicalCodesResult.error.message}`
+        : "",
+      relationshipsResult.error
+        ? `admin_referral_tracking: ${relationshipsResult.error.message}`
+        : "",
+      eventsResult.error
+        ? `pawperks_referral_events: ${eventsResult.error.message}`
+        : "",
+      auditResult.error
+        ? `pawperks_referral_audit_log: ${auditResult.error.message}`
+        : "",
     ].filter(Boolean),
   };
 }
@@ -856,9 +1131,10 @@ export default async function AdminReferralCommandCenter({
             </div>
 
             <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-              Generate, issue, update, archive, and track referral codes across
-              Gurus, Pet Parents, Ambassadors, Partners, PetPerks legacy records,
-              campaigns, events, signups, bookings, and payout accountability.
+              Generate and manage existing codes while monitoring the new
+              universal referral registry, tracked links, QR scans, canonical
+              signup relationships, account progress, rewards, and Admin audit
+              history across every SitGuru role and campaign.
             </p>
           </div>
 
@@ -910,6 +1186,46 @@ export default async function AdminReferralCommandCenter({
           label="Payout Review"
           value={number(data.metrics.pendingPayouts)}
         />
+      </section>
+
+      <section className="rounded-[28px] border border-emerald-200 bg-gradient-to-br from-emerald-950 via-green-950 to-slate-950 p-4 text-white shadow-lg sm:p-6">
+        <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
+          <div>
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="h-7 w-7 text-emerald-300" />
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-300">
+                  Universal Referral Tracking
+                </p>
+                <h2 className="mt-1 text-2xl font-black sm:text-3xl">
+                  Canonical code, link, QR, signup, and reward accountability
+                </h2>
+              </div>
+            </div>
+            <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-emerald-50/85">
+              These totals come from the universal referral registry, canonical
+              relationships, and append-only event stream. Visits and scans do
+              not create rewards by themselves.
+            </p>
+          </div>
+
+          <span className="inline-flex w-fit items-center rounded-full bg-white/10 px-4 py-2 text-xs font-black text-emerald-100 ring-1 ring-white/15">
+            {number(data.canonicalMetrics.relationships)} durable relationships
+          </span>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <CanonicalMetricTile label="Canonical Codes" value={number(data.canonicalMetrics.totalCodes)} icon={<QrCode size={18} />} />
+          <CanonicalMetricTile label="Link Visits" value={number(data.canonicalMetrics.linkVisits)} icon={<MousePointerClick size={18} />} />
+          <CanonicalMetricTile label="QR Scans" value={number(data.canonicalMetrics.qrScans)} icon={<ScanLine size={18} />} />
+          <CanonicalMetricTile label="Signup Captures" value={number(data.canonicalMetrics.signupCaptures)} icon={<UserPlus size={18} />} />
+          <CanonicalMetricTile label="Qualified" value={number(data.canonicalMetrics.qualified)} icon={<CheckCircle2 size={18} />} />
+          <CanonicalMetricTile label="First Bookings" value={number(data.canonicalMetrics.completedBookings)} icon={<ReceiptText size={18} />} />
+          <CanonicalMetricTile label="Reward Review" value={number(data.canonicalMetrics.rewardReview)} icon={<BadgeDollarSign size={18} />} />
+          <CanonicalMetricTile label="Paid + Reference" value={number(data.canonicalMetrics.paidRewards)} icon={<HandCoins size={18} />} />
+          <CanonicalMetricTile label="Active Codes" value={number(data.canonicalMetrics.activeCodes)} icon={<Sparkles size={18} />} />
+          <CanonicalMetricTile label="Audit Entries" value={number(data.audits.length)} icon={<ClipboardList size={18} />} />
+        </div>
       </section>
 
       <section className="grid w-full min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-6">
@@ -1103,12 +1419,56 @@ export default async function AdminReferralCommandCenter({
       <DashboardCard>
         <div className="mb-5 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
           <div>
-            <h2 className="text-xl font-black text-slate-950">
-              Referral Code Registry
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+              Universal Relationships
+            </p>
+            <h2 className="mt-1 text-xl font-black text-slate-950">
+              Referrer to referred-member tracking
             </h2>
             <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-              Search and filter all absorbed and admin-generated codes. Codes are
-              preserved; archive or void real records instead of deleting.
+              One durable first-touch relationship per referred SitGuru account,
+              including source, platform, stage, qualification, booking, and reward review.
+            </p>
+          </div>
+          <span className="rounded-full bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800 ring-1 ring-emerald-100">
+            {number(data.relationships.length)} relationships
+          </span>
+        </div>
+
+        <CanonicalRelationshipList relationships={data.relationships.slice(0, 100)} />
+      </DashboardCard>
+
+      <DashboardCard>
+        <div className="mb-5 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+              Universal Code Registry
+            </p>
+            <h2 className="mt-1 text-xl font-black text-slate-950">
+              Every canonical referral code
+            </h2>
+            <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+              Pet Parent, Guru, Ambassador, partner, campaign, profile, and legacy codes
+              absorbed into one durable registry.
+            </p>
+          </div>
+          <span className="rounded-full bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800 ring-1 ring-emerald-100">
+            {number(data.canonicalCodes.length)} matching codes
+          </span>
+        </div>
+
+        <CanonicalCodeRegistry codes={data.canonicalCodes.slice(0, 250)} />
+      </DashboardCard>
+
+      <DashboardCard>
+        <div className="mb-5 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+          <div>
+            <h2 className="text-xl font-black text-slate-950">
+              Editable Referral Code Registry
+            </h2>
+            <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+              Manage the existing referral_codes records that synchronize into the
+              universal registry. Archive or void real records instead of deleting.
             </p>
           </div>
 
@@ -1268,6 +1628,46 @@ export default async function AdminReferralCommandCenter({
       <section className="grid w-full min-w-0 gap-4 xl:grid-cols-12">
         <div className="xl:col-span-7">
           <DashboardCard>
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                  Canonical Event Stream
+                </p>
+                <h2 className="mt-1 text-xl font-black text-slate-950">
+                  Links, QR scans, signups, and lifecycle events
+                </h2>
+                <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                  Append-only activity from tracked routes, signup provisioning,
+                  verification, activation, booking, and approved reward processes.
+                </p>
+              </div>
+              <Activity className="h-6 w-6 shrink-0 text-emerald-700" />
+            </div>
+            <CanonicalEventFeed events={data.events.slice(0, 25)} />
+          </DashboardCard>
+        </div>
+
+        <div className="xl:col-span-5">
+          <DashboardCard>
+            <div className="mb-5">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                Admin Audit
+              </p>
+              <h2 className="mt-1 text-xl font-black text-slate-950">
+                Referral relationship history
+              </h2>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                Database audit entries for relationship inserts, updates, and deletes.
+              </p>
+            </div>
+            <ReferralAuditFeed audits={data.audits.slice(0, 20)} />
+          </DashboardCard>
+        </div>
+      </section>
+
+      <section className="grid w-full min-w-0 gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-7">
+          <DashboardCard>
             <div className="mb-5">
               <h2 className="text-xl font-black text-slate-950">
                 Recent Referral Activity
@@ -1330,16 +1730,16 @@ export default async function AdminReferralCommandCenter({
 
             <div className="grid gap-3">
               <CapturePoint
-                title="Guru Signup"
-                detail="/become-a-guru?ref=CODE and Guru signup code field."
+                title="Universal Signup Input"
+                detail="/signup accepts one optional referral code for Pet Parents, Gurus, Ambassadors, partners, and campaigns."
               />
               <CapturePoint
-                title="Pet Parent Signup"
-                detail="/signup?ref=CODE and Referral / PetPerks code field."
+                title="Tracked Web and QR Routes"
+                detail="/r/CODE/pet-parent, /r/CODE/guru, and /r/social/CODE/PLATFORM capture visits or scans before signup."
               />
               <CapturePoint
-                title="Ambassador Signup"
-                detail="/ambassador/signup?ref=CODE and ambassador outreach links."
+                title="Web App and Mobile App"
+                detail="URL parameters, cookies, local storage, OAuth callbacks, and provisioning preserve the same referral attribution."
               />
               <CapturePoint
                 title="Guru Leads"
@@ -1358,6 +1758,332 @@ export default async function AdminReferralCommandCenter({
         </div>
       </section>
     </main>
+  );
+}
+
+function CanonicalMetricTile({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-200 sm:text-xs">
+            {label}
+          </p>
+          <p className="mt-2 text-2xl font-black text-white">{value}</p>
+        </div>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-200 ring-1 ring-white/10">
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CanonicalRelationshipList({
+  relationships,
+}: {
+  relationships: CanonicalRelationship[];
+}) {
+  if (!relationships.length) {
+    return (
+      <EmptyState
+        title="No universal referral relationships yet"
+        detail="A durable relationship appears after a valid referral code is attached to a newly provisioned SitGuru account."
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      {relationships.map((relationship) => (
+        <article
+          key={relationship.id}
+          className="rounded-2xl border border-[#e3ece5] bg-[#fbfcf9] p-4"
+        >
+          <div className="grid gap-4 xl:grid-cols-[1.1fr_1.1fr_0.8fr_0.8fr] xl:items-start">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                Referrer
+              </p>
+              <p className="mt-1 font-black text-green-950">
+                {relationshipReferrerLabel(relationship)}
+              </p>
+              <p className="mt-1 text-xs font-bold text-slate-500">
+                {titleCase(
+                  relationship.referrer_role ||
+                    relationship.code_owner_primary_role ||
+                    relationship.code_owner_type,
+                )}
+              </p>
+              <p className="mt-2 break-all text-xs font-black text-emerald-700">
+                Code: {relationship.referral_code || "—"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                Referred Member
+              </p>
+              <p className="mt-1 font-black text-slate-950">
+                {relationshipReferredLabel(relationship)}
+              </p>
+              <p className="mt-1 text-xs font-bold text-slate-500">
+                {titleCase(relationship.referred_role)}
+              </p>
+              <p className="mt-2 text-xs font-bold text-slate-500">
+                Signed up {formatDateTime(relationship.signup_at)}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                Attribution
+              </p>
+              <p className="mt-1 text-sm font-black text-slate-800">
+                {relationship.source || "Unknown source"}
+              </p>
+              <p className="mt-1 text-xs font-bold text-slate-500">
+                {[relationship.platform, relationship.medium, relationship.campaign]
+                  .filter(Boolean)
+                  .join(" • ") || "No platform or campaign"}
+              </p>
+              <p className="mt-2 text-xs font-black text-emerald-700">
+                {number(relationship.tracked_link_visits)} links •{" "}
+                {number(relationship.tracked_qr_scans)} QR
+              </p>
+            </div>
+
+            <div className="xl:text-right">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                Progress
+              </p>
+              <div className="mt-1 flex flex-wrap gap-2 xl:justify-end">
+                <StatusBadge value={relationship.status || "pending"} />
+                <PayoutBadge value={relationship.reward_status || "not_evaluated"} />
+              </div>
+              <p className="mt-2 text-xs font-black text-slate-600">
+                Stage: {titleCase(relationship.referral_stage)}
+              </p>
+              <p className="mt-1 text-xs font-bold text-slate-500">
+                {relationship.first_booking_at
+                  ? `First booking ${formatDate(relationship.first_booking_at)}`
+                  : relationship.qualified_at
+                    ? `Qualified ${formatDate(relationship.qualified_at)}`
+                    : relationship.activated_at
+                      ? `Activated ${formatDate(relationship.activated_at)}`
+                      : "Awaiting next verified stage"}
+              </p>
+              {relationship.reward_status === "paid" ? (
+                <p className="mt-2 text-xs font-black text-green-700">
+                  {relationship.reward_payment_reference
+                    ? "Paid with payment reference"
+                    : "Paid status needs reference review"}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function CanonicalCodeRegistry({
+  codes,
+}: {
+  codes: CanonicalReferralCode[];
+}) {
+  if (!codes.length) {
+    return (
+      <EmptyState
+        title="No canonical referral codes match"
+        detail="Clear the search filters or create a referral code in the editable registry."
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {codes.map((code) => (
+        <article
+          key={code.id}
+          className="rounded-2xl border border-[#e3ece5] bg-[#fbfcf9] p-4"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="break-all text-lg font-black text-green-950">
+                {canonicalCodeLabel(code)}
+              </p>
+              <p className="mt-1 truncate text-sm font-black text-slate-800">
+                {canonicalOwnerLabel(code)}
+              </p>
+            </div>
+            <StatusBadge value={code.status || "active"} />
+          </div>
+
+          <div className="mt-4 grid gap-2">
+            <MobileMeta
+              label="Owner Type"
+              value={titleCase(code.primary_role || code.owner_type)}
+            />
+            <MobileMeta
+              label="Program"
+              value={titleCase(
+                code.program_context || code.program_type || code.campaign_type,
+              )}
+            />
+            <MobileMeta
+              label="Source"
+              value={titleCase(code.legacy_source_table)}
+            />
+            <MobileMeta label="Created" value={formatDate(code.created_at)} />
+          </div>
+
+          <a
+            href={`/signup?ref=${encodeURIComponent(canonicalCodeLabel(code))}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-4 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-2 text-xs font-black text-green-800 transition hover:bg-green-50"
+          >
+            Open General Referral Link
+            <ExternalLink size={13} />
+          </a>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function CanonicalEventFeed({ events }: { events: CanonicalEvent[] }) {
+  if (!events.length) {
+    return (
+      <EmptyState
+        title="No canonical referral events yet"
+        detail="Tracked link visits, QR scans, signup captures, and lifecycle events will appear here."
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      {events.map((event) => {
+        const isQr = event.event_type === "qr_scan";
+        const isLink = event.event_type === "link_visit";
+
+        return (
+          <article
+            key={event.id}
+            className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4"
+          >
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                  {isQr ? (
+                    <ScanLine size={18} />
+                  ) : isLink ? (
+                    <MousePointerClick size={18} />
+                  ) : (
+                    <Activity size={18} />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-black text-green-950">
+                    {titleCase(event.event_type)}
+                  </p>
+                  <p className="mt-1 break-all text-xs font-black text-emerald-700">
+                    {event.submitted_code || "No submitted code"}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-slate-700">
+                    {event.referred_name ||
+                      event.referred_email ||
+                      titleCase(event.referred_role_at_signup)}
+                  </p>
+                  <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+                    {[event.source, event.platform, event.medium, event.campaign]
+                      .filter(Boolean)
+                      .join(" • ") || "No source details"}
+                  </p>
+                  {event.landing_page ? (
+                    <p className="mt-1 break-all text-xs font-semibold text-slate-500">
+                      {event.landing_page}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="shrink-0 sm:text-right">
+                <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
+                  {titleCase(event.conversion_stage || event.conversion_status)}
+                </span>
+                <p className="mt-2 text-xs font-bold text-slate-500">
+                  {formatDateTime(event.occurred_at || event.created_at)}
+                </p>
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReferralAuditFeed({ audits }: { audits: ReferralAuditRow[] }) {
+  if (!audits.length) {
+    return (
+      <EmptyState
+        title="No audit entries yet"
+        detail="Relationship insert, update, and delete history will appear here."
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      {audits.map((audit) => (
+        <details
+          key={audit.id}
+          className="group rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4"
+        >
+          <summary className="cursor-pointer list-none">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-black text-green-950">
+                  {titleCase(audit.operation)}
+                </p>
+                <p className="mt-1 text-xs font-bold text-slate-500">
+                  {titleCase(audit.actor_source)}
+                </p>
+              </div>
+              <p className="shrink-0 text-xs font-bold text-slate-500">
+                {formatDateTime(audit.created_at)}
+              </p>
+            </div>
+          </summary>
+
+          <div className="mt-3 rounded-xl bg-white p-3 text-xs font-semibold leading-5 text-slate-600 ring-1 ring-slate-100">
+            <p className="break-all">
+              Relationship: {audit.relationship_id || "—"}
+            </p>
+            <p className="mt-2 break-all">
+              New: {safeJsonPreview(audit.new_record)}
+            </p>
+            {audit.old_record ? (
+              <p className="mt-2 break-all">
+                Previous: {safeJsonPreview(audit.old_record)}
+              </p>
+            ) : null}
+          </div>
+        </details>
+      ))}
+    </div>
   );
 }
 

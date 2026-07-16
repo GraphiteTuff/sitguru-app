@@ -8,9 +8,11 @@ import {
   BookOpenCheck,
   ClipboardCheck,
   DollarSign,
+  ExternalLink,
   GraduationCap,
   FileText,
   KeyRound,
+  LayoutDashboard,
   LogOut,
   MessageCircle,
   PawPrint,
@@ -21,6 +23,7 @@ import {
   Sparkles,
   UserRound,
   Users,
+  WalletCards,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -28,6 +31,15 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 type AnyRow = Record<string, unknown>;
+
+type SocialPlatformKey =
+  | "facebook"
+  | "instagram"
+  | "tiktok"
+  | "x"
+  | "youtube";
+
+type SocialPlatformStats = Record<SocialPlatformKey, number>;
 
 type AmbassadorRecord = {
   id: string;
@@ -86,6 +98,8 @@ type ReferralStats = {
   guruSignups: number;
   businessSignups: number;
   completedBookings: number;
+  socialSignups: number;
+  socialPlatforms: SocialPlatformStats;
   pendingRewards: number;
   approvedRewards: number;
   readyRewards: number;
@@ -371,6 +385,98 @@ function getSiteUrl() {
   return `https://${configuredUrl.replace(/\/+$/, "")}`;
 }
 
+const SOCIAL_PLATFORMS: Array<{
+  key: SocialPlatformKey;
+  label: string;
+  handle: string;
+  destination: string;
+}> = [
+  {
+    key: "facebook",
+    label: "Facebook",
+    handle: "@SitGuruOfficial",
+    destination: "https://www.facebook.com/SitGuruOfficial",
+  },
+  {
+    key: "instagram",
+    label: "Instagram",
+    handle: "@SitGuruOfficial",
+    destination: "https://www.instagram.com/SitGuruOfficial",
+  },
+  {
+    key: "tiktok",
+    label: "TikTok",
+    handle: "@SitGuruOfficial",
+    destination: "https://www.tiktok.com/@SitGuruOfficial",
+  },
+  {
+    key: "x",
+    label: "X",
+    handle: "@SitGuruOfficial",
+    destination: "https://x.com/SitGuruOfficial",
+  },
+  {
+    key: "youtube",
+    label: "YouTube",
+    handle: "@SitGuruOfficial",
+    destination: "https://www.youtube.com/@SitGuruOfficial",
+  },
+];
+
+function getShortReferralPath({
+  referralCode,
+  type,
+}: {
+  referralCode: string;
+  type: "pet-parent" | "guru";
+}) {
+  return `/r/${encodeURIComponent(referralCode)}/${type}`;
+}
+
+function getShortSocialPath({
+  referralCode,
+  platform,
+}: {
+  referralCode: string;
+  platform: SocialPlatformKey;
+}) {
+  return `/r/social/${encodeURIComponent(referralCode)}/${platform}`;
+}
+
+function getCompactDisplayUrl(path: string) {
+  return `sitguru.com${path}`;
+}
+
+function getQrImageUrl(path: string) {
+  const destination = `${getSiteUrl()}${path}`;
+
+  return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(
+    destination,
+  )}`;
+}
+
+function getReferralSocialPlatform(row: AnyRow): SocialPlatformKey | null {
+  const directPlatform = asString(row.platform).toLowerCase();
+  const source = asString(row.source).toLowerCase();
+  const medium = asString(row.medium).toLowerCase();
+  const campaign = asString(row.campaign).toLowerCase();
+  const combined = `${directPlatform} ${source} ${medium} ${campaign}`;
+
+  if (combined.includes("facebook")) return "facebook";
+  if (combined.includes("instagram")) return "instagram";
+  if (combined.includes("tiktok")) return "tiktok";
+  if (
+    directPlatform === "x" ||
+    combined.includes("twitter") ||
+    combined.includes("x.com")
+  ) {
+    return "x";
+  }
+  if (combined.includes("youtube")) return "youtube";
+
+  return null;
+}
+
 function normalizeUrl(value: string, fallbackPath: string) {
   const siteUrl = getSiteUrl();
   const cleanValue = value.trim();
@@ -538,6 +644,14 @@ async function getLegacyReferralStats(
     guruSignups,
     businessSignups: 0,
     completedBookings,
+    socialSignups: 0,
+    socialPlatforms: {
+      facebook: 0,
+      instagram: 0,
+      tiktok: 0,
+      x: 0,
+      youtube: 0,
+    },
     pendingRewards: 0,
     approvedRewards: 0,
     readyRewards: 0,
@@ -552,7 +666,7 @@ async function getCanonicalReferralStats(
     const [referralResult, rewardResult] = await Promise.all([
       supabaseAdmin
         .from("ambassador_referrals")
-        .select("id, referral_type, status, booking_status")
+        .select("id, referral_type, status, booking_status, source, medium, campaign, platform")
         .eq("ambassador_id", ambassadorId)
         .limit(5000),
       supabaseAdmin
@@ -568,6 +682,23 @@ async function getCanonicalReferralStats(
 
     const referrals = (referralResult.data || []) as AnyRow[];
     const rewards = (rewardResult.data || []) as AnyRow[];
+    const socialPlatforms: SocialPlatformStats = {
+      facebook: 0,
+      instagram: 0,
+      tiktok: 0,
+      x: 0,
+      youtube: 0,
+    };
+
+    referrals.forEach((row) => {
+      const platform = getReferralSocialPlatform(row);
+      if (platform) socialPlatforms[platform] += 1;
+    });
+
+    const socialSignups = Object.values(socialPlatforms).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
 
     const rewardSum = (statuses: string[]) =>
       rewards
@@ -594,6 +725,8 @@ async function getCanonicalReferralStats(
           asString(row.booking_status).toLowerCase(),
         ),
       ).length,
+      socialSignups,
+      socialPlatforms,
       pendingRewards: rewardSum(["pending", "pending_review"]),
       approvedRewards: rewardSum(["approved"]),
       readyRewards: rewardSum(["ready_for_payout"]),
@@ -893,6 +1026,14 @@ export default async function AmbassadorDashboardPage() {
     referralCode,
     type: "guru",
   });
+  const petParentShortPath = getShortReferralPath({
+    referralCode,
+    type: "pet-parent",
+  });
+  const guruShortPath = getShortReferralPath({
+    referralCode,
+    type: "guru",
+  });
   const ambassadorPromoVideoUrl = getEmbeddableVideoUrl(
     process.env.NEXT_PUBLIC_AMBASSADOR_PROMO_VIDEO_URL ||
       process.env.NEXT_PUBLIC_AMBASSADOR_MOTIVATION_VIDEO_URL ||
@@ -922,20 +1063,47 @@ export default async function AmbassadorDashboardPage() {
         ? "View Submitted Packet"
         : "Complete Onboarding";
 
+  const verifiedReferralTotal =
+    stats.petParentSignups +
+    stats.guruSignups +
+    stats.businessSignups;
+  const approvedAndReady =
+    stats.approvedRewards + stats.readyRewards;
+  const socialMilestones = [
+    {
+      verified: 25,
+      reward: 25,
+      reached: stats.socialSignups >= 25,
+    },
+    {
+      verified: 50,
+      reward: 100,
+      reached: stats.socialSignups >= 50,
+    },
+    {
+      verified: 150,
+      reward: 200,
+      reached: stats.socialSignups >= 150,
+    },
+  ];
+  const nextSocialMilestone =
+    socialMilestones.find((milestone) => !milestone.reached) ||
+    socialMilestones[socialMilestones.length - 1];
+
   return (
-    <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-6 sm:py-8 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-4 sm:space-y-6">
-        <section className="overflow-hidden rounded-[28px] border border-green-100 bg-white shadow-sm sm:rounded-[34px]">
-          <div className="grid gap-0 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-            <div className="bg-[radial-gradient(circle_at_95%_10%,rgba(16,185,129,0.16),transparent_28%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_100%)] p-5 sm:p-7">
+    <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-5 lg:px-6">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="overflow-hidden rounded-[28px] border border-green-100 bg-white shadow-sm">
+          <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+            <div className="bg-[radial-gradient(circle_at_95%_10%,rgba(16,185,129,0.16),transparent_28%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_100%)] p-5 sm:p-6">
               <div className="flex min-w-0 items-start gap-4">
-                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-green-100 text-xl font-black text-green-900 ring-1 ring-green-200 sm:h-20 sm:w-20">
+                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-green-100 text-xl font-black text-green-900 ring-1 ring-green-200">
                   {ambassadorAvatarUrl ? (
                     <Image
                       src={ambassadorAvatarUrl}
                       alt={`${fullName} profile photo`}
                       fill
-                      sizes="96px"
+                      sizes="80px"
                       className="object-cover"
                       unoptimized
                     />
@@ -944,911 +1112,815 @@ export default async function AmbassadorDashboardPage() {
                   )}
                 </div>
 
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-700 sm:text-xs">
-                    SitGuru Ambassador Dashboard
+                    SitGuru Ambassador Command Center
                   </p>
-                  <h1 className="mt-1 text-3xl font-black tracking-tight text-green-950 sm:text-5xl">
+                  <h1 className="mt-1 text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
                     Hi, {firstName}
                   </h1>
-                  <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-                    Your command center for referral links, Ambassador
-                    onboarding, training, rewards, and SitGuru support.
+                  <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+                    Event-ready referral, social, commission, training, payout,
+                    and support tools in one compact dashboard.
                   </p>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     <Pill>{asString(ambassadorRecord.status) || "active"}</Pill>
-                    <Pill>
-                      {asString(ambassadorRecord.referral_status) ||
-                        "Referral Code Active"}
-                    </Pill>
                     <Pill>{onboardingPacket.label}</Pill>
+                    <Pill>{trainingProgress.label}</Pill>
                   </div>
 
-                  <div className="mt-4 rounded-3xl border border-green-200 bg-white/90 p-4 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-green-700">
-                      Ambassador Referral Code
-                    </p>
-                    <p className="mt-1 break-all text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-                      {referralCode}
-                    </p>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                      Share this code with every Pet Parent, future Guru, local
-                      partner, or social media referral so SitGuru can track
-                      activity back to you.
+                  <div className="mt-4 flex flex-col gap-2 rounded-2xl border border-green-200 bg-white/90 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-green-700">
+                        Ambassador Code
+                      </p>
+                      <p className="mt-1 break-all text-3xl font-black tracking-tight text-green-950">
+                        {referralCode}
+                      </p>
+                    </div>
+                    <p className="max-w-xl text-xs font-bold leading-5 text-slate-600">
+                      Use this code on every referral, social post, QR flyer,
+                      vendor table, and local outreach conversation.
                     </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-green-100 bg-white p-5 sm:p-7 lg:border-l lg:border-t-0">
-              <div className="grid gap-3">
-                <DashboardSwitcherPanel
-                  access={dashboardAccess}
-                  current="ambassador"
-                />
+            <div className="border-t border-green-100 bg-white p-5 lg:border-l lg:border-t-0">
+              <DashboardSwitcherPanel
+                access={dashboardAccess}
+                current="ambassador"
+              />
 
-                <Link
-                  href={onboardingPacket.href}
-                  className="flex min-h-14 items-center justify-between rounded-2xl bg-green-800 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-                >
-                  {onboardingCtaLabel}
-                  <ArrowRight size={17} />
-                </Link>
-
-                <Link
-                  href="/ambassador/dashboard/messages?support=admin&role=ambassador"
-                  className="flex min-h-14 items-center justify-between rounded-2xl border border-green-200 bg-white px-5 py-4 text-sm font-black text-green-900 transition hover:bg-green-50"
-                >
-                  Message Center
-                  <ArrowRight size={17} />
-                </Link>
-
-                <Link
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <QuickActionLink
                   href="/ambassador/dashboard/social"
-                  className="flex min-h-14 items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-black text-emerald-900 transition hover:bg-emerald-100"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Share2 size={17} />
-                    Social Center
-                  </span>
-                  <ArrowRight size={17} />
-                </Link>
-
-                <form action={signOutAction}>
-                  <button
-                    type="submit"
-                    className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-100"
-                  >
-                    <LogOut size={17} />
-                    Sign Out
-                  </button>
-                </form>
+                  icon={<Share2 size={17} />}
+                  label="Social"
+                />
+                <QuickActionLink
+                  href="/ambassador/dashboard/commissions"
+                  icon={<WalletCards size={17} />}
+                  label="Commissions"
+                />
+                <QuickActionLink
+                  href="/ambassador/dashboard/referrals"
+                  icon={<Users size={17} />}
+                  label="Referrals"
+                />
+                <QuickActionLink
+                  href="/ambassador/dashboard/payouts"
+                  icon={<DollarSign size={17} />}
+                  label="Payouts"
+                />
+                <QuickActionLink
+                  href="/ambassador/dashboard/training"
+                  icon={<GraduationCap size={17} />}
+                  label="Training"
+                />
+                <QuickActionLink
+                  href="/ambassador/dashboard/messages?support=admin&role=ambassador"
+                  icon={<MessageCircle size={17} />}
+                  label="Messages"
+                />
               </div>
+
+              <form action={signOutAction} className="mt-3">
+                <button
+                  type="submit"
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black text-slate-800 transition hover:bg-slate-100"
+                >
+                  <LogOut size={16} />
+                  Sign Out
+                </button>
+              </form>
             </div>
           </div>
         </section>
 
-        <AmbassadorProgressPanel
-          onboardingPacket={onboardingPacket}
-          trainingProgress={trainingProgress}
-          referralCode={referralCode}
-          stats={stats}
-        />
-
-        <section>
-          <DashboardCard>
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-              <SectionHeader
-                icon={<Share2 size={22} />}
-                title="Ambassador Social Center"
-                detail="Open your official @SitGuruOfficial channels, use platform-specific tracked signup links and QR codes, and monitor canonical Facebook, Instagram, TikTok, X, and YouTube referral activity."
-              />
-
-              <Link
-                href="/ambassador/dashboard/social"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-              >
-                Open Social Center
-                <ArrowRight size={17} />
-              </Link>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              {["Facebook", "Instagram", "TikTok", "X", "YouTube"].map(
-                (platform) => (
-                  <div
-                    key={platform}
-                    className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3"
-                  >
-                    <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
-                      {platform}
-                    </p>
-                    <p className="mt-1 text-sm font-black text-green-950">
-                      @SitGuruOfficial
-                    </p>
-                  </div>
-                ),
-              )}
-            </div>
-
-            <p className="mt-4 text-xs font-bold leading-5 text-slate-600">
-              Social signup milestones remain separate from approved and paid
-              rewards. SitGuru creates and reviews canonical reward records
-              before social activity becomes confirmed earnings.
-            </p>
-          </DashboardCard>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.75fr)]">
-          <DashboardCard>
-            <SectionHeader
-              icon={<MessageCircle size={22} />}
-              title="Ambassador Message Center"
-              detail="Use SitGuru messages instead of email when you need Admin help, referral tracking support, payout questions, event support, or quick follow-up."
-            />
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Link
-                href="/ambassador/dashboard/messages?role=ambassador"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-              >
-                Open Message Center
-                <ArrowRight size={17} />
-              </Link>
-              <Link
-                href="/ambassador/dashboard/messages?support=admin&role=ambassador"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-              >
-                Message SitGuru Admin
-                <ArrowRight size={17} />
-              </Link>
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<ShieldCheck size={22} />}
-              title="Connected Support"
-              detail="Messages stay in SitGuru so Admin and Ambassadors can keep referral, reward, and outreach conversations in one place."
-            />
-          </DashboardCard>
-        </section>
-
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           <StatCard
-            icon={<PawPrint size={20} />}
+            icon={<PawPrint size={19} />}
             label="Pet Parents"
             value={String(stats.petParentSignups)}
-            detail="Referred signups"
+            detail="Verified signups"
           />
           <StatCard
-            icon={<Users size={20} />}
+            icon={<Users size={19} />}
             label="Gurus"
             value={String(stats.guruSignups)}
-            detail="Referred applicants"
+            detail="Verified applicants"
           />
           <StatCard
-            icon={<ClipboardCheck size={20} />}
+            icon={<Share2 size={19} />}
+            label="Social"
+            value={String(stats.socialSignups)}
+            detail={`Next: ${nextSocialMilestone.verified}`}
+          />
+          <StatCard
+            icon={<ClipboardCheck size={19} />}
             label="Bookings"
             value={String(stats.completedBookings)}
             detail="Completed referrals"
           />
           <StatCard
-            icon={<DollarSign size={20} />}
-            label="Pending"
-            value={money(stats.pendingRewards)}
-            detail="Awaiting approval"
-          />
-          <StatCard
-            icon={<BadgeCheck size={20} />}
+            icon={<BadgeCheck size={19} />}
             label="Approved"
-            value={money(stats.approvedRewards + stats.readyRewards)}
+            value={money(approvedAndReady)}
             detail="Approved / ready"
           />
           <StatCard
-            icon={<DollarSign size={20} />}
+            icon={<DollarSign size={19} />}
             label="Paid"
             value={money(stats.paidRewards)}
-            detail="Already paid"
+            detail="Paid to date"
           />
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-[28px] border border-green-100 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <SectionHeader
+              icon={<LayoutDashboard size={22} />}
+              title="Event Mode Toolkit"
+              detail="Short referral links, scannable QR codes, official social channels, and live milestone progress for phones and tablets."
+            />
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/ambassador/dashboard/social"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-green-50 px-4 py-2 text-sm font-black text-green-900 transition hover:bg-green-100"
+              >
+                Full Social Center
+                <ArrowRight size={16} />
+              </Link>
+              <Link
+                href="/ambassador/dashboard/referrals"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-2 text-sm font-black text-white transition hover:bg-green-900"
+              >
+                Referral Center
+                <ArrowRight size={16} />
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <CompactReferralCard
+                icon={<PawPrint size={20} />}
+                title="Pet Parent"
+                detail="Trusted pet care signup"
+                shortPath={petParentShortPath}
+                fallbackUrl={petParentUrl}
+              />
+              <CompactReferralCard
+                icon={<Users size={20} />}
+                title="Guru"
+                detail="Future Guru application"
+                shortPath={guruShortPath}
+                fallbackUrl={guruUrl}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              {SOCIAL_PLATFORMS.map((platform) => {
+                const shortPath = getShortSocialPath({
+                  referralCode,
+                  platform: platform.key,
+                });
+
+                return (
+                  <SocialPlatformCard
+                    key={platform.key}
+                    platform={platform.key}
+                    label={platform.label}
+                    handle={platform.handle}
+                    destination={platform.destination}
+                    shortPath={shortPath}
+                    verifiedCount={stats.socialPlatforms[platform.key]}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[24px] border border-green-100 bg-[#fbfcf9] p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
+                  Verified Social Signup Milestones
+                </p>
+                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                  Updated milestone schedule: 25 verified signups earns $25,
+                  50 earns $100, and 150 earns $200 after SitGuru review.
+                </p>
+              </div>
+              <span className="rounded-full bg-green-800 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-white">
+                {stats.socialSignups} verified
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {socialMilestones.map((milestone) => (
+                <MilestoneCard
+                  key={milestone.verified}
+                  verified={milestone.verified}
+                  reward={milestone.reward}
+                  current={stats.socialSignups}
+                  reached={milestone.reached}
+                />
+              ))}
+            </div>
+
+            <p className="mt-3 text-xs font-bold leading-5 text-slate-600">
+              QR scans and channel visits are outreach activity. A reward becomes
+              confirmed only after SitGuru verifies the qualifying signup and
+              creates or approves the canonical reward record.
+            </p>
+          </div>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-3">
+          <DashboardCard>
+            <SectionHeader
+              icon={<WalletCards size={22} />}
+              title="Commissions & Rewards"
+              detail="Personal pending, approved, ready-for-payout, and paid records."
+            />
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <CompactStatusItem label="Pending" value={money(stats.pendingRewards)} />
+              <CompactStatusItem label="Approved" value={money(stats.approvedRewards)} />
+              <CompactStatusItem label="Ready" value={money(stats.readyRewards)} />
+              <CompactStatusItem label="Paid" value={money(stats.paidRewards)} />
+            </div>
+            <Link
+              href="/ambassador/dashboard/commissions"
+              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-2 text-sm font-black text-white transition hover:bg-green-900"
+            >
+              Open Commissions
+              <ArrowRight size={16} />
+            </Link>
+          </DashboardCard>
+
+          <DashboardCard>
+            <SectionHeader
+              icon={<BadgeCheck size={22} />}
+              title="Referral Tracking"
+              detail="Canonical Pet Parent, Guru, business, booking, and social activity."
+            />
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <CompactStatusItem label="All referrals" value={String(verifiedReferralTotal)} />
+              <CompactStatusItem label="Businesses" value={String(stats.businessSignups)} />
+              <CompactStatusItem label="Bookings" value={String(stats.completedBookings)} />
+              <CompactStatusItem label="Social" value={String(stats.socialSignups)} />
+            </div>
+            <Link
+              href="/ambassador/dashboard/referrals"
+              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-green-200 bg-green-50 px-4 py-2 text-sm font-black text-green-900 transition hover:bg-green-100"
+            >
+              Open Referral Details
+              <ArrowRight size={16} />
+            </Link>
+          </DashboardCard>
+
           <DashboardCard>
             <SectionHeader
               icon={<DollarSign size={22} />}
               title="Payout Readiness"
-              detail="Rewards can be tracked before payout setup is complete, but payment remains protected until every required payout item is ready."
+              detail={`${payoutReadiness.completedCount}/${payoutReadiness.totalCount} requirements complete.`}
             />
-
-            <div className="mt-5 flex flex-col gap-4 rounded-[24px] border border-green-100 bg-green-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
-                  Current Status
-                </p>
-                <p className="mt-1 text-2xl font-black text-green-950">
-                  {payoutReadiness.statusLabel}
-                </p>
-                <p className="mt-1 text-sm font-bold text-slate-600">
-                  {payoutReadiness.completedCount}/{payoutReadiness.totalCount} payout requirements complete
-                </p>
-              </div>
-              <span
-                className={`inline-flex rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.12em] ${
-                  payoutReadiness.ready
-                    ? "bg-green-800 text-white"
-                    : "bg-amber-100 text-amber-900"
-                }`}
-              >
-                {payoutReadiness.ready ? "Ready" : "Setup Needed"}
-              </span>
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {payoutReadiness.items.map((item) => (
+            <div className="mt-4 grid gap-2">
+              {payoutReadiness.items.slice(0, 4).map((item) => (
                 <div
                   key={item.label}
-                  className={`rounded-2xl border p-4 ${
+                  className={`flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-black ${
                     item.complete
-                      ? "border-green-100 bg-green-50"
-                      : "border-amber-100 bg-amber-50"
+                      ? "bg-green-50 text-green-950"
+                      : "bg-amber-50 text-amber-950"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-black text-green-950">
-                      {item.label}
-                    </p>
-                    <span
-                      className={`h-3 w-3 rounded-full ${
-                        item.complete ? "bg-green-600" : "bg-amber-500"
-                      }`}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs font-bold leading-5 text-slate-600">
-                    {item.detail}
-                  </p>
+                  <span>{item.label}</span>
+                  <span
+                    className={`h-3 w-3 rounded-full ${
+                      item.complete ? "bg-green-600" : "bg-amber-500"
+                    }`}
+                  />
                 </div>
               ))}
             </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<BadgeCheck size={22} />}
-              title="Verified Referral Tracking"
-              detail="This dashboard now reads the same Ambassador referral and reward records used by SitGuru Admin."
-            />
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
-                  Pet Parents
-                </p>
-                <p className="mt-1 text-3xl font-black text-green-950">
-                  {stats.petParentSignups}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
-                  Gurus
-                </p>
-                <p className="mt-1 text-3xl font-black text-green-950">
-                  {stats.guruSignups}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
-                  Businesses
-                </p>
-                <p className="mt-1 text-3xl font-black text-green-950">
-                  {stats.businessSignups}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
-                  Completed Bookings
-                </p>
-                <p className="mt-1 text-3xl font-black text-green-950">
-                  {stats.completedBookings}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-green-100 bg-white p-4 text-sm font-bold leading-6 text-slate-600">
-              Referral code <span className="font-black text-green-950">{referralCode}</span> is carried through signup source, program, platform, and UTM tracking on both referral links.
-            </div>
-          </DashboardCard>
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)]">
-          <DashboardCard>
-            <SectionHeader
-              icon={<DollarSign size={22} />}
-              title="Verified Reward Activity"
-              detail="Ambassadors should always know how verified rewards may be earned and what SitGuru reviews before approval."
-            />
-
-            <div className="mt-5 grid gap-3">
-              <RewardStructureRow
-                label="Pending review"
-                value={money(stats.pendingRewards)}
-                detail="Tracked rewards waiting for SitGuru review."
-              />
-              <RewardStructureRow
-                label="Approved"
-                value={money(stats.approvedRewards)}
-                detail="Approved rewards that have not moved to payout yet."
-              />
-              <RewardStructureRow
-                label="Ready for payout"
-                value={money(stats.readyRewards)}
-                detail="Approved rewards currently queued for payout."
-              />
-              <RewardStructureRow
-                label="Paid"
-                value={money(stats.paidRewards)}
-                detail="Rewards already recorded as paid."
-              />
-            </div>
-
-            <div className="mt-5 rounded-[24px] border border-green-200 bg-gradient-to-br from-green-50 via-white to-emerald-50 p-4 sm:p-5">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-green-700">
-                    Live verified activity
-                  </p>
-                  <h3 className="mt-1 text-xl font-black text-green-950">
-                    Rewards shown here come from SitGuru records.
-                  </h3>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                    Referral counts and reward totals are read from the same
-                    Ambassador referral and reward records used by SitGuru
-                    Admin. No projected or guaranteed earnings are included.
-                  </p>
-                </div>
-                <span className="inline-flex shrink-0 rounded-full bg-green-800 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white">
-                  Admin Verified
-                </span>
-              </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <ProjectionExampleCard
-                  title="Tracked referrals"
-                  value={String(
-                    stats.petParentSignups +
-                      stats.guruSignups +
-                      stats.businessSignups
-                  )}
-                  detail="Pet Parent, Guru, and business referrals connected to this Ambassador record."
-                />
-                <ProjectionExampleCard
-                  title="Completed bookings"
-                  value={String(stats.completedBookings)}
-                  detail="Referral-linked bookings recorded as completed."
-                />
-                <ProjectionExampleCard
-                  title="Approved and ready"
-                  value={money(stats.approvedRewards + stats.readyRewards)}
-                  detail="Approved rewards, including amounts currently ready for payout."
-                />
-                <ProjectionExampleCard
-                  title="Paid to date"
-                  value={money(stats.paidRewards)}
-                  detail="Rewards recorded as paid in SitGuru."
-                />
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-xs font-bold leading-5 text-green-950">
-              Reward eligibility and amounts are controlled by SitGuru Admin
-              records and the approved Ambassador program terms. Fake,
-              duplicate, self-created, canceled, refunded, or unverifiable
-              activity does not qualify.
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<Users size={22} />}
-              title="SitGuru Pack Leader Program"
-              detail="An invite-only leadership path for trusted Ambassadors who want to help grow SitGuru in their service area."
-            />
-
-            <div className="mt-5 grid gap-3">
-              <ReminderItem>
-                Pack Leaders mentor direct Ambassadors and help grow verified
-                local activity.
-              </ReminderItem>
-              <ReminderItem>
-                One level only: rewards are tied to direct Ambassadors, not a
-                recruiting chain.
-              </ReminderItem>
-              <ReminderItem>
-                Pack Leader rewards are based on verified SitGuru activity and
-                SitGuru share.
-              </ReminderItem>
-              <ReminderItem>
-                Founding Pack Leaders may support a city, school, military
-                community, or service area.
-              </ReminderItem>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-950">
-              Pack Leader participation is reviewed and approved by SitGuru. No
-              earnings are guaranteed.
-            </div>
-          </DashboardCard>
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-          <DashboardCard>
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-              <div className="flex items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-                  <KeyRound size={22} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                    Ambassador Code
-                  </p>
-                  <h2 className="mt-1 break-all text-4xl font-black text-green-950">
-                    {referralCode}
-                  </h2>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                    Use this code with every Pet Parent, future Guru, partner,
-                    or local referral conversation so activity can be tracked.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-4 lg:grid-cols-2">
-              <ReferralLinkCard
-                icon={<PawPrint size={22} />}
-                title="Pet Parent Referral Link"
-                detail="Share this with Pet Parents who may need trusted pet care."
-                url={petParentUrl}
-              />
-              <ReferralLinkCard
-                icon={<Users size={22} />}
-                title="Guru Referral Link"
-                detail="Share this with people who may want to apply as a Guru."
-                url={guruUrl}
-              />
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<Sparkles size={22} />}
-              title="Today’s Focus"
-              detail="Simple next actions to keep the Ambassador workflow moving."
-            />
-
-            <div className="mt-4 grid gap-3">
-              <Link
-                href={onboardingPacket.href}
-                className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
-                  onboardingPacket.status === "complete"
-                    ? "bg-green-50 text-green-900 ring-1 ring-green-100"
-                    : onboardingPacket.status === "pending"
-                      ? "bg-amber-50 text-amber-900 ring-1 ring-amber-100"
-                      : "bg-rose-50 text-rose-900 ring-1 ring-rose-100"
-                }`}
-              >
-                {onboardingPacket.label}: {onboardingPacket.helper}
-              </Link>
-
-              <ReminderItem>
-                Share your Pet Parent link with one local pet family.
-              </ReminderItem>
-              <ReminderItem>
-                Share your Guru link with one potential sitter, walker, or pet
-                professional.
-              </ReminderItem>
-              <Link
-                href="/ambassador/dashboard/messages?support=admin&role=ambassador"
-                className="flex items-start gap-3 rounded-2xl bg-green-50 px-4 py-3 text-sm font-bold leading-6 text-green-950 transition hover:bg-green-100"
-              >
-                <MessageCircle size={17} className="mt-1 shrink-0 text-green-800" />
-                <span>
-                  Message SitGuru Admin if a referral is missing from tracking.
-                </span>
-              </Link>
-            </div>
-          </DashboardCard>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-3">
-          <DashboardCard>
-            <SectionHeader
-              icon={<BadgeCheck size={22} />}
-              title="Referral Health"
-              detail="Quick view of how your code is performing."
-            />
-            <div className="mt-4 grid gap-3">
-              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
-                {stats.petParentSignups +
-                  stats.guruSignups +
-                  stats.businessSignups} total referred signups
-              </div>
-              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
-                {stats.completedBookings} completed referral bookings
-              </div>
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<DollarSign size={22} />}
-              title="Reward Summary"
-              detail="Referral rewards are reviewed and approved by SitGuru."
-            />
-            <div className="mt-4 grid gap-3">
-              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
-                Pending: {money(stats.pendingRewards)}
-              </div>
-              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
-                Approved / ready:{" "}
-                {money(stats.approvedRewards + stats.readyRewards)}
-              </div>
-              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-950">
-                Paid: {money(stats.paidRewards)}
-              </div>
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<ShieldCheck size={22} />}
-              title="Program Rules"
-              detail="Referral-first. Commission-based. Hourly only by exception."
-            />
-            <div className="mt-4 grid gap-3">
-              <ReminderItem>
-                Do not promise guaranteed bookings or earnings.
-              </ReminderItem>
-              <ReminderItem>
-                Use approved SitGuru messaging when sharing.
-              </ReminderItem>
-              <ReminderItem>
-                Hourly work must be separately approved in writing.
-              </ReminderItem>
-            </div>
-          </DashboardCard>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-3">
-          <DashboardCard>
-            <SectionHeader
-              icon={<Sparkles size={22} />}
-              title="Today"
-              detail="Quick actions an Ambassador can do while walking, talking, or sharing from a phone."
-            />
-            <div className="mt-4 grid gap-3">
-              <ReminderItem>
-                Send your Pet Parent link to 3 local pet families.
-              </ReminderItem>
-              <ReminderItem>
-                Send your Guru link to 1 potential sitter, walker, groomer,
-                trainer, or pet professional.
-              </ReminderItem>
-              <ReminderItem>
-                Invite 5 people to follow @SitGuruOfficial.
-              </ReminderItem>
-              <Link
-                href="/ambassador/dashboard/messages?support=admin&role=ambassador"
-                className="flex items-start gap-3 rounded-2xl bg-green-50 px-4 py-3 text-sm font-bold leading-6 text-green-950 transition hover:bg-green-100"
-              >
-                <MessageCircle size={17} className="mt-1 shrink-0 text-green-800" />
-                <span>
-                  Message SitGuru Admin if a referral, flyer, or QR code support
-                  item is needed.
-                </span>
-              </Link>
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<ClipboardCheck size={22} />}
-              title="This Week"
-              detail="Weekly goals to keep local growth moving."
-            />
-            <div className="mt-4 grid gap-3">
-              <ReminderItem>
-                Post or share SitGuru in 2 approved local groups or community
-                pages.
-              </ReminderItem>
-              <ReminderItem>
-                Talk to 1 local pet business, rescue, groomer, trainer, or
-                apartment community.
-              </ReminderItem>
-              <ReminderItem>
-                Follow up with every person who asked for the link but has not
-                signed up yet.
-              </ReminderItem>
-              <ReminderItem>
-                Check your dashboard for verified signups, rewards, and next
-                milestone.
-              </ReminderItem>
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<BadgeCheck size={22} />}
-              title="This Month"
-              detail="Monthly Ambassador focus for stronger growth and better rewards."
-            />
-            <div className="mt-4 grid gap-3">
-              <ReminderItem>
-                Work toward the next verified social signup milestone.
-              </ReminderItem>
-              <ReminderItem>
-                Identify 3 new potential Gurus in your city or service area.
-              </ReminderItem>
-              <ReminderItem>
-                Ask SitGuru for updated flyers, QR codes, or event support
-                before local outreach.
-              </ReminderItem>
-              <ReminderItem>
-                Review rewards and request help if anything looks missing.
-              </ReminderItem>
-            </div>
-          </DashboardCard>
-        </section>
-
-        <section>
-          <DashboardCard>
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)] lg:items-start">
-              <div>
-                <SectionHeader
-                  icon={<MessageCircle size={22} />}
-                  title="Support Request Center"
-                  detail="Use one simple request card when you need flyers, QR codes, missing-referral help, talking points, or social media support."
-                />
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <SupportOption
-                    icon={<FileText size={18} />}
-                    title="Flyers"
-                    detail="Updated local flyers or print-ready handouts."
-                  />
-                  <SupportOption
-                    icon={<QrCode size={18} />}
-                    title="QR Codes"
-                    detail="Fresh QR codes for Pet Parent, Guru, or social outreach."
-                  />
-                  <SupportOption
-                    icon={<MessageCircle size={18} />}
-                    title="Missing Referral"
-                    detail="A signup or booking is not showing on your dashboard."
-                  />
-                  <SupportOption
-                    icon={<BookOpenCheck size={18} />}
-                    title="Talking Points"
-                    detail="Help with wording, local outreach, or social media posts."
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-[24px] border border-green-100 bg-green-50 p-4 sm:p-5">
-                <div className="mb-4 rounded-2xl bg-white px-4 py-3 text-sm font-black leading-6 text-green-950 ring-1 ring-green-100">
-                  Ambassador goal: encourage people to follow @SitGuruOfficial
-                  and sign up using your referral link or code. Verified social
-                  signups may count toward social growth bonuses after SitGuru
-                  review.
-                </div>
-
-                <Link
-                  href="/ambassador/dashboard/messages?support=admin&role=ambassador"
-                  className="mb-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-                >
-                  Open SitGuru Admin Chat
-                  <ArrowRight size={17} />
-                </Link>
-
-                <form
-                  action="mailto:support@sitguru.com"
-                  method="post"
-                  encType="text/plain"
-                  className="grid gap-3"
-                >
-                  <input
-                    type="hidden"
-                    name="Ambassador referral code"
-                    value={referralCode}
-                  />
-
-                  <label className="grid gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-[0.16em] text-green-900">
-                      What do you need?
-                    </span>
-                    <select
-                      name="Support request type"
-                      defaultValue="flyers"
-                      className="min-h-12 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-950 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
-                    >
-                      <option value="flyers">
-                        Request flyers / print-ready handouts
-                      </option>
-                      <option value="qr-codes">Request QR codes</option>
-                      <option value="missing-referral">
-                        Referral or booking is missing
-                      </option>
-                      <option value="talking-points">
-                        Need talking points or local outreach wording
-                      </option>
-                      <option value="social-media-support">
-                        Need help growing @SitGuruOfficial
-                      </option>
-                      <option value="event-support">
-                        Need event, table, or community outreach support
-                      </option>
-                      <option value="other-support">
-                        Other Ambassador support request
-                      </option>
-                    </select>
-                  </label>
-
-                  <label className="grid gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-[0.16em] text-green-900">
-                      Optional note
-                    </span>
-                    <textarea
-                      name="Support details"
-                      rows={4}
-                      placeholder="Example: I need a QR code for Pet Parent signups for a local event this weekend."
-                      className="rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-bold leading-6 text-green-950 outline-none transition placeholder:text-slate-400 focus:border-green-400 focus:ring-4 focus:ring-green-100"
-                    />
-                  </label>
-
-                  <button
-                    type="submit"
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-                  >
-                    Email SitGuru Support
-                    <ArrowRight size={17} />
-                  </button>
-
-                  <p className="text-xs font-bold leading-5 text-green-900/75">
-                    Use Admin Chat for the fastest support. The email form remains as
-                    a backup if you need to send a longer offline request.
-                  </p>
-                </form>
-              </div>
-            </div>
-          </DashboardCard>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-          <DashboardCard>
-            <SectionHeader
-              icon={<PawPrint size={22} />}
-              title="PawPerks / PetPerks Talking Points"
-              detail="Use these programs as an easy conversation starter with Pet Parents, local businesses, future Gurus, and community partners."
-            />
-
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-                <p className="text-sm font-black text-green-950">
-                  PawPerks for Pet Parents
-                </p>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Mention PawPerks when talking with Pet Parents who want
-                  trusted care, rewards, local pet resources, and reasons to
-                  keep using SitGuru.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-                <p className="text-sm font-black text-green-950">
-                  PetPerks for partners
-                </p>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Mention PetPerks when talking with groomers, trainers,
-                  rescues, vets, apartments, and local pet-friendly businesses.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3">
-              <ReminderItem>
-                Use PawPerks/PetPerks as a softer way to start the SitGuru
-                conversation.
-              </ReminderItem>
-              <ReminderItem>
-                Tell people to sign up with your Ambassador code so activity can
-                be verified.
-              </ReminderItem>
-              <ReminderItem>
-                Ask SitGuru for updated flyers or QR codes before local
-                outreach.
-              </ReminderItem>
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<PlayCircle size={22} />}
-              title="Ambassador Promo Video"
-              detail="A quick motivation video for Ambassadors before outreach, events, or social sharing."
-            />
-
-            {ambassadorPromoVideoUrl ? (
-              <div className="mt-5 overflow-hidden rounded-[24px] border border-green-100 bg-black shadow-sm">
-                {isDirectVideoFile(ambassadorPromoVideoUrl) ? (
-                  <video
-                    controls
-                    preload="metadata"
-                    playsInline
-                    className="aspect-video w-full bg-black"
-                  >
-                    <source src={ambassadorPromoVideoUrl} type="video/mp4" />
-                    Your browser does not support the SitGuru Ambassador promo
-                    video.
-                  </video>
-                ) : (
-                  <iframe
-                    src={ambassadorPromoVideoUrl}
-                    title="SitGuru Ambassador Promo Video"
-                    className="aspect-video w-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                  />
-                )}
-              </div>
-            ) : (
-              <div className="mt-5 rounded-[24px] border border-dashed border-green-200 bg-green-50 p-5 text-sm font-bold leading-6 text-green-950">
-                Add a promo video at
-                <span className="mx-1 rounded-lg bg-white px-2 py-1 font-black">
-                  public/videos/sitguru-ambassador-promo.mp4
-                </span>
-                and this card will automatically show the video here.
-              </div>
-            )}
-          </DashboardCard>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-2">
-          <DashboardCard>
-            <SectionHeader
-              icon={<GraduationCap size={22} />}
-              title="Training"
-              detail="Complete Ambassador training before moving into full active status."
-            />
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/ambassador/dashboard/training"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-              >
-                View Training
-                <ArrowRight size={17} />
-              </Link>
-              <span className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-900">
-                {trainingProgress.label}
-              </span>
-            </div>
-          </DashboardCard>
-
-          <DashboardCard>
-            <SectionHeader
-              icon={<MessageCircle size={22} />}
-              title="Message SitGuru Admin"
-              detail="Open Ambassador quick chat for referrals, rewards, partners, events, missing tracking, or local outreach support."
-            />
             <Link
-              href="/ambassador/dashboard/messages?support=admin&role=ambassador"
-              className="mt-4 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
+              href="/ambassador/dashboard/payouts"
+              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-2 text-sm font-black text-green-900 transition hover:bg-green-50"
             >
-              Message SitGuru Admin
-              <ArrowRight size={17} />
+              Review Payout Setup
+              <ArrowRight size={16} />
             </Link>
           </DashboardCard>
         </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <SetupActionCard
+            icon={<ClipboardCheck size={21} />}
+            title="Onboarding"
+            status={onboardingPacket.label}
+            detail={onboardingPacket.helper}
+            href={onboardingPacket.href}
+          />
+          <SetupActionCard
+            icon={<GraduationCap size={21} />}
+            title="Training"
+            status={trainingProgress.label}
+            detail={`${trainingProgress.completedRequired}/${trainingProgress.requiredCount} required steps complete.`}
+            href="/ambassador/dashboard/training"
+          />
+          <SetupActionCard
+            icon={<MessageCircle size={21} />}
+            title="Admin Support"
+            status="Connected"
+            detail="Referral, payout, event, flyer, and QR support."
+            href="/ambassador/dashboard/messages?support=admin&role=ambassador"
+          />
+          <SetupActionCard
+            icon={<Share2 size={21} />}
+            title="Social Center"
+            status={`${stats.socialSignups} verified`}
+            detail="Official channels, platform activity, QR codes, and milestones."
+            href="/ambassador/dashboard/social"
+          />
+        </section>
+
+        <details className="group rounded-[28px] border border-green-100 bg-white shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-green-950">
+                  More Ambassador Tools
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  Progress, program rules, support options, talking points, and
+                  the Ambassador promo video.
+                </p>
+              </div>
+            </div>
+            <ArrowRight
+              size={20}
+              className="text-green-800 transition group-open:rotate-90"
+            />
+          </summary>
+
+          <div className="grid gap-4 border-t border-green-100 p-5 lg:grid-cols-2">
+            <AmbassadorProgressPanel
+              onboardingPacket={onboardingPacket}
+              trainingProgress={trainingProgress}
+              referralCode={referralCode}
+              stats={stats}
+            />
+
+            <DashboardCard>
+              <SectionHeader
+                icon={<ShieldCheck size={22} />}
+                title="Program Rules"
+                detail="Clear expectations protect Ambassadors and the SitGuru community."
+              />
+              <div className="mt-4 grid gap-3">
+                <ReminderItem>
+                  Do not promise guaranteed bookings, rewards, or earnings.
+                </ReminderItem>
+                <ReminderItem>
+                  Use approved SitGuru messaging and tracked links.
+                </ReminderItem>
+                <ReminderItem>
+                  Fake, duplicate, canceled, refunded, self-created, or
+                  unverifiable activity does not qualify.
+                </ReminderItem>
+              </div>
+            </DashboardCard>
+
+            <DashboardCard>
+              <SectionHeader
+                icon={<MessageCircle size={22} />}
+                title="Support Request Center"
+                detail="Use SitGuru messages for flyers, QR codes, event support, missing referrals, and talking points."
+              />
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <SupportOption
+                  icon={<FileText size={18} />}
+                  title="Flyers"
+                  detail="Print-ready event and outreach material."
+                />
+                <SupportOption
+                  icon={<QrCode size={18} />}
+                  title="QR Support"
+                  detail="Referral and social QR troubleshooting."
+                />
+                <SupportOption
+                  icon={<MessageCircle size={18} />}
+                  title="Missing Referral"
+                  detail="A signup, booking, or reward is missing."
+                />
+                <SupportOption
+                  icon={<BookOpenCheck size={18} />}
+                  title="Talking Points"
+                  detail="Approved local and social outreach wording."
+                />
+              </div>
+              <Link
+                href="/ambassador/dashboard/messages?support=admin&role=ambassador"
+                className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-green-800 px-4 py-2 text-sm font-black text-white transition hover:bg-green-900"
+              >
+                Message SitGuru Admin
+                <ArrowRight size={16} />
+              </Link>
+            </DashboardCard>
+
+            <DashboardCard>
+              <SectionHeader
+                icon={<PlayCircle size={22} />}
+                title="Ambassador Promo Video"
+                detail="Quick motivation before an event, outreach visit, or social post."
+              />
+              {ambassadorPromoVideoUrl ? (
+                <div className="mt-4 overflow-hidden rounded-[22px] border border-green-100 bg-black">
+                  {isDirectVideoFile(ambassadorPromoVideoUrl) ? (
+                    <video
+                      controls
+                      preload="metadata"
+                      playsInline
+                      className="aspect-video w-full bg-black"
+                    >
+                      <source
+                        src={ambassadorPromoVideoUrl}
+                        type="video/mp4"
+                      />
+                    </video>
+                  ) : (
+                    <iframe
+                      src={ambassadorPromoVideoUrl}
+                      title="SitGuru Ambassador Promo Video"
+                      className="aspect-video w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  )}
+                </div>
+              ) : null}
+            </DashboardCard>
+          </div>
+        </details>
       </div>
     </main>
+  );
+}
+
+function QuickActionLink({
+  href,
+  icon,
+  label,
+}: {
+  href: string;
+  icon: ReactNode;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex min-h-12 items-center justify-between gap-2 rounded-2xl border border-green-100 bg-green-50 px-3 py-3 text-xs font-black text-green-950 transition hover:border-green-200 hover:bg-green-100"
+    >
+      <span className="inline-flex items-center gap-2">
+        {icon}
+        {label}
+      </span>
+      <ArrowRight size={14} />
+    </Link>
+  );
+}
+
+function CompactReferralCard({
+  icon,
+  title,
+  detail,
+  shortPath,
+  fallbackUrl,
+}: {
+  icon: ReactNode;
+  title: string;
+  detail: string;
+  shortPath: string;
+  fallbackUrl: string;
+}) {
+  return (
+    <div className="rounded-[24px] border border-green-100 bg-green-50 p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-green-800 ring-1 ring-green-100">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-black text-green-950">{title}</p>
+          <p className="mt-1 text-xs font-bold text-slate-600">{detail}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-[92px_minmax(0,1fr)] items-center gap-3">
+        <a
+          href={shortPath}
+          aria-label={`Open ${title} referral QR link`}
+          className="rounded-2xl bg-white p-2 ring-1 ring-green-100"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={getQrImageUrl(shortPath)}
+            alt={`${title} referral QR code`}
+            className="aspect-square w-full"
+          />
+        </a>
+
+        <div className="min-w-0">
+          <p className="break-words rounded-xl bg-white px-3 py-2 text-xs font-black leading-5 text-green-950 ring-1 ring-green-100">
+            {getCompactDisplayUrl(shortPath)}
+          </p>
+          <div className="mt-2 grid gap-2">
+            <Link
+              href={shortPath}
+              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl bg-green-800 px-3 py-2 text-xs font-black text-white hover:bg-green-900"
+            >
+              Open Short Link
+              <ExternalLink size={13} />
+            </Link>
+            <a
+              href={fallbackUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-center text-[10px] font-black text-green-700 hover:text-green-900"
+            >
+              Open full tracked signup link
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SocialPlatformCard({
+  platform,
+  label,
+  handle,
+  destination,
+  shortPath,
+  verifiedCount,
+}: {
+  platform: SocialPlatformKey;
+  label: string;
+  handle: string;
+  destination: string;
+  shortPath: string;
+  verifiedCount: number;
+}) {
+  return (
+    <div className="rounded-[22px] border border-green-100 bg-white p-3 shadow-sm">
+      <div className="flex items-center gap-2">
+        <SocialBrandIcon platform={platform} />
+        <div className="min-w-0">
+          <p className="truncate text-xs font-black text-green-950">{label}</p>
+          <p className="truncate text-[10px] font-bold text-slate-500">
+            {handle}
+          </p>
+        </div>
+      </div>
+
+      <a
+        href={shortPath}
+        aria-label={`Open tracked ${label} QR link`}
+        className="mx-auto mt-3 block w-[104px] rounded-2xl bg-green-50 p-2 ring-1 ring-green-100"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={getQrImageUrl(shortPath)}
+          alt={`${label} SitGuru QR code`}
+          className="aspect-square w-full"
+        />
+      </a>
+
+      <p className="mt-2 text-center text-lg font-black text-green-950">
+        {verifiedCount}
+      </p>
+      <p className="text-center text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">
+        verified
+      </p>
+
+      <div className="mt-2 grid gap-1">
+        <Link
+          href={shortPath}
+          className="inline-flex min-h-8 items-center justify-center rounded-xl bg-green-800 px-2 py-1.5 text-[10px] font-black text-white hover:bg-green-900"
+        >
+          Tracked QR Link
+        </Link>
+        <a
+          href={destination}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-8 items-center justify-center gap-1 rounded-xl border border-green-100 bg-green-50 px-2 py-1.5 text-[10px] font-black text-green-900 hover:bg-green-100"
+        >
+          Official Channel
+          <ExternalLink size={11} />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function SocialBrandIcon({
+  platform,
+}: {
+  platform: SocialPlatformKey;
+}) {
+  const common =
+    "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-50 text-green-900 ring-1 ring-green-100";
+
+  if (platform === "facebook") {
+    return (
+      <span className={common} aria-label="Facebook">
+        <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M13.7 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.5 1.6-1.5H17V3.9c-.3 0-1.2-.1-2.3-.1-2.3 0-3.9 1.4-3.9 4V10H8.2v3h2.6v8h2.9Z"
+          />
+        </svg>
+      </span>
+    );
+  }
+
+  if (platform === "instagram") {
+    return (
+      <span className={common} aria-label="Instagram">
+        <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+          <rect
+            x="3.5"
+            y="3.5"
+            width="17"
+            height="17"
+            rx="5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+          <circle
+            cx="12"
+            cy="12"
+            r="4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+          <circle cx="17.5" cy="6.7" r="1.2" fill="currentColor" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (platform === "tiktok") {
+    return (
+      <span className={common} aria-label="TikTok">
+        <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M14.3 3c.3 2 1.4 3.2 3.7 3.4v2.8c-1.4 0-2.6-.4-3.7-1.2v6.4a5.3 5.3 0 1 1-4.6-5.2v2.9a2.5 2.5 0 1 0 1.8 2.4V3h2.8Z"
+          />
+        </svg>
+      </span>
+    );
+  }
+
+  if (platform === "x") {
+    return (
+      <span className={common} aria-label="X">
+        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M4 3h4.4l4.3 5.8L17.8 3H20l-6.3 7.3L20.5 21h-4.4l-4.7-6.4L5.8 21H3.5l6.9-8L4 3Zm3.2 1.7 9.8 14.6h1.3L8.5 4.7H7.2Z"
+          />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className={common} aria-label="YouTube">
+      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M21 8.2a3 3 0 0 0-2.1-2.1C17 5.6 12 5.6 12 5.6s-5 0-6.9.5A3 3 0 0 0 3 8.2 31 31 0 0 0 2.6 12 31 31 0 0 0 3 15.8a3 3 0 0 0 2.1 2.1c1.9.5 6.9.5 6.9.5s5 0 6.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .4-3.8 31 31 0 0 0-.4-3.8ZM10.2 15.4V8.6l5.9 3.4-5.9 3.4Z"
+        />
+      </svg>
+    </span>
+  );
+}
+
+function MilestoneCard({
+  verified,
+  reward,
+  current,
+  reached,
+}: {
+  verified: number;
+  reward: number;
+  current: number;
+  reached: boolean;
+}) {
+  const progress = Math.min(100, Math.round((current / verified) * 100));
+
+  return (
+    <div
+      className={`rounded-2xl border p-4 ${
+        reached
+          ? "border-green-200 bg-green-50"
+          : "border-slate-200 bg-white"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+            {verified} Verified
+          </p>
+          <p className="mt-1 text-2xl font-black text-green-950">
+            ${reward}
+          </p>
+        </div>
+        <span
+          className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${
+            reached
+              ? "bg-green-800 text-white"
+              : "bg-slate-100 text-slate-600"
+          }`}
+        >
+          {reached ? "Reached" : `${progress}%`}
+        </span>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-green-700"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CompactStatusItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-green-700">
+        {label}
+      </p>
+      <p className="mt-1 text-xl font-black text-green-950">{value}</p>
+    </div>
+  );
+}
+
+function SetupActionCard({
+  icon,
+  title,
+  status,
+  detail,
+  href,
+}: {
+  icon: ReactNode;
+  title: string;
+  status: string;
+  detail: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-[24px] border border-green-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+          {icon}
+        </div>
+        <ArrowRight
+          size={17}
+          className="text-green-700 transition group-hover:translate-x-0.5"
+        />
+      </div>
+      <p className="mt-3 text-base font-black text-green-950">{title}</p>
+      <p className="mt-1 text-xs font-black uppercase tracking-[0.1em] text-green-700">
+        {status}
+      </p>
+      <p className="mt-2 text-xs font-bold leading-5 text-slate-600">
+        {detail}
+      </p>
+    </Link>
   );
 }
 

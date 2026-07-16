@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, FormEvent, useMemo, useState } from "react";
+import { Suspense, FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Apple,
@@ -12,6 +12,7 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  Link2,
   Mail,
   PawPrint,
   Phone,
@@ -29,10 +30,12 @@ type SignupTracking = {
   program: string;
   source: string;
   platform: string;
+  medium: string;
   campaign: string;
   utmSource: string;
   utmMedium: string;
   utmCampaign: string;
+  utmContent: string;
 };
 
 const accountOptions: {
@@ -208,11 +211,38 @@ function isValidZipCode(value: string) {
   return /^\d{5}$/.test(value.trim());
 }
 
-function normalizeAmbassadorReferralCode(value: string) {
-  return value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+function normalizeReferralCode(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, "")
+    .slice(0, 64);
 }
 
-function normalizeTrackingValue(value: string | null) {
+function isValidReferralCodeFormat(value: string) {
+  if (!value) return true;
+  return /^[A-Z0-9_-]{2,64}$/.test(value);
+}
+
+function getCookieValue(name: string) {
+  if (typeof document === "undefined") return "";
+
+  const prefix = `${encodeURIComponent(name)}=`;
+  const cookie = document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(prefix));
+
+  if (!cookie) return "";
+
+  try {
+    return decodeURIComponent(cookie.slice(prefix.length));
+  } catch {
+    return cookie.slice(prefix.length);
+  }
+}
+
+function normalizeTrackingValue(value: string | null | undefined) {
   return (value || "").trim().slice(0, 160);
 }
 
@@ -220,13 +250,13 @@ function buildAuthCallbackUrl({
   origin,
   nextPath,
   intent,
-  ambassadorReferralCode,
+  referralCode,
   tracking,
 }: {
   origin: string;
   nextPath: string;
   intent: AccountIntent;
-  ambassadorReferralCode: string;
+  referralCode: string;
   tracking: SignupTracking;
 }) {
   const params = new URLSearchParams({
@@ -234,17 +264,22 @@ function buildAuthCallbackUrl({
     intent,
   });
 
-  if (ambassadorReferralCode) {
-    params.set("ambassador_referral_code", ambassadorReferralCode);
+  if (referralCode) {
+    params.set("referral_code", referralCode);
+    params.set("ambassador_referral_code", referralCode);
+    params.set("ambassador_code", referralCode);
+    params.set("ref", referralCode);
   }
 
   if (tracking.program) params.set("program", tracking.program);
   if (tracking.source) params.set("source", tracking.source);
   if (tracking.platform) params.set("platform", tracking.platform);
+  if (tracking.medium) params.set("medium", tracking.medium);
   if (tracking.campaign) params.set("campaign", tracking.campaign);
   if (tracking.utmSource) params.set("utm_source", tracking.utmSource);
   if (tracking.utmMedium) params.set("utm_medium", tracking.utmMedium);
   if (tracking.utmCampaign) params.set("utm_campaign", tracking.utmCampaign);
+  if (tracking.utmContent) params.set("utm_content", tracking.utmContent);
 
   return `${origin}/auth/callback?${params.toString()}`;
 }
@@ -281,7 +316,15 @@ async function provisionSignupAccount(payload: {
   phone?: string;
   zipCode: string;
   serviceArea: string;
-  ambassadorReferralCode?: string;
+  referralCode?: string;
+  referralSource?: string;
+  referralPlatform?: string;
+  referralMedium?: string;
+  referralCampaign?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
   source: string;
 }) {
   const {
@@ -304,7 +347,12 @@ async function provisionSignupAccount(payload: {
   const response = await fetch("/api/auth/provision-signup", {
     method: "POST",
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...payload,
+      referralCode: payload.referralCode || null,
+      // Backward compatibility while the provisioning route is upgraded.
+      ambassadorReferralCode: payload.referralCode || null,
+    }),
   });
 
   const result = (await response.json().catch(() => null)) as
@@ -351,19 +399,34 @@ function SignupPageContent() {
     return "pet_parent";
   }, [searchParams]);
 
-  const signupTracking = useMemo<SignupTracking>(() => {
+  const trackingFromUrl = useMemo<SignupTracking>(() => {
+    const medium =
+      searchParams.get("medium") ||
+      searchParams.get("referral_medium") ||
+      searchParams.get("via") ||
+      searchParams.get("utm_medium");
+
     return {
       program: normalizeTrackingValue(searchParams.get("program")),
       source: normalizeTrackingValue(
         searchParams.get("source") || searchParams.get("referral_source"),
       ),
       platform: normalizeTrackingValue(searchParams.get("platform")),
-      campaign: normalizeTrackingValue(searchParams.get("campaign")),
+      medium: normalizeTrackingValue(medium),
+      campaign: normalizeTrackingValue(
+        searchParams.get("campaign") || searchParams.get("referral_campaign"),
+      ),
       utmSource: normalizeTrackingValue(searchParams.get("utm_source")),
-      utmMedium: normalizeTrackingValue(searchParams.get("utm_medium")),
+      utmMedium: normalizeTrackingValue(
+        searchParams.get("utm_medium") || medium,
+      ),
       utmCampaign: normalizeTrackingValue(searchParams.get("utm_campaign")),
+      utmContent: normalizeTrackingValue(searchParams.get("utm_content")),
     };
   }, [searchParams]);
+
+  const [signupTracking, setSignupTracking] =
+    useState<SignupTracking>(trackingFromUrl);
 
   const [intent, setIntent] = useState<AccountIntent>(startingIntent);
   const [mode, setMode] = useState<SignupMode>("email");
@@ -372,11 +435,15 @@ function SignupPageContent() {
   const [phone, setPhone] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [serviceArea, setServiceArea] = useState("");
-  const [ambassadorReferralCode, setAmbassadorReferralCode] = useState(
-    searchParams.get("ambassador_referral_code") ||
-      searchParams.get("ref") ||
-      searchParams.get("code") ||
-      "",
+  const [referralCode, setReferralCode] = useState(
+    normalizeReferralCode(
+      searchParams.get("referral_code") ||
+        searchParams.get("ambassador_referral_code") ||
+        searchParams.get("ambassador_code") ||
+        searchParams.get("ref") ||
+        searchParams.get("code") ||
+        "",
+    ),
   );
   const [password, setPassword] = useState("");
   const [phoneCode, setPhoneCode] = useState("");
@@ -389,6 +456,90 @@ function SignupPageContent() {
   const [appleLoading, setAppleLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const urlReferralCode = normalizeReferralCode(
+      searchParams.get("referral_code") ||
+        searchParams.get("ambassador_referral_code") ||
+        searchParams.get("ambassador_code") ||
+        searchParams.get("ref") ||
+        searchParams.get("code") ||
+        "",
+    );
+
+    const cookieReferralCode = normalizeReferralCode(
+      getCookieValue("sitguru_referral_code") ||
+        getCookieValue("sitguru_ambassador_code"),
+    );
+
+    const storedReferralCode =
+      typeof window !== "undefined"
+        ? normalizeReferralCode(
+            window.localStorage.getItem("sitguru_referral_code") ||
+              window.localStorage.getItem("sitguru_ambassador_code") ||
+              "",
+          )
+        : "";
+
+    const resolvedReferralCode =
+      urlReferralCode || cookieReferralCode || storedReferralCode;
+
+    if (resolvedReferralCode) {
+      setReferralCode((current) => current || resolvedReferralCode);
+
+      try {
+        window.localStorage.setItem(
+          "sitguru_referral_code",
+          resolvedReferralCode,
+        );
+      } catch {
+        // Local storage may be unavailable in private browsing.
+      }
+    }
+
+    setSignupTracking((current) => ({
+      program:
+        current.program ||
+        normalizeTrackingValue(getCookieValue("sitguru_referral_program")),
+      source:
+        current.source ||
+        normalizeTrackingValue(getCookieValue("sitguru_referral_source")),
+      platform:
+        current.platform ||
+        normalizeTrackingValue(getCookieValue("sitguru_referral_platform")),
+      medium:
+        current.medium ||
+        normalizeTrackingValue(getCookieValue("sitguru_referral_medium")),
+      campaign:
+        current.campaign ||
+        normalizeTrackingValue(getCookieValue("sitguru_referral_campaign")),
+      utmSource:
+        current.utmSource ||
+        normalizeTrackingValue(getCookieValue("sitguru_utm_source")),
+      utmMedium:
+        current.utmMedium ||
+        normalizeTrackingValue(
+          getCookieValue("sitguru_utm_medium") ||
+            getCookieValue("sitguru_referral_medium"),
+        ),
+      utmCampaign:
+        current.utmCampaign ||
+        normalizeTrackingValue(getCookieValue("sitguru_utm_campaign")),
+      utmContent:
+        current.utmContent ||
+        normalizeTrackingValue(getCookieValue("sitguru_utm_content")),
+    }));
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!referralCode || typeof window === "undefined") return;
+
+    try {
+      window.localStorage.setItem("sitguru_referral_code", referralCode);
+    } catch {
+      // Local storage may be unavailable in private browsing.
+    }
+  }, [referralCode]);
 
   const redirectPath = getRedirectPath(intent);
   const intentLabel = getIntentLabel(intent);
@@ -431,8 +582,8 @@ function SignupPageContent() {
             origin,
             nextPath: redirectPath,
             intent,
-            ambassadorReferralCode: normalizeAmbassadorReferralCode(
-              ambassadorReferralCode,
+            referralCode: normalizeReferralCode(
+              referralCode,
             ),
             tracking: signupTracking,
           }),
@@ -463,10 +614,16 @@ function SignupPageContent() {
       const cleanEmail = email.trim().toLowerCase();
       const cleanZipCode = zipCode.trim();
       const profileRole = getProfileRoleFromIntent(intent);
-      const cleanAmbassadorReferralCode = normalizeAmbassadorReferralCode(
-        ambassadorReferralCode,
+      const cleanReferralCode = normalizeReferralCode(
+        referralCode,
       );
 
+      if (!isValidReferralCodeFormat(cleanReferralCode)) {
+        setError(
+          "Please enter a valid referral code using 2–64 letters, numbers, hyphens, or underscores.",
+        );
+        return;
+      }
       if (!isValidFullName(cleanName)) {
         setError("Please enter your real first and last name.");
         return;
@@ -507,7 +664,7 @@ function SignupPageContent() {
             origin,
             nextPath: redirectPath,
             intent,
-            ambassadorReferralCode: cleanAmbassadorReferralCode,
+            referralCode: cleanReferralCode,
             tracking: signupTracking,
           }),
           data: {
@@ -522,14 +679,22 @@ function SignupPageContent() {
             signup_status: "pending_email_verification",
             zip_code: cleanZipCode,
             service_area: serviceArea.trim() || cleanZipCode,
-            ambassador_referral_code: cleanAmbassadorReferralCode || null,
+            referral_code: cleanReferralCode || null,
+            ambassador_referral_code: cleanReferralCode || null,
+            referral_attribution_status: cleanReferralCode
+              ? "pending_validation"
+              : null,
             ambassador_program: signupTracking.program || null,
+            referral_program: signupTracking.program || null,
             referral_source: signupTracking.source || null,
             referral_platform: signupTracking.platform || null,
+            referral_medium: signupTracking.medium || null,
             referral_campaign: signupTracking.campaign || null,
             utm_source: signupTracking.utmSource || null,
-            utm_medium: signupTracking.utmMedium || null,
+            utm_medium:
+              signupTracking.utmMedium || signupTracking.medium || null,
             utm_campaign: signupTracking.utmCampaign || null,
+            utm_content: signupTracking.utmContent || null,
           },
         },
       });
@@ -546,7 +711,20 @@ function SignupPageContent() {
           email: cleanEmail,
           zipCode: cleanZipCode,
           serviceArea: serviceArea.trim() || cleanZipCode,
-          ambassadorReferralCode: cleanAmbassadorReferralCode || undefined,
+          referralCode: cleanReferralCode || undefined,
+          referralSource: signupTracking.source || undefined,
+          referralPlatform: signupTracking.platform || undefined,
+          referralMedium:
+            signupTracking.medium || signupTracking.utmMedium || undefined,
+          referralCampaign:
+            signupTracking.campaign ||
+            signupTracking.utmCampaign ||
+            undefined,
+          utmSource: signupTracking.utmSource || undefined,
+          utmMedium:
+            signupTracking.utmMedium || signupTracking.medium || undefined,
+          utmCampaign: signupTracking.utmCampaign || undefined,
+          utmContent: signupTracking.utmContent || undefined,
           source: emailSignupSource,
         });
       }
@@ -576,10 +754,16 @@ function SignupPageContent() {
       const cleanZipCode = zipCode.trim();
       const normalizedPhone = toE164UsPhone(phone);
       const profileRole = getProfileRoleFromIntent(intent);
-      const cleanAmbassadorReferralCode = normalizeAmbassadorReferralCode(
-        ambassadorReferralCode,
+      const cleanReferralCode = normalizeReferralCode(
+        referralCode,
       );
 
+      if (!isValidReferralCodeFormat(cleanReferralCode)) {
+        setError(
+          "Please enter a valid referral code using 2–64 letters, numbers, hyphens, or underscores.",
+        );
+        return;
+      }
       if (!isValidFullName(cleanName)) {
         setError("Please enter your real first and last name before requesting a phone code.");
         return;
@@ -617,14 +801,22 @@ function SignupPageContent() {
             signup_status: "pending_phone_verification",
             zip_code: cleanZipCode,
             service_area: serviceArea.trim() || cleanZipCode,
-            ambassador_referral_code: cleanAmbassadorReferralCode || null,
+            referral_code: cleanReferralCode || null,
+            ambassador_referral_code: cleanReferralCode || null,
+            referral_attribution_status: cleanReferralCode
+              ? "pending_validation"
+              : null,
             ambassador_program: signupTracking.program || null,
+            referral_program: signupTracking.program || null,
             referral_source: signupTracking.source || null,
             referral_platform: signupTracking.platform || null,
+            referral_medium: signupTracking.medium || null,
             referral_campaign: signupTracking.campaign || null,
             utm_source: signupTracking.utmSource || null,
-            utm_medium: signupTracking.utmMedium || null,
+            utm_medium:
+              signupTracking.utmMedium || signupTracking.medium || null,
             utm_campaign: signupTracking.utmCampaign || null,
+            utm_content: signupTracking.utmContent || null,
           },
         },
       });
@@ -652,10 +844,16 @@ function SignupPageContent() {
       const cleanZipCode = zipCode.trim();
       const normalizedPhone = toE164UsPhone(phone);
       const profileRole = getProfileRoleFromIntent(intent);
-      const cleanAmbassadorReferralCode = normalizeAmbassadorReferralCode(
-        ambassadorReferralCode,
+      const cleanReferralCode = normalizeReferralCode(
+        referralCode,
       );
 
+      if (!isValidReferralCodeFormat(cleanReferralCode)) {
+        setError(
+          "Please enter a valid referral code using 2–64 letters, numbers, hyphens, or underscores.",
+        );
+        return;
+      }
       if (!isValidFullName(cleanName)) {
         setError("Please enter your real first and last name.");
         return;
@@ -704,14 +902,22 @@ function SignupPageContent() {
           signup_status: "phone_verified",
           zip_code: cleanZipCode,
           service_area: serviceArea.trim() || cleanZipCode,
-          ambassador_referral_code: cleanAmbassadorReferralCode || null,
+          referral_code: cleanReferralCode || null,
+          ambassador_referral_code: cleanReferralCode || null,
+          referral_attribution_status: cleanReferralCode
+            ? "pending_validation"
+            : null,
           ambassador_program: signupTracking.program || null,
+          referral_program: signupTracking.program || null,
           referral_source: signupTracking.source || null,
           referral_platform: signupTracking.platform || null,
+          referral_medium: signupTracking.medium || null,
           referral_campaign: signupTracking.campaign || null,
           utm_source: signupTracking.utmSource || null,
-          utm_medium: signupTracking.utmMedium || null,
+          utm_medium:
+            signupTracking.utmMedium || signupTracking.medium || null,
           utm_campaign: signupTracking.utmCampaign || null,
+          utm_content: signupTracking.utmContent || null,
         },
       });
 
@@ -725,7 +931,20 @@ function SignupPageContent() {
           phone: normalizedPhone,
           zipCode: cleanZipCode,
           serviceArea: serviceArea.trim() || cleanZipCode,
-          ambassadorReferralCode: cleanAmbassadorReferralCode || undefined,
+          referralCode: cleanReferralCode || undefined,
+          referralSource: signupTracking.source || undefined,
+          referralPlatform: signupTracking.platform || undefined,
+          referralMedium:
+            signupTracking.medium || signupTracking.utmMedium || undefined,
+          referralCampaign:
+            signupTracking.campaign ||
+            signupTracking.utmCampaign ||
+            undefined,
+          utmSource: signupTracking.utmSource || undefined,
+          utmMedium:
+            signupTracking.utmMedium || signupTracking.medium || undefined,
+          utmCampaign: signupTracking.utmCampaign || undefined,
+          utmContent: signupTracking.utmContent || undefined,
           source: phoneSignupSource,
         });
       }
@@ -785,8 +1004,9 @@ function SignupPageContent() {
               </h1>
 
               <p className="mt-5 max-w-xl text-lg leading-8 text-[#5f5648]">
-                Sign up as a Pet Parent, Future Guru, or Ambassador. You can finish
-                profile details from your dashboard after your account is created.
+                Sign up as a Pet Parent, Future Guru, or Ambassador. Referral
+                codes and tracked QR links stay connected while you finish your
+                profile from the dashboard.
               </p>
 
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -955,24 +1175,41 @@ function SignupPageContent() {
                     </label>
                   ) : null}
 
-                  {intent === "ambassador" ? (
-                    <label className="block">
-                      <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
-                        Ambassador referral code{" "}
-                        <span className="text-[#8a7d6b]">(optional)</span>
-                      </span>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                      Referral Code{" "}
+                      <span className="text-[#8a7d6b]">(optional)</span>
+                    </span>
+                    <div className="relative">
+                      <Link2 className="pointer-events-none absolute left-4 top-4 h-5 w-5 text-[#8a7d6b]" />
                       <input
-                        value={ambassadorReferralCode}
+                        value={referralCode}
                         onChange={(event) =>
-                          setAmbassadorReferralCode(
-                            normalizeAmbassadorReferralCode(event.target.value),
+                          setReferralCode(
+                            normalizeReferralCode(event.target.value),
                           )
                         }
-                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 text-base uppercase outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
-                        placeholder="AMBASSADOR-CODE"
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-12 py-3 text-base uppercase outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder="Enter referral code"
+                        autoComplete="off"
+                        spellCheck={false}
+                        maxLength={64}
                       />
-                    </label>
-                  ) : null}
+                    </div>
+                    <p className="mt-2 text-xs font-semibold leading-5 text-[#6a6256]">
+                      Enter the code shared by a Pet Parent, Guru, Ambassador,
+                      business, or SitGuru social campaign.
+                    </p>
+                    {referralCode ? (
+                      <div className="mt-2 flex items-start gap-2 rounded-xl border border-[#0f7f60]/20 bg-[#eaf4ec] px-3 py-2 text-xs font-bold leading-5 text-[#0f7f60]">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>
+                          Referral code detected. SitGuru will verify and connect
+                          it when your account is created.
+                        </span>
+                      </div>
+                    ) : null}
+                  </label>
 
                   <label className="block">
                     <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
@@ -1095,24 +1332,41 @@ function SignupPageContent() {
                     </label>
                   ) : null}
 
-                  {intent === "ambassador" ? (
-                    <label className="block">
-                      <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
-                        Ambassador referral code{" "}
-                        <span className="text-[#8a7d6b]">(optional)</span>
-                      </span>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                      Referral Code{" "}
+                      <span className="text-[#8a7d6b]">(optional)</span>
+                    </span>
+                    <div className="relative">
+                      <Link2 className="pointer-events-none absolute left-4 top-4 h-5 w-5 text-[#8a7d6b]" />
                       <input
-                        value={ambassadorReferralCode}
+                        value={referralCode}
                         onChange={(event) =>
-                          setAmbassadorReferralCode(
-                            normalizeAmbassadorReferralCode(event.target.value),
+                          setReferralCode(
+                            normalizeReferralCode(event.target.value),
                           )
                         }
-                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-4 py-3 text-base uppercase outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
-                        placeholder="AMBASSADOR-CODE"
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-12 py-3 text-base uppercase outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder="Enter referral code"
+                        autoComplete="off"
+                        spellCheck={false}
+                        maxLength={64}
                       />
-                    </label>
-                  ) : null}
+                    </div>
+                    <p className="mt-2 text-xs font-semibold leading-5 text-[#6a6256]">
+                      Enter the code shared by a Pet Parent, Guru, Ambassador,
+                      business, or SitGuru social campaign.
+                    </p>
+                    {referralCode ? (
+                      <div className="mt-2 flex items-start gap-2 rounded-xl border border-[#0f7f60]/20 bg-[#eaf4ec] px-3 py-2 text-xs font-bold leading-5 text-[#0f7f60]">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>
+                          Referral code detected. SitGuru will verify and connect
+                          it when your account is created.
+                        </span>
+                      </div>
+                    ) : null}
+                  </label>
 
                   {phoneCodeSent ? (
                     <label className="block">
