@@ -9,13 +9,16 @@ import {
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import SitGuruPaymentsProvider from '@/components/SitGuruPaymentsProvider';
 import { getAppTheme } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const appTheme = getAppTheme(colorScheme === 'dark' ? 'dark' : 'light');
+  const appTheme = getAppTheme(
+    colorScheme === 'dark' ? 'dark' : 'light',
+  );
 
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_400Regular,
@@ -30,17 +33,21 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+    <SitGuruPaymentsProvider>
+      <AuthProvider>
+        <StatusBar
+          style={colorScheme === 'dark' ? 'light' : 'dark'}
+        />
 
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: appTheme.colors.screen,
-          },
-        }}
-      />
-    </AuthProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: {
+              backgroundColor: appTheme.colors.screen,
+            },
+          }}
+        />
+      </AuthProvider>
+    </SitGuruPaymentsProvider>
   );
 }

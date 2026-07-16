@@ -197,22 +197,6 @@ function firstString(record: RecordRow | null | undefined, keys: string[]) {
   return '';
 }
 
-function normalizeRole(value?: string | null) {
-  const normalized = String(value ?? '')
-    .trim()
-    .toLowerCase();
-
-  if (normalized === 'provider' || normalized === 'sitter' || normalized === 'pet_guru') {
-    return 'guru';
-  }
-
-  if (normalized === 'customer' || normalized === 'pet parent' || normalized === 'pet-parent') {
-    return 'pet_parent';
-  }
-
-  return normalized;
-}
-
 function profileName(profile?: ProfileRow | null, fallback = 'SitGuru User') {
   if (!profile) return fallback;
 

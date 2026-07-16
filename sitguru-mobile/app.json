@@ -9,9 +9,17 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "bundleIdentifier": "com.sitguru.mobile",
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true,
+        "CFBundleLocalizations": [
+          "en"
+        ]
+      }
     },
     "android": {
+      "package": "com.sitguru.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -44,6 +52,13 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Allow SitGuru to use Face ID for faster, secure access to your account."
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.sitguru",
+          "enableGooglePay": true
         }
       ]
     ],
