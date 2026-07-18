@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   ArrowRight,
@@ -54,6 +56,231 @@ type EarningsRow = {
   net: number;
   status: string;
 };
+
+
+type GuruPayoutProvider = "stripe" | "paypal" | "set_up_later";
+
+type GuruPayoutProviderOption = {
+  provider: GuruPayoutProvider;
+  label: string;
+  description: string;
+};
+
+type GuruPayoutAccount = {
+  provider?: "stripe" | "paypal" | null;
+  providerEmail?: string | null;
+  onboardingStatus?: string | null;
+  accountStatus?: string | null;
+  payoutsEnabled?: boolean;
+};
+
+type GuruPayoutSetup = {
+  selectedProvider?: GuruPayoutProvider;
+  setupComplete?: boolean;
+  nextAction?: string | null;
+  accounts?: GuruPayoutAccount[];
+  readyAccount?: GuruPayoutAccount | null;
+  blockers?: {
+    acceptFirstPaidBooking?: boolean;
+    receiveBookingPayout?: boolean;
+  };
+  providerOptions?: GuruPayoutProviderOption[];
+  messaging?: {
+    headline?: string;
+    description?: string;
+    readyMessage?: string;
+    blockedMessage?: string;
+  };
+};
+
+type GuruPayoutSetupResponse = {
+  success: boolean;
+  message?: string;
+  error?: string;
+  setup?: GuruPayoutSetup;
+};
+
+type EarningsPageSearchParams = Record<
+  string,
+  string | string[] | undefined
+>;
+
+type EarningsPageProps = {
+  searchParams?:
+    | EarningsPageSearchParams
+    | Promise<EarningsPageSearchParams>;
+};
+
+function payoutProviderLabel(provider?: GuruPayoutProvider | null) {
+  if (provider === "stripe") return "Stripe";
+  if (provider === "paypal") return "PayPal";
+  return "Set up later";
+}
+
+function humanizeStatus(value?: string | null) {
+  if (!value) return "Not started";
+
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function normalizeBaseUrl(value?: string | null) {
+  if (!value) return null;
+
+  const candidate = value.startsWith("http://") || value.startsWith("https://")
+    ? value
+    : `https://${value}`;
+
+  try {
+    const parsed = new URL(candidate);
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+async function getSharedApiOrigin() {
+  const configuredOrigin =
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
+    normalizeBaseUrl(process.env.SITE_URL) ||
+    normalizeBaseUrl(process.env.VERCEL_URL);
+
+  if (configuredOrigin) return configuredOrigin;
+
+  const requestHeaders = await headers();
+  const forwardedHost = requestHeaders
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    ?.trim();
+  const host = forwardedHost || requestHeaders.get("host") || "";
+  const hostname = (host.split(":")[0] || "").toLowerCase();
+  const allowedHost =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "sitguru.com" ||
+    hostname === "www.sitguru.com" ||
+    hostname.endsWith(".sitguru.com");
+
+  if (!host || !allowedHost) {
+    return "https://www.sitguru.com";
+  }
+
+  const forwardedProto = requestHeaders
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim();
+  const protocol =
+    forwardedProto ||
+    (hostname === "localhost" || hostname === "127.0.0.1"
+      ? "http"
+      : "https");
+
+  return `${protocol}://${host}`;
+}
+
+async function callGuruPayoutSetupApi({
+  accessToken,
+  method = "GET",
+  provider,
+}: {
+  accessToken: string;
+  method?: "GET" | "PATCH";
+  provider?: GuruPayoutProvider;
+}): Promise<GuruPayoutSetupResponse> {
+  const origin = await getSharedApiOrigin();
+  const response = await fetch(`${origin}/api/payouts/setup?role=guru`, {
+    method,
+    cache: "no-store",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      ...(method === "PATCH"
+        ? { "Content-Type": "application/json" }
+        : {}),
+    },
+    body:
+      method === "PATCH"
+        ? JSON.stringify({
+            role: "guru",
+            preferredProvider: provider,
+          })
+        : undefined,
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | GuruPayoutSetupResponse
+    | null;
+
+  if (!payload) {
+    return {
+      success: false,
+      error: "SitGuru could not read the payout setup response.",
+    };
+  }
+
+  if (!response.ok || !payload.success) {
+    return {
+      ...payload,
+      success: false,
+      error: payload.error || "SitGuru could not update payout setup.",
+    };
+  }
+
+  return payload;
+}
+
+async function saveGuruPayoutProvider(formData: FormData) {
+  "use server";
+
+  const requestedProvider = String(formData.get("provider") || "");
+  const provider: GuruPayoutProvider | null =
+    requestedProvider === "stripe" ||
+    requestedProvider === "paypal" ||
+    requestedProvider === "set_up_later"
+      ? requestedProvider
+      : null;
+
+  if (!provider) {
+    redirect("/guru/earnings?payoutStatus=invalid");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    redirect("/guru/login");
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    redirect("/guru/login");
+  }
+
+  const result = await callGuruPayoutSetupApi({
+    accessToken: session.access_token,
+    method: "PATCH",
+    provider,
+  });
+
+  revalidatePath("/guru/earnings");
+
+  if (!result.success) {
+    redirect("/guru/earnings?payoutStatus=error");
+  }
+
+  redirect(`/guru/earnings?payoutSaved=${provider}`);
+}
 
 function currency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -378,7 +605,194 @@ function CustomerAvatar({
   );
 }
 
-export default async function GuruDashboardEarningsPage() {
+function PayoutSetupCard({
+  setup,
+  loadError,
+  saveStatus,
+}: {
+  setup: GuruPayoutSetup | null;
+  loadError?: string | null;
+  saveStatus?: string | null;
+}) {
+  const setupComplete = Boolean(setup?.setupComplete);
+  const selectedProvider = setup?.selectedProvider || "set_up_later";
+  const readyAccount = setup?.readyAccount || null;
+  const providerOptions =
+    setup?.providerOptions && setup.providerOptions.length > 0
+      ? setup.providerOptions
+      : [
+          {
+            provider: "stripe" as const,
+            label: "Stripe",
+            description:
+              "Connect Stripe before accepting your first paid SitGuru booking.",
+          },
+          {
+            provider: "paypal" as const,
+            label: "PayPal",
+            description:
+              "Choose PayPal as your marketplace payout provider.",
+          },
+          {
+            provider: "set_up_later" as const,
+            label: "Set up later",
+            description:
+              "Finish your profile and receive requests before financial onboarding.",
+          },
+        ];
+
+  const successMessage =
+    saveStatus === "stripe"
+      ? "Stripe was selected and your payout preference was saved."
+      : saveStatus === "paypal"
+        ? "PayPal was selected and your payout preference was saved."
+        : saveStatus === "set_up_later"
+          ? "Payout setup was deferred. You can still appear in search and receive booking requests."
+          : null;
+
+  const errorMessage =
+    saveStatus === "error"
+      ? "SitGuru could not save your payout preference. Please try again."
+      : saveStatus === "invalid"
+        ? "Choose Stripe, PayPal, or Set up later."
+        : loadError || null;
+
+  return (
+    <section className="rounded-[2rem] border border-emerald-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.18em] !text-emerald-700">
+            Payout setup
+          </p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight !text-slate-950">
+            {setup?.messaging?.headline ||
+              "Set up payouts before accepting your first paid booking"}
+          </h2>
+        </div>
+
+        <span
+          className={`inline-flex w-fit items-center rounded-full border px-4 py-2 text-xs font-black ${
+            setupComplete
+              ? "border-emerald-200 bg-emerald-50 !text-emerald-700"
+              : "border-amber-200 bg-amber-50 !text-amber-700"
+          }`}
+        >
+          {setupComplete ? "Payout ready" : "Setup not complete"}
+        </span>
+      </div>
+
+      <p className="mt-4 text-sm font-semibold leading-7 !text-slate-700">
+        {setup?.messaging?.description ||
+          "You can complete your Guru profile, appear in search, and receive booking requests before connecting a payout provider."}
+      </p>
+
+      {successMessage ? (
+        <div
+          role="status"
+          className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold !text-emerald-800"
+        >
+          {successMessage}
+        </div>
+      ) : null}
+
+      {errorMessage ? (
+        <div
+          role="alert"
+          className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold !text-rose-700"
+        >
+          {errorMessage}
+        </div>
+      ) : null}
+
+      <div className="mt-6 grid gap-3">
+        {providerOptions.map((option) => {
+          const isSelected = selectedProvider === option.provider;
+
+          return (
+            <form action={saveGuruPayoutProvider} key={option.provider}>
+              <input type="hidden" name="provider" value={option.provider} />
+              <button
+                type="submit"
+                className={`flex w-full items-start justify-between gap-4 rounded-[1.25rem] border p-4 text-left transition ${
+                  isSelected
+                    ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-100"
+                    : "border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50"
+                }`}
+              >
+                <span>
+                  <span className="block font-black !text-slate-950">
+                    {option.label}
+                  </span>
+                  <span className="mt-1 block text-sm font-semibold leading-6 !text-slate-700">
+                    {option.description}
+                  </span>
+                </span>
+
+                <span
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${
+                    isSelected
+                      ? "bg-emerald-600 !text-white"
+                      : "bg-white !text-slate-600 ring-1 ring-slate-200"
+                  }`}
+                >
+                  {isSelected ? "Selected" : "Choose"}
+                </span>
+              </button>
+            </form>
+          );
+        })}
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.14em] !text-slate-600">
+            Current preference
+          </p>
+          <p className="mt-2 text-lg font-black !text-slate-950">
+            {payoutProviderLabel(selectedProvider)}
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
+            {readyAccount
+              ? `${payoutProviderLabel(readyAccount.provider)} account: ${humanizeStatus(readyAccount.onboardingStatus)}`
+              : "No verified payout account is connected yet."}
+          </p>
+        </div>
+
+        <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.14em] !text-slate-600">
+            Booking access
+          </p>
+          <p className="mt-2 text-lg font-black !text-slate-950">
+            {setupComplete ? "Ready for paid bookings" : "Requests remain available"}
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
+            {setupComplete
+              ? setup?.messaging?.readyMessage ||
+                "Your payout account is ready for eligible SitGuru payouts."
+              : setup?.messaging?.blockedMessage ||
+                "Complete provider onboarding before accepting your first paid booking."}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-[1.25rem] border border-dashed border-emerald-200 bg-emerald-50 p-4">
+        <p className="text-sm font-black !text-emerald-800">
+          No payout setup is required during signup
+        </p>
+        <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
+          Choosing a provider saves your SitGuru preference. Approved provider
+          onboarding and identity verification must still be completed before
+          the first paid booking can be accepted. Pet Parents always pay through
+          SitGuru checkout—never directly to a Guru.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+export default async function GuruDashboardEarningsPage({
+  searchParams,
+}: EarningsPageProps) {
   const supabase = await createClient();
 
   const {
@@ -389,6 +803,36 @@ export default async function GuruDashboardEarningsPage() {
   if (userError || !user) {
     redirect("/guru/login");
   }
+
+  const resolvedSearchParams = await Promise.resolve(searchParams || {});
+  const payoutSavedParam = resolvedSearchParams.payoutSaved;
+  const payoutStatusParam = resolvedSearchParams.payoutStatus;
+  const payoutSaveStatus =
+    typeof payoutSavedParam === "string"
+      ? payoutSavedParam
+      : typeof payoutStatusParam === "string"
+        ? payoutStatusParam
+        : null;
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const payoutSetupResponse: GuruPayoutSetupResponse = session?.access_token
+    ? await callGuruPayoutSetupApi({
+        accessToken: session.access_token,
+      })
+    : {
+        success: false,
+        error: "Your payout session could not be loaded. Please sign in again.",
+      };
+
+  const payoutSetup = payoutSetupResponse.success
+    ? payoutSetupResponse.setup || null
+    : null;
+  const payoutSetupError = payoutSetupResponse.success
+    ? null
+    : payoutSetupResponse.error || "SitGuru could not load payout setup.";
 
   const guruProfile = await getGuruProfile(user.id, user.email);
 
@@ -752,6 +1196,12 @@ export default async function GuruDashboardEarningsPage() {
           </div>
 
           <div className="space-y-6">
+            <PayoutSetupCard
+              setup={payoutSetup}
+              loadError={payoutSetupError}
+              saveStatus={payoutSaveStatus}
+            />
+
             <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
               <p className="text-sm font-black uppercase tracking-[0.18em] !text-slate-800">
                 How earnings work
