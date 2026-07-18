@@ -1,15 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties } from "react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
-
-const openSans = {
-  className: "font-sans",
-};
 
 const heroImagePath = "/images/hero/sitguru-dog-walking-hero.jpg";
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
@@ -2329,10 +2324,7 @@ export default function HomePage() {
   }
 
   return (
-    <main
-      className={`${openSans.className} min-h-screen bg-white text-slate-950`}
-      style={{ fontWeight: 300 } as CSSProperties}
-    >
+    <main className="min-h-screen bg-white text-slate-950">
       <section className="relative overflow-hidden border-b border-slate-100 bg-white">
         <HeroVisual />
 
