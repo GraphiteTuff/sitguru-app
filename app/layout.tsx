@@ -1,8 +1,25 @@
 import type { Metadata } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import Script from "next/script";
+
 import "./globals.css";
-import RouteShell from "@/components/RouteShell";
 import CrispWidget from "@/components/CrispWidget";
+import RouteShell from "@/components/RouteShell";
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-plus-jakarta-sans",
+  fallback: [
+    "ui-sans-serif",
+    "system-ui",
+    "-apple-system",
+    "BlinkMacSystemFont",
+    "Segoe UI",
+    "sans-serif",
+  ],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.sitguru.com"),
@@ -35,7 +52,11 @@ export const metadata: Metadata = {
     icon: [{ url: "/favicon.ico", type: "image/x-icon" }],
     shortcut: [{ url: "/favicon.ico", type: "image/x-icon" }],
     apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      {
+        url: "/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
     ],
   },
   openGraph: {
@@ -85,12 +106,14 @@ const websiteSchema = {
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
-    <html lang="en">
-      <body className="site-shell min-h-screen bg-[#f8fcfd] text-slate-900 antialiased">
+    <html lang="en" className={plusJakartaSans.variable}>
+      <body
+        className={`${plusJakartaSans.className} site-shell min-h-screen bg-[#f8fcfd] text-slate-900 antialiased`}
+      >
         <Script id="google-tag-manager" strategy="afterInteractive">
           {`
             (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -106,7 +129,11 @@ export default function RootLayout({
             src="https://www.googletagmanager.com/ns.html?id=GTM-KVDPHX4W"
             height="0"
             width="0"
-            style={{ display: "none", visibility: "hidden" }}
+            title="Google Tag Manager"
+            style={{
+              display: "none",
+              visibility: "hidden",
+            }}
           />
         </noscript>
 
@@ -116,6 +143,7 @@ export default function RootLayout({
             __html: JSON.stringify(organizationSchema),
           }}
         />
+
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
