@@ -2,15 +2,13 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import Stripe from "stripe";
 
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { createClient } from "@/utils/supabase/server";
+
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "";
-
-const stripe = stripeSecretKey
-  ? new Stripe(stripeSecretKey, {
-      apiVersion: "2026-03-25.dahlia",
-    })
-  : null;
+const STRIPE_API_VERSION = "2026-03-25.dahlia";
 
 type SuccessPageProps = {
   searchParams?: Promise<{
@@ -21,6 +19,29 @@ type SuccessPageProps = {
 };
 
 type BookingRow = Record<string, unknown>;
+type PaymentLedgerRow = Record<string, unknown>;
+
+type PaymentStatusKind =
+  | "paid"
+  | "processing"
+  | "pending"
+  | "failed"
+  | "refunded"
+  | "disputed"
+  | "unknown";
+
+type StripeSessionSnapshot = {
+  session: Stripe.Checkout.Session | null;
+  paymentIntentId: string;
+  paymentIntentStatus: string;
+  chargeId: string;
+  receiptUrl: string;
+  paymentMethodType: string;
+  cardBrand: string;
+  cardLast4: string;
+  failureMessage: string;
+  error: string;
+};
 
 type ConfettiPiece = {
   id: number;
@@ -73,74 +94,610 @@ const confettiPieces: ConfettiPiece[] = [
   { id: 36, left: 94, delay: 0.82, duration: 6.1, size: 20, rotate: 295, shape: "rect", color: "#fb7185" },
 ];
 
+
+function getStripeClient() {
+  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
+
+  if (!secretKey) {
+    return null;
+  }
+
+  return new Stripe(secretKey, {
+    apiVersion: STRIPE_API_VERSION,
+  });
+}
+
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function safeNumber(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+function firstNonEmpty(...values: unknown[]) {
+  for (const value of values) {
+    const text = safeString(value);
+
+    if (text) {
+      return text;
+    }
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+  }
+
+  return "";
 }
 
-function formatMoney(amountTotal: unknown, currencyValue: unknown) {
-  const amount = safeNumber(amountTotal);
+function safeNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function dollarsToCents(value: unknown) {
+  const amount = safeNumber(value);
+
+  if (amount === null) {
+    return null;
+  }
+
+  return Math.max(0, Math.round(amount * 100));
+}
+
+function formatMoney(amountCents: number | null, currencyValue: unknown) {
   const currency = safeString(currencyValue) || "usd";
 
-  if (amount === null) return "Not available";
+  if (amountCents === null) {
+    return "Not available";
+  }
 
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amount / 100);
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+    }).format(amountCents / 100);
+  } catch {
+    return `$${(amountCents / 100).toFixed(2)}`;
+  }
 }
 
-async function getBookingFromSession(
-  sessionId: string,
-  fallbackBookingId?: string
-): Promise<BookingRow | null> {
-  if (!stripe || !sessionId) {
-    return fallbackBookingId
-      ? {
-          id: fallbackBookingId,
-          payment_status: "paid",
-          status: "confirmed",
-        }
+function humanize(value: unknown) {
+  const text = safeString(value);
+
+  if (!text) {
+    return "";
+  }
+
+  return text
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatBookingDate(value: unknown) {
+  const text = safeString(value);
+
+  if (!text) {
+    return "";
+  }
+
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(text)
+    ? `${text}T12:00:00`
+    : text;
+
+  const date = new Date(normalized);
+
+  if (Number.isNaN(date.getTime())) {
+    return text;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+async function getAuthenticatedUserId() {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error || !user) {
+      return "";
+    }
+
+    return user.id;
+  } catch (error) {
+    console.error("Unable to resolve booking success user:", error);
+    return "";
+  }
+}
+
+async function retrieveCharge(
+  stripe: Stripe,
+  value: string | Stripe.Charge | null | undefined,
+) {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  try {
+    return await stripe.charges.retrieve(value);
+  } catch (error) {
+    console.error("Unable to retrieve Stripe charge for success page:", error);
+    return null;
+  }
+}
+
+function getPaymentMethodDetails(charge: Stripe.Charge | null) {
+  const details = charge?.payment_method_details as unknown as
+    | Record<string, unknown>
+    | null
+    | undefined;
+
+  const card =
+    details?.card && typeof details.card === "object"
+      ? (details.card as Record<string, unknown>)
       : null;
+
+  return {
+    paymentMethodType: firstNonEmpty(details?.type),
+    cardBrand: firstNonEmpty(card?.brand),
+    cardLast4: firstNonEmpty(card?.last4),
+  };
+}
+
+async function getStripeSessionSnapshot(
+  sessionId: string,
+): Promise<StripeSessionSnapshot> {
+  const emptySnapshot: StripeSessionSnapshot = {
+    session: null,
+    paymentIntentId: "",
+    paymentIntentStatus: "",
+    chargeId: "",
+    receiptUrl: "",
+    paymentMethodType: "",
+    cardBrand: "",
+    cardLast4: "",
+    failureMessage: "",
+    error: "",
+  };
+
+  if (!sessionId) {
+    return emptySnapshot;
+  }
+
+  const stripe = getStripeClient();
+
+  if (!stripe) {
+    return {
+      ...emptySnapshot,
+      error: "Secure payment verification is temporarily unavailable.",
+    };
   }
 
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ["payment_intent"],
+      expand: ["payment_intent.latest_charge"],
     });
 
-    const bookingId =
-      safeString(session.metadata?.bookingId) ||
-      safeString(session.metadata?.booking_id) ||
-      safeString(fallbackBookingId);
+    let paymentIntent: Stripe.PaymentIntent | null = null;
 
-    if (!bookingId) {
-      return null;
+    if (typeof session.payment_intent === "string") {
+      try {
+        paymentIntent = await stripe.paymentIntents.retrieve(
+          session.payment_intent,
+          {
+            expand: ["latest_charge"],
+          },
+        );
+      } catch (error) {
+        console.error(
+          "Unable to retrieve Stripe payment intent for success page:",
+          error,
+        );
+      }
+    } else if (session.payment_intent) {
+      paymentIntent = session.payment_intent;
     }
 
+    const charge = paymentIntent
+      ? await retrieveCharge(stripe, paymentIntent.latest_charge)
+      : null;
+
+    const method = getPaymentMethodDetails(charge);
+
     return {
-      id: bookingId,
-      payment_status: session.payment_status || null,
-      customer_email: session.customer_details?.email || null,
-      amount_total: session.amount_total || null,
-      currency: session.currency || null,
-      livemode: session.livemode,
-      status: "confirmed",
+      session,
+      paymentIntentId: paymentIntent?.id || "",
+      paymentIntentStatus: paymentIntent?.status || "",
+      chargeId: charge?.id || "",
+      receiptUrl: charge?.receipt_url || "",
+      paymentMethodType: method.paymentMethodType,
+      cardBrand: method.cardBrand,
+      cardLast4: method.cardLast4,
+      failureMessage:
+        paymentIntent?.last_payment_error?.message ||
+        paymentIntent?.last_payment_error?.decline_code ||
+        "",
+      error: "",
     };
   } catch (error) {
     console.error("Unable to retrieve Stripe session:", error);
 
-    return fallbackBookingId
-      ? {
-          id: fallbackBookingId,
-          payment_status: "paid",
-          status: "confirmed",
-        }
-      : null;
+    return {
+      ...emptySnapshot,
+      error: "SitGuru could not verify this checkout session.",
+    };
   }
+}
+
+async function fetchOwnedBooking(
+  bookingId: string,
+  userId: string,
+): Promise<BookingRow | null> {
+  if (!bookingId || !userId) {
+    return null;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .eq("customer_id", userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Unable to load booking confirmation record:", error);
+    return null;
+  }
+
+  return (data as BookingRow | null) || null;
+}
+
+async function fetchOwnedPaymentLedger({
+  sessionId,
+  bookingId,
+  userId,
+}: {
+  sessionId: string;
+  bookingId: string;
+  userId: string;
+}): Promise<PaymentLedgerRow | null> {
+  if (!userId) {
+    return null;
+  }
+
+  if (sessionId) {
+    const { data, error } = await supabaseAdmin
+      .from("booking_payments")
+      .select("*")
+      .eq("stripe_checkout_session_id", sessionId)
+      .eq("payer_user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) {
+      return data as PaymentLedgerRow;
+    }
+
+    if (error) {
+      console.error(
+        "Unable to load booking payment ledger by Stripe session:",
+        error,
+      );
+    }
+  }
+
+  if (bookingId) {
+    const { data, error } = await supabaseAdmin
+      .from("booking_payments")
+      .select("*")
+      .eq("booking_id", bookingId)
+      .eq("payer_user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) {
+      return data as PaymentLedgerRow;
+    }
+
+    if (error) {
+      console.error("Unable to load booking payment ledger by booking:", error);
+    }
+  }
+
+  return null;
+}
+
+function normalizeStatus(value: unknown) {
+  return safeString(value).toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function resolvePaymentStatusKind({
+  ledgerStatus,
+  bookingStatus,
+  sessionStatus,
+  paymentIntentStatus,
+}: {
+  ledgerStatus: unknown;
+  bookingStatus: unknown;
+  sessionStatus: unknown;
+  paymentIntentStatus: unknown;
+}): PaymentStatusKind {
+  const ledger = normalizeStatus(ledgerStatus);
+  const booking = normalizeStatus(bookingStatus);
+  const session = normalizeStatus(sessionStatus);
+  const intent = normalizeStatus(paymentIntentStatus);
+
+  const terminalStatuses = [ledger, booking];
+
+  if (
+    terminalStatuses.some(
+      (status) =>
+        status === "refunded" ||
+        status === "partially_refunded" ||
+        status.includes("refund"),
+    )
+  ) {
+    return "refunded";
+  }
+
+  if (
+    terminalStatuses.some(
+      (status) =>
+        status === "disputed" ||
+        status === "chargeback" ||
+        status.includes("dispute"),
+    )
+  ) {
+    return "disputed";
+  }
+
+  if (
+    terminalStatuses.some(
+      (status) =>
+        status === "failed" ||
+        status === "canceled" ||
+        status === "cancelled" ||
+        status === "expired",
+    ) ||
+    intent === "requires_payment_method" ||
+    intent === "canceled"
+  ) {
+    return "failed";
+  }
+
+  if (
+    session === "paid" ||
+    session === "no_payment_required" ||
+    intent === "succeeded" ||
+    ledger === "paid" ||
+    booking === "paid"
+  ) {
+    return "paid";
+  }
+
+  if (
+    session === "processing" ||
+    intent === "processing" ||
+    ledger === "processing" ||
+    booking === "processing"
+  ) {
+    return "processing";
+  }
+
+  if (
+    session === "unpaid" ||
+    ledger === "pending" ||
+    booking === "pending" ||
+    intent === "requires_action" ||
+    intent === "requires_confirmation"
+  ) {
+    return "pending";
+  }
+
+  return "unknown";
+}
+
+function getStatusPresentation(
+  kind: PaymentStatusKind,
+  failureMessage: string,
+) {
+  if (kind === "paid") {
+    return {
+      icon: "✅",
+      eyebrow: "Booking Confirmed",
+      title: "Your booking is confirmed.",
+      description:
+        "Your payment was processed and the booking is recorded in SitGuru.",
+      iconClass: "bg-emerald-100",
+      badgeClass: "text-emerald-700",
+      noticeClass: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    };
+  }
+
+  if (kind === "processing") {
+    return {
+      icon: "⏳",
+      eyebrow: "Payment Processing",
+      title: "Your payment is processing.",
+      description:
+        "SitGuru received your booking request. We will update the booking as soon as the payment processor finishes.",
+      iconClass: "bg-sky-100",
+      badgeClass: "text-sky-700",
+      noticeClass: "border-sky-200 bg-sky-50 text-sky-900",
+    };
+  }
+
+  if (kind === "pending") {
+    return {
+      icon: "🕒",
+      eyebrow: "Confirmation Pending",
+      title: "We are confirming your payment.",
+      description:
+        "Your booking request was received, but payment confirmation is still pending.",
+      iconClass: "bg-amber-100",
+      badgeClass: "text-amber-700",
+      noticeClass: "border-amber-200 bg-amber-50 text-amber-900",
+    };
+  }
+
+  if (kind === "refunded") {
+    return {
+      icon: "↩️",
+      eyebrow: "Payment Refunded",
+      title: "This payment has been refunded.",
+      description:
+        "The payment ledger shows a full or partial refund. Review your booking dashboard for the latest details.",
+      iconClass: "bg-violet-100",
+      badgeClass: "text-violet-700",
+      noticeClass: "border-violet-200 bg-violet-50 text-violet-900",
+    };
+  }
+
+  if (kind === "disputed") {
+    return {
+      icon: "⚠️",
+      eyebrow: "Payment Under Review",
+      title: "This payment is under review.",
+      description:
+        "A payment dispute or chargeback is associated with this booking. SitGuru support will keep the booking record updated.",
+      iconClass: "bg-orange-100",
+      badgeClass: "text-orange-700",
+      noticeClass: "border-orange-200 bg-orange-50 text-orange-900",
+    };
+  }
+
+  if (kind === "failed") {
+    return {
+      icon: "❗",
+      eyebrow: "Payment Needs Attention",
+      title: "Your payment was not completed.",
+      description:
+        failureMessage ||
+        "The payment processor could not complete this payment. Return to your bookings to try again.",
+      iconClass: "bg-rose-100",
+      badgeClass: "text-rose-700",
+      noticeClass: "border-rose-200 bg-rose-50 text-rose-900",
+    };
+  }
+
+  return {
+    icon: "🔎",
+    eyebrow: "Verification In Progress",
+    title: "We are checking your booking.",
+    description:
+      "SitGuru could not confirm the final payment status yet. Your dashboard will show the latest verified booking status.",
+    iconClass: "bg-slate-100",
+    badgeClass: "text-slate-700",
+    noticeClass: "border-slate-200 bg-slate-50 text-slate-900",
+  };
+}
+
+function resolveAmountCents({
+  ledger,
+  session,
+  booking,
+}: {
+  ledger: PaymentLedgerRow | null;
+  session: Stripe.Checkout.Session | null;
+  booking: BookingRow | null;
+}) {
+  const ledgerAmount = safeNumber(ledger?.amount_cents);
+
+  if (ledgerAmount !== null) {
+    return Math.max(0, Math.round(ledgerAmount));
+  }
+
+  if (typeof session?.amount_total === "number") {
+    return session.amount_total;
+  }
+
+  return dollarsToCents(
+    firstNonEmpty(
+      booking?.checkout_amount,
+      booking?.total_customer_paid,
+      booking?.customer_total_amount,
+      booking?.amount_total,
+    ),
+  );
+}
+
+function resolvePaymentMethodLabel({
+  ledger,
+  booking,
+  snapshot,
+}: {
+  ledger: PaymentLedgerRow | null;
+  booking: BookingRow | null;
+  snapshot: StripeSessionSnapshot;
+}) {
+  const cardBrand = firstNonEmpty(snapshot.cardBrand, ledger?.card_brand);
+  const cardLast4 = firstNonEmpty(snapshot.cardLast4, ledger?.card_last4);
+
+  if (cardBrand && cardLast4) {
+    return `${humanize(cardBrand)} ending in ${cardLast4}`;
+  }
+
+  if (cardLast4) {
+    return `Card ending in ${cardLast4}`;
+  }
+
+  const storedLabel = firstNonEmpty(
+    ledger?.payment_method_label,
+    booking?.payment_method_label,
+  );
+
+  if (storedLabel) {
+    return humanize(storedLabel);
+  }
+
+  const paymentMethodType = firstNonEmpty(
+    snapshot.paymentMethodType,
+    ledger?.payment_method_type,
+    booking?.payment_method_type,
+  );
+
+  return paymentMethodType
+    ? humanize(paymentMethodType)
+    : "Stripe Checkout";
+}
+
+function resolveRawStatus({
+  ledger,
+  booking,
+  snapshot,
+}: {
+  ledger: PaymentLedgerRow | null;
+  booking: BookingRow | null;
+  snapshot: StripeSessionSnapshot;
+}) {
+  return firstNonEmpty(
+    ledger?.status,
+    booking?.payment_status,
+    snapshot.session?.payment_status,
+    snapshot.paymentIntentStatus,
+  );
 }
 
 function ConfettiBurst() {
@@ -225,6 +782,7 @@ function ConfettiBurst() {
   );
 }
 
+
 export default async function BookingSuccessPage({
   searchParams,
 }: SuccessPageProps) {
@@ -234,38 +792,144 @@ export default async function BookingSuccessPage({
     safeString(resolvedSearchParams.bookingId) ||
     safeString(resolvedSearchParams.booking_id);
 
-  const booking = sessionId
-    ? await getBookingFromSession(sessionId, fallbackBookingId)
-    : fallbackBookingId
-      ? await getBookingFromSession("", fallbackBookingId)
-      : null;
+  const [snapshot, userId] = await Promise.all([
+    getStripeSessionSnapshot(sessionId),
+    getAuthenticatedUserId(),
+  ]);
 
-  const isLiveMode = booking?.livemode === true;
+  const bookingId =
+    safeString(snapshot.session?.metadata?.booking_id) ||
+    safeString(snapshot.session?.metadata?.bookingId) ||
+    fallbackBookingId;
+
+  const booking = await fetchOwnedBooking(bookingId, userId);
+
+  const ledger = await fetchOwnedPaymentLedger({
+    sessionId,
+    bookingId,
+    userId,
+  });
+
+  const statusKind = resolvePaymentStatusKind({
+    ledgerStatus: ledger?.status,
+    bookingStatus: booking?.payment_status,
+    sessionStatus: snapshot.session?.payment_status,
+    paymentIntentStatus: snapshot.paymentIntentStatus,
+  });
+
+  const failureMessage = firstNonEmpty(
+    snapshot.failureMessage,
+    ledger?.failure_message,
+    booking?.payment_failure_message,
+  );
+
+  const presentation = getStatusPresentation(statusKind, failureMessage);
+  const rawStatus = resolveRawStatus({
+    ledger,
+    booking,
+    snapshot,
+  });
+
+  const currency = firstNonEmpty(
+    ledger?.currency,
+    snapshot.session?.currency,
+    booking?.currency,
+    "usd",
+  );
+
+  const amountCents = resolveAmountCents({
+    ledger,
+    session: snapshot.session,
+    booking,
+  });
+
+  const provider = firstNonEmpty(
+    ledger?.provider,
+    booking?.payment_provider,
+    snapshot.session ? "stripe" : "",
+  );
+
+  const paymentMethodLabel = resolvePaymentMethodLabel({
+    ledger,
+    booking,
+    snapshot,
+  });
+
+  const receiptUrl = firstNonEmpty(
+    snapshot.receiptUrl,
+    ledger?.receipt_url,
+    booking?.receipt_url,
+    booking?.stripe_receipt_url,
+  );
+
+  const customerEmail = firstNonEmpty(
+    snapshot.session?.customer_details?.email,
+    snapshot.session?.customer_email,
+    booking?.customer_email,
+  );
+
+  const serviceLabel = firstNonEmpty(
+    booking?.service,
+    booking?.service_name,
+    booking?.service_type,
+  );
+
+  const petName = firstNonEmpty(
+    booking?.pet_name,
+    booking?.petName,
+  );
+
+  const bookingDate = formatBookingDate(
+    firstNonEmpty(
+      booking?.booking_date,
+      booking?.service_date,
+      booking?.start_date,
+    ),
+  );
+
+  const isLiveMode = snapshot.session?.livemode === true;
   const isTestMode =
-    booking?.livemode === false || sessionId.toLowerCase().startsWith("cs_test_");
+    snapshot.session?.livemode === false ||
+    sessionId.toLowerCase().startsWith("cs_test_");
+
+  const showConfetti = statusKind === "paid";
+  const verificationWarning =
+    snapshot.error && !ledger && !booking ? snapshot.error : "";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.10),_transparent_28%),linear-gradient(to_bottom_right,_#ecfdf5,_#f8fafc,_#ffffff)] px-4 py-10 sm:px-6 lg:px-8">
-      <ConfettiBurst />
+      {showConfetti ? <ConfettiBurst /> : null}
 
       <div className="mx-auto max-w-3xl">
         <section className="relative rounded-[32px] border border-emerald-100 bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-10">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl shadow-[0_10px_30px_rgba(16,185,129,0.18)]">
-            ✅
+          <div
+            className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl shadow-[0_10px_30px_rgba(15,23,42,0.10)] ${presentation.iconClass}`}
+          >
+            {presentation.icon}
           </div>
 
-          <p className="mt-6 text-center text-xs font-semibold uppercase tracking-[0.26em] text-emerald-700">
-            Booking Confirmed
+          <p
+            className={`mt-6 text-center text-xs font-semibold uppercase tracking-[0.26em] ${presentation.badgeClass}`}
+          >
+            {presentation.eyebrow}
           </p>
 
           <h1 className="mt-3 text-center text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">
-            Your booking request was successfully submitted.
+            {presentation.title}
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-center text-base leading-7 text-slate-600">
-            Thank you for booking with SitGuru. Your payment was processed and your
-            request has been recorded.
+            {presentation.description}
           </p>
+
+          {verificationWarning ? (
+            <div
+              className={`mx-auto mt-6 max-w-2xl rounded-2xl border px-5 py-4 text-center ${presentation.noticeClass}`}
+            >
+              <p className="text-sm font-black">Payment verification notice</p>
+              <p className="mt-1 text-sm leading-6">{verificationWarning}</p>
+            </div>
+          ) : null}
 
           {isTestMode ? (
             <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-center">
@@ -273,33 +937,79 @@ export default async function BookingSuccessPage({
                 Test mode payment
               </p>
               <p className="mt-1 text-sm leading-6 text-amber-800/90">
-                This booking was completed in Stripe sandbox/test mode. No live
-                customer money was charged.
+                This checkout used Stripe test mode. No live customer money was
+                charged.
               </p>
             </div>
           ) : isLiveMode ? (
             <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-center">
               <p className="text-sm font-black text-emerald-800">
-                Live payment
+                Secure live payment
               </p>
               <p className="mt-1 text-sm leading-6 text-emerald-800/90">
-                This booking was completed through live Stripe checkout.
+                This payment was processed through SitGuru&apos;s live Stripe
+                checkout.
               </p>
             </div>
           ) : null}
 
           <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-6">
-            <h2 className="text-3xl font-black tracking-tight text-slate-950">
-              Booking summary
-            </h2>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                  SitGuru payment record
+                </p>
+                <h2 className="mt-1 text-3xl font-black tracking-tight text-slate-950">
+                  Booking summary
+                </h2>
+              </div>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              {receiptUrl ? (
+                <a
+                  href={receiptUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-10 items-center justify-center rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+                >
+                  View Stripe receipt
+                </a>
+              ) : null}
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Session ID
+                  Payment Status
                 </p>
-                <p className="mt-2 break-all text-sm font-medium text-slate-800">
-                  {sessionId || "Not available"}
+                <p className="mt-2 text-sm font-black text-slate-900">
+                  {humanize(rawStatus) || humanize(statusKind)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Amount
+                </p>
+                <p className="mt-2 text-sm font-black text-slate-900">
+                  {formatMoney(amountCents, currency)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Payment Provider
+                </p>
+                <p className="mt-2 text-sm font-medium text-slate-800">
+                  {provider ? humanize(provider) : "Not available"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Payment Method
+                </p>
+                <p className="mt-2 text-sm font-medium text-slate-800">
+                  {paymentMethodLabel}
                 </p>
               </div>
 
@@ -308,16 +1018,7 @@ export default async function BookingSuccessPage({
                   Booking ID
                 </p>
                 <p className="mt-2 break-all text-sm font-medium text-slate-800">
-                  {safeString(booking?.id) || fallbackBookingId || "Pending"}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Payment Status
-                </p>
-                <p className="mt-2 text-sm font-medium text-slate-800">
-                  {safeString(booking?.payment_status) || "Paid"}
+                  {bookingId || "Pending"}
                 </p>
               </div>
 
@@ -326,41 +1027,95 @@ export default async function BookingSuccessPage({
                   Customer Email
                 </p>
                 <p className="mt-2 break-all text-sm font-medium text-slate-800">
-                  {safeString(booking?.customer_email) || "Not available"}
+                  {customerEmail || "Available in your account"}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Payment Mode
-                </p>
-                <p className="mt-2 text-sm font-medium text-slate-800">
-                  {isLiveMode ? "Live" : isTestMode ? "Test / Sandbox" : "Not available"}
-                </p>
-              </div>
+              {serviceLabel ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Service
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-slate-800">
+                    {serviceLabel}
+                  </p>
+                </div>
+              ) : null}
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Amount
-                </p>
-                <p className="mt-2 text-sm font-medium text-slate-800">
-                  {formatMoney(booking?.amount_total, booking?.currency)}
-                </p>
-              </div>
+              {petName || bookingDate ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Care Details
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-slate-800">
+                    {[petName, bookingDate].filter(Boolean).join(" • ")}
+                  </p>
+                </div>
+              ) : null}
             </div>
+
+            <details className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+              <summary className="cursor-pointer text-sm font-black text-slate-800">
+                Payment references
+              </summary>
+
+              <div className="mt-4 grid gap-3 text-xs text-slate-600">
+                <div>
+                  <p className="font-black uppercase tracking-[0.12em] text-slate-500">
+                    Checkout Session
+                  </p>
+                  <p className="mt-1 break-all font-medium">
+                    {sessionId || "Not available"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-black uppercase tracking-[0.12em] text-slate-500">
+                    Payment Intent
+                  </p>
+                  <p className="mt-1 break-all font-medium">
+                    {firstNonEmpty(
+                      snapshot.paymentIntentId,
+                      ledger?.stripe_payment_intent_id,
+                      booking?.stripe_payment_intent_id,
+                    ) || "Not available"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-black uppercase tracking-[0.12em] text-slate-500">
+                    Charge
+                  </p>
+                  <p className="mt-1 break-all font-medium">
+                    {firstNonEmpty(
+                      snapshot.chargeId,
+                      ledger?.stripe_charge_id,
+                      booking?.stripe_charge_id,
+                    ) || "Not available"}
+                  </p>
+                </div>
+              </div>
+            </details>
           </div>
 
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Link
               href="/customer/dashboard"
-              className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
+              className="inline-flex min-h-12 items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-bold text-white transition hover:bg-emerald-800"
             >
               Go to Customer Dashboard
             </Link>
 
             <Link
+              href="/bookings"
+              className="inline-flex min-h-12 items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
+            >
+              View My Bookings
+            </Link>
+
+            <Link
               href="/search"
-              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-50"
+              className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-800 transition hover:bg-slate-50"
             >
               Browse More Gurus
             </Link>
