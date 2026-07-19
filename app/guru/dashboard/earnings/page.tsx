@@ -277,52 +277,78 @@ async function callGuruPayPalOnboardingApi({
   refresh?: boolean;
   forceNew?: boolean;
 }): Promise<PayPalOnboardingResponse> {
-  const origin = await getSharedApiOrigin();
-  const url = new URL("/api/paypal/onboarding", origin);
+  try {
+    const origin = await getSharedApiOrigin();
+    const url = new URL("/api/paypal/onboarding", origin);
 
-  if (refresh) {
-    url.searchParams.set("refresh", "true");
-  }
+    if (refresh) {
+      url.searchParams.set("refresh", "true");
+    }
 
-  const response = await fetch(url.toString(), {
-    method,
-    cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      ...(method === "POST"
-        ? { "Content-Type": "application/json" }
-        : {}),
-    },
-    body:
-      method === "POST"
-        ? JSON.stringify({
-            forceNew,
-          })
-        : undefined,
-  });
+    const response = await fetch(url.toString(), {
+      method,
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...(method === "POST"
+          ? { "Content-Type": "application/json" }
+          : {}),
+      },
+      body:
+        method === "POST"
+          ? JSON.stringify({
+              forceNew,
+            })
+          : undefined,
+    });
 
-  const payload = (await response.json().catch(() => null)) as
-    | PayPalOnboardingResponse
-    | null;
+    const responseText = await response.text();
+    let payload: PayPalOnboardingResponse | null = null;
 
-  if (!payload) {
+    try {
+      payload = responseText
+        ? (JSON.parse(responseText) as PayPalOnboardingResponse)
+        : null;
+    } catch {
+      console.error("PayPal onboarding returned non-JSON data:", {
+        status: response.status,
+        responseText: responseText.slice(0, 1200),
+      });
+    }
+
+    if (!payload) {
+      return {
+        success: false,
+        error:
+          response.status >= 500
+            ? "PayPal setup is temporarily unavailable. Please try again."
+            : "SitGuru could not read the PayPal onboarding response.",
+      };
+    }
+
+    if (!response.ok || !payload.success) {
+      return {
+        ...payload,
+        success: false,
+        error:
+          payload.error ||
+          payload.message ||
+          "SitGuru could not load or start PayPal onboarding.",
+      };
+    }
+
+    return payload;
+  } catch (error) {
+    console.error("PayPal onboarding request failed:", error);
+
     return {
-      success: false,
-      error: "SitGuru could not read the PayPal onboarding response.",
-    };
-  }
-
-  if (!response.ok || !payload.success) {
-    return {
-      ...payload,
       success: false,
       error:
-        payload.error ||
-        "SitGuru could not load or start PayPal onboarding.",
+        error instanceof Error
+          ? error.message
+          : "SitGuru could not connect to PayPal onboarding.",
     };
   }
-
-  return payload;
 }
 
 function getSafePayPalOnboardingUrl(value?: string | null) {
@@ -442,23 +468,12 @@ async function startGuruPayPalOnboarding(formData: FormData) {
     redirect("/guru/login");
   }
 
-  const preferenceResult = await callGuruPayoutSetupApi({
-    accessToken: session.access_token,
-    method: "PATCH",
-    provider: "paypal",
-  });
-
-  if (!preferenceResult.success) {
-    redirect(
-      buildEarningsStatusUrl({
-        paypal: "error",
-        paypalMessage:
-          preferenceResult.error ||
-          "SitGuru could not save PayPal as your payout preference.",
-      }),
-    );
-  }
-
+  /*
+    The PayPal onboarding endpoint saves PayPal as the Guru payout preference
+    when it creates or renews the Partner Referrals onboarding record.
+    Do not call /api/payouts/setup first; that duplicate write can fail before
+    PayPal has a chance to open.
+  */
   const result = await callGuruPayPalOnboardingApi({
     accessToken: session.access_token,
     method: "POST",
@@ -468,7 +483,6 @@ async function startGuruPayPalOnboarding(formData: FormData) {
   if (!result.success) {
     redirect(
       buildEarningsStatusUrl({
-        payoutSaved: "paypal",
         paypal: "error",
         paypalMessage:
           result.error || "SitGuru could not start PayPal onboarding.",
@@ -1045,8 +1059,8 @@ function PayoutSetupCard({
                   </span>
                 </div>
                 <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
-                  Connect a PayPal Business account and finish setup securely
-                  on PayPal.
+                  Continue to PayPal to connect a Business account. PayPal
+                  securely collects your identity and bank information.
                 </p>
               </div>
             </div>
