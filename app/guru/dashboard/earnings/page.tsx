@@ -11,8 +11,10 @@ import {
   CheckCircle2,
   Clock3,
   DollarSign,
+  ExternalLink,
   HelpCircle,
   PiggyBank,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Users,
@@ -23,9 +25,9 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_SITGURU_FEE_PERCENT = 0.15;
-const MIN_SITGURU_FEE_PERCENT = 15;
-const MAX_SITGURU_FEE_PERCENT = 20;
+const DEFAULT_SITGURU_FEE_PERCENT = 0;
+const MIN_SITGURU_FEE_PERCENT = 0;
+const MAX_SITGURU_FEE_PERCENT = 0;
 
 type GuruProfile = {
   id?: string | number | null;
@@ -98,6 +100,36 @@ type GuruPayoutSetupResponse = {
   message?: string;
   error?: string;
   setup?: GuruPayoutSetup;
+};
+
+type PayPalOnboardingAccount = {
+  id?: string | null;
+  provider?: "paypal";
+  providerMerchantId?: string | null;
+  providerEmail?: string | null;
+  onboardingStatus?: string | null;
+  accountStatus?: string | null;
+  detailsSubmitted?: boolean;
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+  isDefault?: boolean;
+  isLive?: boolean;
+  connectedAt?: string | null;
+  onboardingCompletedAt?: string | null;
+  lastSyncedAt?: string | null;
+};
+
+type PayPalOnboardingResponse = {
+  success: boolean;
+  environment?: "sandbox" | "live" | string;
+  configured?: boolean;
+  statusRefreshAvailable?: boolean;
+  account?: PayPalOnboardingAccount | null;
+  refreshWarning?: string | null;
+  onboardingUrl?: string;
+  alreadyConnected?: boolean;
+  message?: string;
+  error?: string;
 };
 
 type EarningsPageSearchParams = Record<
@@ -234,6 +266,111 @@ async function callGuruPayoutSetupApi({
   return payload;
 }
 
+async function callGuruPayPalOnboardingApi({
+  accessToken,
+  method = "GET",
+  refresh = false,
+  forceNew = false,
+}: {
+  accessToken: string;
+  method?: "GET" | "POST";
+  refresh?: boolean;
+  forceNew?: boolean;
+}): Promise<PayPalOnboardingResponse> {
+  const origin = await getSharedApiOrigin();
+  const url = new URL("/api/paypal/onboarding", origin);
+
+  if (refresh) {
+    url.searchParams.set("refresh", "true");
+  }
+
+  const response = await fetch(url.toString(), {
+    method,
+    cache: "no-store",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      ...(method === "POST"
+        ? { "Content-Type": "application/json" }
+        : {}),
+    },
+    body:
+      method === "POST"
+        ? JSON.stringify({
+            forceNew,
+          })
+        : undefined,
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | PayPalOnboardingResponse
+    | null;
+
+  if (!payload) {
+    return {
+      success: false,
+      error: "SitGuru could not read the PayPal onboarding response.",
+    };
+  }
+
+  if (!response.ok || !payload.success) {
+    return {
+      ...payload,
+      success: false,
+      error:
+        payload.error ||
+        "SitGuru could not load or start PayPal onboarding.",
+    };
+  }
+
+  return payload;
+}
+
+function getSafePayPalOnboardingUrl(value?: string | null) {
+  if (!value) return null;
+
+  try {
+    const parsed = new URL(value);
+    const hostname = parsed.hostname.toLowerCase();
+    const isPayPalHost =
+      hostname === "paypal.com" || hostname.endsWith(".paypal.com");
+
+    if (parsed.protocol !== "https:" || !isPayPalHost) {
+      return null;
+    }
+
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function buildEarningsStatusUrl({
+  payoutSaved,
+  payoutStatus,
+  paypal,
+  paypalMessage,
+}: {
+  payoutSaved?: string;
+  payoutStatus?: string;
+  paypal?: string;
+  paypalMessage?: string;
+}) {
+  const params = new URLSearchParams();
+
+  if (payoutSaved) params.set("payoutSaved", payoutSaved);
+  if (payoutStatus) params.set("payoutStatus", payoutStatus);
+  if (paypal) params.set("paypal", paypal);
+  if (paypalMessage) {
+    params.set("paypal_message", paypalMessage.slice(0, 240));
+  }
+
+  const query = params.toString();
+
+  return query
+    ? `/guru/dashboard/earnings?${query}`
+    : "/guru/dashboard/earnings";
+}
+
 async function saveGuruPayoutProvider(formData: FormData) {
   "use server";
 
@@ -246,7 +383,7 @@ async function saveGuruPayoutProvider(formData: FormData) {
       : null;
 
   if (!provider) {
-    redirect("/guru/earnings?payoutStatus=invalid");
+    redirect("/guru/dashboard/earnings?payoutStatus=invalid");
   }
 
   const supabase = await createClient();
@@ -273,13 +410,154 @@ async function saveGuruPayoutProvider(formData: FormData) {
     provider,
   });
 
-  revalidatePath("/guru/earnings");
+  revalidatePath("/guru/dashboard/earnings");
 
   if (!result.success) {
-    redirect("/guru/earnings?payoutStatus=error");
+    redirect("/guru/dashboard/earnings?payoutStatus=error");
   }
 
-  redirect(`/guru/earnings?payoutSaved=${provider}`);
+  redirect(`/guru/dashboard/earnings?payoutSaved=${provider}`);
+}
+
+async function startGuruPayPalOnboarding(formData: FormData) {
+  "use server";
+
+  const forceNew = String(formData.get("forceNew") || "") === "true";
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    redirect("/guru/login");
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    redirect("/guru/login");
+  }
+
+  const preferenceResult = await callGuruPayoutSetupApi({
+    accessToken: session.access_token,
+    method: "PATCH",
+    provider: "paypal",
+  });
+
+  if (!preferenceResult.success) {
+    redirect(
+      buildEarningsStatusUrl({
+        paypal: "error",
+        paypalMessage:
+          preferenceResult.error ||
+          "SitGuru could not save PayPal as your payout preference.",
+      }),
+    );
+  }
+
+  const result = await callGuruPayPalOnboardingApi({
+    accessToken: session.access_token,
+    method: "POST",
+    forceNew,
+  });
+
+  if (!result.success) {
+    redirect(
+      buildEarningsStatusUrl({
+        payoutSaved: "paypal",
+        paypal: "error",
+        paypalMessage:
+          result.error || "SitGuru could not start PayPal onboarding.",
+      }),
+    );
+  }
+
+  revalidatePath("/guru/dashboard/earnings");
+
+  if (result.alreadyConnected || result.account?.payoutsEnabled) {
+    redirect(
+      buildEarningsStatusUrl({
+        payoutSaved: "paypal",
+        paypal: "connected",
+        paypalMessage:
+          result.message || "PayPal is connected and ready for payouts.",
+      }),
+    );
+  }
+
+  const onboardingUrl = getSafePayPalOnboardingUrl(result.onboardingUrl);
+
+  if (!onboardingUrl) {
+    redirect(
+      buildEarningsStatusUrl({
+        payoutSaved: "paypal",
+        paypal: "error",
+        paypalMessage:
+          "PayPal did not return a valid onboarding link. Please try again.",
+      }),
+    );
+  }
+
+  redirect(onboardingUrl);
+}
+
+async function refreshGuruPayPalOnboarding() {
+  "use server";
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    redirect("/guru/login");
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    redirect("/guru/login");
+  }
+
+  const result = await callGuruPayPalOnboardingApi({
+    accessToken: session.access_token,
+    method: "GET",
+    refresh: true,
+  });
+
+  revalidatePath("/guru/dashboard/earnings");
+
+  if (!result.success) {
+    redirect(
+      buildEarningsStatusUrl({
+        paypal: "error",
+        paypalMessage:
+          result.error || "SitGuru could not refresh PayPal status.",
+      }),
+    );
+  }
+
+  const isReady =
+    result.account?.payoutsEnabled === true ||
+    result.account?.onboardingStatus === "ready";
+
+  redirect(
+    buildEarningsStatusUrl({
+      paypal: isReady ? "connected" : "pending",
+      paypalMessage: isReady
+        ? "PayPal is connected and ready for eligible SitGuru payouts."
+        : result.refreshWarning ||
+          "PayPal setup is still pending. Complete any remaining steps in PayPal.",
+    }),
+  );
 }
 
 function currency(value: number) {
@@ -309,7 +587,7 @@ function roundMoney(value: number) {
 function normalizeFeePercent(value: unknown) {
   const parsed = toNumber(value);
 
-  if (parsed <= 0) return DEFAULT_SITGURU_FEE_PERCENT;
+  if (parsed <= 0) return 0;
 
   const percent = parsed > 1 ? parsed : parsed * 100;
   const clamped = Math.min(
@@ -609,12 +887,27 @@ function PayoutSetupCard({
   setup,
   loadError,
   saveStatus,
+  paypalStatus,
+  paypalMessage,
+  paypalOnboarding,
 }: {
   setup: GuruPayoutSetup | null;
   loadError?: string | null;
   saveStatus?: string | null;
+  paypalStatus?: string | null;
+  paypalMessage?: string | null;
+  paypalOnboarding: PayPalOnboardingResponse | null;
 }) {
   const setupComplete = Boolean(setup?.setupComplete);
+  const paypalAccount = paypalOnboarding?.account || null;
+  const paypalReady =
+    paypalAccount?.payoutsEnabled === true ||
+    paypalAccount?.onboardingStatus === "ready";
+  const paypalStarted = Boolean(paypalAccount);
+  const paypalEnvironment = paypalOnboarding?.environment || "sandbox";
+  const paypalConfigured = paypalOnboarding?.configured !== false;
+  const paypalRefreshAvailable =
+    paypalOnboarding?.statusRefreshAvailable !== false;
   const selectedProvider = setup?.selectedProvider || "set_up_later";
   const readyAccount = setup?.readyAccount || null;
   const providerOptions =
@@ -631,7 +924,7 @@ function PayoutSetupCard({
             provider: "paypal" as const,
             label: "PayPal",
             description:
-              "Choose PayPal as your marketplace payout provider.",
+              "Choose PayPal, then connect your PayPal Business account below.",
           },
           {
             provider: "set_up_later" as const,
@@ -656,6 +949,19 @@ function PayoutSetupCard({
       : saveStatus === "invalid"
         ? "Choose Stripe, PayPal, or Set up later."
         : loadError || null;
+
+  const paypalBannerClass =
+    paypalStatus === "connected"
+      ? "border-emerald-200 bg-emerald-50 !text-emerald-800"
+      : paypalStatus === "pending"
+        ? "border-amber-200 bg-amber-50 !text-amber-800"
+        : "border-rose-200 bg-rose-50 !text-rose-700";
+
+  const paypalStatusLabel = paypalReady
+    ? "Connected and ready"
+    : paypalStarted
+      ? humanizeStatus(paypalAccount?.onboardingStatus)
+      : "Not connected";
 
   return (
     <section className="rounded-[2rem] border border-emerald-200 bg-white p-6 shadow-sm">
@@ -704,6 +1010,15 @@ function PayoutSetupCard({
         </div>
       ) : null}
 
+      {paypalStatus && paypalMessage ? (
+        <div
+          role={paypalStatus === "error" ? "alert" : "status"}
+          className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-bold ${paypalBannerClass}`}
+        >
+          {paypalMessage}
+        </div>
+      ) : null}
+
       <div className="mt-6 grid gap-3">
         {providerOptions.map((option) => {
           const isSelected = selectedProvider === option.provider;
@@ -741,6 +1056,108 @@ function PayoutSetupCard({
             </form>
           );
         })}
+      </div>
+
+      <div className="mt-6 rounded-[1.5rem] border border-[#c9ddff] bg-[linear-gradient(135deg,#f7fbff_0%,#ffffff_52%,#eef7ff_100%)] p-5">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#003087] text-xl font-black text-white shadow-sm">
+              P
+            </div>
+
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-lg font-black !text-slate-950">
+                  PayPal Business payouts
+                </p>
+                <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-sky-700">
+                  {humanizeStatus(paypalEnvironment)}
+                </span>
+              </div>
+
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 !text-slate-700">
+                Connect a PayPal Business account so PayPal- and Venmo-funded
+                SitGuru bookings can be associated with your Guru account.
+                SitGuru never asks you to send payment details directly to a
+                Pet Parent.
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-2 text-xs font-black">
+                <span
+                  className={`rounded-full border px-3 py-1 ${
+                    paypalReady
+                      ? "border-emerald-200 bg-emerald-50 !text-emerald-700"
+                      : paypalStarted
+                        ? "border-amber-200 bg-amber-50 !text-amber-700"
+                        : "border-slate-200 bg-white !text-slate-600"
+                  }`}
+                >
+                  {paypalStatusLabel}
+                </span>
+
+                {paypalAccount?.providerEmail ? (
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 !text-slate-600">
+                    {paypalAccount.providerEmail}
+                  </span>
+                ) : null}
+
+                {paypalAccount?.providerMerchantId ? (
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 !text-slate-600">
+                    Merchant {paypalAccount.providerMerchantId}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col">
+            {paypalReady ? (
+              <div className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-black !text-white shadow-sm">
+                <CheckCircle2 className="h-4 w-4" />
+                PayPal connected
+              </div>
+            ) : (
+              <form action={startGuruPayPalOnboarding}>
+                <input
+                  type="hidden"
+                  name="forceNew"
+                  value={paypalStarted ? "false" : "true"}
+                />
+                <button
+                  type="submit"
+                  disabled={!paypalConfigured}
+                  className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-[#0070e0] px-5 py-3 text-sm font-black !text-white shadow-sm transition hover:bg-[#003087] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {paypalStarted ? "Continue PayPal setup" : "Connect PayPal"}
+                  <ExternalLink className="h-4 w-4" />
+                </button>
+              </form>
+            )}
+
+            <form action={refreshGuruPayPalOnboarding}>
+              <button
+                type="submit"
+                disabled={!paypalConfigured || !paypalRefreshAvailable}
+                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-black !text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh status
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {!paypalConfigured ? (
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold !text-rose-700">
+            PayPal onboarding is not configured. Contact SitGuru support.
+          </div>
+        ) : null}
+
+        {paypalOnboarding?.refreshWarning ? (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold !text-amber-800">
+            {paypalOnboarding.refreshWarning}
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -807,12 +1224,18 @@ export default async function GuruDashboardEarningsPage({
   const resolvedSearchParams = await Promise.resolve(searchParams || {});
   const payoutSavedParam = resolvedSearchParams.payoutSaved;
   const payoutStatusParam = resolvedSearchParams.payoutStatus;
+  const paypalStatusParam = resolvedSearchParams.paypal;
+  const paypalMessageParam = resolvedSearchParams.paypal_message;
   const payoutSaveStatus =
     typeof payoutSavedParam === "string"
       ? payoutSavedParam
       : typeof payoutStatusParam === "string"
         ? payoutStatusParam
         : null;
+  const paypalStatus =
+    typeof paypalStatusParam === "string" ? paypalStatusParam : null;
+  const paypalMessage =
+    typeof paypalMessageParam === "string" ? paypalMessageParam : null;
 
   const {
     data: { session },
@@ -833,6 +1256,13 @@ export default async function GuruDashboardEarningsPage({
   const payoutSetupError = payoutSetupResponse.success
     ? null
     : payoutSetupResponse.error || "SitGuru could not load payout setup.";
+
+  const paypalOnboardingResponse: PayPalOnboardingResponse | null =
+    session?.access_token
+      ? await callGuruPayPalOnboardingApi({
+          accessToken: session.access_token,
+        })
+      : null;
 
   const guruProfile = await getGuruProfile(user.id, user.email);
 
@@ -888,7 +1318,7 @@ export default async function GuruDashboardEarningsPage({
       .reduce((sum, row) => sum + row.net, 0),
   );
 
-  const sitguruFees = roundMoney(
+  const marketplaceSupportTotal = roundMoney(
     normalizedRows.reduce((sum, row) => sum + row.fee, 0),
   );
 
@@ -941,8 +1371,9 @@ export default async function GuruDashboardEarningsPage({
               <p className="mt-5 max-w-4xl text-base font-semibold leading-8 !text-slate-800 md:text-lg">
                 SitGuru is built to support Gurus with clear earnings and
                 transparent payouts. Earnings shown here reflect completed
-                bookings, payout status, and what you take home after the
-                applicable locality-based SitGuru fee.
+                bookings, payout status, and what you take home after any
+                applicable Marketplace Support amount. Marketplace Support is
+                currently free during SitGuru&apos;s launch period.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -1019,9 +1450,9 @@ export default async function GuruDashboardEarningsPage({
           />
 
           <StatCard
-            title="SitGuru Fees"
-            value={currency(sitguruFees)}
-            description="Total marketplace fees deducted"
+            title="Marketplace Support"
+            value={currency(marketplaceSupportTotal)}
+            description="Free during the current launch period"
             icon={<BadgeDollarSign className="h-6 w-6" />}
           />
         </section>
@@ -1034,12 +1465,12 @@ export default async function GuruDashboardEarningsPage({
                   Booking-by-booking breakdown
                 </p>
                 <p className="mt-1 text-sm font-semibold !text-slate-700">
-                  Gross amount — SitGuru fee = your net earnings
+                  Booking amount and your resulting net earnings
                 </p>
               </div>
 
               <p className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-black !text-emerald-700 ring-1 ring-emerald-100">
-                15%–20% marketplace fee
+                Marketplace Support: Free during launch
               </p>
             </div>
 
@@ -1051,7 +1482,7 @@ export default async function GuruDashboardEarningsPage({
                     <th className="px-5 py-4 font-black">Service</th>
                     <th className="px-5 py-4 font-black">Date</th>
                     <th className="px-5 py-4 font-black">Gross</th>
-                    <th className="px-5 py-4 font-black">Fee</th>
+                    <th className="px-5 py-4 font-black">Marketplace Support</th>
                     <th className="px-5 py-4 font-black">Net</th>
                     <th className="px-5 py-4 font-black">Status</th>
                   </tr>
@@ -1161,7 +1592,7 @@ export default async function GuruDashboardEarningsPage({
                         </div>
 
                         <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
-                          <p className="font-black !text-slate-600">Fee</p>
+                          <p className="font-black !text-slate-600">Marketplace Support</p>
                           <p className="mt-1 font-black !text-rose-500">
                             -{currency(item.fee)}
                           </p>
@@ -1200,6 +1631,9 @@ export default async function GuruDashboardEarningsPage({
               setup={payoutSetup}
               loadError={payoutSetupError}
               saveStatus={payoutSaveStatus}
+              paypalStatus={paypalStatus}
+              paypalMessage={paypalMessage}
+              paypalOnboarding={paypalOnboardingResponse}
             />
 
             <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
@@ -1221,8 +1655,9 @@ export default async function GuruDashboardEarningsPage({
                       Gross booking total
                     </p>
                     <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-                      The full service subtotal tied to the completed booking
-                      before the SitGuru fee is applied.
+                      The service subtotal tied to the completed booking
+                      before adjustments, refunds, or any future Marketplace
+                      Support amount.
                     </p>
                   </div>
                 </div>
@@ -1233,12 +1668,12 @@ export default async function GuruDashboardEarningsPage({
                   </div>
                   <div>
                     <p className="font-black !text-slate-950">
-                      SitGuru fee (15%–20%)
+                      Marketplace Support (currently free)
                     </p>
                     <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-                      A locality-based marketplace fee. The exact percentage
-                      varies by service area and is typically between 15% and
-                      20%.
+                      SitGuru is not deducting any Marketplace Support amount
+                      during the current launch period. Any future Marketplace
+                      Support amount will be disclosed before it applies.
                     </p>
                   </div>
                 </div>
@@ -1250,8 +1685,8 @@ export default async function GuruDashboardEarningsPage({
                   <div>
                     <p className="font-black !text-slate-950">Net earnings</p>
                     <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-                      What you take home after the applicable SitGuru fee is
-                      deducted. Customer tips pass through 100% to you.
+                      What you take home after any applicable Marketplace
+                      Support amount. Customer tips pass through 100% to you.
                     </p>
                   </div>
                 </div>
@@ -1325,14 +1760,13 @@ export default async function GuruDashboardEarningsPage({
 
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.18em] !text-emerald-700">
-                  Locality-based 15%–20% marketplace fee
+                  Marketplace Support is free during launch
                 </p>
                 <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 !text-slate-700">
-                  SitGuru’s current model is designed to keep earnings clear for
-                  Gurus while supporting secure payments, customer support,
-                  safety tools, and platform growth. The applicable fee may vary
-                  by service area, and customer tips pass through 100% to the
-                  Guru.
+                  SitGuru’s current launch model keeps Marketplace Support
+                  free for Gurus while preserving secure payments, customer
+                  support, safety tools, and transparent booking records.
+                  Customer tips pass through 100% to the Guru.
                 </p>
               </div>
             </div>
