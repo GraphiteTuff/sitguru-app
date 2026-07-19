@@ -1039,7 +1039,7 @@ function PayoutSetupCard({
           </div>
         </div>
       ) : (
-        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div
             className={`rounded-[1.5rem] border p-5 ${
               selectedProvider === "paypal"
@@ -1178,8 +1178,8 @@ function PayoutSetupCard({
       )}
 
       {!setupComplete ? (
-        <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-black !text-slate-950">
                 Not ready to connect an account?
@@ -1475,6 +1475,15 @@ export default async function GuruDashboardEarningsPage({
           />
         </section>
 
+        <PayoutSetupCard
+          setup={payoutSetup}
+          loadError={payoutSetupError}
+          saveStatus={payoutSaveStatus}
+          paypalStatus={paypalStatus}
+          paypalMessage={paypalMessage}
+          paypalOnboarding={paypalOnboardingResponse}
+        />
+
         <section className="grid gap-6 xl:grid-cols-[1.45fr_0.75fr]">
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-5 flex flex-col gap-3 border-b border-slate-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
@@ -1645,15 +1654,6 @@ export default async function GuruDashboardEarningsPage({
           </div>
 
           <div className="space-y-6">
-            <PayoutSetupCard
-              setup={payoutSetup}
-              loadError={payoutSetupError}
-              saveStatus={payoutSaveStatus}
-              paypalStatus={paypalStatus}
-              paypalMessage={paypalMessage}
-              paypalOnboarding={paypalOnboardingResponse}
-            />
-
             <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
               <p className="text-sm font-black uppercase tracking-[0.18em] !text-slate-800">
                 How earnings work
