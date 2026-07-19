@@ -899,55 +899,28 @@ function PayoutSetupCard({
   paypalOnboarding: PayPalOnboardingResponse | null;
 }) {
   const setupComplete = Boolean(setup?.setupComplete);
+  const selectedProvider = setup?.selectedProvider || "set_up_later";
   const paypalAccount = paypalOnboarding?.account || null;
   const paypalReady =
     paypalAccount?.payoutsEnabled === true ||
     paypalAccount?.onboardingStatus === "ready";
   const paypalStarted = Boolean(paypalAccount);
-  const paypalEnvironment = paypalOnboarding?.environment || "sandbox";
   const paypalConfigured = paypalOnboarding?.configured !== false;
   const paypalRefreshAvailable =
     paypalOnboarding?.statusRefreshAvailable !== false;
-  const selectedProvider = setup?.selectedProvider || "set_up_later";
-  const readyAccount = setup?.readyAccount || null;
-  const providerOptions =
-    setup?.providerOptions && setup.providerOptions.length > 0
-      ? setup.providerOptions
-      : [
-          {
-            provider: "stripe" as const,
-            label: "Stripe",
-            description:
-              "Connect Stripe before accepting your first paid SitGuru booking.",
-          },
-          {
-            provider: "paypal" as const,
-            label: "PayPal",
-            description:
-              "Choose PayPal, then connect your PayPal Business account below.",
-          },
-          {
-            provider: "set_up_later" as const,
-            label: "Set up later",
-            description:
-              "Finish your profile and receive requests before financial onboarding.",
-          },
-        ];
 
   const successMessage =
     saveStatus === "stripe"
-      ? "Stripe was selected and your payout preference was saved."
-      : saveStatus === "paypal"
-        ? "PayPal was selected and your payout preference was saved."
-        : saveStatus === "set_up_later"
-          ? "Payout setup was deferred. You can still appear in search and receive booking requests."
-          : null;
+      ? "Stripe is now your selected payout method."
+      : saveStatus === "set_up_later"
+        ? "No problem. You can finish payout setup later."
+        : null;
 
   const errorMessage =
     saveStatus === "error"
-      ? "SitGuru could not save your payout preference. Please try again."
+      ? "SitGuru could not save that choice. Please try again."
       : saveStatus === "invalid"
-        ? "Choose Stripe, PayPal, or Set up later."
+        ? "Choose PayPal, Stripe, or set up payouts later."
         : loadError || null;
 
   const paypalBannerClass =
@@ -957,23 +930,22 @@ function PayoutSetupCard({
         ? "border-amber-200 bg-amber-50 !text-amber-800"
         : "border-rose-200 bg-rose-50 !text-rose-700";
 
-  const paypalStatusLabel = paypalReady
-    ? "Connected and ready"
-    : paypalStarted
-      ? humanizeStatus(paypalAccount?.onboardingStatus)
-      : "Not connected";
-
   return (
     <section className="rounded-[2rem] border border-emerald-200 bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-black uppercase tracking-[0.18em] !text-emerald-700">
-            Payout setup
+            Getting paid
           </p>
           <h2 className="mt-2 text-3xl font-black tracking-tight !text-slate-950">
-            {setup?.messaging?.headline ||
-              "Set up payouts before accepting your first paid booking"}
+            {setupComplete
+              ? "Your payout account is ready"
+              : "Choose how you would like to get paid"}
           </h2>
+          <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 !text-slate-700">
+            Pick one option below. You will complete any bank or identity
+            details securely with PayPal or Stripe—not inside SitGuru.
+          </p>
         </div>
 
         <span
@@ -983,14 +955,9 @@ function PayoutSetupCard({
               : "border-amber-200 bg-amber-50 !text-amber-700"
           }`}
         >
-          {setupComplete ? "Payout ready" : "Setup not complete"}
+          {setupComplete ? "Ready" : "Action needed"}
         </span>
       </div>
-
-      <p className="mt-4 text-sm font-semibold leading-7 !text-slate-700">
-        {setup?.messaging?.description ||
-          "You can complete your Guru profile, appear in search, and receive booking requests before connecting a payout provider."}
-      </p>
 
       {successMessage ? (
         <div
@@ -1019,190 +986,192 @@ function PayoutSetupCard({
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-3">
-        {providerOptions.map((option) => {
-          const isSelected = selectedProvider === option.provider;
+      {paypalReady ? (
+        <div className="mt-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#003087] text-lg font-black text-white">
+                P
+              </div>
 
-          return (
-            <form action={saveGuruPayoutProvider} key={option.provider}>
-              <input type="hidden" name="provider" value={option.provider} />
-              <button
-                type="submit"
-                className={`flex w-full items-start justify-between gap-4 rounded-[1.25rem] border p-4 text-left transition ${
-                  isSelected
-                    ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-100"
-                    : "border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50"
-                }`}
-              >
-                <span>
-                  <span className="block font-black !text-slate-950">
-                    {option.label}
-                  </span>
-                  <span className="mt-1 block text-sm font-semibold leading-6 !text-slate-700">
-                    {option.description}
-                  </span>
-                </span>
-
-                <span
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${
-                    isSelected
-                      ? "bg-emerald-600 !text-white"
-                      : "bg-white !text-slate-600 ring-1 ring-slate-200"
-                  }`}
-                >
-                  {isSelected ? "Selected" : "Choose"}
-                </span>
-              </button>
-            </form>
-          );
-        })}
-      </div>
-
-      <div className="mt-6 rounded-[1.5rem] border border-[#c9ddff] bg-[linear-gradient(135deg,#f7fbff_0%,#ffffff_52%,#eef7ff_100%)] p-5">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#003087] text-xl font-black text-white shadow-sm">
-              P
-            </div>
-
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-lg font-black !text-slate-950">
-                  PayPal Business payouts
+              <div>
+                <p className="flex items-center gap-2 text-lg font-black !text-slate-950">
+                  PayPal is connected
+                  <CheckCircle2 className="h-5 w-5 !text-emerald-600" />
                 </p>
-                <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-sky-700">
-                  {humanizeStatus(paypalEnvironment)}
-                </span>
-              </div>
-
-              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 !text-slate-700">
-                Connect a PayPal Business account so PayPal- and Venmo-funded
-                SitGuru bookings can be associated with your Guru account.
-                SitGuru never asks you to send payment details directly to a
-                Pet Parent.
-              </p>
-
-              <div className="mt-3 flex flex-wrap gap-2 text-xs font-black">
-                <span
-                  className={`rounded-full border px-3 py-1 ${
-                    paypalReady
-                      ? "border-emerald-200 bg-emerald-50 !text-emerald-700"
-                      : paypalStarted
-                        ? "border-amber-200 bg-amber-50 !text-amber-700"
-                        : "border-slate-200 bg-white !text-slate-600"
-                  }`}
-                >
-                  {paypalStatusLabel}
-                </span>
-
+                <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
+                  PayPal and eligible Venmo-funded bookings can now be connected
+                  to your Guru payout account.
+                </p>
                 {paypalAccount?.providerEmail ? (
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 !text-slate-600">
+                  <p className="mt-2 text-sm font-black !text-emerald-800">
                     {paypalAccount.providerEmail}
-                  </span>
-                ) : null}
-
-                {paypalAccount?.providerMerchantId ? (
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 !text-slate-600">
-                    Merchant {paypalAccount.providerMerchantId}
-                  </span>
+                  </p>
                 ) : null}
               </div>
             </div>
-          </div>
-
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col">
-            {paypalReady ? (
-              <div className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-black !text-white shadow-sm">
-                <CheckCircle2 className="h-4 w-4" />
-                PayPal connected
-              </div>
-            ) : (
-              <form action={startGuruPayPalOnboarding}>
-                <input
-                  type="hidden"
-                  name="forceNew"
-                  value={paypalStarted ? "false" : "true"}
-                />
-                <button
-                  type="submit"
-                  disabled={!paypalConfigured}
-                  className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-[#0070e0] px-5 py-3 text-sm font-black !text-white shadow-sm transition hover:bg-[#003087] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {paypalStarted ? "Continue PayPal setup" : "Connect PayPal"}
-                  <ExternalLink className="h-4 w-4" />
-                </button>
-              </form>
-            )}
 
             <form action={refreshGuruPayPalOnboarding}>
               <button
                 type="submit"
                 disabled={!paypalConfigured || !paypalRefreshAvailable}
-                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-black !text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-emerald-300 bg-white px-5 py-2.5 text-sm font-black !text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RefreshCw className="h-4 w-4" />
-                Refresh status
+                Check connection
               </button>
             </form>
           </div>
         </div>
+      ) : (
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <div
+            className={`rounded-[1.5rem] border p-5 ${
+              selectedProvider === "paypal"
+                ? "border-[#0070e0] bg-[#f3f8ff] ring-2 ring-[#c9ddff]"
+                : "border-slate-200 bg-slate-50"
+            }`}
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#003087] text-lg font-black text-white">
+                P
+              </div>
 
-        {!paypalConfigured ? (
-          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold !text-rose-700">
-            PayPal onboarding is not configured. Contact SitGuru support.
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-lg font-black !text-slate-950">PayPal</p>
+                  <span className="rounded-full bg-[#eaf3ff] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-[#003087]">
+                    PayPal + Venmo
+                  </span>
+                </div>
+                <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
+                  Connect a PayPal Business account and finish setup securely
+                  on PayPal.
+                </p>
+              </div>
+            </div>
+
+            <form action={startGuruPayPalOnboarding} className="mt-5">
+              <input
+                type="hidden"
+                name="forceNew"
+                value={paypalStarted ? "false" : "true"}
+              />
+              <button
+                type="submit"
+                disabled={!paypalConfigured}
+                className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full bg-[#0070e0] px-5 py-3 text-sm font-black !text-white shadow-sm transition hover:bg-[#003087] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {paypalStarted ? "Continue PayPal setup" : "Connect PayPal"}
+                <ExternalLink className="h-4 w-4" />
+              </button>
+            </form>
+
+            {paypalStarted ? (
+              <form action={refreshGuruPayPalOnboarding} className="mt-2">
+                <button
+                  type="submit"
+                  disabled={!paypalConfigured || !paypalRefreshAvailable}
+                  className="inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-black !text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  I finished—check my status
+                </button>
+              </form>
+            ) : null}
           </div>
-        ) : null}
 
-        {paypalOnboarding?.refreshWarning ? (
-          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold !text-amber-800">
-            {paypalOnboarding.refreshWarning}
+          <div
+            className={`rounded-[1.5rem] border p-5 ${
+              selectedProvider === "stripe"
+                ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-100"
+                : "border-slate-200 bg-slate-50"
+            }`}
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#635bff] text-lg font-black text-white">
+                S
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-lg font-black !text-slate-950">Stripe</p>
+                  {selectedProvider === "stripe" ? (
+                    <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-white">
+                      Selected
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
+                  Choose Stripe Connect to receive eligible SitGuru payouts to
+                  your bank account.
+                </p>
+              </div>
+            </div>
+
+            <form action={saveGuruPayoutProvider} className="mt-5">
+              <input type="hidden" name="provider" value="stripe" />
+              <button
+                type="submit"
+                className={`inline-flex min-h-[50px] w-full items-center justify-center rounded-full px-5 py-3 text-sm font-black transition ${
+                  selectedProvider === "stripe"
+                    ? "border border-emerald-300 bg-white !text-emerald-800"
+                    : "bg-emerald-600 !text-white shadow-sm hover:bg-emerald-700"
+                }`}
+              >
+                {selectedProvider === "stripe"
+                  ? "Stripe selected"
+                  : "Choose Stripe"}
+              </button>
+            </form>
           </div>
-        ) : null}
-      </div>
-
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs font-black uppercase tracking-[0.14em] !text-slate-600">
-            Current preference
-          </p>
-          <p className="mt-2 text-lg font-black !text-slate-950">
-            {payoutProviderLabel(selectedProvider)}
-          </p>
-          <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-            {readyAccount
-              ? `${payoutProviderLabel(readyAccount.provider)} account: ${humanizeStatus(readyAccount.onboardingStatus)}`
-              : "No verified payout account is connected yet."}
-          </p>
         </div>
+      )}
 
-        <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs font-black uppercase tracking-[0.14em] !text-slate-600">
-            Booking access
-          </p>
-          <p className="mt-2 text-lg font-black !text-slate-950">
-            {setupComplete ? "Ready for paid bookings" : "Requests remain available"}
-          </p>
-          <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-            {setupComplete
-              ? setup?.messaging?.readyMessage ||
-                "Your payout account is ready for eligible SitGuru payouts."
-              : setup?.messaging?.blockedMessage ||
-                "Complete provider onboarding before accepting your first paid booking."}
-          </p>
+      {!setupComplete ? (
+        <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-black !text-slate-950">
+                Not ready to connect an account?
+              </p>
+              <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
+                You can still finish your profile and receive booking requests.
+                Connect a payout account before accepting your first paid booking.
+              </p>
+            </div>
+
+            <form action={saveGuruPayoutProvider}>
+              <input type="hidden" name="provider" value="set_up_later" />
+              <button
+                type="submit"
+                className={`inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-full border px-5 py-2.5 text-sm font-black transition ${
+                  selectedProvider === "set_up_later"
+                    ? "border-slate-300 bg-white !text-slate-700"
+                    : "border-slate-300 bg-white !text-slate-900 hover:bg-slate-100"
+                }`}
+              >
+                {selectedProvider === "set_up_later"
+                  ? "Saved for later"
+                  : "Do this later"}
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      <div className="mt-5 rounded-[1.25rem] border border-dashed border-emerald-200 bg-emerald-50 p-4">
-        <p className="text-sm font-black !text-emerald-800">
-          No payout setup is required during signup
-        </p>
-        <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-          Choosing a provider saves your SitGuru preference. Approved provider
-          onboarding and identity verification must still be completed before
-          the first paid booking can be accepted. Pet Parents always pay through
-          SitGuru checkout—never directly to a Guru.
-        </p>
-      </div>
+      {!paypalConfigured ? (
+        <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold !text-rose-700">
+          PayPal setup is temporarily unavailable. Please contact SitGuru
+          support.
+        </div>
+      ) : null}
+
+      {paypalOnboarding?.refreshWarning ? (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold !text-amber-800">
+          {paypalOnboarding.refreshWarning}
+        </div>
+      ) : null}
     </section>
   );
 }
