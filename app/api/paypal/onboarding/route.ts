@@ -705,7 +705,6 @@ async function savePayoutPreference({
       allow_setup_later: true,
       setup_required: !ready,
       setup_completed: ready,
-      setup_completed_at: ready ? now : null,
 
       metadata: {
         ...existingMetadata,
