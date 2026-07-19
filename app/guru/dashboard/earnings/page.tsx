@@ -957,8 +957,9 @@ function PayoutSetupCard({
               : "Choose how you would like to get paid"}
           </h2>
           <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 !text-slate-700">
-            Pick one option below. You will complete any bank or identity
-            details securely with PayPal or Stripe—not inside SitGuru.
+            Pick one option below. SitGuru offers many easy ways to help
+            you get paid. You will complete any bank or identity details
+            securely with PayPal or Stripe.
           </p>
         </div>
 
@@ -1038,7 +1039,7 @@ function PayoutSetupCard({
           </div>
         </div>
       ) : (
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
           <div
             className={`rounded-[1.5rem] border p-5 ${
               selectedProvider === "paypal"
@@ -1059,8 +1060,8 @@ function PayoutSetupCard({
                   </span>
                 </div>
                 <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
-                  Continue to PayPal to connect a Business account. PayPal
-                  securely collects your identity and bank information.
+                  Pet Parents can pay with PayPal or eligible Venmo. You receive
+                  eligible payouts in your connected PayPal Business account.
                 </p>
               </div>
             </div>
@@ -1110,6 +1111,9 @@ function PayoutSetupCard({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-lg font-black !text-slate-950">Stripe</p>
+                  <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-violet-700">
+                    Card + Apple Pay + Google Pay
+                  </span>
                   {selectedProvider === "stripe" ? (
                     <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-white">
                       Selected
@@ -1117,8 +1121,9 @@ function PayoutSetupCard({
                   ) : null}
                 </div>
                 <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
-                  Choose Stripe Connect to receive eligible SitGuru payouts to
-                  your bank account.
+                  Pet Parents can pay with cards, Apple Pay, Google Pay, or Link
+                  when available. You receive eligible payouts to your connected
+                  bank account or supported debit card.
                 </p>
               </div>
             </div>
@@ -1138,6 +1143,36 @@ function PayoutSetupCard({
                   : "Choose Stripe"}
               </button>
             </form>
+          </div>
+
+          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 opacity-85">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#6d1ed4] text-lg font-black text-white">
+                Z
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-lg font-black !text-slate-950">Zelle</p>
+                  <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-violet-700">
+                    Future option
+                  </span>
+                </div>
+                <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
+                  Planned as a future Guru payout option to an eligible enrolled
+                  U.S. business bank account. Pet Parents will continue paying
+                  through SitGuru checkout.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled
+              className="mt-5 inline-flex min-h-[50px] w-full cursor-not-allowed items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-black !text-slate-500 opacity-80"
+            >
+              Not yet available
+            </button>
           </div>
         </div>
       )}
