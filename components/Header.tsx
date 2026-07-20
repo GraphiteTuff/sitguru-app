@@ -1189,38 +1189,6 @@ export default function Header({ user = null }: HeaderProps) {
         </div>
       ) : null}
 
-      <style jsx global>{`
-        .sg-site-header {
-          font-family:
-            Inter,
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
-        }
-        .sg-site-header *,
-        .sg-site-header a,
-        .sg-site-header button,
-        .sg-site-header span,
-        .sg-site-header p {
-          font-family:
-            Inter,
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
-          text-rendering: geometricPrecision;
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-        }
-        .sg-site-header a:hover {
-          text-decoration: none;
-        }
-      `}</style>
     </header>
   );
 }
