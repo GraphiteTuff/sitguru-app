@@ -7,12 +7,6 @@ import GuruRecognitionBadge from "@/components/guru/GuruRecognitionBadge";
 
 export const dynamic = "force-dynamic";
 
-const SITE_FONT_STYLE = {
-  fontFamily:
-    '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  fontWeight: 300,
-};
-
 type GuruProfile = {
   id?: string | number | null;
   user_id?: string | null;
@@ -1922,10 +1916,7 @@ export default async function GuruDashboardPage() {
   });
 
   return (
-    <main
-      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light text-slate-900"
-      style={SITE_FONT_STYLE}
-    >
+    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] text-slate-900">
       <section className="mx-auto max-w-[1440px] px-5 py-8 sm:px-6 lg:px-8">
         <section className="overflow-hidden rounded-[2.3rem] border border-white bg-[radial-gradient(circle_at_18%_15%,rgba(255,255,255,0.42)_0%,transparent_28%),linear-gradient(105deg,#03d39c_0%,#72dec5_45%,#b9e3ff_100%)] shadow-[0_24px_52px_rgba(15,23,42,0.12)]">
           <div className="grid gap-8 p-8 lg:grid-cols-[1.15fr_340px] lg:items-center lg:p-10">
