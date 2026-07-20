@@ -1190,12 +1190,7 @@ function GuruDashboardMessagesPageContent() {
   if (loading) {
     return (
       <main
-        className="bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] pb-10 text-slate-950"
-        style={{
-          fontFamily:
-            '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontWeight: 300,
-        }}
+        className="bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] pb-10 font-sans text-slate-950 [&_button]:font-sans [&_input]:font-sans [&_option]:font-sans [&_select]:font-sans [&_textarea]:font-sans"
       >
         <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
           <div className="rounded-[2rem] border border-emerald-100 bg-white p-8 text-center shadow-sm">
@@ -1214,12 +1209,7 @@ function GuruDashboardMessagesPageContent() {
 
   return (
     <main
-      className="bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] pb-10 text-slate-950"
-      style={{
-        fontFamily:
-          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontWeight: 300,
-      }}
+      className="bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] pb-10 font-sans text-slate-950 [&_button]:font-sans [&_input]:font-sans [&_option]:font-sans [&_select]:font-sans [&_textarea]:font-sans"
     >
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
@@ -1632,12 +1622,7 @@ function GuruDashboardMessagesPageContent() {
 function GuruDashboardMessagesFallback() {
   return (
     <main
-      className="bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] pb-10 text-slate-950"
-      style={{
-        fontFamily:
-          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontWeight: 300,
-      }}
+      className="bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] pb-10 font-sans text-slate-950 [&_button]:font-sans [&_input]:font-sans [&_option]:font-sans [&_select]:font-sans [&_textarea]:font-sans"
     >
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
         <div className="rounded-[2rem] border border-emerald-100 bg-white p-8 text-center shadow-sm">
