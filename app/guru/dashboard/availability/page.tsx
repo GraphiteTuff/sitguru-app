@@ -960,13 +960,7 @@ export default function GuruAvailabilityPage() {
   }
 
   return (
-    <main
-      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffc_42%,#ecfdf5_100%)]"
-      style={{
-        fontFamily:
-          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      }}
-    >
+    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffc_42%,#ecfdf5_100%)]">
       <div className="mx-auto max-w-[1500px] px-4 py-6 md:px-6 lg:px-8">
         <section className="rounded-[2.25rem] border border-emerald-100 bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] md:p-8">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">

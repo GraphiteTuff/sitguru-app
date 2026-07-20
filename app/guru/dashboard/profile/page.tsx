@@ -796,12 +796,7 @@ async function saveGuruPayload({
 function GuruProfileLoadingFallback() {
   return (
     <main
-      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-10 font-light !text-slate-950 md:px-6 lg:px-8"
-      style={{
-        fontFamily:
-          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontWeight: 300,
-      }}
+      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-10 !text-slate-950 md:px-6 lg:px-8"
     >
       <div className="mx-auto flex max-w-6xl items-center justify-center">
         <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-sm">
@@ -1669,12 +1664,7 @@ function GuruDashboardProfilePageContent() {
 
   return (
     <main
-      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light !text-slate-950"
-      style={{
-        fontFamily:
-          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        fontWeight: 300,
-      }}
+      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] !text-slate-950"
     >
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
         <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
