@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 
 const heroVideoPath = "/videos/sitguru-homepage-hero.mp4";
 const heroVideoPosterPath = "/images/sitguru-homepage-hero-poster.jpg";
+const heroVideoPlaybackRate = 0.8;
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
 const sitGuruVideoEmbedUrl =
   "https://www.youtube.com/embed/Jk5vWCWvvKs?si=12529oKyk7IFLtAj";
@@ -1509,6 +1510,8 @@ function HeroVisual() {
     const video = videoRef.current;
     if (!video) return;
 
+    video.playbackRate = heroVideoPlaybackRate;
+
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
@@ -1551,6 +1554,9 @@ function HeroVisual() {
         playsInline
         preload="metadata"
         aria-hidden="true"
+        onLoadedMetadata={(event) => {
+          event.currentTarget.playbackRate = heroVideoPlaybackRate;
+        }}
         onPlay={() => setIsVideoPaused(false)}
         onPause={() => setIsVideoPaused(true)}
       >
@@ -1558,7 +1564,7 @@ function HeroVisual() {
       </video>
 
       <div className="absolute inset-0 bg-slate-950/20" />
-      <div className="absolute inset-y-0 left-0 w-[78%] bg-gradient-to-r from-slate-950/92 via-slate-950/72 to-transparent sm:w-[70%] lg:w-[62%]" />
+      <div className="absolute inset-y-0 left-0 w-[82%] bg-gradient-to-r from-slate-950/96 via-slate-950/82 to-transparent sm:w-[74%] lg:w-[66%]" />
       <div className="absolute inset-y-0 right-0 w-[38%] bg-gradient-to-l from-slate-950/30 via-slate-950/5 to-transparent" />
       <div className="absolute inset-x-0 top-0 h-[18%] bg-gradient-to-b from-slate-950/36 to-transparent" />
       <div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-slate-950/62 via-slate-950/16 to-transparent" />
@@ -2384,10 +2390,28 @@ export default function HomePage() {
                 </div>
 
                 <div className="mt-4 max-w-[76%] sm:max-w-[590px] lg:max-w-[640px] xl:max-w-[680px]">
-                  <h1 className="text-[2.1rem] font-black leading-[0.98] tracking-[-0.055em] text-white drop-shadow-[0_3px_18px_rgba(0,0,0,0.45)] sm:text-[4rem] lg:text-[4.25rem] xl:text-[4.75rem]">
+                  <h1
+                    className="text-[2.1rem] font-black leading-[0.98] tracking-[-0.055em] sm:text-[4rem] lg:text-[4.25rem] xl:text-[4.75rem]"
+                    style={{
+                      color: "#ffffff",
+                      WebkitTextFillColor: "#ffffff",
+                      textShadow:
+                        "0 3px 22px rgba(0,0,0,0.72), 0 1px 3px rgba(0,0,0,0.9)",
+                    }}
+                  >
                     Trusted pet care.
                     <br />
-                    Made <span className="text-emerald-600">simple.</span>
+                    Made{" "}
+                    <span
+                      style={{
+                        color: "#10b981",
+                        WebkitTextFillColor: "#10b981",
+                        textShadow:
+                          "0 3px 22px rgba(0,0,0,0.62), 0 1px 3px rgba(0,0,0,0.85)",
+                      }}
+                    >
+                      simple.
+                    </span>
                   </h1>
 
                   <div className="mt-3 max-w-xl lg:max-w-[610px]">
