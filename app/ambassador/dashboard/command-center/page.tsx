@@ -1185,7 +1185,7 @@ function ComposerShell({
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-              Ambassador Command Center
+              SitGuru Ambassador Portal
             </p>
             <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
               {title}
@@ -1280,7 +1280,7 @@ export default function AmbassadorCommandCenterPage() {
 
       if (!response.ok || !payload.success || !payload.commandCenter) {
         throw new Error(
-          payload.error || "Unable to load the Command Center.",
+          payload.error || "Unable to load the Ambassador Portal.",
         );
       }
 
@@ -1292,7 +1292,7 @@ export default function AmbassadorCommandCenterPage() {
         message:
           error instanceof Error
             ? error.message
-            : "Unable to load the Command Center.",
+            : "Unable to load the Ambassador Portal.",
       });
     } finally {
       setLoading(false);
@@ -1842,7 +1842,7 @@ export default function AmbassadorCommandCenterPage() {
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-center rounded-[2rem] border border-slate-200 bg-white px-6 py-20 text-center shadow-sm">
           <Loader2 className="h-9 w-9 animate-spin text-emerald-700" />
           <h1 className="mt-4 text-2xl font-black text-slate-950">
-            Loading Ambassador Command Center
+            Loading SitGuru Ambassador Portal
           </h1>
           <p className="mt-2 text-sm font-semibold text-slate-600">
             Connecting your calendar, activities, marketing, and leads.
@@ -1900,10 +1900,10 @@ export default function AmbassadorCommandCenterPage() {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800 shadow-sm">
-                  Remote Ambassador Headquarters
+                  SitGuru Ambassador Portal
                 </span>
                 <span className="rounded-full bg-emerald-700 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">
-                  One system for every Ambassador
+                  Your Ambassador working area
                 </span>
               </div>
 

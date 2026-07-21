@@ -1,47 +1,47 @@
 import { router, type Href } from 'expo-router';
 import {
-    ArrowLeft,
-    BadgeCheck,
-    CalendarDays,
-    CalendarPlus,
-    Check,
-    ChevronLeft,
-    ChevronRight,
-    Headphones,
-    Home,
-    Megaphone,
-    MessageCircle,
-    Plus,
-    QrCode,
-    Search,
-    Target,
-    Timer,
-    UserPlus,
-    UserRound,
-    Users,
-    X
+  ArrowLeft,
+  BadgeCheck,
+  CalendarDays,
+  CalendarPlus,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Headphones,
+  Home,
+  Megaphone,
+  MessageCircle,
+  Plus,
+  QrCode,
+  Search,
+  Target,
+  Timer,
+  UserPlus,
+  UserRound,
+  Users,
+  X
 } from 'lucide-react-native';
 import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useState,
-    type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
 } from 'react';
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    View,
-    type TextStyle,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+  type TextStyle,
 } from 'react-native';
 
 import { getAppTheme } from '@/constants/theme';
@@ -904,7 +904,7 @@ function FormModal({
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
             <View style={styles.modalHeaderCopy}>
-              <Text style={styles.eyebrow}>Ambassador Command Center</Text>
+              <Text style={styles.eyebrow}>SitGuru Ambassador Portal</Text>
               <Text style={styles.modalTitle}>{title}</Text>
               <Text style={styles.modalSubtitle}>{subtitle}</Text>
             </View>
@@ -986,14 +986,14 @@ export default function AmbassadorCommandCenterScreen() {
         );
         const payload = (await response.json()) as CommandResponse;
         if (!response.ok || !payload.success || !payload.commandCenter) {
-          throw new Error(payload.error || 'Unable to load the Command Center.');
+          throw new Error(payload.error || 'Unable to load the Ambassador Portal.');
         }
         setData(payload.commandCenter);
         setAmbassador(payload.ambassador || null);
       } catch (error) {
         setFeedback({
           tone: 'error',
-          message: error instanceof Error ? error.message : 'Unable to load the Command Center.',
+          message: error instanceof Error ? error.message : 'Unable to load the Ambassador Portal.',
         });
       } finally {
         setLoading(false);
@@ -1328,7 +1328,7 @@ export default function AmbassadorCommandCenterScreen() {
     return (
       <View style={styles.centerScreen}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.centerTitle}>Loading Command Center</Text>
+        <Text style={styles.centerTitle}>Loading Ambassador Portal</Text>
         <Text style={styles.centerBody}>Connecting your calendar, activities, marketing, and leads.</Text>
       </View>
     );
@@ -1339,7 +1339,7 @@ export default function AmbassadorCommandCenterScreen() {
       <View style={styles.centerScreen}>
         <UserRound color={theme.colors.primary} size={38} strokeWidth={2.2} />
         <Text style={styles.centerTitle}>Sign in to continue</Text>
-        <Text style={styles.centerBody}>The Ambassador Command Center requires your SitGuru account.</Text>
+        <Text style={styles.centerBody}>The SitGuru Ambassador Portal requires your SitGuru account.</Text>
         <Button label="Open sign in" primary onPress={() => go('/login')} styles={styles} theme={theme} />
       </View>
     );
@@ -1391,7 +1391,7 @@ export default function AmbassadorCommandCenterScreen() {
             contentContainerStyle={styles.content}>
             <View style={styles.hero}>
               <View style={styles.heroPill}>
-                <Text style={styles.heroPillText}>Remote Ambassador Headquarters</Text>
+                <Text style={styles.heroPillText}>SitGuru Ambassador Portal</Text>
               </View>
               <Text style={styles.heroTitle}>Welcome, {firstName}.</Text>
               <Text style={styles.heroBody}>
@@ -1845,7 +1845,7 @@ export default function AmbassadorCommandCenterScreen() {
         <Pressable style={styles.sheetBackdrop} onPress={() => setAddMenuOpen(false)}>
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Add to Command Center</Text>
+            <Text style={styles.sheetTitle}>Add to Ambassador Portal</Text>
             {[
               ['Add activity', 'Schedule outreach, events, visits, training, or follow-ups.', CalendarPlus, openActivity],
               ['Add lead', 'Send a person, business, or organization to Headquarters.', UserPlus, openLead],
