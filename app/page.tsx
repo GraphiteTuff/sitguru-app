@@ -1620,11 +1620,11 @@ function HeroVisual() {
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-slate-950">
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[650px] overflow-hidden bg-slate-950 sm:h-[690px] lg:inset-0 lg:h-auto">
       <video
         key={activeVideoPath}
         ref={videoRef}
-        className={`absolute inset-0 h-full w-full object-cover object-[55%_center] transition-opacity duration-500 sm:object-[57%_center] lg:object-center ${
+        className={`absolute inset-0 h-full w-full object-cover object-[60%_center] transition-opacity duration-500 sm:object-[58%_center] lg:object-center ${
           isVideoTransitioning ? "opacity-0" : "opacity-100"
         }`}
         poster={heroVideoPosterPath}
@@ -1644,16 +1644,16 @@ function HeroVisual() {
         <source src={activeVideoPath} type="video/mp4" />
       </video>
 
-      <div className="absolute inset-0 bg-black/10" />
-      <div className="absolute inset-y-0 left-0 w-[78%] bg-gradient-to-r from-black/82 via-black/58 to-transparent sm:w-[70%] lg:w-[61%]" />
-      <div className="absolute inset-y-0 right-0 w-[34%] bg-gradient-to-l from-black/16 via-black/0 to-transparent" />
-      <div className="absolute inset-x-0 top-0 h-[16%] bg-gradient-to-b from-black/22 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-black/44 via-black/10 to-transparent" />
+      <div className="absolute inset-0 bg-black/5 lg:bg-black/10" />
+      <div className="absolute inset-y-0 left-0 w-[92%] bg-gradient-to-r from-black/68 via-black/30 to-transparent sm:w-[80%] sm:from-black/70 sm:via-black/36 lg:w-[61%] lg:from-black/82 lg:via-black/58" />
+      <div className="absolute inset-y-0 right-0 w-[24%] bg-gradient-to-l from-black/8 via-black/0 to-transparent lg:w-[34%] lg:from-black/16" />
+      <div className="absolute inset-x-0 top-0 h-[14%] bg-gradient-to-b from-black/14 to-transparent lg:h-[16%] lg:from-black/22" />
+      <div className="absolute inset-x-0 bottom-0 h-[28%] bg-gradient-to-t from-black/28 via-black/6 to-transparent lg:h-[38%] lg:from-black/44 lg:via-black/10" />
 
       <button
         type="button"
         onClick={toggleHeroVideo}
-        className="pointer-events-auto absolute bottom-4 left-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/50 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/25 sm:bottom-5 sm:left-5"
+        className="pointer-events-auto absolute bottom-4 right-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/45 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/25 sm:bottom-5 sm:right-5 lg:left-5 lg:right-auto"
         aria-label={isVideoPaused ? "Play homepage videos" : "Pause homepage videos"}
         title={isVideoPaused ? "Play homepage videos" : "Pause homepage videos"}
       >
@@ -2459,18 +2459,18 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-white text-slate-950">
-      <section className="relative overflow-hidden border-b border-slate-800 bg-slate-950">
+      <section className="relative overflow-hidden border-b border-slate-200 bg-white lg:border-slate-800 lg:bg-slate-950">
         <HeroVisual />
 
-        <div className="relative z-10 mx-auto grid max-w-7xl gap-6 px-4 pb-5 pt-10 sm:px-6 sm:py-10 lg:min-h-[690px] lg:grid-cols-[minmax(0,690px)_minmax(240px,1fr)_350px] lg:items-center lg:gap-7 lg:px-8 lg:py-12 xl:grid-cols-[minmax(0,720px)_minmax(270px,1fr)_370px] xl:gap-8">
+        <div className="relative z-10 mx-auto grid max-w-7xl gap-6 px-4 pb-8 pt-7 sm:px-6 sm:pb-10 sm:pt-9 lg:min-h-[690px] lg:py-12 lg:grid-cols-[minmax(0,690px)_minmax(240px,1fr)_350px] lg:items-center lg:gap-7 lg:px-8 lg:py-12 xl:grid-cols-[minmax(0,720px)_minmax(270px,1fr)_370px] xl:gap-8">
           <div className="lg:py-8">
             <div className="grid gap-4 lg:block">
-              <div>
+              <div className="min-h-[500px] sm:min-h-[535px] lg:min-h-0">
                 <div className="inline-flex items-center rounded-full border border-white/30 bg-white/95 px-3 py-1 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur sm:text-xs">
                   Local Trusted Marketplace
                 </div>
 
-                <div className="mt-4 max-w-[76%] sm:max-w-[590px] lg:max-w-[640px] xl:max-w-[680px]">
+                <div className="mt-4 max-w-[92%] sm:max-w-[590px] lg:max-w-[640px] xl:max-w-[680px]">
                   <h1
                     className="text-[2.1rem] font-black leading-[0.98] tracking-[-0.055em] sm:text-[4rem] lg:text-[4.25rem] xl:text-[4.75rem]"
                     style={{
@@ -2518,7 +2518,7 @@ export default function HomePage() {
               <form
                 action="/search"
                 onSubmit={handleSearchSubmit}
-                className="relative z-20 mt-9 rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.13)] backdrop-blur sm:mt-8 lg:mt-7 lg:w-[690px] xl:w-[720px]"
+                className="relative z-20 mt-4 rounded-3xl border border-slate-200 bg-white/98 p-4 sm:mt-5 lg:mt-7 shadow-[0_18px_45px_rgba(15,23,42,0.13)] backdrop-blur sm:mt-8 lg:mt-7 lg:w-[690px] xl:w-[720px]"
               >
                 <input type="hidden" name="city" value={searchForm.city} />
                 <input type="hidden" name="state" value={searchForm.state} />
@@ -2592,7 +2592,7 @@ export default function HomePage() {
                 ) : null}
               </form>
 
-              <div className="relative z-20 mt-4 lg:mt-6 lg:w-[640px] xl:w-[670px]">
+              <div className="relative z-20 mt-4 rounded-3xl bg-white lg:mt-6 lg:w-[640px] lg:bg-transparent xl:w-[670px]">
                 <TrustRow />
 
                 <div className="mt-3 grid gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/90 p-3 shadow-sm sm:grid-cols-3">
