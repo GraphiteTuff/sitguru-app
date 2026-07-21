@@ -433,14 +433,74 @@ function getShortReferralPath({
   return `/r/${encodeURIComponent(referralCode)}/${type}`;
 }
 
+async function getCanonicalReferralSlug({
+  ambassadorId,
+  referralCode,
+}: {
+  ambassadorId: string;
+  referralCode: string;
+}) {
+  const { data: byAmbassador, error: ambassadorError } = await supabaseAdmin
+    .from("referral_codes")
+    .select("slug")
+    .eq("ambassador_id", ambassadorId)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+
+  if (ambassadorError) {
+    console.warn(
+      "Ambassador dashboard referral slug lookup by Ambassador failed:",
+      ambassadorError.message,
+    );
+  }
+
+  const ambassadorSlug = asString(byAmbassador?.slug);
+
+  if (ambassadorSlug) {
+    return ambassadorSlug;
+  }
+
+  const { data: byCode, error: codeError } = await supabaseAdmin
+    .from("referral_codes")
+    .select("slug")
+    .ilike("code", referralCode)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+
+  if (codeError) {
+    console.warn(
+      "Ambassador dashboard referral slug lookup by code failed:",
+      codeError.message,
+    );
+  }
+
+  const codeSlug = asString(byCode?.slug);
+
+  if (codeSlug) {
+    return codeSlug;
+  }
+
+  return `ambassador-${referralCode
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")}`;
+}
+
 function getShortSocialPath({
+  referralSlug,
   referralCode,
   platform,
 }: {
+  referralSlug: string;
   referralCode: string;
   platform: SocialPlatformKey;
 }) {
-  return `/r/social/${encodeURIComponent(referralCode)}/${platform}`;
+  return `/r/${encodeURIComponent(
+    referralSlug,
+  )}/social/${encodeURIComponent(
+    referralCode,
+  )}/${platform}`;
 }
 
 function getCompactDisplayUrl(path: string) {
@@ -1039,7 +1099,12 @@ export default async function AmbassadorDashboardPage() {
       process.env.NEXT_PUBLIC_AMBASSADOR_MOTIVATION_VIDEO_URL ||
       "/videos/sitguru-ambassador-promo.mp4",
   );
-  const [stats, onboardingPacket, trainingProgress] = await Promise.all([
+  const [
+    stats,
+    onboardingPacket,
+    trainingProgress,
+    referralLandingSlug,
+  ] = await Promise.all([
     getReferralStats({
       ambassadorId: ambassadorRecord.id,
       referralCode,
@@ -1052,6 +1117,10 @@ export default async function AmbassadorDashboardPage() {
       ambassadorId: ambassadorRecord.id,
       fallbackStatus:
         asString(ambassadorRecord.training_status) || "Not Started",
+    }),
+    getCanonicalReferralSlug({
+      ambassadorId: ambassadorRecord.id,
+      referralCode,
     }),
   ]);
   const payoutReadiness = getPayoutReadiness(ambassadorRecord);
@@ -1285,6 +1354,7 @@ export default async function AmbassadorDashboardPage() {
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               {SOCIAL_PLATFORMS.map((platform) => {
                 const shortPath = getShortSocialPath({
+                  referralSlug: referralLandingSlug,
                   referralCode,
                   platform: platform.key,
                 });
@@ -1611,6 +1681,10 @@ function CompactReferralCard({
   shortPath: string;
   fallbackUrl: string;
 }) {
+  const qrPath = `${shortPath}${
+    shortPath.includes("?") ? "&" : "?"
+  }via=qr`;
+
   return (
     <div className="rounded-[24px] border border-green-100 bg-green-50 p-4">
       <div className="flex items-start gap-3">
@@ -1625,13 +1699,13 @@ function CompactReferralCard({
 
       <div className="mt-4 grid grid-cols-[92px_minmax(0,1fr)] items-center gap-3">
         <a
-          href={shortPath}
+          href={qrPath}
           aria-label={`Open ${title} referral QR link`}
           className="rounded-2xl bg-white p-2 ring-1 ring-green-100"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={getQrImageUrl(shortPath)}
+            src={getQrImageUrl(qrPath)}
             alt={`${title} referral QR code`}
             className="aspect-square w-full"
           />
@@ -1679,6 +1753,10 @@ function SocialPlatformCard({
   shortPath: string;
   verifiedCount: number;
 }) {
+  const qrPath = `${shortPath}${
+    shortPath.includes("?") ? "&" : "?"
+  }via=qr`;
+
   return (
     <div className="rounded-[22px] border border-green-100 bg-white p-3 shadow-sm">
       <div className="flex items-center gap-2">
@@ -1692,13 +1770,13 @@ function SocialPlatformCard({
       </div>
 
       <a
-        href={shortPath}
+        href={qrPath}
         aria-label={`Open tracked ${label} QR link`}
         className="mx-auto mt-3 block w-[104px] rounded-2xl bg-green-50 p-2 ring-1 ring-green-100"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={getQrImageUrl(shortPath)}
+          src={getQrImageUrl(qrPath)}
           alt={`${label} SitGuru QR code`}
           className="aspect-square w-full"
         />
@@ -1713,7 +1791,7 @@ function SocialPlatformCard({
 
       <div className="mt-2 grid gap-1">
         <Link
-          href={shortPath}
+          href={qrPath}
           className="inline-flex min-h-8 items-center justify-center rounded-xl bg-green-800 px-2 py-1.5 text-[10px] font-black text-white hover:bg-green-900"
         >
           Tracked QR Link
