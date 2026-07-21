@@ -1,7 +1,7 @@
 import { router, type Href } from 'expo-router';
 import {
-  ArrowLeft,
   BadgeCheck,
+  Bell,
   CalendarDays,
   CalendarPlus,
   Check,
@@ -44,8 +44,15 @@ import {
   type TextStyle,
 } from 'react-native';
 
+import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruScreen from '@/components/SitGuruScreen';
 import { getAppTheme } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import {
+  setThemePreference,
+  useThemePreference,
+  type SitGuruThemePreference,
+} from '@/hooks/use-color-scheme';
+import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 
 type CommandView = 'today' | 'calendar' | 'activities' | 'marketing' | 'leads';
@@ -288,9 +295,51 @@ const Fonts = {
   extraBold: 'PlusJakartaSans_800ExtraBold',
 } as const;
 
-const API_BASE_URL = (
-  process.env.EXPO_PUBLIC_SITGURU_API_URL || 'https://www.sitguru.com'
-).replace(/\/+$/, '');
+const API_BASE_CANDIDATES = Array.from(
+  new Set(
+    [
+      process.env.EXPO_PUBLIC_SITGURU_API_URL,
+      Platform.OS === 'web' ? 'http://localhost:3000' : '',
+      Platform.OS === 'web' ? 'http://127.0.0.1:3000' : '',
+      process.env.EXPO_PUBLIC_SITGURU_WEB_URL,
+      'https://www.sitguru.com',
+    ]
+      .map((value) => (value || '').trim().replace(/\/+$/, ''))
+      .filter(Boolean),
+  ),
+);
+
+const THEME_OPTIONS: Array<{
+  icon: 'sun' | 'moon';
+  label: string;
+  value: SitGuruThemePreference;
+}> = [
+  { icon: 'sun', label: 'Light', value: 'light' },
+  { icon: 'moon', label: 'Dark', value: 'dark' },
+];
+
+async function readCommandResponse(response: Response): Promise<CommandResponse> {
+  const raw = await response.text();
+
+  if (!raw.trim()) {
+    return {
+      success: false,
+      error: `SitGuru returned an empty response (${response.status}).`,
+    };
+  }
+
+  try {
+    return JSON.parse(raw) as CommandResponse;
+  } catch {
+    return {
+      success: false,
+      error:
+        response.status === 404
+          ? 'The Ambassador Portal API is not available at this address yet.'
+          : `SitGuru returned an unreadable response (${response.status}).`,
+    };
+  }
+}
 
 const activityTypes = [
   'Campus Outreach',
@@ -933,10 +982,39 @@ function FormModal({
   );
 }
 
+function PhoneStatusBar({
+  styles,
+}: {
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.statusBar}>
+      <Text style={styles.statusTime}>9:41</Text>
+      <View style={styles.statusIcons}>
+        <View style={styles.signalBars}>
+          <View style={[styles.signalBar, { height: 5 }]} />
+          <View style={[styles.signalBar, { height: 7 }]} />
+          <View style={[styles.signalBar, { height: 9 }]} />
+        </View>
+        <Text style={styles.wifiText}>⌁</Text>
+        <View style={styles.batteryWrap}>
+          <View style={styles.batteryBody}>
+            <View style={styles.batteryFill} />
+          </View>
+          <View style={styles.batteryCap} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function AmbassadorCommandCenterScreen() {
-  const colorScheme = useColorScheme();
-  const theme = getAppTheme(colorScheme === 'dark' ? 'dark' : 'light');
+  const themeMode = useThemeMode();
+  const themePreference = useThemePreference();
+  const isDark = themeMode === 'dark';
+  const theme = getAppTheme(isDark ? 'dark' : 'light');
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const isWebPreview = Platform.OS === 'web';
   const { session, user, profile, roles, loading: authLoading } = useAuth();
 
   const [view, setView] = useState<CommandView>('today');
@@ -963,9 +1041,45 @@ export default function AmbassadorCommandCenterScreen() {
   const apiFetch = useCallback(
     async (path: string, options?: RequestInit) => {
       const headers = new Headers(options?.headers || {});
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      if (options?.body) headers.set('Content-Type', 'application/json');
-      return fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+
+      if (options?.body) {
+        headers.set('Content-Type', 'application/json');
+      }
+
+      let lastResponse: Response | null = null;
+
+      for (const baseUrl of API_BASE_CANDIDATES) {
+        try {
+          const response = await fetch(`${baseUrl}${path}`, {
+            ...options,
+            headers,
+          });
+
+          lastResponse = response;
+
+          if (response.status === 404) {
+            continue;
+          }
+
+          return response;
+        } catch {
+          // Try the next configured SitGuru API address.
+        }
+      }
+
+      if (lastResponse) {
+        return lastResponse;
+      }
+
+      throw new Error(
+        Platform.OS === 'web'
+          ? 'The Ambassador Portal could not connect to SitGuru. Keep the main SitGuru web server running at http://localhost:3000, then pull down to refresh.'
+          : 'The Ambassador Portal could not connect to SitGuru. Check your internet connection and try again.',
+      );
     },
     [token],
   );
@@ -984,7 +1098,7 @@ export default function AmbassadorCommandCenterScreen() {
           `/api/ambassador/command-center?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
           { method: 'GET', cache: 'no-store' },
         );
-        const payload = (await response.json()) as CommandResponse;
+        const payload = await readCommandResponse(response);
         if (!response.ok || !payload.success || !payload.commandCenter) {
           throw new Error(payload.error || 'Unable to load the Ambassador Portal.');
         }
@@ -1181,7 +1295,7 @@ export default function AmbassadorCommandCenterScreen() {
       method,
       body: JSON.stringify({ entity, id, data: payload }),
     });
-    const result = (await response.json()) as CommandResponse;
+    const result = await readCommandResponse(response);
     if (!response.ok || !result.success) {
       throw new Error(result.error || result.details || 'SitGuru could not save the record.');
     }
@@ -1364,20 +1478,103 @@ export default function AmbassadorCommandCenterScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.webBackdrop}>
-        <View style={styles.phoneShell}>
-          <View style={styles.header}>
-            <Pressable onPress={() => go('/ambassador-dashboard')} style={styles.headerButton}>
-              <ArrowLeft color={theme.colors.text} size={21} strokeWidth={2.4} />
-            </Pressable>
-            <View style={styles.headerCopy}>
-              <Text style={styles.headerEyebrow}>SitGuru Ambassador</Text>
-              <Text style={styles.headerTitle}>Command Center</Text>
-            </View>
-            <Pressable onPress={() => go('/account')} style={styles.avatar}>
-              <Text style={styles.avatarText}>{(firstName[0] || 'A').toUpperCase()}</Text>
-            </Pressable>
-          </View>
+      <SitGuruScreen center={isWebPreview} maxWidth={620}>
+        <View
+          style={[
+            styles.previewCanvas,
+            !isWebPreview && styles.previewCanvasNative,
+          ]}
+        >
+          <View
+            style={[
+              styles.deviceFrame,
+              !isWebPreview && styles.deviceFrameNative,
+            ]}
+          >
+            {isWebPreview ? <View style={styles.deviceTopSpeaker} /> : null}
+
+            <View
+              style={[
+                styles.phoneShell,
+                !isWebPreview && styles.phoneShellNative,
+              ]}
+            >
+              <View style={styles.appScreen}>
+                {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
+
+                <View style={styles.header}>
+                  <View style={styles.headerCopy}>
+                    <Text style={styles.headerTitle}>Ambassador Portal</Text>
+                    <Text style={styles.welcomeText}>
+                      Welcome back, {firstName}! <Text style={styles.wave}>👋</Text>
+                    </Text>
+                    <View style={styles.roleStatusRow}>
+                      <View style={styles.roleStatusDot} />
+                      <Text style={styles.roleStatusText}>Ambassador • Live</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.headerActions}>
+                    <Pressable
+                      accessibilityLabel="Open notifications"
+                      accessibilityRole="button"
+                      onPress={() => go('/notifications')}
+                      style={styles.headerIconButton}
+                    >
+                      <Bell
+                        color={theme.colors.text}
+                        size={18}
+                        strokeWidth={2.3}
+                      />
+                    </Pressable>
+
+                    <View style={styles.modeToggle}>
+                      {THEME_OPTIONS.map((option) => {
+                        const active = themePreference === option.value;
+
+                        return (
+                          <Pressable
+                            key={option.value}
+                            accessibilityLabel={`Switch to ${option.label} mode`}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: active }}
+                            onPress={() => setThemePreference(option.value)}
+                            style={[
+                              styles.modeButton,
+                              active ? styles.modeButtonActive : null,
+                            ]}
+                          >
+                            <SitGuruIcon
+                              color={
+                                active
+                                  ? option.value === 'light'
+                                    ? '#F3AA1F'
+                                    : isDark
+                                      ? '#F0CF62'
+                                      : theme.colors.primary
+                                  : theme.colors.textSecondary
+                              }
+                              name={option.icon}
+                              size={15}
+                              strokeWidth={2.4}
+                            />
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+
+                    <Pressable
+                      accessibilityLabel="Open profile and workspace switcher"
+                      accessibilityRole="button"
+                      onPress={() => go('/account')}
+                      style={styles.avatar}
+                    >
+                      <Text style={styles.avatarText}>
+                        {(firstName[0] || 'A').toUpperCase()}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
 
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -1838,8 +2035,13 @@ export default function AmbassadorCommandCenterScreen() {
               <Text style={styles.bottomLabel}>Profile</Text>
             </Pressable>
           </View>
+              </View>
+            </View>
+
+            {isWebPreview ? <View style={styles.homeIndicator} /> : null}
+          </View>
         </View>
-      </View>
+      </SitGuruScreen>
 
       <Modal visible={addMenuOpen} transparent animationType="fade" onRequestClose={() => setAddMenuOpen(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setAddMenuOpen(false)}>
@@ -2070,20 +2272,143 @@ export default function AmbassadorCommandCenterScreen() {
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: theme.colors.screen },
-    webBackdrop: {
+    screen: {
       flex: 1,
+      backgroundColor: theme.colors.screen,
+    },
+    previewCanvas: {
       alignItems: 'center',
-      backgroundColor: Platform.OS === 'web' ? theme.colors.screenAlt : theme.colors.screen,
+      justifyContent: 'flex-start',
+      minHeight: 930,
+      paddingHorizontal: 16,
+      paddingVertical: 22,
+      width: '100%',
+    },
+    previewCanvasNative: {
+      flex: 1,
+      minHeight: 0,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+    },
+    deviceFrame: {
+      backgroundColor: '#111713',
+      borderColor: '#2E3631',
+      borderRadius: 42,
+      borderWidth: 2,
+      maxWidth: 430,
+      overflow: 'hidden',
+      paddingBottom: 15,
+      paddingHorizontal: 8,
+      paddingTop: 10,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 20 },
+      shadowOpacity: 0.27,
+      shadowRadius: 28,
+      width: '100%',
+    },
+    deviceFrameNative: {
+      backgroundColor: 'transparent',
+      borderRadius: 0,
+      borderWidth: 0,
+      flex: 1,
+      maxWidth: '100%',
+      overflow: 'visible',
+      paddingBottom: 0,
+      paddingHorizontal: 0,
+      paddingTop: 0,
+      shadowOpacity: 0,
+    },
+    deviceTopSpeaker: {
+      alignSelf: 'center',
+      backgroundColor: '#303832',
+      borderRadius: 999,
+      height: 6,
+      marginBottom: 9,
+      width: 86,
     },
     phoneShell: {
+      backgroundColor: theme.colors.screen,
+      borderColor: theme.colors.border,
+      borderRadius: 34,
+      borderWidth: 1,
+      height: 844,
+      overflow: 'hidden',
+      width: '100%',
+    },
+    phoneShellNative: {
+      borderRadius: 0,
+      borderWidth: 0,
+      flex: 1,
+      height: '100%',
+    },
+    appScreen: {
+      backgroundColor: theme.colors.screen,
       flex: 1,
       width: '100%',
-      maxWidth: Platform.OS === 'web' ? 460 : undefined,
-      backgroundColor: theme.colors.screen,
-      borderLeftWidth: Platform.OS === 'web' ? 1 : 0,
-      borderRightWidth: Platform.OS === 'web' ? 1 : 0,
-      borderColor: theme.colors.border,
+    },
+    homeIndicator: {
+      alignSelf: 'center',
+      backgroundColor: '#F3F1EA',
+      borderRadius: 999,
+      height: 5,
+      marginTop: 9,
+      width: 116,
+    },
+    statusBar: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      minHeight: 31,
+      paddingHorizontal: 16,
+      paddingTop: 7,
+    },
+    statusTime: {
+      color: theme.colors.text,
+      fontFamily: Fonts.bold,
+      fontSize: 12,
+    },
+    statusIcons: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 6,
+    },
+    signalBars: {
+      alignItems: 'flex-end',
+      flexDirection: 'row',
+      gap: 2,
+    },
+    signalBar: {
+      backgroundColor: theme.colors.text,
+      borderRadius: 2,
+      width: 3,
+    },
+    wifiText: {
+      color: theme.colors.text,
+      fontFamily: Fonts.bold,
+      fontSize: 11,
+    },
+    batteryWrap: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 2,
+    },
+    batteryBody: {
+      borderColor: theme.colors.text,
+      borderRadius: 3,
+      borderWidth: 1,
+      height: 9,
+      padding: 1,
+      width: 17,
+    },
+    batteryFill: {
+      backgroundColor: theme.colors.text,
+      borderRadius: 2,
+      flex: 1,
+    },
+    batteryCap: {
+      backgroundColor: theme.colors.text,
+      height: 4,
+      width: 2,
     },
     centerScreen: {
       flex: 1,
@@ -2107,39 +2432,87 @@ function createStyles(theme: Theme) {
       textAlign: 'center',
     },
     header: {
-      minHeight: 68,
+      minHeight: 86,
       paddingHorizontal: 16,
-      paddingTop: Platform.OS === 'ios' ? 12 : 8,
-      paddingBottom: 8,
+      paddingTop: 10,
+      paddingBottom: 10,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
-      borderBottomWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.elevatedCard,
+      justifyContent: 'space-between',
+      gap: 8,
+      backgroundColor: theme.colors.screen,
     },
-    headerButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.softCard,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-    },
-    headerCopy: { flex: 1, alignItems: 'center' },
-    headerEyebrow: {
-      color: theme.colors.primary,
-      fontFamily: Fonts.extraBold,
-      fontSize: 8,
-      letterSpacing: 1,
-      textTransform: 'uppercase',
+    headerCopy: {
+      flex: 1,
+      gap: 2,
+      paddingRight: 6,
     },
     headerTitle: {
       color: theme.colors.text,
       fontFamily: Fonts.extraBold,
-      fontSize: 17,
+      fontSize: 20,
+      letterSpacing: -0.4,
+    },
+    welcomeText: {
+      color: theme.colors.textSecondary,
+      fontFamily: Fonts.medium,
+      fontSize: 11,
+    },
+    wave: {
+      fontSize: 11,
+    },
+    roleStatusRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 5,
+      marginTop: 1,
+    },
+    roleStatusDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: theme.colors.primary,
+    },
+    roleStatusText: {
+      color: theme.colors.textSecondary,
+      fontFamily: Fonts.medium,
+      fontSize: 9,
+      lineHeight: 13,
+    },
+    headerActions: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 6,
+    },
+    headerIconButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.elevatedCard,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    modeToggle: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 2,
+      padding: 2,
+      borderRadius: 13,
+      backgroundColor: theme.colors.elevatedCard,
+      borderWidth: 1.2,
+      borderColor: theme.colors.warning,
+    },
+    modeButton: {
+      width: 31,
+      height: 28,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modeButtonActive: {
+      backgroundColor: `${theme.colors.warning}18`,
     },
     avatar: {
       width: 40,
@@ -2149,7 +2522,11 @@ function createStyles(theme: Theme) {
       justifyContent: 'center',
       backgroundColor: theme.colors.primary,
     },
-    avatarText: { color: '#FFFFFF', fontFamily: Fonts.extraBold, fontSize: 15 },
+    avatarText: {
+      color: '#FFFFFF',
+      fontFamily: Fonts.extraBold,
+      fontSize: 15,
+    },
     content: { padding: 14, gap: 14 },
     hero: {
       padding: 18,
