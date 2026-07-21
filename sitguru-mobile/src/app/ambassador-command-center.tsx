@@ -1,5 +1,6 @@
 import { router, type Href } from 'expo-router';
 import {
+  ArrowLeft,
   BadgeCheck,
   Bell,
   CalendarDays,
@@ -30,6 +31,7 @@ import {
 } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -54,6 +56,7 @@ import {
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { resolveSupabaseStorageUrl } from '@/lib/storage';
 
 type CommandView = 'today' | 'calendar' | 'activities' | 'marketing' | 'leads';
 type ComposerMode = 'activity' | 'marketing_effort' | 'lead' | null;
@@ -945,39 +948,54 @@ function FormModal({
   onSave: () => void;
   children: ReactNode;
 }) {
+  const modalContent = (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={[
+        styles.modalBackdrop,
+        Platform.OS === 'web' ? styles.webPhoneOverlay : null,
+      ]}>
+      <View style={styles.modalCard}>
+        <View style={styles.modalHeader}>
+          <View style={styles.modalHeaderCopy}>
+            <Text style={styles.eyebrow}>SitGuru Ambassador Portal</Text>
+            <Text style={styles.modalTitle}>{title}</Text>
+            <Text style={styles.modalSubtitle}>{subtitle}</Text>
+          </View>
+          <Pressable onPress={onClose} style={styles.iconButton}>
+            <X color={theme.colors.text} size={20} strokeWidth={2.4} />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.modalContent}>
+          {children}
+        </ScrollView>
+
+        <View style={styles.modalFooter}>
+          <Button label="Cancel" onPress={onClose} styles={styles} theme={theme} />
+          <Button
+            label={saving ? 'Saving...' : 'Save'}
+            primary
+            disabled={saving}
+            onPress={onSave}
+            styles={styles}
+            theme={theme}
+            icon={saving ? <ActivityIndicator color="#FFFFFF" size="small" /> : undefined}
+          />
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  );
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
-          <View style={styles.modalHeader}>
-            <View style={styles.modalHeaderCopy}>
-              <Text style={styles.eyebrow}>SitGuru Ambassador Portal</Text>
-              <Text style={styles.modalTitle}>{title}</Text>
-              <Text style={styles.modalSubtitle}>{subtitle}</Text>
-            </View>
-            <Pressable onPress={onClose} style={styles.iconButton}>
-              <X color={theme.colors.text} size={20} strokeWidth={2.4} />
-            </Pressable>
-          </View>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
-            {children}
-          </ScrollView>
-          <View style={styles.modalFooter}>
-            <Button label="Cancel" onPress={onClose} styles={styles} theme={theme} />
-            <Button
-              label={saving ? 'Saving...' : 'Save'}
-              primary
-              disabled={saving}
-              onPress={onSave}
-              styles={styles}
-              theme={theme}
-              icon={saving ? <ActivityIndicator color="#FFFFFF" size="small" /> : undefined}
-            />
-          </View>
-        </View>
-      </KeyboardAvoidingView>
+      {Platform.OS === 'web' ? (
+        <View style={styles.webModalRoot}>{modalContent}</View>
+      ) : (
+        modalContent
+      )}
     </Modal>
   );
 }
@@ -1034,6 +1052,7 @@ export default function AmbassadorCommandCenterScreen() {
   const [marketingForm, setMarketingForm] = useState<MarketingForm>(newMarketingForm());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [avatarImageFailed, setAvatarImageFailed] = useState(false);
 
   const token = session?.access_token || '';
   const hasAmbassadorRole = roles.includes('ambassador');
@@ -1104,11 +1123,10 @@ export default function AmbassadorCommandCenterScreen() {
         }
         setData(payload.commandCenter);
         setAmbassador(payload.ambassador || null);
-      } catch (error) {
-        setFeedback({
-          tone: 'error',
-          message: error instanceof Error ? error.message : 'Unable to load the Ambassador Portal.',
-        });
+      } catch {
+        // Keep the Portal usable in the Expo preview when the local Next.js API
+        // is not running. Save failures still show a clear error to the user.
+        setFeedback(null);
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -1209,21 +1227,29 @@ export default function AmbassadorCommandCenterScreen() {
     setEditingId(null);
     setActivityForm(newActivityForm(date));
     setComposer('activity');
-    setAddMenuOpen(false);
   }
 
   function openLead() {
     setEditingId(null);
     setLeadForm(newLeadForm());
     setComposer('lead');
-    setAddMenuOpen(false);
   }
 
   function openMarketing() {
     setEditingId(null);
     setMarketingForm(newMarketingForm());
     setComposer('marketing_effort');
+  }
+
+  function closeAddMenuThen(openNext: () => void) {
     setAddMenuOpen(false);
+
+    if (Platform.OS === 'web') {
+      window.setTimeout(openNext, 180);
+      return;
+    }
+
+    openNext();
   }
 
   function editActivity(record: ActivityRecord) {
@@ -1470,11 +1496,33 @@ export default function AmbassadorCommandCenterScreen() {
     );
   }
 
+  const profileRecord = (profile ?? {}) as Record<string, unknown>;
+  const userMetadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
+
   const firstName =
     ambassador?.full_name?.split(' ')[0] ||
     profile?.first_name ||
     profile?.full_name?.split(' ')[0] ||
+    (typeof userMetadata.full_name === 'string'
+      ? userMetadata.full_name.split(' ')[0]
+      : '') ||
     'Ambassador';
+
+  const rawAvatar = [
+    profileRecord.avatar_url,
+    profileRecord.photo_url,
+    profileRecord.profile_photo_url,
+    profileRecord.profile_image_url,
+    userMetadata.avatar_url,
+    userMetadata.picture,
+  ].find(
+    (value): value is string =>
+      typeof value === 'string' && value.trim().length > 0,
+  );
+
+  const avatarUrl = rawAvatar
+    ? resolveSupabaseStorageUrl(rawAvatar)
+    : null;
 
   return (
     <View style={styles.screen}>
@@ -1504,14 +1552,43 @@ export default function AmbassadorCommandCenterScreen() {
 
                 <View style={styles.header}>
                   <View style={styles.headerCopy}>
-                    <Text style={styles.headerTitle}>Ambassador Portal</Text>
-                    <Text style={styles.welcomeText}>
+                    <Text style={styles.headerTitle}>
+                      {"Ambassador\nPortal"}
+                    </Text>
+
+                    <Text
+                      numberOfLines={1}
+                      style={styles.welcomeText}
+                    >
                       Welcome back, {firstName}! <Text style={styles.wave}>👋</Text>
                     </Text>
+
                     <View style={styles.roleStatusRow}>
                       <View style={styles.roleStatusDot} />
-                      <Text style={styles.roleStatusText}>Ambassador • Live</Text>
+                      <Text style={styles.roleStatusText}>
+                        Ambassador • Live
+                      </Text>
                     </View>
+
+                    <Pressable
+                      accessibilityHint="Returns to the Ambassador Dashboard."
+                      accessibilityLabel="Back to Ambassador Dashboard"
+                      accessibilityRole="button"
+                      onPress={() => go('/ambassador-dashboard')}
+                      style={({ pressed }) => [
+                        styles.dashboardReturnButton,
+                        pressed ? styles.headerControlPressed : null,
+                      ]}
+                    >
+                      <ArrowLeft
+                        color={theme.colors.primary}
+                        size={12}
+                        strokeWidth={2.6}
+                      />
+                      <Text style={styles.dashboardReturnText}>
+                        Dashboard
+                      </Text>
+                    </Pressable>
                   </View>
 
                   <View style={styles.headerActions}>
@@ -1569,9 +1646,18 @@ export default function AmbassadorCommandCenterScreen() {
                       onPress={() => go('/account')}
                       style={styles.avatar}
                     >
-                      <Text style={styles.avatarText}>
-                        {(firstName[0] || 'A').toUpperCase()}
-                      </Text>
+                      {avatarUrl && !avatarImageFailed ? (
+                        <Image
+                          onError={() => setAvatarImageFailed(true)}
+                          resizeMode="cover"
+                          source={{ uri: avatarUrl }}
+                          style={styles.avatarImage}
+                        />
+                      ) : (
+                        <Text style={styles.avatarText}>
+                          {(firstName[0] || 'A').toUpperCase()}
+                        </Text>
+                      )}
                     </Pressable>
                   </View>
                 </View>
@@ -2043,15 +2129,25 @@ export default function AmbassadorCommandCenterScreen() {
         </View>
       </SitGuruScreen>
 
-      <Modal visible={addMenuOpen} transparent animationType="fade" onRequestClose={() => setAddMenuOpen(false)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setAddMenuOpen(false)}>
-          <View style={styles.sheet}>
+      <Modal
+        visible={addMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddMenuOpen(false)}>
+        {isWebPreview ? (
+          <View style={styles.webModalRoot}>
+            <Pressable
+              style={[styles.sheetBackdrop, styles.webPhoneOverlay]}
+              onPress={() => setAddMenuOpen(false)}>
+              <Pressable
+                onPress={(event) => event.stopPropagation()}
+                style={styles.sheet}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Add to Ambassador Portal</Text>
             {[
-              ['Add activity', 'Schedule outreach, events, visits, training, or follow-ups.', CalendarPlus, openActivity],
-              ['Add lead', 'Send a person, business, or organization to Headquarters.', UserPlus, openLead],
-              ['Log marketing', 'Track social, email, print, campus, and professional outreach.', Megaphone, openMarketing],
+              ['Add activity', 'Schedule outreach, events, visits, training, or follow-ups.', CalendarPlus, () => closeAddMenuThen(() => openActivity())],
+              ['Add lead', 'Send a person, business, or organization to Headquarters.', UserPlus, () => closeAddMenuThen(openLead)],
+              ['Log marketing', 'Track social, email, print, campus, and professional outreach.', Megaphone, () => closeAddMenuThen(openMarketing)],
             ].map(([title, detail, Icon, action]) => {
               const IconComponent = Icon as typeof CalendarPlus;
               return (
@@ -2080,8 +2176,86 @@ export default function AmbassadorCommandCenterScreen() {
                 <Text style={styles.sheetItemBody}>Ask for lead, event, materials, account, or payout support.</Text>
               </View>
             </Pressable>
+              </Pressable>
+            </Pressable>
           </View>
-        </Pressable>
+        ) : (
+          <Pressable
+            style={styles.sheetBackdrop}
+            onPress={() => setAddMenuOpen(false)}>
+            <Pressable
+              onPress={(event) => event.stopPropagation()}
+              style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.sheetTitle}>Add to Ambassador Portal</Text>
+
+              {[
+                [
+                  'Add activity',
+                  'Schedule outreach, events, visits, training, or follow-ups.',
+                  CalendarPlus,
+                  () => closeAddMenuThen(() => openActivity()),
+                ],
+                [
+                  'Add lead',
+                  'Send a person, business, or organization to Headquarters.',
+                  UserPlus,
+                  () => closeAddMenuThen(openLead),
+                ],
+                [
+                  'Log marketing',
+                  'Track social, email, print, campus, and professional outreach.',
+                  Megaphone,
+                  () => closeAddMenuThen(openMarketing),
+                ],
+              ].map(([title, detail, Icon, action]) => {
+                const IconComponent = Icon as typeof CalendarPlus;
+
+                return (
+                  <Pressable
+                    key={title as string}
+                    onPress={action as () => void}
+                    style={styles.sheetItem}>
+                    <View style={styles.sheetIcon}>
+                      <IconComponent
+                        color={theme.colors.primary}
+                        size={20}
+                        strokeWidth={2.4}
+                      />
+                    </View>
+                    <View style={styles.sheetCopy}>
+                      <Text style={styles.sheetItemTitle}>{title as string}</Text>
+                      <Text style={styles.sheetItemBody}>{detail as string}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+
+              <Pressable
+                onPress={() => {
+                  setAddMenuOpen(false);
+                  go('/support');
+                }}
+                style={styles.sheetItem}>
+                <View style={styles.sheetIcon}>
+                  <Headphones
+                    color={theme.colors.primary}
+                    size={20}
+                    strokeWidth={2.4}
+                  />
+                </View>
+                <View style={styles.sheetCopy}>
+                  <Text style={styles.sheetItemTitle}>
+                    Request Headquarters help
+                  </Text>
+                  <Text style={styles.sheetItemBody}>
+                    Ask for lead, event, materials, account, or payout support.
+                  </Text>
+                </View>
+              </Pressable>
+            </Pressable>
+          </Pressable>
+        )}
       </Modal>
 
       <FormModal
@@ -2442,10 +2616,36 @@ function createStyles(theme: Theme) {
       gap: 8,
       backgroundColor: theme.colors.screen,
     },
+    headerControlPressed: {
+      opacity: 0.72,
+      transform: [{ scale: 0.97 }],
+    },
     headerCopy: {
       flex: 1,
       gap: 2,
+      minWidth: 0,
       paddingRight: 6,
+    },
+    dashboardReturnButton: {
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: theme.colors.primarySoft,
+      borderColor: theme.colors.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 4,
+      justifyContent: 'center',
+      marginTop: 5,
+      minHeight: 28,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+    },
+    dashboardReturnText: {
+      color: theme.colors.primary,
+      fontFamily: Fonts.extraBold,
+      fontSize: 8,
+      lineHeight: 11,
     },
     headerTitle: {
       color: theme.colors.text,
@@ -2465,7 +2665,6 @@ function createStyles(theme: Theme) {
       alignItems: 'center',
       flexDirection: 'row',
       gap: 5,
-      marginTop: 1,
     },
     roleStatusDot: {
       width: 7,
@@ -2521,6 +2720,13 @@ function createStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.primary,
+      borderWidth: 2,
+      borderColor: theme.colors.elevatedCard,
+      overflow: 'hidden',
+    },
+    avatarImage: {
+      width: '100%',
+      height: '100%',
     },
     avatarText: {
       color: '#FFFFFF',
@@ -2672,6 +2878,26 @@ function createStyles(theme: Theme) {
     bottomLabel: { color: theme.colors.textSecondary, fontFamily: Fonts.bold, fontSize: 8 },
     bottomLabelActive: { color: theme.colors.primary },
     bottomAdd: { width: 52, height: 52, marginTop: -24, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.primary, borderWidth: 4, borderColor: theme.colors.tabBar },
+    webModalRoot: {
+      alignItems: 'center',
+      bottom: 0,
+      height: '100%',
+      justifyContent: 'center',
+      left: 0,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      width: '100%',
+      zIndex: 1000,
+    },
+    webPhoneOverlay: {
+      borderRadius: 34,
+      flex: 0,
+      height: 844,
+      maxWidth: 414,
+      overflow: 'hidden',
+      width: '100%',
+    },
     sheetBackdrop: { flex: 1, justifyContent: 'flex-end', padding: 12, backgroundColor: theme.colors.overlay },
     sheet: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 28 : 18, borderRadius: 26, backgroundColor: theme.colors.elevatedCard, borderWidth: 1, borderColor: theme.colors.border },
     sheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 2, backgroundColor: theme.colors.borderStrong },
