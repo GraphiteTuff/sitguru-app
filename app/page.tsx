@@ -1563,16 +1563,16 @@ function HeroVisual() {
         <source src={heroVideoPath} type="video/mp4" />
       </video>
 
-      <div className="absolute inset-0 bg-slate-950/20" />
-      <div className="absolute inset-y-0 left-0 w-[82%] bg-gradient-to-r from-slate-950/96 via-slate-950/82 to-transparent sm:w-[74%] lg:w-[66%]" />
-      <div className="absolute inset-y-0 right-0 w-[38%] bg-gradient-to-l from-slate-950/30 via-slate-950/5 to-transparent" />
-      <div className="absolute inset-x-0 top-0 h-[18%] bg-gradient-to-b from-slate-950/36 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-slate-950/62 via-slate-950/16 to-transparent" />
+      <div className="absolute inset-0 bg-black/10" />
+      <div className="absolute inset-y-0 left-0 w-[78%] bg-gradient-to-r from-black/82 via-black/58 to-transparent sm:w-[70%] lg:w-[61%]" />
+      <div className="absolute inset-y-0 right-0 w-[34%] bg-gradient-to-l from-black/16 via-black/0 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-[16%] bg-gradient-to-b from-black/22 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-black/44 via-black/10 to-transparent" />
 
       <button
         type="button"
         onClick={toggleHeroVideo}
-        className="pointer-events-auto absolute bottom-4 left-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-slate-950/60 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-slate-950/80 focus:outline-none focus:ring-4 focus:ring-white/25 sm:bottom-5 sm:left-5"
+        className="pointer-events-auto absolute bottom-4 left-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/50 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/25 sm:bottom-5 sm:left-5"
         aria-label={isVideoPaused ? "Play homepage video" : "Pause homepage video"}
         title={isVideoPaused ? "Play homepage video" : "Pause homepage video"}
       >
