@@ -40,6 +40,8 @@ type PaymentOption =
   | "apple_pay"
   | "google_pay"
   | "link"
+  | "paypal"
+  | "venmo"
   | "saved_method"
   | "bank_account"
   | "pawperks_credit"
@@ -295,12 +297,18 @@ const tipOptions: {
   },
 ];
 
+const paypalMarketplaceEnabled =
+  process.env.NEXT_PUBLIC_PAYPAL_MARKETPLACE_ENABLED?.trim().toLowerCase() ===
+  "true";
+
 const paymentOptions: {
   key: PaymentOption;
   label: string;
   helper: string;
   icon: string;
   status: string;
+  enabled?: boolean;
+  disabledMessage?: string;
 }[] = [
   {
     key: "card",
@@ -331,6 +339,30 @@ const paymentOptions: {
     status: "Fast checkout",
   },
   {
+    key: "paypal",
+    label: "PayPal",
+    helper: paypalMarketplaceEnabled
+      ? "Continue through SitGuru secure PayPal marketplace checkout."
+      : "PayPal will be available after SitGuru marketplace approval is activated.",
+    icon: "P",
+    status: paypalMarketplaceEnabled ? "Available" : "Coming soon",
+    enabled: paypalMarketplaceEnabled,
+    disabledMessage:
+      "PayPal checkout is not enabled yet. Please choose card or an available digital wallet.",
+  },
+  {
+    key: "venmo",
+    label: "Venmo",
+    helper: paypalMarketplaceEnabled
+      ? "Continue through SitGuru secure Venmo marketplace checkout."
+      : "Venmo will be available after SitGuru marketplace approval is activated.",
+    icon: "V",
+    status: paypalMarketplaceEnabled ? "Available" : "Coming soon",
+    enabled: paypalMarketplaceEnabled,
+    disabledMessage:
+      "Venmo checkout is not enabled yet. Please choose card or an available digital wallet.",
+  },
+  {
     key: "saved_method",
     label: "Saved payment method",
     helper: "Returning Pet Parents can use saved payment details when available.",
@@ -340,9 +372,13 @@ const paymentOptions: {
   {
     key: "bank_account",
     label: "ACH / bank account",
-    helper: "Bank account payments are planned for larger bookings and future support.",
+    helper:
+      "Bank account payments are planned for larger bookings and future support.",
     icon: "🏦",
     status: "Coming soon",
+    enabled: false,
+    disabledMessage:
+      "ACH and bank-account checkout are not enabled yet. Please choose card or an available digital wallet.",
   },
   {
     key: "pawperks_credit",
@@ -367,10 +403,10 @@ const paymentOptions: {
   },
 ];
 
-const MIN_MARKETPLACE_FEE_PERCENT = 0.1;
-const DEFAULT_MARKETPLACE_FEE_PERCENT = 0.125;
-const MAX_MARKETPLACE_FEE_PERCENT = 0.15;
-const MIN_MARKETPLACE_SUPPORT_FEE = 2.99;
+const MIN_MARKETPLACE_FEE_PERCENT = 0;
+const DEFAULT_MARKETPLACE_FEE_PERCENT = 0;
+const MAX_MARKETPLACE_FEE_PERCENT = 0;
+const MIN_MARKETPLACE_SUPPORT_FEE = 0;
 const DEFAULT_SERVICE_RADIUS_MILES = 25;
 const EARTH_RADIUS_MILES = 3958.8;
 
@@ -1421,9 +1457,15 @@ export default function BookGuruClient({
 
   const tipCents = dollarsToCents(tipAmount);
 
+  const selectedPaymentOptionConfig =
+    paymentOptions.find((option) => option.key === selectedPaymentOption) ||
+    paymentOptions[0];
+
   const selectedPaymentOptionLabel =
-    paymentOptions.find((option) => option.key === selectedPaymentOption)?.label ||
-    "Credit / debit card";
+    selectedPaymentOptionConfig?.label || "Credit / debit card";
+
+  const selectedPaymentOptionEnabled =
+    selectedPaymentOptionConfig?.enabled !== false;
 
   const guruEstimatedBasePayout = Number(servicePrice.toFixed(2));
 
@@ -2345,6 +2387,14 @@ export default function BookGuruClient({
       if (!allAcknowledgementsAccepted) {
         setSubmitError(
           "Please check all acknowledgements before continuing to secure checkout.",
+        );
+        return;
+      }
+
+      if (!selectedPaymentOptionEnabled) {
+        setSubmitError(
+          selectedPaymentOptionConfig?.disabledMessage ||
+            "That payment option is not enabled yet. Please choose card or an available digital wallet.",
         );
         return;
       }
@@ -3504,9 +3554,9 @@ export default function BookGuruClient({
                     trusted pet care
                   </p>
                   <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">
-                    Desktop now matches the mobile payment flow: card, digital
-                    wallet, saved method, PawPerks/referral credit, promo code,
-                    gift card/SitGuru credit, and optional Guru tip.
+                    SitGuru keeps the website and mobile payment experience
+                    aligned with secure card and digital-wallet checkout,
+                    on-platform credits, promo codes, and optional Guru tips.
                   </p>
                 </div>
 
@@ -3536,13 +3586,16 @@ export default function BookGuruClient({
                   <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {paymentOptions.map((option) => {
                       const selected = selectedPaymentOption === option.key;
-                      const comingSoon = option.key === "bank_account";
+                      const optionEnabled = option.enabled !== false;
+                      const comingSoon = !optionEnabled;
 
                       return (
                         <button
                           key={option.key}
                           type="button"
+                          disabled={!optionEnabled}
                           onClick={() => {
+                            if (!optionEnabled) return;
                             setSelectedPaymentOption(option.key);
                             setSubmitError("");
                           }}
@@ -3551,6 +3604,9 @@ export default function BookGuruClient({
                             selected
                               ? "border-emerald-500 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.16)]"
                               : "border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/70",
+                            !optionEnabled
+                              ? "cursor-not-allowed opacity-65 hover:border-slate-200 hover:bg-slate-50"
+                              : "",
                           ].join(" ")}
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -4042,13 +4098,15 @@ export default function BookGuruClient({
                   <span className="font-black text-slate-950">
                     {selectedGuruServiceIsCustomQuote
                       ? "After quote"
-                      : formatMoney(marketplaceFee)}
+                      : marketplaceFee > 0
+                        ? formatMoney(marketplaceFee)
+                        : "Free"}
                   </span>
                 </div>
 
                 <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
-                  A small support charge helps keep SitGuru running for our Pet
-                  Care Community. Varies by locality.
+                  Marketplace Support is free during SitGuru&apos;s current
+                  launch period.
                 </p>
 
                 <div className="mt-3 flex justify-between gap-4 text-sm">

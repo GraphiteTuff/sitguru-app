@@ -4,17 +4,41 @@ import { supabaseAdmin } from "@/utils/supabase/admin";
 import { calculateDistanceMiles } from "@/lib/distance/calculateDistanceMiles";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type BookingInsertPayload = Record<string, unknown>;
 
 type CheckoutRouteResponse = {
+  success?: boolean;
   url?: string;
   checkoutUrl?: string;
+  sessionId?: string;
   stripeSessionId?: string;
+  bookingId?: string;
+  provider?: string;
+  processor?: string;
+  fundingSource?: string;
+  requestedPaymentMethod?: string;
   financialPreview?: unknown;
+  availableProviders?: unknown;
+  code?: string;
   error?: string;
   message?: string;
   details?: unknown;
+};
+
+type AuthenticatedUser = {
+  id: string;
+  email: string | null;
+};
+
+type CheckoutPaymentSelection = {
+  uiOption: string;
+  uiLabel: string;
+  provider: "stripe" | "paypal";
+  paymentMethod: string;
+  checkoutEnabled: boolean;
+  disabledMessage: string;
 };
 
 type ZipLookupLocation = {
@@ -131,15 +155,145 @@ function getBookingId(booking: Record<string, unknown>) {
 }
 
 function getCheckoutBaseUrl(req: NextRequest) {
-  const forwardedProto = req.headers.get("x-forwarded-proto") || "http";
-  const forwardedHost =
-    req.headers.get("x-forwarded-host") || req.headers.get("host");
+  return req.nextUrl.origin.replace(/\/+$/, "");
+}
 
-  if (forwardedHost) {
-    return `${forwardedProto}://${forwardedHost}`;
+async function getAuthenticatedUser(
+  req: NextRequest,
+): Promise<AuthenticatedUser | null> {
+  const authorization = req.headers.get("authorization") || "";
+  const bearerMatch = authorization.match(/^Bearer\s+(.+)$/i);
+
+  if (bearerMatch?.[1]) {
+    const accessToken = bearerMatch[1].trim();
+    const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
+
+    if (error || !data.user) {
+      console.error("Booking route bearer authentication failed:", error);
+      return null;
+    }
+
+    return {
+      id: data.user.id,
+      email: data.user.email || null,
+    };
   }
 
-  return req.nextUrl.origin;
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    console.error("Booking route cookie authentication failed:", error);
+    return null;
+  }
+
+  return {
+    id: user.id,
+    email: user.email || null,
+  };
+}
+
+function normalizePaymentOption(value: unknown) {
+  return toCleanString(value)
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function resolveCheckoutPaymentSelection(
+  body: Record<string, unknown>,
+): CheckoutPaymentSelection {
+  const uiOption =
+    normalizePaymentOption(
+      body.payment_option ??
+        body.paymentOption ??
+        body.payment_method ??
+        body.paymentMethod ??
+        body.payment_provider ??
+        body.paymentProvider,
+    ) || "card";
+
+  const uiLabel =
+    getBodyString(
+      body,
+      ["payment_option_label", "paymentOptionLabel"],
+      "",
+    ) ||
+    uiOption
+      .split("_")
+      .filter(Boolean)
+      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+      .join(" ");
+
+  const paypalMarketplaceEnabled =
+    process.env.PAYPAL_MARKETPLACE_ENABLED?.trim().toLowerCase() === "true";
+
+  if (uiOption === "paypal") {
+    return {
+      uiOption,
+      uiLabel,
+      provider: "paypal",
+      paymentMethod: "paypal",
+      checkoutEnabled: paypalMarketplaceEnabled,
+      disabledMessage:
+        "PayPal checkout is not enabled yet. Please select card or an available digital wallet.",
+    };
+  }
+
+  if (uiOption === "venmo") {
+    return {
+      uiOption,
+      uiLabel,
+      provider: "paypal",
+      paymentMethod: "venmo",
+      checkoutEnabled: paypalMarketplaceEnabled,
+      disabledMessage:
+        "Venmo checkout is not enabled yet. Please select card or an available digital wallet.",
+    };
+  }
+
+  if (uiOption === "bank_account" || uiOption === "ach") {
+    return {
+      uiOption,
+      uiLabel,
+      provider: "stripe",
+      paymentMethod: "bank_account",
+      checkoutEnabled: false,
+      disabledMessage:
+        "ACH and bank-account checkout are not enabled yet. Please select card or an available digital wallet.",
+    };
+  }
+
+  const stripeMethodAliases: Record<string, string> = {
+    card: "card",
+    credit_card: "card",
+    debit_card: "card",
+    apple_pay: "apple_pay",
+    applepay: "apple_pay",
+    google_pay: "google_pay",
+    googlepay: "google_pay",
+    link: "link",
+    cash_app: "cash_app",
+    cash_app_pay: "cash_app",
+    saved_method: "automatic",
+    automatic: "automatic",
+    stripe: "automatic",
+    pawperks_credit: "automatic",
+    promo_code: "automatic",
+    gift_card: "automatic",
+  };
+
+  return {
+    uiOption,
+    uiLabel,
+    provider: "stripe",
+    paymentMethod: stripeMethodAliases[uiOption] || "automatic",
+    checkoutEnabled: true,
+    disabledMessage: "",
+  };
 }
 
 function getBodyNumber(
@@ -586,6 +740,7 @@ async function createCheckoutForBooking({
   tipCents,
   tipAmount,
   tipChoice,
+  paymentSelection,
   checkoutMetadata = {},
 }: {
   req: NextRequest;
@@ -593,9 +748,13 @@ async function createCheckoutForBooking({
   tipCents: number;
   tipAmount: number;
   tipChoice: string;
+  paymentSelection: CheckoutPaymentSelection;
   checkoutMetadata?: Record<string, unknown>;
 }) {
-  const checkoutUrl = new URL("/api/stripe/checkout", getCheckoutBaseUrl(req));
+  const checkoutUrl = new URL(
+    "/api/bookings/checkout",
+    getCheckoutBaseUrl(req),
+  );
 
   const cookieHeader = req.headers.get("cookie") || "";
   const authorizationHeader = req.headers.get("authorization") || "";
@@ -610,6 +769,12 @@ async function createCheckoutForBooking({
     body: JSON.stringify({
       bookingId,
       booking_id: bookingId,
+      paymentMethod: paymentSelection.paymentMethod,
+      payment_method: paymentSelection.paymentMethod,
+      paymentOption: paymentSelection.uiOption,
+      payment_option: paymentSelection.uiOption,
+      paymentOptionLabel: paymentSelection.uiLabel,
+      payment_option_label: paymentSelection.uiLabel,
       tipCents,
       tip_cents: tipCents,
       tipAmount,
@@ -619,6 +784,10 @@ async function createCheckoutForBooking({
       ...checkoutMetadata,
       metadata: {
         booking_id: bookingId,
+        payment_provider: paymentSelection.provider,
+        payment_method: paymentSelection.paymentMethod,
+        payment_option: paymentSelection.uiOption,
+        payment_option_label: paymentSelection.uiLabel,
         tip_choice: tipChoice,
         tip_amount: getCheckoutSafeMetadata(tipAmount),
         ...Object.fromEntries(
@@ -647,13 +816,17 @@ async function createCheckoutForBooking({
   }
 
   if (!response.ok) {
-    console.error("Internal checkout creation failed:", {
+    console.error("Unified checkout creation failed:", {
       status: response.status,
+      bookingId,
+      paymentProvider: paymentSelection.provider,
+      paymentMethod: paymentSelection.paymentMethod,
       data,
     });
 
     return {
       ok: false,
+      status: response.status,
       data,
       error:
         data?.error ||
@@ -662,8 +835,21 @@ async function createCheckoutForBooking({
     };
   }
 
+  const checkoutRedirectUrl = data?.checkoutUrl || data?.url || "";
+
+  if (!checkoutRedirectUrl) {
+    return {
+      ok: false,
+      status: 502,
+      data,
+      error:
+        "The booking was created, but secure checkout did not return a redirect URL.",
+    };
+  }
+
   return {
     ok: true,
+    status: response.status,
     data,
     error: "",
   };
@@ -671,20 +857,12 @@ async function createCheckoutForBooking({
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    const user = await getAuthenticatedUser(req);
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error("Booking route unauthorized:", userError);
-
+    if (!user) {
       return jsonError(
-        userError?.message || "Unauthorized. Please sign in again.",
+        "Unauthorized. Please sign in again.",
         401,
-        userError,
       );
     }
 
@@ -699,6 +877,30 @@ export async function POST(req: NextRequest) {
         "Invalid request body. JSON is required.",
         400,
         error instanceof Error ? error.message : error,
+      );
+    }
+
+    const paymentSelection = resolveCheckoutPaymentSelection(body);
+    const customQuoteRequested =
+      body.custom_quote_requested === true ||
+      body.customQuoteRequested === true ||
+      normalizePaymentOption(body.custom_quote_requested) === "true" ||
+      normalizePaymentOption(body.customQuoteRequested) === "true";
+
+    if (!paymentSelection.checkoutEnabled) {
+      return jsonError(
+        paymentSelection.disabledMessage,
+        409,
+        {
+          code: "PAYMENT_METHOD_NOT_ENABLED",
+          payment_option: paymentSelection.uiOption,
+          available_payment_methods: [
+            "card",
+            "apple_pay",
+            "google_pay",
+            "link",
+          ],
+        },
       );
     }
 
@@ -755,6 +957,16 @@ export async function POST(req: NextRequest) {
     const bookingType =
       getBodyString(body, ["booking_type", "bookingType"]) ||
       "instant_booking";
+
+    const promoCode = getBodyString(body, ["promo_code", "promoCode"]);
+    const giftCardCode = getBodyString(body, [
+      "gift_card_code",
+      "giftCardCode",
+    ]);
+    const creditPreferenceRequested =
+      body.credit_preference_requested === true ||
+      body.creditPreferenceRequested === true ||
+      paymentSelection.uiOption === "pawperks_credit";
 
     const careZipCode = getBodyString(body, ["care_zip_code", "careZipCode"]);
     const careCity = getBodyString(body, ["care_city", "careCity"]);
@@ -1036,6 +1248,8 @@ export async function POST(req: NextRequest) {
       payment_status: "unpaid",
       payout_status: "pending",
 
+      payment_provider: paymentSelection.provider,
+
       /*
         Important:
         total_amount remains the service subtotal for checkout calculation.
@@ -1045,6 +1259,7 @@ export async function POST(req: NextRequest) {
       total_amount: subtotalAmount,
       amount_total: customerTotalAmount,
       total: customerTotalAmount,
+      price: subtotalAmount,
 
       subtotal_amount: subtotalAmount,
       service_price: subtotalAmount,
@@ -1168,6 +1383,18 @@ export async function POST(req: NextRequest) {
         `Service radius eligible: ${serviceRadiusCheck.eligible ? "Yes" : "No"}`,
         `Eligibility checked at: ${now}`,
         "",
+        `Payment provider requested: ${paymentSelection.provider}`,
+        `Payment method requested: ${paymentSelection.paymentMethod}`,
+        `Payment option selected: ${paymentSelection.uiLabel}`,
+        promoCode ? `Promo code entered: ${promoCode}` : "",
+        giftCardCode ? `Gift card / SitGuru credit entered: ${giftCardCode}` : "",
+        creditPreferenceRequested
+          ? "Pet Parent requested available on-platform credit before final payment."
+          : "",
+        customQuoteRequested
+          ? "Custom quote requested. No checkout should be created until the final price is approved."
+          : "",
+        "",
         "Internal SitGuru marketplace fee tracking amount: $0",
         `Guru tip selected: $${tipAmount.toFixed(2)}. 100% of the tip goes directly to the Guru.`,
         `Estimated Guru payout: $${guruEstimatedTotalPayout.toFixed(2)}`,
@@ -1216,12 +1443,70 @@ export async function POST(req: NextRequest) {
     const bookingId = getBookingId(booking);
 
     if (!bookingId) {
+      return jsonError(
+        "Booking was created, but no booking ID was returned to start secure checkout.",
+        500,
+        {
+          booking,
+        },
+      );
+    }
+
+    if (customQuoteRequested) {
       return NextResponse.json({
         success: true,
         booking,
-        checkoutWarning:
-          "Booking was created, but no booking ID was returned to start secure checkout.",
+        bookingId,
+        quoteRequest: true,
+        checkoutRequired: false,
+        paymentStatus: "unpaid",
+        usedFallbackBookingInsert: usedFallback,
       });
+    }
+
+    const storedBookingPrice = toNullableNumber(booking.price);
+
+    if (
+      storedBookingPrice === null ||
+      Math.abs(storedBookingPrice - subtotalAmount) > 0.009
+    ) {
+      const { data: updatedBooking, error: priceUpdateError } =
+        await supabaseAdmin
+          .from("bookings")
+          .update({
+            price: subtotalAmount,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", bookingId)
+          .select("price")
+          .maybeSingle();
+
+      const updatedPrice = toNullableNumber(updatedBooking?.price);
+
+      if (
+        priceUpdateError ||
+        updatedPrice === null ||
+        Math.abs(updatedPrice - subtotalAmount) > 0.009
+      ) {
+        console.error(
+          "Booking price could not be prepared for unified checkout:",
+          {
+            bookingId,
+            subtotalAmount,
+            storedBookingPrice,
+            priceUpdateError,
+          },
+        );
+
+        return jsonError(
+          "The booking request was saved, but SitGuru could not safely prepare the correct checkout amount. No payment was started.",
+          500,
+          {
+            code: "BOOKING_PRICE_NOT_READY",
+            booking_id: bookingId,
+          },
+        );
+      }
     }
 
     const checkoutResult = await createCheckoutForBooking({
@@ -1230,11 +1515,19 @@ export async function POST(req: NextRequest) {
       tipCents,
       tipAmount,
       tipChoice,
+      paymentSelection,
       checkoutMetadata: {
         sitter_id: resolvedGuruId,
         guru_id: resolvedGuruId,
         guru_name: resolvedGuruName,
         guru_avatar_url: resolvedGuruAvatarUrl || "",
+        payment_provider: paymentSelection.provider,
+        payment_method: paymentSelection.paymentMethod,
+        payment_option: paymentSelection.uiOption,
+        payment_option_label: paymentSelection.uiLabel,
+        promo_code: promoCode,
+        gift_card_code: giftCardCode,
+        credit_preference_requested: creditPreferenceRequested,
         pet_id: resolvedPetId || "",
         pet_name: petName,
         pet_photo_url: selectedPetPhotoUrl || "",
@@ -1265,25 +1558,57 @@ export async function POST(req: NextRequest) {
     });
 
     if (!checkoutResult.ok) {
-      return NextResponse.json({
-        success: true,
-        booking,
-        checkoutWarning: checkoutResult.error,
-        checkoutDetails: checkoutResult.data,
-        usedFallbackBookingInsert: usedFallback,
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: checkoutResult.error,
+          code:
+            checkoutResult.data?.code ||
+            "SECURE_CHECKOUT_CREATION_FAILED",
+          booking,
+          bookingId,
+          checkoutDetails: checkoutResult.data,
+          paymentProvider: paymentSelection.provider,
+          paymentMethod: paymentSelection.paymentMethod,
+          usedFallbackBookingInsert: usedFallback,
+        },
+        {
+          status:
+            checkoutResult.status >= 400 &&
+            checkoutResult.status <= 599
+              ? checkoutResult.status
+              : 502,
+        },
+      );
     }
 
     const checkoutUrl =
       checkoutResult.data?.checkoutUrl || checkoutResult.data?.url || "";
 
+    const checkoutSessionId =
+      checkoutResult.data?.stripeSessionId ||
+      checkoutResult.data?.sessionId ||
+      null;
+
     return NextResponse.json({
       success: true,
       booking,
+      bookingId,
+      checkoutRequired: true,
       checkoutUrl,
       url: checkoutUrl,
-      stripeSessionId: checkoutResult.data?.stripeSessionId || null,
+      sessionId: checkoutSessionId,
+      stripeSessionId: checkoutSessionId,
+      paymentProvider:
+        checkoutResult.data?.provider || paymentSelection.provider,
+      paymentProcessor:
+        checkoutResult.data?.processor || paymentSelection.provider,
+      paymentMethod:
+        checkoutResult.data?.requestedPaymentMethod ||
+        paymentSelection.paymentMethod,
+      fundingSource: checkoutResult.data?.fundingSource || null,
       financialPreview: checkoutResult.data?.financialPreview || null,
+      availableProviders: checkoutResult.data?.availableProviders || null,
       usedFallbackBookingInsert: usedFallback,
     });
   } catch (error) {

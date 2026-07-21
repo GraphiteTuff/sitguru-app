@@ -1147,7 +1147,7 @@ export default function PaymentsScreen() {
   const latestPayment = payments[0] || null;
   const accepted = isBookingAccepted(booking);
   const alreadyPaid = isPaymentPaid(latestPayment);
-  const isWide = width >= 760;
+  const isWide = Platform.OS !== 'web' && width >= 760;
 
   const canOpenCheckout =
     isAuthenticated &&
@@ -1705,6 +1705,160 @@ export default function PaymentsScreen() {
             </View>
           </View>
         ) : null}
+
+        <View style={styles.nextStepCard}>
+          <View style={styles.nextStepTop}>
+            <View style={styles.nextStepIcon}>
+              {effectiveRole !== 'pet_parent' ? (
+                <UserRound
+                  color={theme.colors.primary}
+                  size={22}
+                  strokeWidth={2.4}
+                />
+              ) : alreadyPaid ? (
+                <CheckCircle2
+                  color={theme.colors.primary}
+                  size={22}
+                  strokeWidth={2.4}
+                />
+              ) : accepted ? (
+                <CreditCard
+                  color={theme.colors.primary}
+                  size={22}
+                  strokeWidth={2.4}
+                />
+              ) : (
+                <Clock3
+                  color={theme.colors.primary}
+                  size={22}
+                  strokeWidth={2.4}
+                />
+              )}
+            </View>
+
+            <View style={styles.nextStepCopy}>
+              <Text style={styles.nextStepEyebrow}>YOUR NEXT STEP</Text>
+              <Text style={styles.nextStepTitle}>
+                {effectiveRole !== 'pet_parent'
+                  ? 'Switch to Pet Parent to pay'
+                  : !booking
+                    ? 'Choose a booking'
+                    : alreadyPaid
+                      ? 'Payment confirmed'
+                      : accepted
+                        ? `Pay ${formatCurrency(
+                            amountAfterAvailableCredits,
+                            booking.currency,
+                          )} securely`
+                        : 'Waiting for Guru acceptance'}
+              </Text>
+              <Text style={styles.nextStepMessage}>
+                {effectiveRole !== 'pet_parent'
+                  ? `You are currently viewing Payments as ${roleLabel(
+                      activeRole,
+                    )}. Guru-service checkout is completed from the Pet Parent workspace.`
+                  : !booking
+                    ? 'Open a booking to review the final price and available payment methods.'
+                    : alreadyPaid
+                      ? 'This booking has a confirmed payment. Open the receipt or booking details below.'
+                      : accepted
+                        ? 'The booking is accepted and ready for SitGuru Checkout.'
+                        : 'No payment is due yet. The Pay button appears after the Guru accepts and the final amount is confirmed.'}
+              </Text>
+            </View>
+          </View>
+
+          <Button
+            label={
+              effectiveRole !== 'pet_parent'
+                ? 'Switch to Pet Parent'
+                : !booking
+                  ? 'View bookings'
+                  : alreadyPaid
+                    ? latestPayment?.receiptUrl
+                      ? 'View receipt'
+                      : 'View booking details'
+                    : accepted
+                      ? `Pay ${formatCurrency(
+                          amountAfterAvailableCredits,
+                          booking.currency,
+                        )} now`
+                      : 'View booking request'
+            }
+            onPress={() => {
+              if (effectiveRole !== 'pet_parent') {
+                setWorkspaceSwitcherOpen(true);
+                return;
+              }
+
+              if (!booking) {
+                router.push('/booking-details');
+                return;
+              }
+
+              if (alreadyPaid) {
+                if (latestPayment?.receiptUrl) {
+                  void openReceipt(latestPayment);
+                } else {
+                  router.push({
+                    pathname: '/booking-details',
+                    params: { bookingId: booking.id },
+                  });
+                }
+                return;
+              }
+
+              if (accepted) {
+                void startCheckout();
+                return;
+              }
+
+              router.push({
+                pathname: '/booking-details',
+                params: { bookingId: booking.id },
+              });
+            }}
+            styles={styles}
+            primary={effectiveRole === 'pet_parent' && accepted && !alreadyPaid}
+            disabled={startingCheckout}
+            icon={
+              startingCheckout ? (
+                <ActivityIndicator
+                  color={
+                    effectiveRole === 'pet_parent' && accepted
+                      ? '#FFFFFF'
+                      : theme.colors.primary
+                  }
+                  size="small"
+                />
+              ) : effectiveRole !== 'pet_parent' ? (
+                <UserRound
+                  color={theme.colors.primary}
+                  size={18}
+                  strokeWidth={2.4}
+                />
+              ) : alreadyPaid ? (
+                <Receipt
+                  color={theme.colors.primary}
+                  size={18}
+                  strokeWidth={2.4}
+                />
+              ) : accepted ? (
+                <CreditCard
+                  color="#FFFFFF"
+                  size={18}
+                  strokeWidth={2.4}
+                />
+              ) : (
+                <CalendarDays
+                  color={theme.colors.primary}
+                  size={18}
+                  strokeWidth={2.4}
+                />
+              )
+            }
+          />
+        </View>
 
         <View
           style={[
@@ -2323,12 +2477,13 @@ export default function PaymentsScreen() {
                     styles={styles}
                   />
                   <BottomNavItem
+                    active
                     label="Bookings"
                     icon={
                       <CalendarDays
-                        color={theme.colors.textSecondary}
+                        color={theme.colors.primary}
                         size={20}
-                        strokeWidth={2.3}
+                        strokeWidth={2.4}
                       />
                     }
                     onPress={() => router.push('/booking-details')}
@@ -2347,13 +2502,12 @@ export default function PaymentsScreen() {
                     styles={styles}
                   />
                   <BottomNavItem
-                    active
                     label="Profile"
                     icon={
                       <UserRound
-                        color={theme.colors.primary}
+                        color={theme.colors.textSecondary}
                         size={20}
-                        strokeWidth={2.4}
+                        strokeWidth={2.3}
                       />
                     }
                     onPress={() => router.push('/account')}
@@ -2850,6 +3004,50 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
       fontFamily: AppFonts.semiBold,
       fontWeight: '700',
       lineHeight: 19,
+    },
+    nextStepCard: {
+      backgroundColor: theme.colors.elevatedCard,
+      borderColor: theme.colors.borderStrong,
+      borderRadius: 22,
+      borderWidth: 1,
+      gap: 12,
+      padding: 15,
+    },
+    nextStepTop: {
+      alignItems: 'flex-start',
+      flexDirection: 'row',
+      gap: 10,
+    },
+    nextStepIcon: {
+      alignItems: 'center',
+      backgroundColor: theme.colors.primarySoft,
+      borderRadius: 14,
+      height: 42,
+      justifyContent: 'center',
+      width: 42,
+    },
+    nextStepCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    nextStepEyebrow: {
+      color: theme.colors.primary,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 8,
+      letterSpacing: 0.7,
+    },
+    nextStepTitle: {
+      color: theme.colors.text,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 17,
+      letterSpacing: -0.3,
+      lineHeight: 21,
+    },
+    nextStepMessage: {
+      color: theme.colors.textSecondary,
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 16,
     },
     roleGrid: {
       gap: 12,

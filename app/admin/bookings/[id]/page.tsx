@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import VisitUpdateTimeline from "@/components/visit-updates/VisitUpdateTimeline";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { createClient } from "@/utils/supabase/server";
 import StatusUpdateForm from "./StatusUpdateForm";
 
 export const dynamic = "force-dynamic";
@@ -127,6 +130,26 @@ type NoteGroup = {
   media: string[];
   internal: string[];
 };
+
+async function getVisitData(bookingId: string) {
+  const [{ data: session }, { data: updates }] = await Promise.all([
+    supabaseAdmin
+      .from("booking_visit_sessions")
+      .select("*")
+      .eq("booking_id", bookingId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("booking_visit_updates")
+      .select("*")
+      .eq("booking_id", bookingId)
+      .order("created_at", { ascending: true }),
+  ]);
+
+  return {
+    session,
+    updates: updates ?? [],
+  };
+}
 
 function cleanString(value: unknown) {
   if (typeof value === "string") return value.trim();
@@ -664,6 +687,7 @@ function ErrorState({ title, message }: { title: string; message: string }) {
             </Link>
           </div>
         </div>
+
       </div>
     </main>
   );
@@ -672,6 +696,15 @@ function ErrorState({ title, message }: { title: string; message: string }) {
 export default async function AdminBookingDetailPage({ params }: PageProps) {
   const resolvedParams = await params;
   const bookingId = cleanString(resolvedParams?.id);
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/admin/login");
+  }
 
   if (isInvalidBookingId(bookingId)) {
     return (
@@ -703,25 +736,31 @@ export default async function AdminBookingDetailPage({ params }: PageProps) {
 
   const bookingRow = booking as BookingRow;
 
-  const [{ data: customerProfile }, guru, { data: pet }, petPhotoFromMedia] =
-    await Promise.all([
-      bookingRow.customer_id
-        ? supabaseAdmin
-            .from("profiles")
-            .select("*")
-            .eq("id", bookingRow.customer_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      findGuruByBookingSitterId(bookingRow.sitter_id, bookingRow.guru_id),
-      bookingRow.pet_id
-        ? supabaseAdmin
-            .from("pets")
-            .select("*")
-            .eq("id", bookingRow.pet_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      findLatestPetPhotoUrl(bookingRow.pet_id),
-    ]);
+  const [
+    { data: customerProfile },
+    guru,
+    { data: pet },
+    petPhotoFromMedia,
+    visitData,
+  ] = await Promise.all([
+    bookingRow.customer_id
+      ? supabaseAdmin
+          .from("profiles")
+          .select("*")
+          .eq("id", bookingRow.customer_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    findGuruByBookingSitterId(bookingRow.sitter_id, bookingRow.guru_id),
+    bookingRow.pet_id
+      ? supabaseAdmin
+          .from("pets")
+          .select("*")
+          .eq("id", bookingRow.pet_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    findLatestPetPhotoUrl(bookingRow.pet_id),
+    getVisitData(bookingId),
+  ]);
 
   const customer = (customerProfile ?? null) as ProfileRow | null;
   const petRow = (pet ?? null) as PetRow | null;
@@ -938,6 +977,17 @@ export default async function AdminBookingDetailPage({ params }: PageProps) {
             </DetailCard>
           </div>
         </div>
+
+        <DetailCard
+          title="PawReport timeline"
+          subtitle="Review visit start and completion details, care notes, photos, and Guru updates for this booking."
+        >
+          <VisitUpdateTimeline
+            session={visitData.session}
+            updates={visitData.updates}
+            viewer="admin"
+          />
+        </DetailCard>
       </div>
     </main>
   );

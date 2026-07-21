@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+
 import { trackReferralClick } from "@/lib/referrals/trackReferralClick";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type RouteContext = {
   params: Promise<{
-    code: string;
+    slug: string;
     type: string;
   }>;
 };
@@ -93,10 +94,7 @@ async function findAmbassador(referralCode: string) {
     .maybeSingle();
 
   if (error) {
-    console.error(
-      "Ambassador short-link lookup failed:",
-      error.message,
-    );
+    console.error("Ambassador short-link lookup failed:", error.message);
     return null;
   }
 
@@ -240,8 +238,8 @@ export async function GET(
   request: NextRequest,
   context: RouteContext,
 ) {
-  const { code: rawCode, type: rawType } = await context.params;
-  const referralCode = normalizeReferralCode(rawCode);
+  const { slug: rawSlug, type: rawType } = await context.params;
+  const referralCode = normalizeReferralCode(rawSlug);
   const type = normalizeReferralType(rawType);
 
   if (!referralCode || !type) {

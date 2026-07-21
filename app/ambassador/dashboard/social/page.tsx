@@ -88,6 +88,7 @@ type ReferralCodeRow = Record<string, unknown> & {
   id?: string | null;
   ambassador_id?: string | null;
   code?: string | null;
+  slug?: string | null;
   status?: string | null;
 };
 
@@ -131,6 +132,7 @@ type PageDataResult = {
   referrals: AmbassadorReferralRow[];
   rewards: RewardRow[];
   clicks: ReferralClickRow[];
+  referralSlug: string;
   warning: string;
 };
 
@@ -246,15 +248,19 @@ function getSiteUrl() {
 }
 
 function getTrackedSocialPath({
+  referralSlug,
   referralCode,
   platform,
   via,
 }: {
+  referralSlug: string;
   referralCode: string;
   platform: SocialPlatformKey;
   via?: "qr";
 }) {
-  const path = `/r/social/${encodeURIComponent(
+  const path = `/r/${encodeURIComponent(
+    referralSlug,
+  )}/social/${encodeURIComponent(
     referralCode,
   )}/${platform}`;
 
@@ -789,6 +795,11 @@ async function getCanonicalSocialData({
     referrals: (referralResult.data || []) as AmbassadorReferralRow[],
     rewards: (rewardResult.data || []) as RewardRow[],
     clicks,
+    referralSlug:
+      asString(referralCodeRow?.slug) ||
+      `ambassador-${referralCode
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, "-")}`,
     warning: warnings.join(" "),
   };
 }
@@ -913,18 +924,22 @@ function StatCard({
 
 function PlatformCard({
   platform,
+  referralSlug,
   referralCode,
   metrics,
 }: {
   platform: PlatformConfig;
+  referralSlug: string;
   referralCode: string;
   metrics: PlatformMetric;
 }) {
   const trackedPath = getTrackedSocialPath({
+    referralSlug,
     referralCode,
     platform: platform.key,
   });
   const qrPath = getTrackedSocialPath({
+    referralSlug,
     referralCode,
     platform: platform.key,
     via: "qr",
@@ -1318,6 +1333,7 @@ export default async function AmbassadorSocialPage() {
               <PlatformCard
                 key={platform.key}
                 platform={platform}
+                referralSlug={data.referralSlug}
                 referralCode={referralCode}
                 metrics={platformMetrics[platform.key]}
               />
@@ -1337,7 +1353,7 @@ export default async function AmbassadorSocialPage() {
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
                 Every card uses
                 <span className="mx-1 font-black text-emerald-800">
-                  /r/social/{referralCode}/platform
+                  /r/{data.referralSlug}/social/{referralCode}/platform
                 </span>
                 for normal visits and adds
                 <span className="mx-1 font-black text-emerald-800">

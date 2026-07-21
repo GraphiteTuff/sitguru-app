@@ -62,8 +62,295 @@ type CheckoutLineItem = {
   quantity: number;
 };
 
+type AuthSource = "cookie" | "bearer";
+
+type AuthenticatedUser = {
+  id: string;
+  email?: string | null;
+};
+
+type CheckoutRedirectUrls = {
+  successUrl: string;
+  cancelUrl: string;
+  mobileReturnUrl: string;
+  mobileCancelUrl: string;
+};
+
 function normalizeUrl(value: string) {
   return value.replace(/\/+$/, "");
+}
+
+function getBearerToken(req: NextRequest) {
+  const authorization = req.headers.get("authorization")?.trim() || "";
+
+  if (!authorization.toLowerCase().startsWith("bearer ")) {
+    return "";
+  }
+
+  return authorization.slice(7).trim();
+}
+
+async function getAuthenticatedUser(req: NextRequest): Promise<{
+  user: AuthenticatedUser | null;
+  error: string;
+  source: AuthSource;
+}> {
+  const bearerToken = getBearerToken(req);
+
+  if (bearerToken) {
+    const {
+      data: { user },
+      error,
+    } = await supabaseAdmin.auth.getUser(bearerToken);
+
+    return {
+      user: user
+        ? {
+            id: user.id,
+            email: user.email,
+          }
+        : null,
+      error: error?.message || "",
+      source: "bearer",
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  return {
+    user: user
+      ? {
+          id: user.id,
+          email: user.email,
+        }
+      : null,
+    error: error?.message || "",
+    source: "cookie",
+  };
+}
+
+function isAllowedOrigin(origin: string) {
+  if (!origin) return false;
+
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname.toLowerCase();
+
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "sitguru.com" ||
+      hostname === "www.sitguru.com" ||
+      hostname.endsWith(".sitguru.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getCorsHeaders(req: NextRequest) {
+  const origin = req.headers.get("origin")?.trim() || "";
+  const headers = new Headers();
+
+  if (isAllowedOrigin(origin)) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Vary", "Origin");
+  }
+
+  headers.set(
+    "Access-Control-Allow-Headers",
+    "Authorization, Content-Type, Idempotency-Key",
+  );
+  headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  headers.set("Access-Control-Max-Age", "86400");
+
+  return headers;
+}
+
+function jsonResponse(
+  req: NextRequest,
+  body: Record<string, unknown>,
+  status = 200,
+) {
+  return NextResponse.json(body, {
+    status,
+    headers: getCorsHeaders(req),
+  });
+}
+
+function isSafeCheckoutReturnUrl(value: string) {
+  if (!value) return false;
+
+  try {
+    const url = new URL(value);
+    const protocol = url.protocol.toLowerCase();
+    const hostname = url.hostname.toLowerCase();
+
+    if (protocol === "sitgurumobile:") {
+      return true;
+    }
+
+    if (protocol !== "http:" && protocol !== "https:") {
+      return false;
+    }
+
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "sitguru.com" ||
+      hostname === "www.sitguru.com" ||
+      hostname.endsWith(".sitguru.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function buildMobileReturnBridge({
+  baseUrl,
+  bookingId,
+  returnUrl,
+  status,
+  includeSessionId,
+}: {
+  baseUrl: string;
+  bookingId: string;
+  returnUrl: string;
+  status: "success" | "cancelled";
+  includeSessionId: boolean;
+}) {
+  const query = new URLSearchParams({
+    status,
+    bookingId,
+    returnUrl,
+  });
+
+  const sessionSuffix = includeSessionId
+    ? "&session_id={CHECKOUT_SESSION_ID}"
+    : "";
+
+  return `${baseUrl}/api/mobile/payments/return?${query.toString()}${sessionSuffix}`;
+}
+
+function getCheckoutRedirectUrls({
+  req,
+  body,
+  bookingId,
+  authSource,
+}: {
+  req: NextRequest;
+  body: Record<string, unknown> | null;
+  bookingId: string;
+  authSource: AuthSource;
+}): CheckoutRedirectUrls {
+  const baseUrl = getBaseUrl(req);
+  const requestedReturnUrl = firstNonEmpty(
+    body?.returnUrl,
+    body?.return_url,
+    body?.successUrl,
+    body?.success_url,
+  );
+  const requestedCancelUrl = firstNonEmpty(
+    body?.cancelUrl,
+    body?.cancel_url,
+  );
+
+  const mobileReturnUrl =
+    authSource === "bearer" && isSafeCheckoutReturnUrl(requestedReturnUrl)
+      ? requestedReturnUrl
+      : "";
+
+  const mobileCancelUrl =
+    authSource === "bearer" && isSafeCheckoutReturnUrl(requestedCancelUrl)
+      ? requestedCancelUrl
+      : mobileReturnUrl;
+
+  if (mobileReturnUrl) {
+    return {
+      successUrl: buildMobileReturnBridge({
+        baseUrl,
+        bookingId,
+        returnUrl: mobileReturnUrl,
+        status: "success",
+        includeSessionId: true,
+      }),
+      cancelUrl: buildMobileReturnBridge({
+        baseUrl,
+        bookingId,
+        returnUrl: mobileCancelUrl || mobileReturnUrl,
+        status: "cancelled",
+        includeSessionId: false,
+      }),
+      mobileReturnUrl,
+      mobileCancelUrl,
+    };
+  }
+
+  return {
+    successUrl: `${baseUrl}/bookings/success?bookingId=${bookingId}&session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${baseUrl}/bookings/cancel?bookingId=${bookingId}`,
+    mobileReturnUrl: "",
+    mobileCancelUrl: "",
+  };
+}
+
+function isBookingReadyForCheckout(booking: BookingRow) {
+  const status = normalizeComparable(
+    firstNonEmpty(
+      booking.booking_status,
+      booking.status,
+      booking.request_status,
+    ),
+  );
+
+  if (
+    [
+      "accepted",
+      "approved",
+      "confirmed",
+      "booked",
+      "scheduled",
+      "awaiting_payment",
+      "payment_pending",
+      "payment_required",
+      "in_progress",
+      "active",
+      "completed",
+      "complete",
+      "fulfilled",
+      "finished",
+    ].includes(status)
+  ) {
+    return true;
+  }
+
+  return Boolean(
+    firstNonEmpty(
+      booking.accepted_at,
+      booking.approved_at,
+      booking.confirmed_at,
+      booking.completed_at,
+    ),
+  );
+}
+
+function isBookingAlreadyPaid(booking: BookingRow) {
+  const paymentStatus = normalizeComparable(booking.payment_status);
+
+  return [
+    "paid",
+    "succeeded",
+    "successful",
+    "captured",
+    "complete",
+    "completed",
+  ].includes(paymentStatus);
 }
 
 function getBaseUrl(req: NextRequest) {
@@ -1129,9 +1416,15 @@ async function updateCheckoutStarted(
   });
 }
 
+export async function OPTIONS(req: NextRequest) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: getCorsHeaders(req),
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
     const body = (await req.json().catch(() => null)) as Record<
       string,
       unknown
@@ -1140,25 +1433,54 @@ export async function POST(req: NextRequest) {
     const bookingId = firstNonEmpty(body?.bookingId, body?.booking_id, body?.id);
 
     if (!bookingId) {
-      return NextResponse.json({ error: "Missing bookingId" }, { status: 400 });
+      return jsonResponse(req, { error: "Missing bookingId" }, 400);
     }
 
     const {
-      data: { user },
+      user,
       error: userError,
-    } = await supabase.auth.getUser();
+      source: authSource,
+    } = await getAuthenticatedUser(req);
 
     if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return jsonResponse(req, { error: "Unauthorized" }, 401);
     }
 
     const bookingResult = await fetchBookingById(bookingId);
     const booking = bookingResult.data;
 
     if (bookingResult.error || !booking) {
-      return NextResponse.json(
+      return jsonResponse(
+        req,
         { error: bookingResult.error?.message || "Booking not found" },
-        { status: 404 },
+        404,
+      );
+    }
+
+    if (isBookingAlreadyPaid(booking)) {
+      return jsonResponse(
+        req,
+        {
+          error: "This booking already has a confirmed payment.",
+          paymentStatus: firstNonEmpty(booking.payment_status),
+        },
+        409,
+      );
+    }
+
+    if (!isBookingReadyForCheckout(booking)) {
+      return jsonResponse(
+        req,
+        {
+          error:
+            "SitGuru Checkout opens after the Guru accepts and the booking amount is finalized.",
+          bookingStatus: firstNonEmpty(
+            booking.booking_status,
+            booking.status,
+            booking.request_status,
+          ),
+        },
+        409,
       );
     }
 
@@ -1172,20 +1494,20 @@ export async function POST(req: NextRequest) {
         : false;
 
     if (ownerId && !hasOwnerMatch) {
-      return NextResponse.json(
+      return jsonResponse(
+        req,
         { error: "You do not have access to this booking" },
-        { status: 403 },
+        403,
       );
     }
 
     if (!ownerId && bookingCustomerEmail && !hasEmailMatch) {
-      return NextResponse.json(
+      return jsonResponse(
+        req,
         { error: "You do not have access to this booking" },
-        { status: 403 },
+        403,
       );
     }
-
-    const baseUrl = getBaseUrl(req);
 
     const petName =
       asTrimmedString(booking.pet_name) ||
@@ -1263,6 +1585,12 @@ export async function POST(req: NextRequest) {
 
     const bookingIdString = String(booking.id);
     const bookingOwnerId = ownerId || user.id;
+    const checkoutRedirects = getCheckoutRedirectUrls({
+      req,
+      body,
+      bookingId: bookingIdString,
+      authSource,
+    });
 
     const bookingCareCity = getBookingCity(booking);
     const bookingCareState = getBookingState(booking);
@@ -1323,6 +1651,9 @@ export async function POST(req: NextRequest) {
     const checkoutMetadata = {
       booking_id: bookingIdString,
       booking_owner_id: bookingOwnerId,
+      checkout_auth_source: authSource,
+      mobile_return_url: checkoutRedirects.mobileReturnUrl.slice(0, 480),
+      mobile_cancel_url: checkoutRedirects.mobileCancelUrl.slice(0, 480),
       guru_id: asTrimmedString(booking.guru_id),
       guru_name: resolvedGuruName,
       guru_avatar_url: resolvedGuruAvatarUrl,
@@ -1390,25 +1721,37 @@ export async function POST(req: NextRequest) {
       tip_message: "100% of your tip goes directly to your Guru.",
     };
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      customer_email: user.email ?? undefined,
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: "payment",
+        client_reference_id: bookingIdString,
+        customer_email: user.email ?? undefined,
 
-      automatic_tax: {
-        enabled: true,
-      },
+        automatic_tax: {
+          enabled: true,
+        },
 
-      line_items: checkoutLineItems,
+        line_items: checkoutLineItems,
 
-      payment_intent_data: {
+        payment_intent_data: {
+          metadata: checkoutMetadata,
+        },
+
+        success_url: checkoutRedirects.successUrl,
+        cancel_url: checkoutRedirects.cancelUrl,
+
         metadata: checkoutMetadata,
       },
-
-      success_url: `${baseUrl}/bookings/success?bookingId=${bookingIdString}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/bookings/cancel?bookingId=${bookingIdString}`,
-
-      metadata: checkoutMetadata,
-    });
+      {
+        idempotencyKey:
+          req.headers.get("idempotency-key")?.trim() ||
+          `sitguru-checkout-${bookingIdString}-${firstNonEmpty(
+            booking.updated_at,
+            booking.created_at,
+            "initial",
+          )}`,
+      },
+    );
 
     await updateCheckoutStarted(bookingIdString, {
       stripeSessionId: session.id,
@@ -1452,17 +1795,20 @@ export async function POST(req: NextRequest) {
     });
 
     if (!session.url) {
-      return NextResponse.json(
+      return jsonResponse(
+        req,
         { error: "Stripe session did not return a checkout URL" },
-        { status: 500 },
+        500,
       );
     }
 
-    return NextResponse.json({
+    return jsonResponse(req, {
       url: session.url,
       checkoutUrl: session.url,
       stripeSessionId: session.id,
       sessionId: session.id,
+      returnUrl: checkoutRedirects.mobileReturnUrl || undefined,
+      cancelUrl: checkoutRedirects.mobileCancelUrl || undefined,
       financialPreview: {
         subtotalAmount: centsToDollars(subtotalCents),
         marketplaceFeePercent: sitguruFeePercent,
@@ -1501,22 +1847,24 @@ export async function POST(req: NextRequest) {
     console.error("Stripe checkout error:", error);
 
     if (error instanceof Stripe.errors.StripeError) {
-      return NextResponse.json(
+      return jsonResponse(
+        req,
         {
           error: error.message || "Stripe checkout failed",
           type: error.type || "StripeError",
           code: "code" in error ? error.code ?? null : null,
           statusCode: error.statusCode ?? null,
         },
-        { status: 500 },
+        500,
       );
     }
 
-    return NextResponse.json(
+    return jsonResponse(
+      req,
       {
         error: error instanceof Error ? error.message : "Checkout failed",
       },
-      { status: 500 },
+      500,
     );
   }
 }
