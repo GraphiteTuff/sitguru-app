@@ -6,9 +6,13 @@ import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
-const heroVideoPath = "/videos/sitguru-homepage-hero.mp4";
+const heroVideoPaths = [
+  "/videos/sitguru-homepage-hero.mp4",
+  "/videos/sitguru-homepage-hero-2.mp4",
+] as const;
 const heroVideoPosterPath = "/images/sitguru-homepage-hero-poster.jpg";
 const heroVideoPlaybackRate = 0.8;
+const heroVideoTransitionMs = 420;
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
 const sitGuruVideoEmbedUrl =
   "https://www.youtube.com/embed/Jk5vWCWvvKs?si=12529oKyk7IFLtAj";
@@ -1504,7 +1508,12 @@ function HeroSignupCard({
 
 function HeroVisual() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const transitionTimeoutRef = useRef<number | null>(null);
+  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [isVideoPaused, setIsVideoPaused] = useState(false);
+  const [isVideoTransitioning, setIsVideoTransitioning] = useState(false);
+
+  const activeVideoPath = heroVideoPaths[activeVideoIndex];
 
   useEffect(() => {
     const video = videoRef.current;
@@ -1526,16 +1535,84 @@ function HeroVisual() {
     void video.play().catch(() => {
       setIsVideoPaused(true);
     });
+  }, [activeVideoIndex]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const connection = (
+      navigator as Navigator & {
+        connection?: { saveData?: boolean };
+      }
+    ).connection;
+
+    if (
+      connection?.saveData ||
+      !window.matchMedia("(min-width: 768px)").matches
+    ) {
+      return;
+    }
+
+    const nextVideoIndex = (activeVideoIndex + 1) % heroVideoPaths.length;
+    const nextVideo = document.createElement("video");
+    nextVideo.preload = "auto";
+    nextVideo.muted = true;
+    nextVideo.src = heroVideoPaths[nextVideoIndex];
+    nextVideo.load();
+
+    return () => {
+      nextVideo.removeAttribute("src");
+      nextVideo.load();
+    };
+  }, [activeVideoIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimeoutRef.current !== null) {
+        window.clearTimeout(transitionTimeoutRef.current);
+      }
+    };
   }, []);
+
+  function playActiveVideo() {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.playbackRate = heroVideoPlaybackRate;
+
+    void video
+      .play()
+      .then(() => {
+        setIsVideoPaused(false);
+        setIsVideoTransitioning(false);
+      })
+      .catch(() => {
+        setIsVideoPaused(true);
+        setIsVideoTransitioning(false);
+      });
+  }
+
+  function rotateToNextVideo() {
+    if (transitionTimeoutRef.current !== null) {
+      window.clearTimeout(transitionTimeoutRef.current);
+    }
+
+    setIsVideoTransitioning(true);
+
+    transitionTimeoutRef.current = window.setTimeout(() => {
+      setActiveVideoIndex(
+        (currentIndex) => (currentIndex + 1) % heroVideoPaths.length,
+      );
+      transitionTimeoutRef.current = null;
+    }, heroVideoTransitionMs);
+  }
 
   function toggleHeroVideo() {
     const video = videoRef.current;
     if (!video) return;
 
     if (video.paused) {
-      void video.play().catch(() => {
-        setIsVideoPaused(true);
-      });
+      playActiveVideo();
       return;
     }
 
@@ -1545,22 +1622,26 @@ function HeroVisual() {
   return (
     <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-slate-950">
       <video
+        key={activeVideoPath}
         ref={videoRef}
-        className="absolute inset-0 h-full w-full object-cover object-[55%_center] sm:object-[57%_center] lg:object-center"
+        className={`absolute inset-0 h-full w-full object-cover object-[55%_center] transition-opacity duration-500 sm:object-[57%_center] lg:object-center ${
+          isVideoTransitioning ? "opacity-0" : "opacity-100"
+        }`}
         poster={heroVideoPosterPath}
         autoPlay
         muted
-        loop
         playsInline
         preload="metadata"
         aria-hidden="true"
-        onLoadedMetadata={(event) => {
+        onCanPlay={(event) => {
           event.currentTarget.playbackRate = heroVideoPlaybackRate;
+          playActiveVideo();
         }}
+        onEnded={rotateToNextVideo}
         onPlay={() => setIsVideoPaused(false)}
         onPause={() => setIsVideoPaused(true)}
       >
-        <source src={heroVideoPath} type="video/mp4" />
+        <source src={activeVideoPath} type="video/mp4" />
       </video>
 
       <div className="absolute inset-0 bg-black/10" />
@@ -1573,8 +1654,8 @@ function HeroVisual() {
         type="button"
         onClick={toggleHeroVideo}
         className="pointer-events-auto absolute bottom-4 left-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/50 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/25 sm:bottom-5 sm:left-5"
-        aria-label={isVideoPaused ? "Play homepage video" : "Pause homepage video"}
-        title={isVideoPaused ? "Play homepage video" : "Pause homepage video"}
+        aria-label={isVideoPaused ? "Play homepage videos" : "Pause homepage videos"}
+        title={isVideoPaused ? "Play homepage videos" : "Pause homepage videos"}
       >
         <span aria-hidden="true">{isVideoPaused ? "▶" : "Ⅱ"}</span>
       </button>
