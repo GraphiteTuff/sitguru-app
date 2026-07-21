@@ -6,7 +6,8 @@ import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
-const heroImagePath = "/images/hero/sitguru-dog-walking-hero.jpg";
+const heroVideoPath = "/videos/sitguru-homepage-hero.mp4";
+const heroVideoPosterPath = "/images/sitguru-homepage-hero-poster.jpg";
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
 const sitGuruVideoEmbedUrl =
   "https://www.youtube.com/embed/Jk5vWCWvvKs?si=12529oKyk7IFLtAj";
@@ -1501,30 +1502,76 @@ function HeroSignupCard({
 }
 
 function HeroVisual() {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isVideoPaused, setIsVideoPaused] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    if (prefersReducedMotion) {
+      video.pause();
+      video.currentTime = 0;
+      setIsVideoPaused(true);
+      return;
+    }
+
+    void video.play().catch(() => {
+      setIsVideoPaused(true);
+    });
+  }, []);
+
+  function toggleHeroVideo() {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      void video.play().catch(() => {
+        setIsVideoPaused(true);
+      });
+      return;
+    }
+
+    video.pause();
+  }
+
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,1)_0%,rgba(250,252,252,0.97)_42%,rgba(236,253,245,0.78)_100%)]" />
+    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-slate-950">
+      <video
+        ref={videoRef}
+        className="absolute inset-0 h-full w-full object-cover object-[55%_center] sm:object-[57%_center] lg:object-center"
+        poster={heroVideoPosterPath}
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        aria-hidden="true"
+        onPlay={() => setIsVideoPaused(false)}
+        onPause={() => setIsVideoPaused(true)}
+      >
+        <source src={heroVideoPath} type="video/mp4" />
+      </video>
 
-      <img
-        src={heroImagePath}
-        alt=""
-        className="absolute right-[-190px] top-[54px] h-[360px] w-[570px] max-w-none object-cover object-center opacity-100 sm:right-[-150px] sm:top-[38px] sm:h-[470px] sm:w-[720px] lg:right-[13%] lg:top-[20px] lg:h-[585px] lg:w-[860px] xl:right-[14%] xl:top-[12px] xl:h-[640px] xl:w-[920px] 2xl:right-[15%]"
-        style={{
-          WebkitMaskImage:
-            "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 8%, rgba(0,0,0,0.5) 20%, rgba(0,0,0,0.9) 36%, black 56%, rgba(0,0,0,0.92) 72%, rgba(0,0,0,0.5) 88%, transparent 100%), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.46) 7%, black 18%, black 88%, transparent 100%)",
-          maskImage:
-            "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.14) 8%, rgba(0,0,0,0.5) 20%, rgba(0,0,0,0.9) 36%, black 56%, rgba(0,0,0,0.92) 72%, rgba(0,0,0,0.5) 88%, transparent 100%), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.46) 7%, black 18%, black 88%, transparent 100%)",
-          WebkitMaskComposite: "source-in",
-          maskComposite: "intersect",
-        }}
-        loading="eager"
-      />
+      <div className="absolute inset-0 bg-slate-950/20" />
+      <div className="absolute inset-y-0 left-0 w-[78%] bg-gradient-to-r from-slate-950/92 via-slate-950/72 to-transparent sm:w-[70%] lg:w-[62%]" />
+      <div className="absolute inset-y-0 right-0 w-[38%] bg-gradient-to-l from-slate-950/30 via-slate-950/5 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-[18%] bg-gradient-to-b from-slate-950/36 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-slate-950/62 via-slate-950/16 to-transparent" />
 
-      <div className="absolute inset-y-0 left-0 w-[62%] bg-gradient-to-r from-white via-white/76 to-white/0" />
-      <div className="absolute inset-y-0 left-[36%] w-[28%] bg-gradient-to-r from-white/30 via-white/12 to-transparent blur-3xl" />
-      <div className="absolute inset-y-0 right-0 w-[32%] bg-gradient-to-l from-emerald-50/70 via-emerald-50/18 to-transparent" />
-      <div className="absolute inset-x-0 top-0 h-[16%] bg-gradient-to-b from-white/76 via-white/28 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-[34%] bg-gradient-to-t from-emerald-50/82 via-white/8 to-transparent" />
+      <button
+        type="button"
+        onClick={toggleHeroVideo}
+        className="pointer-events-auto absolute bottom-4 left-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-slate-950/60 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-slate-950/80 focus:outline-none focus:ring-4 focus:ring-white/25 sm:bottom-5 sm:left-5"
+        aria-label={isVideoPaused ? "Play homepage video" : "Pause homepage video"}
+        title={isVideoPaused ? "Play homepage video" : "Pause homepage video"}
+      >
+        <span aria-hidden="true">{isVideoPaused ? "▶" : "Ⅱ"}</span>
+      </button>
     </div>
   );
 }
@@ -2325,36 +2372,36 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-white text-slate-950">
-      <section className="relative overflow-hidden border-b border-slate-100 bg-white">
+      <section className="relative overflow-hidden border-b border-slate-800 bg-slate-950">
         <HeroVisual />
 
         <div className="relative z-10 mx-auto grid max-w-7xl gap-6 px-4 pb-5 pt-10 sm:px-6 sm:py-10 lg:min-h-[690px] lg:grid-cols-[minmax(0,690px)_minmax(240px,1fr)_350px] lg:items-center lg:gap-7 lg:px-8 lg:py-12 xl:grid-cols-[minmax(0,720px)_minmax(270px,1fr)_370px] xl:gap-8">
           <div className="lg:py-8">
             <div className="grid gap-4 lg:block">
               <div>
-                <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50/95 px-3 py-1 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur sm:text-xs">
+                <div className="inline-flex items-center rounded-full border border-white/30 bg-white/95 px-3 py-1 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur sm:text-xs">
                   Local Trusted Marketplace
                 </div>
 
                 <div className="mt-4 max-w-[76%] sm:max-w-[590px] lg:max-w-[640px] xl:max-w-[680px]">
-                  <h1 className="text-[2.1rem] font-black leading-[0.98] tracking-[-0.055em] text-slate-950 sm:text-[4rem] lg:text-[4.25rem] xl:text-[4.75rem]">
+                  <h1 className="text-[2.1rem] font-black leading-[0.98] tracking-[-0.055em] text-white drop-shadow-[0_3px_18px_rgba(0,0,0,0.45)] sm:text-[4rem] lg:text-[4.25rem] xl:text-[4.75rem]">
                     Trusted pet care.
                     <br />
                     Made <span className="text-emerald-600">simple.</span>
                   </h1>
 
                   <div className="mt-3 max-w-xl lg:max-w-[610px]">
-                    <p className="text-sm font-bold uppercase tracking-[0.14em] text-emerald-700 sm:text-[0.8rem]">
+                    <p className="text-sm font-bold uppercase tracking-[0.14em] text-emerald-300 drop-shadow-sm sm:text-[0.8rem]">
                       Trusted local pet care marketplace
                     </p>
 
-                    <p className="mt-2 text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
+                    <p className="mt-2 text-sm font-semibold leading-6 text-white/95 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
                       SitGuru connects Pet Parents with trusted independent
                       local Gurus for walks, sitting, boarding, training, and
                       more.
                     </p>
 
-                    <p className="mt-3 text-sm font-medium leading-6 text-slate-700 sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
+                    <p className="mt-3 text-sm font-semibold leading-6 text-white/95 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
                       Create an account in minutes, explore trusted profiles,
                       keep booking details organized, and book local care with
                       confidence.
