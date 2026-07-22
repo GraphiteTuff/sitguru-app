@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import PaymentMethodStrip from "@/components/payments/PaymentMethodStrip";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
@@ -2633,6 +2634,17 @@ export default function HomePage() {
               onTrack={trackHomepageClick}
             />
           </div>
+        </div>
+      </section>
+
+      <section className="bg-gradient-to-b from-emerald-50/70 via-white to-white py-5 sm:py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <PaymentMethodStrip
+            placement="homepage"
+            variant="default"
+            heading="Flexible ways to pay"
+            description="Pet Parents can choose from multiple secure payment options available for their booking."
+          />
         </div>
       </section>
 
