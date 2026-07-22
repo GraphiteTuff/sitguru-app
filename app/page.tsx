@@ -2637,13 +2637,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="bg-gradient-to-b from-emerald-50/70 via-white to-white py-5 sm:py-8">
+      <section
+        aria-label="Ways you can pay for your SitGuru booking"
+        className="bg-white py-3 sm:py-5"
+      >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <PaymentMethodStrip
             placement="homepage"
             variant="default"
-            heading="Flexible ways to pay"
-            description="Pet Parents can choose from multiple secure payment options available for their booking."
+            ariaLabel="Secure payment options available for your SitGuru booking"
           />
         </div>
       </section>
@@ -3163,9 +3165,9 @@ export default function HomePage() {
                 opacity: 1,
               }}
             >
-              Find trusted pet care or join SitGuru as part of a local,
-              community-first pet care marketplace built around easy signup,
-              trusted profiles, and independent Pet Gurus.
+              Find trusted pet care, choose the secure payment option that
+              works best for your booking, or join SitGuru to offer care and
+              earn through our community-first marketplace.
             </p>
 
             <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
