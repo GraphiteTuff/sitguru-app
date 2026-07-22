@@ -150,14 +150,18 @@ function normalizeBaseUrl(value?: string | null) {
   }
 }
 
+function safeHostname(value?: string | null) {
+  const normalized = normalizeBaseUrl(value);
+  if (!normalized) return "";
+
+  try {
+    return new URL(normalized).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
 async function getSharedApiOrigin() {
-  const configuredOrigin =
-    normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
-    normalizeBaseUrl(process.env.SITE_URL) ||
-    normalizeBaseUrl(process.env.VERCEL_URL);
-
-  if (configuredOrigin) return configuredOrigin;
-
   const requestHeaders = await headers();
   const forwardedHost = requestHeaders
     .get("x-forwarded-host")
@@ -165,28 +169,34 @@ async function getSharedApiOrigin() {
     ?.trim();
   const host = forwardedHost || requestHeaders.get("host") || "";
   const hostname = (host.split(":")[0] || "").toLowerCase();
-  const allowedHost =
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
+
+  const configuredVercelHost = safeHostname(process.env.VERCEL_URL);
+  const isKnownLocalHost =
+    hostname === "localhost" || hostname === "127.0.0.1";
+  const isSitGuruHost =
     hostname === "sitguru.com" ||
     hostname === "www.sitguru.com" ||
     hostname.endsWith(".sitguru.com");
+  const isCurrentVercelDeployment =
+    Boolean(configuredVercelHost) && hostname === configuredVercelHost;
 
-  if (!host || !allowedHost) {
-    return "https://www.sitguru.com";
+  if (host && (isKnownLocalHost || isSitGuruHost || isCurrentVercelDeployment)) {
+    const forwardedProto = requestHeaders
+      .get("x-forwarded-proto")
+      ?.split(",")[0]
+      ?.trim();
+    const protocol =
+      forwardedProto || (isKnownLocalHost ? "http" : "https");
+
+    return `${protocol}://${host}`;
   }
 
-  const forwardedProto = requestHeaders
-    .get("x-forwarded-proto")
-    ?.split(",")[0]
-    ?.trim();
-  const protocol =
-    forwardedProto ||
-    (hostname === "localhost" || hostname === "127.0.0.1"
-      ? "http"
-      : "https");
-
-  return `${protocol}://${host}`;
+  return (
+    normalizeBaseUrl(process.env.VERCEL_URL) ||
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
+    normalizeBaseUrl(process.env.SITE_URL) ||
+    "https://www.sitguru.com"
+  );
 }
 
 async function callAmbassadorPayoutSetupApi({
@@ -221,14 +231,28 @@ async function callAmbassadorPayoutSetupApi({
       },
     );
 
-    const payload = (await response.json().catch(() => null)) as
-      | AmbassadorPayoutSetupResponse
-      | null;
+    const responseText = await response.text();
+    let payload: AmbassadorPayoutSetupResponse | null = null;
+
+    try {
+      payload = responseText
+        ? (JSON.parse(responseText) as AmbassadorPayoutSetupResponse)
+        : null;
+    } catch {
+      console.error("Ambassador payout setup returned non-JSON data:", {
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+        responseText: responseText.slice(0, 1000),
+      });
+    }
 
     if (!payload) {
       return {
         success: false,
-        error: "SitGuru could not read your reward payout setup.",
+        error:
+          response.status >= 500
+            ? "Reward payout setup is temporarily unavailable. Please try again."
+            : "SitGuru could not read your reward payout setup.",
       };
     }
 
@@ -1253,6 +1277,13 @@ export default async function AmbassadorDashboardEarningsPage({
           />
         </section>
 
+        <RewardPayoutSetupCard
+          setup={payoutSetup}
+          loadError={payoutSetupError}
+          saveStatus={payoutSaveStatus}
+          approvedAmount={approvedAmount}
+        />
+
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-6">
             <RewardGroup
@@ -1284,13 +1315,6 @@ export default async function AmbassadorDashboardEarningsPage({
           </div>
 
           <div className="space-y-6">
-            <RewardPayoutSetupCard
-              setup={payoutSetup}
-              loadError={payoutSetupError}
-              saveStatus={payoutSaveStatus}
-              approvedAmount={approvedAmount}
-            />
-
             <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <ShieldCheck className="h-6 w-6 text-emerald-700" />
