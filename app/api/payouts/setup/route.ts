@@ -7,12 +7,13 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
 
-const PAYOUT_SETUP_API_VERSION = "2026-07-22";
+const PAYOUT_SETUP_API_VERSION = "2026-07-22.3";
 
 type FinancialRole = "guru" | "ambassador";
 type RoleContext = FinancialRole | "multi_role" | "unknown";
 type GuruProvider = "stripe" | "paypal" | "set_up_later";
-type AmbassadorProvider = "paypal" | "venmo" | "set_up_later";
+type AmbassadorProvider = "stripe" | "paypal" | "venmo" | "set_up_later";
+type AmbassadorDestinationProvider = "paypal" | "venmo";
 type DestinationType =
   | "email"
   | "mobile_number"
@@ -130,7 +131,7 @@ type PayoutDestinationRow = {
 };
 
 type SaveDestinationInput = {
-  provider: Exclude<AmbassadorProvider, "set_up_later">;
+  provider: AmbassadorDestinationProvider;
   destinationType: DestinationType;
   destinationValue: string;
 };
@@ -278,6 +279,10 @@ function normalizeAmbassadorProvider(
     return "set_up_later";
   }
 
+  if (normalized === "stripe" || normalized === "stripe_connect") {
+    return "stripe";
+  }
+
   if (normalized === "paypal" || normalized === "venmo") {
     return normalized;
   }
@@ -344,11 +349,10 @@ function normalizeUsMobile(value: string) {
 }
 
 function sanitizeDestinationInput(
-  provider: AmbassadorProvider,
+  provider: AmbassadorDestinationProvider,
   destinationTypeValue: unknown,
   destinationValueValue: unknown,
 ): SaveDestinationInput | null {
-  if (provider === "set_up_later") return null;
 
   const rawType = safeString(destinationTypeValue).toLowerCase();
   const rawValue = safeString(destinationValueValue);
@@ -677,6 +681,36 @@ function publicAmbassadorReadyAccount(destination: PayoutDestinationRow) {
   };
 }
 
+function getAmbassadorSelectedProvider(
+  preference: PayoutPreferenceRow | null,
+): AmbassadorProvider {
+  const metadataProvider = normalizeAmbassadorProvider(
+    preference?.metadata?.ambassador_reward_provider,
+  );
+
+  if (metadataProvider) return metadataProvider;
+
+  return (
+    normalizeAmbassadorProvider(preference?.reward_payout_provider) ||
+    "set_up_later"
+  );
+}
+
+function isReadyPayoutAccount(account: PayoutAccountRow) {
+  return (
+    account.onboarding_status === "ready" &&
+    account.account_status === "active" &&
+    account.payouts_enabled
+  );
+}
+
+function isReadyPayoutDestination(destination: PayoutDestinationRow) {
+  return (
+    destination.destination_status === "active" &&
+    ["verified", "ready"].includes(destination.verification_status)
+  );
+}
+
 async function loadFinancialSetup(
   userId: string,
   roles: FinancialRole[],
@@ -749,29 +783,49 @@ async function loadFinancialSetup(
       account.account_purpose,
     ),
   );
+  const ambassadorStripeAccounts = accounts.filter(
+    (account) =>
+      account.account_purpose === "ambassador_reward" &&
+      account.provider === "stripe",
+  );
 
   const readyGuruAccount =
-    guruAccounts.find(
-      (account) =>
-        account.onboarding_status === "ready" &&
-        account.account_status === "active" &&
-        account.payouts_enabled,
-    ) || null;
-
-  const readyDestination =
-    destinations.find(
-      (destination) =>
-        destination.destination_status === "active" &&
-        ["verified", "ready"].includes(destination.verification_status),
-    ) || null;
-
-  const setupComplete =
-    role === "guru" ? Boolean(readyGuruAccount) : Boolean(readyDestination);
+    guruAccounts.find(isReadyPayoutAccount) || null;
+  const readyAmbassadorStripeAccount =
+    ambassadorStripeAccounts.find(
+      (account) => account.is_default && isReadyPayoutAccount(account),
+    ) ||
+    ambassadorStripeAccounts.find(isReadyPayoutAccount) ||
+    null;
 
   const selectedProvider =
     role === "guru"
       ? preference?.booking_payout_provider || "set_up_later"
-      : preference?.reward_payout_provider || "set_up_later";
+      : getAmbassadorSelectedProvider(preference);
+
+  const readyDestinations = destinations.filter(isReadyPayoutDestination);
+  const readySelectedDestination =
+    selectedProvider === "paypal" || selectedProvider === "venmo"
+      ? readyDestinations.find(
+          (destination) => destination.provider === selectedProvider,
+        ) || null
+      : null;
+  const readyDefaultDestination =
+    readyDestinations.find((destination) => destination.is_default) ||
+    readyDestinations[0] ||
+    null;
+  const readyDestination =
+    readySelectedDestination || readyDefaultDestination;
+
+  const readyAmbassadorMethod =
+    selectedProvider === "stripe" && readyAmbassadorStripeAccount
+      ? readyAmbassadorStripeAccount
+      : readyDestination || readyAmbassadorStripeAccount;
+
+  const setupComplete =
+    role === "guru"
+      ? Boolean(readyGuruAccount)
+      : Boolean(readyAmbassadorMethod);
 
   const commonBlockers = {
     signup: false,
@@ -801,7 +855,9 @@ async function loadFinancialSetup(
       ? "choose_provider"
       : role === "guru"
         ? `connect_${selectedProvider}`
-        : "add_or_verify_destination";
+        : selectedProvider === "stripe"
+          ? "connect_stripe"
+          : "add_or_verify_destination";
 
   const providerOptions =
     role === "guru"
@@ -827,34 +883,45 @@ async function loadFinancialSetup(
         ]
       : [
           {
+            provider: "stripe",
+            label: "Bank or debit card",
+            description:
+              "Get rewards sent to your bank or eligible debit card. Powered by Stripe.",
+          },
+          {
             provider: "paypal",
             label: "PayPal",
-            description:
-              "Add a PayPal destination when a verified reward becomes payable.",
+            description: "Send rewards to your PayPal.",
           },
           {
             provider: "venmo",
             label: "Venmo",
-            description:
-              "Add an eligible Venmo destination when a verified reward becomes payable.",
+            description: "Get rewards through Venmo.",
           },
           {
             provider: "set_up_later",
-            label: "Set up later",
-            description:
-              "Receive a referral code and track verified rewards before adding a payout destination.",
+            label: "Do this later",
+            description: "Keep earning and finish this before your first payout.",
           },
         ];
 
   const publicReadyGuruAccount = readyGuruAccount
     ? publicAccount(readyGuruAccount)
     : null;
+  const publicReadyAmbassadorStripeAccount = readyAmbassadorStripeAccount
+    ? publicAccount(readyAmbassadorStripeAccount)
+    : null;
   const publicReadyDestination = readyDestination
     ? publicDestination(readyDestination)
     : null;
-  const ambassadorReadyAccount = readyDestination
+  const publicReadyAmbassadorDestination = readyDestination
     ? publicAmbassadorReadyAccount(readyDestination)
     : null;
+  const ambassadorReadyAccount =
+    selectedProvider === "stripe" && publicReadyAmbassadorStripeAccount
+      ? publicReadyAmbassadorStripeAccount
+      : publicReadyAmbassadorDestination ||
+        publicReadyAmbassadorStripeAccount;
 
   return {
     role,
@@ -866,7 +933,10 @@ async function loadFinancialSetup(
     accounts:
       role === "guru"
         ? guruAccounts.map(publicAccount)
-        : destinations.map(publicAmbassadorReadyAccount),
+        : [
+            ...ambassadorStripeAccounts.map(publicAccount),
+            ...destinations.map(publicAmbassadorReadyAccount),
+          ],
     destinations: destinations.map(publicDestination),
     readyAccount:
       role === "guru" ? publicReadyGuruAccount : ambassadorReadyAccount,
@@ -896,14 +966,14 @@ async function loadFinancialSetup(
           }
         : {
             headline: setupComplete
-              ? "Your Ambassador reward payout method is ready"
-              : "Choose how to receive SitGuru rewards",
+              ? "You’re ready to get paid"
+              : "Pick how you get paid",
             description:
-              "You can sign up, receive a referral code, and track verified rewards before adding PayPal or Venmo.",
+              "Choose bank or debit card, PayPal, or Venmo. You can switch later.",
             readyMessage:
-              "This Ambassador account can receive payable SitGuru rewards.",
+              "Your Ambassador account is ready for approved reward payments.",
             blockedMessage:
-              "Add and verify a PayPal or Venmo destination before the first payable reward is released.",
+              "Finish one payment option before your first approved reward is sent.",
           },
   };
 }
@@ -935,11 +1005,16 @@ async function savePreference({
       preference_source: "shared_payout_setup_api",
       last_saved_role: role,
       last_preference_saved_at: now,
+      ...(role === "ambassador"
+        ? { ambassador_reward_provider: provider }
+        : {}),
     },
   };
 
   if (provider !== "set_up_later") {
     payload.setup_started_at = existing?.setup_started_at || now;
+    payload.financial_onboarding_status = "in_progress";
+    payload.onboarding_deferred = false;
   } else {
     payload.setup_started_at = null;
     payload.financial_onboarding_status = "deferred";
@@ -958,8 +1033,31 @@ async function savePreference({
     .from("user_payout_preferences")
     .upsert(payload, { onConflict: "user_id" });
 
-  if (error) {
+  if (!error) return;
+
+  const isAmbassadorStripeCompatibilityError =
+    role === "ambassador" && provider === "stripe";
+
+  if (!isAmbassadorStripeCompatibilityError) {
     throw new Error(error.message);
+  }
+
+  const compatibilityPayload = {
+    ...payload,
+    reward_payout_provider: "set_up_later",
+    metadata: {
+      ...(payload.metadata as Record<string, unknown>),
+      ambassador_reward_provider: "stripe",
+      stripe_preference_storage: "metadata_compatibility",
+    },
+  };
+
+  const { error: compatibilityError } = await supabaseAdmin
+    .from("user_payout_preferences")
+    .upsert(compatibilityPayload, { onConflict: "user_id" });
+
+  if (compatibilityError) {
+    throw new Error(compatibilityError.message);
   }
 }
 
@@ -1224,7 +1322,7 @@ export async function PATCH(req: NextRequest) {
           error:
             role === "guru"
               ? "Guru provider must be stripe, paypal, or set_up_later."
-              : "Ambassador provider must be paypal, venmo, or set_up_later.",
+              : "Ambassador provider must be stripe, paypal, venmo, or set_up_later.",
         },
         400,
       );
@@ -1284,10 +1382,12 @@ export async function PATCH(req: NextRequest) {
       apiVersion: PAYOUT_SETUP_API_VERSION,
       message:
         provider === "set_up_later"
-          ? "Payout setup has been deferred."
-          : destinationSaved
-            ? "Payout preference and destination saved. Verification is still required before payout."
-            : "Payout preference saved.",
+          ? "You can finish payment setup later."
+          : provider === "stripe"
+            ? "Bank or debit card selected. Finish Stripe setup to receive rewards."
+            : destinationSaved
+              ? "Payment option saved. Complete verification before your first reward is sent."
+              : `${provider === "paypal" ? "PayPal" : "Venmo"} selected. Add and verify your account before your first reward is sent.`,
       setup,
     });
   } catch (error) {
