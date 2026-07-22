@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   AlertTriangle,
@@ -17,6 +19,12 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  AMBASSADOR_REWARD_ONBOARDING_STEPS,
+  AMBASSADOR_REWARDS_HEADING,
+  AMBASSADOR_REWARDS_SUPPORTING_TEXT,
+  getAmbassadorRewardMethods,
+} from "@/lib/payments/payment-methods";
 
 export const dynamic = "force-dynamic";
 
@@ -81,15 +89,229 @@ type RewardsResult = {
   warning: string;
 };
 
-type PayoutReadiness = {
-  accountId: string;
-  status: string;
-  onboardingComplete: boolean;
-  payoutsEnabled: boolean;
-  chargesEnabled: boolean;
-  ready: boolean;
-  blockers: string[];
+type AmbassadorPayoutProvider = "paypal" | "venmo" | "set_up_later";
+
+type AmbassadorPayoutAccount = {
+  provider?: "paypal" | "venmo" | null;
+  providerEmail?: string | null;
+  providerPhone?: string | null;
+  onboardingStatus?: string | null;
+  accountStatus?: string | null;
+  payoutsEnabled?: boolean;
 };
+
+type AmbassadorPayoutSetup = {
+  selectedProvider?: AmbassadorPayoutProvider;
+  setupComplete?: boolean;
+  nextAction?: string | null;
+  accounts?: AmbassadorPayoutAccount[];
+  readyAccount?: AmbassadorPayoutAccount | null;
+  blockers?: {
+    receiveRewardPayout?: boolean;
+  };
+};
+
+type AmbassadorPayoutSetupResponse = {
+  success: boolean;
+  message?: string;
+  error?: string;
+  setup?: AmbassadorPayoutSetup;
+};
+
+type EarningsPageSearchParams = Record<
+  string,
+  string | string[] | undefined
+>;
+
+type AmbassadorDashboardEarningsPageProps = {
+  searchParams?:
+    | EarningsPageSearchParams
+    | Promise<EarningsPageSearchParams>;
+};
+
+function normalizeBaseUrl(value?: string | null) {
+  if (!value) return null;
+
+  const candidate =
+    value.startsWith("http://") || value.startsWith("https://")
+      ? value
+      : `https://${value}`;
+
+  try {
+    const parsed = new URL(candidate);
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+async function getSharedApiOrigin() {
+  const configuredOrigin =
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
+    normalizeBaseUrl(process.env.SITE_URL) ||
+    normalizeBaseUrl(process.env.VERCEL_URL);
+
+  if (configuredOrigin) return configuredOrigin;
+
+  const requestHeaders = await headers();
+  const forwardedHost = requestHeaders
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    ?.trim();
+  const host = forwardedHost || requestHeaders.get("host") || "";
+  const hostname = (host.split(":")[0] || "").toLowerCase();
+  const allowedHost =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "sitguru.com" ||
+    hostname === "www.sitguru.com" ||
+    hostname.endsWith(".sitguru.com");
+
+  if (!host || !allowedHost) {
+    return "https://www.sitguru.com";
+  }
+
+  const forwardedProto = requestHeaders
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim();
+  const protocol =
+    forwardedProto ||
+    (hostname === "localhost" || hostname === "127.0.0.1"
+      ? "http"
+      : "https");
+
+  return `${protocol}://${host}`;
+}
+
+async function callAmbassadorPayoutSetupApi({
+  accessToken,
+  method = "GET",
+  provider,
+}: {
+  accessToken: string;
+  method?: "GET" | "PATCH";
+  provider?: AmbassadorPayoutProvider;
+}): Promise<AmbassadorPayoutSetupResponse> {
+  try {
+    const origin = await getSharedApiOrigin();
+    const response = await fetch(
+      `${origin}/api/payouts/setup?role=ambassador`,
+      {
+        method,
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          ...(method === "PATCH"
+            ? { "Content-Type": "application/json" }
+            : {}),
+        },
+        body:
+          method === "PATCH"
+            ? JSON.stringify({
+                role: "ambassador",
+                preferredProvider: provider,
+              })
+            : undefined,
+      },
+    );
+
+    const payload = (await response.json().catch(() => null)) as
+      | AmbassadorPayoutSetupResponse
+      | null;
+
+    if (!payload) {
+      return {
+        success: false,
+        error: "SitGuru could not read your reward payout setup.",
+      };
+    }
+
+    if (!response.ok || !payload.success) {
+      return {
+        ...payload,
+        success: false,
+        error:
+          payload.error ||
+          "SitGuru could not update your reward payout setup.",
+      };
+    }
+
+    return payload;
+  } catch (error) {
+    console.error("Ambassador payout setup request failed:", error);
+
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "SitGuru could not connect to reward payout setup.",
+    };
+  }
+}
+
+async function saveAmbassadorPayoutProvider(formData: FormData) {
+  "use server";
+
+  const requestedProvider = String(formData.get("provider") || "");
+  const continueToSetup =
+    String(formData.get("continueToSetup") || "") === "true";
+  const provider: AmbassadorPayoutProvider | null =
+    requestedProvider === "paypal" ||
+    requestedProvider === "venmo" ||
+    requestedProvider === "set_up_later"
+      ? requestedProvider
+      : null;
+
+  if (!provider) {
+    redirect("/ambassador/dashboard/earnings?payoutStatus=invalid");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    redirect("/login/route?preferred=ambassador");
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    redirect("/login/route?preferred=ambassador");
+  }
+
+  const result = await callAmbassadorPayoutSetupApi({
+    accessToken: session.access_token,
+    method: "PATCH",
+    provider,
+  });
+
+  revalidatePath("/ambassador/dashboard/earnings");
+  revalidatePath("/ambassador/dashboard/payouts");
+
+  if (!result.success) {
+    redirect("/ambassador/dashboard/earnings?payoutStatus=error");
+  }
+
+  if (continueToSetup && provider !== "set_up_later") {
+    redirect(`/ambassador/dashboard/payouts?provider=${provider}`);
+  }
+
+  redirect(
+    `/ambassador/dashboard/earnings?payoutSaved=${provider}`,
+  );
+}
 
 function asString(value: unknown) {
   if (typeof value === "string") return value.trim();
@@ -122,23 +344,6 @@ function money(value: number) {
 
 function roundMoney(value: number) {
   return Number(value.toFixed(2));
-}
-
-function isTruthyValue(value: unknown) {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value > 0;
-
-  const normalized = asString(value).toLowerCase();
-
-  return [
-    "true",
-    "yes",
-    "ready",
-    "enabled",
-    "complete",
-    "completed",
-    "active",
-  ].includes(normalized);
 }
 
 function formatDate(value?: string | null) {
@@ -405,49 +610,6 @@ async function getCanonicalAmbassadorRewards(
   };
 }
 
-function getPayoutReadiness(
-  ambassador: AmbassadorRecord,
-): PayoutReadiness {
-  const accountId =
-    asString(ambassador.stripe_account_id) ||
-    asString(ambassador.stripe_connect_account_id);
-  const status = asString(ambassador.stripe_account_status);
-  const onboardingComplete = isTruthyValue(
-    ambassador.stripe_onboarding_complete,
-  );
-  const payoutsEnabled =
-    isTruthyValue(ambassador.stripe_payouts_enabled) ||
-    isTruthyValue(ambassador.payouts_enabled);
-  const chargesEnabled = isTruthyValue(ambassador.charges_enabled);
-
-  const blockers: string[] = [];
-
-  if (!accountId) {
-    blockers.push("Connect a Stripe payout account.");
-  }
-
-  if (!onboardingComplete) {
-    blockers.push("Complete Stripe identity, tax, and bank onboarding.");
-  }
-
-  if (!payoutsEnabled) {
-    blockers.push("Stripe payouts are not enabled yet.");
-  }
-
-  return {
-    accountId,
-    status,
-    onboardingComplete,
-    payoutsEnabled,
-    chargesEnabled,
-    ready:
-      Boolean(accountId) &&
-      onboardingComplete &&
-      payoutsEnabled,
-    blockers,
-  };
-}
-
 function statusClasses(bucket: RewardBucket) {
   if (bucket === "paid") {
     return "border-emerald-200 bg-emerald-50 !text-emerald-700";
@@ -601,47 +763,87 @@ function RewardGroup({
   );
 }
 
-function StripePayoutCard({
-  readiness,
+function providerFromMethodId(methodId: string): "paypal" | "venmo" {
+  return methodId === "venmo_rewards" ? "venmo" : "paypal";
+}
+
+function RewardPayoutSetupCard({
+  setup,
+  loadError,
+  saveStatus,
   approvedAmount,
 }: {
-  readiness: PayoutReadiness;
+  setup: AmbassadorPayoutSetup | null;
+  loadError?: string | null;
+  saveStatus?: string | null;
   approvedAmount: number;
 }) {
-  const statusLabel = readiness.ready
-    ? "Payout ready"
-    : readiness.accountId
-      ? "Setup needs attention"
-      : "Setup required";
-
-  const statusClassesValue = readiness.ready
-    ? "border-emerald-200 bg-emerald-50 !text-emerald-700"
-    : readiness.accountId
-      ? "border-amber-200 bg-amber-50 !text-amber-700"
-      : "border-rose-200 bg-rose-50 !text-rose-700";
+  const methods = getAmbassadorRewardMethods();
+  const selectedProvider = setup?.selectedProvider || "set_up_later";
+  const readyAccount = setup?.readyAccount || null;
+  const setupComplete = Boolean(setup?.setupComplete);
+  const successMessage =
+    saveStatus === "paypal"
+      ? "PayPal is now your selected reward payout option."
+      : saveStatus === "venmo"
+        ? "Venmo is now your selected reward payout option."
+        : saveStatus === "set_up_later"
+          ? "No problem. You can set up reward payments later."
+          : null;
+  const errorMessage =
+    saveStatus === "error"
+      ? "SitGuru could not save that choice. Please try again."
+      : saveStatus === "invalid"
+        ? "Choose PayPal, Venmo, or set up reward payments later."
+        : loadError || null;
 
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-[2rem] border border-emerald-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Wallet className="h-6 w-6 text-emerald-700" />
-          <h2 className="text-2xl font-black !text-slate-950">
-            Payout Readiness
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.18em] !text-emerald-700">
+            Reward payments
+          </p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight !text-slate-950">
+            {setupComplete
+              ? "Your reward payment account is ready"
+              : AMBASSADOR_REWARDS_HEADING}
           </h2>
+          <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 !text-slate-700">
+            {AMBASSADOR_REWARDS_SUPPORTING_TEXT} You do not need to set this up
+            when you join. Connect your preferred option when your first
+            approved reward is ready to be paid.
+          </p>
         </div>
 
         <span
-          className={`w-fit rounded-full border px-3 py-1 text-xs font-black ${statusClassesValue}`}
+          className={`inline-flex w-fit items-center rounded-full border px-4 py-2 text-xs font-black ${
+            setupComplete
+              ? "border-emerald-200 bg-emerald-50 !text-emerald-700"
+              : "border-amber-200 bg-amber-50 !text-amber-700"
+          }`}
         >
-          {statusLabel}
+          {setupComplete ? "Ready" : "Choose an option"}
         </span>
       </div>
 
-      <p className="mt-3 text-sm font-semibold leading-6 !text-slate-700">
-        Approved rewards are separate from payout readiness. A reward can be
-        approved while Stripe setup still needs attention, but it is not shown
-        as paid until SitGuru records a paid reward status.
-      </p>
+      {successMessage ? (
+        <div
+          role="status"
+          className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold !text-emerald-800"
+        >
+          {successMessage}
+        </div>
+      ) : null}
+
+      {errorMessage ? (
+        <div
+          role="alert"
+          className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold !text-rose-700"
+        >
+          {errorMessage}
+        </div>
+      ) : null}
 
       <div className="mt-5 rounded-[1.35rem] border border-sky-100 bg-sky-50 p-4">
         <p className="text-xs font-black uppercase tracking-[0.14em] text-sky-700">
@@ -650,108 +852,196 @@ function StripePayoutCard({
         <p className="mt-2 text-3xl font-black text-sky-950">
           {money(approvedAmount)}
         </p>
+        <p className="mt-1 text-xs font-bold leading-5 text-sky-800">
+          Approved rewards stay here until SitGuru submits and confirms your
+          payment.
+        </p>
       </div>
 
-      <div className="mt-5 grid gap-3">
-        {[
-          {
-            title: "Stripe account",
-            detail: readiness.accountId
-              ? "Connected account found"
-              : "No connected payout account found",
-            complete: Boolean(readiness.accountId),
-          },
-          {
-            title: "Onboarding",
-            detail: readiness.onboardingComplete
-              ? "Identity, tax, and banking setup marked complete"
-              : "Stripe onboarding is not marked complete",
-            complete: readiness.onboardingComplete,
-          },
-          {
-            title: "Payout capability",
-            detail: readiness.payoutsEnabled
-              ? "Stripe payouts are marked enabled"
-              : "Stripe payouts are not enabled",
-            complete: readiness.payoutsEnabled,
-          },
-        ].map((item) => (
-          <div
-            key={item.title}
-            className="flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100"
-          >
-            {item.complete ? (
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
-            ) : (
-              <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-            )}
+      {setupComplete && readyAccount ? (
+        <div className="mt-5 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 min-w-12 shrink-0 items-center justify-center rounded-2xl bg-white p-2 shadow-sm ring-1 ring-emerald-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={
+                    readyAccount.provider === "venmo"
+                      ? "/images/payments/venmo.svg"
+                      : "/images/payments/paypal.svg"
+                  }
+                  alt={
+                    readyAccount.provider === "venmo" ? "Venmo" : "PayPal"
+                  }
+                  className="max-h-7 max-w-[72px] object-contain"
+                />
+              </div>
 
-            <div>
-              <p className="text-sm font-black !text-slate-950">
-                {item.title}
-              </p>
-              <p className="mt-1 text-xs font-bold leading-5 !text-slate-600">
-                {item.detail}
-              </p>
+              <div>
+                <p className="flex items-center gap-2 text-lg font-black !text-slate-950">
+                  {readyAccount.provider === "venmo" ? "Venmo" : "PayPal"} is
+                  ready
+                  <CheckCircle2 className="h-5 w-5 !text-emerald-600" />
+                </p>
+                <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
+                  Approved commissions and referral rewards can be sent to your
+                  connected account.
+                </p>
+                {readyAccount.providerEmail ? (
+                  <p className="mt-2 text-sm font-black !text-emerald-800">
+                    {readyAccount.providerEmail}
+                  </p>
+                ) : null}
+                {readyAccount.providerPhone ? (
+                  <p className="mt-2 text-sm font-black !text-emerald-800">
+                    {readyAccount.providerPhone}
+                  </p>
+                ) : null}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
 
-      {readiness.blockers.length > 0 ? (
-        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-            <div>
-              <p className="text-sm font-black text-amber-950">
-                Complete these payout steps
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs font-bold leading-5 text-amber-900">
-                {readiness.blockers.map((blocker) => (
-                  <li key={blocker}>{blocker}</li>
-                ))}
-              </ul>
-            </div>
+            <Link
+              href="/ambassador/dashboard/payouts"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-300 bg-white px-5 py-2.5 text-sm font-black !text-emerald-800 transition hover:bg-emerald-100"
+            >
+              Review reward setup
+            </Link>
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {methods.map((method) => {
+            const provider = providerFromMethodId(method.id);
+            const selected = selectedProvider === provider;
+            const logoPath =
+              provider === "venmo"
+                ? "/images/payments/venmo.svg"
+                : "/images/payments/paypal.svg";
 
-      {readiness.accountId ? (
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] !text-slate-500">
-            Stripe Account
-          </p>
-          <p className="mt-1 break-all text-sm font-black !text-slate-900">
-            {readiness.accountId}
-          </p>
-          {readiness.status ? (
-            <p className="mt-1 text-xs font-bold !text-slate-600">
-              Saved status: {readiness.status}
+            return (
+              <article
+                key={method.id}
+                className={`rounded-[1.5rem] border p-5 ${
+                  selected
+                    ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-100"
+                    : "border-slate-200 bg-slate-50"
+                }`}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 min-w-12 shrink-0 items-center justify-center rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={logoPath}
+                      alt={method.label}
+                      className="max-h-7 max-w-[76px] object-contain"
+                    />
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-lg font-black !text-slate-950">
+                        {method.label}
+                      </p>
+                      {selected ? (
+                        <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-white">
+                          Selected
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
+                      {method.description}
+                    </p>
+                    <p className="mt-2 text-xs font-bold leading-5 !text-slate-500">
+                      {method.setupSummary}
+                    </p>
+                  </div>
+                </div>
+
+                <form action={saveAmbassadorPayoutProvider} className="mt-5">
+                  <input type="hidden" name="provider" value={provider} />
+                  <input type="hidden" name="continueToSetup" value="true" />
+                  <button
+                    type="submit"
+                    className={`inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-black transition ${
+                      selected
+                        ? "border border-emerald-300 bg-white !text-emerald-800"
+                        : "bg-emerald-700 !text-white shadow-sm hover:bg-emerald-800"
+                    }`}
+                  >
+                    {selected
+                      ? `Continue ${method.shortLabel} setup`
+                      : `Choose ${method.shortLabel}`}
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </form>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 sm:p-5">
+        <p className="text-sm font-black !text-slate-950">
+          Your simple reward setup
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {AMBASSADOR_REWARD_ONBOARDING_STEPS.map((step) => (
+            <div
+              key={step.step}
+              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-700 text-sm font-black text-white">
+                {step.step}
+              </span>
+              <p className="mt-3 text-sm font-black !text-slate-950">
+                {step.title}
+              </p>
+              <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
+                {step.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {!setupComplete ? (
+        <div className="mt-5 flex flex-col gap-4 rounded-[1.25rem] border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div>
+            <p className="text-sm font-black !text-slate-950">
+              Not ready to connect an account?
             </p>
-          ) : null}
+            <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
+              Keep sharing and earning. You can finish payment setup before
+              your first approved reward is sent.
+            </p>
+          </div>
+
+          <form action={saveAmbassadorPayoutProvider}>
+            <input type="hidden" name="provider" value="set_up_later" />
+            <button
+              type="submit"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-black !text-slate-800 transition hover:bg-slate-100"
+            >
+              Do this later
+            </button>
+          </form>
         </div>
       ) : null}
 
-      <div className="mt-5 grid gap-2 sm:grid-cols-2">
-        <Link
-          href="/ambassador/dashboard/payouts"
-          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black !text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
-        >
-          {readiness.ready ? "Review Payout Setup" : "Complete Payout Setup"}
-        </Link>
-
-        <Link
-          href="/ambassador/dashboard/messages?role=ambassador&support=admin"
-          className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black !text-emerald-800 transition hover:bg-emerald-50"
-        >
-          Message SitGuru Support
-        </Link>
-      </div>
+      <p className="mt-4 text-xs font-semibold leading-5 !text-slate-500">
+        SitGuru never asks for your PayPal password, Venmo password, or bank
+        login. Complete any provider verification securely with PayPal or
+        Venmo.
+      </p>
     </section>
   );
 }
 
-export default async function AmbassadorDashboardEarningsPage() {
+export default async function AmbassadorDashboardEarningsPage({
+  searchParams,
+}: AmbassadorDashboardEarningsPageProps) {
   const supabase = await createClient();
 
   const {
@@ -775,9 +1065,41 @@ export default async function AmbassadorDashboardEarningsPage() {
     redirect("/login/route?preferred=ambassador");
   }
 
+  const resolvedSearchParams = await Promise.resolve(searchParams || {});
+  const payoutSavedParam = resolvedSearchParams.payoutSaved;
+  const payoutStatusParam = resolvedSearchParams.payoutStatus;
+  const payoutSaveStatus =
+    typeof payoutSavedParam === "string"
+      ? payoutSavedParam
+      : typeof payoutStatusParam === "string"
+        ? payoutStatusParam
+        : null;
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const payoutSetupResponse: AmbassadorPayoutSetupResponse =
+    session?.access_token
+      ? await callAmbassadorPayoutSetupApi({
+          accessToken: session.access_token,
+        })
+      : {
+          success: false,
+          error:
+            "Your reward payout session could not be loaded. Please sign in again.",
+        };
+
+  const payoutSetup = payoutSetupResponse.success
+    ? payoutSetupResponse.setup || null
+    : null;
+  const payoutSetupError = payoutSetupResponse.success
+    ? null
+    : payoutSetupResponse.error ||
+      "SitGuru could not load your reward payout setup.";
+
   const rewardsResult = await getCanonicalAmbassadorRewards(ambassador.id);
   const rewards = normalizeRewards(rewardsResult.rows);
-  const payoutReadiness = getPayoutReadiness(ambassador);
 
   const pendingRewards = rewards.filter(
     (reward) => reward.bucket === "pending",
@@ -838,16 +1160,16 @@ export default async function AmbassadorDashboardEarningsPage() {
               </h1>
 
               <p className="mt-5 max-w-4xl text-base font-semibold leading-8 !text-slate-800 md:text-lg">
-                These totals come only from canonical ambassador_rewards rows
-                assigned to your Ambassador account. Pending, approved, and
-                paid money remain separate so projected or unverified activity
-                is never displayed as confirmed earnings.
+                Track your commissions, referral payments, and approved
+                rewards in one place. Pending, approved, and paid amounts stay
+                separate so you always know what is still being reviewed, what
+                is ready, and what SitGuru has confirmed as paid.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
                 <div className="inline-flex items-center gap-2 rounded-2xl bg-white/95 px-5 py-3 text-sm font-black !text-slate-900 shadow-sm ring-1 ring-white/80">
                   <ShieldCheck className="h-4 w-4 !text-emerald-600" />
-                  Canonical rewards only
+                  Verified reward records only
                 </div>
 
                 <div className="inline-flex items-center gap-2 rounded-2xl bg-white/95 px-5 py-3 text-sm font-black !text-slate-900 shadow-sm ring-1 ring-white/80">
@@ -962,8 +1284,10 @@ export default async function AmbassadorDashboardEarningsPage() {
           </div>
 
           <div className="space-y-6">
-            <StripePayoutCard
-              readiness={payoutReadiness}
+            <RewardPayoutSetupCard
+              setup={payoutSetup}
+              loadError={payoutSetupError}
+              saveStatus={payoutSaveStatus}
               approvedAmount={approvedAmount}
             />
 
@@ -976,10 +1300,10 @@ export default async function AmbassadorDashboardEarningsPage() {
               </div>
 
               <p className="mt-3 text-sm font-semibold leading-7 !text-slate-700">
-                This page does not calculate possible earnings from referral
-                counts, booking estimates, daily targets, or social growth
-                projections. A dollar amount appears only after a canonical
-                reward row exists for your Ambassador account.
+                SitGuru does not turn referral counts, daily targets, or
+                projected activity into confirmed earnings. A dollar amount
+                appears only after SitGuru creates and reviews a verified reward
+                record for your Ambassador account.
               </p>
 
               <div className="mt-5 grid gap-3">
