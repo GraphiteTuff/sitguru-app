@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
 
+const PAYOUT_SETUP_API_VERSION = "2026-07-22";
+
 type FinancialRole = "guru" | "ambassador";
 type RoleContext = FinancialRole | "multi_role" | "unknown";
 type GuruProvider = "stripe" | "paypal" | "set_up_later";
@@ -649,12 +651,46 @@ function publicDestination(destination: PayoutDestinationRow) {
   };
 }
 
+function publicAmbassadorReadyAccount(destination: PayoutDestinationRow) {
+  const publicValue = publicDestination(destination);
+  const usesEmail = ["email", "paypal_id"].includes(
+    destination.destination_type,
+  );
+  const usesPhone = ["mobile_number", "venmo_account"].includes(
+    destination.destination_type,
+  );
+
+  return {
+    id: destination.id,
+    provider: destination.provider,
+    providerEmail: usesEmail ? publicValue.displayValue : null,
+    providerPhone: usesPhone ? publicValue.displayValue : null,
+    onboardingStatus: destination.verification_status,
+    accountStatus: destination.destination_status,
+    payoutsEnabled:
+      destination.destination_status === "active" &&
+      ["verified", "ready"].includes(destination.verification_status),
+    isDefault: destination.is_default,
+    isLive: destination.is_live,
+    verifiedAt: destination.verified_at,
+    updatedAt: destination.updated_at,
+  };
+}
+
 async function loadFinancialSetup(
   userId: string,
   roles: FinancialRole[],
   role: FinancialRole,
 ) {
-  await ensurePreference(userId, roles);
+  const warnings: string[] = [];
+  const ensuredPreference = await ensurePreference(userId, roles);
+
+  if (!ensuredPreference) {
+    warnings.push(
+      "Your payout preference record could not be initialized. Existing reward and payout records are still shown.",
+    );
+  }
+
   await refreshReadiness(userId);
 
   const [preferenceResult, accountsResult, destinationsResult] =
@@ -675,7 +711,10 @@ async function loadFinancialSetup(
             .from("user_payout_destinations")
             .select("*")
             .eq("user_id", userId)
-            .in("destination_purpose", ["ambassador_reward", "general_payout"])
+            .in("destination_purpose", [
+              "ambassador_reward",
+              "general_payout",
+            ])
             .neq("destination_status", "removed")
             .order("is_default", { ascending: false })
             .order("created_at", { ascending: true })
@@ -684,18 +723,23 @@ async function loadFinancialSetup(
 
   if (preferenceResult.error) {
     console.error("PAYOUT PREFERENCE STATUS ERROR:", preferenceResult.error);
+    warnings.push("Your saved payout preference could not be read.");
   }
 
   if (accountsResult.error) {
     console.error("PAYOUT ACCOUNT READ ERROR:", accountsResult.error);
+    warnings.push("Connected Guru payout accounts could not be read.");
   }
 
   if (destinationsResult.error) {
     console.error("PAYOUT DESTINATION READ ERROR:", destinationsResult.error);
+    warnings.push("Your Ambassador reward destination could not be read.");
   }
 
   const preference =
-    (preferenceResult.data as PayoutPreferenceRow | null) || null;
+    (preferenceResult.data as PayoutPreferenceRow | null) ||
+    ensuredPreference ||
+    null;
   const accounts = (accountsResult.data || []) as PayoutAccountRow[];
   const destinations = (destinationsResult.data ||
     []) as PayoutDestinationRow[];
@@ -706,7 +750,7 @@ async function loadFinancialSetup(
     ),
   );
 
-  const readyAccount =
+  const readyGuruAccount =
     guruAccounts.find(
       (account) =>
         account.onboarding_status === "ready" &&
@@ -722,7 +766,7 @@ async function loadFinancialSetup(
     ) || null;
 
   const setupComplete =
-    role === "guru" ? Boolean(readyAccount) : Boolean(readyDestination);
+    role === "guru" ? Boolean(readyGuruAccount) : Boolean(readyDestination);
 
   const selectedProvider =
     role === "guru"
@@ -748,6 +792,7 @@ async function loadFinancialSetup(
           referralCodeActivation: false,
           trackVerifiedRewards: false,
           receiveFirstPayableReward: !setupComplete,
+          receiveRewardPayout: !setupComplete,
         };
 
   const nextAction = setupComplete
@@ -801,6 +846,16 @@ async function loadFinancialSetup(
           },
         ];
 
+  const publicReadyGuruAccount = readyGuruAccount
+    ? publicAccount(readyGuruAccount)
+    : null;
+  const publicReadyDestination = readyDestination
+    ? publicDestination(readyDestination)
+    : null;
+  const ambassadorReadyAccount = readyDestination
+    ? publicAmbassadorReadyAccount(readyDestination)
+    : null;
+
   return {
     role,
     roleContext: getRoleContext(roles),
@@ -808,13 +863,16 @@ async function loadFinancialSetup(
     setupComplete,
     nextAction,
     preference,
-    accounts: guruAccounts.map(publicAccount),
+    accounts:
+      role === "guru"
+        ? guruAccounts.map(publicAccount)
+        : destinations.map(publicAmbassadorReadyAccount),
     destinations: destinations.map(publicDestination),
-    readyAccount: readyAccount ? publicAccount(readyAccount) : null,
-    readyDestination: readyDestination
-      ? publicDestination(readyDestination)
-      : null,
+    readyAccount:
+      role === "guru" ? publicReadyGuruAccount : ambassadorReadyAccount,
+    readyDestination: publicReadyDestination,
     blockers,
+    warnings,
     rules: {
       payoutRequiredDuringSignup: false,
       payoutRequiredForProfileCompletion: false,
@@ -831,14 +889,15 @@ async function loadFinancialSetup(
               : "Set up payouts before accepting your first paid booking",
             description:
               "You can sign up, complete your Guru profile, appear in search, and receive booking requests before connecting Stripe or PayPal.",
-            readyMessage: "This Guru account can accept paid SitGuru bookings.",
+            readyMessage:
+              "This Guru account can accept paid SitGuru bookings.",
             blockedMessage:
               "Connect and complete Stripe or PayPal payout setup before accepting the first paid booking.",
           }
         : {
             headline: setupComplete
               ? "Your Ambassador reward payout method is ready"
-              : "Set up payouts when a reward becomes payable",
+              : "Choose how to receive SitGuru rewards",
             description:
               "You can sign up, receive a referral code, and track verified rewards before adding PayPal or Venmo.",
             readyMessage:
@@ -1067,6 +1126,7 @@ export async function GET(req: NextRequest) {
 
     return json(req, {
       success: true,
+      apiVersion: PAYOUT_SETUP_API_VERSION,
       user: {
         id: user.id,
         email: user.email || null,
@@ -1081,6 +1141,7 @@ export async function GET(req: NextRequest) {
       req,
       {
         success: false,
+        apiVersion: PAYOUT_SETUP_API_VERSION,
         error: "SitGuru could not load payout setup status.",
       },
       500,
@@ -1220,6 +1281,7 @@ export async function PATCH(req: NextRequest) {
 
     return json(req, {
       success: true,
+      apiVersion: PAYOUT_SETUP_API_VERSION,
       message:
         provider === "set_up_later"
           ? "Payout setup has been deferred."
@@ -1235,6 +1297,7 @@ export async function PATCH(req: NextRequest) {
       req,
       {
         success: false,
+        apiVersion: PAYOUT_SETUP_API_VERSION,
         error: "SitGuru could not save the payout setup preference.",
       },
       500,
