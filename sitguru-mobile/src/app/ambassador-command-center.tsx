@@ -2,12 +2,14 @@ import { router, type Href } from 'expo-router';
 import {
   ArrowLeft,
   BadgeCheck,
+  BarChart3,
   Bell,
   CalendarDays,
   CalendarPlus,
   Check,
   ChevronLeft,
   ChevronRight,
+  Gift,
   Headphones,
   Home,
   Megaphone,
@@ -15,11 +17,13 @@ import {
   Plus,
   QrCode,
   Search,
+  ShieldCheck,
   Target,
   Timer,
   UserPlus,
   UserRound,
   Users,
+  Wallet,
   X
 } from 'lucide-react-native';
 import {
@@ -42,6 +46,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type TextStyle,
 } from 'react-native';
@@ -58,7 +63,7 @@ import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 
-type CommandView = 'today' | 'calendar' | 'activities' | 'marketing' | 'leads';
+type CommandView = 'today' | 'calendar' | 'activities' | 'marketing' | 'leads' | 'rewards';
 type ComposerMode = 'activity' | 'marketing_effort' | 'lead' | null;
 type Theme = ReturnType<typeof getAppTheme>;
 
@@ -212,6 +217,34 @@ type Feedback = {
   message: string;
 } | null;
 
+type AmbassadorPayoutProvider =
+  | 'stripe'
+  | 'paypal'
+  | 'venmo'
+  | 'set_up_later';
+
+type AmbassadorPayoutAccount = {
+  provider?: 'stripe' | 'paypal' | 'venmo' | null;
+  providerAccountId?: string | null;
+  providerEmail?: string | null;
+  providerPhone?: string | null;
+  onboardingStatus?: string | null;
+  accountStatus?: string | null;
+  payoutsEnabled?: boolean;
+};
+
+type AmbassadorPayoutSetup = {
+  selectedProvider?: AmbassadorPayoutProvider;
+  setupComplete?: boolean;
+  readyAccount?: AmbassadorPayoutAccount | null;
+};
+
+type AmbassadorPayoutResponse = {
+  success: boolean;
+  error?: string;
+  setup?: AmbassadorPayoutSetup;
+};
+
 type ActivityForm = {
   title: string;
   activity_date: string;
@@ -342,6 +375,62 @@ async function readCommandResponse(response: Response): Promise<CommandResponse>
           : `SitGuru returned an unreadable response (${response.status}).`,
     };
   }
+}
+
+async function readPayoutResponse(
+  response: Response,
+): Promise<AmbassadorPayoutResponse> {
+  const raw = await response.text();
+
+  if (!raw.trim()) {
+    return {
+      success: false,
+      error: `SitGuru returned an empty payout response (${response.status}).`,
+    };
+  }
+
+  try {
+    return JSON.parse(raw) as AmbassadorPayoutResponse;
+  } catch {
+    return {
+      success: false,
+      error:
+        response.status === 404
+          ? 'Reward payout setup is not available at this address yet.'
+          : `SitGuru returned an unreadable payout response (${response.status}).`,
+    };
+  }
+}
+
+function payoutProviderLabel(
+  provider?: AmbassadorPayoutProvider | null,
+) {
+  if (provider === 'stripe') return 'Bank or debit card';
+  if (provider === 'paypal') return 'PayPal';
+  if (provider === 'venmo') return 'Venmo';
+  return 'Not picked yet';
+}
+
+function payoutProviderShortLabel(
+  provider?: AmbassadorPayoutProvider | null,
+) {
+  if (provider === 'stripe') return 'Bank or card';
+  if (provider === 'paypal') return 'PayPal';
+  if (provider === 'venmo') return 'Venmo';
+  return 'Pick a payout';
+}
+
+function payoutDestinationLabel(account?: AmbassadorPayoutAccount | null) {
+  if (!account) return 'Choose bank or card, PayPal, or Venmo';
+
+  return (
+    account.providerEmail ||
+    account.providerPhone ||
+    account.providerAccountId ||
+    (account.provider === 'stripe'
+      ? 'Connected securely with Stripe'
+      : 'Connected account')
+  );
 }
 
 const activityTypes = [
@@ -736,21 +825,79 @@ function StatCard({
   value,
   detail,
   icon,
+  onPress,
   styles,
 }: {
   label: string;
   value: string;
   detail: string;
   icon: ReactNode;
+  onPress?: () => void;
   styles: ReturnType<typeof createStyles>;
 }) {
-  return (
-    <View style={styles.statCard}>
+  const content = (
+    <>
       <View style={styles.statIcon}>{icon}</View>
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statDetail}>{detail}</Text>
-    </View>
+    </>
+  );
+
+  if (!onPress) {
+    return <View style={styles.statCard}>{content}</View>;
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel={`Open ${label}`}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.statCard,
+        pressed ? styles.pressed : null,
+      ]}>
+      {content}
+    </Pressable>
+  );
+}
+
+function PortalLinkButton({
+  label,
+  detail,
+  onPress,
+  icon,
+  styles,
+  theme,
+}: {
+  label: string;
+  detail: string;
+  onPress: () => void;
+  icon: ReactNode;
+  styles: ReturnType<typeof createStyles>;
+  theme: Theme;
+}) {
+  return (
+    <Pressable
+      accessibilityHint={`Opens ${label}`}
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.portalLinkButton,
+        pressed ? styles.pressed : null,
+      ]}>
+      <View style={styles.portalLinkIcon}>{icon}</View>
+      <View style={styles.portalLinkCopy}>
+        <Text style={styles.portalLinkTitle}>{label}</Text>
+        <Text style={styles.portalLinkDetail}>{detail}</Text>
+      </View>
+      <ChevronRight
+        color={theme.colors.primary}
+        size={17}
+        strokeWidth={2.4}
+      />
+    </Pressable>
   );
 }
 
@@ -948,54 +1095,87 @@ function FormModal({
   onSave: () => void;
   children: ReactNode;
 }) {
-  const modalContent = (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={[
-        styles.modalBackdrop,
-        Platform.OS === 'web' ? styles.webPhoneOverlay : null,
-      ]}>
-      <View style={styles.modalCard}>
-        <View style={styles.modalHeader}>
-          <View style={styles.modalHeaderCopy}>
-            <Text style={styles.eyebrow}>SitGuru Ambassador Portal</Text>
-            <Text style={styles.modalTitle}>{title}</Text>
-            <Text style={styles.modalSubtitle}>{subtitle}</Text>
-          </View>
-          <Pressable onPress={onClose} style={styles.iconButton}>
-            <X color={theme.colors.text} size={20} strokeWidth={2.4} />
-          </Pressable>
+  if (!visible) {
+    return null;
+  }
+
+  const modalCard = (
+    <View style={styles.modalCard}>
+      <View style={styles.modalHeader}>
+        <View style={styles.modalHeaderCopy}>
+          <Text style={styles.eyebrow}>SitGuru Ambassador Portal</Text>
+          <Text style={styles.modalTitle}>{title}</Text>
+          <Text style={styles.modalSubtitle}>{subtitle}</Text>
         </View>
 
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.modalContent}>
-          {children}
-        </ScrollView>
-
-        <View style={styles.modalFooter}>
-          <Button label="Cancel" onPress={onClose} styles={styles} theme={theme} />
-          <Button
-            label={saving ? 'Saving...' : 'Save'}
-            primary
-            disabled={saving}
-            onPress={onSave}
-            styles={styles}
-            theme={theme}
-            icon={saving ? <ActivityIndicator color="#FFFFFF" size="small" /> : undefined}
-          />
-        </View>
+        <Pressable
+          accessibilityLabel="Close form"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.iconButton}>
+          <X color={theme.colors.text} size={20} strokeWidth={2.4} />
+        </Pressable>
       </View>
-    </KeyboardAvoidingView>
+
+      <ScrollView
+        keyboardShouldPersistTaps="always"
+        nestedScrollEnabled
+        showsVerticalScrollIndicator={false}
+        style={styles.modalScroll}
+        contentContainerStyle={styles.modalContent}>
+        {children}
+      </ScrollView>
+
+      <View style={styles.modalFooter}>
+        <Button
+          label="Cancel"
+          onPress={onClose}
+          styles={styles}
+          theme={theme}
+        />
+        <Button
+          label={saving ? 'Saving...' : 'Save'}
+          primary
+          disabled={saving}
+          onPress={onSave}
+          styles={styles}
+          theme={theme}
+          icon={
+            saving ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : undefined
+          }
+        />
+      </View>
+    </View>
   );
 
+  // React Native Web's Modal portal can mount an invisible full-screen layer
+  // around a simulated-phone preview. Render the web form directly in the
+  // route tree instead so the form is visible and cannot leave a dead overlay.
+  if (Platform.OS === 'web') {
+    return (
+      <View pointerEvents="auto" style={styles.webInlineOverlayRoot}>
+        <View style={styles.webInlinePhoneSurface}>
+          <KeyboardAvoidingView style={styles.modalBackdrop}>
+            {modalCard}
+          </KeyboardAvoidingView>
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      {Platform.OS === 'web' ? (
-        <View style={styles.webModalRoot}>{modalContent}</View>
-      ) : (
-        modalContent
-      )}
+    <Modal
+      visible
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.modalBackdrop}>
+        {modalCard}
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -1027,12 +1207,14 @@ function PhoneStatusBar({
 }
 
 export default function AmbassadorCommandCenterScreen() {
+  const { width: windowWidth } = useWindowDimensions();
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
   const isDark = themeMode === 'dark';
   const theme = getAppTheme(isDark ? 'dark' : 'light');
   const styles = useMemo(() => createStyles(theme), [theme]);
   const isWebPreview = Platform.OS === 'web';
+  const isTablet = Platform.OS !== 'web' && windowWidth >= 768;
   const { session, user, profile, roles, loading: authLoading } = useAuth();
 
   const [view, setView] = useState<CommandView>('today');
@@ -1053,6 +1235,9 @@ export default function AmbassadorCommandCenterScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [avatarImageFailed, setAvatarImageFailed] = useState(false);
+  const [payoutSetup, setPayoutSetup] =
+    useState<AmbassadorPayoutSetup | null>(null);
+  const [payoutWarning, setPayoutWarning] = useState('');
 
   const token = session?.access_token || '';
   const hasAmbassadorRole = roles.includes('ambassador');
@@ -1109,23 +1294,61 @@ export default function AmbassadorCommandCenterScreen() {
         setLoading(false);
         return;
       }
+
       quiet ? setRefreshing(true) : setLoading(true);
+
       try {
         const start = addDays(todayValue(), -45);
         const end = addDays(todayValue(), 120);
-        const response = await apiFetch(
-          `/api/ambassador/command-center?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
-          { method: 'GET', cache: 'no-store' },
-        );
-        const payload = await readCommandResponse(response);
-        if (!response.ok || !payload.success || !payload.commandCenter) {
-          throw new Error(payload.error || 'Unable to load the Ambassador Portal.');
+
+        const [commandResponse, payoutResponse] = await Promise.all([
+          apiFetch(
+            `/api/ambassador/command-center?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+            { method: 'GET', cache: 'no-store' },
+          ),
+          apiFetch('/api/payouts/setup?role=ambassador', {
+            method: 'GET',
+            cache: 'no-store',
+          }).catch(() => null),
+        ]);
+
+        const commandPayload = await readCommandResponse(commandResponse);
+
+        if (
+          !commandResponse.ok ||
+          !commandPayload.success ||
+          !commandPayload.commandCenter
+        ) {
+          throw new Error(
+            commandPayload.error || 'Unable to load the Ambassador Portal.',
+          );
         }
-        setData(payload.commandCenter);
-        setAmbassador(payload.ambassador || null);
+
+        setData(commandPayload.commandCenter);
+        setAmbassador(commandPayload.ambassador || null);
+
+        if (payoutResponse) {
+          const payoutPayload = await readPayoutResponse(payoutResponse);
+
+          if (payoutResponse.ok && payoutPayload.success) {
+            setPayoutSetup(payoutPayload.setup || null);
+            setPayoutWarning('');
+          } else {
+            setPayoutSetup(null);
+            setPayoutWarning(
+              payoutPayload.error ||
+                'Your payout setup could not be loaded right now.',
+            );
+          }
+        } else {
+          setPayoutSetup(null);
+          setPayoutWarning(
+            'Your payout setup could not be loaded right now.',
+          );
+        }
       } catch {
-        // Keep the Portal usable in the Expo preview when the local Next.js API
-        // is not running. Save failures still show a clear error to the user.
+        // Keep the Portal usable in Expo preview when the local Next.js API
+        // is not running. Save failures still show a clear message.
         setFeedback(null);
       } finally {
         setLoading(false);
@@ -1144,6 +1367,16 @@ export default function AmbassadorCommandCenterScreen() {
   const leads = data?.leads || [];
   const marketing = data?.marketingEfforts || [];
   const templates = data?.templates || [];
+  const payoutReady = Boolean(payoutSetup?.setupComplete);
+  const payoutProvider =
+    payoutSetup?.readyAccount?.provider ||
+    payoutSetup?.selectedProvider ||
+    'set_up_later';
+  const payoutLabel = payoutProviderLabel(payoutProvider);
+  const payoutShortLabel = payoutProviderShortLabel(payoutProvider);
+  const payoutDestination = payoutDestinationLabel(
+    payoutSetup?.readyAccount || null,
+  );
 
   const upcoming = useMemo(
     () =>
@@ -1223,9 +1456,10 @@ export default function AmbassadorCommandCenterScreen() {
     return grouped;
   }, [activities]);
 
-  function openActivity(date = selectedDate) {
+  function openActivity(date?: string) {
+    const activityDate = typeof date === 'string' ? date : selectedDate;
     setEditingId(null);
-    setActivityForm(newActivityForm(date));
+    setActivityForm(newActivityForm(activityDate));
     setComposer('activity');
   }
 
@@ -1244,12 +1478,9 @@ export default function AmbassadorCommandCenterScreen() {
   function closeAddMenuThen(openNext: () => void) {
     setAddMenuOpen(false);
 
-    if (Platform.OS === 'web') {
-      window.setTimeout(openNext, 180);
-      return;
-    }
-
-    openNext();
+    // Let the add-menu Modal unmount before opening the next Modal. This avoids
+    // overlapping web/native modal layers that can make the preview appear frozen.
+    setTimeout(openNext, Platform.OS === 'web' ? 50 : 0);
   }
 
   function editActivity(record: ActivityRecord) {
@@ -1282,6 +1513,48 @@ export default function AmbassadorCommandCenterScreen() {
       admin_help_reason: record.admin_help_reason || '',
     });
     setComposer('activity');
+  }
+
+  function editMarketing(record: MarketingEffort) {
+    setEditingId(record.id);
+    setMarketingForm({
+      title: record.title || '',
+      effort_date: record.effort_date || todayValue(),
+      effort_type: record.effort_type || 'Social Post',
+      platform: record.platform || 'Instagram',
+      campaign_name: record.campaign_name || '',
+      target_audience: record.target_audience || 'Pet Parents',
+      target_location: record.target_location || '',
+      description: record.description || '',
+      content_url: record.content_url || '',
+      call_to_action: record.call_to_action || '',
+      minutes_spent:
+        record.minutes_spent == null ? '15' : String(record.minutes_spent),
+      spend_amount:
+        record.spend_amount == null ? '' : String(record.spend_amount),
+      reach: record.reach == null ? '' : String(record.reach),
+      engagements:
+        record.engagements == null ? '' : String(record.engagements),
+      clicks: record.clicks == null ? '' : String(record.clicks),
+      qr_scans: record.qr_scans == null ? '' : String(record.qr_scans),
+      materials_distributed:
+        record.materials_distributed == null
+          ? ''
+          : String(record.materials_distributed),
+      leads_generated:
+        record.leads_generated == null ? '' : String(record.leads_generated),
+      verified_signups:
+        record.verified_signups == null ? '' : String(record.verified_signups),
+      completed_bookings:
+        record.completed_bookings == null
+          ? ''
+          : String(record.completed_bookings),
+      status: record.status || 'planned',
+      outcome_summary: record.outcome_summary || '',
+      notes: record.notes || '',
+      needs_admin_help: Boolean(record.needs_admin_help),
+    });
+    setComposer('marketing_effort');
   }
 
   function editLead(record: LeadRecord) {
@@ -1413,20 +1686,26 @@ export default function AmbassadorCommandCenterScreen() {
     }
     setSaving(true);
     try {
-      const result = await sendCommand('POST', 'marketing_effort', {
-        ...marketingForm,
-        minutes_spent: numberValue(marketingForm.minutes_spent),
-        spend_amount: numberValue(marketingForm.spend_amount),
-        reach: numberValue(marketingForm.reach),
-        engagements: numberValue(marketingForm.engagements),
-        clicks: numberValue(marketingForm.clicks),
-        qr_scans: numberValue(marketingForm.qr_scans),
-        materials_distributed: numberValue(marketingForm.materials_distributed),
-        leads_generated: numberValue(marketingForm.leads_generated),
-        verified_signups: numberValue(marketingForm.verified_signups),
-        completed_bookings: numberValue(marketingForm.completed_bookings),
-      });
+      const result = await sendCommand(
+        editingId ? 'PATCH' : 'POST',
+        'marketing_effort',
+        {
+          ...marketingForm,
+          minutes_spent: numberValue(marketingForm.minutes_spent),
+          spend_amount: numberValue(marketingForm.spend_amount),
+          reach: numberValue(marketingForm.reach),
+          engagements: numberValue(marketingForm.engagements),
+          clicks: numberValue(marketingForm.clicks),
+          qr_scans: numberValue(marketingForm.qr_scans),
+          materials_distributed: numberValue(marketingForm.materials_distributed),
+          leads_generated: numberValue(marketingForm.leads_generated),
+          verified_signups: numberValue(marketingForm.verified_signups),
+          completed_bookings: numberValue(marketingForm.completed_bookings),
+        },
+        editingId || undefined,
+      );
       setComposer(null);
+      setEditingId(null);
       setFeedback({ tone: 'success', message: result.message || 'Marketing effort saved.' });
       await loadData(true);
     } catch (error) {
@@ -1460,16 +1739,46 @@ export default function AmbassadorCommandCenterScreen() {
     }
   }
 
+  function openRoute(path: string) {
+    if (Platform.OS === 'web') {
+      router.navigate(path as never);
+      return;
+    }
+
+    router.push(path as never);
+  }
+
   function go(path: Href) {
-    router.push(path);
+    openRoute(String(path));
+  }
+
+  function openMessages() {
+    router.push(
+      {
+        pathname: '/messages',
+        params: { role: 'ambassador' },
+      } as never,
+    );
+  }
+
+  function openReferralAnalytics() {
+    openRoute('/ambassador-referral-analytics');
+  }
+
+  function openRewards() {
+    setView('rewards');
+  }
+
+  function openPayoutSetup() {
+    openRoute('/ambassador-payouts');
   }
 
   if (authLoading || loading) {
     return (
       <View style={styles.centerScreen}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.centerTitle}>Loading Ambassador Portal</Text>
-        <Text style={styles.centerBody}>Connecting your calendar, activities, marketing, and leads.</Text>
+        <Text style={styles.centerTitle}>Loading your Ambassador tools</Text>
+        <Text style={styles.centerBody}>Getting your activity, leads, rewards, and payout status.</Text>
       </View>
     );
   }
@@ -1526,7 +1835,10 @@ export default function AmbassadorCommandCenterScreen() {
 
   return (
     <View style={styles.screen}>
-      <SitGuruScreen center={isWebPreview} maxWidth={620}>
+      <SitGuruScreen
+        center={isWebPreview || isTablet}
+        maxWidth={isTablet ? 980 : 620}
+      >
         <View
           style={[
             styles.previewCanvas,
@@ -1569,41 +1881,38 @@ export default function AmbassadorCommandCenterScreen() {
                         Ambassador • Live
                       </Text>
                     </View>
-
                     <Pressable
-                      accessibilityHint="Returns to the Ambassador Dashboard."
-                      accessibilityLabel="Back to Ambassador Dashboard"
-                      accessibilityRole="button"
-                      onPress={() => go('/ambassador-dashboard')}
-                      style={({ pressed }) => [
-                        styles.dashboardReturnButton,
-                        pressed ? styles.headerControlPressed : null,
-                      ]}
-                    >
-                      <ArrowLeft
-                        color={theme.colors.primary}
-                        size={12}
-                        strokeWidth={2.6}
-                      />
-                      <Text style={styles.dashboardReturnText}>
-                        Dashboard
-                      </Text>
-                    </Pressable>
+                        accessibilityHint="Returns to the Ambassador Dashboard."
+                        accessibilityLabel="Back to Ambassador Dashboard"
+                        accessibilityRole="button"
+                        onPress={() => openRoute('/ambassador-dashboard')}
+                        style={({ pressed }) => [
+                          styles.dashboardReturnButton,
+                          pressed ? styles.headerControlPressed : null,
+                        ]}>
+                        <ArrowLeft
+                          color={theme.colors.primary}
+                          size={12}
+                          strokeWidth={2.6}
+                        />
+                        <Text style={styles.dashboardReturnText}>
+                          Dashboard
+                        </Text>
+                      </Pressable>
                   </View>
 
                   <View style={styles.headerActions}>
                     <Pressable
-                      accessibilityLabel="Open notifications"
-                      accessibilityRole="button"
-                      onPress={() => go('/notifications')}
-                      style={styles.headerIconButton}
-                    >
-                      <Bell
-                        color={theme.colors.text}
-                        size={18}
-                        strokeWidth={2.3}
-                      />
-                    </Pressable>
+                        accessibilityLabel="Open notifications"
+                        accessibilityRole="button"
+                        onPress={() => openRoute('/notifications')}
+                        style={styles.headerIconButton}>
+                        <Bell
+                          color={theme.colors.text}
+                          size={18}
+                          strokeWidth={2.3}
+                        />
+                      </Pressable>
 
                     <View style={styles.modeToggle}>
                       {THEME_OPTIONS.map((option) => {
@@ -1639,30 +1948,30 @@ export default function AmbassadorCommandCenterScreen() {
                         );
                       })}
                     </View>
-
                     <Pressable
-                      accessibilityLabel="Open profile and workspace switcher"
-                      accessibilityRole="button"
-                      onPress={() => go('/account')}
-                      style={styles.avatar}
-                    >
-                      {avatarUrl && !avatarImageFailed ? (
-                        <Image
-                          onError={() => setAvatarImageFailed(true)}
-                          resizeMode="cover"
-                          source={{ uri: avatarUrl }}
-                          style={styles.avatarImage}
-                        />
-                      ) : (
-                        <Text style={styles.avatarText}>
-                          {(firstName[0] || 'A').toUpperCase()}
-                        </Text>
-                      )}
-                    </Pressable>
+                        accessibilityLabel="Open profile and workspace switcher"
+                        accessibilityRole="button"
+                        onPress={() => openRoute('/account')}
+                        style={styles.avatar}>
+                        {avatarUrl && !avatarImageFailed ? (
+                          <Image
+                            onError={() => setAvatarImageFailed(true)}
+                            resizeMode="cover"
+                            source={{ uri: avatarUrl }}
+                            style={styles.avatarImage}
+                          />
+                        ) : (
+                          <Text style={styles.avatarText}>
+                            {(firstName[0] || 'A').toUpperCase()}
+                          </Text>
+                        )}
+                      </Pressable>
                   </View>
                 </View>
 
           <ScrollView
+            keyboardShouldPersistTaps="always"
+            nestedScrollEnabled
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
@@ -1671,15 +1980,17 @@ export default function AmbassadorCommandCenterScreen() {
                 tintColor={theme.colors.primary}
               />
             }
-            contentContainerStyle={styles.content}>
+            contentContainerStyle={[
+              styles.content,
+              isTablet ? styles.contentTablet : null,
+            ]}>
             <View style={styles.hero}>
               <View style={styles.heroPill}>
                 <Text style={styles.heroPillText}>SitGuru Ambassador Portal</Text>
               </View>
-              <Text style={styles.heroTitle}>Welcome, {firstName}.</Text>
+              <Text style={styles.heroTitle}>Hey, {firstName}.</Text>
               <Text style={styles.heroBody}>
-                Plan your day, schedule outreach, log events and marketing, send leads to Headquarters,
-                and see your impact.
+                Plan it. Share it. Track it. See your impact and rewards in one place.
               </Text>
               <View style={styles.heroActions}>
                 <Button
@@ -1723,11 +2034,18 @@ export default function AmbassadorCommandCenterScreen() {
               </View>
             ) : null}
 
+            {payoutWarning ? (
+              <View style={styles.warning}>
+                <Text style={styles.warningText}>{payoutWarning}</Text>
+              </View>
+            ) : null}
+
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statRow}>
               <StatCard
                 label="Activities"
                 value={String(summary.scheduledActivities)}
                 detail={`${summary.completedActivities} completed`}
+                onPress={() => setView('activities')}
                 styles={styles}
                 icon={<CalendarDays color={theme.colors.primary} size={19} strokeWidth={2.3} />}
               />
@@ -1735,6 +2053,7 @@ export default function AmbassadorCommandCenterScreen() {
                 label="Hours"
                 value={String(summary.totalHours)}
                 detail="Completed time"
+                onPress={() => setView('activities')}
                 styles={styles}
                 icon={<Timer color={theme.colors.primary} size={19} strokeWidth={2.3} />}
               />
@@ -1742,6 +2061,7 @@ export default function AmbassadorCommandCenterScreen() {
                 label="Contacts"
                 value={String(summary.contacts)}
                 detail={`${summary.conversations} conversations`}
+                onPress={() => setView('activities')}
                 styles={styles}
                 icon={<Users color={theme.colors.primary} size={19} strokeWidth={2.3} />}
               />
@@ -1749,6 +2069,7 @@ export default function AmbassadorCommandCenterScreen() {
                 label="Leads"
                 value={String(summary.generatedLeads)}
                 detail={`${summary.convertedLeads} converted`}
+                onPress={() => setView('leads')}
                 styles={styles}
                 icon={<UserPlus color={theme.colors.primary} size={19} strokeWidth={2.3} />}
               />
@@ -1756,10 +2077,102 @@ export default function AmbassadorCommandCenterScreen() {
                 label="QR Scans"
                 value={String(summary.qrScans)}
                 detail={`${summary.materialsDistributed} materials`}
+                onPress={openReferralAnalytics}
                 styles={styles}
                 icon={<QrCode color={theme.colors.primary} size={19} strokeWidth={2.3} />}
               />
+              <StatCard
+                label="Rewards"
+                value={String(summary.verifiedSignups)}
+                detail={`${summary.completedBookings} bookings`}
+                onPress={openRewards}
+                styles={styles}
+                icon={<Gift color={theme.colors.primary} size={19} strokeWidth={2.3} />}
+              />
             </ScrollView>
+
+            <View style={styles.portalLinksSection}>
+              <Text style={styles.portalLinksEyebrow}>CONNECTED TOOLS</Text>
+
+              <PortalLinkButton
+                label="Referral Analytics"
+                detail="Visits, conversions, channels, bookings, and rewards"
+                icon={
+                  <BarChart3
+                    color={theme.colors.primary}
+                    size={19}
+                    strokeWidth={2.4}
+                  />
+                }
+                onPress={openReferralAnalytics}
+                styles={styles}
+                theme={theme}
+              />
+
+              <PortalLinkButton
+                label="Rewards & Payouts"
+                detail={
+                  payoutReady
+                    ? `${payoutShortLabel} is ready`
+                    : 'Track rewards and pick how you get paid'
+                }
+                icon={
+                  <Wallet
+                    color={theme.colors.primary}
+                    size={19}
+                    strokeWidth={2.4}
+                  />
+                }
+                onPress={openRewards}
+                styles={styles}
+                theme={theme}
+              />
+
+              <PortalLinkButton
+                label="Ambassador Dashboard"
+                detail="Return to your main Ambassador overview"
+                icon={
+                  <Home
+                    color={theme.colors.primary}
+                    size={19}
+                    strokeWidth={2.4}
+                  />
+                }
+                onPress={() => openRoute('/ambassador-dashboard')}
+                styles={styles}
+                theme={theme}
+              />
+
+              <PortalLinkButton
+                label="Message Center"
+                detail="Contact Headquarters and review Ambassador conversations"
+                icon={
+                  <MessageCircle
+                    color={theme.colors.primary}
+                    size={19}
+                    strokeWidth={2.4}
+                  />
+                }
+                onPress={openMessages}
+                styles={styles}
+                theme={theme}
+              />
+
+              <PortalLinkButton
+                label="Headquarters Support"
+                detail="Request account, lead, event, materials, or payout help"
+                icon={
+                  <Headphones
+                    color={theme.colors.primary}
+                    size={19}
+                    strokeWidth={2.4}
+                  />
+                }
+                onPress={() => openRoute('/support')}
+                styles={styles}
+                theme={theme}
+              />
+            </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
               {[
@@ -1768,6 +2181,7 @@ export default function AmbassadorCommandCenterScreen() {
                 ['activities', 'Activities', Target],
                 ['marketing', 'Marketing', Megaphone],
                 ['leads', 'Leads', UserPlus],
+                ['rewards', 'Rewards', Gift],
               ].map(([key, label, Icon]) => {
                 const active = view === key;
                 const IconComponent = Icon as typeof Home;
@@ -1863,9 +2277,9 @@ export default function AmbassadorCommandCenterScreen() {
 
                 <View style={styles.headquarters}>
                   <Headphones color={theme.colors.primary} size={25} strokeWidth={2.3} />
-                  <Text style={styles.headquartersTitle}>Help is built into your workflow.</Text>
+                  <Text style={styles.headquartersTitle}>Need a hand?</Text>
                   <Text style={styles.headquartersBody}>
-                    Request assistance on an activity or lead, or open SitGuru Support without leaving your workspace.
+                    Ask SitGuru for help with an activity, lead, event, or payout.
                   </Text>
                   <Button
                     label="Ask Headquarters"
@@ -1899,7 +2313,7 @@ export default function AmbassadorCommandCenterScreen() {
                     style={styles.iconButton}>
                     <ChevronLeft color={theme.colors.text} size={20} strokeWidth={2.4} />
                   </Pressable>
-                  <Button label="Today" onPress={() => setCalendarMonth(new Date())} styles={styles} theme={theme} />
+                  <Button label="Today" onPress={() => { const today = new Date(); setCalendarMonth(today); setSelectedDate(dateKey(today)); }} styles={styles} theme={theme} />
                   <Pressable
                     onPress={() =>
                       setCalendarMonth(
@@ -2032,6 +2446,29 @@ export default function AmbassadorCommandCenterScreen() {
                           <Text style={styles.metricPill}>{item.clicks || 0} clicks</Text>
                           <Text style={styles.metricPill}>{item.leads_generated || 0} leads</Text>
                         </View>
+
+                        <View style={styles.actionRow}>
+                          <Button
+                            label="Update"
+                            onPress={() => editMarketing(item)}
+                            styles={styles}
+                            theme={theme}
+                          />
+                          <Button
+                            label="Analytics"
+                            primary
+                            onPress={openReferralAnalytics}
+                            styles={styles}
+                            theme={theme}
+                            icon={
+                              <BarChart3
+                                color="#FFFFFF"
+                                size={16}
+                                strokeWidth={2.4}
+                              />
+                            }
+                          />
+                        </View>
                       </View>
                     ))
                   ) : (
@@ -2085,21 +2522,199 @@ export default function AmbassadorCommandCenterScreen() {
               </View>
             ) : null}
 
+            {view === 'rewards' ? (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionCopy}>
+                    <Text style={styles.eyebrow}>Rewards</Text>
+                    <Text style={styles.sectionTitle}>
+                      Your rewards, all in one spot
+                    </Text>
+                    <Text style={styles.sectionBody}>
+                      See what&apos;s verified, what drove it, and whether your payout method is ready.
+                    </Text>
+                  </View>
+                  <View style={styles.rewardHeaderIcon}>
+                    <Gift
+                      color={theme.colors.primary}
+                      size={21}
+                      strokeWidth={2.4}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.rewardQuickGrid}>
+                  <View style={styles.rewardQuickCard}>
+                    <BadgeCheck
+                      color={theme.colors.primary}
+                      size={20}
+                      strokeWidth={2.4}
+                    />
+                    <Text style={styles.rewardQuickValue}>
+                      {summary.verifiedSignups}
+                    </Text>
+                    <Text style={styles.rewardQuickLabel}>
+                      Verified signups
+                    </Text>
+                  </View>
+
+                  <View style={styles.rewardQuickCard}>
+                    <CalendarDays
+                      color={theme.colors.primary}
+                      size={20}
+                      strokeWidth={2.4}
+                    />
+                    <Text style={styles.rewardQuickValue}>
+                      {summary.completedBookings}
+                    </Text>
+                    <Text style={styles.rewardQuickLabel}>
+                      Completed bookings
+                    </Text>
+                  </View>
+
+                  <View style={styles.rewardQuickCard}>
+                    <Wallet
+                      color={theme.colors.primary}
+                      size={20}
+                      strokeWidth={2.4}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={styles.rewardQuickValueSmall}
+                    >
+                      {payoutReady ? 'Ready' : 'Pick one'}
+                    </Text>
+                    <Text style={styles.rewardQuickLabel}>
+                      Payout status
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  style={[
+                    styles.payoutCard,
+                    payoutReady ? styles.payoutCardReady : null,
+                  ]}
+                >
+                  <View style={styles.payoutTopRow}>
+                    <View style={styles.payoutIcon}>
+                      <Wallet
+                        color={theme.colors.primary}
+                        size={22}
+                        strokeWidth={2.4}
+                      />
+                    </View>
+
+                    <View style={styles.payoutCopy}>
+                      <Text style={styles.payoutEyebrow}>Get paid</Text>
+                      <Text style={styles.payoutTitle}>
+                        {payoutReady
+                          ? 'You’re ready to get paid'
+                          : 'Pick how you get paid'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.payoutBody}>
+                    {payoutReady
+                      ? `${payoutLabel} • ${payoutDestination}`
+                      : 'Choose bank or card, PayPal, or Venmo. You can switch later.'}
+                  </Text>
+
+                  <Button
+                    label={payoutReady ? 'Manage payout' : 'Pick a payout'}
+                    primary
+                    onPress={openPayoutSetup}
+                    styles={styles}
+                    theme={theme}
+                    icon={
+                      <Wallet
+                        color="#FFFFFF"
+                        size={17}
+                        strokeWidth={2.4}
+                      />
+                    }
+                  />
+                </View>
+
+                <View style={styles.rewardSteps}>
+                  <Text style={styles.rewardStepsTitle}>
+                    Share. Track. Earn.
+                  </Text>
+
+                  {[
+                    ['1', 'Share your link or QR code.'],
+                    ['2', 'Track verified signups and bookings.'],
+                    ['3', 'See approved rewards and payout status.'],
+                  ].map(([step, label]) => (
+                    <View key={step} style={styles.rewardStepRow}>
+                      <View style={styles.rewardStepNumber}>
+                        <Text style={styles.rewardStepNumberText}>
+                          {step}
+                        </Text>
+                      </View>
+                      <Text style={styles.rewardStepText}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={styles.noMysteryCard}>
+                  <ShieldCheck
+                    color={theme.colors.primary}
+                    size={20}
+                    strokeWidth={2.4}
+                  />
+                  <View style={styles.noMysteryCopy}>
+                    <Text style={styles.noMysteryTitle}>
+                      No mystery math
+                    </Text>
+                    <Text style={styles.noMysteryBody}>
+                      Activities and clicks do not automatically create money.
+                      Rewards appear after SitGuru verifies the activity.
+                    </Text>
+                  </View>
+                </View>
+
+                <Button
+                  label="Open referral analytics"
+                  onPress={openReferralAnalytics}
+                  styles={styles}
+                  theme={theme}
+                  icon={
+                    <BarChart3
+                      color={theme.colors.primary}
+                      size={17}
+                      strokeWidth={2.4}
+                    />
+                  }
+                />
+              </View>
+            ) : null}
+
             <View style={styles.accuracyNote}>
               <BadgeCheck color={theme.colors.primary} size={18} strokeWidth={2.3} />
               <Text style={styles.accuracyText}>
-                Activity records document work and support Admin visibility. They do not automatically create a reward.
+                Logged activity helps SitGuru verify your work. It does not automatically create a reward.
               </Text>
             </View>
             <View style={styles.bottomSpacer} />
           </ScrollView>
 
           <View style={styles.bottomNav}>
-            <Pressable onPress={() => go('/ambassador-dashboard')} style={styles.bottomNavItem}>
+            <Pressable
+              accessibilityLabel="Open Ambassador Dashboard"
+              accessibilityRole="button"
+              onPress={() => openRoute('/ambassador-dashboard')}
+              style={styles.bottomNavItem}>
               <Home color={theme.colors.textSecondary} size={20} strokeWidth={2.3} />
               <Text style={styles.bottomLabel}>Home</Text>
             </Pressable>
-            <Pressable onPress={() => setView('calendar')} style={styles.bottomNavItem}>
+
+            <Pressable
+              accessibilityLabel="Open Portal calendar"
+              accessibilityRole="button"
+              onPress={() => setView('calendar')}
+              style={styles.bottomNavItem}>
               <CalendarDays
                 color={view === 'calendar' ? theme.colors.primary : theme.colors.textSecondary}
                 size={20}
@@ -2109,14 +2724,29 @@ export default function AmbassadorCommandCenterScreen() {
                 Calendar
               </Text>
             </Pressable>
-            <Pressable onPress={() => setAddMenuOpen(true)} style={styles.bottomAdd}>
+
+            <Pressable
+              accessibilityLabel="Add to Ambassador Portal"
+              accessibilityRole="button"
+              onPress={() => setAddMenuOpen(true)}
+              style={styles.bottomAdd}>
               <Plus color="#FFFFFF" size={26} strokeWidth={2.8} />
             </Pressable>
-            <Pressable onPress={() => go('/messages')} style={styles.bottomNavItem}>
+
+            <Pressable
+              accessibilityLabel="Open Ambassador messages"
+              accessibilityRole="button"
+              onPress={openMessages}
+              style={styles.bottomNavItem}>
               <MessageCircle color={theme.colors.textSecondary} size={20} strokeWidth={2.3} />
               <Text style={styles.bottomLabel}>Messages</Text>
             </Pressable>
-            <Pressable onPress={() => go('/account')} style={styles.bottomNavItem}>
+
+            <Pressable
+              accessibilityLabel="Open profile"
+              accessibilityRole="button"
+              onPress={() => openRoute('/account')}
+              style={styles.bottomNavItem}>
               <UserRound color={theme.colors.textSecondary} size={20} strokeWidth={2.3} />
               <Text style={styles.bottomLabel}>Profile</Text>
             </Pressable>
@@ -2129,65 +2759,23 @@ export default function AmbassadorCommandCenterScreen() {
         </View>
       </SitGuruScreen>
 
-      <Modal
-        visible={addMenuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setAddMenuOpen(false)}>
-        {isWebPreview ? (
-          <View style={styles.webModalRoot}>
-            <Pressable
-              style={[styles.sheetBackdrop, styles.webPhoneOverlay]}
-              onPress={() => setAddMenuOpen(false)}>
-              <Pressable
-                onPress={(event) => event.stopPropagation()}
-                style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Add to Ambassador Portal</Text>
-            {[
-              ['Add activity', 'Schedule outreach, events, visits, training, or follow-ups.', CalendarPlus, () => closeAddMenuThen(() => openActivity())],
-              ['Add lead', 'Send a person, business, or organization to Headquarters.', UserPlus, () => closeAddMenuThen(openLead)],
-              ['Log marketing', 'Track social, email, print, campus, and professional outreach.', Megaphone, () => closeAddMenuThen(openMarketing)],
-            ].map(([title, detail, Icon, action]) => {
-              const IconComponent = Icon as typeof CalendarPlus;
-              return (
-                <Pressable key={title as string} onPress={action as () => void} style={styles.sheetItem}>
-                  <View style={styles.sheetIcon}>
-                    <IconComponent color={theme.colors.primary} size={20} strokeWidth={2.4} />
-                  </View>
-                  <View style={styles.sheetCopy}>
-                    <Text style={styles.sheetItemTitle}>{title as string}</Text>
-                    <Text style={styles.sheetItemBody}>{detail as string}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-            <Pressable
-              onPress={() => {
-                setAddMenuOpen(false);
-                go('/support');
-              }}
-              style={styles.sheetItem}>
-              <View style={styles.sheetIcon}>
-                <Headphones color={theme.colors.primary} size={20} strokeWidth={2.4} />
-              </View>
-              <View style={styles.sheetCopy}>
-                <Text style={styles.sheetItemTitle}>Request Headquarters help</Text>
-                <Text style={styles.sheetItemBody}>Ask for lead, event, materials, account, or payout support.</Text>
-              </View>
-            </Pressable>
-              </Pressable>
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable
-            style={styles.sheetBackdrop}
-            onPress={() => setAddMenuOpen(false)}>
-            <Pressable
-              onPress={(event) => event.stopPropagation()}
-              style={styles.sheet}>
+      {Platform.OS === 'web' ? (
+        addMenuOpen ? (
+          <View pointerEvents="auto" style={styles.webInlineOverlayRoot}>
+            <View style={styles.webInlinePhoneSurface}>
+          <View style={styles.sheetBackdrop}>
+            <View style={styles.sheet}>
               <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>Add to Ambassador Portal</Text>
+              <View style={styles.sheetHeaderRow}>
+                <Text style={styles.sheetTitle}>Add to Ambassador Portal</Text>
+                <Pressable
+                  accessibilityLabel="Close Add menu"
+                  accessibilityRole="button"
+                  onPress={() => setAddMenuOpen(false)}
+                  style={styles.sheetCloseButton}>
+                  <X color={theme.colors.text} size={18} strokeWidth={2.4} />
+                </Pressable>
+              </View>
 
               {[
                 [
@@ -2234,7 +2822,7 @@ export default function AmbassadorCommandCenterScreen() {
               <Pressable
                 onPress={() => {
                   setAddMenuOpen(false);
-                  go('/support');
+                  setTimeout(() => go('/support'), Platform.OS === 'web' ? 50 : 0);
                 }}
                 style={styles.sheetItem}>
                 <View style={styles.sheetIcon}>
@@ -2249,14 +2837,109 @@ export default function AmbassadorCommandCenterScreen() {
                     Request Headquarters help
                   </Text>
                   <Text style={styles.sheetItemBody}>
-                    Ask for lead, event, materials, account, or payout support.
+                    Ask for help with a lead, event, materials, account, or payout.
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
+          </View>
+            </View>
+          </View>
+        ) : null
+      ) : (
+      <Modal
+        visible={addMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddMenuOpen(false)}>
+        <View style={styles.modalViewport}>
+          <Pressable
+            style={styles.sheetBackdrop}
+            onPress={() => setAddMenuOpen(false)}>
+            <Pressable
+              onPress={(event) => event.stopPropagation()}
+              style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.sheetHeaderRow}>
+                <Text style={styles.sheetTitle}>Add to Ambassador Portal</Text>
+                <Pressable
+                  accessibilityLabel="Close Add menu"
+                  accessibilityRole="button"
+                  onPress={() => setAddMenuOpen(false)}
+                  style={styles.sheetCloseButton}>
+                  <X color={theme.colors.text} size={18} strokeWidth={2.4} />
+                </Pressable>
+              </View>
+
+              {[
+                [
+                  'Add activity',
+                  'Schedule outreach, events, visits, training, or follow-ups.',
+                  CalendarPlus,
+                  () => closeAddMenuThen(() => openActivity()),
+                ],
+                [
+                  'Add lead',
+                  'Send a person, business, or organization to Headquarters.',
+                  UserPlus,
+                  () => closeAddMenuThen(openLead),
+                ],
+                [
+                  'Log marketing',
+                  'Track social, email, print, campus, and professional outreach.',
+                  Megaphone,
+                  () => closeAddMenuThen(openMarketing),
+                ],
+              ].map(([title, detail, Icon, action]) => {
+                const IconComponent = Icon as typeof CalendarPlus;
+
+                return (
+                  <Pressable
+                    key={title as string}
+                    onPress={action as () => void}
+                    style={styles.sheetItem}>
+                    <View style={styles.sheetIcon}>
+                      <IconComponent
+                        color={theme.colors.primary}
+                        size={20}
+                        strokeWidth={2.4}
+                      />
+                    </View>
+                    <View style={styles.sheetCopy}>
+                      <Text style={styles.sheetItemTitle}>{title as string}</Text>
+                      <Text style={styles.sheetItemBody}>{detail as string}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+
+              <Pressable
+                onPress={() => {
+                  setAddMenuOpen(false);
+                  setTimeout(() => go('/support'), Platform.OS === 'web' ? 50 : 0);
+                }}
+                style={styles.sheetItem}>
+                <View style={styles.sheetIcon}>
+                  <Headphones
+                    color={theme.colors.primary}
+                    size={20}
+                    strokeWidth={2.4}
+                  />
+                </View>
+                <View style={styles.sheetCopy}>
+                  <Text style={styles.sheetItemTitle}>
+                    Request Headquarters help
+                  </Text>
+                  <Text style={styles.sheetItemBody}>
+                    Ask for help with a lead, event, materials, account, or payout.
                   </Text>
                 </View>
               </Pressable>
             </Pressable>
           </Pressable>
-        )}
+        </View>
       </Modal>
+      )}
 
       <FormModal
         visible={composer === 'activity'}
@@ -2448,6 +3131,7 @@ function createStyles(theme: Theme) {
   return StyleSheet.create({
     screen: {
       flex: 1,
+      position: 'relative',
       backgroundColor: theme.colors.screen,
     },
     previewCanvas: {
@@ -2734,6 +3418,12 @@ function createStyles(theme: Theme) {
       fontSize: 15,
     },
     content: { padding: 14, gap: 14 },
+    contentTablet: {
+      alignSelf: 'center',
+      maxWidth: 920,
+      padding: 22,
+      width: '100%',
+    },
     hero: {
       padding: 18,
       borderRadius: 26,
@@ -2774,7 +3464,7 @@ function createStyles(theme: Theme) {
     },
     heroActions: { marginTop: 15, flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
     button: {
-      minHeight: 42,
+      minHeight: 48,
       paddingHorizontal: 14,
       borderRadius: 999,
       flexDirection: 'row',
@@ -2785,7 +3475,7 @@ function createStyles(theme: Theme) {
     },
     buttonPrimary: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
     buttonSecondary: { backgroundColor: theme.colors.elevatedCard, borderColor: theme.colors.borderStrong },
-    buttonText: { fontFamily: Fonts.extraBold, fontSize: 10 },
+    buttonText: { fontFamily: Fonts.extraBold, fontSize: 11 },
     buttonTextPrimary: { color: '#FFFFFF' },
     pressed: { opacity: 0.8 },
     disabled: { opacity: 0.55 },
@@ -2818,8 +3508,59 @@ function createStyles(theme: Theme) {
     statLabel: { marginTop: 9, color: theme.colors.textSecondary, fontFamily: Fonts.extraBold, fontSize: 8, letterSpacing: 0.7, textTransform: 'uppercase' },
     statValue: { marginTop: 3, color: theme.colors.text, fontFamily: Fonts.extraBold, fontSize: 23 },
     statDetail: { marginTop: 2, color: theme.colors.textSecondary, fontFamily: Fonts.medium, fontSize: 9, lineHeight: 14 },
+    portalLinksSection: {
+      gap: 8,
+      position: 'relative',
+      zIndex: 5,
+    },
+    portalLinksEyebrow: {
+      color: theme.colors.primary,
+      fontFamily: Fonts.extraBold,
+      fontSize: 8,
+      letterSpacing: 0.9,
+      marginBottom: 1,
+    },
+    portalLinkButton: {
+      alignItems: 'center',
+      backgroundColor: theme.colors.elevatedCard,
+      borderColor: theme.colors.border,
+      borderRadius: 17,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 9,
+      minHeight: 62,
+      paddingHorizontal: 11,
+      paddingVertical: 9,
+      elevation: 2,
+      position: 'relative',
+      zIndex: 6,
+    },
+    portalLinkIcon: {
+      alignItems: 'center',
+      backgroundColor: theme.colors.primarySoft,
+      borderRadius: 12,
+      height: 38,
+      justifyContent: 'center',
+      width: 38,
+    },
+    portalLinkCopy: {
+      flex: 1,
+      gap: 2,
+      minWidth: 0,
+    },
+    portalLinkTitle: {
+      color: theme.colors.text,
+      fontFamily: Fonts.extraBold,
+      fontSize: 10,
+    },
+    portalLinkDetail: {
+      color: theme.colors.textSecondary,
+      fontFamily: Fonts.medium,
+      fontSize: 8,
+      lineHeight: 12,
+    },
     tabRow: { gap: 7, paddingRight: 14 },
-    tab: { minHeight: 42, paddingHorizontal: 12, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.colors.elevatedCard, borderWidth: 1, borderColor: theme.colors.border },
+    tab: { minHeight: 46, paddingHorizontal: 12, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.colors.elevatedCard, borderWidth: 1, borderColor: theme.colors.border },
     tabActive: { backgroundColor: theme.colors.chipActive, borderColor: theme.colors.chipActive },
     tabText: { color: theme.colors.textSecondary, fontFamily: Fonts.bold, fontSize: 10 },
     tabTextActive: { color: theme.colors.chipActiveText },
@@ -2870,45 +3611,264 @@ function createStyles(theme: Theme) {
     selectedDateBody: { marginTop: 2, color: theme.colors.textSecondary, fontFamily: Fonts.medium, fontSize: 9 },
     searchBar: { marginTop: 12, minHeight: 44, paddingHorizontal: 12, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: theme.colors.input, borderWidth: 1, borderColor: theme.colors.border },
     searchInput: { flex: 1, color: theme.colors.inputText, fontFamily: Fonts.semiBold, fontSize: 12 },
+    rewardHeaderIcon: {
+      alignItems: 'center',
+      backgroundColor: theme.colors.primarySoft,
+      borderColor: theme.colors.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      height: 44,
+      justifyContent: 'center',
+      width: 44,
+    },
+    rewardQuickGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 9,
+      paddingTop: 12,
+    },
+    rewardQuickCard: {
+      backgroundColor: theme.colors.softCard,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexBasis: 138,
+      flexGrow: 1,
+      minHeight: 112,
+      padding: 13,
+    },
+    rewardQuickValue: {
+      color: theme.colors.text,
+      fontFamily: Fonts.extraBold,
+      fontSize: 24,
+      marginTop: 9,
+    },
+    rewardQuickValueSmall: {
+      color: theme.colors.text,
+      fontFamily: Fonts.extraBold,
+      fontSize: 17,
+      marginTop: 10,
+    },
+    rewardQuickLabel: {
+      color: theme.colors.textSecondary,
+      fontFamily: Fonts.bold,
+      fontSize: 9,
+      lineHeight: 14,
+      marginTop: 3,
+    },
+    payoutCard: {
+      backgroundColor: theme.colors.softCard,
+      borderColor: theme.colors.borderStrong,
+      borderRadius: 22,
+      borderWidth: 1,
+      gap: 12,
+      marginTop: 12,
+      padding: 15,
+    },
+    payoutCardReady: {
+      backgroundColor: theme.colors.primarySoft,
+      borderColor: theme.colors.primary,
+    },
+    payoutTopRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 11,
+    },
+    payoutIcon: {
+      alignItems: 'center',
+      backgroundColor: theme.colors.elevatedCard,
+      borderColor: theme.colors.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      height: 46,
+      justifyContent: 'center',
+      width: 46,
+    },
+    payoutCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    payoutEyebrow: {
+      color: theme.colors.primary,
+      fontFamily: Fonts.extraBold,
+      fontSize: 8,
+      letterSpacing: 0.9,
+      textTransform: 'uppercase',
+    },
+    payoutTitle: {
+      color: theme.colors.text,
+      fontFamily: Fonts.extraBold,
+      fontSize: 18,
+      lineHeight: 23,
+      marginTop: 2,
+    },
+    payoutBody: {
+      color: theme.colors.textSecondary,
+      fontFamily: Fonts.semiBold,
+      fontSize: 11,
+      lineHeight: 17,
+    },
+    rewardSteps: {
+      backgroundColor: theme.colors.softCard,
+      borderColor: theme.colors.border,
+      borderRadius: 20,
+      borderWidth: 1,
+      gap: 9,
+      marginTop: 12,
+      padding: 14,
+    },
+    rewardStepsTitle: {
+      color: theme.colors.text,
+      fontFamily: Fonts.extraBold,
+      fontSize: 15,
+    },
+    rewardStepRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 10,
+    },
+    rewardStepNumber: {
+      alignItems: 'center',
+      backgroundColor: theme.colors.primary,
+      borderRadius: 999,
+      height: 28,
+      justifyContent: 'center',
+      width: 28,
+    },
+    rewardStepNumberText: {
+      color: '#FFFFFF',
+      fontFamily: Fonts.extraBold,
+      fontSize: 10,
+    },
+    rewardStepText: {
+      color: theme.colors.textSecondary,
+      flex: 1,
+      fontFamily: Fonts.bold,
+      fontSize: 10,
+      lineHeight: 16,
+    },
+    noMysteryCard: {
+      alignItems: 'flex-start',
+      backgroundColor: theme.colors.primarySoft,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      marginVertical: 12,
+      padding: 13,
+    },
+    noMysteryCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    noMysteryTitle: {
+      color: theme.colors.text,
+      fontFamily: Fonts.extraBold,
+      fontSize: 13,
+    },
+    noMysteryBody: {
+      color: theme.colors.textSecondary,
+      fontFamily: Fonts.medium,
+      fontSize: 10,
+      lineHeight: 16,
+      marginTop: 3,
+    },
     accuracyNote: { padding: 13, borderRadius: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 9, backgroundColor: theme.colors.primarySoft, borderWidth: 1, borderColor: theme.colors.border },
     accuracyText: { flex: 1, color: theme.colors.text, fontFamily: Fonts.bold, fontSize: 10, lineHeight: 16 },
     bottomSpacer: { height: 100 },
-    bottomNav: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 76, paddingHorizontal: 10, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 18 : 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: theme.colors.tabBar, borderTopWidth: 1, borderColor: theme.colors.tabBarBorder },
+    bottomNav: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, elevation: 20, minHeight: 76, paddingHorizontal: 10, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 18 : 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: theme.colors.tabBar, borderTopWidth: 1, borderColor: theme.colors.tabBarBorder },
     bottomNavItem: { minWidth: 54, alignItems: 'center', justifyContent: 'center', gap: 3 },
     bottomLabel: { color: theme.colors.textSecondary, fontFamily: Fonts.bold, fontSize: 8 },
     bottomLabelActive: { color: theme.colors.primary },
     bottomAdd: { width: 52, height: 52, marginTop: -24, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.primary, borderWidth: 4, borderColor: theme.colors.tabBar },
-    webModalRoot: {
+    webInlineOverlayRoot: {
       alignItems: 'center',
       bottom: 0,
-      height: '100%',
+      elevation: 1000,
       justifyContent: 'center',
       left: 0,
       position: 'absolute',
       right: 0,
       top: 0,
-      width: '100%',
       zIndex: 1000,
+    },
+    webInlinePhoneSurface: {
+      backgroundColor: theme.colors.overlay,
+      borderRadius: 34,
+      height: 844,
+      justifyContent: 'flex-end',
+      maxHeight: 'calc(100vh - 44px)' as never,
+      maxWidth: 414,
+      overflow: 'hidden',
+      width: '100%',
+    },
+    modalViewport: {
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
+      width: '100%',
     },
     webPhoneOverlay: {
       borderRadius: 34,
       flex: 0,
       height: 844,
+      maxHeight: 'calc(100vh - 44px)' as never,
       maxWidth: 414,
       overflow: 'hidden',
       width: '100%',
     },
-    sheetBackdrop: { flex: 1, justifyContent: 'flex-end', padding: 12, backgroundColor: theme.colors.overlay },
-    sheet: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 28 : 18, borderRadius: 26, backgroundColor: theme.colors.elevatedCard, borderWidth: 1, borderColor: theme.colors.border },
+    sheetBackdrop: {
+      backgroundColor: theme.colors.overlay,
+      height: '100%',
+      justifyContent: 'flex-end',
+      padding: 12,
+      width: '100%',
+    },
+    sheet: {
+      alignSelf: 'stretch',
+      backgroundColor: theme.colors.elevatedCard,
+      borderColor: theme.colors.border,
+      borderRadius: 26,
+      borderWidth: 1,
+      maxHeight: '88%',
+      padding: 16,
+      paddingBottom: Platform.OS === 'ios' ? 28 : 18,
+      width: '100%',
+    },
     sheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 2, backgroundColor: theme.colors.borderStrong },
-    sheetTitle: { marginTop: 14, color: theme.colors.text, fontFamily: Fonts.extraBold, fontSize: 21, textAlign: 'center' },
+    sheetHeaderRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 8,
+      justifyContent: 'space-between',
+      marginTop: 10,
+    },
+    sheetTitle: {
+      color: theme.colors.text,
+      flex: 1,
+      fontFamily: Fonts.extraBold,
+      fontSize: 20,
+      textAlign: 'left',
+    },
+    sheetCloseButton: {
+      alignItems: 'center',
+      backgroundColor: theme.colors.softCard,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 36,
+      justifyContent: 'center',
+      width: 36,
+    },
     sheetItem: { marginTop: 10, padding: 12, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: theme.colors.softCard, borderWidth: 1, borderColor: theme.colors.border },
     sheetIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.primarySoft },
     sheetCopy: { flex: 1 },
     sheetItemTitle: { color: theme.colors.text, fontFamily: Fonts.extraBold, fontSize: 13 },
     sheetItemBody: { marginTop: 2, color: theme.colors.textSecondary, fontFamily: Fonts.medium, fontSize: 9, lineHeight: 14 },
-    modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: theme.colors.overlay },
-    modalCard: { width: '100%', maxHeight: '93%', alignSelf: 'center', maxWidth: Platform.OS === 'web' ? 560 : undefined, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: theme.colors.elevatedCard, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
+    modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: theme.colors.overlay, width: '100%' },
+    modalCard: { width: '100%', maxHeight: '93%', alignSelf: 'center', maxWidth: Platform.OS === 'web' ? 414 : 720, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: theme.colors.elevatedCard, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
+    modalScroll: { flex: 1, minHeight: 0 },
     modalHeader: { padding: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderBottomWidth: 1, borderColor: theme.colors.border },
     modalHeaderCopy: { flex: 1 },
     modalTitle: { marginTop: 4, color: theme.colors.text, fontFamily: Fonts.extraBold, fontSize: 21, lineHeight: 26 },
