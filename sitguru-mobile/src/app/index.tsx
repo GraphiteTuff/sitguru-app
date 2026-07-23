@@ -91,6 +91,9 @@ const sitGuruLogoLight =
 const sitGuruLogoDark =
   require('../assets/images/sitguru-logo-dark.png') as ImageSourcePropType;
 
+const pawBackgroundAsset =
+  require('../assets/images/paw-background-mark.png') as ImageSourcePropType;
+
 const walksIconAsset =
   require('../assets/images/sitguru-walks-icon.png') as ImageSourcePropType;
 
@@ -342,50 +345,44 @@ export default function HomeScreen() {
               !isWebPreview && styles.phoneShellNative,
             ]}
           >
-            <View pointerEvents="none" style={styles.backgroundPawLayer}>
-              <PawPrint
-                color={styles.backgroundPaw.color}
-                size={34}
-                strokeWidth={1.5}
-                style={[styles.backgroundPaw, styles.backgroundPawOne]}
-              />
-              <PawPrint
-                color={styles.backgroundPaw.color}
-                size={23}
-                strokeWidth={1.5}
-                style={[styles.backgroundPaw, styles.backgroundPawTwo]}
-              />
-              <PawPrint
-                color={styles.backgroundPaw.color}
-                size={29}
-                strokeWidth={1.5}
-                style={[styles.backgroundPaw, styles.backgroundPawThree]}
-              />
-              <PawPrint
-                color={styles.backgroundPaw.color}
-                size={21}
-                strokeWidth={1.5}
-                style={[styles.backgroundPaw, styles.backgroundPawFour]}
-              />
-              <PawPrint
-                color={styles.backgroundPaw.color}
-                size={31}
-                strokeWidth={1.5}
-                style={[styles.backgroundPaw, styles.backgroundPawFive]}
-              />
-              <PawPrint
-                color={styles.backgroundPaw.color}
-                size={20}
-                strokeWidth={1.5}
-                style={[styles.backgroundPaw, styles.backgroundPawSix]}
-              />
-            </View>
-
             <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.scrollCanvas}>
+                <View
+                  pointerEvents="none"
+                  style={styles.backgroundPawLayer}
+                >
+                  {[
+                    { positionStyle: styles.backgroundPawOne, size: 46 },
+                    { positionStyle: styles.backgroundPawTwo, size: 29 },
+                    { positionStyle: styles.backgroundPawThree, size: 38 },
+                    { positionStyle: styles.backgroundPawFour, size: 25 },
+                    { positionStyle: styles.backgroundPawFive, size: 43 },
+                    { positionStyle: styles.backgroundPawSix, size: 30 },
+                    { positionStyle: styles.backgroundPawSeven, size: 36 },
+                    { positionStyle: styles.backgroundPawEight, size: 27 },
+                    { positionStyle: styles.backgroundPawNine, size: 35 },
+                  ].map(({ positionStyle, size }, index) => (
+                    <Image
+                      key={`background-paw-${index}`}
+                      resizeMode="contain"
+                      source={pawBackgroundAsset}
+                      style={[
+                        styles.backgroundPaw,
+                        positionStyle,
+                        {
+                          height: size,
+                          width: size,
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+
+                <View style={styles.contentLayer}>
           {isWebPreview ? (
             <View style={styles.statusBar}>
               <Text style={styles.statusTime}>9:41</Text>
@@ -887,6 +884,8 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.bottomSpacer} />
+                </View>
+              </View>
         </ScrollView>
 
         <View style={styles.bottomNav}>
@@ -1117,6 +1116,11 @@ function createStyles(
       position: 'relative',
       width: '100%',
     },
+    scrollCanvas: {
+      overflow: 'hidden',
+      position: 'relative',
+      width: '100%',
+    },
     backgroundPawLayer: {
       bottom: 0,
       left: 0,
@@ -1127,38 +1131,58 @@ function createStyles(
       zIndex: 0,
     },
     backgroundPaw: {
-      color: isDark ? 'rgba(88,213,138,0.055)' : 'rgba(8,116,73,0.045)',
+      opacity: isDark ? 0.2 : 0.12,
       position: 'absolute',
+      tintColor: isDark ? '#48C77B' : '#6A9D78',
     },
     backgroundPawOne: {
-      right: 28,
-      top: 98,
-      transform: [{ rotate: '14deg' }],
-    },
-    backgroundPawTwo: {
-      left: 24,
-      top: 332,
-      transform: [{ rotate: '-18deg' }],
-    },
-    backgroundPawThree: {
-      right: 18,
-      top: 620,
-      transform: [{ rotate: '22deg' }],
-    },
-    backgroundPawFour: {
-      left: 42,
-      top: 790,
-      transform: [{ rotate: '-8deg' }],
-    },
-    backgroundPawFive: {
-      right: 74,
-      top: 980,
+      right: 25,
+      top: 72,
       transform: [{ rotate: '18deg' }],
     },
-    backgroundPawSix: {
-      left: 30,
-      top: 1210,
+    backgroundPawTwo: {
+      left: 15,
+      top: 248,
       transform: [{ rotate: '-16deg' }],
+    },
+    backgroundPawThree: {
+      right: 14,
+      top: 456,
+      transform: [{ rotate: '25deg' }],
+    },
+    backgroundPawFour: {
+      left: 28,
+      top: 638,
+      transform: [{ rotate: '-10deg' }],
+    },
+    backgroundPawFive: {
+      right: 29,
+      top: 813,
+      transform: [{ rotate: '17deg' }],
+    },
+    backgroundPawSix: {
+      left: 11,
+      top: 994,
+      transform: [{ rotate: '-22deg' }],
+    },
+    backgroundPawSeven: {
+      right: 18,
+      top: 1085,
+      transform: [{ rotate: '12deg' }],
+    },
+    backgroundPawEight: {
+      left: 44,
+      top: 1240,
+      transform: [{ rotate: '-14deg' }],
+    },
+    backgroundPawNine: {
+      right: 34,
+      top: 1390,
+      transform: [{ rotate: '24deg' }],
+    },
+    contentLayer: {
+      position: 'relative',
+      zIndex: 1,
     },
     phoneShellNative: {
       borderRadius: 0,
@@ -1171,8 +1195,6 @@ function createStyles(
       paddingBottom: 104,
       paddingHorizontal: isTablet ? 24 : 0,
       paddingTop: Platform.OS === 'web' ? 12 : 6,
-      position: 'relative',
-      zIndex: 1,
     },
 
     statusBar: {
