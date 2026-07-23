@@ -1,3 +1,4 @@
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
@@ -12,11 +13,13 @@ import {
   ShieldCheck,
   UsersRound,
 } from 'lucide-react-native';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Image,
   ImageSourcePropType,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -58,6 +61,14 @@ type ServiceCard = {
   icon: 'walks' | 'dropIns' | 'sitting' | 'boarding';
 };
 
+type SocialIconName = ComponentProps<typeof FontAwesome6>['name'];
+
+type SocialLink = {
+  icon: SocialIconName;
+  label: string;
+  url: string;
+};
+
 const heroCareVideoAsset = require(
   '../assets/videos/sitguru-homepage-care.mp4'
 );
@@ -86,6 +97,34 @@ const walksIconAsset =
 const themeOptions: ThemeOption[] = [
   { label: 'Light', value: 'light', icon: 'sun' },
   { label: 'Dark', value: 'dark', icon: 'moon' },
+];
+
+const socialLinks: SocialLink[] = [
+  {
+    icon: 'facebook-f',
+    label: 'Facebook',
+    url: 'https://www.facebook.com/SitGuruOfficial',
+  },
+  {
+    icon: 'instagram',
+    label: 'Instagram',
+    url: 'https://www.instagram.com/sitguruofficial/',
+  },
+  {
+    icon: 'tiktok',
+    label: 'TikTok',
+    url: 'https://www.tiktok.com/@sitguruofficial',
+  },
+  {
+    icon: 'x-twitter',
+    label: 'X',
+    url: 'https://x.com/SitGuruOfficial',
+  },
+  {
+    icon: 'youtube',
+    label: 'YouTube',
+    url: 'https://www.youtube.com/@SitGuruOfficial',
+  },
 ];
 
 const serviceOptions = [
@@ -258,6 +297,23 @@ export default function HomeScreen() {
       pathname: '/find-care',
       params,
     } as never);
+  }
+
+  async function openSocialProfile(link: SocialLink) {
+    try {
+      const supported = await Linking.canOpenURL(link.url);
+
+      if (!supported) {
+        throw new Error('Unsupported social profile URL');
+      }
+
+      await Linking.openURL(link.url);
+    } catch {
+      Alert.alert(
+        `${link.label} could not open`,
+        'Please search for @SitGuruOfficial in the social app.',
+      );
+    }
   }
 
   return (
@@ -795,6 +851,39 @@ export default function HomeScreen() {
               title="Secure checkout"
               styles={styles}
             />
+          </View>
+
+          <View style={styles.socialSection}>
+            <View style={styles.socialHeadingRow}>
+              <Text style={styles.socialTitle}>Follow SitGuru</Text>
+
+              <View style={styles.socialIdentityRow}>
+                <Text style={styles.socialHandle}>@SitGuruOfficial</Text>
+                <Text style={styles.socialIdentityDot}>•</Text>
+                <Text style={styles.socialHashtag}>#SitGuruOfficial</Text>
+              </View>
+            </View>
+
+            <View style={styles.socialIconRow}>
+              {socialLinks.map((link) => (
+                <Pressable
+                  key={link.label}
+                  accessibilityHint={`Opens SitGuru on ${link.label}`}
+                  accessibilityLabel={`Follow SitGuru on ${link.label}`}
+                  accessibilityRole="link"
+                  onPress={() => void openSocialProfile(link)}
+                  style={({ pressed }) => [
+                    styles.socialIconButton,
+                    pressed && styles.pressed,
+                  ]}>
+                  <FontAwesome6
+                    color={styles.socialGlyph.color}
+                    name={link.icon}
+                    size={19}
+                  />
+                </Pressable>
+              ))}
+            </View>
           </View>
 
           <View style={styles.bottomSpacer} />
@@ -1783,6 +1872,72 @@ function createStyles(
       backgroundColor: border,
       height: 48,
       width: 1,
+    },
+
+    socialGlyph: {
+      color: isDark ? '#58D58A' : BrandColors.greenDark,
+    },
+    socialSection: {
+      gap: 10,
+      marginHorizontal: 18,
+      marginTop: 13,
+      paddingHorizontal: 2,
+      paddingVertical: 2,
+    },
+    socialHeadingRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      justifyContent: 'space-between',
+    },
+    socialTitle: {
+      color: title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 13,
+    },
+    socialIdentityRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 4,
+    },
+    socialHandle: {
+      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 8,
+    },
+    socialIdentityDot: {
+      color: muted,
+      fontFamily: AppFonts.bold,
+      fontSize: 8,
+    },
+    socialHashtag: {
+      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 8,
+    },
+    socialIconRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 10,
+      justifyContent: 'space-between',
+    },
+    socialIconButton: {
+      alignItems: 'center',
+      backgroundColor: isDark ? '#123E2A' : '#E7F7EC',
+      borderColor: isDark ? '#2E6C4B' : '#CDEBD7',
+      borderRadius: 999,
+      borderWidth: 1,
+      flex: 1,
+      height: 46,
+      justifyContent: 'center',
+      maxWidth: 54,
+      minWidth: 46,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: isDark ? 0.16 : 0.05,
+      shadowRadius: 7,
     },
 
     pressed: {
