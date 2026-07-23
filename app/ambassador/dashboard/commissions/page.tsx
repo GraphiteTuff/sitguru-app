@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   AlertTriangle,
@@ -43,6 +44,34 @@ type AmbassadorRecord = {
   payouts_enabled?: boolean | string | number | null;
 };
 
+type AmbassadorPayoutProvider =
+  | "stripe"
+  | "paypal"
+  | "venmo"
+  | "set_up_later";
+
+type AmbassadorPayoutAccount = {
+  provider?: "stripe" | "paypal" | "venmo" | null;
+  providerAccountId?: string | null;
+  providerEmail?: string | null;
+  providerPhone?: string | null;
+  onboardingStatus?: string | null;
+  accountStatus?: string | null;
+  payoutsEnabled?: boolean;
+};
+
+type AmbassadorPayoutSetup = {
+  selectedProvider?: AmbassadorPayoutProvider;
+  setupComplete?: boolean;
+  readyAccount?: AmbassadorPayoutAccount | null;
+};
+
+type AmbassadorPayoutSetupResponse = {
+  success: boolean;
+  error?: string;
+  setup?: AmbassadorPayoutSetup;
+};
+
 type RewardRow = Record<string, unknown>;
 type ReferralRow = Record<string, unknown>;
 type RewardBucket = "pending" | "approved" | "ready" | "paid" | "excluded";
@@ -68,6 +97,175 @@ type CommissionItem = {
   rawDate: string;
   note: string;
 };
+
+function normalizeBaseUrl(value?: string | null) {
+  if (!value) return null;
+
+  const candidate =
+    value.startsWith("http://") || value.startsWith("https://")
+      ? value
+      : `https://${value}`;
+
+  try {
+    const parsed = new URL(candidate);
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+function safeHostname(value?: string | null) {
+  const normalized = normalizeBaseUrl(value);
+  if (!normalized) return "";
+
+  try {
+    return new URL(normalized).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+async function getSharedApiOrigin() {
+  const requestHeaders = await headers();
+  const forwardedHost = requestHeaders
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    ?.trim();
+  const host = forwardedHost || requestHeaders.get("host") || "";
+  const hostname = (host.split(":")[0] || "").toLowerCase();
+
+  const configuredVercelHost = safeHostname(process.env.VERCEL_URL);
+  const isKnownLocalHost =
+    hostname === "localhost" || hostname === "127.0.0.1";
+  const isSitGuruHost =
+    hostname === "sitguru.com" ||
+    hostname === "www.sitguru.com" ||
+    hostname.endsWith(".sitguru.com");
+  const isCurrentVercelDeployment =
+    Boolean(configuredVercelHost) && hostname === configuredVercelHost;
+
+  if (host && (isKnownLocalHost || isSitGuruHost || isCurrentVercelDeployment)) {
+    const forwardedProto = requestHeaders
+      .get("x-forwarded-proto")
+      ?.split(",")[0]
+      ?.trim();
+    const protocol =
+      forwardedProto || (isKnownLocalHost ? "http" : "https");
+
+    return `${protocol}://${host}`;
+  }
+
+  return (
+    normalizeBaseUrl(process.env.VERCEL_URL) ||
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
+    normalizeBaseUrl(process.env.SITE_URL) ||
+    "https://www.sitguru.com"
+  );
+}
+
+async function getAmbassadorPayoutSetup(accessToken: string) {
+  try {
+    const origin = await getSharedApiOrigin();
+    const response = await fetch(
+      `${origin}/api/payouts/setup?role=ambassador`,
+      {
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    const responseText = await response.text();
+    let payload: AmbassadorPayoutSetupResponse | null = null;
+
+    try {
+      payload = responseText
+        ? (JSON.parse(responseText) as AmbassadorPayoutSetupResponse)
+        : null;
+    } catch {
+      console.error("Ambassador commissions payout setup returned non-JSON:", {
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+        responseText: responseText.slice(0, 1000),
+      });
+    }
+
+    if (!payload || !response.ok || !payload.success) {
+      return {
+        setup: null,
+        warning:
+          payload?.error ||
+          "Your payout setup could not be loaded right now.",
+      };
+    }
+
+    return {
+      setup: payload.setup || null,
+      warning: "",
+    };
+  } catch (error) {
+    console.error("Ambassador commissions payout setup failed:", error);
+
+    return {
+      setup: null,
+      warning: "Your payout setup could not be loaded right now.",
+    };
+  }
+}
+
+function payoutMethodDetails(setup: AmbassadorPayoutSetup | null) {
+  const provider =
+    setup?.readyAccount?.provider ||
+    setup?.selectedProvider ||
+    "set_up_later";
+
+  if (provider === "stripe") {
+    return {
+      label: "Bank or debit card",
+      shortLabel: "Bank or card",
+      logoPath: "/images/payments/stripe.svg",
+      detail:
+        setup?.readyAccount?.providerAccountId ||
+        "Powered securely by Stripe",
+    };
+  }
+
+  if (provider === "paypal") {
+    return {
+      label: "PayPal",
+      shortLabel: "PayPal",
+      logoPath: "/images/payments/paypal.svg",
+      detail:
+        setup?.readyAccount?.providerEmail ||
+        "Use the PayPal account you already have",
+    };
+  }
+
+  if (provider === "venmo") {
+    return {
+      label: "Venmo",
+      shortLabel: "Venmo",
+      logoPath: "/images/payments/venmo.svg",
+      detail:
+        setup?.readyAccount?.providerPhone ||
+        setup?.readyAccount?.providerEmail ||
+        "Connect an eligible U.S. mobile number",
+    };
+  }
+
+  return {
+    label: "Not picked yet",
+    shortLabel: "Pick a payout",
+    logoPath: "/images/payments/stripe.svg",
+    detail: "Choose bank or card, PayPal, or Venmo",
+  };
+}
 
 function asString(value: unknown) {
   if (typeof value === "string") return value.trim();
@@ -455,22 +653,6 @@ async function loadCommissionData(ambassadorId: string) {
   };
 }
 
-function getPayoutReadiness(ambassador: AmbassadorRecord) {
-  const accountId =
-    asString(ambassador.stripe_account_id) ||
-    asString(ambassador.stripe_connect_account_id);
-  const onboardingComplete = asBoolean(
-    ambassador.stripe_onboarding_complete,
-  );
-  const payoutsEnabled =
-    asBoolean(ambassador.stripe_payouts_enabled) ||
-    asBoolean(ambassador.payouts_enabled);
-
-  return {
-    ready: Boolean(accountId) && onboardingComplete && payoutsEnabled,
-  };
-}
-
 function filterItems(items: CommissionItem[], params: SearchParamsShape) {
   const q = asString(params.q).toLowerCase();
   const status = asString(params.status).toLowerCase();
@@ -524,7 +706,7 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="min-w-[220px] snap-start rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm sm:min-w-0 sm:rounded-[1.5rem] sm:p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-black text-slate-800">{title}</p>
@@ -565,8 +747,23 @@ export default async function AmbassadorCommissionsPage({
   const ambassador = await getAmbassadorForUser(user.id, user.email);
   if (!ambassador?.id) redirect("/login/route?preferred=ambassador");
 
-  const data = await loadCommissionData(ambassador.id);
-  const payoutReadiness = getPayoutReadiness(ambassador);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const [data, payoutResult] = await Promise.all([
+    loadCommissionData(ambassador.id),
+    session?.access_token
+      ? getAmbassadorPayoutSetup(session.access_token)
+      : Promise.resolve({
+          setup: null,
+          warning: "Sign in again to review your payout setup.",
+        }),
+  ]);
+
+  const payoutSetup = payoutResult.setup;
+  const payoutReady = Boolean(payoutSetup?.setupComplete);
+  const payoutMethod = payoutMethodDetails(payoutSetup);
   const visibleItems = filterItems(data.items, params);
 
   const totalByBucket = (bucket: RewardBucket) =>
@@ -584,7 +781,7 @@ export default async function AmbassadorCommissionsPage({
   ).length;
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-3 py-4 text-slate-950 sm:px-6 sm:py-6 lg:px-8">
       <div className="mx-auto max-w-[1500px] space-y-6">
         <Link
           href="/ambassador/dashboard"
@@ -595,69 +792,87 @@ export default async function AmbassadorCommissionsPage({
         </Link>
 
         <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-8 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#b9f8df_0%,#d9f8ef_48%,#bde9ff_100%)] px-8 py-10 lg:grid-cols-[1.25fr_0.75fr] lg:items-center xl:px-10">
+          <div className="grid gap-6 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#b9f8df_0%,#d9f8ef_48%,#bde9ff_100%)] px-4 py-6 sm:px-8 sm:py-10 lg:grid-cols-[1.25fr_0.75fr] lg:items-center xl:px-10">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.26em] text-emerald-800">
-                Ambassador Commissions & Rewards
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-800 sm:text-sm sm:tracking-[0.26em]">
+                Your Rewards
               </p>
-              <h1 className="mt-4 text-5xl font-black tracking-[-0.055em] text-slate-950 md:text-6xl">
-                See exactly what you earned and why.
+              <h1 className="mt-3 text-4xl font-black tracking-[-0.05em] text-slate-950 sm:mt-4 sm:text-5xl md:text-6xl">
+                See what you earned.
               </h1>
-              <p className="mt-5 max-w-4xl text-base font-semibold leading-8 text-slate-800 md:text-lg">
-                Review your own canonical commission, referral, social,
-                partner, bonus, approval, and payout records. This page never
-                exposes SitGuru-wide revenue, Guru payouts, platform fees, or
-                another Ambassador’s financial information.
+              <p className="mt-4 max-w-4xl text-sm font-semibold leading-6 text-slate-800 sm:mt-5 sm:text-base sm:leading-8 md:text-lg">
+                Track every verified reward, see what&apos;s ready, and know
+                what&apos;s already paid.
               </p>
             </div>
 
-            <div className="rounded-[2rem] border border-white/70 bg-white/95 p-7 shadow-xl">
-              <Wallet className="h-10 w-10 text-emerald-700" />
-              <h2 className="mt-4 text-2xl font-black text-slate-950">
-                {payoutReadiness.ready
-                  ? "Payout setup is ready"
-                  : "Payout setup needs attention"}
-              </h2>
-              <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
-                Commission approval and Stripe readiness remain separate. A
-                connected payout account never automatically marks a commission
-                paid.
+            <div className="rounded-[1.5rem] border border-white/70 bg-white/95 p-5 shadow-xl sm:rounded-[2rem] sm:p-7">
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 p-2 ring-1 ring-emerald-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={payoutMethod.logoPath}
+                    alt={payoutMethod.label}
+                    className="max-h-7 max-w-[76px] object-contain"
+                  />
+                </div>
+
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                    Get paid
+                  </p>
+                  <h2 className="mt-1 text-xl font-black text-slate-950 sm:text-2xl">
+                    {payoutReady
+                      ? "You’re ready to get paid"
+                      : "Pick how you get paid"}
+                  </h2>
+                </div>
+              </div>
+
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
+                {payoutReady
+                  ? `${payoutMethod.label} · ${payoutMethod.detail}`
+                  : "Choose bank or card, PayPal, or Venmo. You can switch later."}
               </p>
+
               <Link
                 href="/ambassador/dashboard/payouts"
-                className="mt-5 inline-flex items-center rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800"
+                className="mt-4 inline-flex min-h-[50px] w-full items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800 sm:w-auto"
               >
-                Review Payout Setup
+                {payoutReady ? "Manage payout" : "Pick a payout"}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </div>
           </div>
         </section>
 
-        {data.warning ? (
+        {data.warning || payoutResult.warning ? (
           <section className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900">
             <AlertTriangle className="mr-2 inline h-5 w-5" />
-            {data.warning}
+            {[data.warning, payoutResult.warning].filter(Boolean).join(" ")}
           </section>
         ) : null}
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <StatCard title="Pending Review" value={money(pendingAmount)} description="Not approved or payable yet" icon={<Clock3 className="h-6 w-6" />} />
-          <StatCard title="Approved" value={money(approvedAmount)} description="Confirmed but not queued or paid" icon={<BadgeDollarSign className="h-6 w-6" />} />
-          <StatCard title="Ready for Payout" value={money(readyAmount)} description="Approved and queued" icon={<HandCoins className="h-6 w-6" />} />
-          <StatCard title="Paid" value={money(paidAmount)} description="Recorded as paid by SitGuru" icon={<CheckCircle2 className="h-6 w-6" />} />
-          <StatCard title="Confirmed Total" value={money(confirmedAmount)} description="Approved, ready, and paid only" icon={<Sparkles className="h-6 w-6" />} />
+        <section
+          aria-label="Reward totals"
+          className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 xl:grid-cols-5"
+        >
+          <StatCard title="Pending" value={money(pendingAmount)} description="Still being checked" icon={<Clock3 className="h-6 w-6" />} />
+          <StatCard title="Approved" value={money(approvedAmount)} description="Approved, not queued yet" icon={<BadgeDollarSign className="h-6 w-6" />} />
+          <StatCard title="Ready to Pay" value={money(readyAmount)} description="Queued for payment" icon={<HandCoins className="h-6 w-6" />} />
+          <StatCard title="Paid" value={money(paidAmount)} description="Rewards already sent" icon={<CheckCircle2 className="h-6 w-6" />} />
+          <StatCard title="Total Earned" value={money(confirmedAmount)} description="Approved, ready, and paid" icon={<Sparkles className="h-6 w-6" />} />
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1fr_0.4fr]">
+        <section className="grid gap-4 xl:grid-cols-[1fr_0.36fr]">
           <form
             action="/ambassador/dashboard/commissions"
-            className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
+            className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[2rem] sm:p-6"
           >
             <div className="flex items-center gap-3">
               <Filter className="h-6 w-6 text-emerald-700" />
-              <h2 className="text-2xl font-black text-slate-950">
-                Find a Commission or Reward
+              <h2 className="text-xl font-black text-slate-950 sm:text-2xl">
+                Search your rewards
               </h2>
             </div>
 
@@ -668,7 +883,7 @@ export default async function AmbassadorCommissionsPage({
                   type="text"
                   name="q"
                   defaultValue={params.q || ""}
-                  placeholder="Search person, source, type, status..."
+                  placeholder="Search rewards..."
                   className="h-12 w-full rounded-2xl border border-slate-200 pl-11 pr-4 text-sm font-semibold outline-none focus:border-emerald-300 focus:ring-4 focus:ring-emerald-50"
                 />
               </label>
@@ -678,7 +893,7 @@ export default async function AmbassadorCommissionsPage({
                 defaultValue={params.status || "all"}
                 className="h-12 rounded-2xl border border-slate-200 px-4 text-sm font-bold"
               >
-                <option value="all">All Statuses</option>
+                <option value="all">All statuses</option>
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
                 <option value="ready">Ready</option>
@@ -691,20 +906,20 @@ export default async function AmbassadorCommissionsPage({
                 defaultValue={params.category || "all"}
                 className="h-12 rounded-2xl border border-slate-200 px-4 text-sm font-bold"
               >
-                <option value="all">All Categories</option>
+                <option value="all">All types</option>
                 <option value="commission">Commissions</option>
-                <option value="referral">Referral Rewards</option>
-                <option value="social">Social Rewards</option>
-                <option value="partner">Partner Rewards</option>
+                <option value="referral">Referrals</option>
+                <option value="social">Social</option>
+                <option value="partner">Partners</option>
                 <option value="bonus">Bonuses</option>
                 <option value="other">Other</option>
               </select>
 
               <button
                 type="submit"
-                className="h-12 rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white hover:bg-emerald-800"
+                className="h-12 touch-manipulation rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800 active:scale-[0.99]"
               >
-                Apply
+                Show rewards
               </button>
             </div>
           </form>
@@ -712,11 +927,10 @@ export default async function AmbassadorCommissionsPage({
           <section className="rounded-[2rem] border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
             <ShieldCheck className="h-7 w-7 text-emerald-700" />
             <h2 className="mt-3 text-xl font-black text-emerald-950">
-              Your data only
+              Just your rewards
             </h2>
-            <p className="mt-2 text-sm font-semibold leading-7 text-emerald-900">
-              Every query is restricted to the signed-in Ambassador’s own
-              `ambassador_id`.
+            <p className="mt-2 text-sm font-semibold leading-6 text-emerald-900">
+              You only see rewards connected to your Ambassador account.
             </p>
           </section>
         </section>
@@ -725,10 +939,10 @@ export default async function AmbassadorCommissionsPage({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                Commission Ledger
+                Reward activity
               </p>
-              <h2 className="mt-1 text-3xl font-black text-slate-950">
-                {visibleItems.length} visible record
+              <h2 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">
+                {visibleItems.length} reward
                 {visibleItems.length === 1 ? "" : "s"}
               </h2>
             </div>
@@ -736,7 +950,7 @@ export default async function AmbassadorCommissionsPage({
               href="/ambassador/dashboard/earnings"
               className="inline-flex items-center text-sm font-black text-emerald-700"
             >
-              Open Earnings Summary
+              View earnings
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </div>
@@ -746,7 +960,7 @@ export default async function AmbassadorCommissionsPage({
               {visibleItems.map((item) => (
                 <article
                   key={item.id}
-                  className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-sm"
+                  className="rounded-[1.3rem] border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[1.4rem] sm:p-5"
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -785,11 +999,11 @@ export default async function AmbassadorCommissionsPage({
           ) : (
             <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-10 text-center">
               <p className="text-xl font-black text-slate-950">
-                No matching commission records
+                No rewards found
               </p>
               <p className="mt-2 text-sm font-semibold text-slate-600">
-                Adjust the filters or return after SitGuru creates and reviews
-                a canonical commission or reward record.
+                Try a different search or check back after your next verified
+                reward.
               </p>
             </div>
           )}
