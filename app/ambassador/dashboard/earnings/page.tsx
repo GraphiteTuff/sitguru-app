@@ -19,12 +19,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import {
-  AMBASSADOR_REWARD_ONBOARDING_STEPS,
-  AMBASSADOR_REWARDS_HEADING,
-  AMBASSADOR_REWARDS_SUPPORTING_TEXT,
-  getAmbassadorRewardMethods,
-} from "@/lib/payments/payment-methods";
+import { getAmbassadorRewardMethods } from "@/lib/payments/payment-methods";
 
 export const dynamic = "force-dynamic";
 
@@ -89,10 +84,11 @@ type RewardsResult = {
   warning: string;
 };
 
-type AmbassadorPayoutProvider = "paypal" | "venmo" | "set_up_later";
+type AmbassadorPayoutProvider = "stripe" | "paypal" | "venmo" | "set_up_later";
 
 type AmbassadorPayoutAccount = {
-  provider?: "paypal" | "venmo" | null;
+  provider?: "stripe" | "paypal" | "venmo" | null;
+  providerAccountId?: string | null;
   providerEmail?: string | null;
   providerPhone?: string | null;
   onboardingStatus?: string | null;
@@ -287,6 +283,7 @@ async function saveAmbassadorPayoutProvider(formData: FormData) {
   const continueToSetup =
     String(formData.get("continueToSetup") || "") === "true";
   const provider: AmbassadorPayoutProvider | null =
+    requestedProvider === "stripe" ||
     requestedProvider === "paypal" ||
     requestedProvider === "venmo" ||
     requestedProvider === "set_up_later"
@@ -662,7 +659,7 @@ function StatCard({
   icon: ReactNode;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="min-w-[220px] snap-start rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm sm:min-w-0">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-black !text-slate-800">{title}</p>
@@ -787,8 +784,105 @@ function RewardGroup({
   );
 }
 
-function providerFromMethodId(methodId: string): "paypal" | "venmo" {
-  return methodId === "venmo_rewards" ? "venmo" : "paypal";
+type RewardPaymentChoice = {
+  provider: Exclude<AmbassadorPayoutProvider, "set_up_later">;
+  label: string;
+  shortLabel: string;
+  description: string;
+  setupSummary: string;
+  logoPath: string;
+  buttonLabel: string;
+};
+
+const QUICK_REWARD_SETUP_STEPS = [
+  {
+    step: 1,
+    title: "Pick a way",
+    description: "Choose bank or card, PayPal, or Venmo.",
+  },
+  {
+    step: 2,
+    title: "Connect it",
+    description: "Finish the secure setup with your provider.",
+  },
+  {
+    step: 3,
+    title: "Get paid",
+    description: "Approved rewards go to the option you picked.",
+  },
+] as const;
+
+function getRewardPaymentChoices(): RewardPaymentChoice[] {
+  const sharedMethods = getAmbassadorRewardMethods();
+  const sharedPayPal = sharedMethods.find(
+    (method) => method.id === "paypal_rewards",
+  );
+  const sharedVenmo = sharedMethods.find(
+    (method) => method.id === "venmo_rewards",
+  );
+
+  return [
+    {
+      provider: "stripe",
+      label: "Bank or debit card",
+      shortLabel: "Bank or card",
+      description: "Send rewards to your bank or eligible debit card.",
+      setupSummary: "Powered securely by Stripe.",
+      logoPath: "/images/payments/stripe.svg",
+      buttonLabel: "Pick bank or card",
+    },
+    {
+      provider: "paypal",
+      label: sharedPayPal?.label || "PayPal",
+      shortLabel: "PayPal",
+      description: "Send rewards straight to your PayPal.",
+      setupSummary:
+        sharedPayPal?.setupSummary || "Use the PayPal account you already have.",
+      logoPath: "/images/payments/paypal.svg",
+      buttonLabel: "Pick PayPal",
+    },
+    {
+      provider: "venmo",
+      label: sharedVenmo?.label || "Venmo",
+      shortLabel: "Venmo",
+      description: "Get approved rewards through Venmo.",
+      setupSummary:
+        sharedVenmo?.setupSummary || "Connect an eligible U.S. mobile number.",
+      logoPath: "/images/payments/venmo.svg",
+      buttonLabel: "Pick Venmo",
+    },
+  ];
+}
+
+function rewardProviderDetails(account: AmbassadorPayoutAccount) {
+  if (account.provider === "stripe") {
+    return {
+      label: "Bank or debit card",
+      logoPath: "/images/payments/stripe.svg",
+      destination:
+        account.providerAccountId || "Connected securely with Stripe",
+    };
+  }
+
+  if (account.provider === "venmo") {
+    return {
+      label: "Venmo",
+      logoPath: "/images/payments/venmo.svg",
+      destination:
+        account.providerPhone ||
+        account.providerEmail ||
+        "Connected Venmo account",
+    };
+  }
+
+  return {
+    label: "PayPal",
+    logoPath: "/images/payments/paypal.svg",
+    destination:
+      account.providerEmail ||
+      account.providerPhone ||
+      "Connected PayPal account",
+  };
 }
 
 function RewardPayoutSetupCard({
@@ -802,39 +896,34 @@ function RewardPayoutSetupCard({
   saveStatus?: string | null;
   approvedAmount: number;
 }) {
-  const methods = getAmbassadorRewardMethods();
+  const choices = getRewardPaymentChoices();
   const selectedProvider = setup?.selectedProvider || "set_up_later";
   const readyAccount = setup?.readyAccount || null;
   const setupComplete = Boolean(setup?.setupComplete);
+
   const successMessage =
-    saveStatus === "paypal"
-      ? "PayPal is now your selected reward payout option."
-      : saveStatus === "venmo"
-        ? "Venmo is now your selected reward payout option."
-        : saveStatus === "set_up_later"
-          ? "No problem. You can set up reward payments later."
-          : null;
+    saveStatus === "stripe"
+      ? "Bank or card is now your payout choice."
+      : saveStatus === "paypal"
+        ? "PayPal is now your payout choice."
+        : saveStatus === "venmo"
+          ? "Venmo is now your payout choice."
+          : saveStatus === "set_up_later"
+            ? "Saved. You can finish this later."
+            : null;
+
   const errorMessage =
     saveStatus === "error"
-      ? "SitGuru could not save that choice. Please try again."
+      ? "That did not save. Try again."
       : saveStatus === "invalid"
-        ? "Choose PayPal, Venmo, or set up reward payments later."
+        ? "Pick bank or card, PayPal, Venmo, or do this later."
         : loadError || null;
 
   if (setupComplete && readyAccount) {
-    const providerLabel =
-      readyAccount.provider === "venmo" ? "Venmo" : "PayPal";
-    const providerLogo =
-      readyAccount.provider === "venmo"
-        ? "/images/payments/venmo.svg"
-        : "/images/payments/paypal.svg";
-    const destinationLabel =
-      readyAccount.providerEmail ||
-      readyAccount.providerPhone ||
-      "Connected account";
+    const provider = rewardProviderDetails(readyAccount);
 
     return (
-      <section className="rounded-[1.5rem] border border-emerald-200 bg-white p-4 shadow-sm sm:p-5">
+      <section className="rounded-[1.4rem] border border-emerald-200 bg-white p-4 shadow-sm sm:p-5">
         {successMessage ? (
           <div
             role="status"
@@ -853,21 +942,21 @@ function RewardPayoutSetupCard({
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-start gap-3 sm:items-center">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,430px)] lg:items-center">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 p-2 ring-1 ring-emerald-100">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={providerLogo}
-                alt={providerLabel}
-                className="max-h-7 max-w-[72px] object-contain"
+                src={provider.logoPath}
+                alt={provider.label}
+                className="max-h-7 max-w-[76px] object-contain"
               />
             </div>
 
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-lg font-black !text-slate-950">
-                  Reward payments ready
+                  You&apos;re ready to get paid
                 </p>
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-emerald-700">
                   <CheckCircle2 className="h-3.5 w-3.5" />
@@ -876,15 +965,15 @@ function RewardPayoutSetupCard({
               </div>
 
               <p className="mt-1 truncate text-sm font-semibold !text-slate-700">
-                {providerLabel} · {destinationLabel}
+                {provider.label} · {provider.destination}
               </p>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center lg:min-w-[410px]">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
             <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3">
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
-                Approved and waiting
+                Ready to pay
               </p>
               <p className="mt-1 text-2xl font-black text-sky-950">
                 {money(approvedAmount)}
@@ -893,9 +982,9 @@ function RewardPayoutSetupCard({
 
             <Link
               href="/ambassador/dashboard/payouts"
-              className="inline-flex min-h-12 items-center justify-center rounded-full border border-emerald-300 bg-white px-5 py-3 text-sm font-black !text-emerald-800 transition hover:bg-emerald-50"
+              className="inline-flex min-h-[50px] items-center justify-center rounded-full border border-emerald-300 bg-white px-5 py-3 text-sm font-black !text-emerald-800 transition hover:bg-emerald-50"
             >
-              Manage reward payments
+              Manage payout
             </Link>
           </div>
         </div>
@@ -904,39 +993,29 @@ function RewardPayoutSetupCard({
   }
 
   return (
-    <section className="rounded-[2rem] border border-emerald-200 bg-white p-5 shadow-sm sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <section className="overflow-hidden rounded-[1.5rem] border border-emerald-200 bg-white p-4 shadow-sm sm:rounded-[2rem] sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.18em] !text-emerald-700">
-            Reward payments
+          <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700 sm:text-sm">
+            Get paid
           </p>
-          <h2 className="mt-2 text-3xl font-black tracking-tight !text-slate-950">
-            {setupComplete
-              ? "Your reward payment account is ready"
-              : AMBASSADOR_REWARDS_HEADING}
+          <h2 className="mt-1.5 text-2xl font-black tracking-tight !text-slate-950 sm:text-3xl">
+            Pick how you get paid
           </h2>
-          <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 !text-slate-700">
-            {AMBASSADOR_REWARDS_SUPPORTING_TEXT} You do not need to set this up
-            when you join. Connect your preferred option when your first
-            approved reward is ready to be paid.
+          <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
+            Choose one now. You can switch later.
           </p>
         </div>
 
-        <span
-          className={`inline-flex w-fit items-center rounded-full border px-4 py-2 text-xs font-black ${
-            setupComplete
-              ? "border-emerald-200 bg-emerald-50 !text-emerald-700"
-              : "border-amber-200 bg-amber-50 !text-amber-700"
-          }`}
-        >
-          {setupComplete ? "Ready" : "Choose an option"}
+        <span className="inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-black !text-amber-700">
+          Pick one
         </span>
       </div>
 
       {successMessage ? (
         <div
           role="status"
-          className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold !text-emerald-800"
+          className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold !text-emerald-800"
         >
           {successMessage}
         </div>
@@ -945,202 +1024,157 @@ function RewardPayoutSetupCard({
       {errorMessage ? (
         <div
           role="alert"
-          className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold !text-rose-700"
+          className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold !text-rose-700"
         >
           {errorMessage}
         </div>
       ) : null}
 
-      <div className="mt-5 rounded-[1.35rem] border border-sky-100 bg-sky-50 p-4">
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-sky-700">
-          Approved and waiting
-        </p>
-        <p className="mt-2 text-3xl font-black text-sky-950">
-          {money(approvedAmount)}
-        </p>
-        <p className="mt-1 text-xs font-bold leading-5 text-sky-800">
-          Approved rewards stay here until SitGuru submits and confirms your
-          payment.
-        </p>
+      <div className="mt-4 rounded-[1.25rem] border border-sky-100 bg-sky-50 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
+              Ready to pay
+            </p>
+            <p className="mt-1 text-2xl font-black text-sky-950 sm:text-3xl">
+              {money(approvedAmount)}
+            </p>
+          </div>
+          <p className="max-w-[180px] text-right text-xs font-bold leading-5 text-sky-800">
+            Approved rewards waiting for your payout choice.
+          </p>
+        </div>
       </div>
 
-      {setupComplete && readyAccount ? (
-        <div className="mt-5 rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 min-w-12 shrink-0 items-center justify-center rounded-2xl bg-white p-2 shadow-sm ring-1 ring-emerald-100">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={
-                    readyAccount.provider === "venmo"
-                      ? "/images/payments/venmo.svg"
-                      : "/images/payments/paypal.svg"
-                  }
-                  alt={
-                    readyAccount.provider === "venmo" ? "Venmo" : "PayPal"
-                  }
-                  className="max-h-7 max-w-[72px] object-contain"
-                />
-              </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {choices.map((choice) => {
+          const selected = selectedProvider === choice.provider;
 
-              <div>
-                <p className="flex items-center gap-2 text-lg font-black !text-slate-950">
-                  {readyAccount.provider === "venmo" ? "Venmo" : "PayPal"} is
-                  ready
-                  <CheckCircle2 className="h-5 w-5 !text-emerald-600" />
-                </p>
-                <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-                  Approved commissions and referral rewards can be sent to your
-                  connected account.
-                </p>
-                {readyAccount.providerEmail ? (
-                  <p className="mt-2 text-sm font-black !text-emerald-800">
-                    {readyAccount.providerEmail}
-                  </p>
-                ) : null}
-                {readyAccount.providerPhone ? (
-                  <p className="mt-2 text-sm font-black !text-emerald-800">
-                    {readyAccount.providerPhone}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            <Link
-              href="/ambassador/dashboard/payouts"
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-300 bg-white px-5 py-2.5 text-sm font-black !text-emerald-800 transition hover:bg-emerald-100"
+          return (
+            <article
+              key={choice.provider}
+              className={`flex h-full flex-col rounded-[1.35rem] border p-4 sm:p-5 ${
+                selected
+                  ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-100"
+                  : "border-slate-200 bg-slate-50"
+              }`}
             >
-              Review reward setup
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {methods.map((method) => {
-            const provider = providerFromMethodId(method.id);
-            const selected = selectedProvider === provider;
-            const logoPath =
-              provider === "venmo"
-                ? "/images/payments/venmo.svg"
-                : "/images/payments/paypal.svg";
-
-            return (
-              <article
-                key={method.id}
-                className={`rounded-[1.5rem] border p-5 ${
-                  selected
-                    ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-100"
-                    : "border-slate-200 bg-slate-50"
-                }`}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 min-w-12 shrink-0 items-center justify-center rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={logoPath}
-                      alt={method.label}
-                      className="max-h-7 max-w-[76px] object-contain"
-                    />
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-lg font-black !text-slate-950">
-                        {method.label}
-                      </p>
-                      {selected ? (
-                        <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-white">
-                          Selected
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
-                      {method.description}
-                    </p>
-                    <p className="mt-2 text-xs font-bold leading-5 !text-slate-500">
-                      {method.setupSummary}
-                    </p>
-                  </div>
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={choice.logoPath}
+                    alt={choice.label}
+                    className="max-h-7 max-w-[78px] object-contain"
+                  />
                 </div>
 
-                <form action={saveAmbassadorPayoutProvider} className="mt-5">
-                  <input type="hidden" name="provider" value={provider} />
-                  <input type="hidden" name="continueToSetup" value="true" />
-                  <button
-                    type="submit"
-                    className={`inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-black transition ${
-                      selected
-                        ? "border border-emerald-300 bg-white !text-emerald-800"
-                        : "bg-emerald-700 !text-white shadow-sm hover:bg-emerald-800"
-                    }`}
-                  >
-                    {selected
-                      ? `Continue ${method.shortLabel} setup`
-                      : `Choose ${method.shortLabel}`}
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </form>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-base font-black !text-slate-950 sm:text-lg">
+                      {choice.label}
+                    </p>
+                    {selected ? (
+                      <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] !text-white">
+                        Picked
+                      </span>
+                    ) : null}
+                  </div>
 
-      <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                  <p className="mt-1.5 text-sm font-semibold leading-5 !text-slate-700">
+                    {choice.description}
+                  </p>
+                  <p className="mt-1 text-xs font-bold leading-5 !text-slate-500">
+                    {choice.setupSummary}
+                  </p>
+                </div>
+              </div>
+
+              <form
+                action={saveAmbassadorPayoutProvider}
+                className="mt-auto pt-4"
+              >
+                <input
+                  type="hidden"
+                  name="provider"
+                  value={choice.provider}
+                />
+                <input
+                  type="hidden"
+                  name="continueToSetup"
+                  value="true"
+                />
+                <button
+                  type="submit"
+                  className={`inline-flex min-h-[52px] w-full touch-manipulation items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-black transition active:scale-[0.99] ${
+                    selected
+                      ? "border border-emerald-300 bg-white !text-emerald-800"
+                      : "bg-emerald-700 !text-white shadow-sm hover:bg-emerald-800"
+                  }`}
+                >
+                  {selected ? `Continue ${choice.shortLabel}` : choice.buttonLabel}
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </form>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4">
         <p className="text-sm font-black !text-slate-950">
-          Your simple reward setup
+          Three quick steps
         </p>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {AMBASSADOR_REWARD_ONBOARDING_STEPS.map((step) => (
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          {QUICK_REWARD_SETUP_STEPS.map((step) => (
             <div
               key={step.step}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+              className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:block sm:p-4"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-700 text-sm font-black text-white">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-sm font-black text-white">
                 {step.step}
               </span>
-              <p className="mt-3 text-sm font-black !text-slate-950">
-                {step.title}
-              </p>
-              <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
-                {step.description}
-              </p>
+              <div>
+                <p className="sm:mt-3 text-sm font-black !text-slate-950">
+                  {step.title}
+                </p>
+                <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
+                  {step.description}
+                </p>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {!setupComplete ? (
-        <div className="mt-5 flex flex-col gap-4 rounded-[1.25rem] border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div>
-            <p className="text-sm font-black !text-slate-950">
-              Not ready to connect an account?
-            </p>
-            <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-              Keep sharing and earning. You can finish payment setup before
-              your first approved reward is sent.
-            </p>
-          </div>
-
-          <form action={saveAmbassadorPayoutProvider}>
-            <input type="hidden" name="provider" value="set_up_later" />
-            <button
-              type="submit"
-              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-black !text-slate-800 transition hover:bg-slate-100"
-            >
-              Do this later
-            </button>
-          </form>
+      <div className="mt-4 flex flex-col gap-3 rounded-[1.2rem] border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-black !text-slate-950">
+            Not ready yet?
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-5 !text-slate-700">
+            Keep earning. Finish this before we send your first approved reward.
+          </p>
         </div>
-      ) : null}
 
-      <p className="mt-4 text-xs font-semibold leading-5 !text-slate-500">
-        SitGuru never asks for your PayPal password, Venmo password, or bank
-        login. Complete any provider verification securely with PayPal or
-        Venmo.
-      </p>
+        <form action={saveAmbassadorPayoutProvider}>
+          <input type="hidden" name="provider" value="set_up_later" />
+          <button
+            type="submit"
+            className="inline-flex min-h-[48px] w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-black !text-slate-800 transition hover:bg-slate-100 sm:w-auto"
+          >
+            Do this later
+          </button>
+        </form>
+      </div>
+
+      <div className="mt-4 flex items-start gap-2 text-xs font-semibold leading-5 !text-slate-500">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 !text-emerald-600" />
+        <p>
+          Your bank, PayPal, or Venmo login stays with the provider—not SitGuru.
+        </p>
+      </div>
     </section>
   );
 }
@@ -1245,10 +1279,10 @@ export default async function AmbassadorDashboardEarningsPage({
     asString(ambassador.referral_code) || "Not assigned";
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-4 py-6 !text-slate-950 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-3 py-4 !text-slate-950 sm:px-6 sm:py-6 lg:px-8">
       <div className="mx-auto max-w-[1720px] space-y-6">
         <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-8 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#b9f8df_0%,#d9f8ef_48%,#bde9ff_100%)] px-8 py-10 lg:grid-cols-[1.35fr_0.75fr] lg:items-center xl:px-10">
+          <div className="grid gap-6 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#b9f8df_0%,#d9f8ef_48%,#bde9ff_100%)] px-4 py-6 sm:px-8 sm:py-10 lg:grid-cols-[1.35fr_0.75fr] lg:items-center xl:px-10">
             <div>
               <Link
                 href="/ambassador/dashboard"
@@ -1261,15 +1295,13 @@ export default async function AmbassadorDashboardEarningsPage({
                 Ambassador Earnings
               </p>
 
-              <h1 className="mt-4 max-w-5xl text-5xl font-black tracking-[-0.055em] !text-slate-950 md:text-6xl xl:text-7xl">
-                Real rewards. Clear status.
+              <h1 className="mt-3 max-w-5xl text-4xl font-black tracking-[-0.05em] !text-slate-950 sm:mt-4 sm:text-5xl md:text-6xl xl:text-7xl">
+                Your rewards, all in one spot.
               </h1>
 
-              <p className="mt-5 max-w-4xl text-base font-semibold leading-8 !text-slate-800 md:text-lg">
-                Track your commissions, referral payments, and approved
-                rewards in one place. Pending, approved, and paid amounts stay
-                separate so you always know what is still being reviewed, what
-                is ready, and what SitGuru has confirmed as paid.
+              <p className="mt-4 max-w-4xl text-sm font-semibold leading-6 !text-slate-800 sm:mt-5 sm:text-base sm:leading-8 md:text-lg">
+                See what&apos;s pending, what&apos;s ready, and what&apos;s
+                already paid. No guessing.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -1292,21 +1324,19 @@ export default async function AmbassadorDashboardEarningsPage({
                 </div>
 
                 <div>
-                  <h2 className="text-2xl font-black tracking-tight !text-slate-950 md:text-3xl">
-                    What each status means
+                  <h2 className="text-xl font-black tracking-tight !text-slate-950 sm:text-2xl md:text-3xl">
+                    Quick status check
                   </h2>
 
-                  <div className="mt-4 space-y-3 text-sm font-semibold leading-7 !text-slate-800">
+                  <div className="mt-3 space-y-2 text-sm font-semibold leading-6 !text-slate-800 sm:mt-4">
                     <p>
-                      <strong>Pending:</strong> under review and not approved.
+                      <strong>Pending:</strong> we&apos;re checking it.
                     </p>
                     <p>
-                      <strong>Approved:</strong> confirmed by SitGuru but not
-                      yet recorded as paid.
+                      <strong>Ready:</strong> approved and waiting to be paid.
                     </p>
                     <p>
-                      <strong>Paid:</strong> payout completion is recorded on
-                      the reward.
+                      <strong>Paid:</strong> your reward was sent.
                     </p>
                   </div>
                 </div>
@@ -1326,35 +1356,38 @@ export default async function AmbassadorDashboardEarningsPage({
           </section>
         ) : null}
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <section
+          aria-label="Reward totals"
+          className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 xl:grid-cols-5"
+        >
           <StatCard
-            title="Pending Review"
+            title="Pending"
             value={money(pendingAmount)}
-            description="Not approved or payable yet"
+            description="Still being checked"
             icon={<Clock3 className="h-6 w-6" />}
           />
           <StatCard
-            title="Approved Unpaid"
+            title="Ready to Pay"
             value={money(approvedAmount)}
-            description="Confirmed and waiting payout"
+            description="Approved and waiting"
             icon={<BadgeDollarSign className="h-6 w-6" />}
           />
           <StatCard
             title="Paid Out"
             value={money(paidAmount)}
-            description="Recorded as paid by SitGuru"
+            description="Rewards already sent"
             icon={<PiggyBank className="h-6 w-6" />}
           />
           <StatCard
-            title="Confirmed Total"
+            title="Total Earned"
             value={money(confirmedAmount)}
-            description="Approved plus paid rewards only"
+            description="Ready plus paid rewards"
             icon={<Trophy className="h-6 w-6" />}
           />
           <StatCard
-            title="Paid This Month"
+            title="This Month"
             value={money(paidThisMonth)}
-            description="Paid rewards dated this month"
+            description="Rewards paid this month"
             icon={<CalendarDays className="h-6 w-6" />}
           />
         </section>
@@ -1369,8 +1402,8 @@ export default async function AmbassadorDashboardEarningsPage({
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-6">
             <RewardGroup
-              title="Pending Review"
-              description="These rewards are not confirmed earnings and are not available for payout."
+              title="Pending"
+              description="We’re checking these rewards."
               total={pendingAmount}
               rewards={pendingRewards}
               emptyMessage="No rewards are currently waiting for review."
@@ -1378,8 +1411,8 @@ export default async function AmbassadorDashboardEarningsPage({
             />
 
             <RewardGroup
-              title="Approved, Not Paid"
-              description="SitGuru approved these rewards, but no paid status has been recorded yet."
+              title="Ready to Pay"
+              description="Approved and waiting to be sent."
               total={approvedAmount}
               rewards={approvedRewards}
               emptyMessage="No approved unpaid rewards are currently recorded."
@@ -1387,8 +1420,8 @@ export default async function AmbassadorDashboardEarningsPage({
             />
 
             <RewardGroup
-              title="Paid Rewards"
-              description="Only rewards with a paid status or paid date appear in this section."
+              title="Paid"
+              description="These rewards were sent."
               total={paidAmount}
               rewards={paidRewards}
               emptyMessage="No paid Ambassador rewards are currently recorded."
@@ -1401,15 +1434,13 @@ export default async function AmbassadorDashboardEarningsPage({
               <div className="flex items-center gap-3">
                 <ShieldCheck className="h-6 w-6 text-emerald-700" />
                 <h2 className="text-2xl font-black !text-slate-950">
-                  Earnings Integrity
+                  No mystery math
                 </h2>
               </div>
 
               <p className="mt-3 text-sm font-semibold leading-7 !text-slate-700">
-                SitGuru does not turn referral counts, daily targets, or
-                projected activity into confirmed earnings. A dollar amount
-                appears only after SitGuru creates and reviews a verified reward
-                record for your Ambassador account.
+                Your totals come from real, verified rewards. Estimates and
+                possible future rewards never count as money you earned.
               </p>
 
               <div className="mt-5 grid gap-3">
@@ -1467,12 +1498,11 @@ export default async function AmbassadorDashboardEarningsPage({
 
                 <div>
                   <p className="text-lg font-black !text-emerald-900">
-                    Grow referrals without guessing earnings.
+                    Share. Track. Earn.
                   </p>
                   <p className="mt-2 text-sm font-semibold leading-7 !text-emerald-900">
-                    Use the Referrals page to share your tracked links and view
-                    canonical referral activity. Earnings appear here only
-                    after SitGuru creates and reviews the matching reward.
+                    Share your link, watch your referrals grow, and track each
+                    verified reward here.
                   </p>
 
                   <Link
