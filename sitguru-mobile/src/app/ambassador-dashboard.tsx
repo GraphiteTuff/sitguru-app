@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import {
+  BarChart3,
   Bell,
   BookOpen,
   ChevronRight,
@@ -38,6 +39,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -81,27 +83,65 @@ type AmbassadorLead = {
 };
 
 type AmbassadorData = {
+  ambassadorStatus: string;
+  approved: number;
+  businessSignups: number;
   clicks: number;
+  completedBookings: number;
   earned: number;
+  guruSignups: number;
   leads: AmbassadorLead[];
+  onboardingLabel: string;
+  onboardingStatus: 'complete' | 'pending' | 'needs_action';
   paid: number;
   partnerLeads: number;
+  payoutCompleted: number;
+  payoutReady: boolean;
+  payoutStatus: string;
+  payoutTotal: number;
   pending: number;
+  petParentSignups: number;
   qualified: number;
+  ready: number;
+  referralCode: string;
   signups: number;
+  socialSignups: number;
+  trainingCompleted: number;
+  trainingLabel: string;
+  trainingPercent: number;
+  trainingRequired: number;
   unreadMessages: number;
   unreadNotifications: number;
 };
 
 const EMPTY_DATA: AmbassadorData = {
+  ambassadorStatus: 'Active',
+  approved: 0,
+  businessSignups: 0,
   clicks: 0,
+  completedBookings: 0,
   earned: 0,
+  guruSignups: 0,
   leads: [],
+  onboardingLabel: 'Needs Action',
+  onboardingStatus: 'needs_action',
   paid: 0,
   partnerLeads: 0,
+  payoutCompleted: 0,
+  payoutReady: false,
+  payoutStatus: 'Setup incomplete',
+  payoutTotal: 6,
   pending: 0,
+  petParentSignups: 0,
   qualified: 0,
+  ready: 0,
+  referralCode: '',
   signups: 0,
+  socialSignups: 0,
+  trainingCompleted: 0,
+  trainingLabel: 'Not Started',
+  trainingPercent: 0,
+  trainingRequired: 0,
   unreadMessages: 0,
   unreadNotifications: 0,
 };
@@ -175,8 +215,14 @@ const REALTIME_TABLES = [
   'referral_performance',
   'referral_stats',
   'ambassador_referrals',
+  'referral_clicks',
+  'ambassador_rewards',
   'referrals',
   'ambassador_leads',
+  'ambassador_activity_log',
+  'ambassador_marketing_efforts',
+  'ambassador_onboarding_packets',
+  'ambassador_training_progress',
   'partner_leads',
   'community_leads',
   'leads',
@@ -186,8 +232,10 @@ const REALTIME_TABLES = [
 ];
 
 export default function AmbassadorDashboardScreen() {
+  const { width } = useWindowDimensions();
   const { user, profile } = useAuth();
   const isWebPreview = Platform.OS === 'web';
+  const isTablet = Platform.OS !== 'web' && width >= 768;
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
   const isDark = themeMode === 'dark';
@@ -231,12 +279,14 @@ export default function AmbassadorDashboardScreen() {
 
   const location = getProfileLocation(profileRecord);
 
-  const referralCode = firstString(profileRecord, [
-    'referral_code',
-    'ambassador_code',
-    'invite_code',
-    'partner_code',
-  ]);
+  const referralCode =
+    data.referralCode ||
+    firstString(profileRecord, [
+      'referral_code',
+      'ambassador_code',
+      'invite_code',
+      'partner_code',
+    ]);
 
   const referralLink = referralCode
     ? `https://www.sitguru.com/signup?ref=${encodeURIComponent(referralCode)}`
@@ -272,18 +322,18 @@ export default function AmbassadorDashboardScreen() {
       }
 
       try {
-        setData(await loadAmbassadorDashboard(user.id));
+        setData(await loadAmbassadorDashboard(user.id, user.email));
         setLoadMessage('');
       } catch {
         setLoadMessage(
-          'Some Ambassador activity could not be loaded. Pull down to try again.',
+          'Some updates didn’t load. Pull down to retry.',
         );
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [user?.id],
+    [user?.email, user?.id],
   );
 
   useEffect(() => {
@@ -362,12 +412,12 @@ export default function AmbassadorDashboardScreen() {
   async function shareReferralLink() {
     if (!referralLink) {
       Alert.alert(
-        'Referral code needed',
-        'Your Ambassador referral code has not been assigned yet. Open Support for help.',
+        'Your share code isn’t ready yet',
+        'SitGuru Support can help get it set up.',
         [
           { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Open Support',
+            text: 'Get help',
             onPress: () => router.push('/support'),
           },
         ],
@@ -377,27 +427,63 @@ export default function AmbassadorDashboardScreen() {
 
     try {
       await Share.share({
-        message: `Join SitGuru with my referral link: ${referralLink}`,
-        title: 'Join SitGuru',
+        message: `Check out SitGuru with my link: ${referralLink}`,
+        title: 'Share SitGuru',
         url: referralLink,
       });
     } catch {
       Alert.alert(
-        'Share unavailable',
-        'The referral link could not be shared from this device.',
+        'Sharing didn’t open',
+        'Try again or open your QR code instead.',
       );
     }
   }
 
-  function showConnectedSoon(label: string) {
-    Alert.alert(
-      `${label} is being connected`,
-      `${label} will open here once the Ambassador workflow is connected to SitGuru. No changes were saved.`,
+  function openPortal(
+    view?:
+      | 'today'
+      | 'calendar'
+      | 'activities'
+      | 'marketing'
+      | 'leads'
+      | 'rewards',
+  ) {
+    router.push(
+      {
+        pathname: '/ambassador-command-center',
+        params: view ? { view } : {},
+      } as never,
     );
   }
 
+  function openMessages() {
+    router.push({
+      pathname: '/messages',
+      params: { role: 'ambassador' },
+    } as never);
+  }
+
+  function openReferralAnalytics() {
+    router.push('/ambassador-referral-analytics' as never);
+  }
+
+  function openSupport() {
+    router.push('/support' as never);
+  }
+
+  function openRewards() {
+    openPortal('rewards');
+  }
+
+  function openPayouts() {
+    router.push('/ambassador-payouts' as never);
+  }
+
   return (
-    <SitGuruScreen center={isWebPreview} maxWidth={620}>
+    <SitGuruScreen
+      center={isWebPreview || isTablet}
+      maxWidth={isTablet ? 920 : 620}
+    >
       <RoleGate requiredRole="ambassador">
         <View
           style={[
@@ -423,7 +509,10 @@ export default function AmbassadorDashboardScreen() {
                 {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
                 <ScrollView
-                  contentContainerStyle={styles.scrollContent}
+                  contentContainerStyle={[
+                    styles.scrollContent,
+                    isTablet && styles.scrollContentTablet,
+                  ]}
                   refreshControl={
                     <RefreshControl
                       colors={[palette.accent]}
@@ -538,6 +627,99 @@ export default function AmbassadorDashboardScreen() {
                     </View>
                   ) : null}
 
+                  <View style={styles.workspaceHero}>
+                    <Text style={styles.workspaceEyebrow}>
+                      SHARE • TRACK • EARN
+                    </Text>
+
+                    <Text style={styles.workspaceTitle}>
+                      Make moves. Grow your impact.
+                    </Text>
+
+                    <Text style={styles.workspaceSubtitle}>
+                      Your links, people, progress, and rewards—all in one spot.
+                    </Text>
+
+                    <View style={styles.statusPillRow}>
+                      <View style={styles.statusPill}>
+                        <Text style={styles.statusPillText}>
+                          {data.ambassadorStatus || 'Active'}
+                        </Text>
+                      </View>
+                      <View style={styles.statusPill}>
+                        <Text style={styles.statusPillText}>
+                          {data.onboardingLabel}
+                        </Text>
+                      </View>
+                      <View style={styles.statusPill}>
+                        <Text style={styles.statusPillText}>
+                          {data.trainingLabel}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.codeCard}>
+                      <View style={styles.codeCopy}>
+                        <Text style={styles.codeLabel}>YOUR SHARE CODE</Text>
+                        <Text style={styles.codeValue}>
+                          {referralCode || 'Not assigned'}
+                        </Text>
+                      </View>
+                      <Text style={styles.codeDetail}>
+                        Drop it in texts, socials, QR flyers, campus events,
+                        and local meetups.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.sectionBlock}>
+                    <View style={styles.sectionHeaderRow}>
+                      <View>
+                        <Text style={styles.sectionEyebrow}>QUICK MOVES</Text>
+                        <Text style={styles.sectionTitle}>What do you want to do?</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.toolGrid}>
+                      <ToolkitAction
+                        icon={<Home color={palette.accent} size={20} />}
+                        label="My day"
+                        onPress={() => openPortal('today')}
+                        styles={styles}
+                      />
+                      <ToolkitAction
+                        icon={<BarChart3 color={palette.accent} size={20} />}
+                        label="Link stats"
+                        onPress={openReferralAnalytics}
+                        styles={styles}
+                      />
+                      <ToolkitAction
+                        icon={<UsersRound color={palette.accent} size={20} />}
+                        label="Referrals"
+                        onPress={openReferralAnalytics}
+                        styles={styles}
+                      />
+                      <ToolkitAction
+                        icon={<Megaphone color={palette.accent} size={20} />}
+                        label="Post & track"
+                        onPress={() => openPortal('marketing')}
+                        styles={styles}
+                      />
+                      <ToolkitAction
+                        icon={<CircleDollarSign color={palette.accent} size={20} />}
+                        label="Get paid"
+                        onPress={openRewards}
+                        styles={styles}
+                      />
+                      <ToolkitAction
+                        icon={<GraduationCap color={palette.accent} size={20} />}
+                        label="Level up"
+                        onPress={openSupport}
+                        styles={styles}
+                      />
+                    </View>
+                  </View>
+
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => void shareReferralLink()}
@@ -548,13 +730,13 @@ export default function AmbassadorDashboardScreen() {
                   >
                     <View style={styles.primaryActionCopy}>
                       <Text style={styles.primaryActionEyebrow}>
-                        SHARE & GROW
+                        YOUR NEXT MOVE
                       </Text>
                       <Text style={styles.primaryActionTitle}>
-                        Share Your Referral Link
+                        Share your link
                       </Text>
                       <Text style={styles.primaryActionText}>
-                        Invite Pet Parents, future Gurus, and local partners.
+                        Send it to friends, classmates, pet parents, and local businesses.
                       </Text>
                     </View>
 
@@ -579,8 +761,8 @@ export default function AmbassadorDashboardScreen() {
                     <View style={styles.impactCard}>
                       <View style={styles.sectionHeaderRow}>
                         <View>
-                          <Text style={styles.sectionEyebrow}>YOUR IMPACT</Text>
-                          <Text style={styles.sectionTitle}>Community growth</Text>
+                          <Text style={styles.sectionEyebrow}>WHAT’S GROWING</Text>
+                          <Text style={styles.sectionTitle}>Your stats</Text>
                         </View>
 
                         <View style={styles.rankPill}>
@@ -595,40 +777,139 @@ export default function AmbassadorDashboardScreen() {
 
                       <View style={styles.impactGrid}>
                         <ImpactMetric
-                          label="Referrals"
+                          label="Pet parents"
                           styles={styles}
-                          value={formatNumber(data.signups)}
+                          value={formatNumber(data.petParentSignups)}
                         />
                         <ImpactMetric
-                          label="Qualified"
+                          label="Gurus"
                           styles={styles}
-                          value={formatNumber(data.qualified)}
+                          value={formatNumber(data.guruSignups)}
                         />
                         <ImpactMetric
-                          label="Partner leads"
+                          label="Social"
                           styles={styles}
-                          value={formatNumber(data.partnerLeads)}
+                          value={formatNumber(data.socialSignups)}
                         />
                         <ImpactMetric
-                          label="Earned"
+                          label="Bookings"
                           styles={styles}
-                          value={currency(data.earned)}
+                          value={formatNumber(data.completedBookings)}
+                        />
+                        <ImpactMetric
+                          label="Ready"
+                          styles={styles}
+                          value={currency(data.approved + data.ready)}
+                        />
+                        <ImpactMetric
+                          label="Paid"
+                          styles={styles}
+                          value={currency(data.paid)}
                         />
                       </View>
 
                       <View style={styles.impactFooter}>
                         <Text style={styles.impactFooterText}>
-                          {formatNumber(data.clicks)} referral link clicks
+                          {formatNumber(data.clicks)} visits
                         </Text>
                         <Text style={styles.impactFooterText}>
-                          {currency(data.pending)} pending
+                          {formatNumber(data.signups)} signups
                         </Text>
                         <Text style={styles.impactFooterText}>
-                          {currency(data.paid)} paid
+                          {currency(data.pending)} being checked
                         </Text>
                       </View>
+
+                      <Pressable
+                        accessibilityHint="Opens detailed referral visits, conversions, channels, and reward analytics."
+                        accessibilityLabel="View referral analytics"
+                        accessibilityRole="button"
+                        onPress={openReferralAnalytics}
+                        style={({ pressed }) => [
+                          styles.analyticsButton,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <View style={styles.analyticsButtonIcon}>
+                          <BarChart3
+                            color={palette.accent}
+                            size={18}
+                            strokeWidth={2.4}
+                          />
+                        </View>
+
+                        <View style={styles.analyticsButtonCopy}>
+                          <Text style={styles.analyticsButtonTitle}>
+                            Open link stats
+                          </Text>
+                          <Text style={styles.analyticsButtonText}>
+                            See visits, signups, bookings, and rewards.
+                          </Text>
+                        </View>
+
+                        <ChevronRight
+                          color={palette.accent}
+                          size={18}
+                          strokeWidth={2.4}
+                        />
+                      </Pressable>
                     </View>
                   )}
+
+                  <View style={styles.readinessCard}>
+                    <View style={styles.sectionHeaderRow}>
+                      <View>
+                        <Text style={styles.sectionEyebrow}>STAY READY</Text>
+                        <Text style={styles.sectionTitle}>Your setup</Text>
+                      </View>
+                    </View>
+
+                    <ReadinessRow
+                      detail={
+                        data.onboardingStatus === 'complete'
+                          ? 'Your profile setup is complete.'
+                          : data.onboardingStatus === 'pending'
+                            ? 'Your setup is being reviewed.'
+                            : 'Finish the basics so everything is ready.'
+                      }
+                      icon={<ClipboardList color={palette.accent} size={18} />}
+                      label="Onboarding"
+                      onPress={openSupport}
+                      status={data.onboardingLabel}
+                      styles={styles}
+                    />
+
+                    <ReadinessRow
+                      detail={
+                        data.trainingRequired > 0
+                          ? `${data.trainingCompleted} of ${data.trainingRequired} steps done`
+                          : 'Quick training appears when it’s assigned.'
+                      }
+                      icon={<GraduationCap color={palette.accent} size={18} />}
+                      label="Quick training"
+                      onPress={openSupport}
+                      progress={data.trainingPercent}
+                      status={data.trainingLabel}
+                      styles={styles}
+                    />
+
+                    <ReadinessRow
+                      detail={`${data.payoutCompleted} of ${data.payoutTotal} payout steps done`}
+                      icon={<CircleDollarSign color={palette.accent} size={18} />}
+                      label="Get paid"
+                      last
+                      onPress={openPayouts}
+                      progress={
+                        data.payoutTotal > 0
+                          ? Math.round(
+                              (data.payoutCompleted / data.payoutTotal) * 100,
+                            )
+                          : 0
+                      }
+                      status={data.payoutReady ? 'Ready' : data.payoutStatus}
+                      styles={styles}
+                    />
+                  </View>
 
                   <View style={styles.quickActions}>
                     <QuickAction
@@ -639,7 +920,7 @@ export default function AmbassadorDashboardScreen() {
                           strokeWidth={2.3}
                         />
                       }
-                      label="Referral Link"
+                      label="Share link"
                       onPress={() => void shareReferralLink()}
                       styles={styles}
                     />
@@ -652,8 +933,8 @@ export default function AmbassadorDashboardScreen() {
                           strokeWidth={2.3}
                         />
                       }
-                      label="QR Flyer"
-                      onPress={() => showConnectedSoon('QR Flyer')}
+                      label="My QR"
+                      onPress={openReferralAnalytics}
                       styles={styles}
                     />
 
@@ -665,8 +946,8 @@ export default function AmbassadorDashboardScreen() {
                           strokeWidth={2.3}
                         />
                       }
-                      label="Add Lead"
-                      onPress={() => showConnectedSoon('Lead tracking')}
+                      label="Add lead"
+                      onPress={() => openPortal('leads')}
                       styles={styles}
                     />
 
@@ -680,26 +961,49 @@ export default function AmbassadorDashboardScreen() {
                         />
                       }
                       label="Messages"
-                      onPress={() =>
-                        router.push({
-                          pathname: '/messages',
-                          params: { role: 'ambassador' },
-                        })
-                      }
+                      onPress={openMessages}
                       styles={styles}
                     />
                   </View>
 
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={openReferralAnalytics}
+                    style={({ pressed }) => [
+                      styles.analyticsStrip,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <BarChart3
+                      color={palette.accent}
+                      size={18}
+                      strokeWidth={2.4}
+                    />
+                    <View style={styles.analyticsStripCopy}>
+                      <Text style={styles.analyticsStripTitle}>
+                        See what’s working
+                      </Text>
+                      <Text style={styles.analyticsStripText}>
+                        Visits, signups, bookings, and rewards
+                      </Text>
+                    </View>
+                    <ChevronRight
+                      color={palette.accent}
+                      size={17}
+                      strokeWidth={2.4}
+                    />
+                  </Pressable>
+
                   <View style={styles.pipelineCard}>
                     <View style={styles.sectionHeaderRow}>
                       <View>
-                        <Text style={styles.sectionEyebrow}>LEAD TRACKING</Text>
-                        <Text style={styles.sectionTitle}>Follow-up pipeline</Text>
+                        <Text style={styles.sectionEyebrow}>YOUR PEOPLE</Text>
+                        <Text style={styles.sectionTitle}>Lead follow-up</Text>
                       </View>
 
                       <Pressable
                         accessibilityRole="button"
-                        onPress={() => showConnectedSoon('Lead tracking')}
+                        onPress={() => openPortal('leads')}
                       >
                         <Text style={styles.sectionLink}>Manage</Text>
                       </Pressable>
@@ -708,16 +1012,16 @@ export default function AmbassadorDashboardScreen() {
                     <PipelineRow
                       count={leadCounts.new}
                       icon={<Target color={palette.accent} size={17} />}
-                      label="New leads"
-                      onPress={() => showConnectedSoon('New leads')}
+                      label="New"
+                      onPress={() => openPortal('leads')}
                       palette={palette}
                       styles={styles}
                     />
                     <PipelineRow
                       count={leadCounts.contacted}
                       icon={<MessageCircle color={palette.accent} size={17} />}
-                      label="Contacted"
-                      onPress={() => showConnectedSoon('Contacted leads')}
+                      label="Reached out"
+                      onPress={() => openPortal('leads')}
                       palette={palette}
                       styles={styles}
                     />
@@ -725,7 +1029,7 @@ export default function AmbassadorDashboardScreen() {
                       count={leadCounts.interested}
                       icon={<Sparkles color={palette.accent} size={17} />}
                       label="Interested"
-                      onPress={() => showConnectedSoon('Interested leads')}
+                      onPress={() => openPortal('leads')}
                       palette={palette}
                       styles={styles}
                     />
@@ -733,16 +1037,16 @@ export default function AmbassadorDashboardScreen() {
                       count={leadCounts.applied}
                       icon={<ClipboardList color={palette.accent} size={17} />}
                       label="Applied"
-                      onPress={() => showConnectedSoon('Applied leads')}
+                      onPress={() => openPortal('leads')}
                       palette={palette}
                       styles={styles}
                     />
                     <PipelineRow
                       count={leadCounts.active}
                       icon={<Handshake color={palette.accent} size={17} />}
-                      label="Active Guru or partner"
+                      label="Active"
                       last
-                      onPress={() => showConnectedSoon('Active referrals')}
+                      onPress={() => openPortal('leads')}
                       palette={palette}
                       styles={styles}
                     />
@@ -752,14 +1056,14 @@ export default function AmbassadorDashboardScreen() {
                     <View style={styles.sectionHeaderRow}>
                       <View>
                         <Text style={styles.sectionEyebrow}>
-                          HOW AMBASSADORS EARN
+                          WAYS TO EARN
                         </Text>
-                        <Text style={styles.sectionTitle}>Rewards program</Text>
+                        <Text style={styles.sectionTitle}>Reward drops</Text>
                       </View>
 
                       <Pressable
                         accessibilityRole="button"
-                        onPress={() => router.push('/payments')}
+                        onPress={openRewards}
                       >
                         <Text style={styles.sectionLink}>View rewards</Text>
                       </Pressable>
@@ -769,28 +1073,28 @@ export default function AmbassadorDashboardScreen() {
                       <EarnRow
                         amount="$15–$25"
                         icon={<Gift color={palette.accent} size={18} />}
-                        label="First Booking Reward"
+                        label="First booking"
                         text="Earn when a referred Pet Parent books their first completed service."
                         styles={styles}
                       />
                       <EarnRow
                         amount="$25–$50"
                         icon={<UserRound color={palette.accent} size={18} />}
-                        label="Approved Guru Reward"
+                        label="Approved Guru"
                         text="Earn when a referred Guru is approved and completes training."
                         styles={styles}
                       />
                       <EarnRow
                         amount="$50–$100"
                         icon={<Store color={palette.accent} size={18} />}
-                        label="Approved Partner Lead"
+                        label="New partner"
                         text="Earn when a referred business becomes an approved SitGuru partner."
                         styles={styles}
                       />
                       <EarnRow
                         amount="$100+"
                         icon={<Trophy color={palette.accent} size={18} />}
-                        label="Partner Activation Bonus"
+                        label="Activation bonus"
                         last
                         text="Bonus eligibility begins after a referred partner completes activation."
                         styles={styles}
@@ -802,47 +1106,47 @@ export default function AmbassadorDashboardScreen() {
                     <View style={styles.sectionHeaderRow}>
                       <View>
                         <Text style={styles.sectionEyebrow}>
-                          AMBASSADOR TOOLKIT
+                          CREATOR KIT
                         </Text>
-                        <Text style={styles.sectionTitle}>Share with confidence</Text>
+                        <Text style={styles.sectionTitle}>Ready-to-share tools</Text>
                       </View>
                     </View>
 
                     <View style={styles.toolGrid}>
                       <ToolkitAction
                         icon={<Link2 color={palette.accent} size={20} />}
-                        label="Referral Links"
+                        label="My link"
                         onPress={() => void shareReferralLink()}
                         styles={styles}
                       />
                       <ToolkitAction
                         icon={<QrCode color={palette.accent} size={20} />}
-                        label="QR Flyers"
-                        onPress={() => showConnectedSoon('QR Flyers')}
+                        label="QR kit"
+                        onPress={openReferralAnalytics}
                         styles={styles}
                       />
                       <ToolkitAction
                         icon={<BookOpen color={palette.accent} size={20} />}
-                        label="Pitch Script"
-                        onPress={() => showConnectedSoon('Business pitch script')}
+                        label="What to say"
+                        onPress={openSupport}
                         styles={styles}
                       />
                       <ToolkitAction
                         icon={<Trophy color={palette.accent} size={20} />}
                         label="Leaderboard"
-                        onPress={() => showConnectedSoon('City leaderboard')}
+                        onPress={openReferralAnalytics}
                         styles={styles}
                       />
                       <ToolkitAction
                         icon={<CircleDollarSign color={palette.accent} size={20} />}
                         label="Rewards"
-                        onPress={() => router.push('/payments')}
+                        onPress={openRewards}
                         styles={styles}
                       />
                       <ToolkitAction
                         icon={<GraduationCap color={palette.accent} size={20} />}
                         label="Training"
-                        onPress={() => router.push('/support')}
+                        onPress={openSupport}
                         styles={styles}
                       />
                     </View>
@@ -852,7 +1156,7 @@ export default function AmbassadorDashboardScreen() {
                     <View style={styles.sectionHeaderRow}>
                       <View>
                         <Text style={styles.sectionEyebrow}>
-                          PATH TO CITY CAPTAIN
+                          LEVEL UP
                         </Text>
                         <Text style={styles.sectionTitle}>{rank.label}</Text>
                       </View>
@@ -899,22 +1203,22 @@ export default function AmbassadorDashboardScreen() {
                     <View style={styles.sectionHeaderRow}>
                       <View>
                         <Text style={styles.sectionEyebrow}>
-                          WAYS TO MAKE AN IMPACT
+                          FIND YOUR LANE
                         </Text>
-                        <Text style={styles.sectionTitle}>Ambassador paths</Text>
+                        <Text style={styles.sectionTitle}>Pick your path</Text>
                       </View>
                     </View>
 
                     <View style={styles.programCard}>
                       <ProgramRow
                         icon={<UsersRound color={palette.accent} size={18} />}
-                        label="Community Ambassador"
+                        label="Community"
                         styles={styles}
                         text="Refer Pet Parents and help spread the word about trusted local care."
                       />
                       <ProgramRow
                         icon={<Store color={palette.accent} size={18} />}
-                        label="Local Partner Ambassador"
+                        label="Local partners"
                         styles={styles}
                         text="Introduce and onboard local pet businesses to partner with SitGuru."
                       />
@@ -926,7 +1230,7 @@ export default function AmbassadorDashboardScreen() {
                       />
                       <ProgramRow
                         icon={<Megaphone color={palette.accent} size={18} />}
-                        label="Campus / Neighborhood Ambassador"
+                        label="Campus & neighborhood"
                         last
                         styles={styles}
                         text="Inspire your campus or neighborhood to choose trusted pet care."
@@ -952,14 +1256,14 @@ export default function AmbassadorDashboardScreen() {
 
                   <BottomNavItem
                     icon={
-                      <Link2
+                      <BarChart3
                         color={palette.navMuted}
                         size={21}
                         strokeWidth={2.3}
                       />
                     }
                     label="Referrals"
-                    onPress={() => void shareReferralLink()}
+                    onPress={openReferralAnalytics}
                     styles={styles}
                   />
 
@@ -972,7 +1276,7 @@ export default function AmbassadorDashboardScreen() {
                       />
                     }
                     label="Leads"
-                    onPress={() => showConnectedSoon('Lead tracking')}
+                    onPress={() => openPortal('leads')}
                     styles={styles}
                   />
 
@@ -986,12 +1290,7 @@ export default function AmbassadorDashboardScreen() {
                       />
                     }
                     label="Messages"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/messages',
-                        params: { role: 'ambassador' },
-                      })
-                    }
+                    onPress={openMessages}
                     styles={styles}
                   />
 
@@ -1127,6 +1426,67 @@ function PipelineRow({
       </View>
       <ChevronRight
         color={palette.muted}
+        size={17}
+        strokeWidth={2.3}
+      />
+    </Pressable>
+  );
+}
+
+function ReadinessRow({
+  detail,
+  icon,
+  label,
+  last = false,
+  onPress,
+  progress,
+  status,
+  styles,
+}: {
+  detail: string;
+  icon: ReactNode;
+  label: string;
+  last?: boolean;
+  onPress: () => void;
+  progress?: number;
+  status: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={`Open ${label}`}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[
+        styles.readinessRow,
+        last && styles.readinessRowLast,
+      ]}>
+      <View style={styles.readinessIcon}>{icon}</View>
+
+      <View style={styles.readinessCopy}>
+        <View style={styles.readinessTitleRow}>
+          <Text style={styles.readinessLabel}>{label}</Text>
+          <Text style={styles.readinessStatus}>{status}</Text>
+        </View>
+
+        <Text style={styles.readinessDetail}>{detail}</Text>
+
+        {typeof progress === 'number' ? (
+          <View style={styles.readinessTrack}>
+            <View
+              style={[
+                styles.readinessFill,
+                {
+                  width: `${Math.max(0, Math.min(100, progress))}%`,
+                },
+              ]}
+            />
+          </View>
+        ) : null}
+      </View>
+
+      <ChevronRight
+        color={styles.readinessChevron.color}
         size={17}
         strokeWidth={2.3}
       />
@@ -1322,149 +1682,305 @@ function PhoneStatusBar({
 
 async function loadAmbassadorDashboard(
   userId: string,
+  email?: string | null,
 ): Promise<AmbassadorData> {
-  const [referralRows, leadRows, conversationRows, notificationRows] =
-    await Promise.all([
-      queryFirstAvailableRows(
-        REFERRAL_TABLES,
-        REFERRAL_OWNER_FIELDS,
-        userId,
-        150,
-      ),
-      queryFirstAvailableRows(
-        LEAD_TABLES,
-        LEAD_OWNER_FIELDS,
-        userId,
-        150,
-      ),
-      queryFirstAvailableRows(
-        CONVERSATION_TABLES,
-        CONVERSATION_OWNER_FIELDS,
-        userId,
-        80,
-      ),
-      queryFirstAvailableRows(
-        NOTIFICATION_TABLES,
-        NOTIFICATION_OWNER_FIELDS,
-        userId,
-        80,
-      ),
-    ]);
+  const ambassador = await findAmbassadorRecord(userId, email);
+  const ambassadorId = firstString(ambassador, ['id']);
+  const referralCode = firstString(ambassador, ['referral_code']);
 
-  const eventCount = (row: RecordRow, terms: string[]) => {
-    const type = firstString(row, [
-      'event_type',
-      'type',
-      'status',
+  const [
+    canonicalReferralRows,
+    rewardRows,
+    canonicalLeadRows,
+    conversationRows,
+    notificationRows,
+    onboardingRows,
+    trainingSteps,
+    trainingProgressRows,
+    referralCodeRows,
+  ] = await Promise.all([
+    ambassadorId
+      ? safeRows('ambassador_referrals', 'ambassador_id', ambassadorId, 5000)
+      : Promise.resolve([]),
+    ambassadorId
+      ? safeRows('ambassador_rewards', 'ambassador_id', ambassadorId, 2000)
+      : Promise.resolve([]),
+    ambassadorId
+      ? safeRows('ambassador_leads', 'ambassador_id', ambassadorId, 1000)
+      : Promise.resolve([]),
+    queryFirstAvailableRows(
+      CONVERSATION_TABLES,
+      CONVERSATION_OWNER_FIELDS,
+      userId,
+      80,
+    ),
+    queryFirstAvailableRows(
+      NOTIFICATION_TABLES,
+      NOTIFICATION_OWNER_FIELDS,
+      userId,
+      80,
+    ),
+    ambassadorId
+      ? safeRows(
+          'ambassador_onboarding_packets',
+          'ambassador_id',
+          ambassadorId,
+          5,
+        )
+      : Promise.resolve([]),
+    safeActiveTrainingSteps(),
+    ambassadorId
+      ? safeRows(
+          'ambassador_training_progress',
+          'ambassador_id',
+          ambassadorId,
+          500,
+        )
+      : Promise.resolve([]),
+    ambassadorId
+      ? safeRows('referral_codes', 'ambassador_id', ambassadorId, 10)
+      : Promise.resolve([]),
+  ]);
+
+  const referralCodeId = firstString(referralCodeRows[0] || {}, ['id']);
+  const clickRows = referralCodeId
+    ? await safeRows('referral_clicks', 'referral_code_id', referralCodeId, 10000)
+    : [];
+
+  let referralRows = canonicalReferralRows;
+  let leadRows = canonicalLeadRows;
+
+  if (!referralRows.length) {
+    referralRows = await queryFirstAvailableRows(
+      REFERRAL_TABLES,
+      REFERRAL_OWNER_FIELDS,
+      userId,
+      500,
+    );
+  }
+
+  if (!leadRows.length) {
+    leadRows = await queryFirstAvailableRows(
+      LEAD_TABLES,
+      LEAD_OWNER_FIELDS,
+      userId,
+      500,
+    );
+  }
+
+  const typeFor = (row: RecordRow) =>
+    firstString(row, [
       'referral_type',
-    ]).toLowerCase();
-
-    return terms.some((term) => type.includes(term)) ? 1 : 0;
-  };
-
-  const clicks = referralRows.reduce(
-    (total, row) =>
-      total +
-      Math.max(
-        0,
-        Math.round(
-          firstNumber(row, ['clicks', 'link_clicks', 'click_count']) ??
-            eventCount(row, ['click']),
-        ),
-      ),
-    0,
-  );
-
-  const signups = referralRows.reduce(
-    (total, row) =>
-      total +
-      Math.max(
-        0,
-        Math.round(
-          firstNumber(row, ['signups', 'signup_count', 'registered_count']) ??
-            eventCount(row, ['signup', 'registered']),
-        ),
-      ),
-    0,
-  );
-
-  const qualified = referralRows.reduce(
-    (total, row) =>
-      total +
-      Math.max(
-        0,
-        Math.round(
-          firstNumber(row, [
-            'qualified_count',
-            'qualified_gurus',
-            'approved_count',
-          ]) ??
-            (firstBoolean(row, ['qualified', 'is_qualified', 'approved'])
-              ? 1
-              : 0),
-        ),
-      ),
-    0,
-  );
-
-  const partnerLeads = [...referralRows, ...leadRows].reduce((total, row) => {
-    const type = firstString(row, [
       'lead_type',
-      'referral_type',
       'type',
       'category',
-    ]).toLowerCase();
+    ])
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
 
-    return total + (type.includes('partner') || type.includes('business') ? 1 : 0);
-  }, 0);
+  const statusFor = (row: RecordRow) =>
+    firstString(row, ['status', 'referral_status'])
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
 
-  const earned = referralRows.reduce(
-    (total, row) =>
-      total +
-      Math.max(
-        0,
-        firstNumber(row, [
-          'reward_earned',
-          'earned_amount',
-          'reward_amount',
-          'total_earned',
-        ]) ?? 0,
-      ),
-    0,
-  );
+  const bookingStatusFor = (row: RecordRow) =>
+    firstString(row, ['booking_status'])
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
 
-  const pending = referralRows.reduce(
-    (total, row) =>
-      total +
-      Math.max(
-        0,
-        firstNumber(row, [
-          'pending_amount',
-          'reward_pending',
-          'pending_reward',
-        ]) ?? 0,
-      ),
-    0,
-  );
+  const petParentSignups = referralRows.filter((row) =>
+    ['pet_parent', 'customer', 'pet_owner', 'parent'].includes(typeFor(row)),
+  ).length;
 
-  const paid = referralRows.reduce(
-    (total, row) =>
-      total +
-      Math.max(
-        0,
-        firstNumber(row, [
-          'paid_amount',
-          'reward_paid',
-          'total_paid',
-        ]) ?? 0,
-      ),
-    0,
-  );
+  const guruSignups = referralRows.filter((row) =>
+    ['guru', 'future_guru', 'provider', 'sitter', 'walker'].includes(typeFor(row)),
+  ).length;
+
+  const businessSignups = referralRows.filter((row) =>
+    ['business', 'partner', 'community_partner'].includes(typeFor(row)),
+  ).length;
+
+  const completedBookings = referralRows.filter((row) => {
+    const bookingStatus = bookingStatusFor(row);
+    const status = statusFor(row);
+
+    return Boolean(
+      firstString(row, ['completed_booking_at']) ||
+        ['booking_completed', 'completed'].includes(bookingStatus) ||
+        status === 'booking_completed',
+    );
+  }).length;
+
+  const qualified = referralRows.filter((row) => {
+    const status = statusFor(row);
+
+    return Boolean(
+      firstString(row, ['qualified_at']) ||
+        firstBoolean(row, ['qualified', 'is_qualified', 'approved']) ||
+        ['qualified', 'approved', 'active', 'completed'].includes(status),
+    );
+  }).length;
+
+  const socialSignups = referralRows.filter((row) => {
+    const source = [
+      firstString(row, ['platform']),
+      firstString(row, ['source']),
+      firstString(row, ['medium']),
+      firstString(row, ['campaign']),
+      firstString(row, ['utm_source']),
+    ]
+      .join(' ')
+      .toLowerCase();
+
+    return ['facebook', 'instagram', 'tiktok', 'youtube', 'twitter', ' x '].some(
+      (platform) => source.includes(platform.trim()),
+    );
+  }).length;
+
+  const partnerLeads = [...referralRows, ...leadRows].filter((row) => {
+    const type = typeFor(row);
+    return type.includes('partner') || type.includes('business');
+  }).length;
+
+  const signups =
+    canonicalReferralRows.length > 0
+      ? referralRows.length
+      : referralRows.reduce(
+          (total, row) =>
+            total +
+            Math.max(
+              0,
+              Math.round(
+                firstNumber(row, [
+                  'signups',
+                  'signup_count',
+                  'registered_count',
+                ]) ?? 1,
+              ),
+            ),
+          0,
+        );
+
+  const clicks =
+    clickRows.length > 0
+      ? clickRows.length
+      : referralRows.reduce(
+          (total, row) =>
+            total +
+            Math.max(
+              0,
+              Math.round(
+                firstNumber(row, [
+                  'clicks',
+                  'link_clicks',
+                  'click_count',
+                ]) ?? 0,
+              ),
+            ),
+          0,
+        );
+
+  let pending = 0;
+  let approved = 0;
+  let ready = 0;
+  let paid = 0;
+
+  rewardRows.forEach((row) => {
+    const amount = Math.max(
+      0,
+      firstNumber(row, [
+        'amount',
+        'reward_amount',
+        'payout_amount',
+      ]) ?? 0,
+    );
+    const statuses = [
+      firstString(row, ['status']),
+      firstString(row, ['financial_status']),
+      firstString(row, ['payout_status']),
+    ].map((value) => value.toLowerCase().replace(/[\s-]+/g, '_'));
+
+    if (
+      firstString(row, ['paid_at']) ||
+      statuses.some((status) =>
+        ['paid', 'payout_paid', 'payout_completed', 'settled'].includes(status),
+      )
+    ) {
+      paid += amount;
+      return;
+    }
+
+    if (
+      statuses.some((status) =>
+        ['ready_for_payout', 'queued_for_payout', 'queued'].includes(status),
+      )
+    ) {
+      ready += amount;
+      return;
+    }
+
+    if (statuses.some((status) => status === 'approved')) {
+      approved += amount;
+      return;
+    }
+
+    if (
+      !statuses.some((status) =>
+        [
+          'rejected',
+          'ineligible',
+          'void',
+          'voided',
+          'cancelled',
+          'canceled',
+          'refunded',
+          'chargeback',
+          'reversed',
+        ].includes(status),
+      )
+    ) {
+      pending += amount;
+    }
+  });
+
+  if (!rewardRows.length) {
+    pending = referralRows.reduce(
+      (sum, row) =>
+        sum +
+        Math.max(
+          0,
+          firstNumber(row, [
+            'pending_amount',
+            'reward_pending',
+            'pending_reward',
+          ]) ?? 0,
+        ),
+      0,
+    );
+    paid = referralRows.reduce(
+      (sum, row) =>
+        sum +
+        Math.max(
+          0,
+          firstNumber(row, [
+            'paid_amount',
+            'reward_paid',
+            'total_paid',
+          ]) ?? 0,
+        ),
+      0,
+    );
+  }
 
   const leads = leadRows.map((row, index) => ({
     id: firstString(row, ['id', 'lead_id']) || `lead-${index}`,
     stage: normalizeLeadStage(
-      firstString(row, ['stage', 'status', 'lead_status', 'pipeline_stage']),
+      firstString(row, [
+        'stage',
+        'status',
+        'lead_status',
+        'pipeline_stage',
+      ]),
     ),
   }));
 
@@ -1480,29 +1996,241 @@ async function loadAmbassadorDashboard(
   }, 0);
 
   const unreadNotifications = notificationRows.reduce((total, row) => {
-    if (firstBoolean(row, ['is_unread', 'unread'])) {
-      return total + 1;
-    }
-
-    if (!firstBoolean(row, ['is_read', 'read', 'seen'])) {
-      return total + 1;
-    }
-
+    if (firstBoolean(row, ['is_unread', 'unread'])) return total + 1;
+    if (!firstBoolean(row, ['is_read', 'read', 'seen'])) return total + 1;
     return total;
   }, 0);
 
+  const onboarding = getOnboardingSummary(
+    onboardingRows[0] || {},
+    firstString(ambassador, ['onboarding_status']),
+  );
+
+  const training = getTrainingSummary(
+    trainingSteps,
+    trainingProgressRows,
+    firstString(ambassador, ['training_status']),
+  );
+
+  const payout = getPayoutSummary(ambassador);
+
   return {
+    ambassadorStatus:
+      formatStatus(firstString(ambassador, ['status'])) || 'Active',
+    approved,
+    businessSignups,
     clicks,
-    earned,
+    completedBookings,
+    earned: pending + approved + ready + paid,
+    guruSignups,
     leads,
+    onboardingLabel: onboarding.label,
+    onboardingStatus: onboarding.status,
     paid,
     partnerLeads,
+    payoutCompleted: payout.completed,
+    payoutReady: payout.ready,
+    payoutStatus: payout.label,
+    payoutTotal: payout.total,
     pending,
+    petParentSignups,
     qualified,
+    ready,
+    referralCode,
     signups,
+    socialSignups,
+    trainingCompleted: training.completed,
+    trainingLabel: training.label,
+    trainingPercent: training.percent,
+    trainingRequired: training.required,
     unreadMessages,
     unreadNotifications,
   };
+}
+
+async function findAmbassadorRecord(
+  userId: string,
+  email?: string | null,
+): Promise<RecordRow> {
+  const byUser = await supabase
+    .from('ambassadors')
+    .select('*')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (!byUser.error && byUser.data) {
+    return byUser.data as RecordRow;
+  }
+
+  const cleanEmail = (email || '').trim().toLowerCase();
+
+  if (!cleanEmail) return {};
+
+  for (const field of ['login_email', 'contact_email', 'email']) {
+    const result = await supabase
+      .from('ambassadors')
+      .select('*')
+      .eq(field, cleanEmail)
+      .limit(1)
+      .maybeSingle();
+
+    if (!result.error && result.data) {
+      return result.data as RecordRow;
+    }
+  }
+
+  return {};
+}
+
+async function safeRows(
+  table: string,
+  field: string,
+  value: string,
+  limit: number,
+): Promise<RecordRow[]> {
+  if (!isSupabaseConfigured || !value) return [];
+
+  const result = await supabase
+    .from(table)
+    .select('*')
+    .eq(field, value)
+    .limit(limit);
+
+  if (result.error || !result.data) return [];
+  return result.data as RecordRow[];
+}
+
+async function safeActiveTrainingSteps(): Promise<RecordRow[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const result = await supabase
+    .from('ambassador_training_steps')
+    .select('*')
+    .eq('is_active', true)
+    .limit(500);
+
+  if (result.error || !result.data) return [];
+  return result.data as RecordRow[];
+}
+
+function getOnboardingSummary(
+  packet: RecordRow,
+  fallbackStatus: string,
+): {
+  label: string;
+  status: 'complete' | 'pending' | 'needs_action';
+} {
+  const status = (
+    firstString(packet, ['status']) || fallbackStatus
+  )
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  if (['approved', 'complete', 'completed'].includes(status)) {
+    return { label: 'Complete', status: 'complete' };
+  }
+
+  if (['submitted', 'pending_review', 'in_review'].includes(status)) {
+    return { label: 'Submitted', status: 'pending' };
+  }
+
+  if (['needs_fix', 'needs_action'].includes(status)) {
+    return { label: 'Needs Fix', status: 'needs_action' };
+  }
+
+  return { label: 'Needs Action', status: 'needs_action' };
+}
+
+function getTrainingSummary(
+  steps: RecordRow[],
+  progressRows: RecordRow[],
+  fallbackStatus: string,
+) {
+  const requiredSteps = steps.filter(
+    (step) => step.is_required !== false,
+  );
+  const completedStepIds = new Set(
+    progressRows
+      .filter((row) => {
+        const status = firstString(row, ['status'])
+          .toLowerCase()
+          .replace(/[\s-]+/g, '_');
+
+        return Boolean(
+          firstString(row, ['completed_at']) ||
+            ['complete', 'completed', 'approved'].includes(status),
+        );
+      })
+      .map((row) => firstString(row, ['training_step_id']))
+      .filter(Boolean),
+  );
+
+  const completed = requiredSteps.filter((step) =>
+    completedStepIds.has(firstString(step, ['id'])),
+  ).length;
+  const required = requiredSteps.length;
+
+  if (required > 0) {
+    const percent = Math.round((completed / required) * 100);
+    return {
+      completed,
+      label:
+        completed >= required
+          ? 'Complete'
+          : progressRows.length
+            ? `In Progress (${percent}%)`
+            : 'Not Started',
+      percent,
+      required,
+    };
+  }
+
+  const fallback = formatStatus(fallbackStatus) || 'Not Started';
+  const complete = fallback.toLowerCase().includes('complete');
+
+  return {
+    completed: complete ? 1 : 0,
+    label: fallback,
+    percent: complete ? 100 : 0,
+    required: complete ? 1 : 0,
+  };
+}
+
+function getPayoutSummary(ambassador: RecordRow) {
+  const taxStatus = firstString(ambassador, ['tax_info_status'])
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  const checks = [
+    Boolean(firstString(ambassador, ['terms_accepted_at'])),
+    Boolean(firstString(ambassador, ['stripe_account_id'])),
+    firstBoolean(ambassador, ['stripe_onboarding_complete']),
+    firstBoolean(ambassador, ['stripe_payouts_enabled']),
+    Boolean(taxStatus && taxStatus !== 'not_started'),
+    Boolean(firstString(ambassador, ['payout_method'])),
+  ];
+
+  const completed = checks.filter(Boolean).length;
+  const total = checks.length;
+  const ready = total > 0 && completed === total;
+
+  return {
+    completed,
+    label:
+      formatStatus(firstString(ambassador, ['payout_status'])) ||
+      (ready ? 'Ready for payout' : 'Setup incomplete'),
+    ready,
+    total,
+  };
+}
+
+function formatStatus(value: string) {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 async function queryFirstAvailableRows(
@@ -1841,6 +2569,12 @@ function createStyles(isDark: boolean) {
       paddingHorizontal: 16,
       paddingTop: 10,
     },
+    scrollContentTablet: {
+      alignSelf: 'center',
+      maxWidth: 880,
+      paddingHorizontal: 24,
+      width: '100%',
+    },
     header: {
       alignItems: 'center',
       flexDirection: 'row',
@@ -1946,6 +2680,153 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.medium,
       fontSize: 10,
       lineHeight: 14,
+    },
+    workspaceHero: {
+      backgroundColor: isDark ? '#0D2B20' : '#ECF8EE',
+      borderColor: isDark ? '#2D6548' : '#CFE8D5',
+      borderRadius: 24,
+      borderWidth: 1,
+      gap: 10,
+      padding: 16,
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: isDark ? 0.2 : 0.07,
+      shadowRadius: 16,
+    },
+    workspaceEyebrow: {
+      color: palette.accent,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 8,
+      letterSpacing: 0.9,
+    },
+    workspaceTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 24,
+      letterSpacing: -0.65,
+      lineHeight: 29,
+    },
+    workspaceSubtitle: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 16,
+    },
+    statusPillRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    statusPill: {
+      backgroundColor: palette.accentSoft,
+      borderRadius: 999,
+      paddingHorizontal: 9,
+      paddingVertical: 6,
+    },
+    statusPillText: {
+      color: palette.accent,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 8,
+    },
+    codeCard: {
+      backgroundColor: palette.surfaceSoft,
+      borderColor: palette.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      gap: 8,
+      padding: 11,
+    },
+    codeCopy: {
+      gap: 2,
+    },
+    codeLabel: {
+      color: palette.accent,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 7,
+      letterSpacing: 0.8,
+    },
+    codeValue: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 22,
+      letterSpacing: -0.4,
+    },
+    codeDetail: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 8,
+      lineHeight: 13,
+    },
+    readinessCard: {
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 20,
+      borderWidth: 1,
+      overflow: 'hidden',
+      paddingTop: 12,
+    },
+    readinessRow: {
+      alignItems: 'center',
+      borderBottomColor: palette.border,
+      borderBottomWidth: 1,
+      flexDirection: 'row',
+      gap: 9,
+      minHeight: 76,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    readinessRowLast: {
+      borderBottomWidth: 0,
+    },
+    readinessIcon: {
+      alignItems: 'center',
+      backgroundColor: palette.accentSoft,
+      borderRadius: 12,
+      height: 38,
+      justifyContent: 'center',
+      width: 38,
+    },
+    readinessCopy: {
+      flex: 1,
+      gap: 4,
+      minWidth: 0,
+    },
+    readinessTitleRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    readinessLabel: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 10,
+    },
+    readinessStatus: {
+      color: palette.accent,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 8,
+      maxWidth: '52%',
+      textAlign: 'right',
+    },
+    readinessDetail: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 8,
+      lineHeight: 12,
+    },
+    readinessTrack: {
+      backgroundColor: palette.accentSoft,
+      borderRadius: 999,
+      height: 5,
+      overflow: 'hidden',
+    },
+    readinessFill: {
+      backgroundColor: palette.accent,
+      borderRadius: 999,
+      height: '100%',
+    },
+    readinessChevron: {
+      color: palette.muted,
     },
     primaryActionCard: {
       alignItems: 'center',
@@ -2101,6 +2982,42 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.medium,
       fontSize: 8,
     },
+    analyticsButton: {
+      alignItems: 'center',
+      backgroundColor: palette.accentSoft,
+      borderColor: palette.border,
+      borderRadius: 15,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 9,
+      marginTop: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 9,
+    },
+    analyticsButtonIcon: {
+      alignItems: 'center',
+      backgroundColor: palette.surface,
+      borderRadius: 11,
+      height: 34,
+      justifyContent: 'center',
+      width: 34,
+    },
+    analyticsButtonCopy: {
+      flex: 1,
+      gap: 1,
+      minWidth: 0,
+    },
+    analyticsButtonTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 10,
+    },
+    analyticsButtonText: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 8,
+      lineHeight: 12,
+    },
     quickActions: {
       flexDirection: 'row',
       gap: 8,
@@ -2114,7 +3031,7 @@ function createStyles(isDark: boolean) {
       flex: 1,
       gap: 6,
       justifyContent: 'center',
-      minHeight: 74,
+      minHeight: 78,
       paddingHorizontal: 5,
       paddingVertical: 9,
     },
@@ -2152,6 +3069,32 @@ function createStyles(isDark: boolean) {
       fontSize: 9,
       textAlign: 'center',
     },
+    analyticsStrip: {
+      alignItems: 'center',
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 9,
+      minHeight: 54,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+    },
+    analyticsStripCopy: {
+      flex: 1,
+      gap: 1,
+    },
+    analyticsStripTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 10,
+    },
+    analyticsStripText: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 8,
+    },
     pressed: {
       opacity: 0.72,
       transform: [{ scale: 0.985 }],
@@ -2170,7 +3113,7 @@ function createStyles(isDark: boolean) {
       borderBottomWidth: 1,
       flexDirection: 'row',
       gap: 9,
-      minHeight: 53,
+      minHeight: 56,
       paddingHorizontal: 13,
       paddingVertical: 8,
     },
@@ -2218,7 +3161,7 @@ function createStyles(isDark: boolean) {
       borderBottomWidth: 1,
       flexDirection: 'row',
       gap: 9,
-      minHeight: 70,
+      minHeight: 74,
       padding: 11,
     },
     earnRowLast: {
@@ -2356,7 +3299,7 @@ function createStyles(isDark: boolean) {
       borderBottomWidth: 1,
       flexDirection: 'row',
       gap: 10,
-      minHeight: 72,
+      minHeight: 76,
       padding: 11,
     },
     programRowLast: {
