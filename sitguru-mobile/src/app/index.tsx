@@ -1,29 +1,30 @@
 import { router } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import {
-    ArrowRight,
-    CalendarCheck2,
-    ChevronDown,
-    LockKeyhole,
-    MapPin,
-    Megaphone,
-    PawPrint,
-    Search,
-    ShieldCheck,
-    UsersRound,
+  ArrowRight,
+  CalendarCheck2,
+  ChevronDown,
+  LockKeyhole,
+  MapPin,
+  Megaphone,
+  PawPrint,
+  Search,
+  ShieldCheck,
+  UsersRound,
 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-    Image,
-    ImageSourcePropType,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  Image,
+  ImageSourcePropType,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 
 import { SitGuruIcon } from '@/components/SitGuruIcon';
@@ -31,9 +32,9 @@ import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
 import { BrandColors } from '@/constants/theme';
 import {
-    setThemePreference,
-    SitGuruThemePreference,
-    useThemePreference,
+  setThemePreference,
+  SitGuruThemePreference,
+  useThemePreference,
 } from '@/hooks/use-color-scheme';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 
@@ -57,11 +58,21 @@ type ServiceCard = {
   icon: 'walks' | 'dropIns' | 'sitting' | 'boarding';
 };
 
-const heroSceneLight =
-  require('../assets/images/home-hero-scene-light.png') as ImageSourcePropType;
+const heroCareVideoAsset = require(
+  '../assets/videos/sitguru-homepage-care.mp4'
+);
 
-const heroSceneDark =
-  require('../assets/images/home-hero-scene-dark.png') as ImageSourcePropType;
+const heroAppVideoAsset = require(
+  '../assets/videos/sitguru-homepage-app.mp4'
+);
+
+const heroCarePosterAsset = require(
+  '../assets/images/sitguru-homepage-care-poster.jpg'
+) as ImageSourcePropType;
+
+const heroAppPosterAsset = require(
+  '../assets/images/sitguru-homepage-app-poster.jpg'
+) as ImageSourcePropType;
 
 const sitGuruLogoLight =
   require('../assets/images/sitguru-logo-light.png') as ImageSourcePropType;
@@ -120,18 +131,56 @@ export default function HomeScreen() {
   const isTablet = Platform.OS !== 'web' && width >= 768;
 
   const styles = createStyles(theme, isDark, isTablet);
-  const heroImage = isDark ? heroSceneDark : heroSceneLight;
   const logoImage = isDark ? sitGuruLogoDark : sitGuruLogoLight;
 
   const [selectedService, setSelectedService] = useState('All services');
   const [zipCode, setZipCode] = useState('');
   const [serviceMenuOpen, setServiceMenuOpen] = useState(false);
 
+  const carePlayer = useVideoPlayer(heroCareVideoAsset, (player) => {
+    player.loop = true;
+    player.muted = true;
+    player.play();
+  });
+
+  const appPlayer = useVideoPlayer(heroAppVideoAsset, (player) => {
+    player.loop = true;
+    player.muted = true;
+    player.play();
+  });
+
+  useEffect(() => {
+    const startVideos = () => {
+      carePlayer.loop = true;
+      carePlayer.muted = true;
+      appPlayer.loop = true;
+      appPlayer.muted = true;
+
+      carePlayer.play();
+      appPlayer.play();
+    };
+
+    startVideos();
+
+    const retryTimer = setTimeout(startVideos, 500);
+
+    return () => {
+      clearTimeout(retryTimer);
+    };
+  }, [appPlayer, carePlayer]);
+
+  function resumeHeroVideos() {
+    carePlayer.muted = true;
+    appPlayer.muted = true;
+    carePlayer.play();
+    appPlayer.play();
+  }
+
   const roleCards = useMemo<RoleCard[]>(
     () => [
       {
         title: 'Find a Guru',
-        subtitle: 'Book trusted care for your pet',
+        subtitle: 'Book trusted local pet care',
         tint: 'green',
         action: 'find',
         icon: (
@@ -148,7 +197,7 @@ export default function HomeScreen() {
       },
       {
         title: 'Become a Guru',
-        subtitle: 'Turn your love for pets into opportunity',
+        subtitle: 'Set your schedule. Earn with pets.',
         tint: 'gold',
         action: 'guru',
         icon: (
@@ -165,7 +214,7 @@ export default function HomeScreen() {
       },
       {
         title: 'Become an Ambassador',
-        subtitle: 'Share SitGuru and earn rewards',
+        subtitle: 'Share SitGuru. Track. Earn.',
         tint: 'lavender',
         action: 'ambassador',
         icon: (
@@ -237,6 +286,45 @@ export default function HomeScreen() {
               !isWebPreview && styles.phoneShellNative,
             ]}
           >
+            <View pointerEvents="none" style={styles.backgroundPawLayer}>
+              <PawPrint
+                color={styles.backgroundPaw.color}
+                size={34}
+                strokeWidth={1.5}
+                style={[styles.backgroundPaw, styles.backgroundPawOne]}
+              />
+              <PawPrint
+                color={styles.backgroundPaw.color}
+                size={23}
+                strokeWidth={1.5}
+                style={[styles.backgroundPaw, styles.backgroundPawTwo]}
+              />
+              <PawPrint
+                color={styles.backgroundPaw.color}
+                size={29}
+                strokeWidth={1.5}
+                style={[styles.backgroundPaw, styles.backgroundPawThree]}
+              />
+              <PawPrint
+                color={styles.backgroundPaw.color}
+                size={21}
+                strokeWidth={1.5}
+                style={[styles.backgroundPaw, styles.backgroundPawFour]}
+              />
+              <PawPrint
+                color={styles.backgroundPaw.color}
+                size={31}
+                strokeWidth={1.5}
+                style={[styles.backgroundPaw, styles.backgroundPawFive]}
+              />
+              <PawPrint
+                color={styles.backgroundPaw.color}
+                size={20}
+                strokeWidth={1.5}
+                style={[styles.backgroundPaw, styles.backgroundPawSix]}
+              />
+            </View>
+
             <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -310,62 +398,128 @@ export default function HomeScreen() {
 
           <View style={styles.heroSection}>
             <View style={styles.heroCopy}>
+              <Text style={styles.heroEyebrow}>LOCAL CARE • EASY BOOKING</Text>
+
               <Text style={styles.heroTitle}>
-                Trusted pet care.{'\n'}Made{' '}
-                <Text style={styles.heroTitleAccent}>simple.</Text>
+                Real care.{'\n'}Right from{' '}
+                <Text style={styles.heroTitleAccent}>your phone.</Text>
               </Text>
 
               <Text style={styles.heroSubtitle}>
-                Book trusted local Gurus for walks, sitting, boarding, training,
-                and more—tailored for your pet.
+                Meet caring local Gurus who’ll treat your pet like family,
+                book with ease, and stay connected through every visit.
               </Text>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openFindCare()}
-                style={({ pressed }) => [
-                  styles.heroPrimaryButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={styles.heroPrimaryButtonText}>Find a Guru</Text>
-                <ArrowRight color="#FFFFFF" size={18} strokeWidth={2.5} />
-              </Pressable>
+              <View style={styles.heroButtonRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => openFindCare()}
+                  style={({ pressed }) => [
+                    styles.heroPrimaryButton,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.heroPrimaryButtonText}>
+                  Find a Guru Near You
+                </Text>
+                  <ArrowRight color="#FFFFFF" size={18} strokeWidth={2.5} />
+                </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/login')}
-                style={({ pressed }) => [
-                  styles.heroLoginButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={styles.heroLoginButtonText}>Log in</Text>
-              </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => router.push('/login')}
+                  style={({ pressed }) => [
+                    styles.heroLoginButton,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.heroLoginButtonText}>Log in</Text>
+                </Pressable>
+              </View>
             </View>
 
-            <View style={styles.heroVisual}>
-              <Image
-                source={heroImage}
-                resizeMode="cover"
-                style={styles.heroImage}
-              />
+            <View style={styles.heroMediaStage}>
+              <Pressable
+                accessibilityHint="Starts the homepage videos if autoplay is paused"
+                accessibilityLabel="Play SitGuru care videos"
+                accessibilityRole="button"
+                onPress={resumeHeroVideos}
+                style={styles.heroCareVideoCard}
+              >
+                <Image
+                  source={heroCarePosterAsset}
+                  resizeMode="cover"
+                  style={styles.heroPoster}
+                />
 
-              <View pointerEvents="none" style={styles.heroImageShade} />
+                <VideoView
+                  contentFit="cover"
+                  nativeControls={false}
+                  player={carePlayer}
+                  playsInline
+                  pointerEvents="none"
+                  style={styles.heroVideo}
+                  surfaceType={
+                    Platform.OS === 'android' ? 'textureView' : undefined
+                  }
+                  useExoShutter={false}
+                />
 
-              <View style={styles.trustBadge}>
-                <View style={styles.trustBadgeIcon}>
-                  <ShieldCheck
-                    color={styles.trustBadgeIconText.color}
-                    size={21}
-                    strokeWidth={2.4}
-                  />
+                <View pointerEvents="none" style={styles.heroVideoShade} />
+
+                <View style={styles.heroVideoLabel}>
+                  <View style={styles.heroVideoLabelDot} />
+                  <Text style={styles.heroVideoLabelText}>Local Dog Walking</Text>
                 </View>
 
-                <Text style={styles.trustBadgeText}>
-                  Trusted by pet parents{'\n'}in your community
-                </Text>
-              </View>
+                <View style={styles.trustBadge}>
+                  <View style={styles.trustBadgeIcon}>
+                    <ShieldCheck
+                      color={styles.trustBadgeIconText.color}
+                      size={20}
+                      strokeWidth={2.4}
+                    />
+                  </View>
+
+                  <Text style={styles.trustBadgeText}>
+                    Trusted Local Pet Care{'\n'}Providers Near You
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityHint="Starts the homepage videos if autoplay is paused"
+                accessibilityLabel="Play SitGuru app video"
+                accessibilityRole="button"
+                onPress={resumeHeroVideos}
+                style={styles.heroAppVideoCard}
+              >
+                <Image
+                  source={heroAppPosterAsset}
+                  resizeMode="cover"
+                  style={styles.heroPoster}
+                />
+
+                <VideoView
+                  contentFit="cover"
+                  nativeControls={false}
+                  player={appPlayer}
+                  playsInline
+                  pointerEvents="none"
+                  style={styles.heroVideo}
+                  surfaceType={
+                    Platform.OS === 'android' ? 'textureView' : undefined
+                  }
+                  useExoShutter={false}
+                />
+
+                <View pointerEvents="none" style={styles.heroAppVideoShade} />
+
+                <View style={styles.heroAppLabel}>
+                  <Search color="#FFFFFF" size={13} strokeWidth={2.5} />
+                  <Text style={styles.heroAppLabelText}>Easily Book a Drop-in Visit</Text>
+                </View>
+              </Pressable>
             </View>
           </View>
 
@@ -472,6 +626,49 @@ export default function HomeScreen() {
               </Pressable>
             </View>
           </View>
+
+          <Pressable
+            accessibilityHint="Opens PawReport Live"
+            accessibilityLabel="Learn about PawReport Live"
+            accessibilityRole="button"
+            onPress={() => router.push('/pawreport-live' as never)}
+            style={({ pressed }) => [
+              styles.pawReportCard,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.pawReportIconWrap}>
+              <PawPrint
+                color={styles.pawReportIconText.color}
+                size={23}
+                strokeWidth={2.4}
+              />
+              <View style={styles.pawReportLiveDot} />
+            </View>
+
+            <View style={styles.pawReportCopy}>
+              <View style={styles.pawReportBadge}>
+                <Text style={styles.pawReportBadgeText}>
+                  EXCLUSIVE SITGURU FEATURE
+                </Text>
+              </View>
+
+              <Text style={styles.pawReportTitle}>
+                Follow care in real time with PawReport Live.
+              </Text>
+
+              <Text style={styles.pawReportBody}>
+                Live walks, visit updates, photos, and final care summaries in
+                one trusted report.
+              </Text>
+            </View>
+
+            <ArrowRight
+              color={styles.pawReportArrow.color}
+              size={18}
+              strokeWidth={2.5}
+            />
+          </Pressable>
 
           <View style={styles.roleGrid}>
             {roleCards.map((card) => (
@@ -828,7 +1025,51 @@ function createStyles(
       borderWidth: 1,
       height: 844,
       overflow: 'hidden',
+      position: 'relative',
       width: '100%',
+    },
+    backgroundPawLayer: {
+      bottom: 0,
+      left: 0,
+      overflow: 'hidden',
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      zIndex: 0,
+    },
+    backgroundPaw: {
+      color: isDark ? 'rgba(88,213,138,0.055)' : 'rgba(8,116,73,0.045)',
+      position: 'absolute',
+    },
+    backgroundPawOne: {
+      right: 28,
+      top: 98,
+      transform: [{ rotate: '14deg' }],
+    },
+    backgroundPawTwo: {
+      left: 24,
+      top: 332,
+      transform: [{ rotate: '-18deg' }],
+    },
+    backgroundPawThree: {
+      right: 18,
+      top: 620,
+      transform: [{ rotate: '22deg' }],
+    },
+    backgroundPawFour: {
+      left: 42,
+      top: 790,
+      transform: [{ rotate: '-8deg' }],
+    },
+    backgroundPawFive: {
+      right: 74,
+      top: 980,
+      transform: [{ rotate: '18deg' }],
+    },
+    backgroundPawSix: {
+      left: 30,
+      top: 1210,
+      transform: [{ rotate: '-16deg' }],
     },
     phoneShellNative: {
       borderRadius: 0,
@@ -841,6 +1082,8 @@ function createStyles(
       paddingBottom: 104,
       paddingHorizontal: isTablet ? 24 : 0,
       paddingTop: Platform.OS === 'web' ? 12 : 6,
+      position: 'relative',
+      zIndex: 1,
     },
 
     statusBar: {
@@ -935,22 +1178,26 @@ function createStyles(
     },
 
     heroSection: {
-      minHeight: isTablet ? 470 : 452,
-      position: 'relative',
+      gap: 16,
+      paddingBottom: 2,
     },
     heroCopy: {
-      maxWidth: isTablet ? 370 : 265,
-      paddingLeft: 22,
-      paddingRight: 10,
-      paddingTop: 12,
-      zIndex: 5,
+      paddingHorizontal: 22,
+      paddingTop: 8,
+    },
+    heroEyebrow: {
+      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 8,
+      letterSpacing: 1.1,
+      marginBottom: 8,
     },
     heroTitle: {
       color: title,
       fontFamily: AppFonts.extraBold,
-      fontSize: isTablet ? 45 : 38,
-      letterSpacing: -1.35,
-      lineHeight: isTablet ? 51 : 43,
+      fontSize: isTablet ? 44 : 37,
+      letterSpacing: -1.25,
+      lineHeight: isTablet ? 50 : 42,
     },
     heroTitleAccent: {
       color: isDark ? '#58D58A' : '#0A9B62',
@@ -960,16 +1207,22 @@ function createStyles(
       fontFamily: AppFonts.medium,
       fontSize: isTablet ? 16 : 14,
       lineHeight: isTablet ? 23 : 20,
-      marginTop: 14,
+      marginTop: 12,
+      maxWidth: isTablet ? 620 : 360,
+    },
+    heroButtonRow: {
+      flexDirection: isTablet ? 'row' : 'column',
+      gap: 10,
+      marginTop: 17,
     },
     heroPrimaryButton: {
       alignItems: 'center',
       backgroundColor: isDark ? '#159A61' : '#0A9B62',
       borderRadius: 13,
+      flex: isTablet ? 1 : undefined,
       flexDirection: 'row',
       gap: 10,
       justifyContent: 'center',
-      marginTop: 18,
       minHeight: 54,
       paddingHorizontal: 18,
       shadowColor: '#000000',
@@ -988,8 +1241,8 @@ function createStyles(
       borderColor: border,
       borderRadius: 13,
       borderWidth: 1,
+      flex: isTablet ? 1 : undefined,
       justifyContent: 'center',
-      marginTop: 10,
       minHeight: 52,
       paddingHorizontal: 18,
       shadowColor: '#000000',
@@ -1002,23 +1255,123 @@ function createStyles(
       fontFamily: AppFonts.bold,
       fontSize: 15,
     },
-    heroVisual: {
-      borderBottomLeftRadius: 130,
-      borderTopLeftRadius: 130,
+    heroMediaStage: {
+      height: isTablet ? 330 : 272,
+      marginHorizontal: 18,
+      position: 'relative',
+    },
+    heroCareVideoCard: {
+      backgroundColor: isDark ? '#10251C' : '#EAF3EC',
+      borderColor: border,
+      borderRadius: 28,
+      borderWidth: 1,
+      bottom: isTablet ? 0 : 34,
+      left: 0,
+      overflow: 'hidden',
+      position: 'absolute',
+      right: isTablet ? '34%' : 0,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: isDark ? 0.24 : 0.11,
+      shadowRadius: 18,
+      top: 0,
+    },
+    heroAppVideoCard: {
+      backgroundColor: isDark ? '#151F1A' : '#F7F2E9',
+      borderColor: isDark ? '#3A6650' : '#FFFFFF',
+      borderRadius: 21,
+      borderWidth: 3,
       bottom: 0,
-      height: isTablet ? 410 : 385,
+      height: isTablet ? '100%' : 124,
       overflow: 'hidden',
       position: 'absolute',
       right: 0,
-      width: isTablet ? '58%' : '58%',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 9 },
+      shadowOpacity: isDark ? 0.32 : 0.2,
+      shadowRadius: 16,
+      width: isTablet ? '38%' : '46%',
     },
-    heroImage: {
+    heroPoster: {
+      bottom: 0,
       height: '100%',
+      left: 0,
+      position: 'absolute',
+      right: 0,
+      top: 0,
       width: '100%',
     },
-    heroImageShade: {
-      backgroundColor: isDark ? 'rgba(6,20,15,0.08)' : 'rgba(255,249,242,0.03)',
-      ...StyleSheet.absoluteFillObject,
+    heroVideo: {
+      bottom: 0,
+      height: '100%',
+      left: 0,
+      opacity: 1,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      width: '100%',
+    },
+    heroVideoShade: {
+      backgroundColor: isDark
+        ? 'rgba(6,20,15,0.16)'
+        : 'rgba(10,48,34,0.05)',
+      bottom: 0,
+      left: 0,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+    },
+    heroAppVideoShade: {
+      backgroundColor: isDark
+        ? 'rgba(6,20,15,0.12)'
+        : 'rgba(11,39,29,0.08)',
+      bottom: 0,
+      left: 0,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+    },
+    heroVideoLabel: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(6,20,15,0.76)',
+      borderRadius: 999,
+      flexDirection: 'row',
+      gap: 6,
+      left: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      position: 'absolute',
+      top: 12,
+    },
+    heroVideoLabelDot: {
+      backgroundColor: '#58D58A',
+      borderRadius: 999,
+      height: 7,
+      width: 7,
+    },
+    heroVideoLabelText: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.bold,
+      fontSize: 9,
+    },
+    heroAppLabel: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(6,20,15,0.82)',
+      borderRadius: 999,
+      bottom: 9,
+      flexDirection: 'row',
+      gap: 5,
+      left: 9,
+      paddingHorizontal: 9,
+      paddingVertical: 7,
+      position: 'absolute',
+      right: 9,
+    },
+    heroAppLabelText: {
+      color: '#FFFFFF',
+      flex: 1,
+      fontFamily: AppFonts.bold,
+      fontSize: 8,
     },
     trustBadge: {
       alignItems: 'center',
@@ -1026,7 +1379,7 @@ function createStyles(
       borderColor: border,
       borderRadius: 13,
       borderWidth: 1,
-      bottom: 18,
+      bottom: isTablet ? 12 : 10,
       flexDirection: 'row',
       gap: 8,
       left: 12,
@@ -1060,7 +1413,7 @@ function createStyles(
       borderWidth: 1,
       gap: 9,
       marginHorizontal: 18,
-      marginTop: -1,
+      marginTop: 14,
       padding: 14,
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 10 },
@@ -1169,6 +1522,86 @@ function createStyles(
       color: '#FFFFFF',
       fontFamily: AppFonts.bold,
       fontSize: 12,
+    },
+
+    pawReportCard: {
+      alignItems: 'center',
+      backgroundColor: isDark ? '#0D2B20' : '#EFF9F2',
+      borderColor: isDark ? '#2D6548' : '#CFE8D5',
+      borderRadius: 19,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      marginHorizontal: 18,
+      marginTop: 15,
+      minHeight: 118,
+      paddingHorizontal: 13,
+      paddingVertical: 12,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 7 },
+      shadowOpacity: isDark ? 0.18 : 0.06,
+      shadowRadius: 14,
+    },
+    pawReportIconWrap: {
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: isDark ? '#123E2A' : '#DFF2E5',
+      borderRadius: 14,
+      height: 44,
+      justifyContent: 'center',
+      marginTop: 2,
+      position: 'relative',
+      width: 44,
+    },
+    pawReportIconText: {
+      color: isDark ? '#58D58A' : BrandColors.greenDark,
+    },
+    pawReportLiveDot: {
+      backgroundColor: '#39D982',
+      borderColor: isDark ? '#123E2A' : '#DFF2E5',
+      borderRadius: 999,
+      borderWidth: 2,
+      height: 10,
+      position: 'absolute',
+      right: 3,
+      top: 3,
+      width: 10,
+    },
+    pawReportCopy: {
+      flex: 1,
+      gap: 4,
+      minWidth: 0,
+    },
+    pawReportBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: isDark ? 'rgba(88,213,138,0.12)' : '#FFFFFF',
+      borderColor: isDark ? '#2D6548' : '#BFE3CB',
+      borderRadius: 999,
+      borderWidth: 1,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    pawReportBadgeText: {
+      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 7,
+      letterSpacing: 0.7,
+    },
+    pawReportTitle: {
+      color: title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 13,
+      letterSpacing: -0.2,
+      lineHeight: 17,
+    },
+    pawReportBody: {
+      color: body,
+      fontFamily: AppFonts.medium,
+      fontSize: 9,
+      lineHeight: 13,
+    },
+    pawReportArrow: {
+      color: isDark ? '#58D58A' : BrandColors.greenDark,
     },
 
     roleGrid: {
@@ -1382,6 +1815,7 @@ function createStyles(
       shadowOffset: { width: 0, height: -8 },
       shadowOpacity: isDark ? 0.28 : 0.08,
       shadowRadius: 18,
+      zIndex: 3,
     },
     navItem: {
       alignItems: 'center',
