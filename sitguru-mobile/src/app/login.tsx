@@ -12,6 +12,7 @@ import {
   UserPlus,
 } from 'lucide-react-native';
 import {
+  createElement,
   useEffect,
   useMemo,
   useRef,
@@ -28,11 +29,17 @@ import {
   View,
 } from 'react-native';
 
+import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SocialAuthButton from '@/components/SocialAuthButton';
-import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
+import {
+  setThemePreference,
+  type SitGuruThemePreference,
+  useThemePreference,
+} from '@/hooks/use-color-scheme';
+import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 
 type SocialProvider =
@@ -43,6 +50,17 @@ type LoginMethod =
   | 'password'
   | 'email_code'
   | 'sms_code';
+
+type ThemeOption = {
+  icon: 'sun' | 'moon';
+  label: string;
+  value: SitGuruThemePreference;
+};
+
+const THEME_OPTIONS: ThemeOption[] = [
+  { icon: 'sun', label: 'Light', value: 'light' },
+  { icon: 'moon', label: 'Dark', value: 'dark' },
+];
 
 function normalizeLoginError(
   message: string,
@@ -256,6 +274,12 @@ function maskPhoneNumber(
 export default function LoginScreen() {
   const isWebPreview =
     Platform.OS === 'web';
+
+  const themeMode = useThemeMode();
+  const themePreference = useThemePreference();
+  const isDark = themeMode === 'dark';
+  const colors = getPalette(isDark);
+  const styles = createStyles(isDark);
 
   const {
     signIn,
@@ -810,6 +834,25 @@ export default function LoginScreen() {
                 styles.phoneShellNative,
             ]}
           >
+            {isWebPreview
+              ? createElement('style', {
+                  dangerouslySetInnerHTML: {
+                    __html: `
+                      input:-webkit-autofill,
+                      input:-webkit-autofill:hover,
+                      input:-webkit-autofill:focus,
+                      input:-webkit-autofill:active {
+                        -webkit-text-fill-color: ${colors.text} !important;
+                        caret-color: ${colors.text} !important;
+                        -webkit-box-shadow: 0 0 0 1000px ${colors.inputSurface} inset !important;
+                        box-shadow: 0 0 0 1000px ${colors.inputSurface} inset !important;
+                        transition: background-color 9999s ease-out 0s;
+                      }
+                    `,
+                  },
+                })
+              : null}
+
             <KeyboardAvoidingView
               behavior={
                 Platform.OS === 'ios'
@@ -821,7 +864,7 @@ export default function LoginScreen() {
               }
             >
               {isWebPreview ? (
-                <PhoneStatusBar />
+                <PhoneStatusBar styles={styles} colors={colors} />
               ) : null}
 
               <ScrollView
@@ -852,7 +895,7 @@ export default function LoginScreen() {
                   >
                     <ChevronLeft
                       color={
-                        SitGuruColors.text
+                        colors.text
                       }
                       size={20}
                       strokeWidth={2.4}
@@ -864,11 +907,40 @@ export default function LoginScreen() {
                     variant="symbol"
                   />
 
-                  <View
-                    style={
-                      styles.topSpacer
-                    }
-                  />
+                  <View style={styles.modeToggle}>
+                    {THEME_OPTIONS.map((option) => {
+                      const active = themePreference === option.value;
+
+                      return (
+                        <Pressable
+                          key={option.value}
+                          accessibilityLabel={`Switch to ${option.label} mode`}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                          onPress={() => setThemePreference(option.value)}
+                          style={[
+                            styles.modeButton,
+                            active && styles.modeButtonActive,
+                          ]}
+                        >
+                          <SitGuruIcon
+                            color={
+                              active
+                                ? option.value === 'light'
+                                  ? '#F3AA1F'
+                                  : isDark
+                                    ? '#F0CF62'
+                                    : colors.primary
+                                : colors.textSoft
+                            }
+                            name={option.icon}
+                            size={16}
+                            strokeWidth={2.4}
+                          />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                 </View>
 
                 <View
@@ -881,7 +953,7 @@ export default function LoginScreen() {
                   >
                     <ShieldCheck
                       color={
-                        SitGuruColors.primary
+                        colors.primary
                       }
                       size={15}
                       strokeWidth={2.4}
@@ -1116,8 +1188,8 @@ export default function LoginScreen() {
                         color={
                           loginMethod ===
                           'password'
-                            ? SitGuruColors.primary
-                            : SitGuruColors.textSoft
+                            ? colors.primary
+                            : colors.textSoft
                         }
                         size={15}
                         strokeWidth={2.3}
@@ -1159,8 +1231,8 @@ export default function LoginScreen() {
                         color={
                           loginMethod ===
                           'email_code'
-                            ? SitGuruColors.primary
-                            : SitGuruColors.textSoft
+                            ? colors.primary
+                            : colors.textSoft
                         }
                         size={15}
                         strokeWidth={2.3}
@@ -1202,8 +1274,8 @@ export default function LoginScreen() {
                         color={
                           loginMethod ===
                           'sms_code'
-                            ? SitGuruColors.primary
-                            : SitGuruColors.textSoft
+                            ? colors.primary
+                            : colors.textSoft
                         }
                         size={15}
                         strokeWidth={2.3}
@@ -1258,7 +1330,7 @@ export default function LoginScreen() {
                       >
                         <Phone
                           color={
-                            SitGuruColors.textSoft
+                            colors.textSoft
                           }
                           size={19}
                           strokeWidth={2.2}
@@ -1279,7 +1351,7 @@ export default function LoginScreen() {
                           }}
                           placeholder="(215) 555-1234"
                           placeholderTextColor={
-                            SitGuruColors.textSoft
+                            colors.textSoft
                           }
                           returnKeyType={
                             codeSent
@@ -1315,7 +1387,7 @@ export default function LoginScreen() {
                       >
                         <Mail
                           color={
-                            SitGuruColors.textSoft
+                            colors.textSoft
                           }
                           size={19}
                           strokeWidth={2.2}
@@ -1341,7 +1413,7 @@ export default function LoginScreen() {
                           }}
                           placeholder="you@example.com"
                           placeholderTextColor={
-                            SitGuruColors.textSoft
+                            colors.textSoft
                           }
                           returnKeyType={
                             loginMethod ===
@@ -1397,7 +1469,7 @@ export default function LoginScreen() {
                       >
                         <LockKeyhole
                           color={
-                            SitGuruColors.textSoft
+                            colors.textSoft
                           }
                           size={19}
                           strokeWidth={2.2}
@@ -1425,7 +1497,7 @@ export default function LoginScreen() {
                           }
                           placeholder="Enter your password"
                           placeholderTextColor={
-                            SitGuruColors.textSoft
+                            colors.textSoft
                           }
                           returnKeyType="go"
                           secureTextEntry={
@@ -1459,7 +1531,7 @@ export default function LoginScreen() {
                           {passwordVisible ? (
                             <EyeOff
                               color={
-                                SitGuruColors.textMuted
+                                colors.textMuted
                               }
                               size={19}
                               strokeWidth={2.2}
@@ -1467,7 +1539,7 @@ export default function LoginScreen() {
                           ) : (
                             <Eye
                               color={
-                                SitGuruColors.textMuted
+                                colors.textMuted
                               }
                               size={19}
                               strokeWidth={2.2}
@@ -1631,7 +1703,7 @@ export default function LoginScreen() {
                       >
                         <KeyRound
                           color={
-                            SitGuruColors.primary
+                            colors.primary
                           }
                           size={20}
                           strokeWidth={2.4}
@@ -1724,7 +1796,7 @@ export default function LoginScreen() {
                   >
                     <ShieldCheck
                       color={
-                        SitGuruColors.primary
+                        colors.primary
                       }
                       size={16}
                       strokeWidth={2.3}
@@ -1752,7 +1824,7 @@ export default function LoginScreen() {
                   >
                     <UserPlus
                       color={
-                        SitGuruColors.primary
+                        colors.primary
                       }
                       size={21}
                       strokeWidth={2.3}
@@ -1835,7 +1907,13 @@ export default function LoginScreen() {
   );
 }
 
-function PhoneStatusBar() {
+function PhoneStatusBar({
+  styles,
+  colors,
+}: {
+  styles: ReturnType<typeof createStyles>;
+  colors: ReturnType<typeof getPalette>;
+}) {
   return (
     <View style={styles.statusBar}>
       <Text
@@ -1904,7 +1982,27 @@ function PhoneStatusBar() {
   );
 }
 
-const styles = StyleSheet.create({
+function getPalette(isDark: boolean) {
+  return {
+    background: isDark ? '#06140F' : '#F5FAF6',
+    border: isDark ? '#244B39' : '#D6E8DB',
+    danger: isDark ? '#FF9B87' : '#B33A2E',
+    primary: isDark ? '#43D98A' : '#117A4B',
+    primaryLight: isDark ? '#2C674A' : '#CFEAD8',
+    inputBorder: isDark ? '#2B6248' : '#D6E8DB',
+    inputSurface: isDark ? '#071B13' : '#F5FAF6',
+    surface: isDark ? '#0B2118' : '#FFFFFF',
+    surfaceSoft: isDark ? '#123427' : '#EAF7EE',
+    text: isDark ? '#FFF5E8' : '#123B2D',
+    textMuted: isDark ? '#B8C6BE' : '#5F756A',
+    textSoft: isDark ? '#8FA49A' : '#71847A',
+  };
+}
+
+function createStyles(isDark: boolean) {
+  const colors = getPalette(isDark);
+
+  return StyleSheet.create({
   previewCanvas: {
     alignItems: 'center',
     minHeight: 960,
@@ -1958,9 +2056,9 @@ const styles = StyleSheet.create({
   },
   phoneShell: {
     backgroundColor:
-      SitGuruColors.background,
+      colors.background,
     borderColor:
-      SitGuruColors.border,
+      colors.border,
     borderRadius: 34,
     borderWidth: 1,
     height: 844,
@@ -1994,7 +2092,7 @@ const styles = StyleSheet.create({
     paddingTop: 7,
   },
   statusTime: {
-    color: SitGuruColors.text,
+    color: colors.text,
     fontFamily: AppFonts.bold,
     fontSize: 12,
   },
@@ -2010,18 +2108,18 @@ const styles = StyleSheet.create({
   },
   signalBar: {
     backgroundColor:
-      SitGuruColors.text,
+      colors.text,
     borderRadius: 2,
     width: 3,
   },
   wifiText: {
-    color: SitGuruColors.text,
+    color: colors.text,
     fontFamily: AppFonts.bold,
     fontSize: 11,
   },
   batteryBody: {
     borderColor:
-      SitGuruColors.text,
+      colors.text,
     borderRadius: 3,
     borderWidth: 1,
     height: 9,
@@ -2030,7 +2128,7 @@ const styles = StyleSheet.create({
   },
   batteryFill: {
     backgroundColor:
-      SitGuruColors.text,
+      colors.text,
     borderRadius: 2,
     flex: 1,
   },
@@ -2049,18 +2147,36 @@ const styles = StyleSheet.create({
   backButton: {
     alignItems: 'center',
     backgroundColor:
-      SitGuruColors.surface,
+      colors.surface,
     borderColor:
-      SitGuruColors.border,
+      colors.border,
     borderRadius: 999,
     borderWidth: 1,
     height: 42,
     justifyContent: 'center',
     width: 42,
   },
-  topSpacer: {
-    height: 42,
-    width: 42,
+  modeToggle: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: isDark ? '#A97D20' : '#F2822E',
+    borderRadius: 14,
+    borderWidth: 1.2,
+    flexDirection: 'row',
+    gap: 2,
+    padding: 3,
+  },
+  modeButton: {
+    alignItems: 'center',
+    borderRadius: 10,
+    height: 32,
+    justifyContent: 'center',
+    width: 36,
+  },
+  modeButtonActive: {
+    backgroundColor: isDark
+      ? 'rgba(226,170,45,0.18)'
+      : '#FFF4D8',
   },
   intro: {
     gap: 9,
@@ -2070,9 +2186,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     backgroundColor:
-      SitGuruColors.surfaceSoft,
+      colors.surfaceSoft,
     borderColor:
-      SitGuruColors.primaryLight,
+      colors.primaryLight,
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2082,12 +2198,12 @@ const styles = StyleSheet.create({
   },
   eyebrowText: {
     color:
-      SitGuruColors.primary,
+      colors.primary,
     fontFamily: AppFonts.bold,
     fontSize: 12,
   },
   title: {
-    color: SitGuruColors.text,
+    color: colors.text,
     fontFamily:
       AppFonts.extraBold,
     fontSize: 34,
@@ -2096,7 +2212,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color:
-      SitGuruColors.textMuted,
+      colors.textMuted,
     fontFamily:
       AppFonts.medium,
     fontSize: 14,
@@ -2104,9 +2220,9 @@ const styles = StyleSheet.create({
   },
   loginCard: {
     backgroundColor:
-      SitGuruColors.surface,
+      colors.surface,
     borderColor:
-      SitGuruColors.border,
+      colors.border,
     borderRadius: 27,
     borderWidth: 1,
     elevation: 3,
@@ -2117,13 +2233,13 @@ const styles = StyleSheet.create({
       width: 0,
       height: 8,
     },
-    shadowOpacity: 0.06,
+    shadowOpacity: isDark ? 0.22 : 0.06,
     shadowRadius: 18,
   },
   warningCard: {
     alignItems: 'center',
-    backgroundColor: '#FFF8E8',
-    borderColor: '#EED18B',
+    backgroundColor: isDark ? '#3A2C10' : '#FFF8E8',
+    borderColor: isDark ? '#7C6428' : '#EED18B',
     borderRadius: 17,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2131,13 +2247,13 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   warningTitle: {
-    color: '#6E4700',
+    color: isDark ? '#F7D67F' : '#6E4700',
     fontFamily:
       AppFonts.extraBold,
     fontSize: 13,
   },
   warningText: {
-    color: '#7B6430',
+    color: isDark ? '#D8C99A' : '#7B6430',
     fontFamily:
       AppFonts.medium,
     fontSize: 11,
@@ -2145,8 +2261,8 @@ const styles = StyleSheet.create({
   },
   successCard: {
     alignItems: 'center',
-    backgroundColor: '#ECF9F0',
-    borderColor: '#A9DEBA',
+    backgroundColor: isDark ? '#103C29' : '#ECF9F0',
+    borderColor: isDark ? '#2C7551' : '#A9DEBA',
     borderRadius: 17,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2154,13 +2270,13 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   successTitle: {
-    color: '#075A39',
+    color: isDark ? '#79E8AC' : '#075A39',
     fontFamily:
       AppFonts.extraBold,
     fontSize: 13,
   },
   successText: {
-    color: '#3C6855',
+    color: isDark ? '#BCE2CC' : '#3C6855',
     fontFamily:
       AppFonts.medium,
     fontSize: 11,
@@ -2171,15 +2287,15 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   errorCard: {
-    backgroundColor: '#FFF0ED',
-    borderColor: '#F1B8AE',
+    backgroundColor: isDark ? '#3A1E19' : '#FFF0ED',
+    borderColor: isDark ? '#7B3C32' : '#F1B8AE',
     borderRadius: 16,
     borderWidth: 1,
     padding: 11,
   },
   errorText: {
     color:
-      SitGuruColors.danger,
+      colors.danger,
     fontFamily: AppFonts.bold,
     fontSize: 12,
     lineHeight: 17,
@@ -2194,22 +2310,22 @@ const styles = StyleSheet.create({
   },
   dividerLine: {
     backgroundColor:
-      SitGuruColors.border,
+      colors.border,
     flex: 1,
     height: 1,
   },
   dividerText: {
     color:
-      SitGuruColors.textSoft,
+      colors.textSoft,
     fontFamily: AppFonts.bold,
     fontSize: 10,
     textTransform: 'uppercase',
   },
   methodToggle: {
     backgroundColor:
-      SitGuruColors.background,
+      colors.background,
     borderColor:
-      SitGuruColors.border,
+      colors.border,
     borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2228,9 +2344,9 @@ const styles = StyleSheet.create({
   },
   methodButtonActive: {
     backgroundColor:
-      SitGuruColors.surface,
+      colors.surface,
     borderColor:
-      SitGuruColors.primaryLight,
+      colors.primaryLight,
     borderWidth: 1,
     elevation: 1,
     shadowColor: '#000000',
@@ -2238,23 +2354,23 @@ const styles = StyleSheet.create({
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.18 : 0.05,
     shadowRadius: 5,
   },
   methodButtonText: {
     color:
-      SitGuruColors.textSoft,
+      colors.textSoft,
     fontFamily: AppFonts.bold,
     fontSize: 9,
     textAlign: 'center',
   },
   methodButtonTextActive: {
     color:
-      SitGuruColors.primary,
+      colors.primary,
   },
   methodHelper: {
     color:
-      SitGuruColors.textMuted,
+      colors.textMuted,
     fontFamily:
       AppFonts.medium,
     fontSize: 11,
@@ -2271,22 +2387,22 @@ const styles = StyleSheet.create({
       'space-between',
   },
   fieldLabel: {
-    color: SitGuruColors.text,
+    color: colors.text,
     fontFamily: AppFonts.bold,
     fontSize: 13,
   },
   forgotLink: {
     color:
-      SitGuruColors.primary,
+      colors.primary,
     fontFamily: AppFonts.bold,
     fontSize: 12,
   },
   inputShell: {
     alignItems: 'center',
     backgroundColor:
-      SitGuruColors.background,
+      colors.inputSurface,
     borderColor:
-      SitGuruColors.border,
+      colors.inputBorder,
     borderRadius: 17,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2295,11 +2411,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   input: {
-    color: SitGuruColors.text,
+    backgroundColor: 'transparent',
+    color: colors.text,
     flex: 1,
     fontFamily:
       AppFonts.medium,
     fontSize: 15,
+    minHeight: 52,
+    paddingHorizontal: 0,
     paddingVertical: 0,
   },
   eyeButton: {
@@ -2320,7 +2439,7 @@ const styles = StyleSheet.create({
   },
   codeEmail: {
     color:
-      SitGuruColors.textMuted,
+      colors.textMuted,
     flex: 1,
     fontFamily:
       AppFonts.medium,
@@ -2335,12 +2454,12 @@ const styles = StyleSheet.create({
   },
   codeInput: {
     backgroundColor:
-      SitGuruColors.background,
+      colors.inputSurface,
     borderColor:
-      SitGuruColors.border,
+      colors.inputBorder,
     borderRadius: 13,
     borderWidth: 1,
-    color: SitGuruColors.text,
+    color: colors.text,
     flex: 1,
     fontFamily:
       AppFonts.extraBold,
@@ -2354,9 +2473,9 @@ const styles = StyleSheet.create({
   },
   codeInputFilled: {
     backgroundColor:
-      SitGuruColors.surfaceSoft,
+      colors.surfaceSoft,
     borderColor:
-      SitGuruColors.primary,
+      colors.primary,
   },
   resendRow: {
     alignItems: 'center',
@@ -2366,7 +2485,7 @@ const styles = StyleSheet.create({
   },
   resendText: {
     color:
-      SitGuruColors.textMuted,
+      colors.textMuted,
     fontFamily:
       AppFonts.medium,
     fontSize: 11,
@@ -2377,20 +2496,20 @@ const styles = StyleSheet.create({
   },
   resendButtonText: {
     color:
-      SitGuruColors.primary,
+      colors.primary,
     fontFamily: AppFonts.bold,
     fontSize: 11,
   },
   resendButtonTextDisabled: {
     color:
-      SitGuruColors.textSoft,
+      colors.textSoft,
   },
   codeReadyCard: {
     alignItems: 'center',
     backgroundColor:
-      SitGuruColors.surfaceSoft,
+      colors.surfaceSoft,
     borderColor:
-      SitGuruColors.primaryLight,
+      colors.primaryLight,
     borderRadius: 17,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2400,7 +2519,7 @@ const styles = StyleSheet.create({
   codeReadyIcon: {
     alignItems: 'center',
     backgroundColor:
-      SitGuruColors.surface,
+      colors.surface,
     borderRadius: 12,
     height: 40,
     justifyContent: 'center',
@@ -2411,14 +2530,14 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   codeReadyTitle: {
-    color: SitGuruColors.text,
+    color: colors.text,
     fontFamily:
       AppFonts.extraBold,
     fontSize: 12,
   },
   codeReadyText: {
     color:
-      SitGuruColors.textMuted,
+      colors.textMuted,
     fontFamily:
       AppFonts.medium,
     fontSize: 10,
@@ -2427,7 +2546,7 @@ const styles = StyleSheet.create({
   loginButton: {
     alignItems: 'center',
     backgroundColor:
-      SitGuruColors.primary,
+      colors.primary,
     borderRadius: 999,
     flexDirection: 'row',
     gap: 8,
@@ -2447,7 +2566,7 @@ const styles = StyleSheet.create({
   securityRow: {
     alignItems: 'flex-start',
     backgroundColor:
-      SitGuruColors.surfaceSoft,
+      colors.surfaceSoft,
     borderRadius: 16,
     flexDirection: 'row',
     gap: 8,
@@ -2455,7 +2574,7 @@ const styles = StyleSheet.create({
   },
   securityText: {
     color:
-      SitGuruColors.textMuted,
+      colors.textMuted,
     flex: 1,
     fontFamily:
       AppFonts.medium,
@@ -2465,9 +2584,9 @@ const styles = StyleSheet.create({
   signupCard: {
     alignItems: 'center',
     backgroundColor:
-      SitGuruColors.surface,
+      colors.surface,
     borderColor:
-      SitGuruColors.border,
+      colors.border,
     borderRadius: 23,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2477,7 +2596,7 @@ const styles = StyleSheet.create({
   signupIcon: {
     alignItems: 'center',
     backgroundColor:
-      SitGuruColors.surfaceSoft,
+      colors.surfaceSoft,
     borderRadius: 14,
     height: 44,
     justifyContent: 'center',
@@ -2488,14 +2607,14 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   signupTitle: {
-    color: SitGuruColors.text,
+    color: colors.text,
     fontFamily:
       AppFonts.extraBold,
     fontSize: 14,
   },
   signupText: {
     color:
-      SitGuruColors.textMuted,
+      colors.textMuted,
     fontFamily:
       AppFonts.medium,
     fontSize: 10,
@@ -2503,21 +2622,21 @@ const styles = StyleSheet.create({
   },
   createButton: {
     backgroundColor:
-      SitGuruColors.surfaceSoft,
+      colors.surfaceSoft,
     borderRadius: 999,
     paddingHorizontal: 13,
     paddingVertical: 9,
   },
   createButtonText: {
     color:
-      SitGuruColors.primary,
+      colors.primary,
     fontFamily:
       AppFonts.extraBold,
     fontSize: 12,
   },
   legalText: {
     color:
-      SitGuruColors.textSoft,
+      colors.textSoft,
     fontFamily:
       AppFonts.medium,
     fontSize: 10,
@@ -2533,4 +2652,5 @@ const styles = StyleSheet.create({
       },
     ],
   },
-});
+  });
+}
