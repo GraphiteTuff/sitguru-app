@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
 
-const PAYOUT_SETUP_API_VERSION = "2026-07-22.3";
+const PAYOUT_SETUP_API_VERSION = "2026-07-24.2";
 
 type FinancialRole = "guru" | "ambassador";
 type RoleContext = FinancialRole | "multi_role" | "unknown";
@@ -28,6 +28,12 @@ type AuthenticatedUser = {
 type PayoutPreferenceRow = {
   id: string;
   user_id: string;
+  workspace_role?: FinancialRole | null;
+  preferred_provider?: GuruProvider | AmbassadorProvider | null;
+  setup_timing?: string | null;
+  allow_setup_later?: boolean | null;
+  setup_required?: boolean | null;
+  setup_completed?: boolean | null;
   role_context: RoleContext;
   booking_payout_provider: GuruProvider;
   reward_payout_provider: AmbassadorProvider;
@@ -65,44 +71,60 @@ type PayoutPreferenceRow = {
 type PayoutAccountRow = {
   id: string;
   user_id: string;
-  account_purpose:
+  account_purpose?:
     | "guru_marketplace_seller"
     | "guru_payout"
-    | "ambassador_reward";
-  provider: "stripe" | "paypal";
-  provider_account_id: string | null;
-  provider_merchant_id: string | null;
-  provider_payer_id: string | null;
-  provider_email: string | null;
-  onboarding_status:
+    | "ambassador_reward"
+    | null;
+  workspace_role?: FinancialRole | null;
+  provider?: "stripe" | "paypal" | null;
+  provider_account_id?: string | null;
+  provider_merchant_id?: string | null;
+  provider_payer_id?: string | null;
+  provider_email?: string | null;
+
+  /*
+    SitGuru has payout-account rows from more than one schema generation.
+    Newer rows use onboarding_status/account_status/is_default. Older live
+    rows use status/is_primary. Keep both readable until the database is
+    migrated without blocking Stripe or PayPal onboarding.
+  */
+  onboarding_status?:
     | "not_started"
     | "in_progress"
     | "pending_review"
     | "ready"
     | "restricted"
-    | "disabled";
-  account_status:
+    | "disabled"
+    | null;
+  status?: string | null;
+  account_status?:
     | "pending"
     | "active"
     | "restricted"
     | "disabled"
-    | "disconnected";
-  details_submitted: boolean;
-  charges_enabled: boolean;
-  payouts_enabled: boolean;
-  country_code: string;
-  default_currency: string;
-  is_default: boolean;
-  is_live: boolean;
-  requirements_currently_due: unknown[] | null;
-  requirements_eventually_due: unknown[] | null;
-  capabilities: Record<string, unknown> | null;
-  connected_at: string | null;
-  onboarding_completed_at: string | null;
-  disabled_at: string | null;
-  last_synced_at: string | null;
-  created_at: string;
-  updated_at: string;
+    | "disconnected"
+    | null;
+
+  details_submitted?: boolean | null;
+  charges_enabled?: boolean | null;
+  payouts_enabled?: boolean | null;
+  country_code?: string | null;
+  default_currency?: string | null;
+  is_default?: boolean | null;
+  is_primary?: boolean | null;
+  is_live?: boolean | null;
+  requirements_currently_due?: unknown[] | null;
+  requirements_eventually_due?: unknown[] | null;
+  capabilities?: Record<string, unknown> | null;
+  connected_at?: string | null;
+  onboarding_started_at?: string | null;
+  onboarding_completed_at?: string | null;
+  disabled_at?: string | null;
+  last_synced_at?: string | null;
+  last_checked_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type PayoutDestinationRow = {
@@ -520,55 +542,109 @@ async function getFinancialRoles(user: AuthenticatedUser) {
   return uniqueRoles(roleValues);
 }
 
-async function ensurePreference(
+function preferenceMatchesRole(
+  preference: PayoutPreferenceRow,
+  role: FinancialRole,
+) {
+  const workspaceRole = normalizeRole(preference.workspace_role);
+
+  if (workspaceRole) {
+    return workspaceRole === role;
+  }
+
+  if (preference.role_context === role) {
+    return true;
+  }
+
+  if (preference.role_context === "multi_role") {
+    return role === "guru"
+      ? normalizeGuruProvider(preference.booking_payout_provider) !== null
+      : normalizeAmbassadorProvider(preference.reward_payout_provider) !== null;
+  }
+
+  return false;
+}
+
+async function findPreferenceForRole(
   userId: string,
-  roles: FinancialRole[],
+  role: FinancialRole,
 ): Promise<PayoutPreferenceRow | null> {
-  const { data: existing, error: readError } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("user_payout_preferences")
     .select("*")
     .eq("user_id", userId)
-    .maybeSingle();
+    .order("updated_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false, nullsFirst: false });
 
-  if (readError) {
-    console.error("PAYOUT PREFERENCE READ ERROR:", readError);
+  if (error) {
+    console.error("PAYOUT PREFERENCE READ ERROR:", error);
     return null;
   }
 
+  const rows = (data || []) as PayoutPreferenceRow[];
+
+  return rows.find((row) => preferenceMatchesRole(row, role)) || null;
+}
+
+async function ensurePreference(
+  userId: string,
+  roles: FinancialRole[],
+  role: FinancialRole,
+): Promise<PayoutPreferenceRow | null> {
+  const existing = await findPreferenceForRole(userId, role);
   const roleContext = getRoleContext(roles);
 
   if (existing) {
-    const row = existing as PayoutPreferenceRow;
+    const updates: Record<string, unknown> = {};
 
-    if (row.role_context !== roleContext) {
-      const { data: updated, error: updateError } = await supabaseAdmin
-        .from("user_payout_preferences")
-        .update({ role_context: roleContext })
-        .eq("user_id", userId)
-        .select("*")
-        .single();
-
-      if (updateError) {
-        console.warn(
-          "PAYOUT ROLE CONTEXT UPDATE WARNING:",
-          updateError.message,
-        );
-        return row;
-      }
-
-      return updated as PayoutPreferenceRow;
+    if (existing.workspace_role !== role) {
+      updates.workspace_role = role;
     }
 
-    return row;
+    if (existing.role_context !== roleContext) {
+      updates.role_context = roleContext;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return existing;
+    }
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from("user_payout_preferences")
+      .update(updates)
+      .eq("id", existing.id)
+      .eq("user_id", userId)
+      .select("*")
+      .single();
+
+    if (updateError) {
+      console.warn(
+        "PAYOUT ROLE-SCOPED PREFERENCE UPDATE WARNING:",
+        updateError.message,
+      );
+      return existing;
+    }
+
+    return updated as PayoutPreferenceRow;
   }
 
+  const now = new Date().toISOString();
   const { data: created, error: createError } = await supabaseAdmin
     .from("user_payout_preferences")
     .insert({
       user_id: userId,
+      workspace_role: role,
       role_context: roleContext,
+      preferred_provider: "set_up_later",
+      booking_payout_provider: "set_up_later",
+      reward_payout_provider: "set_up_later",
       financial_onboarding_status: "deferred",
       onboarding_deferred: true,
+      allow_setup_later: true,
+      setup_required: true,
+      setup_completed: false,
+      created_at: now,
+      updated_at: now,
     })
     .select("*")
     .single();
@@ -592,41 +668,145 @@ async function refreshReadiness(userId: string) {
   }
 }
 
+function getAccountPurpose(
+  account: PayoutAccountRow,
+): "guru_marketplace_seller" | "guru_payout" | "ambassador_reward" {
+  if (
+    account.account_purpose === "guru_marketplace_seller" ||
+    account.account_purpose === "guru_payout" ||
+    account.account_purpose === "ambassador_reward"
+  ) {
+    return account.account_purpose;
+  }
+
+  return account.workspace_role === "ambassador"
+    ? "ambassador_reward"
+    : "guru_marketplace_seller";
+}
+
+function getAccountOnboardingStatus(account: PayoutAccountRow) {
+  const raw = safeString(
+    account.onboarding_status || account.status || "not_started",
+  ).toLowerCase();
+
+  if (
+    ["ready", "active", "connected", "complete", "completed"].includes(raw)
+  ) {
+    return "ready";
+  }
+
+  if (["restricted", "limited", "denied", "declined"].includes(raw)) {
+    return "restricted";
+  }
+
+  if (["disabled", "disconnected", "revoked"].includes(raw)) {
+    return "disabled";
+  }
+
+  if (["pending_review", "review", "under_review"].includes(raw)) {
+    return "pending_review";
+  }
+
+  if (["in_progress", "pending", "started", "selected"].includes(raw)) {
+    return "in_progress";
+  }
+
+  return "not_started";
+}
+
+function getAccountStatus(account: PayoutAccountRow) {
+  const raw = safeString(
+    account.account_status || account.status || "pending",
+  ).toLowerCase();
+
+  if (
+    ["active", "ready", "connected", "complete", "completed"].includes(raw)
+  ) {
+    return "active";
+  }
+
+  if (["restricted", "limited", "denied", "declined"].includes(raw)) {
+    return "restricted";
+  }
+
+  if (["disabled", "revoked"].includes(raw)) {
+    return "disabled";
+  }
+
+  if (raw === "disconnected") {
+    return "disconnected";
+  }
+
+  return "pending";
+}
+
+function isDefaultPayoutAccount(account: PayoutAccountRow) {
+  return account.is_default === true || account.is_primary === true;
+}
+
+function sortPayoutAccounts(accounts: PayoutAccountRow[]) {
+  return [...accounts].sort((left, right) => {
+    const defaultDifference =
+      Number(isDefaultPayoutAccount(right)) -
+      Number(isDefaultPayoutAccount(left));
+
+    if (defaultDifference !== 0) {
+      return defaultDifference;
+    }
+
+    const leftCreatedAt = Date.parse(safeString(left.created_at));
+    const rightCreatedAt = Date.parse(safeString(right.created_at));
+
+    if (Number.isNaN(leftCreatedAt) && Number.isNaN(rightCreatedAt)) {
+      return 0;
+    }
+
+    if (Number.isNaN(leftCreatedAt)) return 1;
+    if (Number.isNaN(rightCreatedAt)) return -1;
+
+    return leftCreatedAt - rightCreatedAt;
+  });
+}
+
 function publicAccount(account: PayoutAccountRow) {
+  const providerAccountId = safeString(account.provider_account_id);
+  const providerMerchantId = safeString(account.provider_merchant_id);
+  const providerPayerId = safeString(account.provider_payer_id);
+  const providerEmail = safeString(account.provider_email);
+
   return {
     id: account.id,
-    accountPurpose: account.account_purpose,
-    provider: account.provider,
-    providerAccountId: account.provider_account_id
-      ? maskIdentifier(account.provider_account_id)
+    accountPurpose: getAccountPurpose(account),
+    provider: account.provider || null,
+    providerAccountId: providerAccountId
+      ? maskIdentifier(providerAccountId)
       : null,
-    providerMerchantId: account.provider_merchant_id
-      ? maskIdentifier(account.provider_merchant_id)
+    providerMerchantId: providerMerchantId
+      ? maskIdentifier(providerMerchantId)
       : null,
-    providerPayerId: account.provider_payer_id
-      ? maskIdentifier(account.provider_payer_id)
+    providerPayerId: providerPayerId
+      ? maskIdentifier(providerPayerId)
       : null,
-    providerEmail: account.provider_email
-      ? maskEmail(account.provider_email)
-      : null,
-    onboardingStatus: account.onboarding_status,
-    accountStatus: account.account_status,
-    detailsSubmitted: account.details_submitted,
-    chargesEnabled: account.charges_enabled,
-    payoutsEnabled: account.payouts_enabled,
-    countryCode: account.country_code,
-    defaultCurrency: account.default_currency,
-    isDefault: account.is_default,
-    isLive: account.is_live,
+    providerEmail: providerEmail ? maskEmail(providerEmail) : null,
+    onboardingStatus: getAccountOnboardingStatus(account),
+    accountStatus: getAccountStatus(account),
+    detailsSubmitted: account.details_submitted === true,
+    chargesEnabled: account.charges_enabled === true,
+    payoutsEnabled: account.payouts_enabled === true,
+    countryCode: safeString(account.country_code) || "US",
+    defaultCurrency: safeString(account.default_currency) || "USD",
+    isDefault: isDefaultPayoutAccount(account),
+    isLive: account.is_live === true,
     requirementsCurrentlyDue: account.requirements_currently_due || [],
     requirementsEventuallyDue: account.requirements_eventually_due || [],
     capabilities: account.capabilities || {},
-    connectedAt: account.connected_at,
-    onboardingCompletedAt: account.onboarding_completed_at,
-    disabledAt: account.disabled_at,
-    lastSyncedAt: account.last_synced_at,
-    createdAt: account.created_at,
-    updatedAt: account.updated_at,
+    connectedAt: account.connected_at || null,
+    onboardingCompletedAt: account.onboarding_completed_at || null,
+    disabledAt: account.disabled_at || null,
+    lastSyncedAt:
+      account.last_synced_at || account.last_checked_at || null,
+    createdAt: account.created_at || null,
+    updatedAt: account.updated_at || null,
   };
 }
 
@@ -698,9 +878,9 @@ function getAmbassadorSelectedProvider(
 
 function isReadyPayoutAccount(account: PayoutAccountRow) {
   return (
-    account.onboarding_status === "ready" &&
-    account.account_status === "active" &&
-    account.payouts_enabled
+    getAccountOnboardingStatus(account) === "ready" &&
+    getAccountStatus(account) === "active" &&
+    account.payouts_enabled === true
   );
 }
 
@@ -717,7 +897,7 @@ async function loadFinancialSetup(
   role: FinancialRole,
 ) {
   const warnings: string[] = [];
-  const ensuredPreference = await ensurePreference(userId, roles);
+  const ensuredPreference = await ensurePreference(userId, roles, role);
 
   if (!ensuredPreference) {
     warnings.push(
@@ -733,12 +913,12 @@ async function loadFinancialSetup(
         .from("user_payout_preferences")
         .select("*")
         .eq("user_id", userId)
-        .maybeSingle(),
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false }),
       supabaseAdmin
         .from("user_payout_accounts")
         .select("*")
         .eq("user_id", userId)
-        .order("is_default", { ascending: false })
         .order("created_at", { ascending: true }),
       role === "ambassador"
         ? supabaseAdmin
@@ -770,22 +950,25 @@ async function loadFinancialSetup(
     warnings.push("Your Ambassador reward destination could not be read.");
   }
 
+  const preferenceRows = (preferenceResult.data || []) as PayoutPreferenceRow[];
   const preference =
-    (preferenceResult.data as PayoutPreferenceRow | null) ||
+    preferenceRows.find((row) => preferenceMatchesRole(row, role)) ||
     ensuredPreference ||
     null;
-  const accounts = (accountsResult.data || []) as PayoutAccountRow[];
+  const accounts = sortPayoutAccounts(
+    (accountsResult.data || []) as PayoutAccountRow[],
+  );
   const destinations = (destinationsResult.data ||
     []) as PayoutDestinationRow[];
 
   const guruAccounts = accounts.filter((account) =>
     ["guru_marketplace_seller", "guru_payout"].includes(
-      account.account_purpose,
+      getAccountPurpose(account),
     ),
   );
   const ambassadorStripeAccounts = accounts.filter(
     (account) =>
-      account.account_purpose === "ambassador_reward" &&
+      getAccountPurpose(account) === "ambassador_reward" &&
       account.provider === "stripe",
   );
 
@@ -793,7 +976,8 @@ async function loadFinancialSetup(
     guruAccounts.find(isReadyPayoutAccount) || null;
   const readyAmbassadorStripeAccount =
     ambassadorStripeAccounts.find(
-      (account) => account.is_default && isReadyPayoutAccount(account),
+      (account) =>
+        isDefaultPayoutAccount(account) && isReadyPayoutAccount(account),
     ) ||
     ambassadorStripeAccounts.find(isReadyPayoutAccount) ||
     null;
@@ -989,7 +1173,7 @@ async function savePreference({
   role: FinancialRole;
   provider: GuruProvider | AmbassadorProvider;
 }) {
-  const existing = await ensurePreference(userId, roles);
+  const existing = await ensurePreference(userId, roles, role);
   const now = new Date().toISOString();
   const existingMetadata =
     existing?.metadata && typeof existing.metadata === "object"
@@ -998,8 +1182,13 @@ async function savePreference({
 
   const payload: Record<string, unknown> = {
     user_id: userId,
+    workspace_role: role,
     role_context: getRoleContext(roles),
+    preferred_provider: provider,
     selected_at: now,
+    allow_setup_later: true,
+    setup_required: provider !== "set_up_later",
+    setup_completed: false,
     metadata: {
       ...existingMetadata,
       preference_source: "shared_payout_setup_api",
@@ -1029,17 +1218,24 @@ async function savePreference({
     payload.reward_setup_requirement = "before_first_reward_payout";
   }
 
-  const { error } = await supabaseAdmin
-    .from("user_payout_preferences")
-    .upsert(payload, { onConflict: "user_id" });
+  const writeResult = existing?.id
+    ? await supabaseAdmin
+        .from("user_payout_preferences")
+        .update(payload)
+        .eq("id", existing.id)
+        .eq("user_id", userId)
+    : await supabaseAdmin.from("user_payout_preferences").insert({
+        ...payload,
+        created_at: now,
+      });
 
-  if (!error) return;
+  if (!writeResult.error) return;
 
   const isAmbassadorStripeCompatibilityError =
     role === "ambassador" && provider === "stripe";
 
   if (!isAmbassadorStripeCompatibilityError) {
-    throw new Error(error.message);
+    throw new Error(writeResult.error.message);
   }
 
   const compatibilityPayload = {
@@ -1052,12 +1248,19 @@ async function savePreference({
     },
   };
 
-  const { error: compatibilityError } = await supabaseAdmin
-    .from("user_payout_preferences")
-    .upsert(compatibilityPayload, { onConflict: "user_id" });
+  const compatibilityResult = existing?.id
+    ? await supabaseAdmin
+        .from("user_payout_preferences")
+        .update(compatibilityPayload)
+        .eq("id", existing.id)
+        .eq("user_id", userId)
+    : await supabaseAdmin.from("user_payout_preferences").insert({
+        ...compatibilityPayload,
+        created_at: now,
+      });
 
-  if (compatibilityError) {
-    throw new Error(compatibilityError.message);
+  if (compatibilityResult.error) {
+    throw new Error(compatibilityResult.error.message);
   }
 }
 
@@ -1382,12 +1585,16 @@ export async function PATCH(req: NextRequest) {
       apiVersion: PAYOUT_SETUP_API_VERSION,
       message:
         provider === "set_up_later"
-          ? "You can finish payment setup later."
-          : provider === "stripe"
-            ? "Bank or debit card selected. Finish Stripe setup to receive rewards."
-            : destinationSaved
-              ? "Payment option saved. Complete verification before your first reward is sent."
-              : `${provider === "paypal" ? "PayPal" : "Venmo"} selected. Add and verify your account before your first reward is sent.`,
+          ? "Saved for later. You can finish payment setup anytime."
+          : role === "guru" && provider === "stripe"
+            ? "Stripe selected. Finish the secure Stripe steps to get paid for bookings."
+            : role === "guru" && provider === "paypal"
+              ? "PayPal selected. Finish the secure PayPal steps to get paid for bookings."
+              : provider === "stripe"
+                ? "Bank or debit card selected. Finish Stripe setup before your first reward is sent."
+                : destinationSaved
+                  ? "Payment option saved. Complete verification before your first reward is sent."
+                  : `${provider === "paypal" ? "PayPal" : "Venmo"} selected. Add and verify your account before your first reward is sent.`,
       setup,
     });
   } catch (error) {

@@ -2,6 +2,13 @@ import { randomUUID } from "node:crypto";
 
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  getPayPalConfig,
+  PayPalApiError,
+  paypalRequest,
+  type PayPalConfig,
+  type PayPalEnvironment,
+} from "@/lib/paypal/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -10,27 +17,11 @@ export const revalidate = 0;
 export const runtime = "nodejs";
 
 type JsonRecord = Record<string, unknown>;
-type PayPalEnvironment = "sandbox" | "live";
 type FinancialRole = "guru" | "ambassador";
 
 type AuthenticatedUser = {
   id: string;
   email: string | null;
-};
-
-type PayPalConfig = {
-  environment: PayPalEnvironment;
-  clientId: string;
-  clientSecret: string;
-  attributionId: string;
-  partnerMerchantId: string;
-  apiBaseUrl: string;
-};
-
-type AccessTokenCache = {
-  cacheKey: string;
-  token: string;
-  expiresAt: number;
 };
 
 type PayPalLink = {
@@ -40,7 +31,37 @@ type PayPalLink = {
 };
 
 type PartnerReferralResponse = {
+  partner_referral_id?: string;
   links?: PayPalLink[];
+  [key: string]: unknown;
+};
+
+type PayPalOAuthThirdParty = {
+  partner_client_id?: string;
+  merchant_client_id?: string;
+  scopes?: string[];
+  [key: string]: unknown;
+};
+
+type PayPalOAuthIntegration = {
+  integration_type?: string;
+  integration_method?: string;
+  oauth_third_party?: PayPalOAuthThirdParty[];
+  [key: string]: unknown;
+};
+
+type PayPalProduct = {
+  name?: string;
+  status?: string;
+  vetting_status?: string;
+  capabilities?: unknown[];
+  [key: string]: unknown;
+};
+
+type PayPalCapability = {
+  name?: string;
+  status?: string;
+  limits?: unknown;
   [key: string]: unknown;
 };
 
@@ -54,13 +75,15 @@ type SellerIntegrationStatus = {
   country?: string;
   country_code?: string;
   oauth_third_party?: unknown;
-  products?: unknown[];
-  capabilities?: unknown[];
+  oauth_integrations?: PayPalOAuthIntegration[];
+  products?: PayPalProduct[];
+  capabilities?: PayPalCapability[];
   [key: string]: unknown;
 };
 
 type OnboardingState = {
   merchantId: string;
+  trackingId: string;
   providerEmail: string;
   ready: boolean;
   restricted: boolean;
@@ -84,8 +107,22 @@ type OnboardingState = {
   countryCode: string;
   requirementsCurrentlyDue: string[];
   capabilities: JsonRecord;
+  products: PayPalProduct[];
+  oauthPermissions: PayPalOAuthThirdParty[];
+  vettingStatus: string | null;
   rawStatus: SellerIntegrationStatus | null;
   returnMetadata?: JsonRecord;
+};
+
+type CanonicalMerchantAccount = {
+  user_id: string;
+  environment: PayPalEnvironment;
+  tracking_id: string;
+  paypal_merchant_id: string | null;
+  merchant_email: string | null;
+  status: string;
+  onboarding_action_url: string | null;
+  merchant_details: JsonRecord | null;
 };
 
 const LOCAL_ORIGINS = new Set([
@@ -96,19 +133,6 @@ const LOCAL_ORIGINS = new Set([
   "http://127.0.0.1:8081",
   "http://127.0.0.1:8082",
 ]);
-
-const PAYPAL_FEATURES = [
-  "PAYMENT",
-  "REFUND",
-  "PARTNER_FEE",
-  "DELAY_FUNDS_DISBURSEMENT",
-  "ACCESS_MERCHANT_INFORMATION",
-  "READ_SELLER_DISPUTE",
-  "UPDATE_SELLER_DISPUTE",
-  "ADVANCED_TRANSACTIONS_SEARCH",
-] as const;
-
-let accessTokenCache: AccessTokenCache | null = null;
 
 function asRecord(value: unknown): JsonRecord | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -122,7 +146,7 @@ function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
-function asTrimmedString(value: unknown) {
+function asTrimmedString(value: unknown): string {
   if (typeof value === "string") return value.trim();
 
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -132,7 +156,7 @@ function asTrimmedString(value: unknown) {
   return "";
 }
 
-function firstNonEmpty(...values: unknown[]) {
+function firstNonEmpty(...values: unknown[]): string {
   for (const value of values) {
     const text = asTrimmedString(value);
 
@@ -142,16 +166,16 @@ function firstNonEmpty(...values: unknown[]) {
   return "";
 }
 
-function asBoolean(value: unknown) {
+function asBoolean(value: unknown): boolean {
   if (typeof value === "boolean") return value;
 
   const normalized = asTrimmedString(value).toLowerCase();
-
   return ["true", "1", "yes", "y"].includes(normalized);
 }
 
 function hasMeaningfulValue(value: unknown): boolean {
   if (Array.isArray(value)) return value.length > 0;
+
   if (value && typeof value === "object") {
     return Object.keys(value as JsonRecord).length > 0;
   }
@@ -159,82 +183,46 @@ function hasMeaningfulValue(value: unknown): boolean {
   return Boolean(asTrimmedString(value));
 }
 
-function normalizeEnvironment(value: unknown): PayPalEnvironment {
-  const normalized = asTrimmedString(value).toLowerCase();
-
-  return normalized === "live" ||
-    normalized === "production" ||
-    normalized === "prod"
-    ? "live"
-    : "sandbox";
+function normalizeUppercase(value: unknown): string {
+  return asTrimmedString(value).toUpperCase();
 }
 
-function getPayPalConfig(): PayPalConfig | null {
-  const environment = normalizeEnvironment(
-    process.env.PAYPAL_ENVIRONMENT || process.env.PAYPAL_MODE,
-  );
+function isEnabled(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
+}
 
-  const clientId = firstNonEmpty(
-    environment === "live" ? process.env.PAYPAL_LIVE_CLIENT_ID : "",
-    environment === "sandbox" ? process.env.PAYPAL_SANDBOX_CLIENT_ID : "",
-    process.env.PAYPAL_CLIENT_ID,
-  );
+function getRequestedFeatures(): string[] {
+  const features = ["PAYMENT", "REFUND", "PARTNER_FEE"];
 
-  const clientSecret = firstNonEmpty(
-    environment === "live" ? process.env.PAYPAL_LIVE_CLIENT_SECRET : "",
-    environment === "sandbox"
-      ? process.env.PAYPAL_SANDBOX_CLIENT_SECRET
-      : "",
-    process.env.PAYPAL_CLIENT_SECRET,
-  );
-
-  const attributionId = firstNonEmpty(
-    environment === "live"
-      ? process.env.PAYPAL_LIVE_PARTNER_ATTRIBUTION_ID
-      : "",
-    environment === "sandbox"
-      ? process.env.PAYPAL_SANDBOX_PARTNER_ATTRIBUTION_ID
-      : "",
-    process.env.PAYPAL_PARTNER_ATTRIBUTION_ID,
-    process.env.PAYPAL_BN_CODE,
-  );
-
-  const partnerMerchantId = firstNonEmpty(
-    environment === "live"
-      ? process.env.PAYPAL_LIVE_PARTNER_MERCHANT_ID
-      : "",
-    environment === "sandbox"
-      ? process.env.PAYPAL_SANDBOX_PARTNER_MERCHANT_ID
-      : "",
-    process.env.PAYPAL_PARTNER_MERCHANT_ID,
-  );
-
-  const apiBaseUrl = firstNonEmpty(
-    process.env.PAYPAL_API_BASE_URL,
-    environment === "live"
-      ? "https://api-m.paypal.com"
-      : "https://api-m.sandbox.paypal.com",
-  ).replace(/\/+$/, "");
-
-  if (!clientId || !clientSecret || !attributionId) {
-    return null;
+  if (isEnabled(process.env.PAYPAL_DELAY_FUNDS_DISBURSEMENT_ENABLED)) {
+    features.push("DELAY_FUNDS_DISBURSEMENT");
   }
 
-  return {
-    environment,
-    clientId,
-    clientSecret,
-    attributionId,
-    partnerMerchantId,
-    apiBaseUrl,
-  };
+  return features;
 }
 
-function normalizeOrigin(value: string) {
+function tryGetPayPalConfig(): PayPalConfig | null {
+  try {
+    return getPayPalConfig();
+  } catch (error) {
+    console.warn(
+      "PayPal configuration is incomplete:",
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
+}
+
+function getConfiguredEnvironment(): PayPalEnvironment {
+  const value = asTrimmedString(process.env.PAYPAL_ENV).toLowerCase();
+  return value === "live" ? "live" : "sandbox";
+}
+
+function normalizeOrigin(value: string): string {
   return value.trim().replace(/\/+$/, "");
 }
 
-function isAllowedOrigin(origin: string) {
+function isAllowedOrigin(origin: string): boolean {
   const normalized = normalizeOrigin(origin);
 
   if (LOCAL_ORIGINS.has(normalized)) return true;
@@ -253,7 +241,7 @@ function isAllowedOrigin(origin: string) {
 }
 
 function corsHeaders(req: NextRequest): Record<string, string> {
-  const headers: Record<string, string> = {
+  const responseHeaders: Record<string, string> = {
     "Cache-Control": "no-store, max-age=0",
     Vary: "Origin",
   };
@@ -261,16 +249,16 @@ function corsHeaders(req: NextRequest): Record<string, string> {
   const origin = req.headers.get("origin") || "";
 
   if (!origin || !isAllowedOrigin(origin)) {
-    return headers;
+    return responseHeaders;
   }
 
-  headers["Access-Control-Allow-Credentials"] = "true";
-  headers["Access-Control-Allow-Headers"] =
+  responseHeaders["Access-Control-Allow-Credentials"] = "true";
+  responseHeaders["Access-Control-Allow-Headers"] =
     "Authorization, Content-Type, X-Requested-With";
-  headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
-  headers["Access-Control-Allow-Origin"] = origin;
+  responseHeaders["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+  responseHeaders["Access-Control-Allow-Origin"] = origin;
 
-  return headers;
+  return responseHeaders;
 }
 
 function json(
@@ -284,16 +272,21 @@ function json(
   });
 }
 
-function getRequestOrigin(req: NextRequest) {
+function getRequestOrigin(req: NextRequest): string {
   const configuredOrigin = firstNonEmpty(
     process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
     process.env.SITE_URL,
     process.env.APP_URL,
   );
 
   if (configuredOrigin) {
     try {
-      return new URL(configuredOrigin).origin;
+      return new URL(
+        configuredOrigin.startsWith("http")
+          ? configuredOrigin
+          : `https://${configuredOrigin}`,
+      ).origin;
     } catch {
       console.warn("Ignoring invalid configured SitGuru site URL.");
     }
@@ -302,7 +295,7 @@ function getRequestOrigin(req: NextRequest) {
   return req.nextUrl.origin;
 }
 
-function maskIdentifier(value: unknown) {
+function maskIdentifier(value: unknown): string | null {
   const text = asTrimmedString(value);
 
   if (!text) return null;
@@ -311,7 +304,7 @@ function maskIdentifier(value: unknown) {
   return `${text.slice(0, 3)}***${text.slice(-3)}`;
 }
 
-function maskEmail(value: unknown) {
+function maskEmail(value: unknown): string | null {
   const email = asTrimmedString(value);
   const [local, domain] = email.split("@");
 
@@ -320,7 +313,7 @@ function maskEmail(value: unknown) {
   return `${local.slice(0, 1)}***@${domain}`;
 }
 
-function getMissingColumnName(errorMessage: string) {
+function getMissingColumnName(errorMessage: string): string | null {
   const quotedColumnMatch = errorMessage.match(/'([^']+)' column/i);
   if (quotedColumnMatch?.[1]) return quotedColumnMatch[1];
 
@@ -373,13 +366,21 @@ async function getAuthenticatedUser(
 function normalizeRole(value: unknown): FinancialRole | null {
   const normalized = asTrimmedString(value).toLowerCase();
 
-  if (normalized === "guru" || normalized === "pet_guru") return "guru";
+  if (
+    normalized === "guru" ||
+    normalized === "pet_guru" ||
+    normalized === "provider" ||
+    normalized === "sitter"
+  ) {
+    return "guru";
+  }
+
   if (normalized === "ambassador") return "ambassador";
 
   return null;
 }
 
-async function getFinancialRoles(userId: string) {
+async function getFinancialRoles(userId: string): Promise<FinancialRole[]> {
   const roles = new Set<FinancialRole>();
 
   const { data: roleRows, error: roleError } = await supabaseAdmin
@@ -397,9 +398,7 @@ async function getFinancialRoles(userId: string) {
   }
 
   if (!roles.has("guru")) {
-    const guruColumns = ["user_id", "profile_id"];
-
-    for (const column of guruColumns) {
+    for (const column of ["user_id", "profile_id"]) {
       const { data, error } = await supabaseAdmin
         .from("gurus")
         .select("id")
@@ -417,132 +416,10 @@ async function getFinancialRoles(userId: string) {
   return [...roles];
 }
 
-async function getAccessToken(config: PayPalConfig) {
-  const cacheKey = `${config.environment}:${config.clientId}`;
-  const now = Date.now();
+function getLink(payload: unknown, relation: string): string {
+  const record = asRecord(payload);
 
-  if (
-    accessTokenCache?.cacheKey === cacheKey &&
-    accessTokenCache.expiresAt > now + 60_000
-  ) {
-    return accessTokenCache.token;
-  }
-
-  const basicAuthorization = Buffer.from(
-    `${config.clientId}:${config.clientSecret}`,
-  ).toString("base64");
-
-  const response = await fetch(`${config.apiBaseUrl}/v1/oauth2/token`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Basic ${basicAuthorization}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-    cache: "no-store",
-  });
-
-  const text = await response.text();
-  let payload: JsonRecord | null = null;
-
-  try {
-    payload = text ? (JSON.parse(text) as JsonRecord) : null;
-  } catch {
-    payload = null;
-  }
-
-  const accessToken = firstNonEmpty(payload?.access_token);
-  const expiresIn = Number(payload?.expires_in || 0);
-
-  if (!response.ok || !accessToken) {
-    console.error("PayPal access-token request failed:", {
-      status: response.status,
-      payload,
-    });
-
-    throw new Error(
-      firstNonEmpty(
-        payload?.error_description,
-        payload?.message,
-        "PayPal authentication failed.",
-      ),
-    );
-  }
-
-  accessTokenCache = {
-    cacheKey,
-    token: accessToken,
-    expiresAt: now + Math.max(300, expiresIn) * 1000,
-  };
-
-  return accessToken;
-}
-
-async function paypalRequest({
-  config,
-  accessToken,
-  url,
-  method = "GET",
-  body,
-}: {
-  config: PayPalConfig;
-  accessToken: string;
-  url: string;
-  method?: "GET" | "POST";
-  body?: JsonRecord;
-}) {
-  const response = await fetch(url, {
-    method,
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      "PayPal-Partner-Attribution-Id": config.attributionId,
-      "PayPal-Request-Id": randomUUID(),
-      Prefer: "return=representation",
-    },
-    body: body ? JSON.stringify(body) : undefined,
-    cache: "no-store",
-  });
-
-  const text = await response.text();
-  let payload: JsonRecord | null = null;
-
-  try {
-    payload = text ? (JSON.parse(text) as JsonRecord) : null;
-  } catch {
-    payload = text ? { message: text } : null;
-  }
-
-  if (!response.ok) {
-    console.error("PayPal onboarding API request failed:", {
-      method,
-      url,
-      status: response.status,
-      debugId: payload?.debug_id || null,
-      payload,
-    });
-
-    throw new Error(
-      firstNonEmpty(
-        payload?.message,
-        asArray(payload?.details)
-          .map((detail) => firstNonEmpty(asRecord(detail)?.description))
-          .filter(Boolean)
-          .join(" "),
-        `PayPal returned HTTP ${response.status}.`,
-      ),
-    );
-  }
-
-  return payload || {};
-}
-
-function getLink(payload: JsonRecord | null, relation: string) {
-  const links = asArray(payload?.links);
-
-  for (const item of links) {
+  for (const item of asArray(record?.links)) {
     const link = asRecord(item);
 
     if (firstNonEmpty(link?.rel).toLowerCase() === relation.toLowerCase()) {
@@ -553,7 +430,7 @@ function getLink(payload: JsonRecord | null, relation: string) {
   return "";
 }
 
-function getReferralId(selfUrl: string) {
+function getReferralId(selfUrl: string): string {
   if (!selfUrl) return "";
 
   try {
@@ -562,6 +439,18 @@ function getReferralId(selfUrl: string) {
   } catch {
     return "";
   }
+}
+
+function getPayPalErrorMessage(error: unknown): string {
+  if (error instanceof PayPalApiError) {
+    return error.message || "PayPal rejected the request.";
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "SitGuru could not complete the PayPal request.";
 }
 
 async function findPayPalAccount(userId: string) {
@@ -607,10 +496,28 @@ async function findPayoutPreference(userId: string) {
   }
 
   const rows = (data || []) as JsonRecord[];
+  return rows.find((row) => row.workspace_role === "guru") || rows[0] || null;
+}
 
-  return (
-    rows.find((row) => row.workspace_role === "guru") || rows[0] || null
-  );
+async function findCanonicalMerchantAccount(
+  userId: string,
+  environment: PayPalEnvironment,
+): Promise<CanonicalMerchantAccount | null> {
+  const { data, error } = await supabaseAdmin
+    .from("paypal_merchant_accounts")
+    .select(
+      "user_id,environment,tracking_id,paypal_merchant_id,merchant_email,status,onboarding_action_url,merchant_details",
+    )
+    .eq("user_id", userId)
+    .eq("environment", environment)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Canonical PayPal merchant lookup warning:", error.message);
+    return null;
+  }
+
+  return (data || null) as CanonicalMerchantAccount | null;
 }
 
 async function safeWriteRow({
@@ -683,7 +590,6 @@ async function savePayoutPreference({
     existingId: firstNonEmpty(existing?.id),
     payload: {
       user_id: userId,
-
       role_context: roleContext,
       booking_payout_provider: "paypal",
       booking_setup_requirement: "before_first_paid_booking",
@@ -698,14 +604,12 @@ async function savePayoutPreference({
       setup_completed_at: ready ? now : null,
       last_verified_at: ready ? now : null,
       can_accept_paid_bookings: ready,
-
       workspace_role: "guru",
       preferred_provider: "paypal",
       setup_timing: "before_first_paid_booking",
       allow_setup_later: true,
       setup_required: !ready,
       setup_completed: ready,
-
       metadata: {
         ...existingMetadata,
         ...metadata,
@@ -718,16 +622,106 @@ async function savePayoutPreference({
   });
 }
 
+async function saveCanonicalMerchantAccount({
+  userId,
+  environment,
+  state,
+  status,
+  onboardingActionUrl,
+  referralResponse,
+  errorCode,
+  errorMessage,
+}: {
+  userId: string;
+  environment: PayPalEnvironment;
+  state: OnboardingState;
+  status:
+    | "not_started"
+    | "referral_created"
+    | "pending"
+    | "connected"
+    | "limited"
+    | "disconnected"
+    | "error";
+  onboardingActionUrl?: string | null;
+  referralResponse?: JsonRecord | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+}) {
+  const now = new Date().toISOString();
+  const merchantDetails: JsonRecord = {
+    ...(state.rawStatus || {}),
+    sitguru_verification: {
+      environment,
+      verified_at: now,
+      requirements_currently_due: state.requirementsCurrentlyDue,
+      requested_features: getRequestedFeatures(),
+      requested_product: "PPCP",
+      return_metadata: state.returnMetadata || null,
+      referral_response: referralResponse || null,
+    },
+  };
+
+  const { error } = await supabaseAdmin
+    .from("paypal_merchant_accounts")
+    .upsert(
+      {
+        user_id: userId,
+        environment,
+        tracking_id: state.trackingId,
+        paypal_merchant_id: state.merchantId || null,
+        merchant_email: state.providerEmail || null,
+        status,
+        onboarding_action_url: onboardingActionUrl ?? null,
+        payments_receivable: state.paymentsReceivable,
+        primary_email_confirmed: state.emailConfirmed,
+        oauth_third_party_permissions: state.oauthPermissions,
+        products: state.products,
+        capabilities: state.capabilities,
+        vetting_status: state.vettingStatus,
+        partner_consent_status: state.permissionsGranted ? "true" : "false",
+        merchant_details: merchantDetails,
+        last_error_code: errorCode || null,
+        last_error_message: errorMessage || null,
+        onboarding_started_at: now,
+        onboarding_completed_at: state.ready ? now : null,
+        last_synced_at: now,
+      },
+      {
+        onConflict: "user_id,environment",
+      },
+    );
+
+  if (error) {
+    console.warn("Canonical PayPal merchant save warning:", error.message);
+  }
+}
+
 async function savePayoutAccount({
   userId,
   roles,
+  environment,
   state,
   metadata,
+  canonicalStatus,
+  onboardingActionUrl,
+  referralResponse,
 }: {
   userId: string;
   roles: FinancialRole[];
+  environment: PayPalEnvironment;
   state: OnboardingState;
   metadata: JsonRecord;
+  canonicalStatus?:
+    | "not_started"
+    | "referral_created"
+    | "pending"
+    | "connected"
+    | "limited"
+    | "disconnected"
+    | "error";
+  onboardingActionUrl?: string | null;
+  referralResponse?: JsonRecord | null;
 }) {
   const now = new Date().toISOString();
   const { account: existing, anyDefault } = await findPayPalAccount(userId);
@@ -742,7 +736,6 @@ async function savePayoutAccount({
     existingId: firstNonEmpty(existing?.id),
     payload: {
       user_id: userId,
-
       account_purpose: "guru_marketplace_seller",
       provider: "paypal",
       provider_account_id: state.merchantId || null,
@@ -757,7 +750,7 @@ async function savePayoutAccount({
       country_code: state.countryCode || "US",
       default_currency: "USD",
       is_default: isDefault,
-      is_live: getPayPalConfig()?.environment === "live",
+      is_live: environment === "live",
       requirements_currently_due: state.requirementsCurrentlyDue,
       requirements_eventually_due: state.requirementsCurrentlyDue,
       capabilities: state.capabilities,
@@ -771,7 +764,6 @@ async function savePayoutAccount({
           ? now
           : null,
       last_synced_at: now,
-
       workspace_role: "guru",
       status: state.ready
         ? "ready"
@@ -781,16 +773,17 @@ async function savePayoutAccount({
       is_primary: isDefault,
       onboarding_started_at: existing?.onboarding_started_at || now,
       last_checked_at: now,
-
       metadata: {
         ...existingMetadata,
         ...metadata,
+        paypal_tracking_id: state.trackingId,
         paypal_merchant_id: state.merchantId || null,
         paypal_provider_email: state.providerEmail || null,
-        paypal_environment: getPayPalConfig()?.environment || "sandbox",
+        paypal_environment: environment,
         paypal_payments_receivable: state.paymentsReceivable,
         paypal_primary_email_confirmed: state.emailConfirmed,
         paypal_permissions_granted: state.permissionsGranted,
+        paypal_vetting_status: state.vettingStatus,
         paypal_requirements_currently_due: state.requirementsCurrentlyDue,
         last_paypal_onboarding_update_at: now,
       },
@@ -806,6 +799,23 @@ async function savePayoutAccount({
     restricted: state.restricted,
     now,
     metadata,
+  });
+
+  await saveCanonicalMerchantAccount({
+    userId,
+    environment,
+    state,
+    status:
+      canonicalStatus ||
+      (state.ready
+        ? "connected"
+        : state.restricted
+          ? "limited"
+          : state.merchantId
+            ? "pending"
+            : "not_started"),
+    onboardingActionUrl,
+    referralResponse,
   });
 
   const { error: readinessError } = await supabaseAdmin.rpc(
@@ -826,6 +836,8 @@ async function savePayoutAccount({
 function publicAccount(account: JsonRecord | null) {
   if (!account) return null;
 
+  const metadata = asRecord(account.metadata) || {};
+
   return {
     id: firstNonEmpty(account.id) || null,
     provider: "paypal",
@@ -842,32 +854,88 @@ function publicAccount(account: JsonRecord | null) {
     detailsSubmitted: account.details_submitted === true,
     chargesEnabled: account.charges_enabled === true,
     payoutsEnabled: account.payouts_enabled === true,
-    isDefault:
-      account.is_default === true || account.is_primary === true,
+    isDefault: account.is_default === true || account.is_primary === true,
     isLive: account.is_live === true,
     connectedAt: account.connected_at || null,
     onboardingCompletedAt: account.onboarding_completed_at || null,
-    lastSyncedAt:
-      account.last_synced_at || account.last_checked_at || null,
+    lastSyncedAt: account.last_synced_at || account.last_checked_at || null,
+    primaryEmailConfirmed:
+      metadata.paypal_primary_email_confirmed === true,
+    paymentsReceivable: metadata.paypal_payments_receivable === true,
+    permissionsGranted: metadata.paypal_permissions_granted === true,
+    vettingStatus: firstNonEmpty(metadata.paypal_vetting_status) || null,
+    requirementsCurrentlyDue: Array.isArray(
+      account.requirements_currently_due,
+    )
+      ? account.requirements_currently_due
+      : [],
   };
 }
 
+function extractOAuthPermissions(
+  status: SellerIntegrationStatus | null,
+): PayPalOAuthThirdParty[] {
+  const permissions: PayPalOAuthThirdParty[] = [];
+
+  if (hasMeaningfulValue(status?.oauth_third_party)) {
+    for (const item of asArray(status?.oauth_third_party)) {
+      const record = asRecord(item);
+      if (record) permissions.push(record as PayPalOAuthThirdParty);
+    }
+  }
+
+  for (const integration of status?.oauth_integrations || []) {
+    for (const item of integration.oauth_third_party || []) {
+      if (item && typeof item === "object") {
+        permissions.push(item);
+      }
+    }
+  }
+
+  return permissions;
+}
+
 function extractProductCapabilities(status: SellerIntegrationStatus | null) {
-  const products = asArray(status?.products);
+  const products = Array.isArray(status?.products) ? status.products : [];
   const productStatuses: JsonRecord = {};
   const capabilityNames = new Set<string>();
+  let vettingStatus: string | null = null;
+  let ppcpProvisioned = false;
+  let ppcpRestricted = false;
 
-  for (const item of products) {
-    const product = asRecord(item);
-    const name = firstNonEmpty(product?.name, "UNKNOWN");
+  for (const product of products) {
+    const name = normalizeUppercase(product.name) || "UNKNOWN";
+    const productStatus = normalizeUppercase(product.status);
+    const productVettingStatus = normalizeUppercase(product.vetting_status);
 
     productStatuses[name] = {
-      status: product?.status || null,
-      vettingStatus: product?.vetting_status || null,
-      capabilities: asArray(product?.capabilities),
+      status: productStatus || null,
+      vettingStatus: productVettingStatus || null,
+      capabilities: asArray(product.capabilities),
     };
 
-    for (const capability of asArray(product?.capabilities)) {
+    if (["PPCP", "PPCP_CUSTOM", "PPCP_STANDARD"].includes(name)) {
+      vettingStatus = productVettingStatus || productStatus || null;
+      ppcpProvisioned =
+        ["ACTIVE", "APPROVED", "SUBSCRIBED"].includes(productStatus) ||
+        ["ACTIVE", "APPROVED", "SUBSCRIBED"].includes(
+          productVettingStatus,
+        );
+      ppcpRestricted = [
+        "DECLINED",
+        "DENIED",
+        "RESTRICTED",
+        "SUSPENDED",
+        "REVOKED",
+        "INACTIVE",
+      ].some(
+        (value) =>
+          productStatus.includes(value) ||
+          productVettingStatus.includes(value),
+      );
+    }
+
+    for (const capability of asArray(product.capabilities)) {
       const capabilityRecord = asRecord(capability);
       const capabilityName = firstNonEmpty(
         capabilityRecord?.name,
@@ -879,35 +947,40 @@ function extractProductCapabilities(status: SellerIntegrationStatus | null) {
     }
   }
 
-  for (const capability of asArray(status?.capabilities)) {
-    const capabilityRecord = asRecord(capability);
+  for (const capability of status?.capabilities || []) {
     const capabilityName = firstNonEmpty(
-      capabilityRecord?.name,
-      capabilityRecord?.capability,
-      capability,
+      capability.name,
+      (capability as JsonRecord).capability,
     );
 
     if (capabilityName) capabilityNames.add(capabilityName);
   }
 
   return {
-    products: productStatuses,
+    products,
+    productStatuses,
     capabilityNames: [...capabilityNames],
+    vettingStatus,
+    ppcpProvisioned,
+    ppcpRestricted,
   };
 }
 
 function buildOnboardingState({
   status,
   merchantId,
+  trackingId,
   fallbackEmail,
   returnMetadata,
 }: {
   status: SellerIntegrationStatus | null;
   merchantId: string;
+  trackingId: string;
   fallbackEmail: string;
   returnMetadata?: JsonRecord;
 }): OnboardingState {
   const resolvedMerchantId = firstNonEmpty(status?.merchant_id, merchantId);
+  const resolvedTrackingId = firstNonEmpty(status?.tracking_id, trackingId);
   const providerEmail = firstNonEmpty(status?.primary_email, fallbackEmail);
   const paymentsReceivable = status
     ? status.payments_receivable === true
@@ -915,43 +988,42 @@ function buildOnboardingState({
   const emailConfirmed = status
     ? status.primary_email_confirmed === true
     : asBoolean(returnMetadata?.isEmailConfirmed);
+  const oauthPermissions = extractOAuthPermissions(status);
   const permissionsGranted = status
-    ? hasMeaningfulValue(status.oauth_third_party)
+    ? oauthPermissions.length > 0
     : asBoolean(returnMetadata?.permissionsGranted) &&
       asBoolean(returnMetadata?.consentStatus);
-  const accountStatus = firstNonEmpty(
-    returnMetadata?.accountStatus,
-  ).toUpperCase();
-  const riskStatus = firstNonEmpty(returnMetadata?.riskStatus).toUpperCase();
-  const restricted = [
-    "DECLINED",
-    "DENIED",
-    "SUSPENDED",
-    "REVOKED",
-    "INACTIVE",
-  ].some((value) => riskStatus.includes(value));
+  const accountStatus = normalizeUppercase(returnMetadata?.accountStatus);
+  const riskStatus = normalizeUppercase(returnMetadata?.riskStatus);
+  const productSnapshot = extractProductCapabilities(status);
+  const restricted =
+    productSnapshot.ppcpRestricted ||
+    ["DECLINED", "DENIED", "SUSPENDED", "REVOKED", "INACTIVE"].some(
+      (value) => riskStatus.includes(value),
+    );
   const ready =
     Boolean(resolvedMerchantId) &&
     paymentsReceivable &&
     emailConfirmed &&
     permissionsGranted &&
+    productSnapshot.ppcpProvisioned &&
     !restricted;
   const detailsSubmitted =
-    ready ||
-    Boolean(resolvedMerchantId) ||
-    accountStatus === "BUSINESS_ACCOUNT";
+    ready || Boolean(resolvedMerchantId) || accountStatus === "BUSINESS_ACCOUNT";
   const requirementsCurrentlyDue: string[] = [];
 
   if (!resolvedMerchantId) requirementsCurrentlyDue.push("paypal_account");
   if (!permissionsGranted) requirementsCurrentlyDue.push("permissions");
   if (!emailConfirmed) requirementsCurrentlyDue.push("email_confirmation");
   if (!paymentsReceivable) requirementsCurrentlyDue.push("payments_receivable");
+  if (!productSnapshot.ppcpProvisioned) {
+    requirementsCurrentlyDue.push("paypal_product_approval");
+  }
   if (restricted) requirementsCurrentlyDue.push("paypal_account_review");
-
-  const capabilitySnapshot = extractProductCapabilities(status);
 
   return {
     merchantId: resolvedMerchantId,
+    trackingId: resolvedTrackingId,
     providerEmail,
     ready,
     restricted,
@@ -978,71 +1050,88 @@ function buildOnboardingState({
     ).toUpperCase(),
     requirementsCurrentlyDue,
     capabilities: {
-      requestedFeatures: [...PAYPAL_FEATURES],
-      ...capabilitySnapshot,
+      requestedFeatures: getRequestedFeatures(),
+      requestedProduct: "PPCP",
+      products: productSnapshot.productStatuses,
+      capabilityNames: productSnapshot.capabilityNames,
     },
+    products: productSnapshot.products,
+    oauthPermissions,
+    vettingStatus: productSnapshot.vettingStatus,
     rawStatus: status,
     returnMetadata,
   };
 }
 
+function getMerchantIntegrationFromResponse(
+  response: unknown,
+): SellerIntegrationStatus | null {
+  if (Array.isArray(response)) {
+    const first = response.find((item) => asRecord(item));
+    return first ? (first as SellerIntegrationStatus) : null;
+  }
+
+  const record = asRecord(response);
+  if (!record) return null;
+
+  if (record.merchant_id || record.tracking_id) {
+    return record as SellerIntegrationStatus;
+  }
+
+  for (const key of ["merchant_integrations", "integrations"]) {
+    const candidate = asArray(record[key]).find((item) => asRecord(item));
+    if (candidate) return candidate as SellerIntegrationStatus;
+  }
+
+  return null;
+}
+
 async function fetchSellerByTrackingId({
   config,
-  accessToken,
   trackingId,
 }: {
   config: PayPalConfig;
-  accessToken: string;
   trackingId: string;
-}) {
-  if (!config.partnerMerchantId || !trackingId) return "";
+}): Promise<SellerIntegrationStatus | null> {
+  if (!config.partnerMerchantId || !trackingId) return null;
 
-  const url = new URL(
+  const response = await paypalRequest<unknown>(
     `/v1/customer/partners/${encodeURIComponent(
       config.partnerMerchantId,
-    )}/merchant-integrations`,
-    `${config.apiBaseUrl}/`,
+    )}/merchant-integrations?tracking_id=${encodeURIComponent(trackingId)}`,
+    {
+      method: "GET",
+    },
   );
-  url.searchParams.set("tracking_id", trackingId);
 
-  const payload = await paypalRequest({
-    config,
-    accessToken,
-    url: url.toString(),
-  });
-
-  return firstNonEmpty(payload.merchant_id);
+  return getMerchantIntegrationFromResponse(response);
 }
 
 async function fetchSellerStatus({
   config,
-  accessToken,
   merchantId,
 }: {
   config: PayPalConfig;
-  accessToken: string;
   merchantId: string;
-}) {
+}): Promise<SellerIntegrationStatus | null> {
   if (!config.partnerMerchantId || !merchantId) return null;
 
-  const url = `${config.apiBaseUrl}/v1/customer/partners/${encodeURIComponent(
-    config.partnerMerchantId,
-  )}/merchant-integrations/${encodeURIComponent(merchantId)}`;
-
-  return (await paypalRequest({
-    config,
-    accessToken,
-    url,
-  })) as SellerIntegrationStatus;
+  return paypalRequest<SellerIntegrationStatus>(
+    `/v1/customer/partners/${encodeURIComponent(
+      config.partnerMerchantId,
+    )}/merchant-integrations/${encodeURIComponent(merchantId)}`,
+    {
+      method: "GET",
+      sellerMerchantId: merchantId,
+    },
+  );
 }
 
 async function renewReferralUrl({
   config,
-  accessToken,
   selfUrl,
 }: {
   config: PayPalConfig;
-  accessToken: string;
   selfUrl: string;
 }) {
   if (!selfUrl) return null;
@@ -1059,10 +1148,9 @@ async function renewReferralUrl({
     return null;
   }
 
-  const payload = await paypalRequest({
-    config,
-    accessToken,
-    url: url.toString(),
+  const path = `${url.pathname}${url.search}`;
+  const payload = await paypalRequest<JsonRecord>(path, {
+    method: "GET",
   });
   const actionUrl = getLink(payload, "action_url");
 
@@ -1079,6 +1167,7 @@ function getExistingReferralMetadata(account: JsonRecord | null) {
   const metadata = asRecord(account?.metadata) || {};
 
   return {
+    trackingId: firstNonEmpty(metadata.paypal_tracking_id),
     selfUrl: firstNonEmpty(metadata.paypal_referral_self_url),
     referralId: firstNonEmpty(metadata.paypal_partner_referral_id),
   };
@@ -1086,14 +1175,12 @@ function getExistingReferralMetadata(account: JsonRecord | null) {
 
 async function createReferral({
   req,
-  config,
-  accessToken,
   user,
+  trackingId,
 }: {
   req: NextRequest;
-  config: PayPalConfig;
-  accessToken: string;
   user: AuthenticatedUser;
+  trackingId: string;
 }) {
   const origin = getRequestOrigin(req);
   const returnUrl = new URL("/api/paypal/onboarding", origin);
@@ -1126,7 +1213,7 @@ async function createReferral({
   }
 
   const referralBody: JsonRecord = {
-    tracking_id: user.id,
+    tracking_id: trackingId,
     preferred_language_code: "en-US",
     legal_country_code: "US",
     partner_config_override: partnerConfigOverride,
@@ -1138,13 +1225,13 @@ async function createReferral({
             integration_method: "PAYPAL",
             integration_type: "THIRD_PARTY",
             third_party_details: {
-              features: [...PAYPAL_FEATURES],
+              features: getRequestedFeatures(),
             },
           },
         },
       },
     ],
-    products: ["EXPRESS_CHECKOUT"],
+    products: ["PPCP"],
     legal_consents: [
       {
         type: "SHARE_DATA_CONSENT",
@@ -1155,13 +1242,14 @@ async function createReferral({
 
   if (user.email) referralBody.email = user.email;
 
-  const payload = await paypalRequest({
-    config,
-    accessToken,
-    url: `${config.apiBaseUrl}/v2/customer/partner-referrals`,
-    method: "POST",
-    body: referralBody,
-  });
+  const payload = await paypalRequest<PartnerReferralResponse>(
+    "/v2/customer/partner-referrals",
+    {
+      method: "POST",
+      requestId: randomUUID(),
+      body: referralBody,
+    },
+  );
 
   const actionUrl = getLink(payload, "action_url");
   const selfUrl = getLink(payload, "self");
@@ -1171,10 +1259,11 @@ async function createReferral({
   }
 
   return {
-    payload,
+    payload: payload as JsonRecord,
     actionUrl,
     selfUrl,
-    referralId: getReferralId(selfUrl),
+    referralId:
+      firstNonEmpty(payload.partner_referral_id) || getReferralId(selfUrl),
   };
 }
 
@@ -1216,13 +1305,13 @@ function redirectToEarnings({
 }
 
 async function handlePayPalReturn(req: NextRequest, user: AuthenticatedUser) {
-  const config = getPayPalConfig();
+  const config = tryGetPayPalConfig();
 
   if (!config) {
     return redirectToEarnings({
       req,
       status: "error",
-      message: "PayPal onboarding is not fully configured.",
+      message: "PayPal setup is not fully configured yet.",
     });
   }
 
@@ -1232,52 +1321,78 @@ async function handlePayPalReturn(req: NextRequest, user: AuthenticatedUser) {
     return redirectToEarnings({
       req,
       status: "error",
-      message: "A Guru workspace is required for PayPal onboarding.",
+      message: "A Guru workspace is required for PayPal setup.",
     });
   }
 
   const returnMetadata = getReturnMetadata(req);
-  const trackingId = firstNonEmpty(returnMetadata.trackingId);
+  const canonical = await findCanonicalMerchantAccount(
+    user.id,
+    config.environment,
+  );
+  const { account: existingPayoutAccount } = await findPayPalAccount(user.id);
+  const payoutMetadata = asRecord(existingPayoutAccount?.metadata) || {};
+  const expectedTrackingId = firstNonEmpty(
+    canonical?.tracking_id,
+    payoutMetadata.paypal_tracking_id,
+  );
+  const returnedTrackingId = firstNonEmpty(returnMetadata.trackingId);
 
-  if (trackingId && trackingId !== user.id) {
+  if (
+    expectedTrackingId &&
+    returnedTrackingId &&
+    returnedTrackingId !== expectedTrackingId
+  ) {
     console.warn("PayPal onboarding return tracking ID mismatch:", {
       authenticatedUserId: user.id,
-      trackingId,
+      expectedTrackingId,
+      returnedTrackingId,
     });
 
     return redirectToEarnings({
       req,
       status: "error",
-      message: "SitGuru could not verify this PayPal onboarding return.",
+      message: "SitGuru could not verify this PayPal setup return.",
     });
   }
 
+  const trackingId =
+    returnedTrackingId ||
+    expectedTrackingId ||
+    `sitguru-${config.environment}-${user.id}`;
+
   try {
-    const accessToken = await getAccessToken(config);
-    let merchantId = firstNonEmpty(returnMetadata.merchantIdInPayPal);
+    let merchantId = firstNonEmpty(
+      returnMetadata.merchantIdInPayPal,
+      canonical?.paypal_merchant_id,
+      existingPayoutAccount?.provider_merchant_id,
+      existingPayoutAccount?.provider_account_id,
+    );
+
+    let sellerStatus: SellerIntegrationStatus | null = null;
 
     if (!merchantId && config.partnerMerchantId) {
-      merchantId = await fetchSellerByTrackingId({
+      sellerStatus = await fetchSellerByTrackingId({
         config,
-        accessToken,
-        trackingId: user.id,
+        trackingId,
       });
+      merchantId = firstNonEmpty(sellerStatus?.merchant_id);
     }
 
-    const sellerStatus = merchantId
-      ? await fetchSellerStatus({
-          config,
-          accessToken,
-          merchantId,
-        }).catch((error) => {
-          console.warn("PayPal seller-status refresh warning:", error);
-          return null;
-        })
-      : null;
+    if (merchantId && config.partnerMerchantId) {
+      sellerStatus = await fetchSellerStatus({
+        config,
+        merchantId,
+      }).catch((error) => {
+        console.warn("PayPal seller-status refresh warning:", error);
+        return sellerStatus;
+      });
+    }
 
     const state = buildOnboardingState({
       status: sellerStatus,
       merchantId,
+      trackingId,
       fallbackEmail: user.email || "",
       returnMetadata,
     });
@@ -1285,11 +1400,17 @@ async function handlePayPalReturn(req: NextRequest, user: AuthenticatedUser) {
     await savePayoutAccount({
       userId: user.id,
       roles,
+      environment: config.environment,
       state,
       metadata: {
         paypal_return_received_at: new Date().toISOString(),
         paypal_return_metadata: returnMetadata,
       },
+      canonicalStatus: state.ready
+        ? "connected"
+        : state.restricted
+          ? "limited"
+          : "pending",
     });
 
     const returnMessage = firstNonEmpty(returnMetadata.returnMessage);
@@ -1298,9 +1419,9 @@ async function handlePayPalReturn(req: NextRequest, user: AuthenticatedUser) {
       req,
       status: state.ready ? "connected" : "pending",
       message: state.ready
-        ? "PayPal is connected and ready for SitGuru bookings."
+        ? "PayPal is connected. You’re ready for eligible SitGuru payouts."
         : returnMessage ||
-          "PayPal received your setup. SitGuru is waiting for final account verification.",
+          "PayPal received your setup. We’re waiting for the final account check.",
     });
   } catch (error) {
     console.error("PayPal onboarding return failed:", error);
@@ -1308,10 +1429,7 @@ async function handlePayPalReturn(req: NextRequest, user: AuthenticatedUser) {
     return redirectToEarnings({
       req,
       status: "error",
-      message:
-        error instanceof Error
-          ? error.message
-          : "SitGuru could not finish PayPal onboarding.",
+      message: getPayPalErrorMessage(error),
     });
   }
 }
@@ -1331,7 +1449,7 @@ export async function GET(req: NextRequest) {
       const loginUrl = new URL("/login", getRequestOrigin(req));
       loginUrl.searchParams.set(
         "next",
-        "/api/paypal/onboarding?mode=return",
+        `${req.nextUrl.pathname}${req.nextUrl.search}`,
       );
       return NextResponse.redirect(loginUrl, 303);
     }
@@ -1357,76 +1475,96 @@ export async function GET(req: NextRequest) {
       req,
       {
         success: false,
-        error: "A Guru workspace is required for PayPal onboarding.",
+        error: "A Guru workspace is required for PayPal setup.",
         roles,
       },
       403,
     );
   }
 
-  const config = getPayPalConfig();
+  const config = tryGetPayPalConfig();
   const { account: existing } = await findPayPalAccount(user.id);
-  const shouldRefresh =
-    req.nextUrl.searchParams.get("refresh") === "true" ||
-    req.nextUrl.searchParams.get("refresh") === "1";
+  const shouldRefresh = ["true", "1"].includes(
+    req.nextUrl.searchParams.get("refresh") || "",
+  );
 
   let account = existing;
   let refreshWarning = "";
 
   if (shouldRefresh && config) {
     try {
-      const accessToken = await getAccessToken(config);
+      const canonical = await findCanonicalMerchantAccount(
+        user.id,
+        config.environment,
+      );
+      const metadata = asRecord(existing?.metadata) || {};
+      const trackingId = firstNonEmpty(
+        canonical?.tracking_id,
+        metadata.paypal_tracking_id,
+      );
       let merchantId = firstNonEmpty(
+        canonical?.paypal_merchant_id,
         existing?.provider_merchant_id,
         existing?.provider_account_id,
       );
+      let sellerStatus: SellerIntegrationStatus | null = null;
 
-      if (!merchantId && config.partnerMerchantId) {
-        merchantId = await fetchSellerByTrackingId({
+      if (!merchantId && config.partnerMerchantId && trackingId) {
+        sellerStatus = await fetchSellerByTrackingId({
           config,
-          accessToken,
-          trackingId: user.id,
+          trackingId,
         });
+        merchantId = firstNonEmpty(sellerStatus?.merchant_id);
       }
 
       if (merchantId && config.partnerMerchantId) {
-        const sellerStatus = await fetchSellerStatus({
+        sellerStatus = await fetchSellerStatus({
           config,
-          accessToken,
           merchantId,
         });
+      }
+
+      if (merchantId || sellerStatus) {
         const state = buildOnboardingState({
           status: sellerStatus,
           merchantId,
+          trackingId:
+            trackingId ||
+            firstNonEmpty(sellerStatus?.tracking_id) ||
+            `sitguru-${config.environment}-${user.id}`,
           fallbackEmail: user.email || "",
         });
 
         account = await savePayoutAccount({
           userId: user.id,
           roles,
+          environment: config.environment,
           state,
           metadata: {
             paypal_status_refreshed_at: new Date().toISOString(),
           },
+          canonicalStatus: state.ready
+            ? "connected"
+            : state.restricted
+              ? "limited"
+              : "pending",
         });
       } else if (!config.partnerMerchantId) {
         refreshWarning =
-          "PAYPAL_PARTNER_MERCHANT_ID is required for direct seller-status checks.";
+          "The PayPal partner merchant ID is required to check setup status.";
+      } else {
+        refreshWarning =
+          "No PayPal seller account was found yet. Start or continue setup first.";
       }
     } catch (error) {
       console.error("PayPal onboarding status refresh failed:", error);
-      refreshWarning =
-        error instanceof Error
-          ? error.message
-          : "PayPal status refresh failed.";
+      refreshWarning = getPayPalErrorMessage(error);
     }
   }
 
   return json(req, {
     success: true,
-    environment: config?.environment || normalizeEnvironment(
-      process.env.PAYPAL_ENVIRONMENT || process.env.PAYPAL_MODE,
-    ),
+    environment: config?.environment || getConfiguredEnvironment(),
     configured: Boolean(config),
     statusRefreshAvailable: Boolean(config?.partnerMerchantId),
     account: publicAccount(account),
@@ -1455,14 +1593,14 @@ export async function POST(req: NextRequest) {
       req,
       {
         success: false,
-        error: "A Guru workspace is required for PayPal onboarding.",
+        error: "A Guru workspace is required for PayPal setup.",
         roles,
       },
       403,
     );
   }
 
-  const config = getPayPalConfig();
+  const config = tryGetPayPalConfig();
 
   if (!config) {
     return json(
@@ -1470,12 +1608,8 @@ export async function POST(req: NextRequest) {
       {
         success: false,
         error:
-          "PayPal onboarding is not configured. Add the PayPal Client ID, Client Secret, and Partner Attribution ID.",
-        requiredEnvironmentVariables: [
-          "PAYPAL_SANDBOX_CLIENT_ID",
-          "PAYPAL_SANDBOX_CLIENT_SECRET",
-          "PAYPAL_SANDBOX_PARTNER_ATTRIBUTION_ID",
-        ],
+          "PayPal setup is not ready yet. Add the Client ID, Client Secret, Partner Merchant ID, and Partner Attribution ID for the active environment.",
+        activeEnvironment: getConfiguredEnvironment(),
       },
       503,
     );
@@ -1500,7 +1634,6 @@ export async function POST(req: NextRequest) {
   const forceNew = body.forceNew === true;
 
   try {
-    const accessToken = await getAccessToken(config);
     const { account: existing } = await findPayPalAccount(user.id);
     const existingStatus = firstNonEmpty(
       existing?.onboarding_status,
@@ -1521,30 +1654,46 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const canonical = await findCanonicalMerchantAccount(
+      user.id,
+      config.environment,
+    );
+    const referralMetadata = getExistingReferralMetadata(existing);
+
     if (!forceNew) {
-      const referralMetadata = getExistingReferralMetadata(existing);
       const renewed = await renewReferralUrl({
         config,
-        accessToken,
-        selfUrl: referralMetadata.selfUrl,
+        selfUrl:
+          referralMetadata.selfUrl ||
+          firstNonEmpty(
+            asRecord(canonical?.merchant_details)?.referral_self_url,
+          ),
       }).catch((error) => {
         console.warn("PayPal referral renewal warning:", error);
         return null;
       });
 
       if (renewed) {
+        const trackingId = firstNonEmpty(
+          canonical?.tracking_id,
+          referralMetadata.trackingId,
+          `sitguru-${config.environment}-${user.id}`,
+        );
         const state = buildOnboardingState({
           status: null,
           merchantId: firstNonEmpty(
+            canonical?.paypal_merchant_id,
             existing?.provider_merchant_id,
             existing?.provider_account_id,
           ),
+          trackingId,
           fallbackEmail: user.email || "",
         });
 
         const account = await savePayoutAccount({
           userId: user.id,
           roles,
+          environment: config.environment,
           state,
           metadata: {
             paypal_partner_referral_id:
@@ -1556,6 +1705,9 @@ export async function POST(req: NextRequest) {
               new Date().toISOString(),
             paypal_referral_renewed: true,
           },
+          canonicalStatus: "referral_created",
+          onboardingActionUrl: renewed.actionUrl,
+          referralResponse: renewed.payload,
         });
 
         return json(req, {
@@ -1568,35 +1720,45 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const trackingId = [
+      "sitguru",
+      config.environment,
+      user.id,
+      randomUUID(),
+    ].join("-");
     const referral = await createReferral({
       req,
-      config,
-      accessToken,
       user,
+      trackingId,
     });
-
     const state = buildOnboardingState({
       status: null,
       merchantId: firstNonEmpty(
+        canonical?.paypal_merchant_id,
         existing?.provider_merchant_id,
         existing?.provider_account_id,
       ),
+      trackingId,
       fallbackEmail: user.email || "",
     });
 
     const account = await savePayoutAccount({
       userId: user.id,
       roles,
+      environment: config.environment,
       state,
       metadata: {
-        paypal_tracking_id: user.id,
+        paypal_tracking_id: trackingId,
         paypal_partner_referral_id: referral.referralId || null,
         paypal_referral_self_url: referral.selfUrl || null,
         paypal_onboarding_action_url_created_at: new Date().toISOString(),
-        paypal_requested_features: [...PAYPAL_FEATURES],
-        paypal_requested_products: ["EXPRESS_CHECKOUT"],
+        paypal_requested_features: getRequestedFeatures(),
+        paypal_requested_products: ["PPCP"],
         paypal_referral_renewed: false,
       },
+      canonicalStatus: "referral_created",
+      onboardingActionUrl: referral.actionUrl,
+      referralResponse: referral.payload,
     });
 
     return json(
@@ -1607,8 +1769,7 @@ export async function POST(req: NextRequest) {
         onboardingUrl: referral.actionUrl,
         referralId: referral.referralId || null,
         account: publicAccount(account),
-        message:
-          "PayPal seller onboarding is ready. Redirect the Guru to onboardingUrl.",
+        message: "Your secure PayPal setup link is ready.",
       },
       201,
     );
@@ -1619,12 +1780,9 @@ export async function POST(req: NextRequest) {
       req,
       {
         success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "SitGuru could not start PayPal onboarding.",
+        error: getPayPalErrorMessage(error),
       },
-      502,
+      error instanceof PayPalApiError ? 502 : 500,
     );
   }
 }

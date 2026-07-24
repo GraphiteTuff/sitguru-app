@@ -12,6 +12,12 @@ export const runtime = "nodejs";
 
 type PayPalEnvironment = "sandbox" | "live";
 
+type PayPalConnectionStatus =
+  | "connected"
+  | "pending"
+  | "limited"
+  | "error";
+
 type PayPalMerchantAccountRecord = {
   user_id: string;
   environment: PayPalEnvironment;
@@ -37,8 +43,8 @@ type PayPalOAuthIntegration = {
 
 type PayPalProduct = {
   name?: string;
-  vetting_status?: string;
   status?: string;
+  vetting_status?: string;
   capabilities?: string[];
   [key: string]: unknown;
 };
@@ -53,7 +59,10 @@ type PayPalCapability = {
 type PayPalMerchantIntegration = {
   merchant_id?: string;
   tracking_id?: string;
+  legal_name?: string;
   primary_email?: string;
+  primary_currency?: string;
+  country?: string;
   payments_receivable?: boolean;
   primary_email_confirmed?: boolean;
   products?: PayPalProduct[];
@@ -68,25 +77,21 @@ type PayPalMerchantIntegrationCollection = {
   [key: string]: unknown;
 };
 
-type PayPalConnectionStatus =
-  | "connected"
-  | "pending"
-  | "limited"
-  | "error";
-
-function getAppUrl(req: NextRequest): string {
-  const appUrl =
+function getAppUrl(request: NextRequest): string {
+  const configuredUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.NEXT_PUBLIC_SITE_URL ||
     process.env.VERCEL_URL ||
-    req.nextUrl.origin;
+    request.nextUrl.origin;
 
-  return appUrl.startsWith("http")
-    ? appUrl.replace(/\/$/, "")
-    : `https://${appUrl.replace(/\/$/, "")}`;
+  return configuredUrl.startsWith("http")
+    ? configuredUrl.replace(/\/$/, "")
+    : `https://${configuredUrl.replace(/\/$/, "")}`;
 }
 
-function normalizeString(value: string | null | undefined): string {
+function normalizeString(
+  value: string | null | undefined,
+): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
@@ -139,7 +144,10 @@ function getOAuthThirdPartyPermissions(
     }
 
     for (const thirdPartyRecord of integration.oauth_third_party) {
-      if (thirdPartyRecord && typeof thirdPartyRecord === "object") {
+      if (
+        thirdPartyRecord &&
+        typeof thirdPartyRecord === "object"
+      ) {
         permissions.push(thirdPartyRecord);
       }
     }
@@ -173,14 +181,29 @@ function getPpcpProduct(
     merchantDetails.products?.find((product) => {
       const productName = normalizeUppercase(product.name);
 
-      return Boolean(
-        productName &&
-          (productName === "PPCP" ||
-            productName === "PPCP_CUSTOM" ||
-            productName === "PPCP_STANDARD"),
+      return (
+        productName === "PPCP" ||
+        productName === "PPCP_CUSTOM" ||
+        productName === "PPCP_STANDARD"
       );
     }) ?? null
   );
+}
+
+function getCapabilityStatus(
+  merchantDetails: PayPalMerchantIntegration,
+  capabilityName: string,
+): string | null {
+  const normalizedName = capabilityName
+    .trim()
+    .toUpperCase();
+
+  const capability = merchantDetails.capabilities?.find(
+    (candidate) =>
+      normalizeUppercase(candidate.name) === normalizedName,
+  );
+
+  return normalizeUppercase(capability?.status);
 }
 
 function normalizeCapabilities(
@@ -189,7 +212,9 @@ function normalizeCapabilities(
   const normalizedCapabilities: Record<string, unknown> = {};
 
   for (const capability of merchantDetails.capabilities ?? []) {
-    const capabilityName = normalizeUppercase(capability.name);
+    const capabilityName = normalizeUppercase(
+      capability.name,
+    );
 
     if (!capabilityName) {
       continue;
@@ -206,9 +231,9 @@ function normalizeCapabilities(
     const productName =
       normalizeUppercase(product.name) || "UNKNOWN_PRODUCT";
 
-    for (const capabilityNameValue of product.capabilities ?? []) {
+    for (const capabilityValue of product.capabilities ?? []) {
       const capabilityName =
-        normalizeUppercase(capabilityNameValue);
+        normalizeUppercase(capabilityValue);
 
       if (!capabilityName) {
         continue;
@@ -227,23 +252,7 @@ function normalizeCapabilities(
   return normalizedCapabilities;
 }
 
-function getCapabilityStatus(
-  merchantDetails: PayPalMerchantIntegration,
-  capabilityName: string,
-): string | null {
-  const normalizedCapabilityName =
-    capabilityName.trim().toUpperCase();
-
-  const capability = merchantDetails.capabilities?.find(
-    (candidate) =>
-      normalizeUppercase(candidate.name) ===
-      normalizedCapabilityName,
-  );
-
-  return normalizeUppercase(capability?.status);
-}
-
-function getMerchantIntegrationFromCollection(
+function getMerchantIntegrationFromResponse(
   response: unknown,
 ): PayPalMerchantIntegration | null {
   if (Array.isArray(response)) {
@@ -295,32 +304,33 @@ function determineConnectionStatus(params: {
     vettingStatus,
   } = params;
 
+  if (
+    vettingStatus === "DENIED" ||
+    vettingStatus === "DECLINED"
+  ) {
+    return "limited";
+  }
+
+  if (vettingStatus === "SUBSCRIBED_WITH_LIMIT") {
+    return "limited";
+  }
+
   const baseRequirementsComplete =
     paymentsReceivable &&
     primaryEmailConfirmed &&
     permissionsPresent;
 
-  const productStatus = normalizeUppercase(ppcpProduct?.status);
+  const productStatus = normalizeUppercase(
+    ppcpProduct?.status,
+  );
 
-  const ppcpProvisioned =
+  const productProvisioned =
     Boolean(ppcpProduct) &&
     (vettingStatus === "SUBSCRIBED" ||
-      vettingStatus === "APPROVED" ||
       productStatus === "ACTIVE");
 
-  if (baseRequirementsComplete && ppcpProvisioned) {
+  if (baseRequirementsComplete && productProvisioned) {
     return "connected";
-  }
-
-  if (
-    vettingStatus === "DECLINED" ||
-    vettingStatus === "DENIED"
-  ) {
-    return "limited";
-  }
-
-  if (baseRequirementsComplete) {
-    return "limited";
   }
 
   return "pending";
@@ -410,9 +420,12 @@ async function findMerchantIdByTrackingId(params: {
   );
 
   const merchantIntegration =
-    getMerchantIntegrationFromCollection(response);
+    getMerchantIntegrationFromResponse(response);
 
-  return normalizeString(merchantIntegration?.merchant_id) || null;
+  return (
+    normalizeString(merchantIntegration?.merchant_id) ||
+    null
+  );
 }
 
 async function getMerchantIntegrationStatus(params: {
@@ -457,8 +470,8 @@ async function saveReturnError(params: {
   }
 }
 
-export async function GET(req: NextRequest) {
-  const appUrl = getAppUrl(req);
+export async function GET(request: NextRequest) {
+  const appUrl = getAppUrl(request);
 
   let authenticatedUserId: string | null = null;
   let activeEnvironment: PayPalEnvironment | null = null;
@@ -517,8 +530,9 @@ export async function GET(req: NextRequest) {
 
     activeEnvironment = environment;
 
-    const partnerMerchantId =
-      normalizeString(paypalConfig.partnerMerchantId);
+    const partnerMerchantId = normalizeString(
+      paypalConfig.partnerMerchantId,
+    );
 
     if (!partnerMerchantId) {
       throw new Error(
@@ -573,13 +587,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    /*
-     * PayPal returns SitGuru's tracking_id in the merchantId query
-     * parameter and the seller's PayPal Merchant ID in
-     * merchantIdInPayPal.
-     */
     const returnedTrackingId = normalizeString(
-      req.nextUrl.searchParams.get("merchantId"),
+      request.nextUrl.searchParams.get("merchantId"),
     );
 
     const expectedTrackingId = normalizeString(
@@ -609,16 +618,12 @@ export async function GET(req: NextRequest) {
 
     let sellerMerchantId =
       normalizeString(
-        req.nextUrl.searchParams.get(
+        request.nextUrl.searchParams.get(
           "merchantIdInPayPal",
         ),
       ) ||
       normalizeString(account.paypal_merchant_id);
 
-    /*
-     * PayPal normally supplies merchantIdInPayPal in the return URL.
-     * If it is absent, resolve it through the stored tracking ID.
-     */
     if (!sellerMerchantId) {
       sellerMerchantId =
         (await findMerchantIdByTrackingId({
@@ -696,13 +701,13 @@ export async function GET(req: NextRequest) {
 
     const ppcpProduct = getPpcpProduct(merchantDetails);
 
-    const returnRiskStatus = normalizeUppercase(
-      req.nextUrl.searchParams.get("riskStatus"),
+    const returnedRiskStatus = normalizeUppercase(
+      request.nextUrl.searchParams.get("riskStatus"),
     );
 
     const vettingStatus =
       normalizeUppercase(ppcpProduct?.vetting_status) ||
-      returnRiskStatus;
+      returnedRiskStatus;
 
     const customCardStatus = getCapabilityStatus(
       merchantDetails,
@@ -717,23 +722,26 @@ export async function GET(req: NextRequest) {
       vettingStatus,
     });
 
-    const connected = connectionStatus === "connected";
+    const connected =
+      connectionStatus === "connected";
 
     const returnedPermissionsGranted =
       parseBooleanParameter(
-        req.nextUrl.searchParams.get(
+        request.nextUrl.searchParams.get(
           "permissionsGranted",
         ),
       );
 
     const returnedConsentStatus =
       parseBooleanParameter(
-        req.nextUrl.searchParams.get("consentStatus"),
+        request.nextUrl.searchParams.get(
+          "consentStatus",
+        ),
       );
 
     const returnedEmailConfirmed =
       parseBooleanParameter(
-        req.nextUrl.searchParams.get(
+        request.nextUrl.searchParams.get(
           "isEmailConfirmed",
         ),
       );
@@ -784,16 +792,21 @@ export async function GET(req: NextRequest) {
               email_confirmed:
                 returnedEmailConfirmed,
               account_status: normalizeUppercase(
-                req.nextUrl.searchParams.get(
+                request.nextUrl.searchParams.get(
                   "accountStatus",
                 ),
               ),
               product_intent_id: normalizeString(
-                req.nextUrl.searchParams.get(
+                request.nextUrl.searchParams.get(
                   "productIntentId",
                 ),
               ),
-              risk_status: returnRiskStatus,
+              risk_status: returnedRiskStatus,
+              return_message: normalizeString(
+                request.nextUrl.searchParams.get(
+                  "returnMessage",
+                ),
+              ),
             },
           },
         },
@@ -840,7 +853,10 @@ export async function GET(req: NextRequest) {
         responseBody: error.responseBody,
       });
     } else {
-      console.error("PayPal return route error:", error);
+      console.error(
+        "PayPal return route error:",
+        error,
+      );
     }
 
     if (authenticatedUserId && activeEnvironment) {

@@ -168,6 +168,16 @@ type GuruOnboardingPacketDisplay = {
   helper: string;
 };
 
+type GuruPaymentSetupSummary = {
+  stripeReady: boolean;
+  paypalReady: boolean;
+  stripeStarted: boolean;
+  paypalStarted: boolean;
+  connectedCount: number;
+  statusLabel: string;
+  helper: string;
+};
+
 function normalizeRole(value?: string | null) {
   const role = String(value || "")
     .trim()
@@ -809,6 +819,117 @@ function isPayoutConnected(profile: GuruProfile | null) {
   );
 }
 
+async function getGuruPaymentSetupSummary(
+  userId: string,
+  profile: GuruProfile | null,
+): Promise<GuruPaymentSetupSummary> {
+  const stripeProfileReady = isPayoutConnected(profile);
+  let stripeReady = stripeProfileReady;
+  let paypalReady = false;
+  let stripeStarted = Boolean(profile?.stripe_account_id);
+  let paypalStarted = false;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("user_payout_accounts")
+      .select(
+        "provider,onboarding_status,account_status,payouts_enabled,charges_enabled,details_submitted",
+      )
+      .eq("user_id", userId)
+      .in("provider", ["stripe", "paypal"]);
+
+    if (error) {
+      console.warn("Unable to load Guru payout accounts:", error.message);
+    } else {
+      for (const row of data || []) {
+        const provider = String(row.provider || "").toLowerCase();
+        const onboardingStatus = String(row.onboarding_status || "").toLowerCase();
+        const accountStatus = String(row.account_status || "").toLowerCase();
+        const ready =
+          row.payouts_enabled === true ||
+          onboardingStatus === "ready" ||
+          accountStatus === "ready" ||
+          accountStatus === "active";
+        const started =
+          row.details_submitted === true ||
+          Boolean(onboardingStatus) ||
+          Boolean(accountStatus);
+
+        if (provider === "stripe") {
+          stripeReady = stripeReady || ready;
+          stripeStarted = stripeStarted || started;
+        }
+
+        if (provider === "paypal") {
+          paypalReady = paypalReady || ready;
+          paypalStarted = paypalStarted || started;
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("Unable to load Guru payout accounts:", error);
+  }
+
+  if (!paypalReady) {
+    try {
+      const environment =
+        String(process.env.PAYPAL_ENV || "sandbox").toLowerCase() === "live"
+          ? "live"
+          : "sandbox";
+      const { data, error } = await supabaseAdmin
+        .from("paypal_merchant_accounts")
+        .select(
+          "status,payments_receivable,primary_email_confirmed,paypal_merchant_id",
+        )
+        .eq("user_id", userId)
+        .eq("environment", environment)
+        .maybeSingle();
+
+      if (!error && data) {
+        const status = String(data.status || "").toLowerCase();
+        paypalStarted =
+          paypalStarted || Boolean(data.paypal_merchant_id) || Boolean(status);
+        paypalReady =
+          status === "connected" &&
+          data.payments_receivable === true &&
+          data.primary_email_confirmed === true;
+      }
+    } catch (error) {
+      console.warn("Unable to load PayPal merchant status:", error);
+    }
+  }
+
+  const connectedCount = Number(stripeReady) + Number(paypalReady);
+  const statusLabel =
+    connectedCount === 2
+      ? "PayPal + Stripe ready"
+      : paypalReady
+        ? "PayPal ready"
+        : stripeReady
+          ? "Stripe ready"
+          : paypalStarted || stripeStarted
+            ? "Finish setup"
+            : "Not started";
+  const helper =
+    connectedCount === 2
+      ? "Both payout options are connected."
+      : connectedCount === 1
+        ? "You are ready to get paid. Add the second option anytime."
+        : paypalStarted || stripeStarted
+          ? "Finish one payout setup before your first paid booking."
+          : "Pick PayPal or Stripe. You only need one to get started.";
+
+  return {
+    stripeReady,
+    paypalReady,
+    stripeStarted,
+    paypalStarted,
+    connectedCount,
+    statusLabel,
+    helper,
+  };
+}
+
 async function getGuruOnboardingPacketDisplay(
   userId: string,
 ): Promise<GuruOnboardingPacketDisplay> {
@@ -1159,7 +1280,7 @@ function GuruAvatar({
 }) {
   if (imageUrl) {
     return (
-      <div className="h-40 w-40 overflow-hidden rounded-full border-[7px] border-white bg-white shadow-[0_18px_40px_rgba(15,23,42,0.16)] lg:h-48 lg:w-48">
+      <div className="h-20 w-20 overflow-hidden rounded-3xl border-4 border-white bg-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] sm:h-24 sm:w-24">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
       </div>
@@ -1167,7 +1288,7 @@ function GuruAvatar({
   }
 
   return (
-    <div className="flex h-40 w-40 items-center justify-center rounded-full border-[7px] border-white bg-[linear-gradient(135deg,#dbfff3_0%,#dcebff_100%)] text-6xl font-black text-slate-900 shadow-[0_18px_40px_rgba(15,23,42,0.16)] lg:h-48 lg:w-48">
+    <div className="flex h-20 w-20 items-center justify-center rounded-3xl border-4 border-white bg-[linear-gradient(135deg,#dbfff3_0%,#dcebff_100%)] text-3xl font-black text-slate-900 shadow-[0_12px_30px_rgba(15,23,42,0.14)] sm:h-24 sm:w-24 sm:text-4xl">
       {getFirstName(name).charAt(0).toUpperCase()}
     </div>
   );
@@ -1322,7 +1443,7 @@ function DashboardSnapshotCard({
   return (
     <Link
       href={href}
-      className="group flex min-h-[220px] flex-col justify-between rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_14px_36px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_22px_48px_rgba(15,23,42,0.10)]"
+      className="group flex min-h-[175px] flex-col justify-between rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
     >
       <div>
         <div className="flex items-start justify-between gap-4">
@@ -1330,7 +1451,7 @@ function DashboardSnapshotCard({
             <p className="text-xs font-black uppercase tracking-[0.22em] !text-slate-500">
               {eyebrow}
             </p>
-            <h3 className="mt-2 text-2xl font-black leading-tight !text-[#07132f]">
+            <h3 className="mt-1 text-xl font-black leading-tight !text-[#07132f]">
               {title}
             </h3>
           </div>
@@ -1341,10 +1462,10 @@ function DashboardSnapshotCard({
           </div>
         </div>
 
-        <p className="mt-5 text-5xl font-black tracking-tight !text-[#07132f]">
+        <p className="mt-4 text-4xl font-black tracking-tight !text-[#07132f]">
           {value}
         </p>
-        <p className="mt-3 text-sm font-bold leading-6 !text-slate-600">
+        <p className="mt-2 text-xs font-bold leading-5 !text-slate-600">
           {helper}
         </p>
       </div>
@@ -1490,14 +1611,15 @@ function GuruSetupChecklist({
   profileCompletion,
   serviceRatesReady,
   onboardingPacket,
+  paymentSetup,
 }: {
   profile: GuruProfile | null;
   profileCompletion: number;
   serviceRatesReady: boolean;
   onboardingPacket: GuruOnboardingPacketDisplay;
+  paymentSetup: GuruPaymentSetupSummary;
 }) {
   const background = getBackgroundCheckDisplay(profile);
-  const payoutConnected = isPayoutConnected(profile);
   const hasProfile = profileCompletion >= 70;
   const hasServiceArea = Boolean(
     profile?.city ||
@@ -1507,241 +1629,174 @@ function GuruSetupChecklist({
   );
   const hasServices =
     normalizeServices(profile?.services).length > 0 || serviceRatesReady;
+  const paymentStarted =
+    paymentSetup.paypalStarted || paymentSetup.stripeStarted;
 
   const steps = [
     {
-      number: 1,
-      title: "Complete your profile",
-      body: "Add your name, bio, profile photo, and experience so Pet Parents know who you are.",
+      title: "Profile",
       status: hasProfile ? "complete" : "needs_action",
-      statusLabel: hasProfile ? "Complete" : "Needs Action",
+      statusLabel: hasProfile ? "Ready" : "Finish it",
+      helper: hasProfile
+        ? `${profileCompletion}% complete`
+        : "Add the basics Pet Parents want to see.",
       href: "/guru/dashboard/profile?step=1",
+      icon: "👤",
     },
     {
-      number: 2,
-      title: "Set your service area",
-      body: "Add your city, state, ZIP/address, and travel radius so local Pet Parents can find you.",
+      title: "Service area",
       status: hasServiceArea ? "complete" : "needs_action",
-      statusLabel: hasServiceArea ? "Complete" : "Needs Action",
+      statusLabel: hasServiceArea ? "Ready" : "Add area",
+      helper: hasServiceArea
+        ? "Local Pet Parents can find you."
+        : "Add your city, ZIP, and travel radius.",
       href: "/guru/dashboard/profile?step=2",
+      icon: "📍",
     },
     {
-      number: 3,
-      title: "Add services and pricing",
-      body: "Open the dedicated Pricing Workspace to choose services, set rates, manage custom quotes, and keep the booking calendar accurate.",
+      title: "Pricing",
       status: hasServices ? "complete" : "needs_action",
-      statusLabel: hasServices ? "Complete" : "Needs Action",
+      statusLabel: hasServices ? "Ready" : "Add rates",
+      helper: hasServices
+        ? "Your active services have pricing."
+        : "Choose services and set your rates.",
       href: "/guru/dashboard/pricing",
+      icon: "💚",
     },
     {
-      number: 4,
-      title: "Complete Trust & Safety Screening",
-      body: "Your Trust & Safety Screening fee is waived through December 31, 2026 during SitGuru's launch year.",
+      title: "Trust & Safety",
       status: background.status,
       statusLabel: background.label,
+      helper: background.label.includes("Waived")
+        ? "Launch-year fee waiver applied."
+        : background.status === "complete"
+          ? "Screening is complete."
+          : "Check your screening status.",
       href: background.href,
+      icon: "🛡️",
     },
     {
-      number: 5,
-      title: "Complete Guru Onboarding Packet",
-      body: onboardingPacket.helper,
+      title: "Guru packet",
       status: onboardingPacket.status,
       statusLabel: onboardingPacket.label,
+      helper:
+        onboardingPacket.status === "complete"
+          ? "Your packet is complete."
+          : onboardingPacket.status === "pending"
+            ? "SitGuru is reviewing it."
+            : "Review and submit your packet.",
       href: onboardingPacket.href,
+      icon: "📋",
     },
     {
-      number: 6,
-      title: "Connect payouts",
-      body: "Connect Stripe payouts so SitGuru can pay you after completed bookings.",
-      status: payoutConnected ? "complete" : "needs_action",
-      statusLabel: payoutConnected ? "Complete" : "Needs Action",
-      href: "/api/stripe/connect/onboard?role=guru",
+      title: "Get paid",
+      status:
+        paymentSetup.connectedCount > 0
+          ? "complete"
+          : paymentStarted
+            ? "pending"
+            : "needs_action",
+      statusLabel: paymentSetup.statusLabel,
+      helper: paymentSetup.helper,
+      href: "/guru/dashboard/earnings",
+      icon: "💸",
     },
   ];
 
   const completedSteps = steps.filter(
     (step) => step.status === "complete",
   ).length;
-  const allComplete = completedSteps === steps.length;
   const nextStep =
-    steps.find((step) => step.status !== "complete") || steps[steps.length - 1];
+    steps.find((step) => step.status !== "complete") || steps[0];
+  const allComplete = completedSteps === steps.length;
 
-  const getStepClassName = (status: string) => {
+  const tone = (status: string) => {
     if (status === "complete") {
-      return "border-emerald-400 bg-[linear-gradient(135deg,#10b981_0%,#05a877_100%)] text-white shadow-[0_18px_36px_rgba(5,150,105,0.24)]";
+      return {
+        card: "border-emerald-200 bg-emerald-50",
+        dot: "bg-emerald-600",
+        label: "!text-emerald-800",
+      };
     }
+
     if (status === "pending") {
-      return "border-amber-400 bg-[linear-gradient(135deg,#d97706_0%,#f59e0b_100%)] text-white shadow-[0_18px_36px_rgba(217,119,6,0.22)]";
+      return {
+        card: "border-amber-200 bg-amber-50",
+        dot: "bg-amber-500",
+        label: "!text-amber-800",
+      };
     }
-    return "border-rose-400 bg-[linear-gradient(135deg,#dc2626_0%,#f43f5e_100%)] text-white shadow-[0_18px_36px_rgba(220,38,38,0.24)]";
+
+    return {
+      card: "border-slate-200 bg-slate-50",
+      dot: "bg-slate-300",
+      label: "!text-slate-700",
+    };
   };
 
-  const cardClassName = allComplete
-    ? "mt-8 overflow-hidden rounded-[2.25rem] border border-emerald-300 bg-white shadow-[0_24px_60px_rgba(5,150,105,0.14)]"
-    : "mt-8 overflow-hidden rounded-[2.25rem] border border-rose-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)]";
-
-  const headerClassName = allComplete
-    ? "bg-[linear-gradient(135deg,#064e3b_0%,#059669_45%,#10b981_100%)] p-6 sm:p-8"
-    : "bg-[linear-gradient(135deg,#7f1d1d_0%,#dc2626_45%,#f97316_100%)] p-6 sm:p-8";
-
   return (
-    <section className={cardClassName}>
-      <div className={headerClassName}>
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-black uppercase tracking-[0.28em] !text-white/85">
-              {allComplete ? "Onboarding Complete" : "Action Required"}
-            </p>
-            <h2 className="mt-3 text-4xl font-black leading-tight tracking-[-0.04em] !text-white sm:text-5xl">
-              {allComplete
-                ? "Your Guru onboarding is complete"
-                : "Complete your Guru onboarding"}
-            </h2>
-            <p className="mt-3 max-w-4xl text-lg font-bold leading-8 !text-white/90">
-              {allComplete
-                ? "Great work. Your Guru onboarding steps are complete. SitGuru will review your profile before it becomes fully bookable."
-                : "Complete these steps so Pet Parents can find you, trust you, book your services, and SitGuru can support your payouts and approval process."}
-            </p>
-          </div>
+    <section className="mt-4 rounded-[28px] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
+            Quick setup check
+          </p>
+          <h2 className="mt-1 text-2xl font-black tracking-tight !text-emerald-950 sm:text-3xl">
+            {allComplete ? "You’re ready to roll" : "Finish your Guru setup"}
+          </h2>
+          <p className="mt-1 text-sm font-semibold leading-6 !text-slate-600">
+            {allComplete
+              ? "Your profile, pricing, safety, packet, and payment setup are ready."
+              : "Keep this moving without losing access to the rest of your dashboard."}
+          </p>
+        </div>
 
-          <div className="rounded-[1.5rem] bg-white/15 p-5 text-center ring-1 ring-white/30 backdrop-blur">
-            <p className="text-sm font-black uppercase tracking-[0.18em] !text-white/80">
-              Onboarding Progress
-            </p>
-            <p className="mt-1 text-5xl font-black !text-white">
+        <div className="flex items-center gap-3">
+          <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-center ring-1 ring-emerald-100">
+            <p className="text-2xl font-black !text-emerald-950">
               {completedSteps}/{steps.length}
             </p>
-            <p className="mt-1 text-sm font-bold !text-white/85">
-              {allComplete ? "all steps complete" : "steps complete"}
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] !text-emerald-700">
+              ready
             </p>
           </div>
+          <Link
+            href={allComplete ? "/guru/dashboard/profile" : nextStep.href}
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-800 px-4 py-2 text-sm font-black !text-white transition hover:bg-emerald-900"
+          >
+            {allComplete ? "View setup" : "Continue setup"} →
+          </Link>
         </div>
       </div>
 
-      <div className="p-5 sm:p-6 lg:p-8">
-        <div
-          className={`mb-5 flex flex-col gap-3 rounded-[1.5rem] border p-5 sm:flex-row sm:items-center sm:justify-between ${
-            allComplete
-              ? "border-emerald-200 bg-emerald-50"
-              : "border-slate-200 bg-slate-50"
-          }`}
-        >
-          <div>
-            <p
-              className={`text-sm font-black uppercase tracking-[0.18em] ${
-                allComplete ? "!text-emerald-700" : "!text-slate-700"
-              }`}
-            >
-              {allComplete ? "All done" : "Next best step"}
-            </p>
-            <p className="mt-1 text-2xl font-black !text-slate-950">
-              {allComplete
-                ? `✓ All ${steps.length} onboarding steps are complete`
-                : `Step ${nextStep.number} → ${nextStep.title}`}
-            </p>
-          </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        {steps.map((step) => {
+          const styles = tone(step.status);
 
-          {nextStep.number === 6 && !allComplete ? (
-            <a
-              href={nextStep.href}
-              className="inline-flex min-h-[54px] items-center justify-center rounded-[1rem] bg-[#07132f] px-7 py-3 text-base font-black !text-white shadow-[0_12px_26px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
-            >
-              Continue Onboarding →
-            </a>
-          ) : (
+          return (
             <Link
-              href={allComplete ? "/guru/dashboard/profile" : nextStep.href}
-              className={`inline-flex min-h-[54px] items-center justify-center rounded-[1rem] px-7 py-3 text-base font-black !text-white shadow-[0_12px_26px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 ${
-                allComplete
-                  ? "bg-emerald-600 hover:bg-emerald-700"
-                  : "bg-[#07132f] hover:bg-[#0b1436]"
-              }`}
+              key={step.title}
+              href={step.href}
+              className={`group min-h-[145px] rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:shadow-md ${styles.card}`}
             >
-              {allComplete ? "View Profile ✓" : "Continue Onboarding →"}
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-xl" aria-hidden="true">
+                  {step.icon}
+                </span>
+                <span className={`h-3 w-3 rounded-full ${styles.dot}`} />
+              </div>
+              <p className="mt-3 text-sm font-black !text-slate-950">
+                {step.title}
+              </p>
+              <p className={`mt-1 text-[10px] font-black uppercase tracking-[0.1em] ${styles.label}`}>
+                {step.statusLabel}
+              </p>
+              <p className="mt-2 text-xs font-bold leading-5 !text-slate-600">
+                {step.helper}
+              </p>
             </Link>
-          )}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {steps.map((step) => {
-            const isComplete = step.status === "complete";
-            const isPending = step.status === "pending";
-
-            const stepCardClassName = `group flex min-h-[230px] flex-col justify-between rounded-[1.45rem] border p-5 transition hover:-translate-y-1 hover:shadow-xl ${getStepClassName(step.status)}`;
-
-            const stepCardContent = (
-              <>
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/20 text-xl font-black !text-white ring-1 ring-white/35">
-                      {isComplete ? "✓" : step.number}
-                    </span>
-                    <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] !text-white ring-1 ring-white/30">
-                      {step.statusLabel}
-                    </span>
-                  </div>
-                  <p className="mt-5 text-lg font-black leading-6 !text-white">
-                    Step {step.number} {isComplete ? "✓" : "→"} {step.title}
-                  </p>
-                  <p className="mt-3 text-sm font-bold leading-6 !text-white/90">
-                    {step.body}
-                  </p>
-                </div>
-                <div className="mt-5 flex items-center justify-between gap-3">
-                  <span className="text-sm font-black !text-white">
-                    {step.number === 4
-                      ? isComplete
-                        ? step.statusLabel.includes("Waived")
-                          ? "View waiver"
-                          : "View screening"
-                        : isPending
-                          ? "Check screening status"
-                          : "Start screening"
-                      : step.number === 5
-                        ? isComplete
-                          ? "View packet"
-                          : "Open packet"
-                        : step.number === 6
-                          ? isComplete
-                            ? "View payouts"
-                            : "Set up payouts"
-                          : isComplete
-                            ? "View details"
-                            : isPending
-                              ? "Check status"
-                              : "Click to complete"}
-                  </span>
-                  <span className="text-2xl font-black !text-white transition group-hover:translate-x-1">
-                    →
-                  </span>
-                </div>
-              </>
-            );
-
-            if (step.number === 6 && !isComplete) {
-              return (
-                <a
-                  key={step.number}
-                  href={step.href}
-                  className={stepCardClassName}
-                >
-                  {stepCardContent}
-                </a>
-              );
-            }
-
-            return (
-              <Link
-                key={step.number}
-                href={step.href}
-                prefetch={step.href.startsWith("/api/") ? false : undefined}
-                className={stepCardClassName}
-              >
-                {stepCardContent}
-              </Link>
-            );
-          })}
-        </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -1749,106 +1804,80 @@ function GuruSetupChecklist({
 
 function GuruAcademyCard({ progress }: { progress: GuruUniversityProgress }) {
   return (
-    <section className="mt-8 overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
-      <div className="grid gap-6 bg-[radial-gradient(circle_at_88%_20%,rgba(255,255,255,0.88),transparent_20%),linear-gradient(110deg,#ecfdf5_0%,#e8fff7_48%,#e8f7ff_100%)] p-6 sm:p-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.26em] !text-emerald-800">
-            SitGuru University
-          </p>
-          <h2 className="mt-3 text-4xl font-black leading-tight tracking-[-0.045em] !text-[#07132f] sm:text-5xl">
-            Guru Academy
-          </h2>
-          <p className="mt-3 max-w-3xl text-base font-bold leading-7 !text-slate-700">
-            Learn SitGuru. Easy as 1, 2, 3. Watch the Guru intro video, review
-            the Guru Success Guide, then acknowledge completion to earn your
-            Certified Guru badge.
-          </p>
-
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[1.25rem] border border-emerald-100 bg-white p-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] !text-emerald-700">
-                Progress
-              </p>
-              <p className="mt-2 text-2xl font-black !text-slate-950">
-                {progress.completedSteps} of {progress.totalSteps}
-              </p>
-              <p className="mt-1 text-xs font-bold !text-slate-600">
-                {progress.progressHelper}
-              </p>
-            </div>
-
-            <div className="rounded-[1.25rem] border border-emerald-100 bg-white p-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] !text-emerald-700">
-                Badge
-              </p>
-              <p className="mt-2 text-2xl font-black !text-slate-950">
-                {progress.badgeStatus}
-              </p>
-              <p className="mt-1 text-xs font-bold !text-slate-600">
-                {progress.isComplete
-                  ? "Certified Guru badge issued"
-                  : "Issued after academy completion"}
-              </p>
-            </div>
-
-            <div className="rounded-[1.25rem] border border-emerald-100 bg-white p-4">
-              <p className="text-xs font-black uppercase tracking-[0.18em] !text-emerald-700">
-                Estimated Time
-              </p>
-              <p className="mt-2 text-2xl font-black !text-slate-950">
-                10–15 min
-              </p>
-              <p className="mt-1 text-xs font-bold !text-slate-600">
-                Mobile-friendly training
-              </p>
-            </div>
+    <details className="group mt-4 rounded-[28px] border border-emerald-100 bg-white shadow-sm">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-xl ring-1 ring-emerald-100">
+            🎓
           </div>
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
+              Guru Academy
+            </p>
+            <h2 className="mt-1 text-xl font-black !text-emerald-950 sm:text-2xl">
+              {progress.isComplete
+                ? "Certified Guru badge unlocked"
+                : progress.isStarted
+                  ? "Keep your Academy progress going"
+                  : "Learn SitGuru in about 10–15 minutes"}
+            </h2>
+            <p className="mt-1 text-sm font-semibold leading-6 !text-slate-600">
+              {progress.progressHelper}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-800 ring-1 ring-emerald-100">
+            {progress.progressPercent}%
+          </span>
+          <span className="text-xl font-black !text-emerald-800 transition group-open:rotate-90">
+            →
+          </span>
+        </div>
+      </summary>
 
-          <div className="mt-6 flex flex-wrap gap-3">
+      <div className="grid gap-4 border-t border-emerald-100 p-5 lg:grid-cols-[1fr_0.8fr]">
+        <div>
+          <p className="text-sm font-bold leading-7 !text-slate-700">
+            Watch the intro, review the Guru Success Guide, and acknowledge the
+            required materials. Your progress saves to your SitGuru account.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href="/guru/dashboard/university"
-              className="inline-flex min-h-[52px] items-center justify-center rounded-[1rem] bg-emerald-600 px-7 py-3 text-base font-black !text-white shadow-[0_12px_26px_rgba(5,150,105,0.18)] transition hover:-translate-y-0.5 hover:bg-emerald-700"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-800 px-5 py-2 text-sm font-black !text-white transition hover:bg-emerald-900"
             >
               {progress.academyButtonLabel}
             </Link>
             <Link
-              href="/guru/dashboard/profile?step=1"
-              className="inline-flex min-h-[52px] items-center justify-center rounded-[1rem] border border-emerald-200 bg-white px-7 py-3 text-base font-black !text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-50"
+              href="/guru/dashboard/success-center"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-2 text-sm font-black !text-emerald-900 transition hover:bg-emerald-100"
             >
-              Review My Profile
-            </Link>
-            <Link
-              href="/guru/dashboard/earnings"
-              className="inline-flex min-h-[52px] items-center justify-center rounded-[1rem] border border-emerald-200 bg-white px-7 py-3 text-base font-black !text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-50"
-            >
-              Review Payouts
+              Guru Success Center
             </Link>
           </div>
         </div>
 
-        <div className="rounded-[1.75rem] border border-emerald-100 bg-white/90 p-5 shadow-sm">
-          <p className="text-sm font-black !text-slate-950">
-            What you will learn
-          </p>
-          <div className="mt-4 grid gap-3">
-            {[
-              "Complete and polish your Guru profile",
-              "Manage bookings, messages, care details, PawReports, and reviews",
-              "Follow SitGuru trust, safety, and pet care standards",
-              "Understand Stripe payouts, earnings, and tax reminders",
-              "Use the Guru Success Center to keep growing",
-            ].map((item) => (
-              <div
-                key={item}
-                className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black !text-emerald-900"
-              >
-                ✓ {item}
-              </div>
-            ))}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] !text-emerald-700">
+              Progress
+            </p>
+            <p className="mt-1 text-2xl font-black !text-emerald-950">
+              {progress.completedSteps}/{progress.totalSteps}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] !text-emerald-700">
+              Badge
+            </p>
+            <p className="mt-1 text-lg font-black !text-emerald-950">
+              {progress.badgeStatus}
+            </p>
           </div>
         </div>
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -1876,12 +1905,14 @@ export default async function GuruDashboardPage() {
     serviceRates,
     universityProgress,
     onboardingPacket,
+    paymentSetup,
   ] = await Promise.all([
     getGuruBookings(guruProfile, user.id),
     getGuruConversations(guruProfile, user.id),
     getGuruServiceRates(guruProfile),
     getGuruUniversityProgress(user.id),
     getGuruOnboardingPacketDisplay(user.id),
+    getGuruPaymentSetupSummary(user.id, guruProfile),
   ]);
 
   const pawReportStats = await getGuruPawReportStats(bookings);
@@ -1916,182 +1947,157 @@ export default async function GuruDashboardPage() {
   });
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] text-slate-900">
-      <section className="mx-auto max-w-[1440px] px-5 py-8 sm:px-6 lg:px-8">
-        <section className="overflow-hidden rounded-[2.3rem] border border-white bg-[radial-gradient(circle_at_18%_15%,rgba(255,255,255,0.42)_0%,transparent_28%),linear-gradient(105deg,#03d39c_0%,#72dec5_45%,#b9e3ff_100%)] shadow-[0_24px_52px_rgba(15,23,42,0.12)]">
-          <div className="grid gap-8 p-8 lg:grid-cols-[1.15fr_340px] lg:items-center lg:p-10">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.34em] !text-[#07132f]">
-                SitGuru Guru Portal
-              </p>
-              <h1 className="mt-4 text-5xl font-extrabold leading-[0.98] tracking-[-0.055em] !text-[#07132f] sm:text-6xl lg:text-7xl">
-                Welcome back, {welcomeName} 👋
-              </h1>
-              <p className="mt-5 max-w-3xl text-xl font-light leading-9 !text-slate-700">
-                Your one-page SitGuru command center: bookings, PawReports,
-                messages, onboarding, profile health, earnings, and next best
-                actions in one clear snapshot.
-              </p>
+    <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 !text-slate-950 sm:px-5 lg:px-6">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-sm">
+          <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+            <div className="bg-[radial-gradient(circle_at_95%_10%,rgba(16,185,129,0.18),transparent_28%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_100%)] p-5 sm:p-6">
+              <div className="flex min-w-0 items-start gap-4">
+                <GuruAvatar name={name} imageUrl={imageUrl} />
 
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <div
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-black ${guruTier.badgeClassName}`}
-                >
-                  <GuruPawCrest className="h-6 w-6" />
-                  <span>{guruTier.label}</span>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-4 py-2">
-                  <span className="text-lg">🎓</span>
-                  <span className="text-sm font-black !text-slate-900">
-                    {universityProgress.certificationLabel}
-                  </span>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-4 py-2">
-                  <TierStars stars={guruTier.stars} />
-                  <span className="text-sm font-black !text-slate-900">
-                    {eliteProgress}% to Elite Guru
-                  </span>
-                </div>
-              </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] !text-emerald-700 sm:text-xs">
+                    SitGuru Guru Command Center
+                  </p>
+                  <h1 className="mt-1 text-3xl font-black tracking-tight !text-emerald-950 sm:text-4xl">
+                    Hey, {welcomeName} 👋
+                  </h1>
+                  <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 !text-slate-600">
+                    Bookings, PawReports, messages, pricing, availability, and
+                    earnings — all in one easy dashboard.
+                  </p>
 
-              <div className="mt-8 flex flex-wrap gap-4">
-                <Link
-                  href="/guru/dashboard/bookings"
-                  className="rounded-[1.2rem] bg-[#07132f] px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
-                >
-                  My Bookings
-                </Link>
-                <Link
-                  href="/guru/dashboard/bookings"
-                  className="rounded-[1.2rem] bg-emerald-700 px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(5,150,105,0.18)] transition hover:-translate-y-0.5 hover:bg-emerald-800"
-                >
-                  PawReports
-                </Link>
-                <Link
-                  href="/guru/dashboard/messages"
-                  className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Open Messages
-                </Link>
-                <Link
-                  href="/guru/dashboard/availability"
-                  className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Availability
-                </Link>
-                <Link
-                  href="/guru/dashboard/pricing"
-                  className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Pricing
-                </Link>
-                <Link
-                  href="/guru/dashboard/profile"
-                  className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  My Profile
-                </Link>
-                <Link
-                  href="/guru/dashboard/earnings"
-                  className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Earnings
-                </Link>
-                <Link
-                  href="/guru/dashboard/university"
-                  className="rounded-[1.2rem] bg-emerald-700 px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(5,150,105,0.18)] transition hover:-translate-y-0.5 hover:bg-emerald-800"
-                >
-                  Guru Academy
-                </Link>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className={`rounded-full border px-3 py-1 text-xs font-black ${guruTier.badgeClassName}`}>
+                      {guruTier.label}
+                    </span>
+                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-900">
+                      {bookable ? "Bookable" : "Setup in progress"}
+                    </span>
+                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-900">
+                      {paymentSetup.statusLabel}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <div>
+                      <p className="text-lg font-black !text-emerald-950">
+                        {name}
+                      </p>
+                      <p className="text-xs font-bold !text-slate-600">
+                        {getGuruTitle(guruProfile)} • {location}
+                      </p>
+                    </div>
+                    {universityProgress.isComplete ? (
+                      <GuruRecognitionBadge
+                        label="Certified SitGuru Guru"
+                        sublabel="Guru Academy Graduate"
+                        size="sm"
+                        showStars={false}
+                      />
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-col items-center text-center">
-              <GuruAvatar name={name} imageUrl={imageUrl} />
-              <h2 className="mt-4 text-4xl font-black tracking-[-0.04em] !text-[#07132f]">
-                {name}
-              </h2>
+            <div className="border-t border-emerald-100 bg-white p-5 lg:border-l lg:border-t-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] !text-emerald-700">
+                Quick actions
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+                {[
+                  ["Bookings", "/guru/dashboard/bookings", "🗓️"],
+                  ["PawReports", "/guru/dashboard/bookings", "🐾"],
+                  ["Messages", "/guru/dashboard/messages", "💬"],
+                  ["Earnings", "/guru/dashboard/earnings", "💸"],
+                  ["Availability", "/guru/dashboard/availability", "⏱️"],
+                  ["Pricing", "/guru/dashboard/pricing", "💚"],
+                ].map(([label, href, icon]) => (
+                  <Link
+                    key={label}
+                    href={href}
+                    className="flex min-h-12 items-center justify-between gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-xs font-black !text-emerald-950 transition hover:border-emerald-200 hover:bg-emerald-100"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span aria-hidden="true">{icon}</span>
+                      {label}
+                    </span>
+                    <span>→</span>
+                  </Link>
+                ))}
+              </div>
 
-              {universityProgress.isComplete ? (
-                <div className="mt-3">
-                  <GuruRecognitionBadge
-                    label="Certified SitGuru Guru"
-                    sublabel="Guru Academy Graduate"
-                    size="md"
-                    showStars={false}
-                    className="max-w-full justify-center"
+              <details className="group mt-3 rounded-2xl border border-slate-200 bg-slate-50">
+                <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-black !text-slate-800">
+                  Update profile photo
+                  <span className="transition group-open:rotate-90">→</span>
+                </summary>
+                <div className="border-t border-slate-200 p-4">
+                  <GuruMediaUploader
+                    userId={user.id}
+                    guruProfileId={String(guruProfile.id ?? "")}
+                    displayName={name}
+                    initialPhotoUrl={imageUrl}
                   />
                 </div>
-              ) : null}
-
-              <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/85 px-4 py-2 text-sm font-black !text-emerald-800 shadow-sm">
-                <GuruPawCrest className="h-6 w-6" />
-                {guruTier.label}
-              </div>
-              <div className="mt-2 flex flex-col items-center gap-1">
-                <TierStars stars={guruTier.stars} />
-                <p className="text-sm font-semibold !text-slate-700">
-                  {getGuruTitle(guruProfile)}
-                </p>
-                <p className="text-sm font-semibold !text-slate-700">
-                  {location}
-                </p>
-              </div>
-              <div className="mt-5 w-full max-w-[300px] rounded-[1.4rem] bg-white/90 p-4 text-left shadow-[0_12px_28px_rgba(15,23,42,0.10)] ring-1 ring-white/70">
-                <GuruMediaUploader
-                  userId={user.id}
-                  guruProfileId={String(guruProfile.id ?? "")}
-                  displayName={name}
-                  initialPhotoUrl={imageUrl}
-                />
-              </div>
+              </details>
             </div>
           </div>
         </section>
 
-        <section className="mt-8 rounded-[2.25rem] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f2fffb_55%,#eef8ff_100%)] p-5 shadow-[0_24px_60px_rgba(15,23,42,0.08)] sm:p-6 lg:p-8">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          <StatCard label="Bookings" value={bookings.length} icon="🗓️" />
+          <StatCard label="Upcoming" value={upcomingBookings.length} icon="⏱️" />
+          <StatCard label="Completed" value={completedBookings.length} icon="✅" />
+          <StatCard label="PawReports" value={pawReportStats.completed} icon="🐾" />
+          <StatCard label="Messages" value={conversations.length} icon="💬" />
+          <StatCard label="Profile" value={`${profileCompletion}%`} icon="⭐" />
+        </section>
+
+        <section className="rounded-[28px] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-800">
-                Guru Snapshot
+              <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
+                Today at a glance
               </p>
-              <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] !text-[#07132f] sm:text-4xl">
-                Everything you need to know right now
+              <h2 className="mt-1 text-2xl font-black tracking-tight !text-emerald-950 sm:text-3xl">
+                Jump into what matters
               </h2>
-              <p className="mt-2 max-w-3xl text-base font-bold leading-7 !text-slate-700">
-                Quickly see your bookings, PawReports, messages, onboarding, profile readiness, and where to go next.
+              <p className="mt-1 text-sm font-semibold leading-6 !text-slate-600">
+                Your busiest Guru tools stay front and center on every screen size.
               </p>
             </div>
             <Link
               href="/guru/dashboard/bookings"
-              className="inline-flex min-h-[50px] items-center justify-center rounded-2xl bg-[#07132f] px-6 py-3 text-sm font-black !text-white transition hover:bg-[#0b1436]"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-800 px-4 py-2 text-sm font-black !text-white transition hover:bg-emerald-900"
             >
-              Open Bookings Hub
+              Open bookings →
             </Link>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <DashboardSnapshotCard
-              eyebrow="Care Schedule"
+              eyebrow="Care schedule"
               title="Upcoming bookings"
               value={upcomingBookings.length}
-              helper="Next visits and active care requests assigned to your Guru account."
+              helper="Your next visits and care requests."
               href="/guru/dashboard/bookings"
               actionLabel="View bookings"
               icon="🗓️"
               tone="sky"
             />
             <DashboardSnapshotCard
-              eyebrow="Signature Feature"
-              title="PawReports delivered"
+              eyebrow="PawReports"
+              title="Care updates"
               value={pawReportStats.completed}
               helper={
                 pawReportStats.active > 0
-                  ? `${pawReportStats.active} PawReport currently active. Keep Pet Parents updated in real time.`
-                  : "Complete a PawReport for each finished booking to build trust and repeat bookings."
+                  ? `${pawReportStats.active} PawReport active right now.`
+                  : "Send trusted updates after every visit."
               }
               href="/guru/dashboard/bookings"
-              actionLabel="Manage PawReports"
+              actionLabel="Open PawReports"
               icon="🐾"
               tone="emerald"
             />
@@ -2099,7 +2105,7 @@ export default async function GuruDashboardPage() {
               eyebrow="Messages"
               title="Inbox activity"
               value={conversations.length}
-              helper="Recent Pet Parent and Admin conversations that may need your attention."
+              helper="Pet Parent and SitGuru conversations."
               href="/guru/dashboard/messages"
               actionLabel="Open inbox"
               icon="💬"
@@ -2107,12 +2113,12 @@ export default async function GuruDashboardPage() {
             />
             <DashboardSnapshotCard
               eyebrow="Pricing"
-              title="Rate workspace"
+              title="Active rates"
               value={enabledPricedServiceRates.length}
               helper={
                 serviceRatesReady
-                  ? "Service rates are active and feeding the customer booking calendar."
-                  : "Add service rates so Pet Parents can see accurate calendar pricing."
+                  ? "Your pricing is ready for bookings."
+                  : "Add rates so Pet Parents can book."
               }
               href="/guru/dashboard/pricing"
               actionLabel="Manage pricing"
@@ -2120,18 +2126,14 @@ export default async function GuruDashboardPage() {
               tone={serviceRatesReady ? "emerald" : "amber"}
             />
             <DashboardSnapshotCard
-              eyebrow="Profile Health"
-              title="Public profile"
-              value={`${profileCompletion}%`}
-              helper={
-                bookable
-                  ? "Your profile is bookable. Keep services, photos, and availability current."
-                  : "Finish setup steps so Pet Parents can confidently book you."
-              }
-              href="/guru/dashboard/profile"
-              actionLabel="Review profile"
-              icon="⭐"
-              tone={bookable ? "emerald" : "amber"}
+              eyebrow="Get paid"
+              title="Payment setup"
+              value={`${paymentSetup.connectedCount}/2`}
+              helper={paymentSetup.helper}
+              href="/guru/dashboard/earnings"
+              actionLabel="Review payments"
+              icon="💸"
+              tone={paymentSetup.connectedCount > 0 ? "emerald" : "amber"}
             />
           </div>
         </section>
@@ -2141,25 +2143,10 @@ export default async function GuruDashboardPage() {
           profileCompletion={profileCompletion}
           serviceRatesReady={serviceRatesReady}
           onboardingPacket={onboardingPacket}
+          paymentSetup={paymentSetup}
         />
 
         <GuruAcademyCard progress={universityProgress} />
-
-        <section className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
-          <StatCard label="Bookings" value={bookings.length} icon="🗓️" />
-          <StatCard
-            label="Upcoming"
-            value={upcomingBookings.length}
-            icon="⏱️"
-          />
-          <StatCard
-            label="Completed"
-            value={completedBookings.length}
-            icon="✅"
-          />
-          <StatCard label="PawReports" value={pawReportStats.completed} icon="🐾" />
-          <StatCard label="Profile" value={`${profileCompletion}%`} icon="⭐" />
-        </section>
 
         <section className="mt-8 overflow-hidden rounded-[2.25rem] border border-emerald-200 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_52%,#edf8ff_100%)] shadow-[0_20px_54px_rgba(15,23,42,0.08)]">
           <div className="grid gap-6 p-6 lg:grid-cols-[1fr_360px] lg:items-center lg:p-8">
@@ -2459,7 +2446,7 @@ export default async function GuruDashboardPage() {
             </div>
           </div>
         </section>
-      </section>
+      </div>
     </main>
   );
 }
