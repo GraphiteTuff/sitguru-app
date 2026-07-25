@@ -2734,105 +2734,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section
-        aria-label="Ways you can pay for your SitGuru booking"
-        className="bg-white py-3 sm:py-5"
-      >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <PaymentMethodStrip
-            placement="homepage"
-            variant="default"
-            ariaLabel="Secure payment options available for your SitGuru booking"
-          />
-        </div>
-      </section>
-
-      <HomeVideoSection onTrack={trackHomepageClick} />
-
-      <SitGuruPawReportSection onTrack={trackHomepageClick} />
-
-      <section className="bg-white py-5 sm:py-10">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-stretch">
-            <div className="rounded-[28px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_16px_42px_rgba(15,23,42,0.07)] sm:p-7">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 sm:text-xs">
-                Easy local signup
-              </p>
-              <h2 className="mt-2 text-2xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-3xl">
-                Built for Pet Parents, Pet Gurus, and local communities.
-              </h2>
-              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
-                Pet Parents can find local care, Pet Gurus can apply to offer
-                services independently, and Ambassadors can help spread the
-                word. SitGuru keeps the experience simple, welcoming, and easy
-                to start.
-              </p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                {[
-                  ["Free", "Local signup"],
-                  ["Local", "Neighborhood care"],
-                  ["Simple", "Easy next steps"],
-                ].map(([value, label]) => (
-                  <div
-                    key={label}
-                    className="rounded-2xl border border-white bg-white/90 p-4 text-center shadow-sm"
-                  >
-                    <p className="text-xl font-black text-emerald-700">
-                      {value}
-                    </p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-slate-600">
-                      {label}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                {
-                  title: "For Pet Parents",
-                  body: "Create an account, search local Gurus, keep care details organized, and rebook trusted care with less back-and-forth.",
-                  cta: "Create Pet Parent Account",
-                  href: petParentSignupHref,
-                },
-                {
-                  title: "For Pet Gurus",
-                  body: "Apply as an independent Pet Guru, choose your services and local area, and accept requests that fit your availability.",
-                  cta: "Start Guru Signup",
-                  href: guruSignupHref,
-                },
-              ].map((card) => (
-                <Link
-                  key={card.title}
-                  href={card.href}
-                  onClick={() =>
-                    trackHomepageClick(`${card.title} Signup Card`, card.href)
-                  }
-                  className="group rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_18px_44px_rgba(15,23,42,0.11)] sm:p-6"
-                >
-                  <h3 className="text-lg font-black tracking-[-0.03em] text-slate-950 group-hover:text-emerald-800">
-                    {card.title}
-                  </h3>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
-                    {card.body}
-                  </p>
-                  <span className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white transition group-hover:bg-emerald-800">
-                    {card.cta}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section className="bg-white py-5 sm:py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between gap-4">
             <div>
               <h2 className="text-xl font-black tracking-[-0.035em] text-slate-950 sm:text-3xl">
-                Meet local Gurus Pet Parents love
+                Meet local Pet Gurus Pet Parents love
               </h2>
               <p className="mt-1 text-xs font-semibold text-slate-600 sm:text-sm">
                 Real people. Real care. On-platform reviews and booking records.
@@ -2941,6 +2848,101 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      <section
+        aria-label="Ways you can pay for your SitGuru booking"
+        className="bg-white py-3 sm:py-5"
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <PaymentMethodStrip
+            placement="homepage"
+            variant="default"
+            ariaLabel="Secure payment options available for your SitGuru booking"
+          />
+        </div>
+      </section>
+
+      <HomeVideoSection onTrack={trackHomepageClick} />
+
+      <SitGuruPawReportSection onTrack={trackHomepageClick} />
+
+      <section className="bg-white py-5 sm:py-10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-stretch">
+            <div className="rounded-[28px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_16px_42px_rgba(15,23,42,0.07)] sm:p-7">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 sm:text-xs">
+                Easy local signup
+              </p>
+              <h2 className="mt-2 text-2xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-3xl">
+                Built for Pet Parents, Pet Gurus, and local communities.
+              </h2>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-700 sm:text-base sm:leading-7">
+                Pet Parents can find local care, Pet Gurus can apply to offer
+                services independently, and Ambassadors can help spread the
+                word. SitGuru keeps the experience simple, welcoming, and easy
+                to start.
+              </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {[
+                  ["Free", "Local signup"],
+                  ["Local", "Neighborhood care"],
+                  ["Simple", "Easy next steps"],
+                ].map(([value, label]) => (
+                  <div
+                    key={label}
+                    className="rounded-2xl border border-white bg-white/90 p-4 text-center shadow-sm"
+                  >
+                    <p className="text-xl font-black text-emerald-700">
+                      {value}
+                    </p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-slate-600">
+                      {label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[
+                {
+                  title: "For Pet Parents",
+                  body: "Create an account, search local Gurus, keep care details organized, and rebook trusted care with less back-and-forth.",
+                  cta: "Create Pet Parent Account",
+                  href: petParentSignupHref,
+                },
+                {
+                  title: "For Pet Gurus",
+                  body: "Apply as an independent Pet Guru, choose your services and local area, and accept requests that fit your availability.",
+                  cta: "Start Guru Signup",
+                  href: guruSignupHref,
+                },
+              ].map((card) => (
+                <Link
+                  key={card.title}
+                  href={card.href}
+                  onClick={() =>
+                    trackHomepageClick(`${card.title} Signup Card`, card.href)
+                  }
+                  className="group rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_18px_44px_rgba(15,23,42,0.11)] sm:p-6"
+                >
+                  <h3 className="text-lg font-black tracking-[-0.03em] text-slate-950 group-hover:text-emerald-800">
+                    {card.title}
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
+                    {card.body}
+                  </p>
+                  <span className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-black text-white transition group-hover:bg-emerald-800">
+                    {card.cta}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+
 
       <PartnerNetworkSection onTrack={trackHomepageClick} />
 
