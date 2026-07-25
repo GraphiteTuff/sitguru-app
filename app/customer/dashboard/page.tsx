@@ -2127,7 +2127,7 @@ function NearbyGurusCarousel({
   onCareZipSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
-    <section className="mt-6 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
+    <section className="mt-4 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
       <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#dff7ef_100%)] p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
@@ -2136,11 +2136,11 @@ function NearbyGurusCarousel({
             </p>
 
             <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-              Care near {careLocationLabel || (careZip ? `ZIP ${careZip}` : "you")}
+              Gurus Near Me
             </h2>
 
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              Change the ZIP anytime to explore another area.
+              Trusted care around {careLocationLabel || (careZip ? `ZIP ${careZip}` : "your area")}.
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2">
@@ -3224,10 +3224,6 @@ export default function CustomerDashboardPage() {
     return (
       <main
         className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#ecfdf5_100%)] px-4 py-10 md:px-6 lg:px-8"
-        style={{
-          fontFamily:
-            '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        }}
       >
         <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center">
           <div className="w-full max-w-md rounded-[2rem] border border-emerald-100 bg-white p-7 text-center shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
@@ -3301,10 +3297,6 @@ export default function CustomerDashboardPage() {
 
       <main
         className="min-h-screen bg-[linear-gradient(180deg,#fffdf8_0%,#ffffff_34%,#f2fff8_100%)] pb-24 text-slate-950 md:pb-10"
-        style={{
-          fontFamily:
-            '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        }}
       >
         <Header />
 
@@ -3341,13 +3333,13 @@ export default function CustomerDashboardPage() {
                     href={routes.bookings}
                     className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                   >
-                    Bookings
+                    My Bookings
                   </Link>
                   <Link
                     href={routes.messages}
                     className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-50"
                   >
-                    Messages
+                    My Messages
                   </Link>
                   <Link
                     href={routes.pets}
@@ -3414,6 +3406,18 @@ export default function CustomerDashboardPage() {
               </div>
             </div>
           </section>
+          <NearbyGurusCarousel
+            gurus={nearbyGurus}
+            careZip={careZip}
+            careLocationLabel={careLocationLabel}
+            careZipInput={careZipInput}
+            loading={loadingNearbyGurus}
+            message={nearbyGuruMessage}
+            onCareZipInputChange={(value) =>
+              setCareZipInput(cleanZipCode(value))
+            }
+            onCareZipSubmit={handleCareZipSubmit}
+          />
 
           <section className="mt-4 grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
             <article className="overflow-hidden rounded-[2rem] border border-sky-100 bg-white shadow-sm">
@@ -3665,13 +3669,13 @@ export default function CustomerDashboardPage() {
                 icon: <PawPrint className="h-5 w-5" />,
               },
               {
-                label: "Bookings",
+                label: "My Bookings",
                 helper: `${stats.upcoming} upcoming`,
                 href: routes.bookings,
                 icon: <CalendarDays className="h-5 w-5" />,
               },
               {
-                label: "Messages",
+                label: "My Messages",
                 helper: "Open inbox",
                 href: routes.messages,
                 icon: <MessageCircle className="h-5 w-5" />,
@@ -3683,7 +3687,7 @@ export default function CustomerDashboardPage() {
                 icon: <PawPrint className="h-5 w-5" />,
               },
               {
-                label: "PawPerks",
+                label: "My PawPerks",
                 helper: formatMoney(referralProfile?.available_credit ?? 0),
                 href: routes.pawPerks,
                 icon: <Star className="h-5 w-5" />,
@@ -3718,10 +3722,10 @@ export default function CustomerDashboardPage() {
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                    Your pets
+                    My Pets
                   </p>
                   <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                    Your pets
+                    My Pets
                   </h2>
                 </div>
                 <div className="flex gap-2">
@@ -3980,7 +3984,7 @@ export default function CustomerDashboardPage() {
                     Updates
                   </p>
                   <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
-                    What’s new
+                    My Updates
                   </h2>
                 </div>
                 <span className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-sky-700 ring-1 ring-sky-100">
@@ -4046,10 +4050,10 @@ export default function CustomerDashboardPage() {
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                  Upcoming care
+                  Care schedule
                 </p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                  Upcoming care
+                  My Upcoming Care
                 </h2>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                   Everything for the next visit, in one place.
@@ -4097,28 +4101,16 @@ export default function CustomerDashboardPage() {
             )}
           </section>
 
-          <NearbyGurusCarousel
-            gurus={nearbyGurus}
-            careZip={careZip}
-            careLocationLabel={careLocationLabel}
-            careZipInput={careZipInput}
-            loading={loadingNearbyGurus}
-            message={nearbyGuruMessage}
-            onCareZipInputChange={(value) =>
-              setCareZipInput(cleanZipCode(value))
-            }
-            onCareZipSubmit={handleCareZipSubmit}
-          />
 
           <section className="mt-4 grid gap-4 lg:grid-cols-2">
             <article className="rounded-[2rem] border border-emerald-200 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                    Profile + safety
+                    My Profile
                   </p>
                   <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
-                    Profile {profileCompletion}% ready
+                    My Profile · {profileCompletion}% ready
                   </h2>
                   <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                     Keep contact and care details current.
@@ -4309,10 +4301,10 @@ export default function CustomerDashboardPage() {
                   </div>
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
-                      Pet Parent Academy
+                      My Academy
                     </p>
                     <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
-                      Pet Parent Academy
+                      My Academy
                     </h2>
                   </div>
                 </div>
@@ -4368,7 +4360,7 @@ export default function CustomerDashboardPage() {
                   Recent activity
                 </p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                  Recent care
+                  My Recent Care
                 </h2>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                   Bookings, payments, and tips.
@@ -4378,7 +4370,7 @@ export default function CustomerDashboardPage() {
                 href={routes.bookings}
                 className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
               >
-                All Bookings
+                My Bookings
               </Link>
             </div>
 
