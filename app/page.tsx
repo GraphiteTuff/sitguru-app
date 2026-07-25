@@ -32,7 +32,7 @@ const heroVideoCaptions = [
 ] as const;
 
 const heroVideoPosterPath = "/images/sitguru-homepage-hero-poster.jpg";
-const heroVideoPlaybackRate = 1;
+const heroVideoPlaybackRates = [1, 1, 0.9] as const;
 const heroVideoTransitionMs = 420;
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
 const sitGuruVideoEmbedUrl =
@@ -1539,6 +1539,8 @@ function HeroVisual({
   const [isVideoTransitioning, setIsVideoTransitioning] = useState(false);
 
   const activeVideoPath = heroVideoPaths[activeVideoIndex];
+  const activeVideoPlaybackRate =
+    heroVideoPlaybackRates[activeVideoIndex] ?? 1;
 
   useEffect(() => {
     onActiveVideoChange(activeVideoIndex);
@@ -1548,7 +1550,7 @@ function HeroVisual({
     const video = videoRef.current;
     if (!video) return;
 
-    video.playbackRate = heroVideoPlaybackRate;
+    video.playbackRate = activeVideoPlaybackRate;
 
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
@@ -1564,7 +1566,7 @@ function HeroVisual({
     void video.play().catch(() => {
       setIsVideoPaused(true);
     });
-  }, [activeVideoIndex]);
+  }, [activeVideoIndex, activeVideoPlaybackRate]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1607,7 +1609,7 @@ function HeroVisual({
     const video = videoRef.current;
     if (!video) return;
 
-    video.playbackRate = heroVideoPlaybackRate;
+    video.playbackRate = activeVideoPlaybackRate;
 
     void video
       .play()
@@ -1663,7 +1665,7 @@ function HeroVisual({
         preload="metadata"
         aria-hidden="true"
         onCanPlay={(event) => {
-          event.currentTarget.playbackRate = heroVideoPlaybackRate;
+          event.currentTarget.playbackRate = activeVideoPlaybackRate;
           playActiveVideo();
         }}
         onEnded={rotateToNextVideo}
