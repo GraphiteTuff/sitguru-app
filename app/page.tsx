@@ -1527,7 +1527,11 @@ function HeroSignupCard({
   );
 }
 
-function HeroVisual() {
+function HeroVisual({
+  onActiveVideoChange,
+}: {
+  onActiveVideoChange: (index: number) => void;
+}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const transitionTimeoutRef = useRef<number | null>(null);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
@@ -1535,7 +1539,10 @@ function HeroVisual() {
   const [isVideoTransitioning, setIsVideoTransitioning] = useState(false);
 
   const activeVideoPath = heroVideoPaths[activeVideoIndex];
-  const activeVideoCaption = heroVideoCaptions[activeVideoIndex];
+
+  useEffect(() => {
+    onActiveVideoChange(activeVideoIndex);
+  }, [activeVideoIndex, onActiveVideoChange]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -1671,62 +1678,6 @@ function HeroVisual() {
       <div className="absolute inset-y-0 right-0 w-[24%] bg-gradient-to-l from-black/8 via-black/0 to-transparent lg:w-[34%] lg:from-black/16" />
       <div className="absolute inset-x-0 top-0 h-[14%] bg-gradient-to-b from-black/14 to-transparent lg:h-[16%] lg:from-black/22" />
       <div className="absolute inset-x-0 bottom-0 h-[28%] bg-gradient-to-t from-black/28 via-black/6 to-transparent lg:h-[38%] lg:from-black/44 lg:via-black/10" />
-
-      <style>{`
-        @keyframes sitguruHeroCaptionFade {
-          0%,
-          8% {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-
-          17%,
-          72% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-
-          88%,
-          100% {
-            opacity: 0;
-            transform: translateY(5px);
-          }
-        }
-
-        .sitguru-hero-caption {
-          animation: sitguruHeroCaptionFade 7.2s ease-in-out both;
-          will-change: opacity, transform;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .sitguru-hero-caption {
-            animation: none;
-            opacity: 1;
-            transform: none;
-          }
-        }
-      `}</style>
-
-      <div
-        key={`hero-caption-${activeVideoPath}`}
-        className="sitguru-hero-caption pointer-events-none absolute left-1/2 top-4 z-20 w-[calc(100%-2rem)] max-w-[300px] -translate-x-1/2 sm:top-5 sm:max-w-[340px] lg:bottom-6 lg:left-auto lg:right-[390px] lg:top-auto lg:w-auto lg:max-w-[330px] lg:translate-x-0 xl:right-[415px]"
-        style={{
-          animationPlayState: isVideoPaused ? "paused" : "running",
-        }}
-        aria-live="polite"
-      >
-        <div className="rounded-2xl border border-white/20 bg-black/35 px-4 py-2.5 text-center text-white shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-md sm:px-5 sm:py-3 lg:text-left">
-          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300 sm:text-[10px]">
-            {activeVideoCaption.eyebrow}
-          </p>
-          <p className="mt-1 text-xs font-extrabold leading-4 text-white sm:text-sm sm:leading-5">
-            <span className="sm:hidden">{activeVideoCaption.mobile}</span>
-            <span className="hidden sm:inline">
-              {activeVideoCaption.desktop}
-            </span>
-          </p>
-        </div>
-      </div>
 
       <button
         type="button"
@@ -2267,8 +2218,10 @@ export default function HomePage() {
   const [zipLookupMessage, setZipLookupMessage] = useState("");
   const [guruCards, setGuruCards] = useState<GuruCard[]>(demoGuruCards);
   const [source, setSource] = useState("direct");
+  const [activeHeroVideoIndex, setActiveHeroVideoIndex] = useState(0);
 
   const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
+  const activeHeroVideoCaption = heroVideoCaptions[activeHeroVideoIndex];
   const visibleGuruCards = useMemo(() => guruCards.slice(0, 10), [guruCards]);
 
   useEffect(() => {
@@ -2538,12 +2491,12 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-white text-slate-950">
       <section className="relative overflow-hidden border-b border-slate-200 bg-white lg:border-slate-800 lg:bg-slate-950">
-        <HeroVisual />
+        <HeroVisual onActiveVideoChange={setActiveHeroVideoIndex} />
 
         <div className="relative z-10 mx-auto grid max-w-7xl gap-6 px-4 pb-8 pt-7 sm:px-6 sm:pb-10 sm:pt-9 lg:min-h-[690px] lg:py-12 lg:grid-cols-[minmax(0,690px)_minmax(240px,1fr)_350px] lg:items-center lg:gap-7 lg:px-8 lg:py-12 xl:grid-cols-[minmax(0,720px)_minmax(270px,1fr)_370px] xl:gap-8">
           <div className="lg:py-8">
             <div className="grid gap-4 lg:block">
-              <div className="min-h-[500px] sm:min-h-[535px] lg:min-h-0">
+              <div className="min-h-[350px] sm:min-h-[535px] lg:min-h-0">
                 <div className="inline-flex items-center rounded-full border border-white/30 bg-white/95 px-3 py-1 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur sm:text-xs">
                   Local Trusted Marketplace
                 </div>
@@ -2577,6 +2530,59 @@ export default function HomePage() {
                       For busy days, last-minute plans, or time away—find a
                       local Pet Guru for walks, drop-ins, sitting, and more.
                     </p>
+
+                    <style>{`
+                      @keyframes sitguruHeroCaptionFade {
+                        0%,
+                        6% {
+                          opacity: 0;
+                          transform: translateY(7px);
+                        }
+
+                        14%,
+                        82% {
+                          opacity: 1;
+                          transform: translateY(0);
+                        }
+
+                        94%,
+                        100% {
+                          opacity: 0;
+                          transform: translateY(4px);
+                        }
+                      }
+
+                      .sitguru-hero-caption {
+                        animation: sitguruHeroCaptionFade 10.5s ease-in-out both;
+                        will-change: opacity, transform;
+                      }
+
+                      @media (prefers-reduced-motion: reduce) {
+                        .sitguru-hero-caption {
+                          animation: none;
+                          opacity: 1;
+                          transform: none;
+                        }
+                      }
+                    `}</style>
+
+                    <div
+                      key={`hero-caption-${activeHeroVideoIndex}`}
+                      className="sitguru-hero-caption mt-4 w-fit max-w-[94%] rounded-2xl border border-white/20 bg-black/35 px-4 py-2.5 text-left text-white shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-md sm:max-w-[360px] sm:px-5 sm:py-3"
+                      aria-live="polite"
+                    >
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300 sm:text-[10px]">
+                        {activeHeroVideoCaption.eyebrow}
+                      </p>
+                      <p className="mt-1 text-xs font-extrabold leading-4 text-white sm:text-sm sm:leading-5">
+                        <span className="sm:hidden">
+                          {activeHeroVideoCaption.mobile}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {activeHeroVideoCaption.desktop}
+                        </span>
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2584,7 +2590,7 @@ export default function HomePage() {
               <form
                 action="/search"
                 onSubmit={handleSearchSubmit}
-                className="relative z-20 mt-4 rounded-3xl border border-slate-200 bg-white/98 p-4 sm:mt-5 lg:mt-7 shadow-[0_18px_45px_rgba(15,23,42,0.13)] backdrop-blur sm:mt-8 lg:mt-7 lg:w-[690px] xl:w-[720px]"
+                className="relative z-20 mt-2 rounded-3xl border border-slate-200 bg-white/98 p-3 shadow-[0_18px_45px_rgba(15,23,42,0.13)] backdrop-blur sm:mt-7 sm:p-4 lg:mt-7 lg:w-[690px] xl:w-[720px]"
               >
                 <input type="hidden" name="city" value={searchForm.city} />
                 <input type="hidden" name="state" value={searchForm.state} />
