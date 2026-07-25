@@ -488,15 +488,18 @@ async function findPayoutPreference(userId: string) {
   const { data, error } = await supabaseAdmin
     .from("user_payout_preferences")
     .select("*")
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("workspace_role", "guru")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
 
   if (error) {
     console.error("PayPal payout-preference lookup failed:", error);
     return null;
   }
 
-  const rows = (data || []) as JsonRecord[];
-  return rows.find((row) => row.workspace_role === "guru") || rows[0] || null;
+  return (data || null) as JsonRecord | null;
 }
 
 async function findCanonicalMerchantAccount(
@@ -899,14 +902,23 @@ function extractProductCapabilities(status: SellerIntegrationStatus | null) {
   const products = Array.isArray(status?.products) ? status.products : [];
   const productStatuses: JsonRecord = {};
   const capabilityNames = new Set<string>();
-  let vettingStatus: string | null = null;
+  const rootVettingStatus = normalizeUppercase(
+    status?.["products.vetting_status"] ||
+      status?.["products.vetting status"] ||
+      status?.vetting_status,
+  );
+  let vettingStatus: string | null = rootVettingStatus || null;
   let ppcpProvisioned = false;
   let ppcpRestricted = false;
+  let ppcpLimited = false;
+  let ppcpNeedsMoreData = false;
+  let ppcpInReview = false;
 
   for (const product of products) {
     const name = normalizeUppercase(product.name) || "UNKNOWN";
     const productStatus = normalizeUppercase(product.status);
-    const productVettingStatus = normalizeUppercase(product.vetting_status);
+    const productVettingStatus =
+      normalizeUppercase(product.vetting_status) || rootVettingStatus;
 
     productStatuses[name] = {
       status: productStatus || null,
@@ -915,24 +927,35 @@ function extractProductCapabilities(status: SellerIntegrationStatus | null) {
     };
 
     if (["PPCP", "PPCP_CUSTOM", "PPCP_STANDARD"].includes(name)) {
-      vettingStatus = productVettingStatus || productStatus || null;
+      vettingStatus = productVettingStatus || productStatus || vettingStatus;
+
+      const combinedStatus = `${productStatus} ${productVettingStatus}`;
+      const subscribedWithLimit = combinedStatus.includes(
+        "SUBSCRIBED_WITH_LIMIT",
+      );
+
       ppcpProvisioned =
+        ppcpProvisioned ||
+        subscribedWithLimit ||
         ["ACTIVE", "APPROVED", "SUBSCRIBED"].includes(productStatus) ||
         ["ACTIVE", "APPROVED", "SUBSCRIBED"].includes(
           productVettingStatus,
         );
-      ppcpRestricted = [
-        "DECLINED",
-        "DENIED",
-        "RESTRICTED",
-        "SUSPENDED",
-        "REVOKED",
-        "INACTIVE",
-      ].some(
-        (value) =>
-          productStatus.includes(value) ||
-          productVettingStatus.includes(value),
-      );
+
+      ppcpLimited = ppcpLimited || subscribedWithLimit;
+      ppcpNeedsMoreData =
+        ppcpNeedsMoreData || combinedStatus.includes("NEED_MORE_DATA");
+      ppcpInReview = ppcpInReview || combinedStatus.includes("IN_REVIEW");
+      ppcpRestricted =
+        ppcpRestricted ||
+        [
+          "DECLINED",
+          "DENIED",
+          "RESTRICTED",
+          "SUSPENDED",
+          "REVOKED",
+          "INACTIVE",
+        ].some((value) => combinedStatus.includes(value));
     }
 
     for (const capability of asArray(product.capabilities)) {
@@ -945,6 +968,24 @@ function extractProductCapabilities(status: SellerIntegrationStatus | null) {
 
       if (capabilityName) capabilityNames.add(capabilityName);
     }
+  }
+
+  if (!products.length && rootVettingStatus) {
+    ppcpProvisioned = ["ACTIVE", "APPROVED", "SUBSCRIBED"].includes(
+      rootVettingStatus,
+    );
+    ppcpLimited = rootVettingStatus === "SUBSCRIBED_WITH_LIMIT";
+    ppcpProvisioned = ppcpProvisioned || ppcpLimited;
+    ppcpNeedsMoreData = rootVettingStatus === "NEED_MORE_DATA";
+    ppcpInReview = rootVettingStatus === "IN_REVIEW";
+    ppcpRestricted = [
+      "DECLINED",
+      "DENIED",
+      "RESTRICTED",
+      "SUSPENDED",
+      "REVOKED",
+      "INACTIVE",
+    ].includes(rootVettingStatus);
   }
 
   for (const capability of status?.capabilities || []) {
@@ -963,6 +1004,9 @@ function extractProductCapabilities(status: SellerIntegrationStatus | null) {
     vettingStatus,
     ppcpProvisioned,
     ppcpRestricted,
+    ppcpLimited,
+    ppcpNeedsMoreData,
+    ppcpInReview,
   };
 }
 
@@ -998,6 +1042,7 @@ function buildOnboardingState({
   const productSnapshot = extractProductCapabilities(status);
   const restricted =
     productSnapshot.ppcpRestricted ||
+    productSnapshot.ppcpLimited ||
     ["DECLINED", "DENIED", "SUSPENDED", "REVOKED", "INACTIVE"].some(
       (value) => riskStatus.includes(value),
     );
@@ -1016,10 +1061,18 @@ function buildOnboardingState({
   if (!permissionsGranted) requirementsCurrentlyDue.push("permissions");
   if (!emailConfirmed) requirementsCurrentlyDue.push("email_confirmation");
   if (!paymentsReceivable) requirementsCurrentlyDue.push("payments_receivable");
-  if (!productSnapshot.ppcpProvisioned) {
+  if (productSnapshot.ppcpNeedsMoreData) {
+    requirementsCurrentlyDue.push("paypal_additional_information");
+  } else if (productSnapshot.ppcpInReview) {
+    requirementsCurrentlyDue.push("paypal_review_in_progress");
+  } else if (!productSnapshot.ppcpProvisioned) {
     requirementsCurrentlyDue.push("paypal_product_approval");
   }
-  if (restricted) requirementsCurrentlyDue.push("paypal_account_review");
+  if (productSnapshot.ppcpLimited) {
+    requirementsCurrentlyDue.push("paypal_account_limit");
+  } else if (restricted) {
+    requirementsCurrentlyDue.push("paypal_account_review");
+  }
 
   return {
     merchantId: resolvedMerchantId,

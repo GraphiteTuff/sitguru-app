@@ -123,6 +123,25 @@ function firstNonEmpty(...values: unknown[]) {
   return "";
 }
 
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => asTrimmedString(item))
+    .filter(Boolean);
+}
+
+function appendUniqueString(
+  values: string[],
+  value: unknown,
+  maximumItems = 50,
+) {
+  const nextValue = asTrimmedString(value);
+  const unique = [...new Set([...values, nextValue].filter(Boolean))];
+
+  return unique.slice(Math.max(0, unique.length - maximumItems));
+}
+
 function toFiniteNumber(value: unknown, fallback = 0) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -166,6 +185,19 @@ function asUuidOrNull(value: unknown) {
   }
 
   return null;
+}
+
+function extractUserIdFromTrackingId(value: unknown) {
+  const trackingId = asTrimmedString(value);
+  const directUserId = asUuidOrNull(trackingId);
+
+  if (directUserId) return directUserId;
+
+  const uuidMatches = trackingId.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi,
+  );
+
+  return uuidMatches?.[0] || null;
 }
 
 function getPath(record: JsonRecord | null, path: string[]) {
@@ -218,7 +250,9 @@ function normalizePayPalEnvironment(value: unknown): "sandbox" | "live" {
 
 function getPayPalConfig(): PayPalConfig | null {
   const environment = normalizePayPalEnvironment(
-    process.env.PAYPAL_ENVIRONMENT || process.env.PAYPAL_MODE,
+    process.env.PAYPAL_ENV ||
+      process.env.PAYPAL_ENVIRONMENT ||
+      process.env.PAYPAL_MODE,
   );
 
   const clientId = firstNonEmpty(
@@ -609,12 +643,7 @@ function getMerchantId(record: JsonRecord | null) {
 }
 
 function getTrackingId(record: JsonRecord | null) {
-  return firstNonEmpty(
-    record?.tracking_id,
-    record?.trackingId,
-    record?.merchant_id,
-    record?.merchantId,
-  );
+  return firstNonEmpty(record?.tracking_id, record?.trackingId);
 }
 
 async function getPayPalOrder(
@@ -1134,6 +1163,10 @@ async function safePaymentLedgerUpsert({
   let existingId = firstNonEmpty(existing?.id);
   const existingMetadata = asRecord(existing?.metadata) || {};
   const incomingMetadata = asRecord(payload.metadata) || {};
+  const processedEventIds = appendUniqueString(
+    asStringArray(existingMetadata.paypal_processed_event_ids),
+    incomingMetadata.paypal_event_id,
+  );
 
   const writePayload: Record<string, unknown> = {
     ...payload,
@@ -1143,9 +1176,25 @@ async function safePaymentLedgerUpsert({
     metadata: {
       ...existingMetadata,
       ...incomingMetadata,
+      paypal_processed_event_ids: processedEventIds,
     },
     updated_at: new Date().toISOString(),
   };
+
+  for (const timestampField of [
+    "processing_at",
+    "paid_at",
+    "failed_at",
+    "refunded_at",
+  ]) {
+    if (
+      (writePayload[timestampField] === null ||
+        writePayload[timestampField] === undefined) &&
+      existing?.[timestampField]
+    ) {
+      writePayload[timestampField] = existing[timestampField];
+    }
+  }
 
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const result = existingId
@@ -1155,7 +1204,8 @@ async function safePaymentLedgerUpsert({
           .eq("id", existingId)
       : await supabaseAdmin.from("booking_payments").insert({
           ...writePayload,
-          created_at: firstNonEmpty(writePayload.created_at) ||
+          created_at:
+            firstNonEmpty(writePayload.created_at) ||
             new Date().toISOString(),
         });
 
@@ -1187,6 +1237,29 @@ async function safePaymentLedgerUpsert({
   }
 
   return false;
+}
+
+async function hasProcessedPaymentEvent({
+  context,
+  bookingId,
+  eventId,
+}: {
+  context: PaymentContext;
+  bookingId: string;
+  eventId: string;
+}) {
+  if (!eventId) return false;
+
+  const existing = await findLedgerByReferences({
+    ...context,
+    bookingId,
+  });
+  const metadata = asRecord(existing?.metadata) || {};
+
+  return (
+    firstNonEmpty(metadata.paypal_event_id) === eventId ||
+    asStringArray(metadata.paypal_processed_event_ids).includes(eventId)
+  );
 }
 
 function buildPaymentLedgerPayload({
@@ -1420,6 +1493,21 @@ async function processBookingPaymentEvent({
     };
   }
 
+  if (
+    await hasProcessedPaymentEvent({
+      context,
+      bookingId,
+      eventId: firstNonEmpty(event.id),
+    })
+  ) {
+    return {
+      handled: true,
+      duplicate: true,
+      bookingId,
+      eventId: event.id || null,
+    };
+  }
+
   const financial = getFinancialSnapshot({
     context,
     booking,
@@ -1485,7 +1573,11 @@ function getRefundOutcome({
   context: PaymentContext;
   booking: BookingRow | null;
 }): PaymentEventOutcome {
-  const refundedCents = context.amountCents;
+  const currentRefundCents = context.amountCents;
+  const previousRefundCents = bookingCents(booking, [
+    "refunded_amount",
+    "refund_amount",
+  ]);
   const originalTotalCents = bookingCents(booking, [
     "total_customer_paid",
     "checkout_amount",
@@ -1493,9 +1585,17 @@ function getRefundOutcome({
     "amount_total",
     "total",
   ]);
+  const cumulativeRefundCents =
+    originalTotalCents > 0
+      ? Math.min(
+          originalTotalCents,
+          previousRefundCents + currentRefundCents,
+        )
+      : previousRefundCents + currentRefundCents;
 
   const fullyRefunded =
-    originalTotalCents <= 0 || refundedCents >= originalTotalCents;
+    originalTotalCents <= 0 ||
+    cumulativeRefundCents >= originalTotalCents;
   const paymentStatus = fullyRefunded
     ? "refunded"
     : "partially_refunded";
@@ -1504,7 +1604,7 @@ function getRefundOutcome({
     paymentStatus,
     payoutStatus: "adjusted",
     refundStatus: paymentStatus,
-    refundAmountCents: refundedCents,
+    refundAmountCents: cumulativeRefundCents,
   };
 }
 
@@ -1613,139 +1713,356 @@ async function fetchPayPalPayoutAccount({
   return null;
 }
 
+async function fetchCanonicalPayPalMerchantAccount({
+  userId,
+  merchantId,
+  trackingId,
+  environment,
+}: {
+  userId: string;
+  merchantId: string;
+  trackingId: string;
+  environment: "sandbox" | "live";
+}) {
+  const lookups = [
+    ["paypal_merchant_id", merchantId],
+    ["tracking_id", trackingId],
+    ["user_id", userId],
+  ] as const;
+
+  for (const [column, value] of lookups) {
+    if (!value) continue;
+
+    const { data, error } = await supabaseAdmin
+      .from("paypal_merchant_accounts")
+      .select("*")
+      .eq("environment", environment)
+      .eq(column, value)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) return data as JsonRecord;
+
+    if (error && !isMissingColumnError(error)) {
+      console.warn("Canonical PayPal merchant lookup warning:", {
+        column,
+        value,
+        error: error.message,
+      });
+    }
+  }
+
+  return null;
+}
+
+async function safeRoleScopedWrite({
+  table,
+  existingId,
+  payload,
+}: {
+  table: "user_payout_accounts" | "user_payout_preferences";
+  existingId: string;
+  payload: Record<string, unknown>;
+}) {
+  const writePayload = { ...payload };
+
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const result = existingId
+      ? await supabaseAdmin
+          .from(table)
+          .update(writePayload)
+          .eq("id", existingId)
+      : await supabaseAdmin.from(table).insert(writePayload);
+
+    if (!result.error) return true;
+
+    const missingColumn = getMissingColumnName(result.error.message || "");
+
+    if (missingColumn && missingColumn in writePayload) {
+      console.warn(
+        `Removing missing ${table} column and retrying:`,
+        missingColumn,
+      );
+      delete writePayload[missingColumn];
+      continue;
+    }
+
+    console.error(`PayPal ${table} webhook write failed:`, result.error);
+    return false;
+  }
+
+  return false;
+}
+
+async function findGuruPayoutPreference(userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("user_payout_preferences")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("workspace_role", "guru")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error && !isMissingColumnError(error)) {
+    console.error("Guru payout preference lookup failed:", error);
+  }
+
+  return (data as JsonRecord | null) || null;
+}
+
 async function updatePayPalOnboardingAccount({
   event,
   context,
   completed,
+  config,
 }: {
   event: PayPalWebhookEvent;
   context: PaymentContext;
   completed: boolean;
+  config: PayPalConfig;
 }) {
   const now = new Date().toISOString();
-  const userId = asUuidOrNull(context.trackingId) || "";
+  const trackingId = context.trackingId;
+  const parsedUserId = extractUserIdFromTrackingId(trackingId) || "";
   const merchantId = context.merchantId;
+  const canonical = await fetchCanonicalPayPalMerchantAccount({
+    userId: parsedUserId,
+    merchantId,
+    trackingId,
+    environment: config.environment,
+  });
+  const mappedUserId = firstNonEmpty(canonical?.user_id, parsedUserId);
   const existing = await fetchPayPalPayoutAccount({
-    userId,
+    userId: mappedUserId,
     merchantId,
   });
-  const existingId = firstNonEmpty(existing?.id);
-  const resolvedUserId = firstNonEmpty(existing?.user_id, userId);
+  const resolvedUserId = firstNonEmpty(existing?.user_id, mappedUserId);
+  const resolvedMerchantId = firstNonEmpty(
+    merchantId,
+    existing?.provider_merchant_id,
+    existing?.provider_account_id,
+    canonical?.paypal_merchant_id,
+  );
+  const resolvedTrackingId = firstNonEmpty(
+    trackingId,
+    canonical?.tracking_id,
+    asRecord(existing?.metadata)?.paypal_tracking_id,
+  );
 
-  if (!existingId && !resolvedUserId) {
-    console.warn("PayPal onboarding webhook has no SitGuru user mapping:", {
+  if (!resolvedUserId) {
+    console.error("PayPal onboarding webhook has no SitGuru user mapping:", {
       eventId: event.id,
       eventType: event.event_type,
-      merchantId,
-      trackingId: context.trackingId,
+      merchantId: resolvedMerchantId,
+      trackingId: resolvedTrackingId,
     });
 
+    throw new Error(
+      "SitGuru could not map the PayPal onboarding event to a user.",
+    );
+  }
+
+  const existingMetadata = asRecord(existing?.metadata) || {};
+  const processedEventIds = asStringArray(
+    existingMetadata.paypal_processed_event_ids,
+  );
+
+  if (
+    event.id &&
+    (firstNonEmpty(existingMetadata.paypal_event_id) === event.id ||
+      processedEventIds.includes(event.id))
+  ) {
     return {
-      handled: false,
-      reason: "No SitGuru payout-account mapping was found.",
+      handled: true,
+      duplicate: true,
+      userId: resolvedUserId,
+      merchantId: resolvedMerchantId,
+      completed,
     };
   }
 
-  const metadata = {
-    ...(asRecord(existing?.metadata) || {}),
+  const nextProcessedEventIds = appendUniqueString(
+    processedEventIds,
+    event.id,
+  );
+  const accountReady = completed;
+  const accountDisabled = !completed;
+  const accountMetadata = {
+    ...existingMetadata,
     paypal_event_id: event.id || null,
     paypal_event_type: event.event_type || null,
-    paypal_merchant_id: merchantId || null,
-    paypal_tracking_id: context.trackingId || null,
-    consent_revoked: !completed,
+    paypal_merchant_id: resolvedMerchantId || null,
+    paypal_tracking_id: resolvedTrackingId || null,
+    paypal_environment: config.environment,
+    paypal_payments_receivable: accountReady,
+    paypal_primary_email_confirmed: accountReady,
+    paypal_permissions_granted: accountReady,
+    paypal_processed_event_ids: nextProcessedEventIds,
+    consent_revoked: accountDisabled,
     last_webhook_at: now,
   };
 
-  const payload: Record<string, unknown> = {
-    user_id: resolvedUserId,
-    workspace_role: "guru",
-    provider: "paypal",
-    provider_account_id: merchantId || null,
-    provider_merchant_id: merchantId || null,
-    status: completed ? "ready" : "disabled",
-    details_submitted: completed,
-    charges_enabled: completed,
-    payouts_enabled: completed,
-    is_primary: existing?.is_primary ?? true,
-    onboarding_started_at:
-      existing?.onboarding_started_at || event.create_time || now,
-    onboarding_completed_at: completed ? now : null,
-    last_checked_at: now,
-    metadata,
-    updated_at: now,
-  };
-
-  let accountSaved = false;
-
-  if (existingId) {
-    const { error } = await supabaseAdmin
-      .from("user_payout_accounts")
-      .update(payload)
-      .eq("id", existingId);
-
-    accountSaved = !error;
-
-    if (error) {
-      console.error("PayPal payout account update failed:", error);
-    }
-  } else {
-    const { error } = await supabaseAdmin
-      .from("user_payout_accounts")
-      .insert({
-        ...payload,
-        created_at: now,
-      });
-
-    accountSaved = !error;
-
-    if (error) {
-      console.error("PayPal payout account insert failed:", error);
-    }
-  }
+  const accountSaved = await safeRoleScopedWrite({
+    table: "user_payout_accounts",
+    existingId: firstNonEmpty(existing?.id),
+    payload: {
+      user_id: resolvedUserId,
+      account_purpose: "guru_marketplace_seller",
+      workspace_role: "guru",
+      provider: "paypal",
+      provider_account_id: resolvedMerchantId || null,
+      provider_merchant_id: resolvedMerchantId || null,
+      provider_payer_id: resolvedMerchantId || null,
+      onboarding_status: accountReady ? "ready" : "disabled",
+      account_status: accountReady ? "active" : "disconnected",
+      status: accountReady ? "ready" : "disabled",
+      details_submitted: accountReady,
+      charges_enabled: accountReady,
+      payouts_enabled: accountReady,
+      is_primary:
+        existing?.is_primary === true || existing?.is_default === true ||
+        !existing,
+      is_default:
+        existing?.is_default === true || existing?.is_primary === true ||
+        !existing,
+      is_live: config.environment === "live",
+      country_code: firstNonEmpty(existing?.country_code, "US"),
+      default_currency: firstNonEmpty(existing?.default_currency, "USD"),
+      onboarding_started_at:
+        existing?.onboarding_started_at || event.create_time || now,
+      onboarding_completed_at: accountReady ? now : null,
+      connected_at: accountReady
+        ? existing?.connected_at || now
+        : existing?.connected_at || null,
+      disabled_at: accountDisabled ? now : null,
+      last_checked_at: now,
+      last_synced_at: now,
+      metadata: accountMetadata,
+      updated_at: now,
+      created_at: existing?.created_at || now,
+    },
+  });
 
   if (!accountSaved) {
     throw new Error("SitGuru could not save the PayPal onboarding status.");
   }
 
-  if (resolvedUserId) {
-    const { error: preferenceError } = await supabaseAdmin
-      .from("user_payout_preferences")
-      .upsert(
-        {
-          user_id: resolvedUserId,
-          workspace_role: "guru",
-          preferred_provider: "paypal",
-          setup_timing: "before_first_paid_booking",
-          allow_setup_later: true,
-          setup_required: !completed,
-          setup_completed: completed,
-          setup_completed_at: completed ? now : null,
-          updated_at: now,
-        },
-        {
-          onConflict: "user_id,workspace_role",
-        },
-      );
+  const existingPreference = await findGuruPayoutPreference(resolvedUserId);
+  const preferenceMetadata = {
+    ...(asRecord(existingPreference?.metadata) || {}),
+    paypal_event_id: event.id || null,
+    paypal_event_type: event.event_type || null,
+    paypal_merchant_id: resolvedMerchantId || null,
+    paypal_tracking_id: resolvedTrackingId || null,
+    consent_revoked: accountDisabled,
+    last_paypal_onboarding_update_at: now,
+  };
+  const preferenceSaved = await safeRoleScopedWrite({
+    table: "user_payout_preferences",
+    existingId: firstNonEmpty(existingPreference?.id),
+    payload: {
+      user_id: resolvedUserId,
+      role_context: firstNonEmpty(existingPreference?.role_context, "guru"),
+      booking_payout_provider: "paypal",
+      booking_setup_requirement: "before_first_paid_booking",
+      financial_onboarding_status: accountReady ? "ready" : "restricted",
+      onboarding_deferred: false,
+      selected_at: existingPreference?.selected_at || now,
+      setup_started_at: existingPreference?.setup_started_at || now,
+      setup_completed_at: accountReady ? now : null,
+      last_verified_at: accountReady ? now : null,
+      can_accept_paid_bookings: accountReady,
+      workspace_role: "guru",
+      preferred_provider: "paypal",
+      setup_timing: "before_first_paid_booking",
+      allow_setup_later: true,
+      setup_required: !accountReady,
+      setup_completed: accountReady,
+      metadata: preferenceMetadata,
+      updated_at: now,
+      created_at: existingPreference?.created_at || now,
+    },
+  });
 
-    if (preferenceError) {
-      throw new Error(
-        `SitGuru could not update the PayPal payout preference: ${preferenceError.message}`,
-      );
-    }
+  if (!preferenceSaved) {
+    throw new Error("SitGuru could not update the Guru payout preference.");
+  }
+
+  const canonicalMetadata = {
+    ...(asRecord(canonical?.merchant_details) || {}),
+    paypal_event_id: event.id || null,
+    paypal_event_type: event.event_type || null,
+    paypal_tracking_id: resolvedTrackingId || null,
+    paypal_merchant_id: resolvedMerchantId || null,
+    consent_revoked: accountDisabled,
+    last_webhook_at: now,
+  };
+  const { error: canonicalError } = await supabaseAdmin
+    .from("paypal_merchant_accounts")
+    .upsert(
+      {
+        user_id: resolvedUserId,
+        environment: config.environment,
+        tracking_id: resolvedTrackingId,
+        paypal_merchant_id: resolvedMerchantId || null,
+        merchant_email:
+          firstNonEmpty(canonical?.merchant_email, existing?.provider_email) ||
+          null,
+        status: accountReady ? "connected" : "disconnected",
+        onboarding_action_url: null,
+        payments_receivable: accountReady,
+        primary_email_confirmed: accountReady,
+        oauth_third_party_permissions: accountReady
+          ? canonical?.oauth_third_party_permissions || []
+          : [],
+        products: canonical?.products || [],
+        capabilities: canonical?.capabilities || {},
+        vetting_status: canonical?.vetting_status || null,
+        partner_consent_status: accountReady ? "true" : "false",
+        merchant_details: canonicalMetadata,
+        last_error_code: null,
+        last_error_message: null,
+        onboarding_started_at:
+          canonical?.onboarding_started_at || event.create_time || now,
+        onboarding_completed_at: accountReady ? now : null,
+        last_synced_at: now,
+      },
+      {
+        onConflict: "user_id,environment",
+      },
+    );
+
+  if (canonicalError) {
+    throw new Error(
+      `SitGuru could not update the canonical PayPal account: ${canonicalError.message}`,
+    );
+  }
+
+  const { error: readinessError } = await supabaseAdmin.rpc(
+    "sitguru_refresh_user_payout_readiness",
+    { p_user_id: resolvedUserId },
+  );
+
+  if (readinessError) {
+    console.warn(
+      "PayPal webhook payout-readiness refresh warning:",
+      readinessError.message,
+    );
   }
 
   console.log("PayPal seller onboarding event recorded:", {
     eventId: event.id,
     eventType: event.event_type,
     userId: resolvedUserId,
-    merchantId,
+    merchantId: resolvedMerchantId,
     completed,
   });
 
   return {
     handled: true,
     userId: resolvedUserId,
-    merchantId,
+    merchantId: resolvedMerchantId,
     completed,
   };
 }
@@ -1777,6 +2094,21 @@ async function processReferencedPayoutEvent({
     return {
       handled: false,
       reason: "No SitGuru booking reference was found.",
+    };
+  }
+
+  if (
+    await hasProcessedPaymentEvent({
+      context,
+      bookingId,
+      eventId: firstNonEmpty(event.id),
+    })
+  ) {
+    return {
+      handled: true,
+      duplicate: true,
+      bookingId,
+      eventId: event.id || null,
     };
   }
 
@@ -1845,6 +2177,7 @@ async function handlePayPalEvent(
         event,
         context,
         completed: true,
+        config,
       });
 
     case "MERCHANT.PARTNER-CONSENT.REVOKED":
@@ -1852,6 +2185,7 @@ async function handlePayPalEvent(
         event,
         context,
         completed: false,
+        config,
       });
 
     case "CHECKOUT.ORDER.APPROVED":
@@ -1990,10 +2324,12 @@ export async function GET() {
     service: "SitGuru PayPal webhook",
     environment: config?.environment ||
       normalizePayPalEnvironment(
-        process.env.PAYPAL_ENVIRONMENT || process.env.PAYPAL_MODE,
+        process.env.PAYPAL_ENV ||
+          process.env.PAYPAL_ENVIRONMENT ||
+          process.env.PAYPAL_MODE,
       ),
     configured: Boolean(config),
-    webhookPath: "/api/paypal/webhook",
+    webhookPath: "/api/paypal/webhooks",
   });
 }
 
