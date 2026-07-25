@@ -3126,24 +3126,128 @@ export default function CustomerDashboardPage() {
     [customerProfile],
   );
 
+  const featuredCareBooking =
+    liveCareBookings[0] || stats.nextBooking || latestBooking || null;
+
+  const featuredPawReport = featuredCareBooking
+    ? pawReportMap.get(featuredCareBooking.id) || null
+    : null;
+
+  const isCareLive = Boolean(
+    featuredPawReport &&
+      (featuredPawReport.status === "in_progress" ||
+        featuredPawReport.active_walk_status === "in_progress"),
+  );
+
+  const dashboardUpdates = useMemo(() => {
+    const updates: Array<{
+      label: string;
+      detail: string;
+      href: string;
+      tone: "emerald" | "sky" | "amber" | "slate";
+    }> = [];
+
+    const activeBooking = liveCareBookings[0];
+    const activeSummary = activeBooking
+      ? pawReportMap.get(activeBooking.id) || null
+      : null;
+
+    if (activeBooking && activeSummary) {
+      updates.push({
+        label: getLatestPawReportLabel(activeSummary),
+        detail: `${activeBooking.pet_name || "Your pet"} • ${formatLiveUpdateTime(
+          activeSummary.latest_update_at,
+        )}`,
+        href: getBookingPawReportHref(activeBooking.id),
+        tone: "sky",
+      });
+    }
+
+    if (stats.nextBooking) {
+      updates.push({
+        label: "Upcoming care is ready",
+        detail: `${getBookingCareSummary(stats.nextBooking)} • ${formatDate(
+          getBookingDisplayDate(stats.nextBooking),
+        )}`,
+        href: getBookingDetailHref(stats.nextBooking.id),
+        tone: "emerald",
+      });
+    }
+
+    if ((referralProfile?.pending_rewards ?? 0) > 0) {
+      updates.push({
+        label: "PawPerks reward pending",
+        detail: `${formatMoney(
+          referralProfile?.pending_rewards ?? 0,
+          true,
+        )} is being tracked in PawPerks.`,
+        href: routes.pawPerks,
+        tone: "amber",
+      });
+    }
+
+    if (profileCompletion < 100) {
+      updates.push({
+        label: "Finish your care profile",
+        detail: `Your Pet Parent profile is ${profileCompletion}% complete.`,
+        href: routes.profile,
+        tone: "slate",
+      });
+    }
+
+    if (!universityProgress.isComplete) {
+      updates.push({
+        label: "Pet Parent Academy",
+        detail: `${universityProgress.completedSteps} of ${universityProgress.totalSteps} steps complete.`,
+        href: routes.university,
+        tone: "slate",
+      });
+    }
+
+    if (updates.length === 0) {
+      updates.push({
+        label: "You are all caught up",
+        detail: "New booking, PawReport, reward, and profile updates will appear here.",
+        href: routes.dashboard,
+        tone: "emerald",
+      });
+    }
+
+    return updates.slice(0, 5);
+  }, [
+    liveCareBookings,
+    pawReportMap,
+    stats.nextBooking,
+    referralProfile?.pending_rewards,
+    profileCompletion,
+    universityProgress.completedSteps,
+    universityProgress.isComplete,
+    universityProgress.totalSteps,
+  ]);
+
   if (loading) {
     return (
       <main
-        className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#ecfdf5_100%)] px-4 py-10 font-light md:px-6 lg:px-8"
+        className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#ecfdf5_100%)] px-4 py-10 md:px-6 lg:px-8"
         style={{
           fontFamily:
             '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontWeight: 300,
         }}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-center">
-          <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-sm">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-2xl ring-1 ring-emerald-100">
+        <div className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center">
+          <div className="w-full max-w-md rounded-[2rem] border border-emerald-100 bg-white p-7 text-center shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-emerald-50 text-3xl ring-1 ring-emerald-100">
               🐾
             </div>
-            <p className="text-base font-semibold text-slate-700">
-              Loading your Pet Parent dashboard...
+            <p className="mt-5 text-lg font-black text-slate-950">
+              Getting your pet care hub ready
             </p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              Loading pets, bookings, PawReports, Gurus, and PawPerks.
+            </p>
+            <div className="mt-5 h-2 overflow-hidden rounded-full bg-emerald-50">
+              <div className="h-full w-2/3 animate-pulse rounded-full bg-emerald-500" />
+            </div>
           </div>
         </div>
       </main>
@@ -3194,121 +3298,75 @@ export default function CustomerDashboardPage() {
               Booking confirmed!
             </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-              Your booking is now organized in your SitGuru dashboard.
+              Your booking and care updates are now organized here.
             </p>
           </div>
         </div>
       ) : null}
 
       <main
-        className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light text-slate-950"
+        className="min-h-screen bg-[linear-gradient(180deg,#fafffd_0%,#ffffff_34%,#f3fff9_100%)] pb-24 text-slate-950 md:pb-10"
         style={{
           fontFamily:
             '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontWeight: 300,
         }}
       >
         <Header />
 
-        <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 lg:px-8">
-          <section
-            id="care-start"
-            className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]"
-          >
-            <div className="grid gap-8 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#00d69f_0%,#66e3c7_48%,#b8e5ff_100%)] px-6 py-8 md:px-10 md:py-12 lg:grid-cols-[1.35fr_0.65fr] lg:items-center">
+        <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 md:py-6 lg:px-8">
+          <section className="relative overflow-hidden rounded-[2rem] border border-emerald-100 bg-slate-950 shadow-[0_28px_100px_rgba(15,23,42,0.18)] sm:rounded-[2.4rem]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(52,211,153,0.34),transparent_30%),radial-gradient(circle_at_88%_20%,rgba(56,189,248,0.24),transparent_26%),linear-gradient(135deg,#071a13_0%,#0f3325_58%,#123c47_100%)]" />
+            <div className="relative grid gap-7 px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[1.35fr_0.65fr] lg:items-center lg:px-10 lg:py-10">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-900/80 md:text-sm">
-                  SitGuru Pet Parent Dashboard
-                </p>
-
-                <h1 className="mt-4 max-w-4xl text-4xl font-extrabold tracking-[-0.045em] text-slate-950 md:text-6xl lg:text-7xl">
-                  Welcome back, {firstName} <span aria-hidden="true">👋</span>
-                </h1>
-
-                <p className="mt-5 max-w-3xl text-base leading-8 text-slate-900/75 md:text-xl">
-                  Manage your pets, book Gurus, review messages, complete
-                  SitGuru University, and keep your care details organized in
-                  one simple place.
-                </p>
-
-                <div className="mt-6 flex flex-wrap items-center gap-3">
-                  <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-emerald-800 shadow-sm ring-1 ring-white/70">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-sm">
-                      🐾
-                    </span>
-                    Pet Parent
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100 ring-1 ring-white/15 backdrop-blur">
+                    Your SitGuru home
                   </span>
-
-                  <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
-                    <GraduationCap className="h-4 w-4 text-emerald-700" />
-                    {universityProgress.isComplete
-                      ? "Certified Pet Parent"
-                      : "Pet Parent Academy"}
+                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/15 px-3 py-1.5 text-[11px] font-black text-emerald-100 ring-1 ring-emerald-300/25">
+                    <span className="h-2 w-2 rounded-full bg-emerald-300" />
+                    Updates are live
                   </span>
-
-                  <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
-                    <Star className="h-4 w-4 text-amber-500" />
-                    PawPerks code: {referralCode}
-                  </span>
-
-                  {latestBooking ? (
-                    <span className="inline-flex items-center gap-2 rounded-full bg-white/85 px-4 py-2 text-xs font-extrabold text-slate-800 shadow-sm ring-1 ring-white/70">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      Last booking: {formatStatus(latestBooking.status)}
-                    </span>
-                  ) : null}
                 </div>
 
-                <div className="mt-8 flex flex-wrap items-center gap-3">
+                <h1 className="mt-5 text-4xl font-black tracking-[-0.045em] text-white sm:text-5xl lg:text-6xl">
+                  Hey, {firstName} <span aria-hidden="true">👋</span>
+                </h1>
+                <p className="mt-3 max-w-2xl text-base font-semibold leading-7 text-slate-200 sm:text-lg">
+                  Everything your pets need, everything your Gurus share, and
+                  every reward you earn—right here.
+                </p>
+
+                <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
                   <Link
                     href={routes.findGuru}
-                    className="inline-flex min-h-[52px] min-w-[150px] items-center justify-center rounded-full bg-emerald-600 px-7 py-3 text-base font-black text-white shadow-sm shadow-emerald-900/10 ring-1 ring-emerald-500/20 transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-lg"
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-emerald-400 px-5 text-sm font-black text-slate-950 shadow-lg shadow-emerald-950/20 transition hover:-translate-y-0.5 hover:bg-emerald-300"
                   >
-                    Find a Guru
+                    Find Care
                   </Link>
-
                   <Link
-                    href={routes.bookGuru}
-                    className="inline-flex min-h-[52px] min-w-[150px] items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3 text-base font-black text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-lg"
+                    href={stats.nextBooking ? getBookingDetailHref(stats.nextBooking.id) : routes.bookGuru}
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-emerald-50"
                   >
-                    Book a Guru
+                    {stats.nextBooking ? "View Next Care" : "Book Care"}
                   </Link>
-
                   <Link
                     href={routes.messages}
-                    className="inline-flex min-h-[52px] min-w-[150px] items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3 text-base font-black text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-lg"
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-white/10 px-5 text-sm font-black text-white ring-1 ring-white/15 transition hover:-translate-y-0.5 hover:bg-white/15"
                   >
                     Messages
                   </Link>
-
                   <Link
                     href={routes.pets}
-                    className="inline-flex min-h-[52px] min-w-[150px] items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3 text-base font-black text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-lg"
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-white/10 px-5 text-sm font-black text-white ring-1 ring-white/15 transition hover:-translate-y-0.5 hover:bg-white/15"
                   >
                     My Pets
-                  </Link>
-
-                  <Link
-                    href={routes.profile}
-                    className="inline-flex min-h-[52px] min-w-[150px] items-center justify-center rounded-full border border-slate-200 bg-white px-7 py-3 text-base font-black text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-lg"
-                  >
-                    My Profile
-                  </Link>
-
-                  <Link
-                    href={routes.university}
-                    className="inline-flex min-h-[52px] min-w-[190px] items-center justify-center gap-2 rounded-full bg-slate-950 px-7 py-3 text-base font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-lg"
-                  >
-                    <GraduationCap className="h-5 w-5" />
-                    SitGuru University
                   </Link>
                 </div>
               </div>
 
-              <div className="flex flex-col items-center text-center">
-                <div className="relative">
-                  <div className="absolute -inset-4 rounded-full bg-white/30 blur-xl" />
-                  <div className="relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-full border-[8px] border-white bg-gradient-to-br from-emerald-50 to-white text-5xl font-extrabold text-emerald-700 shadow-2xl md:h-56 md:w-56">
+              <div className="rounded-[1.8rem] border border-white/15 bg-white/10 p-4 backdrop-blur-md sm:p-5">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.5rem] bg-white text-2xl font-black text-emerald-700 shadow-xl ring-4 ring-white/10">
                     {showCustomerProfilePhoto ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -3321,176 +3379,283 @@ export default function CustomerDashboardPage() {
                       customerInitials
                     )}
                   </div>
-                  <div className="absolute -bottom-2 -right-2 flex h-14 w-14 items-center justify-center rounded-full border-4 border-white bg-emerald-500 text-2xl shadow-lg">
-                    🐾
+                  <div className="min-w-0">
+                    <p className="truncate text-xl font-black text-white">
+                      {customerDisplayName}
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-emerald-100">
+                      Pet Parent • {profileCompletion}% profile ready
+                    </p>
+                    <p className="mt-1 truncate text-xs font-semibold text-slate-300">
+                      {getCustomerLocationLabel(customerProfile) ||
+                        "Add your care location"}
+                    </p>
                   </div>
                 </div>
 
-                <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-950 md:text-4xl">
-                  {customerDisplayName}
-                </h2>
-                <p className="mt-2 text-lg font-semibold text-slate-700">
-                  SitGuru Pet Parent
-                </p>
-
-                {getCustomerLocationLabel(customerProfile) ? (
-                  <p className="mt-1 text-base font-black text-slate-800">
-                    {getCustomerLocationLabel(customerProfile)}
-                  </p>
-                ) : null}
-
-                <p className="mt-1 max-w-xs text-sm font-semibold leading-6 text-slate-600">
-                  {pets.length > 0
-                    ? `${pets.length} pet profile${pets.length === 1 ? "" : "s"} ready for care`
-                    : "Add your first pet profile to get started"}
-                </p>
-
-                <label className="mt-5 inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white/90 px-5 py-3 text-sm font-extrabold text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white">
-                  <Upload className="h-4 w-4" />
-                  {uploadingAvatar ? "Uploading..." : "Upload profile photo"}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png"
-                    disabled={uploadingAvatar}
-                    onChange={handleCustomerAvatarUpload}
-                    className="sr-only"
-                  />
-                </label>
-
-                {avatarMessage ? (
-                  <p className="mt-3 rounded-full bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-800 ring-1 ring-emerald-100">
-                    {avatarMessage}
-                  </p>
-                ) : null}
-
-                {avatarError ? (
-                  <p className="mt-3 max-w-sm rounded-2xl bg-red-50 px-4 py-3 text-xs font-semibold leading-5 text-red-700 ring-1 ring-red-100">
-                    {avatarError}
-                  </p>
-                ) : null}
+                <div className="mt-5 grid grid-cols-3 gap-2">
+                  <Link
+                    href={routes.pets}
+                    className="rounded-2xl bg-white/10 p-3 text-center ring-1 ring-white/10 transition hover:bg-white/15"
+                  >
+                    <p className="text-xl font-black text-white">{pets.length}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300">
+                      Pets
+                    </p>
+                  </Link>
+                  <Link
+                    href={routes.bookings}
+                    className="rounded-2xl bg-white/10 p-3 text-center ring-1 ring-white/10 transition hover:bg-white/15"
+                  >
+                    <p className="text-xl font-black text-white">
+                      {upcomingBookings.length}
+                    </p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300">
+                      Upcoming
+                    </p>
+                  </Link>
+                  <Link
+                    href={routes.pawPerks}
+                    className="rounded-2xl bg-emerald-300 p-3 text-center shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-200"
+                  >
+                    <p className="text-xl font-black text-slate-950">
+                      {formatMoney(referralProfile?.available_credit ?? 0)}
+                    </p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-950">
+                      PawPerks
+                    </p>
+                  </Link>
+                </div>
               </div>
-            </div>
-
-            <div className="grid gap-4 bg-white px-6 py-6 md:grid-cols-2 lg:grid-cols-6 md:px-8">
-              {[
-                {
-                  label: "Upcoming Booking",
-                  value: nextBookingLabel,
-                  helper: stats.nextBooking ? "View details" : "Book care",
-                  href: stats.nextBooking
-                    ? getBookingDetailHref(stats.nextBooking.id)
-                    : routes.findGuru,
-                  icon: <CalendarDays className="h-5 w-5" />,
-                },
-                {
-                  label: "My Pets",
-                  value: `${stats.pets} ${stats.pets === 1 ? "Pet" : "Pets"}`,
-                  helper: "Manage pets",
-                  href: routes.pets,
-                  icon: <PawPrint className="h-5 w-5" />,
-                },
-                {
-                  label: "Total Bookings",
-                  value: String(stats.total),
-                  helper: "View history",
-                  href: routes.allBookings,
-                  icon: <ShieldCheck className="h-5 w-5" />,
-                },
-                {
-                  label: "PawPerks Referrals",
-                  value: String(referralProfile?.completed_referrals ?? 0),
-                  helper: "Invite friends",
-                  href: routes.pawPerks,
-                  icon: <HeartHandshake className="h-5 w-5" />,
-                },
-                {
-                  label: "SitGuru Credit",
-                  value: formatMoney(referralProfile?.available_credit ?? 0),
-                  helper: "Open PawPerks",
-                  href: routes.pawPerks,
-                  icon: <Star className="h-5 w-5" />,
-                },
-                {
-                  label: "University",
-                  value: `${universityProgress.completedSteps} of ${universityProgress.totalSteps}`,
-                  helper: universityProgress.universityTileHelper,
-                  href: routes.university,
-                  icon: <GraduationCap className="h-5 w-5" />,
-                },
-              ].map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="group rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-lg"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-500">
-                        {item.label}
-                      </p>
-                      <p className="mt-2 truncate text-2xl font-extrabold text-slate-950">
-                        {item.value}
-                      </p>
-                      <p className="mt-3 text-sm font-bold text-emerald-700">
-                        {item.helper} <span aria-hidden="true">→</span>
-                      </p>
-                    </div>
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 transition group-hover:scale-105">
-                      {item.icon}
-                    </div>
-                  </div>
-                </Link>
-              ))}
             </div>
           </section>
 
-          <section className="mt-6 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
-            <div className="grid gap-6 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#fff7ed_100%)] p-6 md:p-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-              <div>
-                <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
-                  PawPerks Rewards
-                </p>
-
-                <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
-                  Share SitGuru and earn rewards.
-                </h2>
-
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-700 md:text-base">
-                  Invite Pet Parents who need trusted care or future Gurus who
-                  love pets. Your referral code is ready to share right from
-                  your dashboard.
-                </p>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                      Referral code
-                    </p>
-                    <p className="mt-2 break-all text-xl font-black text-slate-950">
-                      {referralCode}
-                    </p>
+          <section className="mt-4 grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
+            <article className="overflow-hidden rounded-[2rem] border border-sky-100 bg-white shadow-sm">
+              <div className="grid gap-5 bg-[radial-gradient(circle_at_92%_4%,rgba(125,211,252,0.28),transparent_28%),linear-gradient(135deg,#f0f9ff_0%,#ffffff_52%,#ecfdf5_100%)] p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-center">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-sky-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-sky-800">
+                      Care Pulse
+                    </span>
+                    {isCareLive ? (
+                      <span className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-rose-700 ring-1 ring-rose-100">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" />
+                        Live now
+                      </span>
+                    ) : null}
                   </div>
 
-                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                      Available credit
+                  <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                    {isCareLive
+                      ? "Your pet’s care is happening now"
+                      : stats.nextBooking
+                        ? "Your next care plan is ready"
+                        : latestBooking
+                          ? "Your recent care is easy to revisit"
+                          : "Ready when your pet needs care"}
+                  </h2>
+
+                  {featuredCareBooking ? (
+                    <>
+                      <p className="mt-3 text-base font-bold leading-7 text-slate-700">
+                        {getBookingCareSummary(featuredCareBooking)}
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-2 text-xs font-black">
+                        <span className="rounded-full bg-white px-3 py-2 text-slate-700 ring-1 ring-slate-200">
+                          {formatDate(getBookingDisplayDate(featuredCareBooking))}
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-2 text-slate-700 ring-1 ring-slate-200">
+                          {featuredCareBooking.time_window ||
+                            formatTime(getBookingDisplayDate(featuredCareBooking))}
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-2 text-slate-700 ring-1 ring-slate-200">
+                          {formatStatus(featuredCareBooking.status)}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-slate-600 sm:text-base">
+                      Find a trusted local Guru for walks, drop-ins, overnight
+                      care, and the routines that keep your pet comfortable.
                     </p>
-                    <p className="mt-2 text-2xl font-black text-slate-950">
-                      {formatMoney(referralProfile?.available_credit ?? 0)}
+                  )}
+
+                  {featuredPawReport ? (
+                    <div className="mt-5 grid gap-2 sm:grid-cols-4">
+                      <div className="rounded-2xl bg-white p-3 ring-1 ring-sky-100">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
+                          Updates
+                        </p>
+                        <p className="mt-1 text-lg font-black text-slate-950">
+                          {featuredPawReport.update_count}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-white p-3 ring-1 ring-sky-100">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
+                          Photos
+                        </p>
+                        <p className="mt-1 text-lg font-black text-slate-950">
+                          {featuredPawReport.photo_count}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-white p-3 ring-1 ring-sky-100">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
+                          Walk
+                        </p>
+                        <p className="mt-1 text-lg font-black text-slate-950">
+                          {formatPawReportDistance(
+                            featuredPawReport.active_walk_distance_meters,
+                          )}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-white p-3 ring-1 ring-sky-100">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
+                          Latest
+                        </p>
+                        <p className="mt-1 text-sm font-black text-slate-950">
+                          {formatLiveUpdateTime(
+                            featuredPawReport.latest_update_at,
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    {featuredCareBooking ? (
+                      <>
+                        <Link
+                          href={getBookingPawReportHref(featuredCareBooking.id)}
+                          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-sky-600 px-5 text-sm font-black text-white transition hover:bg-sky-700"
+                        >
+                          {isCareLive ? "Follow Live PawReport" : "View PawReport"}
+                        </Link>
+                        <Link
+                          href={getBookingDetailHref(featuredCareBooking.id)}
+                          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-900 transition hover:bg-slate-50"
+                        >
+                          Booking Details
+                        </Link>
+                        <Link
+                          href={routes.messages}
+                          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-900 transition hover:bg-slate-50"
+                        >
+                          Message Guru
+                        </Link>
+                      </>
+                    ) : (
+                      <Link
+                        href={routes.findGuru}
+                        className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-emerald-600 px-6 text-sm font-black text-white transition hover:bg-emerald-700"
+                      >
+                        Find Care
+                      </Link>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-[1.6rem] border border-white bg-white/90 p-4 shadow-sm ring-1 ring-sky-100">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">
+                      {featuredCareBooking
+                        ? (() => {
+                            const matchedPet = findPetForBooking(
+                              featuredCareBooking,
+                              pets,
+                            );
+                            return matchedPet?.photo_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={matchedPet.photo_url}
+                                alt={matchedPet.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <PawPrint className="h-6 w-6 text-emerald-600" />
+                            );
+                          })()
+                        : <PawPrint className="h-6 w-6 text-emerald-600" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-slate-950">
+                        {featuredCareBooking?.pet_name || "Your pet care hub"}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        {featuredCareBooking?.guru_name
+                          ? `With ${featuredCareBooking.guru_name}`
+                          : "Trusted care, organized simply"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-2xl bg-slate-950 p-4 text-white">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">
+                      Next best action
+                    </p>
+                    <p className="mt-2 text-sm font-bold leading-6 text-slate-100">
+                      {featuredCareBooking
+                        ? getBookingNextStep(featuredCareBooking)
+                        : "Start with Find Care and SitGuru will keep every next step visible here."}
                     </p>
                   </div>
+                </div>
+              </div>
+            </article>
 
-                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-sky-100">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">
-                      Completed referrals
+            <article className="overflow-hidden rounded-[2rem] border border-amber-100 bg-slate-950 shadow-sm">
+              <div className="relative h-full bg-[radial-gradient(circle_at_80%_0%,rgba(251,191,36,0.28),transparent_34%),linear-gradient(150deg,#111827_0%,#14251f_100%)] p-5 sm:p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-300">
+                      PawPerks rewards
                     </p>
-                    <p className="mt-2 text-2xl font-black text-slate-950">
+                    <p className="mt-3 text-5xl font-black tracking-tight text-white">
+                      {formatMoney(referralProfile?.available_credit ?? 0, true)}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-300">
+                      Available SitGuru credit
+                    </p>
+                  </div>
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-300 text-2xl shadow-lg shadow-black/20">
+                    🎁
+                  </div>
+                </div>
+
+                <div className="mt-6 grid grid-cols-2 gap-2">
+                  <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                      Pending
+                    </p>
+                    <p className="mt-1 text-xl font-black text-white">
+                      {formatMoney(referralProfile?.pending_rewards ?? 0, true)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                      Referrals
+                    </p>
+                    <p className="mt-1 text-xl font-black text-white">
                       {referralProfile?.completed_referrals ?? 0}
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-6 flex flex-wrap gap-3">
+                <div className="mt-5 rounded-2xl bg-white/10 p-3 ring-1 ring-white/10">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                    Your code
+                  </p>
+                  <p className="mt-1 break-all text-base font-black text-amber-200">
+                    {referralCode}
+                  </p>
+                </div>
+
+                <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                  <Link
+                    href={routes.pawPerks}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-amber-300 px-4 text-sm font-black text-slate-950 transition hover:bg-amber-200"
+                  >
+                    View Rewards
+                  </Link>
                   <button
                     type="button"
                     onClick={() =>
@@ -3499,289 +3664,460 @@ export default function CustomerDashboardPage() {
                         "Pet Parent referral link",
                       )
                     }
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-lg"
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-white/10 px-4 text-sm font-black text-white ring-1 ring-white/15 transition hover:bg-white/15"
                   >
-                    Copy Pet Parent Invite
+                    Invite Friends
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      copyReferralLink(guruReferralLink, "Guru invite link")
-                    }
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
-                  >
-                    Copy Guru Invite
-                  </button>
-
-                  <Link
-                    href={routes.pawPerks}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800"
-                  >
-                    View PawPerks
-                  </Link>
                 </div>
 
                 {referralMessage ? (
-                  <div className="mt-4 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-emerald-800">
+                  <div className="mt-4 rounded-2xl bg-emerald-400/15 px-4 py-3 text-xs font-bold leading-5 text-emerald-100 ring-1 ring-emerald-300/20">
                     {referralMessage}
                   </div>
                 ) : null}
               </div>
-
-              <div className="rounded-[1.7rem] border border-emerald-100 bg-white/85 p-5 shadow-sm">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-2xl text-white shadow-sm">
-                    🎁
-                  </div>
-
-                  <div>
-                    <p className="text-lg font-black text-slate-950">
-                      Help more pet families find SitGuru.
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Pet Parents get a simple way to find trusted local care,
-                      and new Gurus help expand SitGuru in your community.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3">
-                  {[
-                    "Share your Pet Parent invite with friends and neighbors.",
-                    "Refer future Gurus who love pets and want flexible work.",
-                    "Track rewards and SitGuru credit inside PawPerks.",
-                  ].map((item) => (
-                    <div
-                      key={item}
-                      className="flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100"
-                    >
-                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                      <p className="text-sm font-bold leading-6 text-slate-700">
-                        {item}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            </article>
           </section>
 
-          <section className="mt-6 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
-            <div className="grid gap-6 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_52%,#e0f2fe_100%)] p-6 md:p-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-              <div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
-                    <GraduationCap className="h-7 w-7" />
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
-                      SitGuru University
-                    </p>
-                    <h2 className="mt-1 text-3xl font-black tracking-tight text-slate-950">
-                      Pet Parent Academy
-                    </h2>
-                  </div>
+          <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              {
+                label: "Find Care",
+                helper: "Trusted Gurus",
+                href: routes.findGuru,
+                icon: <PawPrint className="h-5 w-5" />,
+              },
+              {
+                label: "Bookings",
+                helper: `${stats.upcoming} upcoming`,
+                href: routes.bookings,
+                icon: <CalendarDays className="h-5 w-5" />,
+              },
+              {
+                label: "Messages",
+                helper: "Gurus + support",
+                href: routes.messages,
+                icon: <MessageCircle className="h-5 w-5" />,
+              },
+              {
+                label: "My Pets",
+                helper: `${pets.length} profiles`,
+                href: routes.pets,
+                icon: <PawPrint className="h-5 w-5" />,
+              },
+              {
+                label: "PawPerks",
+                helper: formatMoney(referralProfile?.available_credit ?? 0),
+                href: routes.pawPerks,
+                icon: <Star className="h-5 w-5" />,
+              },
+              {
+                label: "My Profile",
+                helper: `${profileCompletion}% ready`,
+                href: routes.profile,
+                icon: <ShieldCheck className="h-5 w-5" />,
+              },
+            ].map((action) => (
+              <Link
+                key={action.label}
+                href={action.href}
+                className="group rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 transition group-hover:bg-emerald-100">
+                  {action.icon}
                 </div>
-
-                <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-700 md:text-base">
-                  Complete your Pet Parent Academy, learn how to use SitGuru
-                  safely, and prepare to earn your Certified Pet Parent badge.
-                  This guided training will walk you through profiles, pets,
-                  messaging, booking, trust and safety, reviews, and next steps.
+                <p className="mt-3 text-sm font-black text-slate-950">
+                  {action.label}
                 </p>
+                <p className="mt-1 text-[11px] font-bold text-slate-500">
+                  {action.helper}
+                </p>
+              </Link>
+            ))}
+          </section>
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                      Progress
-                    </p>
-                    <p className="mt-2 text-2xl font-black text-slate-950">
-                      {universityProgress.completedSteps} of{" "}
-                      {universityProgress.totalSteps}
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">
-                      {universityProgress.progressHelper}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                      Badge
-                    </p>
-                    <p className="mt-2 text-lg font-black text-slate-950">
-                      {universityProgress.badgeStatus}
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">
-                      {universityProgress.isComplete
-                        ? "Academy completed"
-                        : "Awarded after academy completion"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                      Estimated Time
-                    </p>
-                    <p className="mt-2 text-2xl font-black text-slate-950">
-                      9–15 min
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">
-                      Mobile-friendly lessons
-                    </p>
-                  </div>
+          <section className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                    Your pets
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                    The crew behind every care plan
+                  </h2>
                 </div>
-
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <Link
-                    href={routes.university}
-                    className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-lg"
-                  >
-                    <GraduationCap className="h-5 w-5" />
-                    {universityProgress.academyButtonLabel}
-                  </Link>
-
-                  <Link
-                    href={routes.profile}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
-                  >
-                    Review My Profile
-                  </Link>
-
+                <div className="flex gap-2">
                   <Link
                     href={routes.pets}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
+                    className="inline-flex min-h-[42px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-800 transition hover:bg-slate-50"
                   >
-                    Review My Pets
+                    Pet Passports
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => setShowPetForm((value) => !value)}
+                    className="inline-flex min-h-[42px] items-center justify-center rounded-2xl bg-emerald-600 px-4 text-xs font-black text-white transition hover:bg-emerald-700"
+                  >
+                    {showPetForm ? "Close" : "+ Add Pet"}
+                  </button>
                 </div>
               </div>
 
-              <div className="rounded-[1.7rem] border border-emerald-100 bg-white/85 p-5 shadow-sm">
-                <p className="text-sm font-black text-slate-950">
-                  What you will learn
-                </p>
+              {formError ? (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                  {formError}
+                </div>
+              ) : null}
+              {petMediaMessage ? (
+                <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
+                  {petMediaMessage}
+                </div>
+              ) : null}
+              {petMediaError ? (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                  {petMediaError}
+                </div>
+              ) : null}
 
-                <div className="mt-4 grid gap-3">
-                  {[
-                    "Create and complete your Pet Parent profile",
-                    "Add pets with helpful care notes and safety details",
-                    "Find, review, and message trusted local Gurus",
-                    "Book safely through SitGuru and leave reviews",
-                    "Understand trust, safety, support, and certification",
-                  ].map((item) => (
-                    <div
-                      key={item}
-                      className="flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100"
+              {showPetForm ? (
+                <form
+                  onSubmit={handleAddPet}
+                  className="mt-5 grid gap-3 rounded-[1.6rem] bg-slate-50 p-4 ring-1 ring-slate-200 sm:grid-cols-2"
+                >
+                  <input
+                    required
+                    type="text"
+                    placeholder="Pet name"
+                    value={petForm.name}
+                    onChange={(e) =>
+                      setPetForm({ ...petForm, name: e.target.value })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Species"
+                    value={petForm.species}
+                    onChange={(e) =>
+                      setPetForm({ ...petForm, species: e.target.value })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Breed"
+                    value={petForm.breed}
+                    onChange={(e) =>
+                      setPetForm({ ...petForm, breed: e.target.value })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Age"
+                    value={petForm.age}
+                    onChange={(e) =>
+                      setPetForm({ ...petForm, age: e.target.value })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Weight"
+                    value={petForm.weight}
+                    onChange={(e) =>
+                      setPetForm({ ...petForm, weight: e.target.value })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Temperament"
+                    value={petForm.temperament}
+                    onChange={(e) =>
+                      setPetForm({ ...petForm, temperament: e.target.value })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Medications"
+                    value={petForm.medications}
+                    onChange={(e) =>
+                      setPetForm({ ...petForm, medications: e.target.value })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500 sm:col-span-2"
+                  />
+                  <input
+                    type="url"
+                    placeholder="Optional photo URL"
+                    value={petForm.photo_url}
+                    onChange={(e) =>
+                      setPetForm({ ...petForm, photo_url: e.target.value })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="url"
+                    placeholder="Optional video URL"
+                    value={petForm.video_url}
+                    onChange={(e) =>
+                      setPetForm({ ...petForm, video_url: e.target.value })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <textarea
+                    placeholder="Care notes for your Guru"
+                    rows={4}
+                    value={petForm.notes}
+                    onChange={(e) =>
+                      setPetForm({ ...petForm, notes: e.target.value })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500 sm:col-span-2"
+                  />
+                  <button
+                    type="submit"
+                    disabled={savingPet}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-black text-white transition hover:bg-slate-800 disabled:opacity-60 sm:col-span-2"
+                  >
+                    {savingPet ? "Saving pet..." : "Save Pet Profile"}
+                  </button>
+                </form>
+              ) : null}
+
+              {pets.length === 0 ? (
+                <div className="mt-5 rounded-[1.6rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-7 text-center">
+                  <PawPrint className="mx-auto h-9 w-9 text-emerald-600" />
+                  <p className="mt-3 text-lg font-black text-slate-950">
+                    Add your first pet
+                  </p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    Pet Passports help Gurus understand routines, medication,
+                    photos, and comfort needs before care begins.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-5 flex gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:overflow-visible">
+                  {pets.slice(0, 6).map((pet) => (
+                    <article
+                      key={pet.id}
+                      className="min-w-[245px] overflow-hidden rounded-[1.6rem] border border-slate-200 bg-slate-50 lg:min-w-0"
                     >
-                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                      <p className="text-sm font-bold leading-6 text-slate-700">
-                        {item}
-                      </p>
-                    </div>
+                      <div className="relative h-36 bg-emerald-50">
+                        {pet.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={pet.photo_url}
+                            alt={pet.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <PawPrint className="h-10 w-10 text-emerald-500" />
+                          </div>
+                        )}
+                        {pet.medications ? (
+                          <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-[10px] font-black text-rose-700 shadow-sm">
+                            Medication note
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="truncate text-lg font-black text-slate-950">
+                            {pet.name}
+                          </h3>
+                          {pet.video_url ? (
+                            <span className="rounded-full bg-sky-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-sky-700 ring-1 ring-sky-100">
+                              Video
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 truncate text-xs font-bold text-slate-500">
+                          {[pet.breed, pet.age, pet.weight]
+                            .filter(Boolean)
+                            .join(" • ") || "Add profile details"}
+                        </p>
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                          <Link
+                            href={buildPetBookingHref(pet)}
+                            className="inline-flex min-h-[38px] items-center justify-center rounded-xl bg-emerald-600 px-3 text-xs font-black text-white transition hover:bg-emerald-700"
+                          >
+                            Book Care
+                          </Link>
+                          <Link
+                            href={routes.pets}
+                            className="inline-flex min-h-[38px] items-center justify-center rounded-xl bg-white px-3 text-xs font-black text-slate-800 ring-1 ring-slate-200 transition hover:bg-slate-50"
+                          >
+                            Passport
+                          </Link>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <label className="inline-flex cursor-pointer min-h-[36px] items-center justify-center rounded-xl bg-white px-2 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-50">
+                            {uploadingPetMedia?.petId === pet.id &&
+                            uploadingPetMedia.kind === "photo"
+                              ? "Uploading..."
+                              : pet.photo_url
+                                ? "Change Photo"
+                                : "Add Photo"}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png"
+                              disabled={Boolean(uploadingPetMedia)}
+                              onChange={(event) =>
+                                handlePetMediaUpload(event, pet, "photo")
+                              }
+                              className="sr-only"
+                            />
+                          </label>
+                          <label className="inline-flex cursor-pointer min-h-[36px] items-center justify-center rounded-xl bg-white px-2 text-[10px] font-black text-sky-700 ring-1 ring-sky-100 transition hover:bg-sky-50">
+                            {uploadingPetMedia?.petId === pet.id &&
+                            uploadingPetMedia.kind === "video"
+                              ? "Uploading..."
+                              : pet.video_url
+                                ? "Change Video"
+                                : "Add Video"}
+                            <input
+                              type="file"
+                              accept="video/mp4,video/quicktime,video/webm"
+                              disabled={Boolean(uploadingPetMedia)}
+                              onChange={(event) =>
+                                handlePetMediaUpload(event, pet, "video")
+                              }
+                              className="sr-only"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </article>
                   ))}
                 </div>
+              )}
+            </article>
+
+            <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
+                    Your SitGuru updates
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+                    What needs your attention
+                  </h2>
+                </div>
+                <span className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-sky-700 ring-1 ring-sky-100">
+                  Live hub
+                </span>
               </div>
-            </div>
+
+              <div className="mt-5 grid gap-3">
+                {dashboardUpdates.map((update) => {
+                  const toneClasses = {
+                    emerald:
+                      "border-emerald-100 bg-emerald-50 text-emerald-700",
+                    sky: "border-sky-100 bg-sky-50 text-sky-700",
+                    amber: "border-amber-100 bg-amber-50 text-amber-700",
+                    slate: "border-slate-200 bg-slate-50 text-slate-700",
+                  }[update.tone];
+
+                  return (
+                    <Link
+                      key={`${update.label}-${update.detail}`}
+                      href={update.href}
+                      className={`group rounded-[1.35rem] border p-4 transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/80 ring-1 ring-black/5">
+                          <CheckCircle2 className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-black text-slate-950">
+                            {update.label}
+                          </p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                            {update.detail}
+                          </p>
+                        </div>
+                        <span className="text-sm font-black transition group-hover:translate-x-0.5">
+                          →
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <Link
+                  href={routes.messages}
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-2xl bg-slate-950 px-4 text-xs font-black text-white transition hover:bg-slate-800"
+                >
+                  Open Messages
+                </Link>
+                <Link
+                  href={routes.adminMessages}
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-800 transition hover:bg-slate-50"
+                >
+                  Get Support
+                </Link>
+              </div>
+            </article>
           </section>
 
-          <section className="mt-6 overflow-hidden rounded-[2rem] border border-sky-200 bg-white shadow-sm">
-            <div className="grid gap-5 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_48%,#ecfdf5_100%)] p-6 md:p-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+          <section className="mt-4 rounded-[2rem] border border-emerald-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.22em] text-sky-700">
-                  Live Care / PawReport
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                  Upcoming care
                 </p>
-                <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
-                  See your Guru&apos;s updates as care happens.
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                  Your next care plans, clearly organized
                 </h2>
-                <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-slate-700 md:text-base">
-                  When your Guru starts a PawReport or live walk, updates appear
-                  here automatically, including potty updates, food and water,
-                  photos, notes, walk progress, and the final summary.
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Booking details, PawReports, messages, and support stay connected.
                 </p>
               </div>
-
-              <div className="rounded-[1.7rem] border border-sky-100 bg-white p-5 shadow-sm">
-                {liveCareBookings.length === 0 ? (
-                  <div className="text-center">
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-2xl ring-1 ring-sky-100">
-                      🐾
-                    </div>
-                    <p className="mt-3 text-lg font-black text-slate-950">
-                      No live PawReport activity yet
-                    </p>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                      Once a Guru starts care, this card will update while the
-                      visit is active.
-                    </p>
-                    {stats.nextBooking ? (
-                      <Link
-                        href={getBookingPawReportHref(stats.nextBooking.id)}
-                        className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-2xl bg-sky-600 px-5 py-3 text-sm font-black text-white transition hover:bg-sky-700"
-                      >
-                        Open next booking PawReport
-                      </Link>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="grid gap-3">
-                    {liveCareBookings.map((booking) => {
-                      const summary = pawReportMap.get(booking.id);
-
-                      return (
-                        <Link
-                          key={booking.id}
-                          href={getBookingPawReportHref(booking.id)}
-                          className="group rounded-[1.35rem] border border-sky-100 bg-sky-50/70 p-4 transition hover:-translate-y-0.5 hover:bg-sky-50 hover:shadow-lg"
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">
-                                {normalizePawReportStatus(summary?.status)}
-                              </p>
-                              <h3 className="mt-1 text-xl font-black text-slate-950">
-                                {booking.pet_name || "Your pet"}
-                              </h3>
-                              <p className="mt-1 text-sm font-bold text-slate-700">
-                                {getLatestPawReportLabel(summary)}
-                              </p>
-                            </div>
-
-                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-sky-800 ring-1 ring-sky-100">
-                              {formatLiveUpdateTime(summary?.latest_update_at)}
-                            </span>
-                          </div>
-
-                          <div className="mt-3 grid gap-2 sm:grid-cols-4">
-                            <span className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-800 ring-1 ring-sky-100">
-                              {summary?.update_count ?? 0} updates
-                            </span>
-                            <span className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-800 ring-1 ring-sky-100">
-                              {summary?.photo_count ?? 0} photos
-                            </span>
-                            <span className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-800 ring-1 ring-sky-100">
-                              {summary?.potty_count ?? 0} potty
-                            </span>
-                            <span className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-800 ring-1 ring-sky-100">
-                              {summary?.active_walk_status === "in_progress"
-                                ? formatPawReportDistance(
-                                    summary.active_walk_distance_meters,
-                                  )
-                                : "Walk ready"}
-                            </span>
-                          </div>
-
-                          <p className="mt-3 text-sm font-black text-sky-800 group-hover:text-sky-900">
-                            View Live PawReport →
-                          </p>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <Link
+                href={routes.findGuru}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white transition hover:bg-emerald-700"
+              >
+                Book More Care
+              </Link>
             </div>
+
+            {upcomingBookings.length === 0 ? (
+              <div className="mt-5 rounded-[1.7rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-7 text-center">
+                <Sparkles className="mx-auto h-9 w-9 text-emerald-600" />
+                <p className="mt-3 text-lg font-black text-slate-950">
+                  No upcoming bookings yet
+                </p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Your next confirmed care plan will appear here automatically.
+                </p>
+                <Link
+                  href={routes.findGuru}
+                  className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white transition hover:bg-emerald-700"
+                >
+                  Find a Guru
+                </Link>
+              </div>
+            ) : (
+              <div className="mt-5 grid gap-4">
+                {upcomingBookings.slice(0, 3).map((booking, index) => {
+                  const matchedPet = findPetForBooking(booking, pets);
+                  return (
+                    <BookingCard
+                      key={booking.id}
+                      booking={booking}
+                      featured={index === 0}
+                      petPhotoUrl={matchedPet?.photo_url || null}
+                      pawReportSummary={pawReportMap.get(booking.id) || null}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           <NearbyGurusCarousel
@@ -3797,975 +4133,364 @@ export default function CustomerDashboardPage() {
             onCareZipSubmit={handleCareZipSubmit}
           />
 
-          <section className="mt-6 grid gap-6 lg:grid-cols-[0.72fr_1.28fr]">
-            <div className="space-y-6">
-              <div className="overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
-                <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#dff7ef_100%)] p-6">
-                  <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-                    <div>
-                      <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
-                        PawPerks Rewards
-                      </p>
-                      <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-                        Invite friends with PawPerks.
-                      </h3>
-                      <p className="mt-3 text-sm leading-6 text-slate-700">
-                        Invite Pet Parents and Gurus, earn rewards, and help
-                        SitGuru expand trusted pet care in more communities.
-                      </p>
-                    </div>
-
-                    <div className="relative hidden min-h-[180px] lg:block">
-                      <div className="absolute inset-x-6 bottom-0 h-24 rounded-full bg-emerald-100/70 blur-2xl" />
-                      <div className="relative flex items-end justify-center gap-4">
-                        <div className="h-40 w-32 overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-xl">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={PAWPERKS_PREVIEW_DOG_SRC}
-                            alt="Golden retriever for PawPerks preview"
-                            className="h-full w-full object-cover object-center"
-                          />
-                        </div>
-                        <div className="mb-2 h-32 w-28 overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-xl">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={PAWPERKS_PREVIEW_CAT_SRC}
-                            alt="Tabby cat for PawPerks preview"
-                            className="h-full w-full object-cover object-center"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
-                        Referral code
-                      </p>
-                      <p className="mt-2 break-all text-xl font-black text-slate-950">
-                        {referralCode}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
-                        Available credit
-                      </p>
-                      <p className="mt-2 text-2xl font-black text-slate-950">
-                        {formatMoney(referralProfile?.available_credit ?? 0)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-amber-100">
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">
-                        Pending rewards
-                      </p>
-                      <p className="mt-2 text-2xl font-black text-slate-950">
-                        {formatMoney(referralProfile?.pending_rewards ?? 0)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-sky-100">
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-700">
-                        Completed
-                      </p>
-                      <p className="mt-2 text-2xl font-black text-slate-950">
-                        {referralProfile?.completed_referrals ?? 0}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <Link
-                      href={routes.pawPerks}
-                      className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-700"
-                    >
-                      Open PawPerks
-                    </Link>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        copyReferralLink(
-                          customerReferralLink,
-                          "Pet Parent referral link",
-                        )
-                      }
-                      className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
-                    >
-                      Copy Pet Parent Invite
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        copyReferralLink(guruReferralLink, "Guru invite link")
-                      }
-                      className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
-                    >
-                      Copy Guru Invite
-                    </button>
-                  </div>
-
-                  {referralMessage ? (
-                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-emerald-800">
-                      {referralMessage}
-                    </div>
-                  ) : null}
+          <section className="mt-4 grid gap-4 lg:grid-cols-2">
+            <article className="rounded-[2rem] border border-emerald-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                    Profile + safety
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
+                    Your care profile is {profileCompletion}% ready
+                  </h2>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    Keep contact, service location, emergency, and care preferences current.
+                  </p>
+                </div>
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.3rem] bg-emerald-50 text-lg font-black text-emerald-700 ring-1 ring-emerald-100">
+                  {showCustomerProfilePhoto ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={customerAvatarSrc}
+                      alt={`${customerDisplayName} profile photo`}
+                      onError={() => setCustomerPhotoFailed(true)}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    customerInitials
+                  )}
                 </div>
               </div>
 
-              <div
-                id="customer-profile"
-                className="rounded-[2rem] border border-emerald-200 bg-white p-6 shadow-sm"
-              >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-600">
-                      Pet Parent profile
-                    </p>
-                    <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
-                      Your pet family care details
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Keep household notes, emergency contacts, and preferences
-                      ready for your Guru.
-                    </p>
-                  </div>
+              <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-emerald-50 ring-1 ring-emerald-100">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all"
+                  style={{ width: `${profileCompletion}%` }}
+                />
+              </div>
 
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-50 text-xl font-black text-emerald-700 shadow-sm ring-4 ring-emerald-100">
-                    {showCustomerProfilePhoto ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={customerAvatarSrc}
-                        alt={`${customerDisplayName} profile photo`}
-                        onError={() => setCustomerPhotoFailed(true)}
-                        className="h-full w-full object-cover object-center"
-                      />
-                    ) : (
-                      getCustomerInitials(customerProfile)
-                    )}
-                  </div>
+              {profileMessage ? (
+                <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
+                  {profileMessage}
                 </div>
-
-                <div className="mt-5 rounded-[1.5rem] bg-emerald-50 p-4 ring-1 ring-emerald-100">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-black text-slate-950">
-                      Care details
-                    </p>
-                    <p className="text-sm font-black text-emerald-700">
-                      {profileCompletion}%
-                    </p>
-                  </div>
-                  <div className="mt-3 h-3 overflow-hidden rounded-full bg-white ring-1 ring-emerald-100">
-                    <div
-                      className="h-full rounded-full bg-emerald-500 transition-all"
-                      style={{ width: `${profileCompletion}%` }}
-                    />
-                  </div>
+              ) : null}
+              {profileError ? (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                  {profileError}
                 </div>
-
-                {profileMessage ? (
-                  <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
-                    {profileMessage}
-                  </div>
-                ) : null}
-
-                {profileError ? (
-                  <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                    {profileError}
-                  </div>
-                ) : null}
-
-                <div className="mt-5 grid gap-3">
-                  {[
-                    [
-                      "Name",
-                      getDisplayValue(
-                        customerProfile?.full_name ||
-                          customerProfile?.first_name,
-                      ),
-                    ],
-                    ["Email", getDisplayValue(customerProfile?.email)],
-                    ["Phone", getDisplayValue(customerProfile?.phone)],
-                    [
-                      "Service address",
-                      getDisplayValue(customerProfile?.service_address),
-                    ],
-                    [
-                      "Emergency contact",
-                      getDisplayValue(customerProfile?.emergency_contact),
-                    ],
-                    [
-                      "Care preferences",
-                      getDisplayValue(customerProfile?.care_preferences),
-                    ],
-                  ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"
-                    >
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                        {label}
-                      </p>
-                      <p className="mt-1 break-words text-sm font-black leading-6 text-slate-950">
-                        {value}
-                      </p>
-                    </div>
-                  ))}
+              ) : null}
+              {avatarMessage ? (
+                <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
+                  {avatarMessage}
                 </div>
+              ) : null}
+              {avatarError ? (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                  {avatarError}
+                </div>
+              ) : null}
 
-                <div className="mt-5 flex flex-wrap gap-3">
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                {[
+                  ["Phone", getDisplayValue(customerProfile?.phone)],
+                  [
+                    "Service location",
+                    getDisplayValue(customerProfile?.service_address),
+                  ],
+                  [
+                    "Emergency contact",
+                    getDisplayValue(customerProfile?.emergency_contact),
+                  ],
+                  [
+                    "Care preferences",
+                    getDisplayValue(customerProfile?.care_preferences),
+                  ],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200"
+                  >
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                      {label}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-slate-800">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileError("");
+                    setProfileMessage("");
+                    setProfileForm(customerProfileToForm(customerProfile));
+                    setShowProfileForm((value) => !value);
+                  }}
+                  className="inline-flex min-h-[42px] items-center justify-center rounded-2xl bg-emerald-600 px-4 text-xs font-black text-white transition hover:bg-emerald-700"
+                >
+                  {showProfileForm ? "Close Form" : "Edit Profile"}
+                </button>
+                <label className="inline-flex min-h-[42px] cursor-pointer items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-xs font-black text-emerald-800 transition hover:bg-emerald-100">
+                  {uploadingAvatar ? "Uploading..." : "Update Photo"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    disabled={uploadingAvatar}
+                    onChange={handleCustomerAvatarUpload}
+                    className="sr-only"
+                  />
+                </label>
+                <Link
+                  href={routes.accountSecurity}
+                  className="inline-flex min-h-[42px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-800 transition hover:bg-slate-50"
+                >
+                  Account Security
+                </Link>
+              </div>
+
+              {showProfileForm ? (
+                <form
+                  onSubmit={handleSaveProfile}
+                  className="mt-5 grid gap-3 rounded-[1.6rem] bg-slate-50 p-4 ring-1 ring-slate-200"
+                >
+                  <input
+                    type="text"
+                    placeholder="Full name"
+                    value={profileForm.full_name}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        full_name: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Phone number"
+                    value={profileForm.phone}
+                    onChange={(e) =>
+                      setProfileForm({ ...profileForm, phone: e.target.value })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Home or service address"
+                    value={profileForm.service_address}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        service_address: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Emergency contact"
+                    value={profileForm.emergency_contact}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        emergency_contact: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
+                  <textarea
+                    placeholder="Care preferences, access notes, or communication preferences"
+                    rows={4}
+                    value={profileForm.care_preferences}
+                    onChange={(e) =>
+                      setProfileForm({
+                        ...profileForm,
+                        care_preferences: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
+                  />
                   <button
-                    type="button"
-                    onClick={() => {
-                      setProfileError("");
-                      setProfileMessage("");
-                      setProfileForm(customerProfileToForm(customerProfile));
-                      setShowProfileForm((value) => !value);
-                    }}
-                    className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
+                    type="submit"
+                    disabled={savingProfile}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-black text-white transition hover:bg-slate-800 disabled:opacity-60"
                   >
-                    {showProfileForm ? "Close profile form" : "Edit Profile"}
+                    {savingProfile ? "Saving profile..." : "Save Pet Parent Profile"}
                   </button>
+                </form>
+              ) : null}
+            </article>
 
-                  <label className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100">
-                    {uploadingAvatar ? "Uploading..." : "Upload Photo"}
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png"
-                      disabled={uploadingAvatar}
-                      onChange={handleCustomerAvatarUpload}
-                      className="sr-only"
-                    />
-                  </label>
-
-                  <Link
-                    href={routes.accountSecurity}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
-                  >
-                    <LockKeyhole className="h-4 w-4" />
-                    Account Security
-                  </Link>
-
-                  <Link
-                    href={routes.adminMessages}
-                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-                  >
-                    Ask Admin for help
-                  </Link>
+            <article className="overflow-hidden rounded-[2rem] border border-sky-100 bg-white shadow-sm">
+              <div className="h-full bg-[radial-gradient(circle_at_90%_0%,rgba(56,189,248,0.24),transparent_28%),linear-gradient(135deg,#eff6ff_0%,#ffffff_55%,#ecfdf5_100%)] p-5 sm:p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-lg">
+                    <GraduationCap className="h-7 w-7" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
+                      Pet Parent Academy
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                      Confidence for every booking
+                    </h2>
+                  </div>
                 </div>
 
-                {showProfileForm ? (
-                  <form
-                    onSubmit={handleSaveProfile}
-                    className="mt-5 grid gap-3"
-                  >
-                    <input
-                      type="text"
-                      placeholder="Full name"
-                      value={profileForm.full_name}
-                      onChange={(e) =>
-                        setProfileForm({
-                          ...profileForm,
-                          full_name: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                    />
-
-                    <input
-                      type="tel"
-                      placeholder="Phone number"
-                      value={profileForm.phone}
-                      onChange={(e) =>
-                        setProfileForm({
-                          ...profileForm,
-                          phone: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="Home or service address"
-                      value={profileForm.service_address}
-                      onChange={(e) =>
-                        setProfileForm({
-                          ...profileForm,
-                          service_address: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="Emergency contact"
-                      value={profileForm.emergency_contact}
-                      onChange={(e) =>
-                        setProfileForm({
-                          ...profileForm,
-                          emergency_contact: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                    />
-
-                    <textarea
-                      placeholder="Care preferences, home access notes, or communication preferences"
-                      rows={4}
-                      value={profileForm.care_preferences}
-                      onChange={(e) =>
-                        setProfileForm({
-                          ...profileForm,
-                          care_preferences: e.target.value,
-                        })
-                      }
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                    />
-
-                    <button
-                      type="submit"
-                      disabled={savingProfile}
-                      className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:opacity-60"
-                    >
-                      {savingProfile
-                        ? "Saving profile..."
-                        : "Save Pet Parent profile"}
-                    </button>
-                  </form>
-                ) : null}
-              </div>
-
-              <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Communication center
+                <p className="mt-4 text-sm font-semibold leading-7 text-slate-600">
+                  Learn profiles, messaging, safe booking, support, reviews,
+                  PawReports, and how SitGuru protects the care experience.
                 </p>
 
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
-                  Clear next steps for you and your pets
-                </h2>
+                <div className="mt-5 rounded-[1.4rem] bg-white p-4 shadow-sm ring-1 ring-sky-100">
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
+                        Progress
+                      </p>
+                      <p className="mt-1 text-3xl font-black text-slate-950">
+                        {universityProgress.progressPercent}%
+                      </p>
+                    </div>
+                    <p className="text-right text-xs font-bold text-slate-500">
+                      {universityProgress.completedSteps} of {universityProgress.totalSteps} steps
+                    </p>
+                  </div>
+                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-sky-50">
+                    <div
+                      className="h-full rounded-full bg-sky-500"
+                      style={{ width: `${universityProgress.progressPercent}%` }}
+                    />
+                  </div>
+                </div>
 
-                <div className="mt-5 grid gap-3">
+                <div className="mt-5 grid grid-cols-2 gap-2">
                   <Link
-                    href={routes.messages}
-                    className="rounded-2xl bg-emerald-500 px-5 py-4 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
+                    href={routes.university}
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-slate-950 px-4 text-xs font-black text-white transition hover:bg-slate-800"
                   >
-                    Open messages
+                    {universityProgress.academyButtonLabel}
                   </Link>
-
-                  <Link
-                    href={routes.pets}
-                    className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
-                  >
-                    Manage Pet Care Passports
-                  </Link>
-
                   <Link
                     href={routes.adminMessages}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-800 transition hover:bg-slate-50"
                   >
-                    Message Admin support
-                  </Link>
-
-                  <Link
-                    href={routes.findGuru}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-                  >
-                    Find a Guru for your pets
+                    Ask Support
                   </Link>
                 </div>
               </div>
+            </article>
+          </section>
+
+          <section className="mt-4 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                  Recent activity
+                </p>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                  Your care history
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Review bookings, payment status, tips, and the next action.
+                </p>
+              </div>
+              <Link
+                href={routes.bookings}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
+              >
+                All Bookings
+              </Link>
             </div>
 
-            <div className="space-y-6">
-              <section
-                id="upcoming-care"
-                className="rounded-[2rem] border border-emerald-200 bg-white p-6 shadow-sm"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-600">
-                      Upcoming care
-                    </p>
-                    <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-900">
-                      Your next booking, clearly organized
-                    </h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                      View details, message your Guru, rebook, or get help
-                      without being sent back to search.
-                    </p>
-                  </div>
-
-                  <Link
-                    href={routes.findGuru}
-                    className="inline-flex items-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
-                  >
-                    Book more care
-                  </Link>
-                </div>
-
-                <div className="mt-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <p className="text-sm font-black text-slate-950">
-                        A calmer Pet Parent experience, built for trust
-                      </p>
-                      <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-                        Plans can change. If timing, notes, or details need an
-                        adjustment, message your Guru or support first and we’ll
-                        help keep your care on track.
-                      </p>
-
-                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                        <div className="rounded-2xl border border-emerald-200 bg-white px-3 py-2">
-                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">
-                            Confidence
-                          </p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-                            Care details stay organized.
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-emerald-200 bg-white px-3 py-2">
-                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">
-                            Support
-                          </p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-                            Message before canceling.
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-emerald-200 bg-white px-3 py-2">
-                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">
-                            Updates
-                          </p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-                            Review every next step.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
+            {bookings.length === 0 ? (
+              <div className="mt-5 rounded-[1.6rem] border border-dashed border-slate-300 bg-slate-50 p-7 text-center">
+                <p className="text-lg font-black text-slate-950">No bookings yet</p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Your care activity will appear here after your first request.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {recentBookings.slice(0, 6).map((booking) => {
+                  const matchedPet = findPetForBooking(booking, pets);
+                  return (
                     <Link
-                      href={routes.adminMessages}
-                      className="inline-flex min-h-[42px] shrink-0 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
+                      key={booking.id}
+                      href={getBookingDetailHref(booking.id)}
+                      className="group rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-lg"
                     >
-                      Need help first?
-                    </Link>
-                  </div>
-                </div>
-
-                {upcomingBookings.length === 0 ? (
-                  <div className="mt-6 rounded-[1.75rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-8 text-center">
-                    <Sparkles className="mx-auto h-10 w-10 text-emerald-600" />
-                    <p className="mt-4 text-lg font-black text-slate-900">
-                      No upcoming bookings yet
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Find a trusted Guru and book care when your pet needs
-                      support.
-                    </p>
-                    <Link
-                      href={routes.findGuru}
-                      className="mt-5 inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
-                    >
-                      Find a Guru
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="mt-6 grid gap-4">
-                    {upcomingBookings.slice(0, 3).map((booking, index) => {
-                      const matchedPet = findPetForBooking(booking, pets);
-
-                      return (
-                        <BookingCard
-                          key={booking.id}
-                          booking={booking}
-                          featured={index === 0}
-                          petPhotoUrl={matchedPet?.photo_url || null}
-                          pawReportSummary={
-                            pawReportMap.get(booking.id) || null
-                          }
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-
-              <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-                      My pets
-                    </p>
-                    <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">
-                      Pet profiles your Gurus can understand
-                    </h2>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      href={routes.pets}
-                      className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
-                    >
-                      Full Passport
-                    </Link>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowPetForm((value) => !value)}
-                      className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
-                    >
-                      {showPetForm ? "Close pet form" : "Add a pet"}
-                    </button>
-                  </div>
-                </div>
-
-                {formError ? (
-                  <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                    {formError}
-                  </div>
-                ) : null}
-
-                {petMediaMessage ? (
-                  <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
-                    {petMediaMessage}
-                  </div>
-                ) : null}
-
-                {petMediaError ? (
-                  <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                    {petMediaError}
-                  </div>
-                ) : null}
-
-                {showPetForm ? (
-                  <form onSubmit={handleAddPet} className="mt-5 grid gap-3">
-                    <input
-                      required
-                      type="text"
-                      placeholder="Pet name"
-                      value={petForm.name}
-                      onChange={(e) =>
-                        setPetForm({ ...petForm, name: e.target.value })
-                      }
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                    />
-
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <input
-                        type="text"
-                        placeholder="Species"
-                        value={petForm.species}
-                        onChange={(e) =>
-                          setPetForm({ ...petForm, species: e.target.value })
-                        }
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                      />
-
-                      <input
-                        type="text"
-                        placeholder="Breed"
-                        value={petForm.breed}
-                        onChange={(e) =>
-                          setPetForm({ ...petForm, breed: e.target.value })
-                        }
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                      />
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <input
-                        type="text"
-                        placeholder="Age"
-                        value={petForm.age}
-                        onChange={(e) =>
-                          setPetForm({ ...petForm, age: e.target.value })
-                        }
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                      />
-
-                      <input
-                        type="text"
-                        placeholder="Weight"
-                        value={petForm.weight}
-                        onChange={(e) =>
-                          setPetForm({ ...petForm, weight: e.target.value })
-                        }
-                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                      />
-                    </div>
-
-                    <input
-                      type="text"
-                      placeholder="Temperament"
-                      value={petForm.temperament}
-                      onChange={(e) =>
-                        setPetForm({ ...petForm, temperament: e.target.value })
-                      }
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="Medications"
-                      value={petForm.medications}
-                      onChange={(e) =>
-                        setPetForm({ ...petForm, medications: e.target.value })
-                      }
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                    />
-
-                    <input
-                      type="url"
-                      placeholder="Optional photo URL, or upload after saving"
-                      value={petForm.photo_url}
-                      onChange={(e) =>
-                        setPetForm({ ...petForm, photo_url: e.target.value })
-                      }
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                    />
-
-                    <input
-                      type="url"
-                      placeholder="Optional video URL, or upload after saving"
-                      value={petForm.video_url}
-                      onChange={(e) =>
-                        setPetForm({ ...petForm, video_url: e.target.value })
-                      }
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                    />
-
-                    <textarea
-                      placeholder="Care notes for your Guru"
-                      rows={4}
-                      value={petForm.notes}
-                      onChange={(e) =>
-                        setPetForm({ ...petForm, notes: e.target.value })
-                      }
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
-                    />
-
-                    <button
-                      type="submit"
-                      disabled={savingPet}
-                      className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:opacity-60"
-                    >
-                      {savingPet ? "Saving pet..." : "Save pet profile"}
-                    </button>
-                  </form>
-                ) : null}
-
-                {pets.length === 0 ? (
-                  <div className="mt-5 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-5">
-                    <p className="text-sm font-semibold text-slate-900">
-                      Add your first pet when ready.
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Pet profiles help Gurus understand routines, care notes,
-                      photos, and preferences before a booking.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-5 grid gap-4">
-                    {pets.slice(0, 3).map((pet) => (
-                      <div
-                        key={pet.id}
-                        className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4"
-                      >
-                        <div className="flex flex-col gap-4 sm:flex-row">
-                          <div className="flex shrink-0 flex-col items-center gap-2">
-                            <div className="h-24 w-24 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
-                              {pet.photo_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={pet.photo_url}
-                                  alt={pet.name}
-                                  className="h-full w-full object-cover object-center"
-                                />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center text-2xl">
-                                  🐾
-                                </div>
-                              )}
-                            </div>
-
-                            {pet.video_url ? (
-                              <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-100">
-                                Video ready
-                              </span>
-                            ) : null}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-lg font-black text-slate-900">
-                                {pet.name}
-                              </h3>
-
-                              {pet.species ? (
-                                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                                  {pet.species}
-                                </span>
-                              ) : null}
-                            </div>
-
-                            <p className="mt-1 text-sm text-slate-600">
-                              {[pet.breed, pet.age, pet.weight]
-                                .filter(Boolean)
-                                .join(" • ") ||
-                                "Profile details can be added anytime."}
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
+                          {matchedPet?.photo_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={matchedPet.photo_url}
+                              alt={matchedPet.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <PawPrint className="h-6 w-6 text-emerald-600" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-black text-slate-950">
+                              {booking.pet_name || "Pet Care"} • {booking.service_type || "Booking"}
                             </p>
-
-                            {pet.notes ? (
-                              <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-700">
-                                {pet.notes}
-                              </p>
-                            ) : null}
-
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              <Link
-                                href={buildPetBookingHref(pet)}
-                                className="inline-flex items-center rounded-xl bg-emerald-500 px-3.5 py-2 text-xs font-bold text-slate-950 transition hover:bg-emerald-400"
-                              >
-                                Book care
-                              </Link>
-
-                              <Link
-                                href={routes.pets}
-                                className="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100"
-                              >
-                                Edit Passport
-                              </Link>
-
-                              <label className="inline-flex cursor-pointer items-center rounded-xl border border-emerald-200 bg-white px-3.5 py-2 text-xs font-bold text-emerald-800 transition hover:bg-emerald-50">
-                                {uploadingPetMedia?.petId === pet.id &&
-                                uploadingPetMedia.kind === "photo"
-                                  ? "Uploading photo..."
-                                  : pet.photo_url
-                                    ? "Change Photo"
-                                    : "Upload Photo"}
-                                <input
-                                  type="file"
-                                  accept="image/jpeg,image/png"
-                                  disabled={Boolean(uploadingPetMedia)}
-                                  onChange={(event) =>
-                                    handlePetMediaUpload(event, pet, "photo")
-                                  }
-                                  className="sr-only"
-                                />
-                              </label>
-
-                              <label className="inline-flex cursor-pointer items-center rounded-xl border border-sky-200 bg-white px-3.5 py-2 text-xs font-bold text-sky-800 transition hover:bg-sky-50">
-                                {uploadingPetMedia?.petId === pet.id &&
-                                uploadingPetMedia.kind === "video"
-                                  ? "Uploading video..."
-                                  : pet.video_url
-                                    ? "Change Video"
-                                    : "Upload Video"}
-                                <input
-                                  type="file"
-                                  accept="video/mp4,video/quicktime,video/webm"
-                                  disabled={Boolean(uploadingPetMedia)}
-                                  onChange={(event) =>
-                                    handlePetMediaUpload(event, pet, "video")
-                                  }
-                                  className="sr-only"
-                                />
-                              </label>
-
-                              <Link
-                                href={buildPetMessageHref(pet)}
-                                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
-                              >
-                                Message Guru
-                              </Link>
-
-                              <Link
-                                href={buildPetAdminHref(pet)}
-                                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
-                              >
-                                Message Admin
-                              </Link>
-                            </div>
+                            <span className={`rounded-full px-2.5 py-1 text-[9px] font-black ${getStatusClasses(booking.status)}`}>
+                              {formatStatus(booking.status)}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs font-bold text-slate-500">
+                            {formatDate(getBookingDisplayDate(booking))}
+                          </p>
+                          <div className="mt-3 flex items-center justify-between gap-3">
+                            <span className="text-xs font-black text-emerald-700">
+                              {formatStatus(booking.payment_status)}
+                            </span>
+                            <span className="text-sm font-black text-slate-950">
+                              {formatMoney(
+                                booking.total_customer_paid || booking.subtotal_amount,
+                                true,
+                              )}
+                            </span>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              <section
-                id="recent-bookings"
-                className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-                      Recent bookings
-                    </p>
-                    <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-900">
-                      Your pet care activity
-                    </h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                      A cleaner timeline of requests, checkout, tips, payments,
-                      and care history. Use the full Bookings page for the Trust
-                      & Care overview.
-                    </p>
-                  </div>
-
-                  <Link
-                    href={routes.bookings}
-                    className="inline-flex items-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
-                  >
-                    Open Bookings Overview
-                  </Link>
-                </div>
-
-                {bookings.length === 0 ? (
-                  <div className="mt-6 rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                    <p className="text-lg font-bold text-slate-900">
-                      No bookings yet
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Start exploring trusted pet care options and request your
-                      first booking with a Guru who feels right for your pet.
-                    </p>
-
-                    <Link
-                      href={routes.findGuru}
-                      className="mt-5 inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
-                    >
-                      Find a Guru
                     </Link>
-                  </div>
-                ) : (
-                  <div className="mt-6 grid gap-4">
-                    {recentBookings.slice(0, 5).map((booking) => {
-                      const matchedPet = findPetForBooking(booking, pets);
-                      const location = getBookingLocation(booking);
-
-                      return (
-                        <div
-                          key={booking.id}
-                          className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5"
-                        >
-                          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-start gap-3">
-                                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[1.1rem] bg-white shadow-sm ring-1 ring-slate-200">
-                                  {matchedPet?.photo_url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                      src={matchedPet.photo_url}
-                                      alt={booking.pet_name || matchedPet.name}
-                                      className="h-full w-full object-cover object-center"
-                                    />
-                                  ) : (
-                                    <PawPrint className="h-6 w-6 text-emerald-600" />
-                                  )}
-                                </div>
-
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-base font-black text-slate-900">
-                                      {booking.pet_name || "Pet Care"} •{" "}
-                                      {booking.service_type || "Booking"}
-                                    </p>
-                                    <span
-                                      className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-[11px] font-bold ${getStatusClasses(
-                                        booking.status,
-                                      )}`}
-                                    >
-                                      {formatStatus(booking.status)}
-                                    </span>
-                                  </div>
-
-                                  <p className="mt-1 text-sm font-medium text-slate-500">
-                                    {formatDate(getBookingDisplayDate(booking))}
-                                    {location ? ` • ${location}` : ""}
-                                  </p>
-                                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                                    {getBookingNextStep(booking)}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                                <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
-                                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                                    Payment
-                                  </p>
-                                  <p className="mt-1 text-sm font-black text-slate-950">
-                                    {formatStatus(booking.payment_status)}
-                                  </p>
-                                </div>
-                                <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
-                                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                                    Tip
-                                  </p>
-                                  <p className="mt-1 text-sm font-black text-emerald-700">
-                                    {formatMoney(booking.tip_amount, true)}
-                                  </p>
-                                </div>
-                                <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
-                                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                                    Total
-                                  </p>
-                                  <p className="mt-1 text-sm font-black text-slate-950">
-                                    {formatMoney(
-                                      booking.total_customer_paid ||
-                                        booking.subtotal_amount,
-                                      true,
-                                    )}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                <Link
-                                  href={getBookingDetailHref(booking.id)}
-                                  className="inline-flex items-center rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-black text-white transition hover:bg-emerald-700"
-                                >
-                                  View Details
-                                </Link>
-
-                                <Link
-                                  href={routes.messages}
-                                  className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
-                                >
-                                  Open messages
-                                </Link>
-
-                                <Link
-                                  href={routes.adminMessages}
-                                  className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
-                                >
-                                  Get support
-                                </Link>
-
-                                <Link
-                                  href={routes.bookings}
-                                  className="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
-                                >
-                                  All bookings
-                                </Link>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         </div>
+
+        <nav className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-5 rounded-[1.5rem] border border-slate-200 bg-white/95 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.2)] backdrop-blur md:hidden">
+          {[
+            { label: "Home", href: routes.dashboard, icon: <PawPrint className="h-5 w-5" /> },
+            { label: "Find", href: routes.findGuru, icon: <Sparkles className="h-5 w-5" /> },
+            { label: "Care", href: routes.bookings, icon: <CalendarDays className="h-5 w-5" /> },
+            { label: "Messages", href: routes.messages, icon: <MessageCircle className="h-5 w-5" /> },
+            { label: "Profile", href: routes.profile, icon: <ShieldCheck className="h-5 w-5" /> },
+          ].map((item, index) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl text-[10px] font-black ${
+                index === 0
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "text-slate-500"
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </Link>
+          ))}
+        </nav>
       </main>
     </>
   );
