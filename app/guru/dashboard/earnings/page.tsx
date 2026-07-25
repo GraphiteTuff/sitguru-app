@@ -171,41 +171,37 @@ async function getSharedApiOrigin() {
   const isLocalHost =
     hostname === "localhost" || hostname === "127.0.0.1";
 
-  // Local Next.js development runs over plain HTTP. Always keep local API
-  // requests on the incoming local origin so localhost is never converted to
-  // HTTPS by a production environment variable.
+  // Local Next.js development runs over plain HTTP. Always prefer the
+  // incoming localhost origin before production environment variables so a
+  // value such as NEXT_PUBLIC_SITE_URL=localhost:3000 cannot be converted to
+  // https://localhost:3000 and trigger ERR_SSL_PACKET_LENGTH_TOO_LONG.
   if (host && isLocalHost) {
     return `http://${host}`;
-  }
-
-  // In production, prefer the trusted domain that actually received the
-  // request. This prevents same-app API calls from being routed through a
-  // protected Vercel deployment URL that can return an HTML login/protection
-  // page instead of the JSON response expected by this server component.
-  const isTrustedSitGuruHost =
-    hostname === "sitguru.com" ||
-    hostname === "www.sitguru.com" ||
-    hostname.endsWith(".sitguru.com");
-
-  if (host && isTrustedSitGuruHost) {
-    const forwardedProto = requestHeaders
-      .get("x-forwarded-proto")
-      ?.split(",")[0]
-      ?.trim();
-    const protocol = forwardedProto === "http" ? "http" : "https";
-
-    return `${protocol}://${host}`;
   }
 
   const configuredOrigin =
     normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
     normalizeBaseUrl(process.env.SITE_URL) ||
-    normalizeBaseUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL) ||
     normalizeBaseUrl(process.env.VERCEL_URL);
 
   if (configuredOrigin) return configuredOrigin;
 
-  return "https://www.sitguru.com";
+  const allowedHost =
+    hostname === "sitguru.com" ||
+    hostname === "www.sitguru.com" ||
+    hostname.endsWith(".sitguru.com");
+
+  if (!host || !allowedHost) {
+    return "https://www.sitguru.com";
+  }
+
+  const forwardedProto = requestHeaders
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim();
+  const protocol = forwardedProto || "https";
+
+  return `${protocol}://${host}`;
 }
 
 async function callGuruPayoutSetupApi({
@@ -669,6 +665,23 @@ function formatTime(value?: string | null) {
   });
 }
 
+function formatStatusCheckedAt(value?: string | null) {
+  if (!value) return "Not checked yet";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Not checked yet";
+
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
 function startOfCurrentMonth() {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1111,6 +1124,9 @@ function PaymentSetupCard({
   const paypalConfigured = paypalOnboarding?.configured !== false;
   const paypalRefreshAvailable =
     paypalOnboarding?.statusRefreshAvailable !== false;
+  const paypalLastCheckedAt = formatStatusCheckedAt(
+    paypalAccount?.lastSyncedAt,
+  );
 
   const paypalMethod = GURU_EARNINGS_METHODS.find(
     (method) => method.id === "paypal_merchant",
@@ -1270,13 +1286,44 @@ function PaymentSetupCard({
                   !paypalRefreshAvailable ||
                   !paypalStarted
                 }
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black !text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-black !text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw className="h-4 w-4" />
                 Check status
               </button>
             </form>
           </div>
+
+          {paypalStarted ? (
+            <div
+              role="status"
+              className={`mt-3 flex items-start gap-3 rounded-2xl border px-4 py-3 ${
+                paypalReady
+                  ? "border-green-200 bg-green-50"
+                  : "border-amber-200 bg-amber-50"
+              }`}
+            >
+              {paypalReady ? (
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 !text-green-700" />
+              ) : (
+                <Clock3 className="mt-0.5 h-5 w-5 shrink-0 !text-amber-700" />
+              )}
+              <div>
+                <p
+                  className={`text-sm font-black ${
+                    paypalReady ? "!text-green-900" : "!text-amber-900"
+                  }`}
+                >
+                  {paypalReady
+                    ? "PayPal status verified"
+                    : "PayPal setup is still being reviewed"}
+                </p>
+                <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
+                  Last checked: {paypalLastCheckedAt}
+                </p>
+              </div>
+            </div>
+          ) : null}
         </article>
 
         <article
@@ -1878,5 +1925,5 @@ export default async function GuruDashboardEarningsPage({
         </details>
       </div>
     </main>
-  );
+ );
 }
