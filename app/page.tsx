@@ -12,6 +12,25 @@ const heroVideoPaths = [
   "/videos/sitguru-homepage-hero-2.mp4",
   "/videos/sitguru-homepage-hero-3-ambassadors.mp4",
 ] as const;
+
+const heroVideoCaptions = [
+  {
+    eyebrow: "Dog Walking",
+    desktop: "Happy walks. Trusted local care.",
+    mobile: "Happy walks. Trusted care.",
+  },
+  {
+    eyebrow: "Drop-In Visits",
+    desktop: "Care and updates while you’re away.",
+    mobile: "Care while you’re away.",
+  },
+  {
+    eyebrow: "Join the Pet Community",
+    desktop: "Help pets. Spread the word. Grow your community.",
+    mobile: "Help pets. Grow your community.",
+  },
+] as const;
+
 const heroVideoPosterPath = "/images/sitguru-homepage-hero-poster.jpg";
 const heroVideoPlaybackRate = 0.8;
 const heroVideoTransitionMs = 420;
@@ -1516,6 +1535,7 @@ function HeroVisual() {
   const [isVideoTransitioning, setIsVideoTransitioning] = useState(false);
 
   const activeVideoPath = heroVideoPaths[activeVideoIndex];
+  const activeVideoCaption = heroVideoCaptions[activeVideoIndex];
 
   useEffect(() => {
     const video = videoRef.current;
@@ -1651,6 +1671,62 @@ function HeroVisual() {
       <div className="absolute inset-y-0 right-0 w-[24%] bg-gradient-to-l from-black/8 via-black/0 to-transparent lg:w-[34%] lg:from-black/16" />
       <div className="absolute inset-x-0 top-0 h-[14%] bg-gradient-to-b from-black/14 to-transparent lg:h-[16%] lg:from-black/22" />
       <div className="absolute inset-x-0 bottom-0 h-[28%] bg-gradient-to-t from-black/28 via-black/6 to-transparent lg:h-[38%] lg:from-black/44 lg:via-black/10" />
+
+      <style>{`
+        @keyframes sitguruHeroCaptionFade {
+          0%,
+          8% {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+
+          17%,
+          72% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+
+          88%,
+          100% {
+            opacity: 0;
+            transform: translateY(5px);
+          }
+        }
+
+        .sitguru-hero-caption {
+          animation: sitguruHeroCaptionFade 7.2s ease-in-out both;
+          will-change: opacity, transform;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .sitguru-hero-caption {
+            animation: none;
+            opacity: 1;
+            transform: none;
+          }
+        }
+      `}</style>
+
+      <div
+        key={`hero-caption-${activeVideoPath}`}
+        className="sitguru-hero-caption pointer-events-none absolute left-1/2 top-4 z-20 w-[calc(100%-2rem)] max-w-[300px] -translate-x-1/2 sm:top-5 sm:max-w-[340px] lg:bottom-6 lg:left-auto lg:right-[390px] lg:top-auto lg:w-auto lg:max-w-[330px] lg:translate-x-0 xl:right-[415px]"
+        style={{
+          animationPlayState: isVideoPaused ? "paused" : "running",
+        }}
+        aria-live="polite"
+      >
+        <div className="rounded-2xl border border-white/20 bg-black/35 px-4 py-2.5 text-center text-white shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-md sm:px-5 sm:py-3 lg:text-left">
+          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300 sm:text-[10px]">
+            {activeVideoCaption.eyebrow}
+          </p>
+          <p className="mt-1 text-xs font-extrabold leading-4 text-white sm:text-sm sm:leading-5">
+            <span className="sm:hidden">{activeVideoCaption.mobile}</span>
+            <span className="hidden sm:inline">
+              {activeVideoCaption.desktop}
+            </span>
+          </p>
+        </div>
+      </div>
 
       <button
         type="button"
@@ -2482,9 +2558,8 @@ export default function HomePage() {
                         "0 3px 22px rgba(0,0,0,0.72), 0 1px 3px rgba(0,0,0,0.9)",
                     }}
                   >
-                    Trusted pet care.
+                    Looking for
                     <br />
-                    Made{" "}
                     <span
                       style={{
                         color: "#10b981",
@@ -2493,25 +2568,14 @@ export default function HomePage() {
                           "0 3px 22px rgba(0,0,0,0.62), 0 1px 3px rgba(0,0,0,0.85)",
                       }}
                     >
-                      simple.
+                      trusted pet care?
                     </span>
                   </h1>
 
-                  <div className="mt-3 max-w-xl lg:max-w-[610px]">
-                    <p className="text-sm font-bold uppercase tracking-[0.14em] text-emerald-300 drop-shadow-sm sm:text-[0.8rem]">
-                      Trusted local pet care marketplace
-                    </p>
-
-                    <p className="mt-2 text-sm font-semibold leading-6 text-white/95 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
-                      SitGuru connects Pet Parents with trusted independent
-                      local Gurus for walks, sitting, boarding, training, and
-                      more.
-                    </p>
-
-                    <p className="mt-3 text-sm font-semibold leading-6 text-white/95 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
-                      Create an account in minutes, explore trusted profiles,
-                      keep booking details organized, and book local care with
-                      confidence.
+                  <div className="mt-4 max-w-xl lg:max-w-[610px]">
+                    <p className="text-sm font-semibold leading-6 text-white/95 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] sm:text-lg sm:leading-8 lg:text-[1.05rem] xl:text-lg">
+                      For busy days, last-minute plans, or time away—find a
+                      local Pet Guru for walks, drop-ins, sitting, and more.
                     </p>
                   </div>
                 </div>
@@ -2574,7 +2638,7 @@ export default function HomePage() {
                       type="submit"
                       className="h-12 w-full rounded-xl bg-emerald-700 px-7 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 md:w-auto"
                     >
-                      Search Gurus
+                      Find Care Near Me
                     </button>
                   </div>
                 </div>
