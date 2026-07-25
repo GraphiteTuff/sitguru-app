@@ -2534,12 +2534,12 @@ export default function HomePage() {
                     <style>{`
                       @keyframes sitguruHeroCaptionFade {
                         0%,
-                        6% {
+                        5% {
                           opacity: 0;
                           transform: translateY(7px);
                         }
 
-                        14%,
+                        13%,
                         82% {
                           opacity: 1;
                           transform: translateY(0);
@@ -2552,13 +2552,33 @@ export default function HomePage() {
                         }
                       }
 
+                      @keyframes sitguruHeroCaptionHold {
+                        0%,
+                        5% {
+                          opacity: 0;
+                          transform: translateY(7px);
+                        }
+
+                        13%,
+                        100% {
+                          opacity: 1;
+                          transform: translateY(0);
+                        }
+                      }
+
                       .sitguru-hero-caption {
-                        animation: sitguruHeroCaptionFade 10.5s ease-in-out both;
+                        animation: sitguruHeroCaptionFade 13.5s ease-in-out both;
+                        will-change: opacity, transform;
+                      }
+
+                      .sitguru-hero-caption-hold {
+                        animation: sitguruHeroCaptionHold 12s ease-in-out both;
                         will-change: opacity, transform;
                       }
 
                       @media (prefers-reduced-motion: reduce) {
-                        .sitguru-hero-caption {
+                        .sitguru-hero-caption,
+                        .sitguru-hero-caption-hold {
                           animation: none;
                           opacity: 1;
                           transform: none;
@@ -2568,7 +2588,11 @@ export default function HomePage() {
 
                     <div
                       key={`hero-caption-${activeHeroVideoIndex}`}
-                      className="sitguru-hero-caption mt-4 w-fit max-w-[94%] rounded-2xl border border-white/20 bg-black/35 px-4 py-2.5 text-left text-white shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-md sm:max-w-[360px] sm:px-5 sm:py-3"
+                      className={`${
+                        activeHeroVideoIndex === heroVideoCaptions.length - 1
+                          ? "sitguru-hero-caption-hold"
+                          : "sitguru-hero-caption"
+                      } mt-4 w-fit max-w-[94%] rounded-2xl border border-white/20 bg-black/35 px-4 py-2.5 text-left text-white shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-md sm:max-w-[360px] sm:px-5 sm:py-3`}
                       aria-live="polite"
                     >
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300 sm:text-[10px]">
