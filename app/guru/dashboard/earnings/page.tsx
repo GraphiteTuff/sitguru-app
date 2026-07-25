@@ -171,37 +171,41 @@ async function getSharedApiOrigin() {
   const isLocalHost =
     hostname === "localhost" || hostname === "127.0.0.1";
 
-  // Local Next.js development runs over plain HTTP. Always prefer the
-  // incoming localhost origin before production environment variables so a
-  // value such as NEXT_PUBLIC_SITE_URL=localhost:3000 cannot be converted to
-  // https://localhost:3000 and trigger ERR_SSL_PACKET_LENGTH_TOO_LONG.
+  // Local Next.js development runs over plain HTTP. Always keep local API
+  // requests on the incoming local origin so localhost is never converted to
+  // HTTPS by a production environment variable.
   if (host && isLocalHost) {
     return `http://${host}`;
+  }
+
+  // In production, prefer the trusted domain that actually received the
+  // request. This prevents same-app API calls from being routed through a
+  // protected Vercel deployment URL that can return an HTML login/protection
+  // page instead of the JSON response expected by this server component.
+  const isTrustedSitGuruHost =
+    hostname === "sitguru.com" ||
+    hostname === "www.sitguru.com" ||
+    hostname.endsWith(".sitguru.com");
+
+  if (host && isTrustedSitGuruHost) {
+    const forwardedProto = requestHeaders
+      .get("x-forwarded-proto")
+      ?.split(",")[0]
+      ?.trim();
+    const protocol = forwardedProto === "http" ? "http" : "https";
+
+    return `${protocol}://${host}`;
   }
 
   const configuredOrigin =
     normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
     normalizeBaseUrl(process.env.SITE_URL) ||
+    normalizeBaseUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL) ||
     normalizeBaseUrl(process.env.VERCEL_URL);
 
   if (configuredOrigin) return configuredOrigin;
 
-  const allowedHost =
-    hostname === "sitguru.com" ||
-    hostname === "www.sitguru.com" ||
-    hostname.endsWith(".sitguru.com");
-
-  if (!host || !allowedHost) {
-    return "https://www.sitguru.com";
-  }
-
-  const forwardedProto = requestHeaders
-    .get("x-forwarded-proto")
-    ?.split(",")[0]
-    ?.trim();
-  const protocol = forwardedProto || "https";
-
-  return `${protocol}://${host}`;
+  return "https://www.sitguru.com";
 }
 
 async function callGuruPayoutSetupApi({
@@ -1925,5 +1929,5 @@ export default async function GuruDashboardEarningsPage({
         </details>
       </div>
     </main>
- );
+  );
 }
