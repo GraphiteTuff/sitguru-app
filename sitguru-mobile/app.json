@@ -60,7 +60,8 @@
           "merchantIdentifier": "merchant.com.sitguru",
           "enableGooglePay": true
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

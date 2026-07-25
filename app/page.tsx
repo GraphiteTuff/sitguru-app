@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 const heroVideoPaths = [
   "/videos/sitguru-homepage-hero.mp4",
   "/videos/sitguru-homepage-hero-2.mp4",
+  "/videos/sitguru-homepage-hero-3-ambassadors.mp4",
 ] as const;
 const heroVideoPosterPath = "/images/sitguru-homepage-hero-poster.jpg";
 const heroVideoPlaybackRate = 0.8;

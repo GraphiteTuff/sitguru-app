@@ -33,19 +33,18 @@ type CommandBody = Record<string, unknown> & {
   data?: unknown;
 };
 
-const LOCAL_ORIGINS = new Set([
-  "http://localhost:3000",
-  "http://localhost:8081",
-  "http://localhost:8082",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:8081",
-  "http://127.0.0.1:8082",
+const LOCAL_HOSTNAMES = new Set([
+  "localhost",
+  "127.0.0.1",
+  "::1",
 ]);
 
 const ACTIVITY_FIELDS = new Set([
   "template_id",
   "title",
+  "activity_title",
   "description",
+  "activity_notes",
   "category",
   "activity_type",
   "engagement_mode",
@@ -197,16 +196,21 @@ function normalizeOrigin(value: string) {
 function isAllowedOrigin(origin: string) {
   const normalized = normalizeOrigin(origin);
 
-  if (LOCAL_ORIGINS.has(normalized)) {
-    return true;
-  }
-
   try {
     const url = new URL(normalized);
+    const hostname = url.hostname.toLowerCase();
+
+    if (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      LOCAL_HOSTNAMES.has(hostname)
+    ) {
+      return true;
+    }
 
     return (
-      url.hostname === "sitguru.com" ||
-      url.hostname.endsWith(".sitguru.com")
+      url.protocol === "https:" &&
+      (hostname === "sitguru.com" ||
+        hostname.endsWith(".sitguru.com"))
     );
   } catch {
     return false;
@@ -298,6 +302,73 @@ function fieldsForEntity(entity: CommandEntity) {
   if (entity === "marketing_effort") return MARKETING_FIELDS;
   if (entity === "lead") return LEAD_FIELDS;
   return TEMPLATE_FIELDS;
+}
+
+function withLegacyActivityFields(
+  source: Record<string, unknown>,
+) {
+  const activityTitle =
+    asString(source.title) ||
+    asString(source.activity_title);
+
+  const activityNotes =
+    asString(source.notes) ||
+    asString(source.activity_notes);
+
+  return {
+    ...source,
+    title: activityTitle || null,
+    activity_title: activityTitle || null,
+    notes: activityNotes || null,
+    activity_notes: activityNotes || null,
+  };
+}
+
+function withoutLegacyActivityFields(
+  source: Record<string, unknown>,
+) {
+  const cleaned = { ...source };
+
+  delete cleaned.activity_title;
+  delete cleaned.activity_notes;
+
+  return cleaned;
+}
+
+function normalizeActivityRecord<
+  T extends Record<string, unknown>,
+>(
+  value: T,
+): T & {
+  title: string;
+  notes: string | null;
+} {
+  return {
+    ...value,
+    title:
+      asString(value.title) ||
+      asString(value.activity_title) ||
+      "Ambassador activity",
+    notes:
+      asString(value.notes) ||
+      asString(value.activity_notes) ||
+      null,
+  };
+}
+
+function isMissingLegacyActivityColumnError(
+  message: string | undefined,
+) {
+  const normalized = asString(message).toLowerCase();
+
+  return (
+    normalized.includes("activity_title") ||
+    normalized.includes("activity_notes")
+  ) && (
+    normalized.includes("column") ||
+    normalized.includes("schema cache") ||
+    normalized.includes("could not find")
+  );
 }
 
 function parseDateParam(value: string | null) {
@@ -533,7 +604,9 @@ async function loadCommandCenter({
     console.error("AMBASSADOR COMMAND CENTER LOAD ERRORS:", errors);
   }
 
-  const activities = activitiesResult.data || [];
+  const activities = (activitiesResult.data || []).map((row) =>
+    normalizeActivityRecord(row),
+  );
   const efforts = effortsResult.data || [];
   const leads = leadsResult.data || [];
 
@@ -839,14 +912,38 @@ export async function POST(req: NextRequest) {
       null;
   }
 
-  const { data: created, error } = await supabaseAdmin
+  const primaryInsertPayload =
+    entity === "activity"
+      ? withLegacyActivityFields(insertPayload)
+      : insertPayload;
+
+  let createResult = await supabaseAdmin
     .from(table)
-    .insert(insertPayload)
+    .insert(primaryInsertPayload)
     .select("*")
     .single();
 
-  if (error) {
-    console.error("AMBASSADOR COMMAND CENTER CREATE ERROR:", error);
+  if (
+    createResult.error &&
+    entity === "activity" &&
+    isMissingLegacyActivityColumnError(
+      createResult.error.message,
+    )
+  ) {
+    createResult = await supabaseAdmin
+      .from(table)
+      .insert(
+        withoutLegacyActivityFields(primaryInsertPayload),
+      )
+      .select("*")
+      .single();
+  }
+
+  if (createResult.error) {
+    console.error(
+      "AMBASSADOR COMMAND CENTER CREATE ERROR:",
+      createResult.error,
+    );
 
     return json(
       req,
@@ -856,11 +953,18 @@ export async function POST(req: NextRequest) {
           "_",
           " ",
         )}.`,
-        details: error.message,
+        details: createResult.error.message,
       },
       500,
     );
   }
+
+  const created =
+    entity === "activity"
+      ? normalizeActivityRecord(
+          createResult.data as Record<string, unknown>,
+        )
+      : createResult.data;
 
   return json(
     req,
@@ -948,19 +1052,44 @@ export async function PATCH(req: NextRequest) {
   }
 
   const table = tableForEntity(entity);
+  const baseUpdatePayload = {
+    ...updates,
+    updated_at: new Date().toISOString(),
+  };
+  const primaryUpdatePayload =
+    entity === "activity"
+      ? withLegacyActivityFields(baseUpdatePayload)
+      : baseUpdatePayload;
 
-  const { data: updated, error } = await supabaseAdmin
+  let updateResult = await supabaseAdmin
     .from(table)
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
-    })
+    .update(primaryUpdatePayload)
     .eq("id", id)
     .select("*")
     .single();
 
-  if (error) {
-    console.error("AMBASSADOR COMMAND CENTER UPDATE ERROR:", error);
+  if (
+    updateResult.error &&
+    entity === "activity" &&
+    isMissingLegacyActivityColumnError(
+      updateResult.error.message,
+    )
+  ) {
+    updateResult = await supabaseAdmin
+      .from(table)
+      .update(
+        withoutLegacyActivityFields(primaryUpdatePayload),
+      )
+      .eq("id", id)
+      .select("*")
+      .single();
+  }
+
+  if (updateResult.error) {
+    console.error(
+      "AMBASSADOR COMMAND CENTER UPDATE ERROR:",
+      updateResult.error,
+    );
 
     return json(
       req,
@@ -970,11 +1099,18 @@ export async function PATCH(req: NextRequest) {
           "_",
           " ",
         )}.`,
-        details: error.message,
+        details: updateResult.error.message,
       },
       500,
     );
   }
+
+  const updated =
+    entity === "activity"
+      ? normalizeActivityRecord(
+          updateResult.data as Record<string, unknown>,
+        )
+      : updateResult.data;
 
   return json(req, {
     success: true,
