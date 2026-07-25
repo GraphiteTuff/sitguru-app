@@ -25,14 +25,14 @@ const heroVideoCaptions = [
     mobile: "Care while you’re away.",
   },
   {
-    eyebrow: "Join the Pet Community",
-    desktop: "Help pets. Spread the word. Grow your community.",
-    mobile: "Help pets. Grow your community.",
+    eyebrow: "Become a SitGuru Ambassador",
+    desktop: "Share your voice. Help pets. Make an impact.",
+    mobile: "Share your voice. Help pets. Make an impact.",
   },
 ] as const;
 
 const heroVideoPosterPath = "/images/sitguru-homepage-hero-poster.jpg";
-const heroVideoPlaybackRate = 0.8;
+const heroVideoPlaybackRate = 1;
 const heroVideoTransitionMs = 420;
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
 const sitGuruVideoEmbedUrl =
