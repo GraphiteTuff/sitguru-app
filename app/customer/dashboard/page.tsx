@@ -1202,25 +1202,25 @@ function getBookingNextStep(booking: Booking) {
   const payment = booking.payment_status.toLowerCase();
 
   if (["pending", "requested"].includes(status)) {
-    return "Your request is in review. We’ll keep your care plan and updates easy to follow here.";
+    return "Request sent. Watch here for updates.";
   }
 
   if (["checkout_started", "unpaid"].includes(payment)) {
-    return "Your booking is saved and ready for final care coordination.";
+    return "Finish payment to confirm care.";
   }
 
   if (
     ["confirmed", "paid", "succeeded"].includes(payment) ||
-    ["confirmed"].includes(status)
+    status === "confirmed"
   ) {
-    return "You’re all set. Review your timing, pet details, and support options anytime.";
+    return "You’re all set.";
   }
 
-  if (["completed"].includes(status)) {
-    return "This visit is complete. Rebook or revisit the care summary whenever you need it.";
+  if (status === "completed") {
+    return "Care complete. View the PawReport or book again.";
   }
 
-  return "Everything for this booking is organized in one place for easy, stress-free care.";
+  return "Open the booking for the latest details.";
 }
 
 function buildCustomerProfile(
@@ -2132,17 +2132,15 @@ function NearbyGurusCarousel({
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
-              Gurus near your care location
+              Nearby Gurus
             </p>
 
             <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-              Personalized care options based on your requested ZIP.
+              Care near {careLocationLabel || (careZip ? `ZIP ${careZip}` : "you")}
             </h2>
 
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              We use your latest booking care ZIP first, then your profile
-              service address. Traveling or booking care somewhere else? Enter
-              that ZIP to refresh this list.
+              Change the ZIP anytime to explore another area.
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2">
@@ -2302,9 +2300,7 @@ function NearbyGurusCarousel({
               Personalized Guru matches will appear here.
             </p>
             <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-              Add a care ZIP, update your service address, or start a booking so
-              SitGuru can show Gurus who accept care inside their service
-              radius.
+              Add a care ZIP to see available Gurus.
             </p>
           </div>
         )}
@@ -2486,8 +2482,7 @@ function BookingCard({
             ) : null}
 
             <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-800">
-              Need to adjust timing or care notes? Message your Guru or support
-              first so we can help before you cancel.
+              Need a change? Message your Guru or SitGuru support.
             </div>
 
             {booking.tip_amount > 0 ? (
@@ -3165,8 +3160,8 @@ export default function CustomerDashboardPage() {
 
     if (stats.nextBooking) {
       updates.push({
-        label: "Upcoming care is ready",
-        detail: `${getBookingCareSummary(stats.nextBooking)} • ${formatDate(
+        label: "Next care",
+        detail: `${stats.nextBooking.pet_name || "Pet care"} • ${formatShortDate(
           getBookingDisplayDate(stats.nextBooking),
         )}`,
         href: getBookingDetailHref(stats.nextBooking.id),
@@ -3176,11 +3171,11 @@ export default function CustomerDashboardPage() {
 
     if ((referralProfile?.pending_rewards ?? 0) > 0) {
       updates.push({
-        label: "PawPerks reward pending",
+        label: "PawPerks pending",
         detail: `${formatMoney(
           referralProfile?.pending_rewards ?? 0,
           true,
-        )} is being tracked in PawPerks.`,
+        )} pending`,
         href: routes.pawPerks,
         tone: "amber",
       });
@@ -3188,8 +3183,8 @@ export default function CustomerDashboardPage() {
 
     if (profileCompletion < 100) {
       updates.push({
-        label: "Finish your care profile",
-        detail: `Your Pet Parent profile is ${profileCompletion}% complete.`,
+        label: "Profile update",
+        detail: `${profileCompletion}% complete`,
         href: routes.profile,
         tone: "slate",
       });
@@ -3197,8 +3192,8 @@ export default function CustomerDashboardPage() {
 
     if (!universityProgress.isComplete) {
       updates.push({
-        label: "Pet Parent Academy",
-        detail: `${universityProgress.completedSteps} of ${universityProgress.totalSteps} steps complete.`,
+        label: "Academy progress",
+        detail: `${universityProgress.completedSteps}/${universityProgress.totalSteps} steps`,
         href: routes.university,
         tone: "slate",
       });
@@ -3207,13 +3202,13 @@ export default function CustomerDashboardPage() {
     if (updates.length === 0) {
       updates.push({
         label: "You are all caught up",
-        detail: "New booking, PawReport, reward, and profile updates will appear here.",
+        detail: "Nothing needs attention right now.",
         href: routes.dashboard,
         tone: "emerald",
       });
     }
 
-    return updates.slice(0, 5);
+    return updates.slice(0, 3);
   }, [
     liveCareBookings,
     pawReportMap,
@@ -3305,7 +3300,7 @@ export default function CustomerDashboardPage() {
       ) : null}
 
       <main
-        className="min-h-screen bg-[linear-gradient(180deg,#fafffd_0%,#ffffff_34%,#f3fff9_100%)] pb-24 text-slate-950 md:pb-10"
+        className="min-h-screen bg-[linear-gradient(180deg,#fffdf8_0%,#ffffff_34%,#f2fff8_100%)] pb-24 text-slate-950 md:pb-10"
         style={{
           fontFamily:
             '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -3314,59 +3309,58 @@ export default function CustomerDashboardPage() {
         <Header />
 
         <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 md:py-6 lg:px-8">
-          <section className="relative overflow-hidden rounded-[2rem] border border-emerald-100 bg-slate-950 shadow-[0_28px_100px_rgba(15,23,42,0.18)] sm:rounded-[2.4rem]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(52,211,153,0.34),transparent_30%),radial-gradient(circle_at_88%_20%,rgba(56,189,248,0.24),transparent_26%),linear-gradient(135deg,#071a13_0%,#0f3325_58%,#123c47_100%)]" />
-            <div className="relative grid gap-7 px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[1.35fr_0.65fr] lg:items-center lg:px-10 lg:py-10">
+          <section className="relative overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-[0_20px_70px_rgba(15,118,110,0.10)] sm:rounded-[2.4rem]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(52,211,153,0.22),transparent_30%),radial-gradient(circle_at_92%_12%,rgba(251,191,36,0.18),transparent_26%),linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#fff7ed_100%)]" />
+            <div className="relative grid gap-5 px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-center lg:px-10 lg:py-9">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100 ring-1 ring-white/15 backdrop-blur">
-                    Your SitGuru home
+                  <span className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-800 ring-1 ring-emerald-200">
+                    Pet Parent Home
                   </span>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/15 px-3 py-1.5 text-[11px] font-black text-emerald-100 ring-1 ring-emerald-300/25">
-                    <span className="h-2 w-2 rounded-full bg-emerald-300" />
-                    Updates are live
+                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 text-[11px] font-black text-emerald-800 ring-1 ring-emerald-200">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    Updates live
                   </span>
                 </div>
 
-                <h1 className="mt-5 text-4xl font-black tracking-[-0.045em] text-white sm:text-5xl lg:text-6xl">
+                <h1 className="mt-4 text-4xl font-black tracking-[-0.045em] text-slate-950 sm:text-5xl lg:text-6xl">
                   Hey, {firstName} <span aria-hidden="true">👋</span>
                 </h1>
-                <p className="mt-3 max-w-2xl text-base font-semibold leading-7 text-slate-200 sm:text-lg">
-                  Everything your pets need, everything your Gurus share, and
-                  every reward you earn—right here.
+                <p className="mt-3 max-w-2xl text-base font-bold leading-7 text-slate-700 sm:text-lg">
+                  Care, updates, pets, and rewards—one tap away.
                 </p>
 
                 <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
                   <Link
                     href={routes.findGuru}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-emerald-400 px-5 text-sm font-black text-slate-950 shadow-lg shadow-emerald-950/20 transition hover:-translate-y-0.5 hover:bg-emerald-300"
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700"
                   >
                     Find Care
                   </Link>
                   <Link
-                    href={stats.nextBooking ? getBookingDetailHref(stats.nextBooking.id) : routes.bookGuru}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-emerald-50"
+                    href={routes.bookings}
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
                   >
-                    {stats.nextBooking ? "View Next Care" : "Book Care"}
+                    Bookings
                   </Link>
                   <Link
                     href={routes.messages}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-white/10 px-5 text-sm font-black text-white ring-1 ring-white/15 transition hover:-translate-y-0.5 hover:bg-white/15"
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-50"
                   >
                     Messages
                   </Link>
                   <Link
                     href={routes.pets}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-white/10 px-5 text-sm font-black text-white ring-1 ring-white/15 transition hover:-translate-y-0.5 hover:bg-white/15"
+                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-50"
                   >
                     My Pets
                   </Link>
                 </div>
               </div>
 
-              <div className="rounded-[1.8rem] border border-white/15 bg-white/10 p-4 backdrop-blur-md sm:p-5">
+              <div className="rounded-[1.8rem] border border-white bg-white/90 p-4 shadow-xl ring-1 ring-emerald-100 backdrop-blur sm:p-5">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.5rem] bg-white text-2xl font-black text-emerald-700 shadow-xl ring-4 ring-white/10">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.5rem] bg-emerald-50 text-2xl font-black text-emerald-700 ring-1 ring-emerald-100">
                     {showCustomerProfilePhoto ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -3380,15 +3374,14 @@ export default function CustomerDashboardPage() {
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-xl font-black text-white">
+                    <p className="truncate text-xl font-black text-slate-950">
                       {customerDisplayName}
                     </p>
-                    <p className="mt-1 text-sm font-bold text-emerald-100">
-                      Pet Parent • {profileCompletion}% profile ready
+                    <p className="mt-1 text-sm font-bold text-emerald-700">
+                      Pet Parent • {profileCompletion}% ready
                     </p>
-                    <p className="mt-1 truncate text-xs font-semibold text-slate-300">
-                      {getCustomerLocationLabel(customerProfile) ||
-                        "Add your care location"}
+                    <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                      {getCustomerLocationLabel(customerProfile) || "Add care location"}
                     </p>
                   </div>
                 </div>
@@ -3396,34 +3389,26 @@ export default function CustomerDashboardPage() {
                 <div className="mt-5 grid grid-cols-3 gap-2">
                   <Link
                     href={routes.pets}
-                    className="rounded-2xl bg-white/10 p-3 text-center ring-1 ring-white/10 transition hover:bg-white/15"
+                    className="rounded-2xl bg-emerald-50 p-3 text-center ring-1 ring-emerald-100 transition hover:bg-emerald-100"
                   >
-                    <p className="text-xl font-black text-white">{pets.length}</p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300">
-                      Pets
-                    </p>
+                    <p className="text-xl font-black text-slate-950">{pets.length}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">Pets</p>
                   </Link>
                   <Link
                     href={routes.bookings}
-                    className="rounded-2xl bg-white/10 p-3 text-center ring-1 ring-white/10 transition hover:bg-white/15"
+                    className="rounded-2xl bg-sky-50 p-3 text-center ring-1 ring-sky-100 transition hover:bg-sky-100"
                   >
-                    <p className="text-xl font-black text-white">
-                      {upcomingBookings.length}
-                    </p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-300">
-                      Upcoming
-                    </p>
+                    <p className="text-xl font-black text-slate-950">{upcomingBookings.length}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">Upcoming</p>
                   </Link>
                   <Link
                     href={routes.pawPerks}
-                    className="rounded-2xl bg-emerald-300 p-3 text-center shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-200"
+                    className="rounded-2xl bg-amber-100 p-3 text-center ring-1 ring-amber-200 transition hover:bg-amber-200"
                   >
                     <p className="text-xl font-black text-slate-950">
                       {formatMoney(referralProfile?.available_credit ?? 0)}
                     </p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-950">
-                      PawPerks
-                    </p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">PawPerks</p>
                   </Link>
                 </div>
               </div>
@@ -3448,12 +3433,12 @@ export default function CustomerDashboardPage() {
 
                   <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
                     {isCareLive
-                      ? "Your pet’s care is happening now"
+                      ? "Care is live now"
                       : stats.nextBooking
-                        ? "Your next care plan is ready"
+                        ? "Next care is ready"
                         : latestBooking
-                          ? "Your recent care is easy to revisit"
-                          : "Ready when your pet needs care"}
+                          ? "Recent care at a glance"
+                          : "Ready for care"}
                   </h2>
 
                   {featuredCareBooking ? (
@@ -3476,8 +3461,7 @@ export default function CustomerDashboardPage() {
                     </>
                   ) : (
                     <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-slate-600 sm:text-base">
-                      Find a trusted local Guru for walks, drop-ins, overnight
-                      care, and the routines that keep your pet comfortable.
+                      Find a trusted Guru when your pet needs care.
                     </p>
                   )}
 
@@ -3584,69 +3568,65 @@ export default function CustomerDashboardPage() {
                       <p className="mt-1 text-xs font-semibold text-slate-500">
                         {featuredCareBooking?.guru_name
                           ? `With ${featuredCareBooking.guru_name}`
-                          : "Trusted care, organized simply"}
+                          : "Care in one place"}
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 rounded-2xl bg-slate-950 p-4 text-white">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">
+                  <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
                       Next best action
                     </p>
-                    <p className="mt-2 text-sm font-bold leading-6 text-slate-100">
-                      {featuredCareBooking
-                        ? getBookingNextStep(featuredCareBooking)
-                        : "Start with Find Care and SitGuru will keep every next step visible here."}
+                    <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
+                      {isCareLive
+                        ? "Follow live updates."
+                        : stats.nextBooking
+                          ? "Review details before care."
+                          : latestBooking
+                            ? "View the PawReport or book again."
+                            : "Find a Guru when you need care."}
                     </p>
                   </div>
                 </div>
               </div>
             </article>
 
-            <article className="overflow-hidden rounded-[2rem] border border-amber-100 bg-slate-950 shadow-sm">
-              <div className="relative h-full bg-[radial-gradient(circle_at_80%_0%,rgba(251,191,36,0.28),transparent_34%),linear-gradient(150deg,#111827_0%,#14251f_100%)] p-5 sm:p-6">
+            <article className="overflow-hidden rounded-[2rem] border border-amber-200 bg-white shadow-sm">
+              <div className="relative h-full bg-[radial-gradient(circle_at_88%_0%,rgba(251,191,36,0.28),transparent_34%),linear-gradient(145deg,#fffbeb_0%,#ffffff_56%,#ecfdf5_100%)] p-5 sm:p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-300">
-                      PawPerks rewards
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+                      PawPerks
                     </p>
-                    <p className="mt-3 text-5xl font-black tracking-tight text-white">
+                    <p className="mt-2 text-5xl font-black tracking-tight text-slate-950">
                       {formatMoney(referralProfile?.available_credit ?? 0, true)}
                     </p>
-                    <p className="mt-2 text-sm font-semibold text-slate-300">
-                      Available SitGuru credit
+                    <p className="mt-1 text-sm font-bold text-slate-600">
+                      Available credit
                     </p>
                   </div>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-300 text-2xl shadow-lg shadow-black/20">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-200 text-2xl shadow-sm ring-1 ring-amber-300">
                     🎁
                   </div>
                 </div>
 
-                <div className="mt-6 grid grid-cols-2 gap-2">
-                  <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                      Pending
-                    </p>
-                    <p className="mt-1 text-xl font-black text-white">
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <div className="rounded-2xl bg-white p-3 ring-1 ring-amber-100">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">Pending</p>
+                    <p className="mt-1 text-xl font-black text-slate-950">
                       {formatMoney(referralProfile?.pending_rewards ?? 0, true)}
                     </p>
                   </div>
-                  <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                      Referrals
-                    </p>
-                    <p className="mt-1 text-xl font-black text-white">
+                  <div className="rounded-2xl bg-white p-3 ring-1 ring-emerald-100">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Referrals</p>
+                    <p className="mt-1 text-xl font-black text-slate-950">
                       {referralProfile?.completed_referrals ?? 0}
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl bg-white/10 p-3 ring-1 ring-white/10">
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                    Your code
-                  </p>
-                  <p className="mt-1 break-all text-base font-black text-amber-200">
-                    {referralCode}
-                  </p>
+                <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-amber-100">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">Your code</p>
+                  <p className="mt-1 break-all text-base font-black text-slate-950">{referralCode}</p>
                 </div>
 
                 <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -3659,19 +3639,16 @@ export default function CustomerDashboardPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      copyReferralLink(
-                        customerReferralLink,
-                        "Pet Parent referral link",
-                      )
+                      copyReferralLink(customerReferralLink, "Pet Parent referral link")
                     }
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-white/10 px-4 text-sm font-black text-white ring-1 ring-white/15 transition hover:bg-white/15"
+                    className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
                   >
                     Invite Friends
                   </button>
                 </div>
 
                 {referralMessage ? (
-                  <div className="mt-4 rounded-2xl bg-emerald-400/15 px-4 py-3 text-xs font-bold leading-5 text-emerald-100 ring-1 ring-emerald-300/20">
+                  <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-xs font-bold leading-5 text-emerald-800 ring-1 ring-emerald-100">
                     {referralMessage}
                   </div>
                 ) : null}
@@ -3683,7 +3660,7 @@ export default function CustomerDashboardPage() {
             {[
               {
                 label: "Find Care",
-                helper: "Trusted Gurus",
+                helper: "Nearby Gurus",
                 href: routes.findGuru,
                 icon: <PawPrint className="h-5 w-5" />,
               },
@@ -3695,13 +3672,13 @@ export default function CustomerDashboardPage() {
               },
               {
                 label: "Messages",
-                helper: "Gurus + support",
+                helper: "Open inbox",
                 href: routes.messages,
                 icon: <MessageCircle className="h-5 w-5" />,
               },
               {
                 label: "My Pets",
-                helper: `${pets.length} profiles`,
+                helper: `${pets.length} pets`,
                 href: routes.pets,
                 icon: <PawPrint className="h-5 w-5" />,
               },
@@ -3744,7 +3721,7 @@ export default function CustomerDashboardPage() {
                     Your pets
                   </p>
                   <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                    The crew behind every care plan
+                    Your pets
                   </h2>
                 </div>
                 <div className="flex gap-2">
@@ -4000,14 +3977,14 @@ export default function CustomerDashboardPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
-                    Your SitGuru updates
+                    Updates
                   </p>
                   <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
-                    What needs your attention
+                    What’s new
                   </h2>
                 </div>
                 <span className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-sky-700 ring-1 ring-sky-100">
-                  Live hub
+                  Live
                 </span>
               </div>
 
@@ -4053,13 +4030,13 @@ export default function CustomerDashboardPage() {
                   href={routes.messages}
                   className="inline-flex min-h-[44px] items-center justify-center rounded-2xl bg-slate-950 px-4 text-xs font-black text-white transition hover:bg-slate-800"
                 >
-                  Open Messages
+                  Messages
                 </Link>
                 <Link
                   href={routes.adminMessages}
                   className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-800 transition hover:bg-slate-50"
                 >
-                  Get Support
+                  Support
                 </Link>
               </div>
             </article>
@@ -4072,17 +4049,17 @@ export default function CustomerDashboardPage() {
                   Upcoming care
                 </p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                  Your next care plans, clearly organized
+                  Upcoming care
                 </h2>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Booking details, PawReports, messages, and support stay connected.
+                  Everything for the next visit, in one place.
                 </p>
               </div>
               <Link
                 href={routes.findGuru}
                 className="inline-flex min-h-[44px] items-center justify-center rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white transition hover:bg-emerald-700"
               >
-                Book More Care
+                Find Care
               </Link>
             </div>
 
@@ -4093,7 +4070,7 @@ export default function CustomerDashboardPage() {
                   No upcoming bookings yet
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Your next confirmed care plan will appear here automatically.
+                  New bookings will appear here.
                 </p>
                 <Link
                   href={routes.findGuru}
@@ -4141,10 +4118,10 @@ export default function CustomerDashboardPage() {
                     Profile + safety
                   </p>
                   <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
-                    Your care profile is {profileCompletion}% ready
+                    Profile {profileCompletion}% ready
                   </h2>
                   <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                    Keep contact, service location, emergency, and care preferences current.
+                    Keep contact and care details current.
                   </p>
                 </div>
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.3rem] bg-emerald-50 text-lg font-black text-emerald-700 ring-1 ring-emerald-100">
@@ -4335,14 +4312,13 @@ export default function CustomerDashboardPage() {
                       Pet Parent Academy
                     </p>
                     <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
-                      Confidence for every booking
+                      Pet Parent Academy
                     </h2>
                   </div>
                 </div>
 
                 <p className="mt-4 text-sm font-semibold leading-7 text-slate-600">
-                  Learn profiles, messaging, safe booking, support, reviews,
-                  PawReports, and how SitGuru protects the care experience.
+                  Quick lessons for safer, smoother bookings.
                 </p>
 
                 <div className="mt-5 rounded-[1.4rem] bg-white p-4 shadow-sm ring-1 ring-sky-100">
@@ -4392,10 +4368,10 @@ export default function CustomerDashboardPage() {
                   Recent activity
                 </p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                  Your care history
+                  Recent care
                 </h2>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Review bookings, payment status, tips, and the next action.
+                  Bookings, payments, and tips.
                 </p>
               </div>
               <Link
@@ -4410,7 +4386,7 @@ export default function CustomerDashboardPage() {
               <div className="mt-5 rounded-[1.6rem] border border-dashed border-slate-300 bg-slate-50 p-7 text-center">
                 <p className="text-lg font-black text-slate-950">No bookings yet</p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Your care activity will appear here after your first request.
+                  Your bookings will appear here.
                 </p>
               </div>
             ) : (
