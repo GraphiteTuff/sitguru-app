@@ -219,11 +219,7 @@ export default function Footer() {
                   </Link>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-2 font-bold text-emerald-800 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
-                  <a href="tel:18554748738" className="hover:text-emerald-900">
-                    (855) 474-8738
-                  </a>
-
+                <div className="mt-4 font-bold text-emerald-800">
                   <a
                     href="mailto:support@sitguru.com"
                     className="break-words hover:text-emerald-900"
@@ -261,11 +257,17 @@ export default function Footer() {
               <FooterColumn title="Company" links={companyLinks} />
 
               <div className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-700 p-5 text-white shadow-lg shadow-emerald-900/10">
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-50">
+                <p
+                  className="text-xs font-black uppercase tracking-[0.16em] text-white"
+                  style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }}
+                >
                   Grow with SitGuru
                 </p>
 
-                <p className="mt-3 text-lg font-black leading-7 text-white">
+                <p
+                  className="mt-3 text-lg font-black leading-7 text-white"
+                  style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }}
+                >
                   Students, community helpers, military-connected families, and
                   local pet lovers can help SitGuru grow.
                 </p>
@@ -281,6 +283,7 @@ export default function Footer() {
                   <Link
                     href="/ambassadors"
                     className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
+                    style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }}
                   >
                     Join Ambassadors
                   </Link>
