@@ -3,625 +3,497 @@ import Link from "next/link";
 const guruApplyLink = "/signup?role=guru&next=/guru/dashboard";
 const guruLoginLink = "/login?role=guru&next=/guru/dashboard";
 
-const providerTypes = [
-  "Pet sitters",
-  "Dog walkers",
-  "Boarding providers",
-  "Drop-in caregivers",
-  "Dog trainers",
-  "Groomers",
-  "Experienced pet parents",
-  "Students",
-  "Retirees",
-  "Trusted local helpers",
-  "Small pet care businesses",
-  "Independent providers",
-];
-
-const benefits = [
+const coreBenefits = [
   {
-    icon: "📣",
-    title: "Get discovered by more Pet Parents",
+    icon: "📍",
+    title: "Get discovered locally",
     description:
-      "Create a friendly Guru profile that gives local Pet Parents another trusted way to find your pet care services.",
-  },
-  {
-    icon: "🐾",
-    title: "Offer the services you enjoy",
-    description:
-      "Show Pet Parents whether you offer walking, drop-ins, sitting, boarding, training, grooming, or other trusted pet care support.",
+      "Create a public Guru profile that helps nearby Pet Parents find your approved pet care services.",
   },
   {
     icon: "📅",
-    title: "Choose availability that fits your life",
+    title: "Stay in control",
     description:
-      "Use SitGuru to support open time slots, weekends, holidays, seasonal availability, or flexible local care opportunities.",
-  },
-  {
-    icon: "📍",
-    title: "Set your local service area",
-    description:
-      "Focus on the neighborhoods, towns, or nearby communities that make sense for you and the pet care services you want to provide.",
-  },
-  {
-    icon: "⭐",
-    title: "Build trust with every great experience",
-    description:
-      "Profiles, reviews, care details, and trust signals help Pet Parents feel more confident choosing a local Guru.",
+      "Choose the services, availability, rates, and local service areas that work for you.",
   },
   {
     icon: "💚",
-    title: "Built for new and experienced providers",
+    title: "Build repeat relationships",
     description:
-      "Whether you already provide pet care or want to start locally, SitGuru helps you present your services in a clear, professional way.",
+      "Keep care details, messages, PawReports, reviews, and rebooking activity connected through SitGuru.",
+  },
+];
+
+const guruTools = [
+  {
+    icon: "👤",
+    title: "Professional Guru profile",
+    description: "Show your experience, photos, care style, and service details.",
+  },
+  {
+    icon: "🐾",
+    title: "Services and pricing",
+    description: "Choose the care services you offer and enter your rates.",
+  },
+  {
+    icon: "📍",
+    title: "Service area",
+    description: "Focus on the neighborhoods and communities you want to serve.",
+  },
+  {
+    icon: "🗓️",
+    title: "Availability",
+    description: "Share the days and times that fit your schedule.",
+  },
+  {
+    icon: "💬",
+    title: "Pet Parent messaging",
+    description: "Keep booking conversations and care details in one place.",
+  },
+  {
+    icon: "📋",
+    title: "PawReport updates",
+    description: "Share walk progress, photos, notes, and completed care reports.",
+  },
+  {
+    icon: "⭐",
+    title: "Reviews and rebooking",
+    description: "Build trust through completed care and repeat relationships.",
+  },
+  {
+    icon: "💵",
+    title: "Earnings and payouts",
+    description: "Review booking earnings and complete required payout setup.",
   },
 ];
 
 const steps = [
   {
-    step: "01",
-    title: "Join Free",
-    description:
-      "Create your Guru account and share the basic services you want Pet Parents to know about.",
+    step: "1",
+    title: "Create your account",
+    description: "Tell us who you are and where you plan to provide care.",
   },
   {
-    step: "02",
-    title: "Build Your Profile",
+    step: "2",
+    title: "Build your profile",
     description:
-      "Add your experience, service area, pet care style, photos, and details that help families feel comfortable choosing you.",
+      "Add your services, rates, availability, experience, photos, and local area.",
   },
   {
-    step: "03",
-    title: "Complete Trust Steps",
+    step: "3",
+    title: "Complete trust steps",
     description:
-      "Finish simple trust and safety steps designed to help protect pets, families, Gurus, and the SitGuru community.",
+      "Finish the required identity, safety, account, and payout setup.",
   },
   {
-    step: "04",
-    title: "Start Getting Discovered",
+    step: "4",
+    title: "Start accepting bookings",
     description:
-      "Once approved and active, use SitGuru as another trusted way to connect with local Pet Parents looking for care.",
+      "Review requests and accept the care opportunities that work for you.",
   },
 ];
 
-const trustPoints = [
-  "Free to join",
-  "Choose your services",
-  "Choose your availability",
+const controlPoints = [
+  "Choose which services you offer",
+  "Set your rates",
+  "Select your availability",
   "Choose your local service area",
-  "Helpful profile setup",
-  "Trust and safety steps",
-  "Pet Parent confidence tools",
-  "Reviews and badges help approved Gurus stand out",
+  "Review requests before accepting",
+  "See booking details before confirming",
+  "Keep messages and care records organized",
+  "Track earnings from your Guru dashboard",
 ];
 
-const quickBenefits = [
-  "More visibility",
-  "Local Pet Parent connections",
-  "Flexible availability",
-  "Easy profile sharing",
-  "Trust-focused experience",
-  "Helpful for open time slots",
+const serviceTypes = [
+  "Dog Walking",
+  "Drop-In Visits",
+  "Pet Sitting",
+  "Boarding",
+  "Doggy Day Care",
+  "Training Support",
 ];
 
-const launchFit = [
+const faqs = [
   {
-    title: "Students",
-    description:
-      "Great for students who love pets and want flexible local opportunities around classes, campus life, or breaks.",
+    question: "Is it free to apply?",
+    answer:
+      "Yes. Creating your Guru account and submitting your profile is free. You will complete the required profile and trust steps before becoming fully bookable.",
   },
   {
-    title: "Community helpers",
-    description:
-      "Ideal for trusted local caregivers, retirees, neighbors, and pet lovers who want to support families nearby.",
+    question: "What services can I offer?",
+    answer:
+      "Available services may include dog walking, drop-in visits, pet sitting, boarding, doggy day care, training support, and other approved pet care services.",
   },
   {
-    title: "Military & veteran families",
-    description:
-      "A strong fit for veterans, military spouses, and transitioning service members who value flexible, community-based work.",
+    question: "Can I choose my schedule and service area?",
+    answer:
+      "Yes. You choose the availability and local service areas shown through your Guru profile.",
+  },
+  {
+    question: "Can I set my own rates?",
+    answer:
+      "Yes. You can enter rates for the services you offer. Booking details and applicable platform charges should be reviewed before you accept a request.",
+  },
+  {
+    question: "How do payments and payouts work?",
+    answer:
+      "Eligible paid bookings and Guru payouts are handled through SitGuru after the required payout setup is completed.",
+  },
+  {
+    question: "Do I need professional pet-care experience?",
+    answer:
+      "You should describe your experience honestly. SitGuru welcomes experienced providers and responsible local pet lovers who are prepared to complete all required profile and trust steps.",
+  },
+  {
+    question: "What happens after I apply?",
+    answer:
+      "You will complete your profile, services, pricing, availability, trust requirements, and payout setup. Your profile must be approved and active before Pet Parents can fully book you.",
   },
 ];
 
-const warmGallery = [
-  {
-    title: "More ways to be discovered",
-    caption:
-      "Give local Pet Parents another trusted place to find your pet care services.",
-    image:
-      "https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    title: "Flexible local opportunities",
-    caption:
-      "Use SitGuru to support open spots, weekends, holidays, and extra availability.",
-    image:
-      "https://images.unsplash.com/photo-1507146426996-ef05306b995a?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    title: "A profile built for trust",
-    caption:
-      "Show Pet Parents who you are, what you offer, and why they can feel confident choosing you.",
-    image:
-      "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1200&q=80",
-  },
-];
+function PrimaryButton({
+  label = "Start Free Guru Profile",
+  className = "",
+}: {
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <Link
+      href={guruApplyLink}
+      className={`inline-flex min-h-14 items-center justify-center rounded-full bg-emerald-600 px-7 py-4 text-base font-black !text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200 ${className}`}
+    >
+      {label}
+    </Link>
+  );
+}
+
+function GuruLoginButton({ className = "" }: { className?: string }) {
+  return (
+    <Link
+      href={guruLoginLink}
+      className={`inline-flex min-h-14 items-center justify-center rounded-full border border-slate-300 bg-white px-7 py-4 text-base font-black !text-slate-800 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100 ${className}`}
+    >
+      Guru Login
+    </Link>
+  );
+}
+
+function GuruProfilePreview() {
+  return (
+    <div className="relative mx-auto w-full max-w-[520px]">
+      <div className="absolute -left-8 -top-8 h-40 w-40 rounded-full bg-emerald-300/25 blur-3xl" />
+      <div className="absolute -bottom-8 -right-8 h-44 w-44 rounded-full bg-sky-300/20 blur-3xl" />
+
+      <div className="relative overflow-hidden rounded-[34px] border border-white/15 bg-white shadow-[0_30px_90px_rgba(2,44,34,0.32)]">
+        <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-700 p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-200">
+                Your Guru profile
+              </p>
+              <p className="mt-1 text-sm font-semibold !text-white/80">
+                What Pet Parents can discover
+              </p>
+            </div>
+
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] !text-white">
+              Profile Preview
+            </span>
+          </div>
+        </div>
+
+        <div className="p-5 sm:p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[24px] bg-gradient-to-br from-emerald-100 to-sky-100 text-4xl shadow-inner">
+              🐕
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-2xl font-black tracking-[-0.04em] !text-slate-950">
+                  Your Name
+                </h2>
+                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-emerald-800">
+                  Guru
+                </span>
+              </div>
+
+              <p className="mt-1 text-sm font-black !text-emerald-700">
+                Dog Walking · Drop-Ins
+              </p>
+              <p className="mt-1 text-sm font-semibold !text-slate-500">
+                Your local area
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            {[
+              ["$25", "Starting rate"],
+              ["4.9", "Example rating"],
+              ["Open", "Availability"],
+            ].map(([value, label]) => (
+              <div
+                key={label}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center"
+              >
+                <p className="text-lg font-black !text-slate-950">{value}</p>
+                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.08em] !text-slate-500">
+                  {label}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 rounded-[24px] border border-emerald-100 bg-emerald-50 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.14em] !text-emerald-800">
+              Profile highlights
+            </p>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {[
+                "Services and rates",
+                "Availability",
+                "Experience and photos",
+                "Care area and reviews",
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black !text-emerald-700 shadow-sm">
+                    ✓
+                  </span>
+                  <span className="text-xs font-bold !text-slate-700">
+                    {item}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-slate-950 px-4 py-3">
+            <div>
+              <p className="text-xs font-black !text-white">
+                Ready for local bookings
+              </p>
+              <p className="mt-0.5 text-[10px] font-semibold !text-slate-300">
+                After profile approval and required setup
+              </p>
+            </div>
+            <span className="text-xl">→</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function BecomeAGuruPage() {
   return (
-    <main className="public-page min-h-screen bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#f1f5f9_100%)] pb-24 !text-slate-950 sm:pb-0">
-      {/* Mobile sticky CTA */}
+    <main className="public-page min-h-screen bg-white pb-24 !text-slate-950 sm:pb-0">
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden">
-        <Link
-          href={guruApplyLink}
-          className="flex min-h-14 w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-4 text-base font-black !text-white shadow-lg shadow-emerald-600/25 transition hover:bg-emerald-700"
-        >
-          Join Free as a Guru
-        </Link>
+        <PrimaryButton className="w-full" />
       </div>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50">
+      <section className="relative overflow-hidden border-b border-emerald-100 bg-gradient-to-br from-white via-emerald-50/45 to-sky-50">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-0 top-0 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
-          <div className="absolute right-0 top-8 h-72 w-72 rounded-full bg-slate-300/20 blur-3xl" />
+          <div className="absolute -left-20 top-10 h-80 w-80 rounded-full bg-emerald-200/30 blur-3xl" />
+          <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-sky-200/25 blur-3xl" />
         </div>
 
-        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-18 lg:px-8 lg:py-24">
-          <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-12">
-            <div className="relative z-10">
-              <div className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-100 px-4 py-1.5 text-sm font-bold !text-emerald-800 shadow-sm">
-                For Sitters, Walkers, Trainers & Pet Care Providers
+        <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.02fr_0.98fr] lg:gap-14">
+            <div>
+              <div className="inline-flex items-center rounded-full border border-emerald-200 bg-white px-4 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] !text-emerald-800 shadow-sm sm:text-xs">
+                Flexible local pet care
               </div>
 
-              <h1 className="mt-5 max-w-3xl text-4xl font-black leading-[1.03] tracking-[-0.04em] !text-slate-950 sm:text-5xl lg:text-6xl">
-                Become a trusted local Pet Guru.
+              <h1 className="mt-5 max-w-3xl text-4xl font-black leading-[1.02] tracking-[-0.055em] !text-slate-950 sm:text-5xl lg:text-6xl">
+                Earn on your schedule caring for pets.
               </h1>
 
-              <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 !text-slate-800 sm:text-xl">
-                Join SitGuru free and create a friendly profile that helps Pet
-                Parents find your dog walking, pet sitting, drop-in, boarding,
-                training, grooming, or local pet care services.
+              <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 !text-slate-700 sm:text-xl">
+                Choose your services, rates, availability, and local area.
+                SitGuru helps nearby Pet Parents discover, book, and rebook you.
               </p>
 
-              <div className="mt-6 rounded-[28px] border border-emerald-200 bg-white/95 p-5 shadow-[0_20px_55px_rgba(15,23,42,0.10)] sm:p-6">
-                <p className="text-sm font-black uppercase tracking-[0.18em] !text-emerald-700">
-                  Start here
-                </p>
-
-                <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] !text-slate-950 sm:text-3xl">
-                  Create a profile Pet Parents can trust.
-                </h2>
-
-                <p className="mt-3 text-base font-semibold leading-7 !text-slate-700">
-                  Set up your Guru profile, choose the services you want to
-                  offer, highlight your care style, and help nearby families
-                  understand why you may be the right fit for their pets.
-                </p>
-
-                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  <Link
-                    href={guruApplyLink}
-                    className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-emerald-600 px-7 py-4 text-base font-black !text-white shadow-lg shadow-emerald-600/25 transition hover:bg-emerald-700 sm:w-auto"
-                  >
-                    Join Free as a Guru
-                  </Link>
-
-                  <Link
-                    href={guruLoginLink}
-                    className="inline-flex min-h-14 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-7 py-4 text-base font-black !text-slate-800 shadow-sm transition hover:bg-slate-50 sm:w-auto"
-                  >
-                    Guru Login
-                  </Link>
-                </div>
-
-                <div className="mt-5 grid gap-2 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-xs font-black !text-slate-700">
-                    Free to join
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-xs font-black !text-slate-700">
-                    Choose services
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-xs font-black !text-slate-700">
-                    Local connections
-                  </div>
-                </div>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <PrimaryButton className="w-full sm:w-auto" />
+                <GuruLoginButton className="w-full sm:w-auto" />
               </div>
 
-              <p className="mt-5 max-w-2xl text-sm font-semibold leading-7 !text-slate-600 sm:text-base">
-                SitGuru is designed for independent local Pet Gurus who want a
-                simple, trusted way to present their services and connect with
-                Pet Parents in their community.
+              <div className="mt-6 grid gap-2 sm:grid-cols-2">
+                {[
+                  "Free to apply",
+                  "Choose your schedule",
+                  "Set your services and rates",
+                  "Keep bookings organized",
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-2 rounded-2xl border border-white bg-white/80 px-4 py-3 text-sm font-black !text-slate-700 shadow-sm"
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs !text-emerald-700">
+                      ✓
+                    </span>
+                    {item}
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-5 max-w-2xl text-xs font-semibold leading-5 !text-slate-500 sm:text-sm">
+                Pet Gurus are independent providers who choose the services they
+                offer and the booking requests they accept.
               </p>
             </div>
 
-            <div className="public-dark-section rounded-[30px] border border-slate-200 bg-[linear-gradient(135deg,#0f172a,#0b1220_45%,#111827)] p-5 !text-white shadow-[0_30px_80px_rgba(15,23,42,0.18)] sm:p-7">
-              <div className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] !text-emerald-300">
-                What is a Guru?
-              </div>
-
-              <h2 className="mt-4 text-2xl font-black !text-white sm:text-3xl">
-                A trusted pet care provider Pet Parents can feel good about.
-              </h2>
-
-              <p className="mt-4 text-base leading-7 !text-slate-200">
-                A Guru is a local pet care provider who helps Pet Parents with
-                services such as walks, sitting, drop-ins, boarding, grooming,
-                training, or reliable everyday pet care support.
-              </p>
-
-              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-sm font-semibold !text-white">
-                    Choose your services
-                  </p>
-                  <p className="mt-1 text-sm !text-slate-300">
-                    Show Pet Parents what care you offer and what types of pets
-                    you enjoy helping.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-sm font-semibold !text-white">
-                    Choose your availability
-                  </p>
-                  <p className="mt-1 text-sm !text-slate-300">
-                    Support care opportunities that fit your life, schedule, and
-                    preferred local area.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-sm font-semibold !text-white">
-                    Build trust faster
-                  </p>
-                  <p className="mt-1 text-sm !text-slate-300">
-                    A clear profile helps families understand your experience,
-                    personality, and care style.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-sm font-semibold !text-white">
-                    Stay local
-                  </p>
-                  <p className="mt-1 text-sm !text-slate-300">
-                    Focus on the neighborhoods and communities that make sense
-                    for the way you provide care.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 border-t border-white/10 pt-5">
-                <Link
-                  href={guruApplyLink}
-                  className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-4 text-base font-black !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
-                >
-                  Start Free Guru Profile
-                </Link>
-              </div>
-            </div>
+            <GuruProfilePreview />
           </div>
         </div>
       </section>
 
-      {/* Fast mobile signup reminder */}
-      <section className="bg-white py-8 sm:hidden">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 text-center shadow-sm">
-            <h2 className="text-2xl font-black tracking-[-0.03em] !text-slate-950">
-              Love pets and want to help local families?
-            </h2>
-            <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
-              Join free and create a Guru profile that helps Pet Parents learn
-              about your care services.
-            </p>
-            <Link
-              href={guruApplyLink}
-              className="mt-5 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-emerald-600 px-6 py-4 text-base font-black !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
-            >
-              Join Free Now
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Quick benefits */}
-      <section className="bg-slate-50 py-12 sm:py-16">
+      <section className="bg-white py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold !text-slate-700">
-              Built for modern pet care providers
-            </div>
-
-            <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] !text-slate-950 sm:text-4xl">
-              More visibility. More trust. More ways to connect.
-            </h2>
-
-            <p className="mx-auto mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-              SitGuru helps turn your pet care experience into a clear,
-              mobile-friendly profile that Pet Parents can understand quickly.
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
+              Built around your goals
             </p>
-          </div>
-
-          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {quickBenefits.map((benefit) => (
-              <div
-                key={benefit}
-                className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-center text-sm font-black !text-slate-800 shadow-sm"
-              >
-                {benefit}
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 text-center">
-            <Link
-              href={guruApplyLink}
-              className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-emerald-600 px-7 py-4 text-base font-black !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
-            >
-              Join Free as a Guru
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Benefits */}
-      <section className="bg-white py-12 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-sm font-semibold !text-slate-700">
-              Why join SitGuru?
-            </div>
-
-            <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] !text-slate-950 sm:text-4xl">
-              A simple way to grow your local pet care presence
+            <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
+              Grow your pet-care business your way.
             </h2>
-
-            <p className="mx-auto mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-              Whether you are experienced, just getting started, or looking for
-              another trusted place to share your services, SitGuru makes it
-              easier for Pet Parents to learn about you.
-            </p>
           </div>
 
-          <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {benefits.map((benefit) => (
-              <div
+          <div className="mt-9 grid gap-5 lg:grid-cols-3">
+            {coreBenefits.map((benefit) => (
+              <article
                 key={benefit.title}
-                className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 shadow-sm transition hover:-translate-y-1 hover:border-emerald-200 hover:bg-white hover:shadow-lg"
+                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_35px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_20px_45px_rgba(15,23,42,0.10)]"
               >
-                <div className="text-3xl">{benefit.icon}</div>
-                <h3 className="mt-4 text-xl font-black !text-slate-950">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-2xl">
+                  {benefit.icon}
+                </div>
+                <h3 className="mt-5 text-xl font-black tracking-[-0.03em] !text-slate-950">
                   {benefit.title}
                 </h3>
-                <p className="mt-3 text-sm leading-7 !text-slate-700">
+                <p className="mt-3 text-sm font-semibold leading-6 !text-slate-600">
                   {benefit.description}
                 </p>
-              </div>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="bg-slate-50 py-12 sm:py-20">
+      <section className="bg-slate-50 py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-            <div>
-              <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold !text-slate-700">
-                How it works
-              </div>
-
-              <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] !text-slate-950 sm:text-4xl">
-                Create your free profile and start getting discovered
+          <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
+            <div className="lg:sticky lg:top-28">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
+                Your Guru workspace
+              </p>
+              <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
+                Everything you need in one place.
               </h2>
-
-              <p className="mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-                Join free, build your Guru profile, complete simple trust and
-                safety steps, then use SitGuru as another way to connect with
-                Pet Parents looking for local care.
+              <p className="mt-4 max-w-xl text-base font-semibold leading-7 !text-slate-700">
+                Build your profile, organize care details, communicate with Pet
+                Parents, complete PawReports, and follow your Guru activity
+                through SitGuru.
               </p>
 
-              <div className="mt-6 rounded-[28px] border border-emerald-200 bg-white p-5 shadow-sm">
-                <p className="text-sm font-black uppercase tracking-[0.16em] !text-emerald-700">
-                  Independent provider friendly
-                </p>
-                <p className="mt-2 text-sm font-semibold leading-7 !text-slate-700 sm:text-base">
-                  Pet Gurus are independent local providers who choose the
-                  services they offer, the availability they share, and the
-                  local areas they want to serve.
-                </p>
-              </div>
-
               <div className="mt-6">
-                <Link
-                  href={guruApplyLink}
-                  className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-emerald-600 px-7 py-4 text-base font-black !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
-                >
-                  Join Free as a Guru
-                </Link>
+                <PrimaryButton className="w-full sm:w-auto" />
               </div>
             </div>
 
-            <div className="space-y-4">
-              {steps.map((item) => (
-                <div
-                  key={item.step}
-                  className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-emerald-200 hover:shadow-md sm:p-6"
+            <div className="grid gap-4 sm:grid-cols-2">
+              {guruTools.map((tool) => (
+                <article
+                  key={tool.title}
+                  className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm"
                 >
-                  <div className="flex gap-4">
-                    <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold !text-white">
-                      {item.step}
-                    </div>
-
-                    <div className="flex-1">
-                      <h3 className="text-lg font-black !text-slate-950">
-                        {item.title}
-                      </h3>
-                      <p className="mt-2 text-sm leading-7 !text-slate-700 sm:text-base">
-                        {item.description}
-                      </p>
-                    </div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-xl">
+                    {tool.icon}
                   </div>
-                </div>
+                  <h3 className="mt-4 text-lg font-black !text-slate-950">
+                    {tool.title}
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold leading-6 !text-slate-600">
+                    {tool.description}
+                  </p>
+                </article>
               ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Provider types */}
-      <section className="bg-white py-12 sm:py-20">
+      <section className="bg-white py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-sm font-semibold !text-slate-700">
-              Who can join?
-            </div>
-
-            <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] !text-slate-950 sm:text-4xl">
-              If you love helping pets, SitGuru can help Pet Parents find you
-            </h2>
-
-            <p className="mx-auto mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-              SitGuru is for experienced providers, new providers, and trusted
-              local caregivers who want a simple way to be discovered by Pet
-              Parents.
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
+              Simple from the start
             </p>
-          </div>
-
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {providerTypes.map((type) => (
-              <div
-                key={type}
-                className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 shadow-sm transition hover:-translate-y-1 hover:border-emerald-200 hover:bg-white hover:shadow-md"
-              >
-                <p className="text-base font-semibold !text-slate-900">
-                  {type}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 text-center">
-            <Link
-              href={guruApplyLink}
-              className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-emerald-600 px-7 py-4 text-base font-black !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
-            >
-              Start Free Guru Profile
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Program fit */}
-      <section className="bg-emerald-50 py-12 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-flex items-center rounded-full border border-emerald-200 bg-white px-4 py-1.5 text-sm font-semibold !text-emerald-800">
-              Local programs
-            </div>
-
-            <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] !text-slate-950 sm:text-4xl">
-              A flexible fit for students, communities, and military families
+            <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
+              Start in four steps.
             </h2>
-
-            <p className="mx-auto mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-              SitGuru is building a local-first pet care community with simple
-              pathways for people who want to help pets and families nearby.
-            </p>
           </div>
 
-          <div className="mt-10 grid gap-5 lg:grid-cols-3">
-            {launchFit.map((item) => (
-              <div
-                key={item.title}
-                className="rounded-[28px] border border-emerald-200 bg-white p-6 shadow-sm"
+          <div className="relative mt-10 grid gap-4 lg:grid-cols-4">
+            <div className="pointer-events-none absolute left-[12%] right-[12%] top-7 hidden h-px bg-emerald-200 lg:block" />
+
+            {steps.map((item) => (
+              <article
+                key={item.step}
+                className="relative rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm"
               >
-                <h3 className="text-xl font-black !text-slate-950">
+                <div className="relative z-10 mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-lg font-black !text-white shadow-lg shadow-emerald-700/20">
+                  {item.step}
+                </div>
+                <h3 className="mt-5 text-lg font-black !text-slate-950">
                   {item.title}
                 </h3>
-                <p className="mt-3 text-sm leading-7 !text-slate-700">
+                <p className="mt-2 text-sm font-semibold leading-6 !text-slate-600">
                   {item.description}
                 </p>
-              </div>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Warm image gallery */}
-      <section className="bg-slate-50 py-12 sm:py-20">
+      <section className="public-dark-section bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 py-12 !text-white sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold !text-slate-700">
-              A better way to present your services
-            </div>
-
-            <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] !text-slate-950 sm:text-4xl">
-              Make it easier for Pet Parents to choose you
-            </h2>
-
-            <p className="mx-auto mt-5 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-              A friendly, clear Guru profile helps Pet Parents understand your
-              personality, services, and experience faster.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {warmGallery.map((item) => (
-              <div
-                key={item.title}
-                className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-              >
-                <div className="relative h-56 w-full overflow-hidden sm:h-64">
-                  <img
-                    src={item.image}
-                    alt={item.title}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-black !text-slate-950">
-                    {item.title}
-                  </h3>
-                  <p className="mt-3 text-sm leading-7 !text-slate-700">
-                    {item.caption}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Dark trust section */}
-      <section className="public-dark-section bg-slate-950 py-12 !text-white sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-start">
+          <div className="grid gap-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
             <div>
-              <div className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-1.5 text-sm font-semibold !text-emerald-300">
-                The SitGuru standard
-              </div>
-
-              <h2 className="mt-5 text-3xl font-black tracking-[-0.035em] !text-white sm:text-4xl">
-                More opportunity, with trust built in.
-              </h2>
-
-              <p className="mt-5 max-w-2xl text-base leading-7 !text-slate-200 sm:text-lg">
-                SitGuru is built to help local pet care providers connect with
-                Pet Parents while keeping the experience clear, friendly, and
-                trust-focused for pets, families, and Gurus.
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-200 sm:text-xs">
+                Independent provider control
               </p>
+              <h2
+                className="mt-3 text-3xl font-black tracking-[-0.045em] !text-white sm:text-4xl"
+                style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }}
+              >
+                You decide how you work.
+              </h2>
+              <p className="mt-4 max-w-xl text-base font-semibold leading-7 !text-emerald-50">
+                SitGuru gives you a structured way to present your services and
+                review local booking opportunities without giving up control of
+                your schedule.
+              </p>
+
+              <div className="mt-6">
+                <PrimaryButton className="w-full bg-emerald-400 !text-emerald-950 hover:bg-emerald-300 sm:w-auto" />
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              {trustPoints.map((point) => (
+              {controlPoints.map((point) => (
                 <div
                   key={point}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm font-semibold !text-slate-100"
+                  className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-4 backdrop-blur"
                 >
-                  {point}
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-black !text-emerald-800">
+                    ✓
+                  </span>
+                  <span className="text-sm font-black !text-white">{point}</span>
                 </div>
               ))}
             </div>
@@ -629,39 +501,107 @@ export default function BecomeAGuruPage() {
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="bg-white py-12 sm:py-20">
+      <section className="bg-white py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-[32px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50 p-6 shadow-sm sm:p-10">
-            <div className="mx-auto max-w-3xl text-center">
-              <div className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-100 px-4 py-1.5 text-sm font-semibold !text-emerald-800">
-                Ready to connect with more Pet Parents?
-              </div>
-
-              <h2 className="mt-5 text-3xl font-black leading-tight tracking-[-0.035em] !text-slate-950 sm:text-4xl">
-                Join SitGuru free and create a profile Pet Parents can find.
-              </h2>
-
-              <p className="mx-auto mt-4 max-w-2xl text-base leading-7 !text-slate-700 sm:text-lg">
-                Show your services, choose your local focus, and give nearby Pet
-                Parents another trusted place to learn about you.
-              </p>
-
-              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-                <Link
-                  href={guruApplyLink}
-                  className="inline-flex min-h-14 w-full items-center justify-center rounded-full bg-emerald-600 px-7 py-4 text-base font-black !text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 sm:w-auto"
-                >
-                  Join Free as a Guru
-                </Link>
+          <div className="overflow-hidden rounded-[34px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-8">
+            <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-center">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
+                  Who can become a Guru?
+                </p>
+                <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
+                  Pet experience comes in many forms.
+                </h2>
+                <p className="mt-4 text-base font-semibold leading-7 !text-slate-700">
+                  SitGuru welcomes experienced pet-care providers and
+                  responsible local pet lovers who are prepared to describe
+                  their experience honestly and complete the required profile
+                  and trust steps.
+                </p>
 
                 <Link
-                  href={guruLoginLink}
-                  className="inline-flex min-h-14 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-7 py-4 text-base font-black !text-slate-800 shadow-sm transition hover:bg-slate-50 sm:w-auto"
+                  href="/programs"
+                  className="mt-6 inline-flex items-center gap-2 text-sm font-black !text-emerald-700 transition hover:!text-emerald-800 hover:underline"
                 >
-                  Guru Login
+                  Student, community, or military-connected? Explore SitGuru
+                  Programs →
                 </Link>
               </div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] !text-slate-500">
+                  Common Guru services
+                </p>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {serviceTypes.map((service) => (
+                    <div
+                      key={service}
+                      className="flex min-h-20 items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-4 text-center text-sm font-black !text-slate-800 shadow-sm"
+                    >
+                      {service}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-slate-50 py-12 sm:py-16">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
+              Guru questions
+            </p>
+            <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
+              Know what to expect before you start.
+            </h2>
+          </div>
+
+          <div className="mt-9 space-y-3">
+            {faqs.map((faq) => (
+              <details
+                key={faq.question}
+                className="group rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm open:border-emerald-200 open:shadow-md"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left">
+                  <span className="text-base font-black !text-slate-950 sm:text-lg">
+                    {faq.question}
+                  </span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-lg font-black !text-emerald-800 transition group-open:rotate-45">
+                    +
+                  </span>
+                </summary>
+                <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 !text-slate-600 sm:text-base">
+                  {faq.answer}
+                </p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white py-12 sm:py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-[34px] bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 px-6 py-10 text-center shadow-[0_24px_70px_rgba(6,78,59,0.24)] sm:px-10 sm:py-14">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-200 sm:text-xs">
+              Ready to get started?
+            </p>
+            <h2
+              className="mx-auto mt-3 max-w-3xl text-3xl font-black tracking-[-0.045em] !text-white sm:text-4xl"
+              style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }}
+            >
+              Earn caring for pets and build trusted local relationships.
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-7 !text-emerald-50">
+              Create your free Guru profile, choose how you want to provide
+              care, and complete the steps required to become bookable.
+            </p>
+
+            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+              <PrimaryButton className="w-full bg-emerald-400 !text-emerald-950 hover:bg-emerald-300 sm:w-auto" />
+              <GuruLoginButton className="w-full border-white/30 bg-white/10 !text-white hover:bg-white/15 sm:w-auto" />
             </div>
           </div>
         </div>
