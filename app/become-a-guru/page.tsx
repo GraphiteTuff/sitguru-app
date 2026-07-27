@@ -140,7 +140,7 @@ const faqs = [
       "Eligible paid bookings and Guru payouts are handled through SitGuru after the required payout setup is completed.",
   },
   {
-    question: "Do I need professional pet-care experience?",
+    question: "Do I need professional pet care experience?",
     answer:
       "You should describe your experience honestly. SitGuru welcomes experienced providers and responsible local pet lovers who are prepared to complete all required profile and trust steps.",
   },
@@ -358,7 +358,7 @@ export default function BecomeAGuruPage() {
               Built around your goals
             </p>
             <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
-              Grow your pet-care business your way.
+              Grow your pet care business your way.
             </h2>
           </div>
 
@@ -513,7 +513,7 @@ export default function BecomeAGuruPage() {
                   Pet experience comes in many forms.
                 </h2>
                 <p className="mt-4 text-base font-semibold leading-7 !text-slate-700">
-                  SitGuru welcomes experienced pet-care providers and
+                  SitGuru welcomes experienced pet care providers and
                   responsible local pet lovers who are prepared to describe
                   their experience honestly and complete the required profile
                   and trust steps.
