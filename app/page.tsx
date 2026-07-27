@@ -202,10 +202,11 @@ type GuruCard = {
   reviewCount: number;
   priceLabel: string;
   image: string;
-  imagePosition?: string;
+  imagePositionClass?: string;
   badge: string;
   href: string;
   isAcademyCertified?: boolean;
+  isFoundingGuru?: boolean;
 };
 
 type PublicAcademyCertificationResponse = {
@@ -385,6 +386,34 @@ function getGuruPriceLabel(guru: Guru) {
   return amount > 0 ? `From $${amount}` : "View care options";
 }
 
+function getGuruImagePositionClass(guru: Guru) {
+  const normalizedName = normalizeGuruDisplayName(getGuruName(guru));
+
+  const featuredImagePositions: Record<string, string> = {
+    "bethany staab":
+      "object-[center_18%] sm:object-[center_24%] lg:object-[center_30%]",
+    "millisant george":
+      "object-[center_3%] sm:object-[center_7%] lg:object-[center_10%]",
+    "norah wallace":
+      "object-[center_12%] sm:object-[center_18%] lg:object-[center_24%]",
+    "olivia goode":
+      "object-[center_10%] sm:object-[center_16%] lg:object-[center_22%]",
+  };
+
+  return (
+    featuredImagePositions[normalizedName] ||
+    "object-[center_18%] sm:object-[center_26%] lg:object-[center_34%]"
+  );
+}
+
+function isFoundingHomepageGuru(guru: Guru) {
+  const normalizedName = normalizeGuruDisplayName(getGuruName(guru));
+
+  return featuredHomepageGuruTargets.some(
+    (target) => target.fullName === normalizedName,
+  );
+}
+
 async function loadCertifiedHomepageGuruUserIds(guruUserIds: string[]) {
   const safeUserIds = Array.from(
     new Set(guruUserIds.map((id) => String(id || "").trim()).filter(Boolean)),
@@ -432,12 +461,13 @@ function mapGurusToCards(
       reviewCount: Number(guru.review_count || 0),
       priceLabel: getGuruPriceLabel(guru),
       image: getGuruPhotoUrl(guru),
-      imagePosition: "center 34%",
+      imagePositionClass: getGuruImagePositionClass(guru),
       badge: guru.is_verified ? "Verified" : "Profile",
       href: getGuruHref(guru),
       isAcademyCertified: userId
         ? certifiedGuruUserIds.has(userId)
         : false,
+      isFoundingGuru: isFoundingHomepageGuru(guru),
     };
   });
 }
@@ -453,8 +483,10 @@ function getMessengerInitials(name: string) {
 
 function HeroVisual({
   onActiveVideoChange,
+  onVideoTransitionChange,
 }: {
   onActiveVideoChange: (index: number) => void;
+  onVideoTransitionChange: (isTransitioning: boolean) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const transitionTimeoutRef = useRef<number | null>(null);
@@ -503,10 +535,12 @@ function HeroVisual({
       .then(() => {
         setIsVideoPaused(false);
         setIsVideoTransitioning(false);
+        onVideoTransitionChange(false);
       })
       .catch(() => {
         setIsVideoPaused(true);
         setIsVideoTransitioning(false);
+        onVideoTransitionChange(false);
       });
   }
 
@@ -516,6 +550,7 @@ function HeroVisual({
     }
 
     setIsVideoTransitioning(true);
+    onVideoTransitionChange(true);
     transitionTimeoutRef.current = window.setTimeout(() => {
       setActiveVideoIndex(
         (currentIndex) => (currentIndex + 1) % heroVideoPaths.length,
@@ -676,31 +711,32 @@ function GuruCardView({
       onClick={() => onTrack(`Guru Card ${guru.name}`, guru.href)}
       className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_20px_45px_rgba(15,23,42,0.12)]"
     >
-      <div className="relative h-56 overflow-hidden bg-slate-100">
+      <div className="relative h-72 overflow-hidden bg-slate-100 sm:h-64 lg:h-56">
         <img
           src={guru.image}
           alt={`${guru.name}, ${guru.role}`}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-          style={{ objectPosition: guru.imagePosition || "center 40%" }}
+          className={`h-full w-full object-cover transition duration-500 group-hover:scale-[1.02] ${
+            guru.imagePositionClass ||
+            "object-[center_18%] sm:object-[center_26%] lg:object-[center_34%]"
+          }`}
           loading="lazy"
         />
-
-        {guru.isAcademyCertified ? (
-          <div className="pointer-events-none absolute left-3 top-3 z-20">
-            <AcademyGraduateBadge
-              academyType="guru"
-              variant="photo-overlay"
-              className="h-[70px] w-[70px]"
-            />
-          </div>
-        ) : null}
-
-        <span className="absolute right-3 top-3 rounded-full bg-white/95 px-3 py-1 text-[10px] font-black text-emerald-800 shadow-sm">
-          {guru.badge}
-        </span>
       </div>
 
       <div className="p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {guru.isFoundingGuru ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-amber-900">
+              <span aria-hidden="true">★</span>
+              Founding Guru
+            </span>
+          ) : null}
+
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-800">
+            {guru.badge}
+          </span>
+        </div>
+
         <div className="flex items-start gap-2">
           <h3 className="min-w-0 flex-1 text-base font-black text-slate-950">
             {guru.name}
@@ -1468,6 +1504,7 @@ export default function HomePage() {
   const [isLoadingGurus, setIsLoadingGurus] = useState(true);
   const [source, setSource] = useState("direct");
   const [activeHeroVideoIndex, setActiveHeroVideoIndex] = useState(0);
+  const [isHeroVideoTransitioning, setIsHeroVideoTransitioning] = useState(false);
 
   const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
   const visibleGuruCards = useMemo(() => guruCards.slice(0, 4), [guruCards]);
@@ -1702,13 +1739,25 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-white text-slate-950">
       <section className="relative min-h-[920px] overflow-hidden bg-slate-950 sm:min-h-[860px] md:min-h-[790px] lg:min-h-[690px]">
-        <HeroVisual onActiveVideoChange={setActiveHeroVideoIndex} />
+        <HeroVisual
+          onActiveVideoChange={setActiveHeroVideoIndex}
+          onVideoTransitionChange={setIsHeroVideoTransitioning}
+        />
 
         <div className="relative z-10 mx-auto flex min-h-[920px] max-w-7xl px-4 sm:min-h-[860px] sm:px-6 md:min-h-[790px] lg:min-h-[690px] lg:items-center lg:px-8 lg:py-12">
           <div className="flex w-full max-w-3xl flex-col self-stretch pb-8 pt-12 sm:pb-10 sm:pt-14 md:pb-12 md:pt-16 lg:block lg:self-auto lg:py-0">
             <div>
-              <div className="inline-flex rounded-full border border-white/25 bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800 shadow-sm backdrop-blur">
-                {heroVideoLabels[activeHeroVideoIndex]}
+              <div
+                aria-live="polite"
+                className={`inline-flex min-h-7 items-center rounded-full border border-white/25 bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800 shadow-sm backdrop-blur transition-all duration-300 ease-out motion-reduce:transition-none ${
+                  isHeroVideoTransitioning
+                    ? "translate-y-1 opacity-0"
+                    : "translate-y-0 opacity-100"
+                }`}
+              >
+                <span key={activeHeroVideoIndex}>
+                  {heroVideoLabels[activeHeroVideoIndex]}
+                </span>
               </div>
 
               <h1
