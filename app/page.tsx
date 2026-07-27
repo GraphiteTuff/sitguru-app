@@ -54,6 +54,19 @@ const popularServices = [
   },
 ];
 
+type FeaturedHomepageGuruTarget = {
+  label: string;
+  fullName?: string;
+  firstName?: string;
+};
+
+const featuredHomepageGuruTargets: FeaturedHomepageGuruTarget[] = [
+  { label: "Bethany Staab", fullName: "bethany staab" },
+  { label: "Millisant George", fullName: "millisant george" },
+  { label: "Norah Wallace", fullName: "norah wallace" },
+  { label: "Olivia Goode", fullName: "olivia goode" },
+];
+
 const zipCodeFallbackMap: Record<
   string,
   { city: string; state: string; stateAbbreviation: string }
@@ -268,6 +281,50 @@ function buildSearchHref(searchForm: SearchFormState) {
 
 function getGuruName(guru: Guru) {
   return guru.display_name || guru.full_name || "Local Pet Guru";
+}
+
+function normalizeGuruDisplayName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function doesGuruMatchFeaturedTarget(
+  guru: Guru,
+  target: FeaturedHomepageGuruTarget,
+) {
+  const normalizedName = normalizeGuruDisplayName(getGuruName(guru));
+
+  if (target.fullName) {
+    return normalizedName === target.fullName;
+  }
+
+  if (target.firstName) {
+    const firstName = normalizedName.split(/\s+/)[0] || "";
+    return firstName === target.firstName;
+  }
+
+  return false;
+}
+
+function selectFeaturedHomepageGurus(gurus: Guru[]) {
+  const selectedGuruIds = new Set<string>();
+
+  return featuredHomepageGuruTargets
+    .map((target) => {
+      const match = gurus.find((guru) => {
+        const guruId = String(guru.id);
+        if (selectedGuruIds.has(guruId)) return false;
+
+        return doesGuruMatchFeaturedTarget(guru, target);
+      });
+
+      if (match) selectedGuruIds.add(String(match.id));
+      return match;
+    })
+    .filter((guru): guru is Guru => Boolean(guru));
 }
 
 function getGuruPhotoUrl(guru: Guru) {
@@ -511,7 +568,7 @@ function HeroVisual({
       <button
         type="button"
         onClick={toggleHeroVideo}
-        className="pointer-events-auto absolute bottom-5 right-5 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/45 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/25"
+        className="pointer-events-auto absolute right-5 top-5 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/45 text-sm font-black text-white shadow-lg backdrop-blur transition hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/25 sm:right-6 sm:top-6 lg:bottom-5 lg:right-5 lg:top-auto"
         aria-label={isVideoPaused ? "Play homepage videos" : "Pause homepage videos"}
         title={isVideoPaused ? "Play homepage videos" : "Pause homepage videos"}
       >
@@ -813,7 +870,7 @@ function CompactPartnerSection({
             SitGuru Partner Network
           </p>
           <h2 className="mt-1 text-xl font-black text-slate-950">
-            Growing with local pet-care organizations.
+            Growing with local pet care organizations.
           </h2>
         </div>
 
@@ -1451,7 +1508,7 @@ export default function HomePage() {
         .eq("is_active", true)
         .eq("is_public", true)
         .order("updated_at", { ascending: false, nullsFirst: false })
-        .limit(12);
+        .limit(100);
 
       if (!isMounted) return;
 
@@ -1475,20 +1532,37 @@ export default function HomePage() {
       const liveGuruRows = ((data || []) as Guru[]).filter(
         (guru) => guru.is_active !== false && guru.is_public !== false,
       );
-      const liveGuruUserIds = Array.from(
+      const featuredGuruRows = selectFeaturedHomepageGurus(liveGuruRows);
+      const missingFeaturedGuruNames = featuredHomepageGuruTargets
+        .filter(
+          (target) =>
+            !featuredGuruRows.some((guru) =>
+              doesGuruMatchFeaturedTarget(guru, target),
+            ),
+        )
+        .map((target) => target.label);
+
+      if (missingFeaturedGuruNames.length > 0) {
+        console.warn(
+          "Some featured homepage Gurus were not found as active, public profiles:",
+          missingFeaturedGuruNames.join(", "),
+        );
+      }
+
+      const featuredGuruUserIds = Array.from(
         new Set(
-          liveGuruRows
+          featuredGuruRows
             .map((guru) => getGuruCertificationUserId(guru))
             .filter(Boolean),
         ),
       );
       const certifiedGuruUserIds =
-        await loadCertifiedHomepageGuruUserIds(liveGuruUserIds);
+        await loadCertifiedHomepageGuruUserIds(featuredGuruUserIds);
 
       if (!isMounted) return;
 
       const liveGuruCards = mapGurusToCards(
-        liveGuruRows,
+        featuredGuruRows,
         certifiedGuruUserIds,
       );
 
@@ -1627,57 +1701,61 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-white text-slate-950">
-      <section className="relative min-h-[690px] overflow-hidden bg-slate-950">
+      <section className="relative min-h-[920px] overflow-hidden bg-slate-950 sm:min-h-[860px] md:min-h-[790px] lg:min-h-[690px]">
         <HeroVisual onActiveVideoChange={setActiveHeroVideoIndex} />
 
-        <div className="relative z-10 mx-auto flex min-h-[690px] max-w-7xl items-center px-4 py-12 sm:px-6 lg:px-8">
-          <div className="w-full max-w-3xl">
-            <div className="inline-flex rounded-full border border-white/25 bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800 shadow-sm backdrop-blur">
-              {heroVideoLabels[activeHeroVideoIndex]}
+        <div className="relative z-10 mx-auto flex min-h-[920px] max-w-7xl px-4 sm:min-h-[860px] sm:px-6 md:min-h-[790px] lg:min-h-[690px] lg:items-center lg:px-8 lg:py-12">
+          <div className="flex w-full max-w-3xl flex-col self-stretch pb-8 pt-12 sm:pb-10 sm:pt-14 md:pb-12 md:pt-16 lg:block lg:self-auto lg:py-0">
+            <div>
+              <div className="inline-flex rounded-full border border-white/25 bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800 shadow-sm backdrop-blur">
+                {heroVideoLabels[activeHeroVideoIndex]}
+              </div>
+
+              <h1
+                className="mt-5 max-w-3xl text-[2.8rem] font-black leading-[0.98] tracking-[-0.055em] drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)] sm:text-6xl lg:text-7xl"
+                style={{
+                  color: "#ffffff",
+                  WebkitTextFillColor: "#ffffff",
+                  textShadow:
+                    "0 4px 24px rgba(0,0,0,0.58), 0 2px 5px rgba(0,0,0,0.9)",
+                }}
+              >
+                Find trusted pet care near you.
+              </h1>
+
+              <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-white/90 drop-shadow sm:text-lg">
+                Book walks, drop-ins, sitting, boarding, and day care with local
+                Pet Gurus.
+              </p>
             </div>
 
-            <h1
-              className="mt-5 max-w-3xl text-[2.8rem] font-black leading-[0.98] tracking-[-0.055em] drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)] sm:text-6xl lg:text-7xl"
-              style={{
-                color: "#ffffff",
-                WebkitTextFillColor: "#ffffff",
-                textShadow:
-                  "0 4px 24px rgba(0,0,0,0.58), 0 2px 5px rgba(0,0,0,0.9)",
-              }}
-            >
-              Find trusted pet care near you.
-            </h1>
+            <div className="mt-auto pt-24 sm:pt-28 md:pt-20 lg:mt-8 lg:pt-0">
+              <div className="max-w-3xl">
+                <SearchPanel
+                  searchForm={searchForm}
+                  zipLookupMessage={zipLookupMessage}
+                  zipLookupStatus={zipLookupStatus}
+                  onSubmit={handleSearchSubmit}
+                  onChange={updateSearchField}
+                />
+              </div>
 
-            <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-white/90 drop-shadow sm:text-lg">
-              Book walks, drop-ins, sitting, boarding, and day care with local
-              Pet Gurus.
-            </p>
+              <div className="mt-5 flex flex-col gap-4 text-sm font-bold text-white sm:flex-row sm:items-center sm:gap-6">
+                <span>✓ Reviewed profiles</span>
+                <span>✓ Secure booking</span>
+                <span>✓ PawReport updates</span>
+              </div>
 
-            <div className="mt-8 max-w-3xl">
-              <SearchPanel
-                searchForm={searchForm}
-                zipLookupMessage={zipLookupMessage}
-                zipLookupStatus={zipLookupStatus}
-                onSubmit={handleSearchSubmit}
-                onChange={updateSearchField}
-              />
+              <Link
+                href={guruSignupHref}
+                onClick={() =>
+                  trackHomepageClick("Become a Guru Hero Link", guruSignupHref)
+                }
+                className="mt-5 inline-flex text-sm font-black text-emerald-300 hover:text-emerald-200 hover:underline"
+              >
+                Love caring for pets? Become a Guru →
+              </Link>
             </div>
-
-            <div className="mt-5 flex flex-col gap-4 text-sm font-bold text-white sm:flex-row sm:items-center sm:gap-6">
-              <span>✓ Reviewed profiles</span>
-              <span>✓ Secure booking</span>
-              <span>✓ PawReport updates</span>
-            </div>
-
-            <Link
-              href={guruSignupHref}
-              onClick={() =>
-                trackHomepageClick("Become a Guru Hero Link", guruSignupHref)
-              }
-              className="mt-5 inline-flex text-sm font-black text-emerald-300 hover:text-emerald-200 hover:underline"
-            >
-              Love caring for pets? Become a Guru →
-            </Link>
           </div>
         </div>
       </section>
