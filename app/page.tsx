@@ -61,10 +61,18 @@ type FeaturedHomepageGuruTarget = {
 };
 
 const featuredHomepageGuruTargets: FeaturedHomepageGuruTarget[] = [
-  { label: "Bethany Staab", fullName: "bethany staab" },
+  { label: "Adonai", firstName: "adonai" },
+  { label: "Amanda Costello", fullName: "amanda costello" },
+  { label: "Anna Fryer", fullName: "anna fryer" },
+  { label: "Carol Detweiler", fullName: "carol detweiler" },
+  { label: "George Medina", fullName: "george medina" },
+  { label: "Jazzy", firstName: "jazzy" },
+  { label: "Latavea Tillman", fullName: "latavea tillman" },
+  { label: "Marie Lao", fullName: "marie lao" },
   { label: "Millisant George", fullName: "millisant george" },
   { label: "Norah Wallace", fullName: "norah wallace" },
   { label: "Olivia Goode", fullName: "olivia goode" },
+  { label: "Vanessa Guedez", fullName: "vanessa guedez" },
 ];
 
 const zipCodeFallbackMap: Record<
@@ -203,6 +211,7 @@ type GuruCard = {
   priceLabel: string;
   image: string;
   imagePositionClass?: string;
+  imageScaleClass?: string;
   badge: string;
   href: string;
   isAcademyCertified?: boolean;
@@ -310,22 +319,33 @@ function doesGuruMatchFeaturedTarget(
   return false;
 }
 
-function selectFeaturedHomepageGurus(gurus: Guru[]) {
-  const selectedGuruIds = new Set<string>();
+function getFoundingGuruOrder(guru: Guru) {
+  return featuredHomepageGuruTargets.findIndex((target) =>
+    doesGuruMatchFeaturedTarget(guru, target),
+  );
+}
 
-  return featuredHomepageGuruTargets
-    .map((target) => {
-      const match = gurus.find((guru) => {
-        const guruId = String(guru.id);
-        if (selectedGuruIds.has(guruId)) return false;
+function orderHomepageGurus(gurus: Guru[]) {
+  return gurus
+    .map((guru, originalIndex) => ({
+      guru,
+      originalIndex,
+      foundingOrder: getFoundingGuruOrder(guru),
+    }))
+    .sort((left, right) => {
+      const leftIsFounding = left.foundingOrder >= 0;
+      const rightIsFounding = right.foundingOrder >= 0;
 
-        return doesGuruMatchFeaturedTarget(guru, target);
-      });
+      if (leftIsFounding && rightIsFounding) {
+        return left.foundingOrder - right.foundingOrder;
+      }
 
-      if (match) selectedGuruIds.add(String(match.id));
-      return match;
+      if (leftIsFounding) return -1;
+      if (rightIsFounding) return 1;
+
+      return left.originalIndex - right.originalIndex;
     })
-    .filter((guru): guru is Guru => Boolean(guru));
+    .map(({ guru }) => guru);
 }
 
 function getGuruPhotoUrl(guru: Guru) {
@@ -393,7 +413,7 @@ function getGuruImagePositionClass(guru: Guru) {
     "bethany staab":
       "object-[center_18%] sm:object-[center_24%] lg:object-[center_30%]",
     "millisant george":
-      "object-[center_3%] sm:object-[center_7%] lg:object-[center_10%]",
+      "object-[center_1%] sm:object-[center_4%] lg:object-[center_6%]",
     "norah wallace":
       "object-[center_12%] sm:object-[center_18%] lg:object-[center_24%]",
     "olivia goode":
@@ -406,11 +426,19 @@ function getGuruImagePositionClass(guru: Guru) {
   );
 }
 
-function isFoundingHomepageGuru(guru: Guru) {
+function getGuruImageScaleClass(guru: Guru) {
   const normalizedName = normalizeGuruDisplayName(getGuruName(guru));
 
-  return featuredHomepageGuruTargets.some(
-    (target) => target.fullName === normalizedName,
+  const featuredImageScales: Record<string, string> = {
+    "millisant george": "scale-[0.88] sm:scale-[0.9] lg:scale-[0.92]",
+  };
+
+  return featuredImageScales[normalizedName] || "";
+}
+
+function isFoundingHomepageGuru(guru: Guru) {
+  return featuredHomepageGuruTargets.some((target) =>
+    doesGuruMatchFeaturedTarget(guru, target),
   );
 }
 
@@ -701,21 +729,27 @@ function SearchPanel({
 function GuruCardView({
   guru,
   onTrack,
+  isClone = false,
 }: {
   guru: GuruCard;
   onTrack: (label: string, destination: string) => void;
+  isClone?: boolean;
 }) {
   return (
     <Link
       href={guru.href}
       onClick={() => onTrack(`Guru Card ${guru.name}`, guru.href)}
-      className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_20px_45px_rgba(15,23,42,0.12)]"
+      tabIndex={isClone ? -1 : undefined}
+      aria-hidden={isClone ? true : undefined}
+      className="block h-full overflow-hidden rounded-[26px] border border-emerald-100 bg-white shadow-[0_14px_35px_rgba(15,23,42,0.08)]"
     >
       <div className="relative h-72 overflow-hidden bg-slate-100 sm:h-64 lg:h-56">
         <img
           src={guru.image}
           alt={`${guru.name}, ${guru.role}`}
-          className={`h-full w-full object-cover transition duration-500 group-hover:scale-[1.02] ${
+          className={`h-full w-full object-cover ${
+            guru.imageScaleClass || ""
+          } ${
             guru.imagePositionClass ||
             "object-[center_18%] sm:object-[center_26%] lg:object-[center_34%]"
           }`}
@@ -898,47 +932,75 @@ function CompactPartnerSection({
 }: {
   onTrack: (label: string, destination: string) => void;
 }) {
+  const partners = [
+    {
+      name: "Doylestown Animal Medical Clinic",
+      href: "https://doylestownanimalmedicalclinic.com/",
+      image: "/images/partners/doylestown-animal-medical-clinic.png",
+      imageClassName: "h-16 w-full object-contain",
+      imageWrapperClassName: "bg-white",
+    },
+    {
+      name: "Outcast Rescue",
+      href: "https://www.outcastrescue.com/",
+      image: "/images/partners/outcast-rescue.webp",
+      imageClassName: "h-20 w-full object-contain",
+      imageWrapperClassName: "bg-black",
+    },
+    {
+      name: "Mostly Muttz Rescue",
+      href: "https://www.mostlymuttz.org/",
+      image:
+        "https://static.wixstatic.com/media/571106_b2fad3bdb2c84b218f39dd5d847cb0c3~mv2.jpg",
+      imageClassName: "h-16 w-full object-contain",
+      imageWrapperClassName: "bg-white",
+    },
+  ] as const;
+
   return (
-    <section className="border-y border-slate-100 bg-white py-8">
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-5 px-4 text-center sm:px-6 lg:flex-row lg:px-8 lg:text-left">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-            SitGuru Partner Network
-          </p>
-          <h2 className="mt-1 text-xl font-black text-slate-950">
-            Growing with local pet care organizations.
-          </h2>
+    <section className="border-y border-slate-100 bg-white py-10 sm:py-12">
+      <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+          SitGuru Partner Network
+        </p>
+        <h2 className="mx-auto mt-2 max-w-3xl text-2xl font-black tracking-[-0.035em] text-slate-950 sm:text-3xl">
+          Explore our growing network of local pet care partners.
+        </h2>
+
+        <div className="-mx-4 mt-7 overflow-x-auto px-4 py-7 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:overflow-visible">
+          <div className="mx-auto flex w-max flex-nowrap items-center gap-4 sm:gap-5">
+            {partners.map((partner) => (
+              <a
+                key={partner.name}
+                href={partner.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => onTrack(partner.name, partner.href)}
+                aria-label={`Visit ${partner.name}`}
+                className="relative z-0 flex h-32 w-[260px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition duration-300 ease-out hover:z-20 hover:-translate-y-1 hover:scale-[1.045] hover:border-emerald-300 hover:shadow-[0_20px_45px_rgba(15,23,42,0.16)] focus-visible:z-20 focus-visible:-translate-y-1 focus-visible:scale-[1.045] focus-visible:border-emerald-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 sm:w-72"
+              >
+                <div
+                  className={`flex h-full w-full items-center justify-center overflow-hidden rounded-xl px-4 ${partner.imageWrapperClassName}`}
+                >
+                  <img
+                    src={partner.image}
+                    alt={`${partner.name} logo`}
+                    className={partner.imageClassName}
+                    loading="lazy"
+                  />
+                </div>
+              </a>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-col items-center gap-4 sm:flex-row">
-          <a
-            href="https://doylestownanimalmedicalclinic.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() =>
-              onTrack(
-                "Doylestown Animal Medical Clinic",
-                "https://doylestownanimalmedicalclinic.com/",
-              )
-            }
-            className="flex min-h-20 w-72 items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-emerald-200 hover:shadow-md"
-          >
-            <img
-              src="/images/partners/doylestown-animal-medical-clinic.png"
-              alt="Doylestown Animal Medical Clinic logo"
-              className="max-h-14 w-full object-contain"
-              loading="lazy"
-            />
-          </a>
-
-          <Link
-            href="/contact"
-            onClick={() => onTrack("Become a SitGuru Partner", "/contact")}
-            className="text-sm font-black text-emerald-700 hover:underline"
-          >
-            Become a partner →
-          </Link>
-        </div>
+        <Link
+          href="/contact"
+          onClick={() => onTrack("Become a SitGuru Partner", "/contact")}
+          className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2.5 text-sm font-black text-emerald-700 hover:bg-emerald-50 hover:underline"
+        >
+          Become a partner →
+        </Link>
       </div>
     </section>
   );
@@ -1507,7 +1569,11 @@ export default function HomePage() {
   const [isHeroVideoTransitioning, setIsHeroVideoTransitioning] = useState(false);
 
   const searchHref = useMemo(() => buildSearchHref(searchForm), [searchForm]);
-  const visibleGuruCards = useMemo(() => guruCards.slice(0, 4), [guruCards]);
+  const visibleGuruCards = useMemo(() => guruCards, [guruCards]);
+  const guruCarouselDurationSeconds = Math.max(
+    visibleGuruCards.length * 6.5,
+    60,
+  );
 
   useEffect(() => {
     if ("scrollRestoration" in window.history) {
@@ -1569,11 +1635,11 @@ export default function HomePage() {
       const liveGuruRows = ((data || []) as Guru[]).filter(
         (guru) => guru.is_active !== false && guru.is_public !== false,
       );
-      const featuredGuruRows = selectFeaturedHomepageGurus(liveGuruRows);
+      const orderedGuruRows = orderHomepageGurus(liveGuruRows);
       const missingFeaturedGuruNames = featuredHomepageGuruTargets
         .filter(
           (target) =>
-            !featuredGuruRows.some((guru) =>
+            !orderedGuruRows.some((guru) =>
               doesGuruMatchFeaturedTarget(guru, target),
             ),
         )
@@ -1581,25 +1647,25 @@ export default function HomePage() {
 
       if (missingFeaturedGuruNames.length > 0) {
         console.warn(
-          "Some featured homepage Gurus were not found as active, public profiles:",
+          "Some Founding Gurus were not found as active, public profiles:",
           missingFeaturedGuruNames.join(", "),
         );
       }
 
-      const featuredGuruUserIds = Array.from(
+      const liveGuruUserIds = Array.from(
         new Set(
-          featuredGuruRows
+          orderedGuruRows
             .map((guru) => getGuruCertificationUserId(guru))
             .filter(Boolean),
         ),
       );
       const certifiedGuruUserIds =
-        await loadCertifiedHomepageGuruUserIds(featuredGuruUserIds);
+        await loadCertifiedHomepageGuruUserIds(liveGuruUserIds);
 
       if (!isMounted) return;
 
       const liveGuruCards = mapGurusToCards(
-        featuredGuruRows,
+        orderedGuruRows,
         certifiedGuruUserIds,
       );
 
@@ -1834,24 +1900,96 @@ export default function HomePage() {
           </div>
 
           {isLoadingGurus ? (
-            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {[0, 1, 2, 3].map((item) => (
-                <div
-                  key={item}
-                  className="h-[360px] animate-pulse rounded-3xl bg-slate-100"
-                />
-              ))}
+            <div className="-mx-4 mt-8 overflow-hidden px-4 pb-4">
+              <div className="flex w-max gap-4">
+                {[0, 1, 2, 3, 4, 5].map((item) => (
+                  <div
+                    key={item}
+                    className="h-[430px] w-[286px] shrink-0 animate-pulse rounded-[26px] bg-slate-100 sm:w-[300px] lg:w-[292px] xl:w-[300px]"
+                  />
+                ))}
+              </div>
             </div>
           ) : visibleGuruCards.length > 0 ? (
-            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {visibleGuruCards.map((guru) => (
-                <GuruCardView
-                  key={guru.id}
-                  guru={guru}
-                  onTrack={trackHomepageClick}
-                />
-              ))}
-            </div>
+            <>
+              <div
+                aria-label="All active SitGuru Pet Gurus"
+                aria-roledescription="carousel"
+                className="sitguru-guru-carousel-viewport -mx-4 mt-8 overflow-hidden px-4 py-8"
+              >
+                <div
+                  className="sitguru-guru-carousel-track flex w-max will-change-transform"
+                  style={{
+                    animationDuration: `${guruCarouselDurationSeconds}s`,
+                  }}
+                >
+                  {[0, 1].map((groupIndex) => (
+                    <div
+                      key={groupIndex}
+                      className="flex shrink-0 gap-4 pr-4"
+                      aria-hidden={groupIndex === 1 ? true : undefined}
+                    >
+                      {visibleGuruCards.map((guru) => (
+                        <div
+                          key={`${groupIndex}-${guru.id}`}
+                          className="sitguru-guru-carousel-card relative w-[286px] shrink-0 sm:w-[300px] lg:w-[292px] xl:w-[300px]"
+                        >
+                          <GuruCardView
+                            guru={guru}
+                            onTrack={trackHomepageClick}
+                            isClone={groupIndex === 1}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <style>{`
+                @keyframes sitguru-guru-carousel-loop {
+                  from {
+                    transform: translateX(0);
+                  }
+
+                  to {
+                    transform: translateX(-50%);
+                  }
+                }
+
+                .sitguru-guru-carousel-track {
+                  animation-name: sitguru-guru-carousel-loop;
+                  animation-timing-function: linear;
+                  animation-iteration-count: infinite;
+                }
+
+                .sitguru-guru-carousel-card {
+                  transform-origin: center center;
+                }
+
+                @media (hover: hover) and (pointer: fine) {
+                  .sitguru-guru-carousel-viewport:hover
+                    .sitguru-guru-carousel-track,
+                  .sitguru-guru-carousel-viewport:focus-within
+                    .sitguru-guru-carousel-track {
+                    animation-play-state: paused;
+                  }
+
+                  .sitguru-guru-carousel-card {
+                    transition:
+                      transform 280ms ease,
+                      filter 280ms ease;
+                  }
+
+                  .sitguru-guru-carousel-card:hover,
+                  .sitguru-guru-carousel-card:focus-within {
+                    z-index: 30;
+                    transform: scale(1.06);
+                    filter: drop-shadow(0 24px 34px rgba(15, 23, 42, 0.2));
+                  }
+                }
+              `}</style>
+            </>
           ) : (
             <div className="mt-8 rounded-3xl border border-emerald-100 bg-emerald-50 p-7 text-center">
               <h3 className="text-xl font-black text-slate-950">
