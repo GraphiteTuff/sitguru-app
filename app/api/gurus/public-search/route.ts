@@ -377,7 +377,6 @@ function isPlaceholderSearchGuru(guru: GuruRow) {
     qualityStatus === "placeholder" ||
     qualityStatus.includes("demo") ||
     qualityStatus.includes("seed") ||
-    bookingStatus === "listed_only" ||
     source.includes("seed") ||
     source.includes("demo")
   );
@@ -535,11 +534,23 @@ function chooseNumberValue(primary: unknown, secondary: unknown) {
     : primary;
 }
 
-function chooseSearchBoolean(primary: unknown, secondary: unknown): boolean | null | undefined {
+function chooseSearchBoolean(
+  primary: unknown,
+  secondary: unknown,
+): boolean | null | undefined {
   if (primary === true || secondary === true) return true;
   if (primary === false && secondary === false) return false;
   if (typeof primary === "boolean") return primary;
   if (typeof secondary === "boolean") return secondary;
+  return undefined;
+}
+
+function chooseBookingSafetyBoolean(
+  primary: unknown,
+  secondary: unknown,
+): boolean | null | undefined {
+  if (primary === false || secondary === false) return false;
+  if (primary === true || secondary === true) return true;
   return undefined;
 }
 
@@ -591,12 +602,15 @@ function mergeDuplicateGuruRows(current: GuruRow, incoming: GuruRow): GuruRow {
     is_public: chooseSearchBoolean(primary.is_public, secondary.is_public),
     is_public_visible: chooseSearchBoolean(primary.is_public_visible, secondary.is_public_visible),
     is_active: chooseSearchBoolean(primary.is_active, secondary.is_active),
-    is_bookable: chooseSearchBoolean(primary.is_bookable, secondary.is_bookable),
-    is_accepting_bookings: chooseSearchBoolean(
+    is_bookable: chooseBookingSafetyBoolean(
+      primary.is_bookable,
+      secondary.is_bookable,
+    ),
+    is_accepting_bookings: chooseBookingSafetyBoolean(
       primary.is_accepting_bookings,
       secondary.is_accepting_bookings,
     ),
-    accepting_bookings: chooseSearchBoolean(
+    accepting_bookings: chooseBookingSafetyBoolean(
       primary.accepting_bookings,
       secondary.accepting_bookings,
     ),
@@ -915,15 +929,45 @@ function getGuruCoordinates(guru: GuruRow) {
   return getFallbackCoordinatesForGuru(guru);
 }
 
-function getDisplayStatus(canBook: boolean, isPlaceholder: boolean) {
-  if (canBook) return "Bookable";
-  if (isPlaceholder) return "Profile Preview";
+function getPublicListingState(
+  guru: GuruRow,
+  canBook: boolean,
+  isPlaceholder: boolean,
+) {
+  if (isPlaceholder) return "preview";
+  if (canBook) return "bookable";
+
+  const bookingStatus = normalizeStatus(guru.booking_status);
+
+  if (
+    bookingStatus === "listed_only" ||
+    guru.is_public_visible === true ||
+    guru.is_public === true
+  ) {
+    return "listed_only";
+  }
+
+  return "preview";
+}
+
+function getDisplayStatus(
+  listingState: "bookable" | "listed_only" | "preview",
+) {
+  if (listingState === "bookable") return "Bookable";
+  if (listingState === "listed_only") return "Booking opens soon";
   return "Profile Preview";
 }
 
 function normalizeGuruForPublicSearch(guru: GuruRow) {
-  const isPlaceholder = isPlaceholderSearchGuru(guru) || isDemoSearchGuru(guru);
+  const isPlaceholder =
+    isPlaceholderSearchGuru(guru) || isDemoSearchGuru(guru);
   const canBook = isBookableSearchGuru(guru);
+  const listingState = getPublicListingState(
+    guru,
+    canBook,
+    isPlaceholder,
+  );
+  const isListedOnly = listingState === "listed_only";
   const radius = readNumber(
     guru.service_radius_miles || guru.radius_miles,
     isPlaceholder ? 50 : 25,
@@ -957,7 +1001,9 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
       : guru.application_status || (canBook ? "bookable" : "public"),
     booking_status: isPlaceholder
       ? "listed_only"
-      : guru.booking_status || (canBook ? "bookable" : "listed_only"),
+      : canBook
+        ? "bookable"
+        : "listed_only",
     admin_status: guru.admin_status || (isPlaceholder ? "placeholder" : "approved"),
     public_status: guru.public_status || "public",
     profile_quality_status:
@@ -972,9 +1018,19 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
     can_view_profile: true,
     can_book: canBook,
     is_placeholder: isPlaceholder,
+    is_listed_only: isListedOnly,
+    public_listing_state: listingState,
     profile_url: profileUrl,
     booking_url: bookingUrl,
-    display_status: getDisplayStatus(canBook, isPlaceholder),
+    display_status: getDisplayStatus(listingState),
+    booking_button_label: canBook ? "Book now" : "Booking opens soon",
+    booking_button_disabled: !canBook,
+    booking_button_variant: canBook ? "primary" : "subdued",
+    booking_message: canBook
+      ? "This Guru is accepting booking requests."
+      : isListedOnly
+        ? "This Guru is visible while finishing setup and is not accepting bookings yet."
+        : "This profile is available for preview only.",
     service_area_enabled: guru.service_area_enabled ?? true,
     service_radius_miles: Math.max(Number(radius || 25), isPlaceholder ? 50 : 1),
     radius_miles: Math.max(Number(radius || 25), isPlaceholder ? 50 : 1),
@@ -1067,9 +1123,24 @@ export async function GET(request: NextRequest) {
 
     const normalizedGurus = dedupeGuruRows(guruRows)
       .map(normalizeGuruForPublicSearch)
-      .sort((a, b) =>
-        String(a.display_name || "").localeCompare(String(b.display_name || "")),
-      );
+      .sort((a, b) => {
+        const rank = (guru: {
+          can_book?: boolean;
+          is_listed_only?: boolean;
+          is_placeholder?: boolean;
+        }) => {
+          if (guru.can_book) return 0;
+          if (guru.is_listed_only && !guru.is_placeholder) return 1;
+          return 2;
+        };
+
+        const rankDifference = rank(a) - rank(b);
+        if (rankDifference !== 0) return rankDifference;
+
+        return String(a.display_name || "").localeCompare(
+          String(b.display_name || ""),
+        );
+      });
 
     return NextResponse.json(
       {
@@ -1081,7 +1152,12 @@ export async function GET(request: NextRequest) {
                 overrides_loaded: overrides.length,
                 standalone_overrides_displayed: standaloneOverrideRows.length,
                 can_book_count: normalizedGurus.filter((guru) => guru.can_book).length,
-                placeholder_count: normalizedGurus.filter((guru) => guru.is_placeholder).length,
+                listed_only_count: normalizedGurus.filter(
+                  (guru) => guru.is_listed_only && !guru.is_placeholder,
+                ).length,
+                placeholder_count: normalizedGurus.filter(
+                  (guru) => guru.is_placeholder,
+                ).length,
                 mapped_count: normalizedGurus.filter((guru) => guru.map_latitude && guru.map_longitude).length,
                 source_results: sourceResults,
               },
