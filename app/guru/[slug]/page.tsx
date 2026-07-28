@@ -515,7 +515,13 @@ function getGuruName(
 }
 
 function getGuruTitle(profile: GuruProfile | null) {
-  return profile?.title || profile?.headline || "Trusted Pet Care Guru";
+  const explicitTitle = String(profile?.title || profile?.headline || "").trim();
+
+  if (explicitTitle) return explicitTitle;
+
+  return isBookable(profile)
+    ? "Trusted Pet Care Guru"
+    : "Guru profile setup in progress";
 }
 
 function getGuruLocation(profile: GuruProfile | null) {
@@ -730,7 +736,7 @@ function readNumber(value: unknown, fallback = 0) {
 function formatCurrencyAmount(value: number | string | null | undefined) {
   const amount = Number(value);
 
-  if (!Number.isFinite(amount) || amount < 0) return "";
+  if (!Number.isFinite(amount) || amount <= 0) return "";
 
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -789,7 +795,7 @@ function getExperienceYears(profile: GuruProfile | null) {
 }
 
 function getGuruRadius(profile: GuruProfile | null) {
-  if (!profile) return 25;
+  if (!profile) return null;
 
   const radius = [
     profile.service_radius_miles,
@@ -803,7 +809,7 @@ function getGuruRadius(profile: GuruProfile | null) {
     return Math.min(Math.round(radius), 100);
   }
 
-  return 25;
+  return null;
 }
 
 function getPublicIdentifier(profile: GuruProfile | null, fallback: string) {
@@ -994,8 +1000,8 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
     name: profile.name || fullName,
     first_name: firstName || null,
     last_name: lastName || null,
-    title: profile.title || profile.headline || "Trusted Pet Care Guru",
-    headline: profile.headline || profile.title || "Trusted Pet Care Guru",
+    title: profile.title || profile.headline || null,
+    headline: profile.headline || profile.title || null,
     bio:
       profile.bio ||
       "This Guru is building their SitGuru profile. More details about their care style, experience, and pet preferences will appear here soon.",
@@ -1012,9 +1018,9 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
       profile.service_radius_miles ||
       profile.service_radius ||
       profile.radius_miles ||
-      25,
-    service_radius: profile.service_radius || profile.service_radius_miles || 25,
-    radius_miles: profile.radius_miles || profile.service_radius_miles || 25,
+      null,
+    service_radius: profile.service_radius || profile.service_radius_miles || null,
+    radius_miles: profile.radius_miles || profile.service_radius_miles || null,
     profile_photo_url:
       profile.avatar_url || profile.profile_photo_url || profile.image_url || null,
     image_url: profile.avatar_url || profile.image_url || profile.profile_photo_url || null,
@@ -1036,9 +1042,9 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
       "profile_incomplete",
     role: "guru",
     account_type: "guru",
-    is_public: true,
-    is_active: profile.account_status === "suspended" ? false : true,
-    is_public_visible: profile.is_public_visible ?? null,
+    is_public: profile.is_public === true,
+    is_active: profile.is_active === true,
+    is_public_visible: profile.is_public_visible === true,
     is_bookable: false,
     is_accepting_bookings: profile.is_accepting_bookings ?? null,
     accepting_bookings: profile.accepting_bookings ?? null,
@@ -1481,8 +1487,8 @@ function normalizeGuruProfileFromBookingLookupRow(
     name: row.name || fullName || "Guru",
     first_name: firstName || null,
     last_name: lastName || null,
-    title: row.title || row.headline || "Trusted Pet Care Guru",
-    headline: row.headline || row.title || "Trusted Pet Care Guru",
+    title: row.title || row.headline || null,
+    headline: row.headline || row.title || null,
     bio: row.bio || null,
     city: row.city || row.service_city || null,
     state: row.state || row.service_state || null,
@@ -1498,9 +1504,9 @@ function normalizeGuruProfileFromBookingLookupRow(
       row.service_radius ||
       row.radius_miles ||
       row.radius ||
-      25,
-    service_radius: row.service_radius || row.service_radius_miles || 25,
-    radius_miles: row.radius_miles || row.service_radius_miles || 25,
+      null,
+    service_radius: row.service_radius || row.service_radius_miles || null,
+    radius_miles: row.radius_miles || row.service_radius_miles || null,
     profile_photo_url:
       row.profile_photo_url || row.photo_url || row.avatar_url || row.image_url || null,
     photo_url: row.photo_url || row.profile_photo_url || row.avatar_url || row.image_url || null,
@@ -1515,9 +1521,9 @@ function normalizeGuruProfileFromBookingLookupRow(
     status: row.status || row.application_status || row.approval_status || null,
     role: "guru",
     account_type: "guru",
-    is_public: row.is_public !== false,
-    is_active: row.is_active !== false,
-    is_public_visible: row.is_public_visible ?? null,
+    is_public: row.is_public === true,
+    is_active: row.is_active === true,
+    is_public_visible: row.is_public_visible === true,
     is_bookable: row.is_bookable === true,
     is_accepting_bookings: row.is_accepting_bookings ?? null,
     accepting_bookings: row.accepting_bookings ?? null,
@@ -1715,8 +1721,8 @@ function buildGuruProfileFromPublicSearchRow(row: Record<string, any>): GuruProf
     name: row.name || fullName || "Guru",
     first_name: firstName || null,
     last_name: lastName || null,
-    title: row.title || row.headline || "Trusted Pet Care Guru",
-    headline: row.headline || row.title || "Trusted Pet Care Guru",
+    title: row.title || row.headline || null,
+    headline: row.headline || row.title || null,
     bio: row.bio || null,
     city: row.city || row.service_city || null,
     state: row.state || row.service_state || null,
@@ -1732,9 +1738,9 @@ function buildGuruProfileFromPublicSearchRow(row: Record<string, any>): GuruProf
       row.service_radius ||
       row.radius_miles ||
       row.radius ||
-      25,
-    service_radius: row.service_radius || row.service_radius_miles || 25,
-    radius_miles: row.radius_miles || row.service_radius_miles || 25,
+      null,
+    service_radius: row.service_radius || row.service_radius_miles || null,
+    radius_miles: row.radius_miles || row.service_radius_miles || null,
     profile_photo_url:
       row.avatar_url || row.profile_photo_url || row.photo_url || row.image_url || null,
     image_url: row.avatar_url || row.image_url || row.profile_photo_url || row.photo_url || null,
@@ -1749,9 +1755,9 @@ function buildGuruProfileFromPublicSearchRow(row: Record<string, any>): GuruProf
     status: row.status || row.application_status || row.approval_status || null,
     role: "guru",
     account_type: "guru",
-    is_public: row.is_public !== false,
-    is_active: row.is_active !== false,
-    is_public_visible: row.is_public_visible ?? null,
+    is_public: row.is_public === true,
+    is_active: row.is_active === true,
+    is_public_visible: row.is_public_visible === true,
     is_bookable: row.is_bookable === true,
     is_accepting_bookings: row.is_accepting_bookings ?? null,
     accepting_bookings: row.accepting_bookings ?? null,
@@ -1953,6 +1959,49 @@ async function getGuruProfile(
   }
 
   return null;
+}
+
+async function isAdminUser(userId: string) {
+  if (!userId) return false;
+
+  const profileLookups = [
+    supabaseAdmin
+      .from("profiles")
+      .select("role, account_type")
+      .eq("id", userId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("profiles")
+      .select("role, account_type")
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ];
+
+  for (const lookup of profileLookups) {
+    try {
+      const result = await lookup;
+      const role = normalizeRole(
+        result.data?.role || result.data?.account_type || null,
+      );
+
+      if (!result.error && role === "admin") return true;
+    } catch {
+      // Continue to the role-table fallback.
+    }
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .limit(1);
+
+    return !error && Array.isArray(data) && data.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 async function getGuruBookings(
@@ -3152,10 +3201,12 @@ function PublicBookButton({
   disabled,
   href,
   className,
+  disabledLabel = "Not Bookable Yet",
 }: {
   disabled: boolean;
   href: string;
   className: string;
+  disabledLabel?: string;
 }) {
   if (disabled) {
     return (
@@ -3165,7 +3216,7 @@ function PublicBookButton({
         aria-disabled="true"
         className={`${className} cursor-not-allowed opacity-55`}
       >
-        Profile Preview
+        {disabledLabel}
       </button>
     );
   }
@@ -3183,12 +3234,14 @@ function PublicGuruProfilePage({
   identifier,
   universityProgress,
   reviews,
+  isPrivatePreview = false,
 }: {
   guruProfile: GuruProfile;
   serviceRates: GuruServiceRateRow[];
   identifier: string;
   universityProgress: GuruUniversityProgress;
   reviews: BookingReviewRow[];
+  isPrivatePreview?: boolean;
 }) {
   const name = getGuruName(guruProfile);
   const firstName = getFirstName(name);
@@ -3198,8 +3251,14 @@ function PublicGuruProfilePage({
   const baseRate = getBaseRate(guruProfile);
   const visibleReviews = getVisibleReviews(reviews);
   const reviewAverage = getAverageReviewRating(reviews);
-  const rating = reviewAverage > 0 ? reviewAverage : getGuruRating(guruProfile);
-  const reviewCount = visibleReviews.length || getReviewCount(guruProfile);
+  const storedReviewCount = getReviewCount(guruProfile);
+  const reviewCount = Math.max(visibleReviews.length, storedReviewCount);
+  const rating =
+    reviewCount > 0
+      ? reviewAverage > 0
+        ? reviewAverage
+        : getGuruRating(guruProfile)
+      : 0;
   const experienceYears = getExperienceYears(guruProfile);
   const serviceRadius = getGuruRadius(guruProfile);
   const bookHref = getBookHref(guruProfile, identifier);
@@ -3207,7 +3266,21 @@ function PublicGuruProfilePage({
   const bookable = isBookable(guruProfile);
   const isPlaceholderGuru = isPlaceholderGuruProfile(guruProfile);
   const disableBooking = isPlaceholderGuru || !bookable;
+  const disableMessaging = isPlaceholderGuru || !bookable;
   const isAcademyGraduate = universityProgress.isComplete;
+  const visibleServiceRates = serviceRates.filter(
+    (rate) => rate.is_enabled !== false,
+  );
+  const trustLabel = bookable
+    ? guruProfile.is_verified
+      ? "Verified Guru"
+      : "Approved Guru"
+    : "Pending Guru";
+  const rateDisplay =
+    baseRate ||
+    (hasEnabledPricedServiceRates(visibleServiceRates)
+      ? "By service"
+      : "Pending");
 
   return (
     <main
@@ -3222,6 +3295,19 @@ function PublicGuruProfilePage({
           ← Back to Find Care
         </Link>
 
+        {isPrivatePreview ? (
+          <div className="mb-6 rounded-[1.5rem] border border-amber-300 bg-amber-50 px-5 py-4 shadow-sm">
+            <p className="text-sm font-black uppercase tracking-[0.18em] !text-amber-800">
+              Admin Preview — Not Public
+            </p>
+            <p className="mt-1 text-sm font-bold leading-6 !text-amber-950">
+              This Guru is registered but still completing onboarding. Pet Parents
+              cannot find, message, or book this profile until Admin makes the Guru
+              bookable.
+            </p>
+          </div>
+        ) : null}
+
         <section className="overflow-hidden rounded-[2.3rem] border border-white bg-[radial-gradient(circle_at_18%_15%,rgba(255,255,255,0.42)_0%,transparent_28%),linear-gradient(105deg,#03d39c_0%,#72dec5_45%,#b9e3ff_100%)] shadow-[0_24px_52px_rgba(15,23,42,0.12)]">
           <div className="grid gap-8 p-8 lg:grid-cols-[1fr_1.1fr] lg:items-center lg:p-10">
             <PublicGuruHeroImage
@@ -3232,7 +3318,9 @@ function PublicGuruProfilePage({
 
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.34em] !text-[#07132f]">
-                SitGuru Public Guru Profile
+                {isPrivatePreview
+                  ? "SitGuru Guru Profile Preview"
+                  : "SitGuru Public Guru Profile"}
               </p>
 
               <h1 className="mt-4 text-5xl font-extrabold leading-[0.98] tracking-[-0.055em] !text-[#07132f] sm:text-6xl lg:text-7xl">
@@ -3246,7 +3334,7 @@ function PublicGuruProfilePage({
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-emerald-800 shadow-sm">
                   <GuruPawCrest className="h-6 w-6" />
-                  {guruProfile.is_verified ? "Verified Guru" : "Trusted Guru"}
+                  {trustLabel}
                 </div>
 
                 {isAcademyGraduate ? (
@@ -3258,7 +3346,7 @@ function PublicGuruProfilePage({
                 </div>
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-slate-900 shadow-sm">
-                  🗺️ {serviceRadius}-mile service area
+                  🗺️ {serviceRadius ? `${serviceRadius}-mile service area` : "Service radius pending"}
                 </div>
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-slate-900 shadow-sm">
@@ -3270,15 +3358,27 @@ function PublicGuruProfilePage({
                 <PublicBookButton
                   disabled={disableBooking}
                   href={bookHref}
+                  disabledLabel="Not Bookable Yet"
                   className="rounded-[1.2rem] bg-[#07132f] px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
                 />
 
-                <Link
-                  href={messageHref}
-                  className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
-                >
-                  Message Guru
-                </Link>
+                {disableMessaging ? (
+                  <button
+                    type="button"
+                    disabled
+                    aria-disabled="true"
+                    className="cursor-not-allowed rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-500 opacity-70 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70"
+                  >
+                    Messaging Unavailable
+                  </button>
+                ) : (
+                  <Link
+                    href={messageHref}
+                    className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
+                  >
+                    Message Guru
+                  </Link>
+                )}
 
                 <Link
                   href="/signup"
@@ -3289,9 +3389,9 @@ function PublicGuruProfilePage({
               </div>
 
               <p className="mt-4 max-w-2xl text-sm font-bold leading-6 !text-slate-700">
-                You can view Guru profiles without signing in. Booking or
-                messaging may ask Pet Parents to sign in so SitGuru can protect
-                both sides of the care request.
+                {bookable
+                  ? "Pet Parents may be asked to sign in before booking or messaging so SitGuru can protect both sides of the care request."
+                  : "This profile is still being completed and is not accepting bookings or messages yet."}
               </p>
             </div>
           </div>
@@ -3306,11 +3406,15 @@ function PublicGuruProfilePage({
           <StatCard label="Reviews" value={reviewCount} icon="💬" />
           <StatCard
             label="Experience"
-            value={experienceYears > 0 ? `${experienceYears}+` : "Listed"}
+            value={experienceYears > 0 ? `${experienceYears}+ years` : "Not provided"}
             icon="🐕"
           />
-          <StatCard label="Rate" value={baseRate || "By service"} icon="💚" />
-          <StatCard label="Service Area" value={`${serviceRadius} mi`} icon="📍" />
+          <StatCard label="Rate" value={rateDisplay} icon="💚" />
+          <StatCard
+            label="Service Area"
+            value={serviceRadius ? `${serviceRadius} mi` : "Pending"}
+            icon="📍"
+          />
         </section>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
@@ -3374,11 +3478,9 @@ function PublicGuruProfilePage({
             </p>
           </div>
 
-          {serviceRates.length ? (
+          {visibleServiceRates.length ? (
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {serviceRates
-                .filter((rate) => rate.is_enabled !== false)
-                .map((rate) => {
+              {visibleServiceRates.map((rate) => {
                   const formatted = formatServiceRate(rate);
 
                   return (
@@ -3498,18 +3600,22 @@ function PublicGuruProfilePage({
               </p>
 
               <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-                View trusted local pet care with {firstName}
+                {bookable
+                  ? `Connect with ${firstName} for trusted local pet care`
+                  : `${firstName}'s Guru profile is still being completed`}
               </h2>
 
               <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
-                View the profile, check services, and search more local Gurus
-                when you are ready.
+                {bookable
+                  ? "Review services and availability, then send a protected SitGuru booking request."
+                  : "This Guru is registered but not yet public or accepting bookings. Search for another currently bookable Guru."}
               </p>
             </div>
 
             <PublicBookButton
               disabled={disableBooking}
               href={bookHref}
+              disabledLabel="Not Bookable Yet"
               className="flex min-h-[58px] items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-4 text-base font-black !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] hover:bg-[#0b1436]"
             />
 
@@ -3964,15 +4070,13 @@ async function GuruDashboardView({
 export default async function GuruSlugPage({ params }: PageProps) {
   const resolvedParams = await params;
   const identifier = cleanIdentifier(resolvedParams.slug);
-
   const publicGuruProfile = await getPublicGuruProfile(identifier);
 
-  if (!publicGuruProfile || publicGuruProfile.is_active === false) {
+  if (!publicGuruProfile) {
     notFound();
   }
 
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -3981,6 +4085,13 @@ export default async function GuruSlugPage({ params }: PageProps) {
     Boolean(user?.id) &&
     Boolean(publicGuruProfile.user_id) &&
     user?.id === publicGuruProfile.user_id;
+
+  const isAdminViewer = user?.id ? await isAdminUser(user.id) : false;
+  const isPubliclyAvailable = isBookable(publicGuruProfile);
+
+  if (!isPubliclyAvailable && !isViewingOwnGuruProfile && !isAdminViewer) {
+    notFound();
+  }
 
   if (isViewingOwnGuruProfile && user) {
     const guruProfile = await getGuruProfile(user.id, user.email);
@@ -4029,6 +4140,7 @@ export default async function GuruSlugPage({ params }: PageProps) {
       identifier={identifier}
       universityProgress={universityProgress}
       reviews={reviews}
+      isPrivatePreview={!isPubliclyAvailable}
     />
   );
 }
