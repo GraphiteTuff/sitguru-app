@@ -419,17 +419,12 @@ function isPlaceholderGuruProfile(profile: GuruProfile | null) {
   const qualityStatus = String(profile.profile_quality_status || "")
     .trim()
     .toLowerCase();
-  const bookingStatus = String(profile.booking_status || "")
-    .trim()
-    .toLowerCase();
-
   return (
     PLACEHOLDER_GURU_FULL_NAMES.has(fullName) ||
     email.endsWith(PLACEHOLDER_EMAIL_DOMAIN) ||
     adminStatus === "placeholder" ||
     publicStatus === "visible_placeholder" ||
-    qualityStatus === "placeholder" ||
-    bookingStatus === "listed_only"
+    qualityStatus === "placeholder"
   );
 }
 
@@ -520,8 +515,8 @@ function getGuruTitle(profile: GuruProfile | null) {
   if (explicitTitle) return explicitTitle;
 
   return isBookable(profile)
-    ? "Trusted Pet Care Guru"
-    : "Guru profile setup in progress";
+    ? "Warm, dependable pet care with heart"
+    : "Getting ready to welcome local pets";
 }
 
 function getGuruLocation(profile: GuruProfile | null) {
@@ -532,7 +527,7 @@ function getGuruLocation(profile: GuruProfile | null) {
   if (city) return city;
   if (state) return state;
 
-  return "Service area pending";
+  return "My local community";
 }
 
 function getGuruImage(profile: GuruProfile | null) {
@@ -628,6 +623,91 @@ function isBookable(profile: GuruProfile | null) {
       hasGuruCommunicationEmail(profile) &&
       hasGuruServiceArea(profile),
   );
+}
+
+function isPubliclyVisibleGuruProfile(profile: GuruProfile | null) {
+  if (!profile) return false;
+
+  const status = String(profile.status || "").trim().toLowerCase();
+  const applicationStatus = String(profile.application_status || "")
+    .trim()
+    .toLowerCase();
+  const publicStatus = String(profile.public_status || "")
+    .trim()
+    .toLowerCase();
+  const bookingStatus = String(profile.booking_status || "")
+    .trim()
+    .toLowerCase();
+
+  const blockedStatuses = new Set([
+    "inactive",
+    "suspended",
+    "rejected",
+    "paused",
+    "deleted",
+    "archived",
+    "not_approved",
+    "not approved",
+    "hidden",
+  ]);
+
+  if (
+    profile.is_public === false ||
+    profile.is_public_visible === false ||
+    profile.is_active === false ||
+    blockedStatuses.has(status) ||
+    blockedStatuses.has(applicationStatus) ||
+    blockedStatuses.has(publicStatus)
+  ) {
+    return false;
+  }
+
+  return Boolean(
+    profile.is_public === true ||
+      profile.is_public_visible === true ||
+      [
+        "public",
+        "visible",
+        "visible_setup_in_progress",
+        "visible_placeholder",
+      ].includes(publicStatus) ||
+      ["public", "visible", "bookable"].includes(applicationStatus) ||
+      bookingStatus === "listed_only" ||
+      bookingStatus === "requestable" ||
+      bookingStatus === "bookable",
+  );
+}
+
+function getPublicAreaPhrase(profile: GuruProfile | null) {
+  const location = getGuruLocation(profile);
+
+  if (location === "My local community") {
+    return "my local community";
+  }
+
+  return `the ${location} area`;
+}
+
+function getFriendlyPublicBio(profile: GuruProfile | null) {
+  const name = getGuruName(profile);
+  const firstName = getFirstName(name);
+  const location = getGuruLocation(profile);
+  const rawBio = String(profile?.bio || "").trim();
+  const normalizedBio = rawBio.toLowerCase();
+  const looksSystemGenerated =
+    !rawBio ||
+    normalizedBio.includes("this guru is building") ||
+    normalizedBio.includes("more details about their care style") ||
+    normalizedBio.includes("profile setup in progress");
+
+  if (!looksSystemGenerated) return rawBio;
+
+  const area =
+    location === "My local community"
+      ? "my local community"
+      : `${location} and nearby communities`;
+
+  return `Hi, I’m ${firstName}! I’m so excited to offer warm, dependable pet care around ${area}. I’m adding a few more details about my care style, experience, and favorite ways to help pets feel happy and comfortable. Check back soon—there’s more tail-wagging goodness on the way! 🐾`;
 }
 
 function calculateProfileCompletion(profile: GuruProfile | null) {
@@ -1004,7 +1084,7 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
     headline: profile.headline || profile.title || null,
     bio:
       profile.bio ||
-      "This Guru is building their SitGuru profile. More details about their care style, experience, and pet preferences will appear here soon.",
+      "I’m so excited to offer pet care through SitGuru! I’m adding a few more details about my care style, experience, and the pets I love helping. Check back soon—there’s more tail-wagging goodness on the way! 🐾",
     city: profile.city || profile.service_city || null,
     state: profile.state || profile.service_state || null,
     service_city: profile.service_city || profile.city || null,
@@ -3201,12 +3281,14 @@ function PublicBookButton({
   disabled,
   href,
   className,
-  disabledLabel = "Not Bookable Yet",
+  disabledLabel = "Bookings opening soon 🐾",
+  activeLabel = "Book pet care",
 }: {
   disabled: boolean;
   href: string;
   className: string;
   disabledLabel?: string;
+  activeLabel?: string;
 }) {
   if (disabled) {
     return (
@@ -3214,7 +3296,7 @@ function PublicBookButton({
         type="button"
         disabled
         aria-disabled="true"
-        className={`${className} cursor-not-allowed opacity-55`}
+        className={`${className} cursor-default opacity-75`}
       >
         {disabledLabel}
       </button>
@@ -3223,7 +3305,7 @@ function PublicBookButton({
 
   return (
     <Link href={href} className={className}>
-      Book This Guru
+      {activeLabel}
     </Link>
   );
 }
@@ -3234,19 +3316,18 @@ function PublicGuruProfilePage({
   identifier,
   universityProgress,
   reviews,
-  isPrivatePreview = false,
 }: {
   guruProfile: GuruProfile;
   serviceRates: GuruServiceRateRow[];
   identifier: string;
   universityProgress: GuruUniversityProgress;
   reviews: BookingReviewRow[];
-  isPrivatePreview?: boolean;
 }) {
   const name = getGuruName(guruProfile);
   const firstName = getFirstName(name);
   const imageUrl = getGuruImage(guruProfile);
   const location = getGuruLocation(guruProfile);
+  const areaPhrase = getPublicAreaPhrase(guruProfile);
   const services = normalizeServices(guruProfile.services);
   const baseRate = getBaseRate(guruProfile);
   const visibleReviews = getVisibleReviews(reviews);
@@ -3273,43 +3354,31 @@ function PublicGuruProfilePage({
   );
   const trustLabel = bookable
     ? guruProfile.is_verified
-      ? "Verified Guru"
-      : "Approved Guru"
-    : "Pending Guru";
+      ? "Verified with SitGuru"
+      : "Ready to care"
+    : "New to SitGuru";
   const rateDisplay =
     baseRate ||
     (hasEnabledPricedServiceRates(visibleServiceRates)
       ? "By service"
-      : "Pending");
+      : "Coming soon");
+  const friendlyBio = getFriendlyPublicBio(guruProfile);
 
   return (
     <main
       className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light text-slate-900"
       style={SITE_FONT_STYLE}
     >
-      <section className="mx-auto max-w-[1440px] px-5 py-8 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <Link
           href="/search"
-          className="mb-6 inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black !text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+          className="mb-6 inline-flex min-h-[48px] items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black !text-emerald-800 shadow-sm transition hover:bg-emerald-50"
         >
-          ← Back to Find Care
+          ← Meet more local Gurus
         </Link>
 
-        {isPrivatePreview ? (
-          <div className="mb-6 rounded-[1.5rem] border border-amber-300 bg-amber-50 px-5 py-4 shadow-sm">
-            <p className="text-sm font-black uppercase tracking-[0.18em] !text-amber-800">
-              Admin Preview — Not Public
-            </p>
-            <p className="mt-1 text-sm font-bold leading-6 !text-amber-950">
-              This Guru is registered but still completing onboarding. Pet Parents
-              cannot find, message, or book this profile until Admin makes the Guru
-              bookable.
-            </p>
-          </div>
-        ) : null}
-
-        <section className="overflow-hidden rounded-[2.3rem] border border-white bg-[radial-gradient(circle_at_18%_15%,rgba(255,255,255,0.42)_0%,transparent_28%),linear-gradient(105deg,#03d39c_0%,#72dec5_45%,#b9e3ff_100%)] shadow-[0_24px_52px_rgba(15,23,42,0.12)]">
-          <div className="grid gap-8 p-8 lg:grid-cols-[1fr_1.1fr] lg:items-center lg:p-10">
+        <section className="overflow-hidden rounded-[2rem] border border-white bg-[radial-gradient(circle_at_18%_15%,rgba(255,255,255,0.42)_0%,transparent_28%),linear-gradient(105deg,#03d39c_0%,#72dec5_45%,#b9e3ff_100%)] shadow-[0_24px_52px_rgba(15,23,42,0.12)] sm:rounded-[2.3rem]">
+          <div className="grid gap-7 p-5 sm:p-8 lg:grid-cols-[1fr_1.1fr] lg:items-center lg:p-10">
             <PublicGuruHeroImage
               name={name}
               imageUrl={imageUrl}
@@ -3317,18 +3386,20 @@ function PublicGuruProfilePage({
             />
 
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.34em] !text-[#07132f]">
-                {isPrivatePreview
-                  ? "SitGuru Guru Profile Preview"
-                  : "SitGuru Public Guru Profile"}
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] !text-[#07132f] sm:tracking-[0.3em]">
+                {location === "My local community"
+                  ? `Hi, I’m ${firstName} — caring for pets in my local community`
+                  : `Hi, I’m ${firstName} — from the ${location} area`}
               </p>
 
-              <h1 className="mt-4 text-5xl font-extrabold leading-[0.98] tracking-[-0.055em] !text-[#07132f] sm:text-6xl lg:text-7xl">
-                Meet {firstName} 🐾
+              <h1 className="mt-4 text-4xl font-extrabold leading-[1] tracking-[-0.05em] !text-[#07132f] sm:text-6xl lg:text-7xl">
+                I can’t wait to meet your pet 🐾
               </h1>
 
-              <p className="mt-5 max-w-3xl text-xl font-light leading-9 !text-slate-700">
-                {getGuruTitle(guruProfile)}
+              <p className="mt-5 max-w-3xl text-lg font-semibold leading-8 !text-slate-700 sm:text-xl sm:leading-9">
+                {bookable
+                  ? `I’m excited to offer warm, dependable pet care around ${areaPhrase}. Take a look at my services, and let’s find the right care for your pet.`
+                  : `I’m excited to offer loving pet care around ${areaPhrase}. I’m adding the finishing touches to my SitGuru profile, and bookings will be opening soon!`}
               </p>
 
               <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -3342,24 +3413,27 @@ function PublicGuruProfilePage({
                 ) : null}
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-slate-900 shadow-sm">
-                  📍 {location}
+                  📍 Proudly serving {location}
                 </div>
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-slate-900 shadow-sm">
-                  🗺️ {serviceRadius ? `${serviceRadius}-mile service area` : "Service radius pending"}
+                  🗺️ {serviceRadius
+                    ? `Happy to travel within ${serviceRadius} miles`
+                    : "My local care area is coming together"}
                 </div>
 
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/85 px-4 py-2 text-sm font-black !text-slate-900 shadow-sm">
-                  {bookable && !disableBooking ? "✅ Bookable" : "📝 Profile setup"}
+                  {bookable ? "✨ Ready to care" : "🐾 Bookings opening soon"}
                 </div>
               </div>
 
-              <div className="mt-8 flex flex-wrap gap-4">
+              <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap">
                 <PublicBookButton
                   disabled={disableBooking}
                   href={bookHref}
-                  disabledLabel="Not Bookable Yet"
-                  className="rounded-[1.2rem] bg-[#07132f] px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436]"
+                  activeLabel={`Book with ${firstName}`}
+                  disabledLabel="Bookings opening soon 🐾"
+                  className="flex min-h-[56px] w-full items-center justify-center rounded-[1.2rem] bg-[#07132f] px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:-translate-y-0.5 hover:bg-[#0b1436] sm:w-auto"
                 />
 
                 {disableMessaging ? (
@@ -3367,79 +3441,78 @@ function PublicGuruProfilePage({
                     type="button"
                     disabled
                     aria-disabled="true"
-                    className="cursor-not-allowed rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-500 opacity-70 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70"
+                    className="min-h-[56px] w-full cursor-default rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-600 opacity-80 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 sm:w-auto"
                   >
-                    Messaging Unavailable
+                    Say hi soon 💬
                   </button>
                 ) : (
                   <Link
                     href={messageHref}
-                    className="rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white"
+                    className="flex min-h-[56px] w-full items-center justify-center rounded-[1.2rem] bg-white/90 px-7 py-4 text-base font-extrabold !text-slate-900 shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:bg-white sm:w-auto"
                   >
-                    Message Guru
+                    Say hi to {firstName}
                   </Link>
                 )}
 
                 <Link
                   href="/signup"
-                  className="rounded-[1.2rem] bg-emerald-700 px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(5,150,105,0.18)] transition hover:-translate-y-0.5 hover:bg-emerald-800"
+                  className="flex min-h-[56px] w-full items-center justify-center rounded-[1.2rem] bg-emerald-700 px-7 py-4 text-base font-extrabold !text-white shadow-[0_12px_28px_rgba(5,150,105,0.18)] transition hover:-translate-y-0.5 hover:bg-emerald-800 sm:w-auto"
                 >
-                  Sign Up Free
+                  Join SitGuru Free
                 </Link>
               </div>
 
               <p className="mt-4 max-w-2xl text-sm font-bold leading-6 !text-slate-700">
                 {bookable
-                  ? "Pet Parents may be asked to sign in before booking or messaging so SitGuru can protect both sides of the care request."
-                  : "This profile is still being completed and is not accepting bookings or messages yet."}
+                  ? "Sign in when you’re ready to book or message—I’d love to learn more about your pet!"
+                  : "I’m putting on the final touches before bookings and messages open. Check back soon—I’d love to meet you and your pet!"}
               </p>
             </div>
           </div>
         </section>
 
-        <section className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <StatCard
-            label="Rating"
-            value={rating > 0 ? rating.toFixed(1) : "New"}
+            label="Pet Parent love"
+            value={rating > 0 ? rating.toFixed(1) : "New here"}
             icon="⭐"
           />
-          <StatCard label="Reviews" value={reviewCount} icon="💬" />
+          <StatCard label="Kind words" value={reviewCount} icon="💬" />
           <StatCard
-            label="Experience"
-            value={experienceYears > 0 ? `${experienceYears}+ years` : "Not provided"}
+            label="My experience"
+            value={experienceYears > 0 ? `${experienceYears}+ years` : "More soon"}
             icon="🐕"
           />
-          <StatCard label="Rate" value={rateDisplay} icon="💚" />
+          <StatCard label="Care rates" value={rateDisplay} icon="💚" />
           <StatCard
-            label="Service Area"
-            value={serviceRadius ? `${serviceRadius} mi` : "Pending"}
+            label="My care zone"
+            value={serviceRadius ? `${serviceRadius} mi` : "Local area"}
             icon="📍"
           />
         </section>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
-            <p className="text-xs font-black uppercase tracking-[0.28em] !text-[#07132f]">
-              About This Guru
+            <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-700">
+              A little about me
             </p>
 
             <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-              {name}
+              Hi, I’m {firstName} 👋
             </h2>
 
             <p className="mt-4 whitespace-pre-line text-base font-bold leading-8 !text-slate-700">
-              {guruProfile.bio ||
-                "This Guru is building their SitGuru profile. More details about their care style, experience, and pet preferences will appear here soon."}
+              {friendlyBio}
             </p>
           </div>
 
           <aside className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
-            <p className="text-xs font-black uppercase tracking-[0.28em] !text-[#07132f]">
-              Services
+            <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-700">
+              How I’d love to help
             </p>
 
             <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-              Care offered
+              Care made for your pet
             </h2>
 
             <div className="mt-5 grid gap-3">
@@ -3449,12 +3522,12 @@ function PublicGuruProfilePage({
                     key={service}
                     className="rounded-full bg-emerald-50 px-4 py-3 text-sm font-black !text-emerald-800 ring-1 ring-emerald-100"
                   >
-                    {service}
+                    🐾 {service}
                   </span>
                 ))
               ) : (
-                <span className="rounded-full bg-amber-50 px-4 py-3 text-sm font-black !text-amber-800 ring-1 ring-amber-100">
-                  Services pending
+                <span className="rounded-[1.25rem] bg-amber-50 px-4 py-4 text-sm font-black leading-6 !text-amber-900 ring-1 ring-amber-100">
+                  I’m putting together my care options now—more tail-wagging details are coming soon!
                 </span>
               )}
             </div>
@@ -3464,60 +3537,60 @@ function PublicGuruProfilePage({
         <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.28em] !text-[#07132f]">
-                Service Rates
+              <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-700">
+                My care rates
               </p>
 
               <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-                Pricing details
+                Simple, clear pricing
               </h2>
             </div>
 
             <p className="text-sm font-bold !text-slate-600">
-              Final care details are confirmed during booking.
+              I’ll confirm every care detail with you before your booking begins.
             </p>
           </div>
 
           {visibleServiceRates.length ? (
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {visibleServiceRates.map((rate) => {
-                  const formatted = formatServiceRate(rate);
+                const formatted = formatServiceRate(rate);
 
-                  return (
-                    <div
-                      key={String(
-                        rate.id || `${rate.guru_id}-${rate.service_key}`,
-                      )}
-                      className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 shadow-sm"
-                    >
-                      <p className="text-lg font-black !text-slate-900">
-                        {rate.service_label || "Pet care service"}
+                return (
+                  <div
+                    key={String(
+                      rate.id || `${rate.guru_id}-${rate.service_key}`,
+                    )}
+                    className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 shadow-sm"
+                  >
+                    <p className="text-lg font-black !text-slate-900">
+                      {rate.service_label || "Personalized pet care"}
+                    </p>
+
+                    <p className="mt-2 text-3xl font-black !text-emerald-700">
+                      {formatted.primary}
+                      <span className="ml-1 text-sm font-bold !text-slate-600">
+                        {formatted.detail}
+                      </span>
+                    </p>
+
+                    {rate.notes ? (
+                      <p className="mt-3 text-sm font-bold leading-6 !text-slate-600">
+                        {rate.notes}
                       </p>
-
-                      <p className="mt-2 text-3xl font-black !text-emerald-700">
-                        {formatted.primary}
-                        <span className="ml-1 text-sm font-bold !text-slate-600">
-                          {formatted.detail}
-                        </span>
-                      </p>
-
-                      {rate.notes ? (
-                        <p className="mt-3 text-sm font-bold leading-6 !text-slate-600">
-                          {rate.notes}
-                        </p>
-                      ) : null}
-                    </div>
-                  );
-                })}
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <div className="mt-6 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+            <div className="mt-6 rounded-[1.5rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-8 text-center">
               <h3 className="text-xl font-black !text-slate-900">
-                Rates are being finalized
+                My rates are almost ready 💚
               </h3>
 
               <p className="mx-auto mt-2 max-w-xl text-sm font-bold leading-6 !text-slate-700">
-                Profile details are available while booking setup is finalized.
+                I’m adding the finishing touches so everything feels simple and clear when bookings open.
               </p>
             </div>
           )}
@@ -3526,26 +3599,26 @@ function PublicGuruProfilePage({
         <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_42px_rgba(15,23,42,0.08)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.28em] !text-[#07132f]">
-                Reviews & Trust
+              <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-700">
+                Happy tails & kind words
               </p>
               <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
-                Real Pet Parent feedback
+                What pet families are saying
               </h2>
               <p className="mt-2 max-w-3xl text-sm font-bold leading-6 !text-slate-700">
-                SitGuru only shows real review signals when reviews exist. New Gurus stay marked as New until Pet Parents submit feedback after completed bookings.
+                Every review here comes from a real SitGuru care experience.
               </p>
             </div>
 
             <div className="rounded-[1.4rem] border border-emerald-200 bg-emerald-50 px-5 py-4 text-center">
               <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
-                Current Rating
+                Pet Parent love
               </p>
               <p className="mt-1 text-3xl font-black !text-slate-950">
                 {rating > 0 ? rating.toFixed(1) : "New"}
               </p>
               <p className="text-xs font-bold !text-slate-600">
-                {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
+                {reviewCount} {reviewCount === 1 ? "kind word" : "kind words"}
               </p>
             </div>
           </div>
@@ -3553,7 +3626,10 @@ function PublicGuruProfilePage({
           {visibleReviews.length ? (
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {visibleReviews.slice(0, 6).map((review) => {
-                const reviewRating = Math.max(1, Math.min(5, Math.round(readNumber(review.rating, 0))));
+                const reviewRating = Math.max(
+                  1,
+                  Math.min(5, Math.round(readNumber(review.rating, 0))),
+                );
 
                 return (
                   <article
@@ -3569,11 +3645,12 @@ function PublicGuruProfilePage({
                       </span>
                     </div>
                     <p className="mt-4 line-clamp-5 text-sm font-bold leading-6 !text-slate-700">
-                      {review.review_text || "This Pet Parent shared a positive SitGuru care experience."}
+                      {review.review_text ||
+                        "A Pet Parent shared a lovely SitGuru care experience."}
                     </p>
                     {review.would_rebook ? (
                       <p className="mt-4 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-800 ring-1 ring-emerald-100">
-                        Would book again
+                        Would happily book again 🐾
                       </p>
                     ) : null}
                   </article>
@@ -3581,12 +3658,12 @@ function PublicGuruProfilePage({
               })}
             </div>
           ) : (
-            <div className="mt-6 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+            <div className="mt-6 rounded-[1.5rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-8 text-center">
               <h3 className="text-xl font-black !text-slate-900">
-                New Guru review profile
+                My SitGuru story is just getting started ✨
               </h3>
               <p className="mx-auto mt-2 max-w-xl text-sm font-bold leading-6 !text-slate-700">
-                Reviews will appear here after completed SitGuru bookings. Until then, Pet Parents can review this Guru’s profile, services, pricing, service area, and SitGuru Academy badge status.
+                I’m new here, and I can’t wait to meet local pets, earn their families’ trust, and collect my first happy-tail review.
               </p>
             </div>
           )}
@@ -3596,26 +3673,27 @@ function PublicGuruProfilePage({
           <div className="grid gap-5 lg:grid-cols-[1fr_260px_260px] lg:items-center">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-800">
-                Ready to connect?
+                One more paw-some thing
               </p>
 
               <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] !text-[#07132f]">
                 {bookable
-                  ? `Connect with ${firstName} for trusted local pet care`
-                  : `${firstName}'s Guru profile is still being completed`}
+                  ? `Ready to plan care with ${firstName}?`
+                  : "I can’t wait to meet your pet"}
               </h2>
 
               <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
                 {bookable
-                  ? "Review services and availability, then send a protected SitGuru booking request."
-                  : "This Guru is registered but not yet public or accepting bookings. Search for another currently bookable Guru."}
+                  ? `Take a look at my services and availability, then send a secure SitGuru care request when you’re ready.`
+                  : `My profile is live, and I’m finishing a few final details before bookings open. Check back soon—or meet more wonderful SitGuru caregivers nearby.`}
               </p>
             </div>
 
             <PublicBookButton
               disabled={disableBooking}
               href={bookHref}
-              disabledLabel="Not Bookable Yet"
+              activeLabel={`Book with ${firstName}`}
+              disabledLabel="Bookings opening soon 🐾"
               className="flex min-h-[58px] items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-4 text-base font-black !text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] hover:bg-[#0b1436]"
             />
 
@@ -3623,7 +3701,7 @@ function PublicGuruProfilePage({
               href="/search"
               className="flex min-h-[58px] items-center justify-center rounded-[1rem] border border-emerald-200 bg-white px-6 py-4 text-base font-black !text-emerald-800 shadow-sm hover:bg-emerald-50"
             >
-              Search More Gurus
+              Meet more local Gurus
             </Link>
           </div>
         </section>
@@ -4087,9 +4165,9 @@ export default async function GuruSlugPage({ params }: PageProps) {
     user?.id === publicGuruProfile.user_id;
 
   const isAdminViewer = user?.id ? await isAdminUser(user.id) : false;
-  const isPubliclyAvailable = isBookable(publicGuruProfile);
+  const isPubliclyVisible = isPubliclyVisibleGuruProfile(publicGuruProfile);
 
-  if (!isPubliclyAvailable && !isViewingOwnGuruProfile && !isAdminViewer) {
+  if (!isPubliclyVisible && !isViewingOwnGuruProfile && !isAdminViewer) {
     notFound();
   }
 
@@ -4140,7 +4218,6 @@ export default async function GuruSlugPage({ params }: PageProps) {
       identifier={identifier}
       universityProgress={universityProgress}
       reviews={reviews}
-      isPrivatePreview={!isPubliclyAvailable}
     />
   );
 }
