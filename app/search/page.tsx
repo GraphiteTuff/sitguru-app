@@ -44,6 +44,7 @@ type GuruRow = {
   service_state?: string | null;
   service_zip?: string | null;
   service_zip_code?: string | null;
+  service_area?: string | null;
   status?: string | null;
   application_status?: string | null;
   is_bookable?: boolean | null;
@@ -82,6 +83,12 @@ type GuruRow = {
   can_view_profile?: boolean | null;
   can_book?: boolean | null;
   is_placeholder?: boolean | null;
+  is_listed_only?: boolean | null;
+  public_listing_state?: string | null;
+  booking_button_label?: string | null;
+  booking_button_disabled?: boolean | null;
+  booking_button_variant?: string | null;
+  booking_message?: string | null;
   profile_url?: string | null;
   booking_url?: string | null;
   map_latitude?: number | string | null;
@@ -228,11 +235,25 @@ function Card({
   );
 }
 
-function formatLocation(city?: string | null, state?: string | null) {
-  if (city && state) return `${city}, ${state}`;
-  if (city) return city;
-  if (state) return state;
-  return "Location not listed";
+function formatLocation(
+  city?: string | null,
+  state?: string | null,
+  zip?: string | null,
+) {
+  const cleanCity = String(city || "").trim();
+  const cleanState = normalizeStateCode(state);
+  const cleanPostalCode = cleanZip(zip);
+
+  const cityState = [cleanCity, cleanState].filter(Boolean).join(", ");
+
+  if (cityState && cleanPostalCode) {
+    return `${cityState} · ${cleanPostalCode}`;
+  }
+
+  if (cityState) return cityState;
+  if (cleanPostalCode) return `Proudly serving ZIP ${cleanPostalCode}`;
+
+  return "Proudly serving the local pet community";
 }
 
 const RATE_UNIT_LABELS: Record<string, string> = {
@@ -381,7 +402,7 @@ function formatServiceRate(rate: GuruServiceRate) {
 
   if (!amount) {
     return {
-      primary: "Rate pending",
+      primary: "Rates coming soon",
       detail: rate.service_label || "Rates by service",
     };
   }
@@ -436,8 +457,8 @@ function getGuruRateDisplay(
 
   return {
     eyebrow: "Rate",
-    primary: fallbackRate === null ? "Rate pending" : `$${fallbackRate}`,
-    detail: fallbackRate === null ? "Rates not listed" : "/hr",
+    primary: fallbackRate === null ? "Rates coming soon" : `$${fallbackRate}`,
+    detail: fallbackRate === null ? "Care rates coming soon" : "/hr",
     serviceLabel: "Base hourly rate",
     isFallback: true,
   };
@@ -447,16 +468,104 @@ function getGuruName(guru: GuruRow) {
   return guru.display_name || guru.full_name || guru.name || "Guru";
 }
 
+function parseGuruServiceArea(value?: string | null) {
+  const raw = String(value || "").trim();
+
+  if (!raw) {
+    return {
+      city: "",
+      state: "",
+      zip: "",
+    };
+  }
+
+  const zip = cleanZip(raw);
+  const withoutZip = raw
+    .replace(/\b\d{5}(?:-\d{4})?\b/g, "")
+    .replace(/[·|]/g, ",")
+    .replace(/\s+/g, " ")
+    .replace(/^[,\s]+|[,\s]+$/g, "")
+    .trim();
+
+  const commaParts = withoutZip
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (commaParts.length >= 2) {
+    return {
+      city: commaParts[0],
+      state: normalizeStateCode(commaParts[1]),
+      zip,
+    };
+  }
+
+  const stateMatch = withoutZip.match(/\b([A-Za-z]{2})$/);
+
+  if (stateMatch) {
+    return {
+      city: withoutZip.slice(0, stateMatch.index).trim(),
+      state: normalizeStateCode(stateMatch[1]),
+      zip,
+    };
+  }
+
+  return {
+    city: withoutZip,
+    state: "",
+    zip,
+  };
+}
+
 function getGuruCity(guru: GuruRow) {
-  return String(guru.service_city || guru.city || "").trim();
+  const parsedServiceArea = parseGuruServiceArea(guru.service_area);
+
+  return String(
+    guru.service_city ||
+      guru.city ||
+      parsedServiceArea.city ||
+      "",
+  ).trim();
 }
 
 function getGuruState(guru: GuruRow) {
-  return String(guru.service_state || guru.state || "").trim();
+  const parsedServiceArea = parseGuruServiceArea(guru.service_area);
+
+  return normalizeStateCode(
+    String(
+      guru.service_state ||
+        guru.state ||
+        parsedServiceArea.state ||
+        "",
+    ).trim(),
+  );
 }
 
 function getGuruZip(guru: GuruRow) {
-  return cleanZip(guru.service_zip || guru.service_zip_code || guru.zip_code || "");
+  const parsedServiceArea = parseGuruServiceArea(guru.service_area);
+
+  return cleanZip(
+    guru.service_zip ||
+      guru.service_zip_code ||
+      guru.zip_code ||
+      parsedServiceArea.zip ||
+      "",
+  );
+}
+
+function getGuruDisplayLocation(
+  guru: GuruRow,
+  guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
+) {
+  const zip = getGuruZip(guru);
+  const zipLookup = zip ? guruZipLookupsByZip[zip] : null;
+
+  const city = getGuruCity(guru) || String(zipLookup?.city || "").trim();
+  const state =
+    getGuruState(guru) ||
+    normalizeStateCode(zipLookup?.state || zipLookup?.stateName || "");
+
+  return formatLocation(city, state, zip);
 }
 
 function isNegativeGuruStatus(value?: string | null) {
@@ -546,9 +655,6 @@ function isPlaceholderSearchGuru(guru: GuruRow) {
   const qualityStatus = String(guru.profile_quality_status || "")
     .trim()
     .toLowerCase();
-  const bookingStatus = String(guru.booking_status || "")
-    .trim()
-    .toLowerCase();
   const source = String(guru.source || guru.profile_source || guru.search_source || "")
     .trim()
     .toLowerCase();
@@ -560,10 +666,8 @@ function isPlaceholderSearchGuru(guru: GuruRow) {
     qualityStatus.includes("demo") ||
     qualityStatus.includes("seed") ||
     qualityStatus.includes("fallback") ||
-    bookingStatus === "listed_only" ||
     source.includes("seed") ||
-    source.includes("demo") ||
-    source.includes("canonical")
+    source.includes("demo")
   );
 }
 
@@ -1392,6 +1496,15 @@ function chooseSearchBoolean(
   return undefined;
 }
 
+function chooseBookingSafetyBoolean(
+  primary: unknown,
+  secondary: unknown,
+): boolean | null | undefined {
+  if (primary === false || secondary === false) return false;
+  if (primary === true || secondary === true) return true;
+  return undefined;
+}
+
 function mergeServices(primary?: string[] | null, secondary?: string[] | null) {
   const services = [...(primary || []), ...(secondary || [])]
     .map((service) => String(service || "").trim())
@@ -1425,6 +1538,7 @@ function mergeDuplicateGuruRows(current: GuruRow, incoming: GuruRow): GuruRow {
     service_state: chooseTextValue(primary.service_state, secondary.service_state) as string | null,
     service_zip: chooseTextValue(primary.service_zip, secondary.service_zip) as string | null,
     service_zip_code: chooseTextValue(primary.service_zip_code, secondary.service_zip_code) as string | null,
+    service_area: chooseTextValue(primary.service_area, secondary.service_area) as string | null,
     profile_photo_url: chooseTextValue(primary.profile_photo_url, secondary.profile_photo_url) as string | null,
     photo_url: chooseTextValue(primary.photo_url, secondary.photo_url) as string | null,
     avatar_url: chooseTextValue(primary.avatar_url, secondary.avatar_url) as string | null,
@@ -1440,12 +1554,15 @@ function mergeDuplicateGuruRows(current: GuruRow, incoming: GuruRow): GuruRow {
     is_public: chooseSearchBoolean(primary.is_public, secondary.is_public),
     is_public_visible: chooseSearchBoolean(primary.is_public_visible, secondary.is_public_visible),
     is_active: chooseSearchBoolean(primary.is_active, secondary.is_active),
-    is_bookable: chooseSearchBoolean(primary.is_bookable, secondary.is_bookable),
-    is_accepting_bookings: chooseSearchBoolean(
+    is_bookable: chooseBookingSafetyBoolean(
+      primary.is_bookable,
+      secondary.is_bookable,
+    ),
+    is_accepting_bookings: chooseBookingSafetyBoolean(
       primary.is_accepting_bookings,
       secondary.is_accepting_bookings,
     ),
-    accepting_bookings: chooseSearchBoolean(
+    accepting_bookings: chooseBookingSafetyBoolean(
       primary.accepting_bookings,
       secondary.accepting_bookings,
     ),
@@ -1457,11 +1574,38 @@ function mergeDuplicateGuruRows(current: GuruRow, incoming: GuruRow): GuruRow {
       primary.can_view_profile,
       secondary.can_view_profile,
     ),
-    can_book: chooseSearchBoolean(primary.can_book, secondary.can_book),
+    can_book: chooseBookingSafetyBoolean(
+      primary.can_book,
+      secondary.can_book,
+    ),
     is_placeholder: chooseSearchBoolean(
       primary.is_placeholder,
       secondary.is_placeholder,
     ),
+    is_listed_only: chooseSearchBoolean(
+      primary.is_listed_only,
+      secondary.is_listed_only,
+    ),
+    public_listing_state: chooseTextValue(
+      primary.public_listing_state,
+      secondary.public_listing_state,
+    ) as string | null,
+    booking_button_label: chooseTextValue(
+      primary.booking_button_label,
+      secondary.booking_button_label,
+    ) as string | null,
+    booking_button_disabled: chooseSearchBoolean(
+      primary.booking_button_disabled,
+      secondary.booking_button_disabled,
+    ),
+    booking_button_variant: chooseTextValue(
+      primary.booking_button_variant,
+      secondary.booking_button_variant,
+    ) as string | null,
+    booking_message: chooseTextValue(
+      primary.booking_message,
+      secondary.booking_message,
+    ) as string | null,
     profile_url: chooseTextValue(primary.profile_url, secondary.profile_url) as string | null,
     booking_url: chooseTextValue(primary.booking_url, secondary.booking_url) as string | null,
     map_latitude: chooseNumberValue(primary.map_latitude, secondary.map_latitude) as string | number | null,
@@ -2225,13 +2369,13 @@ function SearchPageContent() {
             </p>
 
             <h1 className="mt-3 max-w-5xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-              Search trusted local pet care by ZIP code
+              Find pet care that feels like a perfect match
             </h1>
 
             <p className="mt-4 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
-              Enter your care ZIP code to find SitGuru providers who accept
-              bookings inside their service radius. City and state will
-              auto-fill and the map will center around your search area.
+              Start with your ZIP code and meet trusted local Gurus who are
+              ready to care for your pet. We’ll fill in the location details
+              and bring nearby matches right to you.
             </p>
           </div>
 
@@ -2373,7 +2517,7 @@ function SearchPageContent() {
 
         {loading ? (
           <Card className="p-6">
-            <p className="text-slate-600">Loading Gurus...</p>
+            <p className="text-slate-600">Finding local Gurus for you...</p>
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_460px]">
@@ -2381,13 +2525,12 @@ function SearchPageContent() {
               {filteredGurus.length === 0 ? (
                 <Card className="p-7">
                   <h2 className="text-xl font-bold text-slate-900">
-                    No Gurus found
+                    No perfect matches just yet
                   </h2>
 
                   <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
-                    Try changing the ZIP code, service, or profile search. ZIP
-                    searches now show only Gurus who accept care inside their
-                    service radius for that location.
+                    Try another ZIP code, service, or name. Your pet’s next
+                    favorite person may be just one quick search away.
                   </p>
 
                   <div className="mt-5">
@@ -2396,7 +2539,7 @@ function SearchPageContent() {
                       onClick={() => clearFilters("no_results_reset")}
                       className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                     >
-                      Reset Search
+                      Show all Gurus
                     </button>
                   </div>
                 </Card>
@@ -2404,6 +2547,12 @@ function SearchPageContent() {
                 filteredGurus.map((guru) => {
                   const photoUrl = getGuruPhotoUrl(guru);
                   const guruName = getGuruName(guru);
+                  const guruFirstName =
+                    guruName.trim().split(/\s+/)[0] || "Guru";
+                  const guruDisplayLocation = getGuruDisplayLocation(
+                    guru,
+                    guruZipLookupsByZip,
+                  );
                   const guruRateDisplay = getGuruRateDisplay(
                     guru,
                     serviceFilter,
@@ -2432,10 +2581,27 @@ function SearchPageContent() {
                         String(guru.slug || "").toLowerCase() ===
                           selectedGuruSlug.toLowerCase()),
                   );
+                  const isListedOnly =
+                    guru.is_listed_only === true ||
+                    String(guru.public_listing_state || "")
+                      .trim()
+                      .toLowerCase() === "listed_only" ||
+                    String(guru.booking_status || "")
+                      .trim()
+                      .toLowerCase() === "listed_only";
+
                   const bookingDisabled =
-                    guru.can_book === true && !isPlaceholderSearchGuru(guru)
-                      ? false
-                      : isDisplayOnlySearchGuru(guru);
+                    guru.booking_button_disabled === true ||
+                    isListedOnly ||
+                    guru.can_book !== true ||
+                    isDisplayOnlySearchGuru(guru);
+
+                  const bookingButtonLabel =
+                    String(guru.booking_button_label || "").trim() ||
+                    (bookingDisabled
+                      ? "Bookings opening soon"
+                      : `Book with ${guruFirstName}`);
+
                   const isAcademyCertified = certifiedGuruUserIds.has(
                     getGuruCertificationUserId(guru),
                   );
@@ -2499,7 +2665,7 @@ function SearchPageContent() {
                                     </span>
                                   ) : (
                                     <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                                      Location pending
+                                      Local care area
                                     </span>
                                   )}
                                 </div>
@@ -2509,8 +2675,7 @@ function SearchPageContent() {
                                 </p>
 
                                 <p className="mt-1 line-clamp-1 text-sm text-slate-500">
-                                  {formatLocation(getGuruCity(guru), getGuruState(guru))}
-                                  {getGuruZip(guru) ? ` · ${getGuruZip(guru)}` : ""}
+                                  {guruDisplayLocation}
                                 </p>
 
                                 <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
@@ -2550,17 +2715,20 @@ function SearchPageContent() {
                             <div className="mt-4 flex max-h-[66px] flex-wrap gap-2 overflow-hidden text-sm text-slate-700">
                               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-bold text-emerald-800">
                                 {guruRateDisplay.primary}
-                                <span className="ml-1 font-semibold text-emerald-700">
-                                  {guruRateDisplay.primary === "Custom quote"
-                                    ? "· Book through SitGuru"
-                                    : guruRateDisplay.detail}
-                                </span>
+                                {guruRateDisplay.primary === "Custom quote" ||
+                                guruRateDisplay.detail ? (
+                                  <span className="ml-1 font-semibold text-emerald-700">
+                                    {guruRateDisplay.primary === "Custom quote"
+                                      ? "· Book through SitGuru"
+                                      : guruRateDisplay.detail}
+                                  </span>
+                                ) : null}
                               </span>
 
                               <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-medium">
                                 {guru.experience_years
                                   ? `${guru.experience_years}+ years experience`
-                                  : "Experience not listed"}
+                                  : "More about my experience coming soon"}
                               </span>
 
                               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-bold text-emerald-800">
@@ -2594,7 +2762,9 @@ function SearchPageContent() {
                                 </p>
                               ) : (
                                 <p className="line-clamp-2 text-sm leading-6 text-slate-500 sm:text-base">
-                                  This Guru has not added a bio yet.
+                                  Hi, I’m {guruFirstName}! I’m adding the
+                                  finishing touches to my profile and can’t wait
+                                  to meet local pets and their people. 🐾
                                 </p>
                               )}
                             </div>
@@ -2604,11 +2774,11 @@ function SearchPageContent() {
                             <Link
                               href={getGuruHref(guru)}
                               onClick={() =>
-                                trackGuruProfileClick(guru, "View Guru Profile")
+                                trackGuruProfileClick(guru, `Meet ${guruFirstName}`)
                               }
                               className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
                             >
-                              View Guru Profile
+                              Meet {guruFirstName}
                             </Link>
 
                             {bookingDisabled ? (
@@ -2618,7 +2788,7 @@ function SearchPageContent() {
                                 aria-disabled="true"
                                 className="inline-flex cursor-not-allowed items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white opacity-55"
                               >
-                                Profile Preview
+                                {bookingButtonLabel}
                               </button>
                             ) : (
                               <Link
@@ -2628,7 +2798,7 @@ function SearchPageContent() {
                                 }}
                                 className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
                               >
-                                Book This Guru
+                                {bookingButtonLabel}
                               </Link>
                             )}
                           </div>
@@ -2646,8 +2816,8 @@ function SearchPageContent() {
                   <h2 className="text-lg font-bold text-slate-900">Map view</h2>
 
                   <p className="mt-1 text-sm text-slate-600">
-                    Enter a ZIP code or hover over a Guru card to highlight
-                    nearby care.
+                    Enter a ZIP code or hover over a Guru card to explore
+                    nearby pet care.
                   </p>
 
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -2737,13 +2907,13 @@ function SearchPageFallback() {
             </p>
 
             <h1 className="mt-3 max-w-5xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-              Search trusted local pet care by ZIP code
+              Find pet care that feels like a perfect match
             </h1>
 
             <p className="mt-4 max-w-4xl text-base leading-7 text-slate-700 sm:text-lg">
-              Enter your care ZIP code to find SitGuru providers who accept
-              bookings inside their service radius. City and state will
-              auto-fill and the map will center around your search area.
+              Start with your ZIP code and meet trusted local Gurus who are
+              ready to care for your pet. We’ll fill in the location details
+              and bring nearby matches right to you.
             </p>
           </div>
 
@@ -2764,7 +2934,7 @@ function SearchPageFallback() {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_460px]">
           <div className="space-y-5">
             <Card className="p-7">
-              <p className="text-slate-600">Loading Gurus...</p>
+              <p className="text-slate-600">Finding local Gurus for you...</p>
             </Card>
           </div>
 
