@@ -1,137 +1,1162 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
+import {
+  Activity,
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Clock3,
+  ExternalLink,
+  Mail,
+  MessageSquare,
+  Phone,
+  RefreshCw,
+  ShieldCheck,
+  UserRound,
+  Wrench,
+} from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { calculateSitGuruProfileCompletion } from "@/lib/profileCompletion";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type AnyRow = Record<string, unknown>;
-type PageProps = { searchParams?: Promise<{ query?: string }> };
+
+type PageProps = {
+  searchParams?: Promise<{
+    query?: string;
+    refresh?: string;
+  }>;
+};
+
+type ActivityItem = {
+  id: string;
+  title: string;
+  description: string;
+  actor: string;
+  source: string;
+  createdAt: string;
+  tone: "green" | "amber" | "slate" | "sky";
+};
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function asBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+
+  const normalized = asString(value).toLowerCase();
+  return ["true", "1", "yes", "active", "bookable", "approved"].includes(
+    normalized,
+  );
 }
 
 function yesNo(value: unknown) {
   return value ? "Yes" : "No";
 }
 
-function Field({ label, value }: { label: string; value: unknown }) {
+function firstNonEmpty(...values: unknown[]) {
+  return values.map(asString).find(Boolean) || "";
+}
+
+function formatDateTime(value: unknown) {
+  const raw = asString(value);
+  if (!raw) return "Time not recorded";
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
+
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getStatusClasses(status: string) {
+  const normalized = status.toLowerCase();
+
+  if (
+    ["sent", "delivered", "read", "complete", "completed", "success"].some(
+      (value) => normalized.includes(value),
+    )
+  ) {
+    return "bg-emerald-100 text-emerald-800";
+  }
+
+  if (
+    ["failed", "error", "rejected", "blocked", "undelivered"].some((value) =>
+      normalized.includes(value),
+    )
+  ) {
+    return "bg-rose-100 text-rose-800";
+  }
+
+  if (
+    ["queued", "pending", "processing", "scheduled"].some((value) =>
+      normalized.includes(value),
+    )
+  ) {
+    return "bg-amber-100 text-amber-800";
+  }
+
+  return "bg-slate-100 text-slate-700";
+}
+
+function getIssueClasses(issue: string) {
+  if (issue === "complete" || issue === "account_live") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  }
+
+  if (issue.includes("missing") || issue.includes("repair")) {
+    return "border-rose-200 bg-rose-50 text-rose-900";
+  }
+
+  return "border-amber-200 bg-amber-50 text-amber-950";
+}
+
+function Field({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: unknown;
+  helper?: string;
+}) {
+  const displayedValue =
+    value === false || value === 0
+      ? String(value)
+      : String(value || "Not provided");
+
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <dt className="text-xs font-black uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-bold text-slate-900">{String(value || "Not provided")}</dd>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <dt className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">
+        {label}
+      </dt>
+      <dd className="mt-1 break-words text-sm font-black leading-5 text-slate-950">
+        {displayedValue}
+      </dd>
+      {helper ? (
+        <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+          {helper}
+        </p>
+      ) : null}
     </div>
   );
+}
+
+function SummaryCard({
+  icon,
+  label,
+  value,
+  detail,
+  tone = "slate",
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "green" | "amber" | "rose" | "sky" | "slate";
+}) {
+  const toneClasses = {
+    green: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    amber: "border-amber-200 bg-amber-50 text-amber-800",
+    rose: "border-rose-200 bg-rose-50 text-rose-800",
+    sky: "border-sky-200 bg-sky-50 text-sky-800",
+    slate: "border-slate-200 bg-white text-slate-700",
+  };
+
+  return (
+    <div
+      className={[
+        "rounded-2xl border p-4 shadow-sm",
+        toneClasses[tone],
+      ].join(" ")}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 ring-1 ring-black/5">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-black uppercase tracking-[0.12em] opacity-75">
+            {label}
+          </p>
+          <p className="mt-0.5 truncate text-lg font-black">{value}</p>
+        </div>
+      </div>
+      <p className="mt-3 text-xs font-semibold leading-5 opacity-80">
+        {detail}
+      </p>
+    </div>
+  );
+}
+
+async function safeRows(
+  query: PromiseLike<{ data: unknown; error: unknown }>,
+  label: string,
+) {
+  try {
+    const result = await query;
+
+    if (result.error) {
+      console.warn(`Account lifecycle query skipped for ${label}:`, result.error);
+      return [] as AnyRow[];
+    }
+
+    return Array.isArray(result.data) ? (result.data as AnyRow[]) : [];
+  } catch (error) {
+    console.warn(`Account lifecycle query skipped for ${label}:`, error);
+    return [] as AnyRow[];
+  }
 }
 
 async function findProfile(query: string) {
   const clean = query.trim();
   if (!clean) return null;
 
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      clean,
+    );
+
   let request = supabaseAdmin.from("profiles").select("*").limit(1);
 
   if (isUuid) {
     request = request.eq("id", clean);
   } else {
-    request = request.or(`email.ilike.%${clean}%,full_name.ilike.%${clean}%,first_name.ilike.%${clean}%,last_name.ilike.%${clean}%,phone.ilike.%${clean}%`);
+    request = request.or(
+      `email.ilike.%${clean}%,full_name.ilike.%${clean}%,first_name.ilike.%${clean}%,last_name.ilike.%${clean}%,phone.ilike.%${clean}%`,
+    );
   }
 
-  const { data } = await request;
+  const { data, error } = await request;
+
+  if (error) {
+    console.warn("Account lifecycle profile lookup failed:", error);
+    return null;
+  }
+
   return ((data || [])[0] || null) as AnyRow | null;
 }
 
-export default async function AccountLifecyclePage({ searchParams }: PageProps) {
+function buildDerivedActivity({
+  profile,
+  guru,
+  ambassador,
+  referral,
+  lifecycleEvents,
+}: {
+  profile: AnyRow;
+  guru: AnyRow | null;
+  ambassador: AnyRow | null;
+  referral: AnyRow | null;
+  lifecycleEvents: AnyRow[];
+}) {
+  const items: ActivityItem[] = lifecycleEvents.map((event, index) => ({
+    id:
+      asString(event.id) ||
+      `event-${asString(event.created_at) || index.toString()}`,
+    title:
+      firstNonEmpty(
+        event.action_label,
+        event.title,
+        event.event_type,
+        event.action,
+      ) || "Account activity recorded",
+    description:
+      firstNonEmpty(
+        event.description,
+        event.details,
+        event.message,
+        event.summary,
+      ) || "An account lifecycle event was recorded.",
+    actor:
+      firstNonEmpty(
+        event.actor_name,
+        event.admin_name,
+        event.performed_by_name,
+        event.actor_email,
+        event.admin_email,
+      ) || "System",
+    source:
+      firstNonEmpty(event.source, event.source_page, event.origin) ||
+      "Account lifecycle",
+    createdAt:
+      firstNonEmpty(
+        event.created_at,
+        event.occurred_at,
+        event.updated_at,
+      ) || "",
+    tone: "sky",
+  }));
+
+  const pushDerived = (
+    id: string,
+    title: string,
+    description: string,
+    createdAt: unknown,
+    tone: ActivityItem["tone"],
+  ) => {
+    const date = asString(createdAt);
+    if (!date) return;
+
+    items.push({
+      id,
+      title,
+      description,
+      actor: "System / database",
+      source: "Current account records",
+      createdAt: date,
+      tone,
+    });
+  };
+
+  pushDerived(
+    `profile-created-${asString(profile.id)}`,
+    "Public profile created",
+    "The core SitGuru profile row was created.",
+    profile.created_at,
+    "slate",
+  );
+
+  if (
+    asString(profile.updated_at) &&
+    asString(profile.updated_at) !== asString(profile.created_at)
+  ) {
+    pushDerived(
+      `profile-updated-${asString(profile.id)}`,
+      "Public profile updated",
+      "The core SitGuru profile was updated.",
+      profile.updated_at,
+      "slate",
+    );
+  }
+
+  if (guru) {
+    pushDerived(
+      `guru-created-${asString(guru.id)}`,
+      "Guru workspace created",
+      `A canonical Guru workspace now exists. Current status: ${
+        firstNonEmpty(guru.status, guru.application_status) || "pending"
+      }.`,
+      guru.created_at,
+      "green",
+    );
+
+    if (
+      asString(guru.updated_at) &&
+      asString(guru.updated_at) !== asString(guru.created_at)
+    ) {
+      pushDerived(
+        `guru-updated-${asString(guru.id)}`,
+        "Guru workspace updated",
+        `The Guru workspace was updated. Bookable: ${
+          asBoolean(guru.is_bookable) ? "Yes" : "No"
+        }. Public: ${
+          asBoolean(guru.is_public_visible) ? "Yes" : "No"
+        }.`,
+        guru.updated_at,
+        "green",
+      );
+    }
+  }
+
+  if (referral) {
+    pushDerived(
+      `referral-created-${asString(referral.id) || asString(referral.code)}`,
+      "Referral code created",
+      `Referral code: ${asString(referral.code) || "Generated"}.`,
+      referral.created_at || referral.updated_at,
+      "sky",
+    );
+  }
+
+  if (ambassador) {
+    pushDerived(
+      `ambassador-created-${asString(ambassador.id)}`,
+      "Ambassador workspace created",
+      "An Ambassador workspace exists for this account.",
+      ambassador.created_at,
+      "sky",
+    );
+  }
+
+  const seen = new Set<string>();
+
+  return items
+    .filter((item) => {
+      const key = [
+        item.title.toLowerCase(),
+        item.createdAt,
+        item.description.toLowerCase(),
+      ].join("|");
+
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => {
+      const aTime = new Date(a.createdAt).getTime();
+      const bTime = new Date(b.createdAt).getTime();
+
+      if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
+      if (Number.isNaN(aTime)) return 1;
+      if (Number.isNaN(bTime)) return -1;
+
+      return bTime - aTime;
+    });
+}
+
+function ActivityTimeline({ items }: { items: ActivityItem[] }) {
+  const toneClasses = {
+    green: "bg-emerald-600",
+    amber: "bg-amber-500",
+    slate: "bg-slate-500",
+    sky: "bg-sky-500",
+  };
+
+  return (
+    <div className="space-y-3">
+      {items.length ? (
+        items.map((item, index) => (
+          <div
+            key={item.id}
+            className="relative rounded-2xl border border-slate-200 bg-white p-4 pl-12 shadow-sm"
+          >
+            <div
+              className={[
+                "absolute left-4 top-5 h-4 w-4 rounded-full ring-4 ring-white",
+                toneClasses[item.tone],
+              ].join(" ")}
+            />
+            {index < items.length - 1 ? (
+              <div className="absolute bottom-[-14px] left-[23px] top-9 w-px bg-slate-200" />
+            ) : null}
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="font-black text-slate-950">{item.title}</p>
+                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                  {item.description}
+                </p>
+              </div>
+              <span className="shrink-0 text-xs font-bold text-slate-500">
+                {formatDateTime(item.createdAt)}
+              </span>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
+              <span className="rounded-full bg-slate-100 px-3 py-1">
+                By: {item.actor}
+              </span>
+              <span className="rounded-full bg-slate-100 px-3 py-1">
+                Source: {item.source}
+              </span>
+            </div>
+          </div>
+        ))
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-semibold text-slate-600">
+          No account activity has been recorded yet.
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default async function AccountLifecyclePage({
+  searchParams,
+}: PageProps) {
   const params = searchParams ? await searchParams : {};
   const query = params.query || "";
   const profile = await findProfile(query);
   const userId = asString(profile?.id);
 
-  const [rolesResult, guruResult, ambassadorResult, referralsResult, logsResult] = userId
+  const [
+    rolesRows,
+    guruRows,
+    ambassadorRows,
+    referralRows,
+    communicationLogs,
+    lifecycleEvents,
+  ] = userId
     ? await Promise.all([
-        supabaseAdmin.from("user_roles").select("role").eq("user_id", userId),
-        supabaseAdmin.from("gurus").select("*").eq("user_id", userId).maybeSingle(),
-        supabaseAdmin.from("ambassadors").select("*").eq("user_id", userId).maybeSingle(),
-        supabaseAdmin.from("pawperks_account_referral_codes").select("*").eq("account_id", userId).maybeSingle(),
-        supabaseAdmin.from("communication_logs").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(10),
+        safeRows(
+          supabaseAdmin
+            .from("user_roles")
+            .select("*")
+            .eq("user_id", userId),
+          "user_roles",
+        ),
+        safeRows(
+          supabaseAdmin
+            .from("gurus")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(10),
+          "gurus",
+        ),
+        safeRows(
+          supabaseAdmin
+            .from("ambassadors")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(10),
+          "ambassadors",
+        ),
+        safeRows(
+          supabaseAdmin
+            .from("pawperks_account_referral_codes")
+            .select("*")
+            .eq("account_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(10),
+          "pawperks_account_referral_codes",
+        ),
+        safeRows(
+          supabaseAdmin
+            .from("communication_logs")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(25),
+          "communication_logs",
+        ),
+        safeRows(
+          supabaseAdmin
+            .from("account_lifecycle_events")
+            .select("*")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(50),
+          "account_lifecycle_events",
+        ),
       ])
-    : [null, null, null, null, null];
+    : [[], [], [], [], [], []];
 
-  const roles = ((rolesResult?.data || []) as AnyRow[]).map((row) => asString(row.role)).filter(Boolean);
-  const referralCode = asString((referralsResult?.data as AnyRow | null)?.code) || asString(profile?.referral_code) || asString((ambassadorResult?.data as AnyRow | null)?.referral_code);
+  const roles = rolesRows
+    .map((row) => asString(row.role))
+    .filter(Boolean);
+
+  const guru = guruRows[0] || null;
+  const ambassador = ambassadorRows[0] || null;
+  const referral = referralRows[0] || null;
+
+  const referralCode =
+    asString(referral?.code) ||
+    asString(profile?.referral_code) ||
+    asString(ambassador?.referral_code);
+
   const completion = profile
     ? calculateSitGuruProfileCompletion({
         userId,
         email: asString(profile.email),
         roles,
         profile: { ...profile, referral_code: referralCode },
-        guru: (guruResult?.data as AnyRow | null) || null,
-        ambassador: (ambassadorResult?.data as AnyRow | null) || null,
+        guru,
+        ambassador,
       })
     : null;
 
+  const guruRolePresent =
+    roles.includes("guru") ||
+    asString(profile?.role).toLowerCase() === "guru" ||
+    asString(profile?.account_type).toLowerCase() === "guru";
+
+  const likelyIssueType =
+    guruRolePresent && !guru
+      ? "role_profile_missing"
+      : guru && (completion?.completion_percentage || 0) < 100
+        ? "incomplete_setup"
+        : completion?.likely_issue_type || "unknown";
+
+  const profileName =
+    firstNonEmpty(
+      profile?.full_name,
+      `${asString(profile?.first_name)} ${asString(profile?.last_name)}`.trim(),
+      guru?.display_name,
+      guru?.full_name,
+      guru?.name,
+    ) || "Unnamed account";
+
+  const profileEmail = firstNonEmpty(profile?.email, guru?.email);
+  const profilePhone = firstNonEmpty(
+    profile?.phone,
+    profile?.phone_number,
+    guru?.phone,
+    guru?.phone_number,
+  );
+
+  const guruId = asString(guru?.id);
+  const guruHref = guruId
+    ? `/admin/gurus/${encodeURIComponent(guruId)}`
+    : "/admin/gurus";
+
+  const refreshHref = query
+    ? `/admin/account-lifecycle?query=${encodeURIComponent(
+        query,
+      )}&refresh=${Date.now()}`
+    : "/admin/account-lifecycle";
+
+  const activityItems = profile
+    ? buildDerivedActivity({
+        profile,
+        guru,
+        ambassador,
+        referral,
+        lifecycleEvents,
+      })
+    : [];
+
+  const isPublicVisible = asBoolean(guru?.is_public_visible);
+  const isBookable = asBoolean(guru?.is_bookable);
+  const bestContact = profilePhone
+    ? profileEmail
+      ? "Email + phone"
+      : "Phone"
+    : profileEmail
+      ? "Email"
+      : "No contact";
+
   return (
-    <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-3xl font-black tracking-tight text-slate-950">Account lifecycle diagnostics</h1>
-        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Search by UUID, email, name, or phone to determine whether an incomplete user likely abandoned setup or hit a website/data-wiring issue.</p>
-        <form className="mt-5 flex flex-col gap-3 sm:flex-row">
-          <input name="query" defaultValue={query} placeholder="UUID, email, name, or phone" className="h-12 flex-1 rounded-2xl border border-slate-200 px-4 text-sm font-bold outline-none focus:border-emerald-400" />
-          <button className="h-12 rounded-2xl bg-emerald-700 px-6 text-sm font-black text-white">Search</button>
-        </form>
-      </section>
+    <main className="min-h-screen overflow-x-hidden bg-[#f8faf7] px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl space-y-5 sm:space-y-6">
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div>
+              <div className="grid gap-2 sm:flex sm:flex-wrap">
+                <Link
+                  href="/admin/gurus"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+                >
+                  <ArrowLeft size={16} />
+                  Back to Guru Management
+                </Link>
 
-      {!query ? null : !profile ? (
-        <section className="rounded-[2rem] border border-rose-200 bg-rose-50 p-6 font-bold text-rose-800">No public profile row was found. If an auth user exists for this search, this is a possible profile creation issue or auth-only signup.</section>
-      ) : (
-        <>
-          <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-6">
-            <h2 className="text-xl font-black text-slate-950">Diagnosis</h2>
-            <p className="mt-2 text-sm font-bold text-slate-700">Likely issue type: <span className="rounded-full bg-white px-2 py-1 text-amber-800 ring-1 ring-amber-200">{completion?.likely_issue_type}</span></p>
-            <p className="mt-2 text-sm font-semibold text-slate-700">Completion: {completion?.completion_percentage}% — Missing: {completion?.missing_required_fields.join(", ") || "None"}</p>
+                {profile ? (
+                  <Link
+                    href={guruHref}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-800 transition hover:bg-emerald-100 sm:w-auto"
+                  >
+                    <UserRound size={16} />
+                    {guru ? "Open Guru Record" : "Open Guru Management"}
+                  </Link>
+                ) : null}
+
+                <Link
+                  href={refreshHref}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-sm font-black text-white transition hover:bg-emerald-800 sm:w-auto"
+                >
+                  <RefreshCw size={16} />
+                  Refresh Diagnosis
+                </Link>
+              </div>
+
+              <p className="mt-5 text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                Admin account support
+              </p>
+              <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                Account lifecycle diagnostics
+              </h1>
+              <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-slate-600">
+                Find an account, understand what exists, see what is missing,
+                review recent work, and confirm whether communication was sent.
+              </p>
+            </div>
+
+            {profile ? (
+              <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 xl:w-auto xl:max-w-md">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                  Current account
+                </p>
+                <p className="mt-1 text-lg font-black text-slate-950">
+                  {profileName}
+                </p>
+                <p className="mt-1 break-all text-xs font-semibold text-slate-500">
+                  {userId}
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          <form className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <input
+              name="query"
+              defaultValue={query}
+              placeholder="UUID, email, name, or phone"
+              className="h-12 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+            />
+            <button className="h-12 w-full rounded-2xl bg-emerald-700 px-7 text-sm font-black text-white transition hover:bg-emerald-800 sm:w-auto">
+              Search
+            </button>
+          </form>
+        </section>
+
+        {!query ? (
+          <section className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-8 text-center">
+            <UserRound className="mx-auto text-slate-400" size={34} />
+            <h2 className="mt-3 text-xl font-black text-slate-950">
+              Search for an account
+            </h2>
+            <p className="mt-2 text-sm font-semibold text-slate-500">
+              Enter a UUID, email, name, or phone number above.
+            </p>
           </section>
-
-          <dl className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Field label="Auth user ID / profile ID" value={userId} />
-            <Field label="Profile row exists" value={yesNo(profile)} />
-            <Field label="Public profile role" value={asString(profile.role) || asString(profile.account_type)} />
-            <Field label="All roles" value={completion?.roles.join(", ")} />
-            <Field label="Profile name" value={asString(profile.full_name) || `${asString(profile.first_name)} ${asString(profile.last_name)}`} />
-            <Field label="Profile email" value={asString(profile.email)} />
-            <Field label="Profile phone" value={asString(profile.phone) || asString(profile.phone_number)} />
-            <Field label="Profile picture exists" value={yesNo(asString(profile.avatar_url) || asString(profile.profile_photo_url) || asString(profile.photo_url) || asString(profile.image_url))} />
-            <Field label="ZIP code exists" value={yesNo(asString(profile.zip_code) || asString(profile.zip) || asString(profile.postal_code))} />
-            <Field label="Service area exists" value={yesNo(asString(profile.service_area) || asString(profile.local_area) || asString(profile.city))} />
-            <Field label="Referral code exists" value={referralCode || "No"} />
-            <Field label="Guru profile exists" value={yesNo(guruResult?.data)} />
-            <Field label="Ambassador profile exists" value={yesNo(ambassadorResult?.data)} />
-            <Field label="Last updated" value={asString(profile.updated_at)} />
-          </dl>
-
-          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-wrap gap-2">
-              <Link href={`/messages/new?to=${encodeURIComponent(userId)}`} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-black text-white">Message in SitGuru</Link>
-              {asString(profile.email) ? <a href={`mailto:${asString(profile.email)}`} className="rounded-xl border border-sky-200 px-4 py-2 text-sm font-black text-sky-700">Email</a> : null}
-              {asString(profile.phone) ? <a href={`tel:${asString(profile.phone)}`} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-700">Call/Text</a> : null}
-              <Link href={completion?.dashboard_url || "/admin"} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-700">Dashboard URL</Link>
+        ) : !profile ? (
+          <section className="rounded-[2rem] border border-rose-200 bg-rose-50 p-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle
+                className="mt-0.5 shrink-0 text-rose-700"
+                size={22}
+              />
+              <div>
+                <h2 className="text-lg font-black text-rose-950">
+                  No public profile row was found
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-rose-800">
+                  An Auth-only signup or profile-creation issue may exist. Check
+                  Supabase Auth or search using the exact UUID.
+                </p>
+              </div>
             </div>
           </section>
-
-          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-black text-slate-950">Communication history</h2>
-            <div className="mt-4 space-y-3">
-              {((logsResult?.data || []) as AnyRow[]).map((log) => (
-                <div key={asString(log.id)} className="rounded-2xl border border-slate-100 p-4 text-sm font-semibold text-slate-700">
-                  <p className="font-black text-slate-950">{asString(log.channel)} · {asString(log.status)}</p>
-                  <p>{asString(log.subject) || "No subject"}</p>
-                  <p className="text-xs text-slate-500">{asString(log.created_at)}</p>
+        ) : (
+          <>
+            <section
+              className={[
+                "rounded-[2rem] border p-5 shadow-sm sm:p-6",
+                getIssueClasses(likelyIssueType),
+              ].join(" ")}
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.15em] opacity-70">
+                    Current diagnosis
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black">
+                    {likelyIssueType.replace(/_/g, " ")}
+                  </h2>
+                  <p className="mt-2 max-w-4xl text-sm font-semibold leading-6">
+                    Completion: {completion?.completion_percentage || 0}%
+                    {completion?.missing_required_fields?.length
+                      ? ` — Missing: ${completion.missing_required_fields.join(
+                          ", ",
+                        )}`
+                      : " — No required items are currently missing."}
+                  </p>
                 </div>
-              ))}
-              {!(logsResult?.data || []).length ? <p className="text-sm font-semibold text-slate-500">No communication logs yet.</p> : null}
-            </div>
-          </section>
-        </>
-      )}
+
+                <div className="rounded-2xl bg-white/80 px-5 py-4 text-center ring-1 ring-black/5">
+                  <p className="text-3xl font-black">
+                    {completion?.completion_percentage || 0}%
+                  </p>
+                  <p className="text-xs font-black uppercase tracking-[0.12em] opacity-70">
+                    Complete
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <div className="mb-3">
+                <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-700">
+                  At a glance
+                </p>
+                <h2 className="text-2xl font-black text-slate-950">
+                  Current account state
+                </h2>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                <SummaryCard
+                  icon={<CheckCircle2 size={19} />}
+                  label="Profile"
+                  value="Exists"
+                  detail="A public profile row is present."
+                  tone="green"
+                />
+                <SummaryCard
+                  icon={guru ? <CheckCircle2 size={19} /> : <Wrench size={19} />}
+                  label="Guru workspace"
+                  value={guru ? "Exists" : "Missing"}
+                  detail={
+                    guru
+                      ? "A canonical Guru record is available."
+                      : "This account needs a Guru workspace repair."
+                  }
+                  tone={guru ? "green" : "rose"}
+                />
+                <SummaryCard
+                  icon={<ShieldCheck size={19} />}
+                  label="Visibility"
+                  value={isPublicVisible ? "Public" : "Hidden"}
+                  detail={
+                    isPublicVisible
+                      ? "The profile may appear to Pet Parents."
+                      : "The profile is currently hidden from public search."
+                  }
+                  tone={isPublicVisible ? "green" : "amber"}
+                />
+                <SummaryCard
+                  icon={<Activity size={19} />}
+                  label="Bookability"
+                  value={isBookable ? "Bookable" : "Not bookable"}
+                  detail={
+                    isBookable
+                      ? "The Guru may receive booking requests."
+                      : "The Guru cannot receive booking requests yet."
+                  }
+                  tone={isBookable ? "green" : "amber"}
+                />
+                <SummaryCard
+                  icon={
+                    bestContact === "No contact" ? (
+                      <AlertTriangle size={19} />
+                    ) : (
+                      <MessageSquare size={19} />
+                    )
+                  }
+                  label="Best contact"
+                  value={bestContact}
+                  detail={
+                    bestContact === "No contact"
+                      ? "No usable email or phone is currently available."
+                      : "Use the available channel for profile follow-up."
+                  }
+                  tone={bestContact === "No contact" ? "rose" : "sky"}
+                />
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-4">
+                <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-700">
+                  Account details
+                </p>
+                <h2 className="text-2xl font-black text-slate-950">
+                  What currently exists
+                </h2>
+              </div>
+
+              <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <Field label="Auth user ID / profile ID" value={userId} />
+                <Field label="Profile row exists" value={yesNo(profile)} />
+                <Field
+                  label="Public profile role"
+                  value={
+                    asString(profile.role) ||
+                    asString(profile.account_type) ||
+                    "Not assigned"
+                  }
+                />
+                <Field
+                  label="All roles"
+                  value={
+                    completion?.roles?.length
+                      ? completion.roles.join(", ")
+                      : "No role rows"
+                  }
+                />
+                <Field label="Profile name" value={profileName} />
+                <Field label="Profile email" value={profileEmail} />
+                <Field label="Profile phone" value={profilePhone} />
+                <Field
+                  label="Profile picture exists"
+                  value={yesNo(
+                    asString(profile.avatar_url) ||
+                      asString(profile.profile_photo_url) ||
+                      asString(profile.photo_url) ||
+                      asString(profile.image_url),
+                  )}
+                />
+                <Field
+                  label="ZIP code exists"
+                  value={yesNo(
+                    asString(profile.zip_code) ||
+                      asString(profile.zip) ||
+                      asString(profile.postal_code),
+                  )}
+                />
+                <Field
+                  label="Service area exists"
+                  value={yesNo(
+                    asString(profile.service_area) ||
+                      asString(profile.local_area) ||
+                      asString(profile.city) ||
+                      asString(guru?.service_area) ||
+                      asString(guru?.city),
+                  )}
+                />
+                <Field
+                  label="Referral code"
+                  value={referralCode || "Not created"}
+                />
+                <Field
+                  label="Guru profile exists"
+                  value={yesNo(Boolean(guru))}
+                  helper={
+                    guruRows.length > 1
+                      ? `${guruRows.length} Guru rows found — review for duplicates.`
+                      : undefined
+                  }
+                />
+                <Field
+                  label="Ambassador profile exists"
+                  value={yesNo(Boolean(ambassador))}
+                />
+                <Field
+                  label="Guru status"
+                  value={
+                    firstNonEmpty(guru?.status, guru?.application_status) ||
+                    "No Guru workspace"
+                  }
+                />
+                <Field
+                  label="Last profile update"
+                  value={formatDateTime(profile.updated_at)}
+                />
+                <Field
+                  label="Last Guru update"
+                  value={
+                    guru
+                      ? formatDateTime(guru.updated_at || guru.created_at)
+                      : "No Guru workspace"
+                  }
+                />
+              </dl>
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-700">
+                    Admin actions
+                  </p>
+                  <h2 className="text-2xl font-black text-slate-950">
+                    Contact or continue the review
+                  </h2>
+                </div>
+
+                <div className="grid gap-2 sm:flex sm:flex-wrap">
+                  <Link
+                    href={`/messages/new?to=${encodeURIComponent(userId)}`}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800 sm:w-auto"
+                  >
+                    <MessageSquare size={16} />
+                    Message in SitGuru
+                  </Link>
+
+                  {profileEmail ? (
+                    <a
+                      href={`mailto:${profileEmail}`}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-black text-sky-800 transition hover:bg-sky-100 sm:w-auto"
+                    >
+                      <Mail size={16} />
+                      Email
+                    </a>
+                  ) : null}
+
+                  {profilePhone ? (
+                    <a
+                      href={`tel:${profilePhone}`}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+                    >
+                      <Phone size={16} />
+                      Call / Text
+                    </a>
+                  ) : null}
+
+                  <Link
+                    href={completion?.dashboard_url || "/admin"}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+                  >
+                    <ExternalLink size={16} />
+                    User Dashboard
+                  </Link>
+
+                  {guru ? (
+                    <Link
+                      href={guruHref}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100 sm:w-auto"
+                    >
+                      <UserRound size={16} />
+                      Open Guru Record
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-5 flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
+                  <Clock3 size={21} />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-700">
+                    Audit trail
+                  </p>
+                  <h2 className="text-2xl font-black text-slate-950">
+                    Account activity
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                    See what changed, when it changed, and who or what recorded
+                    the action.
+                  </p>
+                </div>
+              </div>
+
+              <ActivityTimeline items={activityItems} />
+
+              {!lifecycleEvents.length ? (
+                <p className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-semibold leading-5 text-slate-500">
+                  Detailed administrator attribution is not available for older
+                  actions unless they were written to{" "}
+                  <span className="font-black">
+                    account_lifecycle_events
+                  </span>
+                  . The timeline above is safely reconstructed from current
+                  profile, Guru, Ambassador, and referral timestamps.
+                </p>
+              ) : null}
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-5 flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-800">
+                  <MessageSquare size={21} />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.15em] text-sky-700">
+                    Outreach record
+                  </p>
+                  <h2 className="text-2xl font-black text-slate-950">
+                    Communication history
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                    Review the channel, sender, recipient, delivery status, and
+                    time for each message.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {communicationLogs.length ? (
+                  communicationLogs.map((log, index) => {
+                    const channel =
+                      firstNonEmpty(log.channel, log.delivery_channel) ||
+                      "Message";
+                    const status =
+                      firstNonEmpty(log.status, log.delivery_status) ||
+                      "Recorded";
+                    const sender =
+                      firstNonEmpty(
+                        log.sent_by_name,
+                        log.sender_name,
+                        log.actor_name,
+                        log.sent_by_email,
+                        log.sender_email,
+                      ) || "SitGuru system";
+                    const recipient =
+                      firstNonEmpty(
+                        log.recipient,
+                        log.recipient_email,
+                        log.to_email,
+                        log.to_phone,
+                      ) ||
+                      profileEmail ||
+                      profilePhone ||
+                      "Recipient not recorded";
+                    const createdAt =
+                      firstNonEmpty(
+                        log.sent_at,
+                        log.delivered_at,
+                        log.created_at,
+                      ) || "";
+                    const preview =
+                      firstNonEmpty(
+                        log.preview,
+                        log.message_preview,
+                        log.body,
+                        log.message,
+                      ) || "";
+
+                    return (
+                      <div
+                        key={asString(log.id) || `communication-${index}`}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-black text-slate-950">
+                                {channel}
+                              </span>
+                              <span
+                                className={[
+                                  "rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em]",
+                                  getStatusClasses(status),
+                                ].join(" ")}
+                              >
+                                {status}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-sm font-black text-slate-900">
+                              {firstNonEmpty(log.subject, log.title) ||
+                                "No subject"}
+                            </p>
+                            {preview ? (
+                              <p className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-slate-600">
+                                {preview}
+                              </p>
+                            ) : null}
+                          </div>
+
+                          <p className="shrink-0 text-xs font-bold text-slate-500">
+                            {formatDateTime(createdAt)}
+                          </p>
+                        </div>
+
+                        <div className="mt-3 grid gap-2 text-xs font-semibold text-slate-500 sm:grid-cols-2">
+                          <p>
+                            <span className="font-black text-slate-700">
+                              Sent by:
+                            </span>{" "}
+                            {sender}
+                          </p>
+                          <p className="break-words">
+                            <span className="font-black text-slate-700">
+                              Sent to:
+                            </span>{" "}
+                            {recipient}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6">
+                    <p className="font-black text-slate-800">
+                      No communication logs yet
+                    </p>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                      Email, SMS, and SitGuru messages will appear here when the
+                      sending workflow records them in communication_logs.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+          </>
+        )}
+      </div>
     </main>
   );
 }
