@@ -77,6 +77,34 @@ function formatDateTime(value: unknown) {
   });
 }
 
+function latestTimestamp(...values: unknown[]) {
+  const candidates = values
+    .map(asString)
+    .filter(Boolean)
+    .map((value) => ({ value, time: new Date(value).getTime() }))
+    .filter((item) => !Number.isNaN(item.time))
+    .sort((a, b) => b.time - a.time);
+
+  return candidates[0]?.value || "";
+}
+
+async function findAuthUser(userId: string) {
+  try {
+    const { data, error } =
+      await supabaseAdmin.auth.admin.getUserById(userId);
+
+    if (error) {
+      console.warn("Account lifecycle Auth lookup failed:", error);
+      return null;
+    }
+
+    return (data?.user || null) as unknown as AnyRow | null;
+  } catch (error) {
+    console.warn("Account lifecycle Auth lookup failed:", error);
+    return null;
+  }
+}
+
 function getStatusClasses(status: string) {
   const normalized = status.toLowerCase();
 
@@ -245,12 +273,14 @@ async function findProfile(query: string) {
 }
 
 function buildDerivedActivity({
+  authUser,
   profile,
   guru,
   ambassador,
   referral,
   lifecycleEvents,
 }: {
+  authUser: AnyRow | null;
   profile: AnyRow;
   guru: AnyRow | null;
   ambassador: AnyRow | null;
@@ -315,6 +345,28 @@ function buildDerivedActivity({
       tone,
     });
   };
+
+  if (authUser) {
+    pushDerived(
+      `auth-created-${asString(authUser.id)}`,
+      "SitGuru account created",
+      "The Supabase Auth account was created.",
+      authUser.created_at,
+      "slate",
+    );
+
+    if (asString(authUser.last_sign_in_at)) {
+      pushDerived(
+        `auth-login-${asString(authUser.id)}-${asString(
+          authUser.last_sign_in_at,
+        )}`,
+        "Last successful login",
+        "The user successfully signed in to SitGuru.",
+        authUser.last_sign_in_at,
+        "green",
+      );
+    }
+  }
 
   pushDerived(
     `profile-created-${asString(profile.id)}`,
@@ -476,6 +528,7 @@ export default async function AccountLifecyclePage({
   const query = params.query || "";
   const profile = await findProfile(query);
   const userId = asString(profile?.id);
+  const authUser = userId ? await findAuthUser(userId) : null;
 
   const [
     rolesRows,
@@ -607,6 +660,7 @@ export default async function AccountLifecyclePage({
 
   const activityItems = profile
     ? buildDerivedActivity({
+        authUser,
         profile,
         guru,
         ambassador,
@@ -624,6 +678,42 @@ export default async function AccountLifecyclePage({
     : profileEmail
       ? "Email"
       : "No contact";
+
+  const lastLoginAt = asString(authUser?.last_sign_in_at);
+  const recordedAppActivityAt = firstNonEmpty(
+    profile?.last_seen_at,
+    profile?.last_active_at,
+    profile?.last_activity_at,
+    guru?.last_seen_at,
+    guru?.last_active_at,
+    guru?.last_activity_at,
+  );
+  const lastUsedAt =
+    recordedAppActivityAt ||
+    lastLoginAt ||
+    latestTimestamp(
+      profile?.updated_at,
+      guru?.updated_at,
+      ambassador?.updated_at,
+    );
+  const lastUsedSource = recordedAppActivityAt
+    ? "Recorded app activity"
+    : lastLoginAt
+      ? "Last successful login"
+      : "Latest account update";
+  const signInProvider =
+    firstNonEmpty(
+      (authUser?.app_metadata as AnyRow | undefined)?.provider,
+      (authUser?.app_metadata as AnyRow | undefined)?.providers &&
+        Array.isArray(
+          (authUser?.app_metadata as AnyRow | undefined)?.providers,
+        )
+        ? String(
+            ((authUser?.app_metadata as AnyRow).providers as unknown[])[0] ||
+              "",
+          )
+        : "",
+    ) || "Not recorded";
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f8faf7] px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
@@ -774,7 +864,7 @@ export default async function AccountLifecyclePage({
                 </h2>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 <SummaryCard
                   icon={<CheckCircle2 size={19} />}
                   label="Profile"
@@ -831,6 +921,28 @@ export default async function AccountLifecyclePage({
                       : "Use the available channel for profile follow-up."
                   }
                   tone={bestContact === "No contact" ? "rose" : "sky"}
+                />
+                <SummaryCard
+                  icon={<Clock3 size={19} />}
+                  label="Last login"
+                  value={
+                    lastLoginAt
+                      ? formatDateTime(lastLoginAt)
+                      : "No login recorded"
+                  }
+                  detail="Pulled directly from the Supabase Auth account."
+                  tone={lastLoginAt ? "green" : "slate"}
+                />
+                <SummaryCard
+                  icon={<Activity size={19} />}
+                  label="Last used SitGuru"
+                  value={
+                    lastUsedAt
+                      ? formatDateTime(lastUsedAt)
+                      : "No activity recorded"
+                  }
+                  detail={`Source: ${lastUsedSource}.`}
+                  tone={lastUsedAt ? "sky" : "slate"}
                 />
               </div>
             </section>
@@ -917,6 +1029,32 @@ export default async function AccountLifecyclePage({
                     firstNonEmpty(guru?.status, guru?.application_status) ||
                     "No Guru workspace"
                   }
+                />
+                <Field
+                  label="Account created"
+                  value={formatDateTime(authUser?.created_at)}
+                />
+                <Field
+                  label="Last successful login"
+                  value={
+                    lastLoginAt
+                      ? formatDateTime(lastLoginAt)
+                      : "No successful login recorded"
+                  }
+                  helper="Supabase Auth last_sign_in_at."
+                />
+                <Field
+                  label="Last used SitGuru"
+                  value={
+                    lastUsedAt
+                      ? formatDateTime(lastUsedAt)
+                      : "No activity recorded"
+                  }
+                  helper={`Source: ${lastUsedSource}.`}
+                />
+                <Field
+                  label="Sign-in method"
+                  value={signInProvider}
                 />
                 <Field
                   label="Last profile update"
