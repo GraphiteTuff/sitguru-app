@@ -967,32 +967,91 @@ function CompactPartnerSection({
           Explore our growing network of local pet care partners.
         </h2>
 
-        <div className="-mx-4 mt-7 overflow-x-auto px-4 py-7 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:overflow-visible">
-          <div className="mx-auto flex w-max flex-nowrap items-center gap-4 sm:gap-5">
-            {partners.map((partner) => (
-              <a
-                key={partner.name}
-                href={partner.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => onTrack(partner.name, partner.href)}
-                aria-label={`Visit ${partner.name}`}
-                className="relative z-0 flex h-32 w-[260px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition duration-300 ease-out hover:z-20 hover:-translate-y-1 hover:scale-[1.045] hover:border-emerald-300 hover:shadow-[0_20px_45px_rgba(15,23,42,0.16)] focus-visible:z-20 focus-visible:-translate-y-1 focus-visible:scale-[1.045] focus-visible:border-emerald-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 sm:w-72"
+        <div
+          aria-label="SitGuru partner carousel"
+          aria-roledescription="carousel"
+          className="sitguru-partner-carousel-viewport -mx-4 mt-7 overflow-hidden px-4 py-8"
+        >
+          <div className="sitguru-partner-carousel-track flex w-max will-change-transform">
+            {[0, 1].map((groupIndex) => (
+              <div
+                key={groupIndex}
+                className="flex shrink-0 items-center gap-4 pr-4 sm:gap-5 sm:pr-5"
+                aria-hidden={groupIndex === 1 ? true : undefined}
               >
-                <div
-                  className={`flex h-full w-full items-center justify-center overflow-hidden rounded-xl px-4 ${partner.imageWrapperClassName}`}
-                >
-                  <img
-                    src={partner.image}
-                    alt={`${partner.name} logo`}
-                    className={partner.imageClassName}
-                    loading="lazy"
-                  />
-                </div>
-              </a>
+                {partners.map((partner) => (
+                  <a
+                    key={`${groupIndex}-${partner.name}`}
+                    href={partner.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => onTrack(partner.name, partner.href)}
+                    aria-label={`Visit ${partner.name}`}
+                    tabIndex={groupIndex === 1 ? -1 : undefined}
+                    className="sitguru-partner-carousel-card relative z-0 flex h-32 w-[260px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm focus-visible:z-20 focus-visible:border-emerald-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 sm:w-72"
+                  >
+                    <div
+                      className={`flex h-full w-full items-center justify-center overflow-hidden rounded-xl px-4 ${partner.imageWrapperClassName}`}
+                    >
+                      <img
+                        src={partner.image}
+                        alt={`${partner.name} logo`}
+                        className={partner.imageClassName}
+                        loading="lazy"
+                      />
+                    </div>
+                  </a>
+                ))}
+              </div>
             ))}
           </div>
         </div>
+
+        <style>{`
+          @keyframes sitguru-partner-carousel-loop {
+            from {
+              transform: translateX(0);
+            }
+
+            to {
+              transform: translateX(-50%);
+            }
+          }
+
+          .sitguru-partner-carousel-track {
+            animation: sitguru-partner-carousel-loop 30s linear infinite;
+          }
+
+          @media (hover: hover) and (pointer: fine) {
+            .sitguru-partner-carousel-viewport:hover
+              .sitguru-partner-carousel-track,
+            .sitguru-partner-carousel-viewport:focus-within
+              .sitguru-partner-carousel-track {
+              animation-play-state: paused;
+            }
+
+            .sitguru-partner-carousel-card {
+              transition:
+                transform 280ms ease,
+                border-color 280ms ease,
+                box-shadow 280ms ease;
+            }
+
+            .sitguru-partner-carousel-card:hover,
+            .sitguru-partner-carousel-card:focus-visible {
+              z-index: 30;
+              transform: translateY(-4px) scale(1.045);
+              border-color: rgb(110 231 183);
+              box-shadow: 0 20px 45px rgba(15, 23, 42, 0.16);
+            }
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .sitguru-partner-carousel-track {
+              animation: none;
+            }
+          }
+        `}</style>
 
         <Link
           href="/contact"
