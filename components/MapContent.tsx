@@ -1012,8 +1012,7 @@ export default function MapContent({
       `}</style>
 
       <div className="pointer-events-none absolute left-4 top-4 z-[950] rounded-full border border-emerald-100 bg-white/95 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700 shadow-lg shadow-slate-950/10 backdrop-blur">
-        {normalizedMarkers.length} Guru map pin
-        {normalizedMarkers.length === 1 ? "" : "s"}
+        {normalizedMarkers.length} on the map
       </div>
 
       {mapError ? (

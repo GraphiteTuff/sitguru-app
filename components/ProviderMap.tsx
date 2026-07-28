@@ -343,8 +343,6 @@ export default function ProviderMap({
       : undefined;
   }, [highlightedMarkerId, usableMarkers]);
 
-  const hasSearchFilters = hasActiveSearchFilters(searchParams);
-  const hasSearchLocation = hasActiveSearchLocation(searchParams);
   const centerReady = isValidCenter(center);
 
   return (
@@ -359,23 +357,16 @@ export default function ProviderMap({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-sm font-black text-slate-950">
-              {usableMarkers.length} Guru map pin
-              {usableMarkers.length === 1 ? "" : "s"} available
+              Your next Guru is closer than you think.
             </p>
             <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
-              Map pins mirror the Guru cards shown on the page and use ZIP/city
-              service locations before verified coordinates.
+              {usableMarkers.length} Guru
+              {usableMarkers.length === 1 ? "" : "s"} on the map.
             </p>
           </div>
 
           <div className="shrink-0 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-black text-emerald-800">
-            {hasSearchLocation
-              ? centerReady
-                ? "Search area ready"
-                : "Search filters active"
-              : hasSearchFilters
-                ? "Filters active"
-                : "Locations ready"}
+            Ready when you are
           </div>
         </div>
       </div>

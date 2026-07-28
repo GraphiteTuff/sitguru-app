@@ -868,6 +868,19 @@ function getGuruAnalyticsId(guru: GuruRow) {
   return String(guru.user_id || guru.id || "");
 }
 
+function getGuruMapMarkerId(guru: GuruRow) {
+  const markerId =
+    guru.id ??
+    guru.user_id ??
+    guru.profile_id ??
+    guru.guru_id ??
+    guru.public_slug ??
+    guru.slug ??
+    getPreferredPublicSlug(guru);
+
+  return String(markerId || "").trim();
+}
+
 function getGuruCertificationUserId(guru: GuruRow) {
   return String(guru.user_id || "").trim();
 }
@@ -1200,10 +1213,13 @@ function getProviderMapMarkerRows(
       const [latitude, longitude] = coordinates;
       const guruName = getGuruName(guru);
       const publicIdentifier = getGuruPublicIdentifier(guru);
+      const mapMarkerId = getGuruMapMarkerId(guru);
+
+      if (!mapMarkerId) return null;
 
       return {
         ...guru,
-        id: String(guru.id || guru.user_id || guru.profile_id || publicIdentifier),
+        id: mapMarkerId,
         name: guruName,
         full_name: guru.full_name || guruName,
         display_name: guru.display_name || guruName,
@@ -2467,7 +2483,7 @@ function SearchPageContent() {
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
                 {filteredGurus.length} Guru
-                {filteredGurus.length === 1 ? "" : "s"} found
+                {filteredGurus.length === 1 ? "" : "s"} nearby
               </span>
 
               {cleanZip(zipFilter) ? (
@@ -2477,8 +2493,7 @@ function SearchPageContent() {
               ) : null}
 
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
-                {mapReadyGuruCount} map pin
-                {mapReadyGuruCount === 1 ? "" : "s"} ready
+                {mapReadyGuruCount} on the map
               </span>
 
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
@@ -2615,7 +2630,7 @@ function SearchPageContent() {
                           : ""
                       }`}
                       onMouseEnter={() => {
-                        setHighlightedGuruId(String(guru.id));
+                        setHighlightedGuruId(getGuruMapMarkerId(guru));
                         trackGuruHover(guru);
                       }}
                       onMouseLeave={() => setHighlightedGuruId(undefined)}
@@ -2813,17 +2828,17 @@ function SearchPageContent() {
             <div className="xl:sticky xl:top-28 xl:self-start">
               <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
                 <div className="border-b border-slate-200 px-5 py-4">
-                  <h2 className="text-lg font-bold text-slate-900">Map view</h2>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    Care is closer with SitGuru
+                  </h2>
 
                   <p className="mt-1 text-sm text-slate-600">
-                    Enter a ZIP code or hover over a Guru card to explore
-                    nearby pet care.
+                    Friendly Pet Gurus are ready when you are.
                   </p>
 
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                      {mapReadyGuruCount} map pin
-                      {mapReadyGuruCount === 1 ? "" : "s"}
+                      {mapReadyGuruCount} on the map
                     </span>
 
                     {zipLookupStatus === "found" && zipLookup ? (
