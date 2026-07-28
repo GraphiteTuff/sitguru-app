@@ -34,6 +34,12 @@ type BackgroundCheckRow = Record<string, unknown>;
 type UserRoleRow = Record<string, unknown>;
 type AmbassadorRow = Record<string, unknown>;
 
+type AccountMergeAliasRow = {
+  duplicate_user_id?: string | null;
+  canonical_user_id?: string | null;
+  status?: string | null;
+};
+
 type AuthUserRow = {
   id: string;
   email?: string | null;
@@ -909,6 +915,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
     backgroundChecks,
     userRoles,
     ambassadors,
+    mergeAliases,
     authUsers,
   ] = await Promise.all([
     safeRows<GuruRow>(
@@ -943,13 +950,33 @@ async function getGuruManagementData(searchParams: SearchParams) {
       supabaseAdmin.from("ambassadors").select("*").limit(2000),
       "ambassadors",
     ),
+    safeRows<AccountMergeAliasRow>(
+      supabaseAdmin
+        .from("account_merge_aliases")
+        .select("duplicate_user_id, canonical_user_id, status")
+        .eq("status", "active")
+        .limit(5000),
+      "account_merge_aliases",
+    ),
     getAllAuthUsers(),
   ]);
+
+  const retiredDuplicateUserIds = new Set(
+    mergeAliases
+      .map((row) => asTrimmedString(row.duplicate_user_id))
+      .filter(Boolean),
+  );
 
   const profileMap = new Map<string, ProfileRow>();
   for (const profile of profiles) {
     for (const key of getProfileIdentityKeys(profile)) profileMap.set(key, profile);
   }
+
+  const activeGurus = gurus.filter((guru) => {
+    const profile = findProfileForGuru(guru, profileMap);
+    const userId = getGuruUserId(guru, profile);
+    return !retiredDuplicateUserIds.has(userId);
+  });
 
   const authMap = new Map(authUsers.map((user) => [user.id, user]));
   const backgroundMap = new Map<string, BackgroundCheckRow>();
@@ -979,13 +1006,13 @@ async function getGuruManagementData(searchParams: SearchParams) {
   );
 
   const canonicalGuruUserIds = new Set<string>();
-  for (const guru of gurus) {
+  for (const guru of activeGurus) {
     const userId = getGuruUserId(guru, findProfileForGuru(guru, profileMap));
     if (userId) canonicalGuruUserIds.add(userId);
   }
 
   const duplicateCounts = new Map<string, number>();
-  for (const guru of gurus) {
+  for (const guru of activeGurus) {
     const profile = findProfileForGuru(guru, profileMap);
     const userId = getGuruUserId(guru, profile);
     const authUser = authMap.get(userId);
@@ -998,7 +1025,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
     }
   }
 
-  const canonicalRows: GuruDisplayRow[] = gurus.map((guru) => {
+  const canonicalRows: GuruDisplayRow[] = activeGurus.map((guru) => {
     const profile = findProfileForGuru(guru, profileMap);
     const id = getGuruId(guru);
     const userId = getGuruUserId(guru, profile);
@@ -1152,6 +1179,8 @@ async function getGuruManagementData(searchParams: SearchParams) {
   const repairUserIds = new Set<string>();
 
   for (const [userId, roles] of roleMap.entries()) {
+    if (retiredDuplicateUserIds.has(userId)) continue;
+
     const hasGuruRole = Array.from(roles).some(
       (role) => normalizeRoleLabel(role) === "Guru",
     );
@@ -1163,6 +1192,9 @@ async function getGuruManagementData(searchParams: SearchParams) {
       asTrimmedString(profile.user_id) ||
       asTrimmedString(profile.id) ||
       asTrimmedString(profile.profile_id);
+
+    if (!userId || retiredDuplicateUserIds.has(userId)) continue;
+
     const profileRole = normalizeRoleLabel(profile.role || profile.account_type);
     const hasIdentity = Boolean(
       getGuruName({}, profile, authMap.get(userId)) !== "Guru" ||
@@ -1178,6 +1210,10 @@ async function getGuruManagementData(searchParams: SearchParams) {
     ) {
       repairUserIds.add(userId);
     }
+  }
+
+  for (const retiredUserId of retiredDuplicateUserIds) {
+    repairUserIds.delete(retiredUserId);
   }
 
   const repairRows: GuruDisplayRow[] = Array.from(repairUserIds).map((userId) => {
@@ -1288,6 +1324,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       ).length,
       internal: canonicalRows.filter((row) => row.recordCategory === "internal").length,
       archived: canonicalRows.filter((row) => row.recordCategory === "archived").length,
+      mergedDuplicates: retiredDuplicateUserIds.size,
     },
   };
 }
@@ -1521,7 +1558,7 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
 
         <section className="rounded-[24px] border border-slate-200 bg-white p-4 text-sm font-semibold leading-6 text-slate-600 shadow-sm">
           <span className="font-black text-slate-900">Excluded from the main Guru total:</span>{" "}
-          {guruData.totals.placeholders} placeholder/demo, {guruData.totals.archived} archived/test, and {guruData.totals.internal} internal records. These are preserved in the database but no longer clutter the daily Admin review queue.
+          {guruData.totals.placeholders} placeholder/demo, {guruData.totals.archived} archived/test, {guruData.totals.internal} internal records, and {guruData.totals.mergedDuplicates} merged duplicate aliases. These are preserved in the database but no longer clutter the daily Admin review queue.
         </section>
       </div>
     </main>
