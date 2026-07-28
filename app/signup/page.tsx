@@ -448,6 +448,7 @@ function SignupPageContent() {
   const [password, setPassword] = useState("");
   const [phoneCode, setPhoneCode] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [smsRemindersOptIn, setSmsRemindersOptIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [phoneCodeSent, setPhoneCodeSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -612,6 +613,9 @@ function SignupPageContent() {
 
       const { cleanName, firstName, lastName } = getNameParts(fullName);
       const cleanEmail = email.trim().toLowerCase();
+      const normalizedOptionalPhone = phone.trim()
+        ? toE164UsPhone(phone)
+        : "";
       const cleanZipCode = zipCode.trim();
       const profileRole = getProfileRoleFromIntent(intent);
       const cleanReferralCode = normalizeReferralCode(
@@ -631,6 +635,11 @@ function SignupPageContent() {
 
       if (!isValidEmailAddress(cleanEmail)) {
         setError("Please enter a valid personal email address.");
+        return;
+      }
+
+      if (phone.trim() && !normalizedOptionalPhone) {
+        setError("Please enter a valid 10-digit mobile number or leave it blank.");
         return;
       }
 
@@ -677,6 +686,19 @@ function SignupPageContent() {
             account_intent: intent,
             signup_source: emailSignupSource,
             signup_status: "pending_email_verification",
+            phone: normalizedOptionalPhone || null,
+            transactional_sms_opt_in:
+              Boolean(normalizedOptionalPhone) && smsRemindersOptIn,
+            sms_opt_in:
+              Boolean(normalizedOptionalPhone) && smsRemindersOptIn,
+            sms_consent:
+              Boolean(normalizedOptionalPhone) && smsRemindersOptIn,
+            sms_consent_at:
+              normalizedOptionalPhone && smsRemindersOptIn
+                ? new Date().toISOString()
+                : null,
+            phone_notifications_enabled:
+              Boolean(normalizedOptionalPhone) && smsRemindersOptIn,
             zip_code: cleanZipCode,
             service_area: serviceArea.trim() || cleanZipCode,
             referral_code: cleanReferralCode || null,
@@ -709,6 +731,7 @@ function SignupPageContent() {
           intent,
           fullName: cleanName,
           email: cleanEmail,
+          phone: normalizedOptionalPhone || undefined,
           zipCode: cleanZipCode,
           serviceArea: serviceArea.trim() || cleanZipCode,
           referralCode: cleanReferralCode || undefined,
@@ -753,6 +776,7 @@ function SignupPageContent() {
       const { cleanName, firstName, lastName } = getNameParts(fullName);
       const cleanZipCode = zipCode.trim();
       const normalizedPhone = toE164UsPhone(phone);
+      const cleanOptionalEmail = email.trim().toLowerCase();
       const profileRole = getProfileRoleFromIntent(intent);
       const cleanReferralCode = normalizeReferralCode(
         referralCode,
@@ -771,6 +795,11 @@ function SignupPageContent() {
 
       if (!normalizedPhone) {
         setError("Please enter a valid 10-digit phone number.");
+        return;
+      }
+
+      if (cleanOptionalEmail && !isValidEmailAddress(cleanOptionalEmail)) {
+        setError("Please enter a valid email address or leave it blank.");
         return;
       }
 
@@ -799,6 +828,12 @@ function SignupPageContent() {
             account_intent: intent,
             signup_source: phoneSignupSource,
             signup_status: "pending_phone_verification",
+            email: cleanOptionalEmail || null,
+            transactional_sms_opt_in: true,
+            sms_opt_in: true,
+            sms_consent: true,
+            sms_consent_at: new Date().toISOString(),
+            phone_notifications_enabled: true,
             zip_code: cleanZipCode,
             service_area: serviceArea.trim() || cleanZipCode,
             referral_code: cleanReferralCode || null,
@@ -843,6 +878,7 @@ function SignupPageContent() {
       const { cleanName, firstName, lastName } = getNameParts(fullName);
       const cleanZipCode = zipCode.trim();
       const normalizedPhone = toE164UsPhone(phone);
+      const cleanOptionalEmail = email.trim().toLowerCase();
       const profileRole = getProfileRoleFromIntent(intent);
       const cleanReferralCode = normalizeReferralCode(
         referralCode,
@@ -861,6 +897,11 @@ function SignupPageContent() {
 
       if (!normalizedPhone) {
         setError("Please enter a valid 10-digit phone number.");
+        return;
+      }
+
+      if (cleanOptionalEmail && !isValidEmailAddress(cleanOptionalEmail)) {
+        setError("Please enter a valid email address or leave it blank.");
         return;
       }
 
@@ -900,6 +941,12 @@ function SignupPageContent() {
           account_intent: intent,
           signup_source: phoneSignupSource,
           signup_status: "phone_verified",
+          email: cleanOptionalEmail || null,
+          transactional_sms_opt_in: true,
+          sms_opt_in: true,
+          sms_consent: true,
+          sms_consent_at: new Date().toISOString(),
+          phone_notifications_enabled: true,
           zip_code: cleanZipCode,
           service_area: serviceArea.trim() || cleanZipCode,
           referral_code: cleanReferralCode || null,
@@ -928,6 +975,7 @@ function SignupPageContent() {
           userId,
           intent,
           fullName: cleanName,
+          email: cleanOptionalEmail || undefined,
           phone: normalizedPhone,
           zipCode: cleanZipCode,
           serviceArea: serviceArea.trim() || cleanZipCode,
@@ -1142,6 +1190,48 @@ function SignupPageContent() {
 
                   <label className="block">
                     <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                      Mobile phone{" "}
+                      <span className="text-[#8a7d6b]">(optional)</span>
+                    </span>
+                    <div className="relative">
+                      <Phone className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a7d6b]" />
+                      <input
+                        value={phone}
+                        onChange={(event) =>
+                          setPhone(formatPhoneNumber(event.target.value))
+                        }
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-12 py-3 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder="(267) 555-1234"
+                        inputMode="tel"
+                        autoComplete="tel"
+                      />
+                    </div>
+                    <p className="mt-2 text-xs font-semibold leading-5 text-[#6a6256]">
+                      Add a phone number now or later. Your email remains your
+                      primary sign-in method.
+                    </p>
+                  </label>
+
+                  {phoneDigits(phone).length > 0 ? (
+                    <label className="flex items-start gap-3 rounded-2xl border border-[#d7eadf] bg-[#f2fbf6] p-4 text-sm leading-6 text-[#4e675b]">
+                      <input
+                        type="checkbox"
+                        checked={smsRemindersOptIn}
+                        onChange={(event) =>
+                          setSmsRemindersOptIn(event.target.checked)
+                        }
+                        className="mt-1 h-4 w-4 rounded border-[#b8d8c7] text-[#0f7f60] focus:ring-[#0f7f60]"
+                      />
+                      <span>
+                        Send me transactional SMS updates about account setup,
+                        profile completion, bookings, and safety. Message and
+                        data rates may apply. Reply STOP to opt out.
+                      </span>
+                    </label>
+                  ) : null}
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
                       ZIP code <span className="text-red-500">*</span>
                     </span>
                     <input
@@ -1299,6 +1389,27 @@ function SignupPageContent() {
 
                   <label className="block">
                     <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
+                      Email{" "}
+                      <span className="text-[#8a7d6b]">(optional)</span>
+                    </span>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#8a7d6b]" />
+                      <input
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        className="w-full rounded-2xl border border-[#d8ccb8] bg-white px-12 py-3 text-base outline-none transition focus:border-[#0f7f60] focus:ring-4 focus:ring-[#0f7f60]/10"
+                        placeholder="you@example.com"
+                        autoComplete="email"
+                      />
+                    </div>
+                    <p className="mt-2 text-xs font-semibold leading-5 text-[#6a6256]">
+                      Optional backup contact. Your verified phone remains your
+                      primary sign-in method.
+                    </p>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-[#2f2a22]">
                       ZIP code <span className="text-red-500">*</span>
                     </span>
                     <input
@@ -1393,8 +1504,11 @@ function SignupPageContent() {
                       className="mt-1 h-4 w-4 rounded border-[#d8ccb8] text-[#0f7f60] focus:ring-[#0f7f60]"
                     />
                     <span>
-                      I agree to SitGuru&apos;s terms, privacy policy, and understand
-                      my profile may need additional information before it is complete.
+                      I agree to SitGuru&apos;s terms and privacy policy. By
+                      requesting a phone code, I also agree to receive recurring
+                      transactional SMS for verification, profile completion,
+                      bookings, payouts, and safety. Message and data rates may
+                      apply. Reply STOP to opt out.
                     </span>
                   </label>
 
@@ -1452,8 +1566,10 @@ function SignupPageContent() {
               </div>
 
               <p className="mt-5 text-center text-xs leading-5 text-[#7b7164]">
-                Phone is required before a profile is marked complete. Profile photo,
-                service area, and ZIP code are verified from your dashboard.
+                A verified email or verified phone is enough to create and use
+                your account. Add the other contact method whenever you are ready.
+                Profile photo, services, pricing, availability, location, and payout
+                setup are completed from your dashboard before becoming bookable.
               </p>
             </div>
           </div>

@@ -32,8 +32,8 @@ async function runReminderJob(request: NextRequest) {
 
   try {
     const backfill = await backfillRecentSignupReminderQueue({
-      days: 14,
-      maxUsers: 300,
+      days: 365,
+      maxUsers: 1000,
     });
 
     const processing = await processProfileCompletionReminderQueue({
