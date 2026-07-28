@@ -115,17 +115,22 @@ function isValidCenter(center?: [number, number]) {
 }
 
 function getMarkerId(marker: MapMarker) {
-  const id =
-    marker.id ??
-    marker.user_id ??
-    marker.userId ??
-    marker.profile_id ??
-    marker.profileId ??
-    marker.guru_id ??
-    marker.guruId ??
-    marker.slug;
+  const id = [
+    marker.id,
+    marker.user_id,
+    marker.userId,
+    marker.profile_id,
+    marker.profileId,
+    marker.guru_id,
+    marker.guruId,
+    marker.public_slug,
+    marker.publicSlug,
+    marker.slug,
+  ]
+    .map((value) => getString(value))
+    .find(Boolean);
 
-  return id === null || id === undefined ? "" : String(id);
+  return id || "";
 }
 
 function getMarkerCity(marker: MapMarker) {

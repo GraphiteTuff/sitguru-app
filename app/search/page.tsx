@@ -869,16 +869,19 @@ function getGuruAnalyticsId(guru: GuruRow) {
 }
 
 function getGuruMapMarkerId(guru: GuruRow) {
-  const markerId =
-    guru.id ??
-    guru.user_id ??
-    guru.profile_id ??
-    guru.guru_id ??
-    guru.public_slug ??
-    guru.slug ??
-    getPreferredPublicSlug(guru);
+  const markerId = [
+    guru.user_id,
+    guru.id,
+    guru.profile_id,
+    guru.guru_id,
+    guru.public_slug,
+    guru.slug,
+    getPreferredPublicSlug(guru),
+  ]
+    .map((value) => String(value ?? "").trim())
+    .find(Boolean);
 
-  return String(markerId || "").trim();
+  return markerId || "";
 }
 
 function getGuruCertificationUserId(guru: GuruRow) {
@@ -2282,7 +2285,7 @@ function SearchPageContent() {
   }
 
   function trackGuruHover(guru: GuruRow) {
-    const guruId = String(guru.id);
+    const guruId = getGuruMapMarkerId(guru);
 
     if (hoveredGuruIds.current.has(guruId)) return;
 
@@ -2623,7 +2626,10 @@ function SearchPageContent() {
 
                   return (
                     <Card
-                      key={guru.id}
+                      key={
+                        getGuruMapMarkerId(guru) ||
+                        getGuruPublicIdentifier(guru)
+                      }
                       className={`overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md md:h-[380px] ${
                         isSelectedGuru
                           ? "border-emerald-400 ring-4 ring-emerald-100"
