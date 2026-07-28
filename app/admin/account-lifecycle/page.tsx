@@ -13,8 +13,11 @@ import {
   RefreshCw,
   ShieldCheck,
   UserRound,
+  UserCog,
+  StickyNote,
   Wrench,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { calculateSitGuruProfileCompletion } from "@/lib/profileCompletion";
 
@@ -34,9 +37,15 @@ type ActivityItem = {
   id: string;
   title: string;
   description: string;
-  actor: string;
+  actorName: string;
+  actorEmail: string;
+  actorRole: string;
+  actorType: string;
   source: string;
   createdAt: string;
+  changedFields: string[];
+  beforeData: unknown;
+  afterData: unknown;
   tone: "green" | "amber" | "slate" | "sky";
 };
 
@@ -86,6 +95,23 @@ function latestTimestamp(...values: unknown[]) {
     .sort((a, b) => b.time - a.time);
 
   return candidates[0]?.value || "";
+}
+
+function asStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => asString(item)).filter(Boolean)
+    : [];
+}
+
+function jsonPreview(value: unknown) {
+  if (!value) return "";
+
+  try {
+    const output = JSON.stringify(value, null, 2);
+    return output.length > 6000 ? `${output.slice(0, 6000)}\n…` : output;
+  } catch {
+    return String(value);
+  }
 }
 
 async function findAuthUser(userId: string) {
@@ -305,14 +331,17 @@ function buildDerivedActivity({
         event.message,
         event.summary,
       ) || "An account lifecycle event was recorded.",
-    actor:
+    actorName:
       firstNonEmpty(
         event.actor_name,
         event.admin_name,
         event.performed_by_name,
-        event.actor_email,
-        event.admin_email,
-      ) || "System",
+      ) || "System / database",
+    actorEmail: firstNonEmpty(event.actor_email, event.admin_email),
+    actorRole:
+      firstNonEmpty(event.actor_role, event.admin_role) ||
+      (asString(event.actor_type) === "admin" ? "Admin" : "System"),
+    actorType: firstNonEmpty(event.actor_type) || "system",
     source:
       firstNonEmpty(event.source, event.source_page, event.origin) ||
       "Account lifecycle",
@@ -322,7 +351,15 @@ function buildDerivedActivity({
         event.occurred_at,
         event.updated_at,
       ) || "",
-    tone: "sky",
+    changedFields: asStringArray(event.changed_fields),
+    beforeData: event.before_data,
+    afterData: event.after_data,
+    tone:
+      asString(event.actor_type) === "admin"
+        ? "green"
+        : asString(event.event_type).includes("communication")
+          ? "sky"
+          : "slate",
   }));
 
   const pushDerived = (
@@ -339,9 +376,15 @@ function buildDerivedActivity({
       id,
       title,
       description,
-      actor: "System / database",
+      actorName: "System / database",
+      actorEmail: "",
+      actorRole: "System",
+      actorType: "system",
       source: "Current account records",
       createdAt: date,
+      changedFields: [],
+      beforeData: null,
+      afterData: null,
       tone,
     });
   };
@@ -502,14 +545,61 @@ function ActivityTimeline({ items }: { items: ActivityItem[] }) {
               </span>
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
+            <div className="mt-3 grid gap-2 text-xs font-bold text-slate-500 sm:flex sm:flex-wrap">
               <span className="rounded-full bg-slate-100 px-3 py-1">
-                By: {item.actor}
+                By: {item.actorName}
+              </span>
+              {item.actorEmail ? (
+                <span className="break-all rounded-full bg-slate-100 px-3 py-1">
+                  {item.actorEmail}
+                </span>
+              ) : null}
+              <span className="rounded-full bg-slate-100 px-3 py-1">
+                Role: {item.actorRole}
               </span>
               <span className="rounded-full bg-slate-100 px-3 py-1">
                 Source: {item.source}
               </span>
             </div>
+
+            {item.changedFields.length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {item.changedFields.slice(0, 12).map((field) => (
+                  <span
+                    key={field}
+                    className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-800 ring-1 ring-emerald-100"
+                  >
+                    {field.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            {item.beforeData || item.afterData ? (
+              <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50">
+                <summary className="cursor-pointer px-4 py-3 text-xs font-black text-slate-700">
+                  View before and after values
+                </summary>
+                <div className="grid gap-3 border-t border-slate-200 p-4 lg:grid-cols-2">
+                  <div>
+                    <p className="mb-2 text-[11px] font-black uppercase tracking-[0.1em] text-slate-500">
+                      Before
+                    </p>
+                    <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-white p-3 text-[11px] leading-5 text-slate-700">
+                      {jsonPreview(item.beforeData) || "No previous values recorded."}
+                    </pre>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-[11px] font-black uppercase tracking-[0.1em] text-slate-500">
+                      After
+                    </p>
+                    <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-white p-3 text-[11px] leading-5 text-slate-700">
+                      {jsonPreview(item.afterData) || "No new values recorded."}
+                    </pre>
+                  </div>
+                </div>
+              </details>
+            ) : null}
           </div>
         ))
       ) : (
@@ -526,6 +616,12 @@ export default async function AccountLifecyclePage({
 }: PageProps) {
   const params = searchParams ? await searchParams : {};
   const query = params.query || "";
+
+  const supabase = await createClient();
+  const {
+    data: { user: signedInAdmin },
+  } = await supabase.auth.getUser();
+
   const profile = await findProfile(query);
   const userId = asString(profile?.id);
   const authUser = userId ? await findAuthUser(userId) : null;
@@ -537,6 +633,8 @@ export default async function AccountLifecyclePage({
     referralRows,
     communicationLogs,
     lifecycleEvents,
+    assignmentRows,
+    adminNotes,
   ] = userId
     ? await Promise.all([
         safeRows(
@@ -586,13 +684,31 @@ export default async function AccountLifecyclePage({
           supabaseAdmin
             .from("account_lifecycle_events")
             .select("*")
-            .eq("user_id", userId)
+            .or(`user_id.eq.${userId},target_user_id.eq.${userId}`)
             .order("created_at", { ascending: false })
-            .limit(50),
+            .limit(100),
           "account_lifecycle_events",
         ),
+        safeRows(
+          supabaseAdmin
+            .from("account_management_assignments")
+            .select("*")
+            .eq("target_user_id", userId)
+            .order("updated_at", { ascending: false })
+            .limit(25),
+          "account_management_assignments",
+        ),
+        safeRows(
+          supabaseAdmin
+            .from("account_admin_notes")
+            .select("*")
+            .eq("target_user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(50),
+          "account_admin_notes",
+        ),
       ])
-    : [[], [], [], [], [], []];
+    : [[], [], [], [], [], [], [], []];
 
   const roles = rolesRows
     .map((row) => asString(row.role))
@@ -601,6 +717,43 @@ export default async function AccountLifecyclePage({
   const guru = guruRows[0] || null;
   const ambassador = ambassadorRows[0] || null;
   const referral = referralRows[0] || null;
+
+  const currentAdminId = signedInAdmin?.id || "";
+  const currentAdminPermissionRows = currentAdminId
+    ? await safeRows(
+        supabaseAdmin
+          .from("admin_account_permissions")
+          .select("*")
+          .eq("user_id", currentAdminId)
+          .limit(1),
+        "current_admin_permission",
+      )
+    : [];
+  const currentAdminPermission = currentAdminPermissionRows[0] || null;
+
+  const activeAssignment =
+    assignmentRows.find(
+      (row) =>
+        !["completed", "unassigned"].includes(
+          asString(row.status).toLowerCase(),
+        ),
+    ) || null;
+
+  const assignedAdminId = asString(activeAssignment?.assigned_admin_user_id);
+  const assignedAdminPermissionRows = assignedAdminId
+    ? await safeRows(
+        supabaseAdmin
+          .from("admin_account_permissions")
+          .select("*")
+          .eq("user_id", assignedAdminId)
+          .limit(1),
+        "assigned_admin_permission",
+      )
+    : [];
+  const assignedAdminPermission = assignedAdminPermissionRows[0] || null;
+  const assignedAdminAuth = assignedAdminId
+    ? await findAuthUser(assignedAdminId)
+    : null;
 
   const referralCode =
     asString(referral?.code) ||
@@ -715,6 +868,49 @@ export default async function AccountLifecyclePage({
         : "",
     ) || "Not recorded";
 
+  const currentAdminName =
+    firstNonEmpty(
+      currentAdminPermission?.display_name,
+      signedInAdmin?.user_metadata?.full_name,
+      signedInAdmin?.user_metadata?.display_name,
+      signedInAdmin?.user_metadata?.name,
+      signedInAdmin?.email,
+    ) || "Signed-in Admin";
+  const currentAdminEmail =
+    firstNonEmpty(currentAdminPermission?.email, signedInAdmin?.email) ||
+    "Email not available";
+  const currentAdminRole =
+    firstNonEmpty(currentAdminPermission?.access_level) || "admin";
+
+  const assignedAdminName =
+    firstNonEmpty(
+      assignedAdminPermission?.display_name,
+      assignedAdminAuth?.user_metadata &&
+        (assignedAdminAuth.user_metadata as AnyRow).full_name,
+      assignedAdminAuth?.user_metadata &&
+        (assignedAdminAuth.user_metadata as AnyRow).display_name,
+      assignedAdminPermission?.email,
+      assignedAdminAuth?.email,
+    ) || "Unassigned";
+  const assignedAdminEmail =
+    firstNonEmpty(assignedAdminPermission?.email, assignedAdminAuth?.email);
+  const assignedAdminRole =
+    firstNonEmpty(assignedAdminPermission?.access_level) ||
+    (assignedAdminId ? "Admin" : "Not assigned");
+
+  const lastAdminEvent = lifecycleEvents.find(
+    (event) =>
+      asString(event.actor_type).toLowerCase() === "admin" &&
+      Boolean(firstNonEmpty(event.actor_name, event.actor_email)),
+  );
+  const lastWorkedByName =
+    firstNonEmpty(lastAdminEvent?.actor_name, lastAdminEvent?.actor_email) ||
+    "No Admin action recorded";
+  const lastWorkedByEmail = firstNonEmpty(lastAdminEvent?.actor_email);
+  const lastWorkedByRole =
+    firstNonEmpty(lastAdminEvent?.actor_role) || "Not recorded";
+  const lastWorkedAt = firstNonEmpty(lastAdminEvent?.created_at);
+
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f8faf7] px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
       <div className="mx-auto w-full max-w-7xl space-y-5 sm:space-y-6">
@@ -761,19 +957,36 @@ export default async function AccountLifecyclePage({
               </p>
             </div>
 
-            {profile ? (
-              <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 xl:w-auto xl:max-w-md">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                  Current account
+            <div className="grid w-full gap-3 xl:w-auto xl:min-w-[360px]">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+                  Signed in as
                 </p>
-                <p className="mt-1 text-lg font-black text-slate-950">
-                  {profileName}
+                <p className="mt-1 text-lg font-black text-emerald-950">
+                  {currentAdminName}
                 </p>
-                <p className="mt-1 break-all text-xs font-semibold text-slate-500">
-                  {userId}
+                <p className="mt-1 break-all text-xs font-semibold text-emerald-800">
+                  {currentAdminEmail}
+                </p>
+                <p className="mt-1 text-xs font-black uppercase tracking-[0.08em] text-emerald-700">
+                  {currentAdminRole.replace(/_/g, " ")}
                 </p>
               </div>
-            ) : null}
+
+              {profile ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                    Current account
+                  </p>
+                  <p className="mt-1 text-lg font-black text-slate-950">
+                    {profileName}
+                  </p>
+                  <p className="mt-1 break-all text-xs font-semibold text-slate-500">
+                    {userId}
+                  </p>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <form className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -943,6 +1156,98 @@ export default async function AccountLifecyclePage({
                   }
                   detail={`Source: ${lastUsedSource}.`}
                   tone={lastUsedAt ? "sky" : "slate"}
+                />
+                <SummaryCard
+                  icon={<UserCog size={19} />}
+                  label="Assigned manager"
+                  value={assignedAdminName}
+                  detail={
+                    assignedAdminEmail
+                      ? `${assignedAdminEmail} · ${assignedAdminRole.replace(
+                          /_/g,
+                          " ",
+                        )}`
+                      : "No active account manager is assigned."
+                  }
+                  tone={assignedAdminId ? "green" : "slate"}
+                />
+                <SummaryCard
+                  icon={<Clock3 size={19} />}
+                  label="Last worked by"
+                  value={lastWorkedByName}
+                  detail={
+                    lastWorkedAt
+                      ? `${lastWorkedByEmail || lastWorkedByRole} · ${formatDateTime(
+                          lastWorkedAt,
+                        )}`
+                      : "No attributed Admin action has been recorded yet."
+                  }
+                  tone={lastWorkedAt ? "sky" : "slate"}
+                />
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-4 flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
+                  <UserCog size={21} />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-700">
+                    Account management
+                  </p>
+                  <h2 className="text-2xl font-black text-slate-950">
+                    Ownership and follow-up
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                    See who owns this account, who last changed it, and when the
+                    next follow-up is due.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Field
+                  label="Assigned account manager"
+                  value={assignedAdminName}
+                  helper={
+                    assignedAdminEmail
+                      ? `${assignedAdminEmail} · ${assignedAdminRole.replace(
+                          /_/g,
+                          " ",
+                        )}`
+                      : "No active assignment."
+                  }
+                />
+                <Field
+                  label="Assignment status"
+                  value={asString(activeAssignment?.status) || "Unassigned"}
+                  helper={`Priority: ${
+                    asString(activeAssignment?.priority) || "normal"
+                  }`}
+                />
+                <Field
+                  label="Next follow-up"
+                  value={
+                    asString(activeAssignment?.next_follow_up_at)
+                      ? formatDateTime(activeAssignment?.next_follow_up_at)
+                      : "Not scheduled"
+                  }
+                  helper={
+                    asString(activeAssignment?.assignment_note) ||
+                    "No assignment note."
+                  }
+                />
+                <Field
+                  label="Last Admin action"
+                  value={lastWorkedByName}
+                  helper={
+                    lastWorkedAt
+                      ? `${lastWorkedByEmail || lastWorkedByRole} · ${formatDateTime(
+                          lastWorkedAt,
+                        )}`
+                      : "No attributed Admin event yet."
+                  }
                 />
               </div>
             </section>
@@ -1129,6 +1434,85 @@ export default async function AccountLifecyclePage({
                     </Link>
                   ) : null}
                 </div>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-5 flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
+                  <StickyNote size={21} />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.15em] text-amber-700">
+                    Internal record
+                  </p>
+                  <h2 className="text-2xl font-black text-slate-950">
+                    Admin notes
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                    Notes are visible to authorized SitGuru staff and identify
+                    who wrote them.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {adminNotes.length ? (
+                  adminNotes.map((note, index) => (
+                    <div
+                      key={asString(note.id) || `admin-note-${index}`}
+                      className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4"
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em] text-amber-800 ring-1 ring-amber-200">
+                              {asString(note.note_type).replace(/_/g, " ") ||
+                                "general"}
+                            </span>
+                            {asBoolean(note.is_pinned) ? (
+                              <span className="rounded-full bg-amber-600 px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em] text-white">
+                                Pinned
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-700">
+                            {asString(note.note) || "No note text."}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs font-bold text-slate-500">
+                          {formatDateTime(note.created_at)}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
+                        <span className="rounded-full bg-white px-3 py-1 ring-1 ring-amber-100">
+                          By:{" "}
+                          {firstNonEmpty(
+                            note.created_by_name,
+                            note.created_by_email,
+                          ) || "Unknown Admin"}
+                        </span>
+                        {asString(note.created_by_email) ? (
+                          <span className="break-all rounded-full bg-white px-3 py-1 ring-1 ring-amber-100">
+                            {asString(note.created_by_email)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
+                    <p className="font-black text-slate-800">
+                      No Admin notes yet
+                    </p>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
+                      Notes added through the Admin account-management workflow
+                      will appear here with the staff member’s name, email, and
+                      time.
+                    </p>
+                  </div>
+                )}
               </div>
             </section>
 
