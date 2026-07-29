@@ -868,30 +868,24 @@ function getGuruAnalyticsId(guru: GuruRow) {
   return String(guru.user_id || guru.id || "");
 }
 
-function getGuruMapMarkerId(guru: GuruRow) {
-  const identityParts = [
-    ["user", guru.user_id],
-    ["row", guru.id],
-    ["profile", guru.profile_id],
-    ["guru", guru.guru_id],
-    ["public-slug", guru.public_slug],
-    ["slug", guru.slug],
-    ["email", guru.email],
+function getGuruMapMarkerId(guru: GuruRow, resultIndex: number) {
+  const primaryIdentity = [
+    guru.user_id,
+    guru.id,
+    guru.profile_id,
+    guru.guru_id,
+    guru.public_slug,
+    guru.slug,
+    guru.email,
   ]
-    .map(([label, value]) => {
-      const normalizedValue = String(value ?? "").trim().toLowerCase();
-      return normalizedValue ? `${label}:${normalizedValue}` : "";
-    })
-    .filter(Boolean);
+    .map((value) => String(value ?? "").trim().toLowerCase())
+    .find(Boolean);
 
-  if (identityParts.length > 0) {
-    return identityParts.join("::");
-  }
+  const fallbackIdentity =
+    primaryIdentity ||
+    `${slugifyPublicIdentifier(getGuruName(guru)) || "guru"}-${getGuruZip(guru) || "local"}`;
 
-  const fallbackName = slugifyPublicIdentifier(getGuruName(guru)) || "guru";
-  const fallbackZip = getGuruZip(guru) || "no-zip";
-
-  return `fallback:${fallbackName}:${fallbackZip}`;
+  return `sitguru-map-${resultIndex}-${fallbackIdentity}`;
 }
 
 function getGuruCertificationUserId(guru: GuruRow) {
@@ -1218,7 +1212,7 @@ function getProviderMapMarkerRows(
   guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
 ) {
   return guruRows
-    .map((guru) => {
+    .map((guru, markerIndex) => {
       const coordinates = getGuruSearchCoordinates(guru, guruZipLookupsByZip);
 
       if (!coordinates) return null;
@@ -1226,7 +1220,7 @@ function getProviderMapMarkerRows(
       const [latitude, longitude] = coordinates;
       const guruName = getGuruName(guru);
       const publicIdentifier = getGuruPublicIdentifier(guru);
-      const mapMarkerId = getGuruMapMarkerId(guru);
+      const mapMarkerId = getGuruMapMarkerId(guru, markerIndex);
 
       if (!mapMarkerId) return null;
 
@@ -2295,8 +2289,8 @@ function SearchPageContent() {
     setSearchTerm("");
   }
 
-  function trackGuruHover(guru: GuruRow) {
-    const guruId = getGuruMapMarkerId(guru);
+  function trackGuruHover(guru: GuruRow, mapMarkerId: string) {
+    const guruId = mapMarkerId;
 
     if (hoveredGuruIds.current.has(guruId)) return;
 
@@ -2573,9 +2567,10 @@ function SearchPageContent() {
                   </div>
                 </Card>
               ) : (
-                filteredGurus.map((guru) => {
+                filteredGurus.map((guru, guruIndex) => {
                   const photoUrl = getGuruPhotoUrl(guru);
                   const guruName = getGuruName(guru);
+                  const guruMapMarkerId = getGuruMapMarkerId(guru, guruIndex);
                   const guruFirstName =
                     guruName.trim().split(/\s+/)[0] || "Guru";
                   const guruDisplayLocation = getGuruDisplayLocation(
@@ -2637,18 +2632,15 @@ function SearchPageContent() {
 
                   return (
                     <Card
-                      key={
-                        getGuruMapMarkerId(guru) ||
-                        getGuruPublicIdentifier(guru)
-                      }
+                      key={guruMapMarkerId}
                       className={`overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md md:h-[380px] ${
                         isSelectedGuru
                           ? "border-emerald-400 ring-4 ring-emerald-100"
                           : ""
                       }`}
                       onMouseEnter={() => {
-                        setHighlightedGuruId(getGuruMapMarkerId(guru));
-                        trackGuruHover(guru);
+                        setHighlightedGuruId(guruMapMarkerId);
+                        trackGuruHover(guru, guruMapMarkerId);
                       }}
                       onMouseLeave={() => setHighlightedGuruId(undefined)}
                     >

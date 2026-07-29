@@ -115,22 +115,29 @@ function isValidCenter(center?: [number, number]) {
 }
 
 function getMarkerId(marker: MapMarker) {
-  const id = [
-    marker.id,
-    marker.user_id,
-    marker.userId,
-    marker.profile_id,
-    marker.profileId,
-    marker.guru_id,
-    marker.guruId,
-    marker.public_slug,
-    marker.publicSlug,
-    marker.slug,
-  ]
-    .map((value) => getString(value))
-    .find(Boolean);
+  const explicitMapMarkerId =
+    getString(marker.__sitguruMapMarkerId) ||
+    getString(marker.map_marker_id) ||
+    getString(marker.mapMarkerId);
 
-  return id || "";
+  if (explicitMapMarkerId) return explicitMapMarkerId;
+
+  const identityParts = [
+    ["row", marker.id],
+    ["user", marker.user_id ?? marker.userId],
+    ["profile", marker.profile_id ?? marker.profileId],
+    ["guru", marker.guru_id ?? marker.guruId],
+    ["public-slug", marker.public_slug ?? marker.publicSlug],
+    ["slug", marker.slug],
+    ["email", marker.email],
+  ]
+    .map(([label, value]) => {
+      const normalizedValue = getString(value).toLowerCase();
+      return normalizedValue ? `${label}:${normalizedValue}` : "";
+    })
+    .filter(Boolean);
+
+  return identityParts.join("::");
 }
 
 function getMarkerCity(marker: MapMarker) {
@@ -340,14 +347,6 @@ export default function ProviderMap({
       }) as NormalizedMapMarker[];
   }, [markers]);
 
-  const safeHighlightedMarkerId = useMemo(() => {
-    if (!highlightedMarkerId) return undefined;
-
-    return usableMarkers.some((marker) => getMarkerId(marker) === highlightedMarkerId)
-      ? highlightedMarkerId
-      : undefined;
-  }, [highlightedMarkerId, usableMarkers]);
-
   const centerReady = isValidCenter(center);
 
   return (
@@ -355,7 +354,7 @@ export default function ProviderMap({
       <MapWithNoSSR
         markers={usableMarkers}
         center={centerReady ? center : undefined}
-        highlightedMarkerId={safeHighlightedMarkerId}
+        highlightedMarkerId={highlightedMarkerId}
       />
 
       <div className="border-t border-slate-100 bg-white p-4">

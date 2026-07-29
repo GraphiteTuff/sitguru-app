@@ -134,22 +134,29 @@ function cityKey(city: string, state: string) {
 }
 
 function getId(marker: RawMarker) {
-  const id = [
-    marker.id,
-    marker.user_id,
-    marker.userId,
-    marker.profile_id,
-    marker.profileId,
-    marker.guru_id,
-    marker.guruId,
-    marker.public_slug,
-    marker.publicSlug,
-    marker.slug,
-  ]
-    .map((value) => asString(value))
-    .find(Boolean);
+  const explicitMapMarkerId =
+    asString(marker.__sitguruMapMarkerId) ||
+    asString(marker.map_marker_id) ||
+    asString(marker.mapMarkerId);
 
-  return id || "";
+  if (explicitMapMarkerId) return explicitMapMarkerId;
+
+  const identityParts = [
+    ["row", marker.id],
+    ["user", marker.user_id ?? marker.userId],
+    ["profile", marker.profile_id ?? marker.profileId],
+    ["guru", marker.guru_id ?? marker.guruId],
+    ["public-slug", marker.public_slug ?? marker.publicSlug],
+    ["slug", marker.slug],
+    ["email", marker.email],
+  ]
+    .map(([label, value]) => {
+      const normalizedValue = asString(value).toLowerCase();
+      return normalizedValue ? `${label}:${normalizedValue}` : "";
+    })
+    .filter(Boolean);
+
+  return identityParts.join("::");
 }
 
 function getName(marker: RawMarker) {
@@ -786,6 +793,7 @@ export default function MapContent({
       );
 
       if (highlightedMarker) {
+        map.stop();
         map.flyTo(
           [highlightedMarker.latitude, highlightedMarker.longitude],
           Math.max(map.getZoom(), HOVER_ZOOM),
@@ -800,6 +808,7 @@ export default function MapContent({
     }
 
     const timer = window.setTimeout(() => {
+      map.stop();
       fitMapToMarkers({
         map,
         markers: normalizedMarkers,
