@@ -423,7 +423,31 @@ function getGuruLocation(guru: GuruRow, profile?: ProfileRow | null) {
     asTrimmedString(profile?.service_state) ||
     asTrimmedString(profile?.state_code);
 
-  return [city, state].filter(Boolean).join(", ") || "Location not listed";
+  const zipCode =
+    asTrimmedString(guru.zip_code) ||
+    asTrimmedString(guru.service_zip_code) ||
+    asTrimmedString(guru.service_zip) ||
+    asTrimmedString(guru.postal_code) ||
+    asTrimmedString(profile?.zip_code) ||
+    asTrimmedString(profile?.service_zip_code) ||
+    asTrimmedString(profile?.service_zip) ||
+    asTrimmedString(profile?.postal_code);
+
+  const serviceArea =
+    asTrimmedString(guru.service_area) ||
+    asTrimmedString(profile?.service_area);
+
+  const cityState = [city, state].filter(Boolean).join(", ");
+
+  if (cityState && zipCode) {
+    return `${cityState} ${zipCode}`;
+  }
+
+  if (cityState) return cityState;
+  if (zipCode) return zipCode;
+  if (serviceArea) return serviceArea;
+
+  return "Location not listed";
 }
 
 function getGuruServices(guru: GuruRow, profile?: ProfileRow | null) {
