@@ -869,19 +869,29 @@ function getGuruAnalyticsId(guru: GuruRow) {
 }
 
 function getGuruMapMarkerId(guru: GuruRow) {
-  const markerId = [
-    guru.user_id,
-    guru.id,
-    guru.profile_id,
-    guru.guru_id,
-    guru.public_slug,
-    guru.slug,
-    getPreferredPublicSlug(guru),
+  const identityParts = [
+    ["user", guru.user_id],
+    ["row", guru.id],
+    ["profile", guru.profile_id],
+    ["guru", guru.guru_id],
+    ["public-slug", guru.public_slug],
+    ["slug", guru.slug],
+    ["email", guru.email],
   ]
-    .map((value) => String(value ?? "").trim())
-    .find(Boolean);
+    .map(([label, value]) => {
+      const normalizedValue = String(value ?? "").trim().toLowerCase();
+      return normalizedValue ? `${label}:${normalizedValue}` : "";
+    })
+    .filter(Boolean);
 
-  return markerId || "";
+  if (identityParts.length > 0) {
+    return identityParts.join("::");
+  }
+
+  const fallbackName = slugifyPublicIdentifier(getGuruName(guru)) || "guru";
+  const fallbackZip = getGuruZip(guru) || "no-zip";
+
+  return `fallback:${fallbackName}:${fallbackZip}`;
 }
 
 function getGuruCertificationUserId(guru: GuruRow) {
@@ -1222,7 +1232,8 @@ function getProviderMapMarkerRows(
 
       return {
         ...guru,
-        id: mapMarkerId,
+        __sitguruMapMarkerId: mapMarkerId,
+        id: guru.id || mapMarkerId,
         name: guruName,
         full_name: guru.full_name || guruName,
         display_name: guru.display_name || guruName,
