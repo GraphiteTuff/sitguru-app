@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
 
-const PAYOUT_SETUP_API_VERSION = "2026-07-24.2";
+const PAYOUT_SETUP_API_VERSION = "2026-07-29.1";
 
 type FinancialRole = "guru" | "ambassador";
 type RoleContext = FinancialRole | "multi_role" | "unknown";
@@ -131,6 +131,7 @@ type PayoutDestinationRow = {
   id: string;
   user_id: string;
   destination_purpose: "ambassador_reward" | "guru_reward" | "general_payout";
+  workspace_role?: FinancialRole | null;
   provider: "paypal" | "venmo";
   destination_type: DestinationType;
   destination_value?: string | null;
@@ -144,6 +145,18 @@ type PayoutDestinationRow = {
   destination_status: "active" | "disabled" | "removed";
   is_default: boolean;
   is_live: boolean;
+
+  /*
+    Older SitGuru destination rows may still include these legacy fields.
+    The API writes both generations when available so web, web app, and
+    mobile payout setup remain compatible during the schema transition.
+  */
+  recipient_type?: string | null;
+  recipient_value?: string | null;
+  masked_value?: string | null;
+  status?: string | null;
+  is_primary?: boolean | null;
+
   verified_at: string | null;
   last_used_at: string | null;
   disabled_at: string | null;
@@ -1276,7 +1289,6 @@ async function saveAmbassadorDestination({
     .select("*")
     .eq("user_id", userId)
     .eq("provider", input.provider)
-    .eq("destination_type", input.destinationType)
     .neq("destination_status", "removed");
 
   if (matchingError) {
@@ -1284,57 +1296,138 @@ async function saveAmbassadorDestination({
   }
 
   const existing = ((matchingRows || []) as PayoutDestinationRow[]).find(
-    (row) =>
-      safeString(row.destination_value).toLowerCase() ===
-      input.destinationValue.toLowerCase(),
+    (row) => {
+      const savedType = safeString(
+        row.destination_type || row.recipient_type,
+      ).toLowerCase();
+      const savedValue = safeString(
+        row.destination_value || row.recipient_value,
+      ).toLowerCase();
+
+      return (
+        savedType === input.destinationType.toLowerCase() &&
+        savedValue === input.destinationValue.toLowerCase()
+      );
+    },
   );
 
   const now = new Date().toISOString();
   const displayValue = maskIdentifier(input.destinationValue);
-  let destinationId = existing?.id || null;
+  const legacyStatus = "pending";
+
+  function missingDestinationColumn(message: string) {
+    return (
+      message.match(/Could not find the '([^']+)' column/i)?.[1] ||
+      message.match(/column \"([^\"]+)\" of relation \"user_payout_destinations\" does not exist/i)?.[1] ||
+      ""
+    );
+  }
+
+  async function updateDestination(
+    destinationId: string,
+    payload: Record<string, unknown>,
+  ) {
+    const workingPayload = { ...payload };
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const { error } = await supabaseAdmin
+        .from("user_payout_destinations")
+        .update(workingPayload)
+        .eq("id", destinationId)
+        .eq("user_id", userId);
+
+      if (!error) return;
+
+      const missingColumn = missingDestinationColumn(error.message);
+
+      if (
+        missingColumn &&
+        Object.prototype.hasOwnProperty.call(workingPayload, missingColumn)
+      ) {
+        delete workingPayload[missingColumn];
+        continue;
+      }
+
+      throw new Error(error.message);
+    }
+
+    throw new Error("The payout destination update could not be completed.");
+  }
+
+  async function insertDestination(payload: Record<string, unknown>) {
+    const workingPayload = { ...payload };
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const { data, error } = await supabaseAdmin
+        .from("user_payout_destinations")
+        .insert(workingPayload)
+        .select("id")
+        .single();
+
+      if (!error && data?.id) {
+        return safeString(data.id);
+      }
+
+      if (error) {
+        const missingColumn = missingDestinationColumn(error.message);
+
+        if (
+          missingColumn &&
+          Object.prototype.hasOwnProperty.call(workingPayload, missingColumn)
+        ) {
+          delete workingPayload[missingColumn];
+          continue;
+        }
+
+        throw new Error(error.message);
+      }
+    }
+
+    throw new Error("The payout destination could not be created.");
+  }
+
+  const sharedPayload: Record<string, unknown> = {
+    destination_purpose: "ambassador_reward",
+    workspace_role: "ambassador",
+    provider: input.provider,
+    destination_type: input.destinationType,
+    destination_value: input.destinationValue,
+    display_value: displayValue,
+    verification_status: "unverified",
+    destination_status: "active",
+    is_default: false,
+
+    // Legacy destination columns retained for compatibility with older rows.
+    recipient_type: input.destinationType,
+    recipient_value: input.destinationValue,
+    masked_value: displayValue,
+    status: legacyStatus,
+    is_primary: false,
+
+    updated_at: now,
+  };
+
+  let destinationId = existing?.id || "";
 
   if (existing) {
-    const { error } = await supabaseAdmin
-      .from("user_payout_destinations")
-      .update({
-        destination_purpose: "ambassador_reward",
-        destination_value: input.destinationValue,
-        display_value: displayValue,
-        destination_status: "active",
-        is_default: false,
-        metadata: {
-          ...(existing.metadata || {}),
-          preference_source: "shared_payout_setup_api",
-          last_updated_at: now,
-        },
-      })
-      .eq("id", existing.id)
-      .eq("user_id", userId);
-
-    if (error) throw new Error(error.message);
+    await updateDestination(existing.id, {
+      ...sharedPayload,
+      metadata: {
+        ...(existing.metadata || {}),
+        preference_source: "shared_payout_setup_api",
+        last_updated_at: now,
+      },
+    });
   } else {
-    const { data, error } = await supabaseAdmin
-      .from("user_payout_destinations")
-      .insert({
-        user_id: userId,
-        destination_purpose: "ambassador_reward",
-        provider: input.provider,
-        destination_type: input.destinationType,
-        destination_value: input.destinationValue,
-        display_value: displayValue,
-        verification_status: "unverified",
-        destination_status: "active",
-        is_default: false,
-        metadata: {
-          preference_source: "shared_payout_setup_api",
-          created_at: now,
-        },
-      })
-      .select("id")
-      .single();
-
-    if (error) throw new Error(error.message);
-    destinationId = data.id;
+    destinationId = await insertDestination({
+      user_id: userId,
+      ...sharedPayload,
+      metadata: {
+        preference_source: "shared_payout_setup_api",
+        created_at: now,
+      },
+      created_at: now,
+    });
   }
 
   if (!destinationId) {
@@ -1343,24 +1436,61 @@ async function saveAmbassadorDestination({
 
   const { error: unsetDefaultError } = await supabaseAdmin
     .from("user_payout_destinations")
-    .update({ is_default: false })
+    .update({
+      is_default: false,
+      is_primary: false,
+    })
     .eq("user_id", userId)
     .eq("destination_purpose", "ambassador_reward")
     .eq("destination_status", "active")
     .neq("id", destinationId);
 
   if (unsetDefaultError) {
-    throw new Error(unsetDefaultError.message);
+    const missingColumn = missingDestinationColumn(unsetDefaultError.message);
+
+    if (missingColumn === "is_primary") {
+      const { error: canonicalUnsetError } = await supabaseAdmin
+        .from("user_payout_destinations")
+        .update({ is_default: false })
+        .eq("user_id", userId)
+        .eq("destination_purpose", "ambassador_reward")
+        .eq("destination_status", "active")
+        .neq("id", destinationId);
+
+      if (canonicalUnsetError) {
+        throw new Error(canonicalUnsetError.message);
+      }
+    } else {
+      throw new Error(unsetDefaultError.message);
+    }
   }
 
   const { error: setDefaultError } = await supabaseAdmin
     .from("user_payout_destinations")
-    .update({ is_default: true })
+    .update({
+      is_default: true,
+      is_primary: true,
+      updated_at: now,
+    })
     .eq("id", destinationId)
     .eq("user_id", userId);
 
   if (setDefaultError) {
-    throw new Error(setDefaultError.message);
+    const missingColumn = missingDestinationColumn(setDefaultError.message);
+
+    if (missingColumn === "is_primary") {
+      const { error: canonicalSetError } = await supabaseAdmin
+        .from("user_payout_destinations")
+        .update({ is_default: true, updated_at: now })
+        .eq("id", destinationId)
+        .eq("user_id", userId);
+
+      if (canonicalSetError) {
+        throw new Error(canonicalSetError.message);
+      }
+    } else {
+      throw new Error(setDefaultError.message);
+    }
   }
 
   return destinationId;

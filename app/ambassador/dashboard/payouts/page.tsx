@@ -972,6 +972,9 @@ async function startStripeOnboardingAction() {
   });
 
   if (!preferenceResult.success) {
+    console.error("Unable to save Ambassador Stripe preference:", {
+      error: preferenceResult.error,
+    });
     redirect(
       "/ambassador/dashboard/payouts?provider=stripe&payout_error=save",
     );
@@ -982,6 +985,8 @@ async function startStripeOnboardingAction() {
   if (!ambassador?.id) {
     redirect("/login/route?preferred=ambassador");
   }
+
+  let onboardingUrl = "";
 
   try {
     let accountId = getStripeAccountId(ambassador);
@@ -1016,15 +1021,12 @@ async function startStripeOnboardingAction() {
             "Unable to save new Ambassador Stripe account:",
             saveError.message,
           );
-          redirect(
-            "/ambassador/dashboard/payouts?provider=stripe&stripe_error=account_save_failed",
-          );
+          throw new Error("account_save_failed");
         }
       }
     }
 
-    const onboardingUrl = await createStripeAccountLink(accountId);
-    redirect(onboardingUrl);
+    onboardingUrl = await createStripeAccountLink(accountId);
   } catch (stripeError) {
     const code =
       stripeError instanceof Error
@@ -1037,6 +1039,15 @@ async function startStripeOnboardingAction() {
       )}`,
     );
   }
+
+  if (!onboardingUrl) {
+    redirect(
+      "/ambassador/dashboard/payouts?provider=stripe&stripe_error=stripe_request_failed",
+    );
+  }
+
+  // Next.js redirect throws internally, so keep it outside the try/catch.
+  redirect(onboardingUrl);
 }
 
 async function saveQuickPayoutDestinationAction(formData: FormData) {
@@ -1089,6 +1100,10 @@ async function saveQuickPayoutDestinationAction(formData: FormData) {
   revalidatePath("/ambassador/dashboard/payouts");
 
   if (!result.success) {
+    console.error("Ambassador payout destination save failed:", {
+      provider,
+      error: result.error,
+    });
     redirect(
       `/ambassador/dashboard/payouts?provider=${provider}&payout_error=save`,
     );
