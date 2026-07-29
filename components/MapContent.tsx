@@ -11,6 +11,7 @@ type MapContentProps = {
   markers?: RawMarker[];
   center?: [number, number];
   highlightedMarkerId?: string;
+  highlightedMarkerPosition?: [number, number];
 };
 
 type NormalizedMarker = {
@@ -587,6 +588,7 @@ export default function MapContent({
   markers = [],
   center,
   highlightedMarkerId,
+  highlightedMarkerPosition,
 }: MapContentProps) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -787,15 +789,26 @@ export default function MapContent({
 
     lastHighlightedMarkerIdRef.current = highlightedMarkerId;
 
-    if (highlightedMarkerId) {
-      const highlightedMarker = normalizedMarkers.find(
-        (marker) => marker.id === highlightedMarkerId,
-      );
+    if (highlightedMarkerId || isValidCenter(highlightedMarkerPosition)) {
+      const highlightedMarker = highlightedMarkerId
+        ? normalizedMarkers.find(
+            (marker) => marker.id === highlightedMarkerId,
+          )
+        : undefined;
 
-      if (highlightedMarker) {
+      const hoverTarget = isValidCenter(highlightedMarkerPosition)
+        ? (highlightedMarkerPosition as [number, number])
+        : highlightedMarker
+          ? [highlightedMarker.latitude, highlightedMarker.longitude] as [
+              number,
+              number,
+            ]
+          : null;
+
+      if (hoverTarget) {
         map.stop();
         map.flyTo(
-          [highlightedMarker.latitude, highlightedMarker.longitude],
+          hoverTarget,
           Math.max(map.getZoom(), HOVER_ZOOM),
           {
             animate: true,
@@ -818,7 +831,12 @@ export default function MapContent({
     }, 120);
 
     return () => window.clearTimeout(timer);
-  }, [center, highlightedMarkerId, normalizedMarkers]);
+  }, [
+    center,
+    highlightedMarkerId,
+    highlightedMarkerPosition,
+    normalizedMarkers,
+  ]);
 
   return (
     <div className="relative h-[420px] min-h-[420px] w-full overflow-hidden rounded-[2rem] border border-emerald-100 bg-sky-50 shadow-inner">

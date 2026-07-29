@@ -1731,6 +1731,9 @@ function SearchPageContent() {
   const [highlightedGuruId, setHighlightedGuruId] = useState<
     string | undefined
   >(undefined);
+  const [highlightedGuruPosition, setHighlightedGuruPosition] = useState<
+    [number, number] | undefined
+  >(undefined);
 
   const hasTrackedSearchPageVisit = useRef(false);
   const lastTrackedSearchKey = useRef("");
@@ -2589,9 +2592,11 @@ function SearchPageContent() {
                     services.length - visibleServices.length,
                     0,
                   );
-                  const guruHasMapLocation = Boolean(
-                    getGuruSearchCoordinates(guru, guruZipLookupsByZip),
+                  const guruMapCoordinates = getGuruSearchCoordinates(
+                    guru,
+                    guruZipLookupsByZip,
                   );
+                  const guruHasMapLocation = Boolean(guruMapCoordinates);
                   const guruRadius = Math.round(
                     guru.service_radius_display || getGuruRadius(guru),
                   );
@@ -2640,9 +2645,15 @@ function SearchPageContent() {
                       }`}
                       onMouseEnter={() => {
                         setHighlightedGuruId(guruMapMarkerId);
+                        setHighlightedGuruPosition(
+                          guruMapCoordinates || undefined,
+                        );
                         trackGuruHover(guru, guruMapMarkerId);
                       }}
-                      onMouseLeave={() => setHighlightedGuruId(undefined)}
+                      onMouseLeave={() => {
+                        setHighlightedGuruId(undefined);
+                        setHighlightedGuruPosition(undefined);
+                      }}
                     >
                       <div className="flex min-h-[380px] flex-col md:h-full md:min-h-0 md:flex-row md:items-stretch">
                         <GuruResultPhoto
@@ -2876,6 +2887,7 @@ function SearchPageContent() {
                         : undefined
                     }
                     highlightedMarkerId={highlightedGuruId}
+                    highlightedMarkerPosition={highlightedGuruPosition}
                   />
                 </div>
               </div>

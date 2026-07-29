@@ -10,6 +10,7 @@ type ProviderMapProps = {
   markers?: MapMarker[];
   center?: [number, number];
   highlightedMarkerId?: string;
+  highlightedMarkerPosition?: [number, number];
 };
 
 type NormalizedMapMarker = MapMarker & {
@@ -329,23 +330,17 @@ export default function ProviderMap({
   markers = [],
   center,
   highlightedMarkerId,
+  highlightedMarkerPosition,
 }: ProviderMapProps) {
   const searchParams = useSearchParams();
 
-  const usableMarkers = useMemo(() => {
-    const seen = new Set<string>();
-
-    return markers
-      .map((marker) => normalizeMarkerForMap(marker))
-      .filter(Boolean)
-      .filter((marker) => {
-        const id = getMarkerId(marker as NormalizedMapMarker);
-        if (!id || seen.has(id)) return false;
-
-        seen.add(id);
-        return true;
-      }) as NormalizedMapMarker[];
-  }, [markers]);
+  const usableMarkers = useMemo(
+    () =>
+      markers
+        .map((marker) => normalizeMarkerForMap(marker))
+        .filter(Boolean) as NormalizedMapMarker[],
+    [markers],
+  );
 
   const centerReady = isValidCenter(center);
 
@@ -355,6 +350,7 @@ export default function ProviderMap({
         markers={usableMarkers}
         center={centerReady ? center : undefined}
         highlightedMarkerId={highlightedMarkerId}
+        highlightedMarkerPosition={highlightedMarkerPosition}
       />
 
       <div className="border-t border-slate-100 bg-white p-4">
