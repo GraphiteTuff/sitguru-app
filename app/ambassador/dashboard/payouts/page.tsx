@@ -1,5 +1,8 @@
+import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   AlertTriangle,
@@ -8,13 +11,11 @@ import {
   BadgeDollarSign,
   CheckCircle2,
   Clock3,
-  Download,
   ExternalLink,
-  HelpCircle,
   History,
   ShieldCheck,
-  Wallet,
-  XCircle,
+  Smartphone,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -23,9 +24,6 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
-const GUIDE_IMAGE_PATH =
-  "/images/ambassadors/sitguru-ambassador-stripe-setup-guide.png";
-
 type AmbassadorRecord = {
   id: string;
   user_id?: string | null;
@@ -112,6 +110,38 @@ type PayoutReadiness = {
 
 type SearchParamValue = string | string[] | undefined;
 type PayoutSearchParams = Record<string, SearchParamValue>;
+
+
+type AmbassadorPayoutProvider =
+  | "stripe"
+  | "paypal"
+  | "venmo"
+  | "set_up_later";
+
+type AmbassadorPayoutAccount = {
+  provider?: "stripe" | "paypal" | "venmo" | null;
+  providerAccountId?: string | null;
+  providerEmail?: string | null;
+  providerPhone?: string | null;
+  onboardingStatus?: string | null;
+  accountStatus?: string | null;
+  payoutsEnabled?: boolean;
+};
+
+type AmbassadorPayoutSetup = {
+  selectedProvider?: AmbassadorPayoutProvider;
+  setupComplete?: boolean;
+  nextAction?: string | null;
+  accounts?: AmbassadorPayoutAccount[];
+  readyAccount?: AmbassadorPayoutAccount | null;
+};
+
+type AmbassadorPayoutSetupResponse = {
+  success: boolean;
+  message?: string;
+  error?: string;
+  setup?: AmbassadorPayoutSetup;
+};
 
 function asString(value: unknown) {
   if (typeof value === "string") return value.trim();
@@ -208,6 +238,156 @@ function getSiteUrl() {
   }
 
   return `https://${configuredUrl.replace(/\/+$/, "")}`;
+}
+
+
+function normalizeBaseUrl(value?: string | null) {
+  if (!value) return null;
+
+  const candidate =
+    value.startsWith("http://") || value.startsWith("https://")
+      ? value
+      : `https://${value}`;
+
+  try {
+    const parsed = new URL(candidate);
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+function safeHostname(value?: string | null) {
+  const normalized = normalizeBaseUrl(value);
+  if (!normalized) return "";
+
+  try {
+    return new URL(normalized).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+async function getSharedApiOrigin() {
+  const requestHeaders = await headers();
+  const forwardedHost = requestHeaders
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    ?.trim();
+  const host = forwardedHost || requestHeaders.get("host") || "";
+  const hostname = (host.split(":")[0] || "").toLowerCase();
+
+  const configuredVercelHost = safeHostname(process.env.VERCEL_URL);
+  const isKnownLocalHost =
+    hostname === "localhost" || hostname === "127.0.0.1";
+  const isSitGuruHost =
+    hostname === "sitguru.com" ||
+    hostname === "www.sitguru.com" ||
+    hostname.endsWith(".sitguru.com");
+  const isCurrentVercelDeployment =
+    Boolean(configuredVercelHost) && hostname === configuredVercelHost;
+
+  if (host && (isKnownLocalHost || isSitGuruHost || isCurrentVercelDeployment)) {
+    const forwardedProto = requestHeaders
+      .get("x-forwarded-proto")
+      ?.split(",")[0]
+      ?.trim();
+    const protocol =
+      forwardedProto || (isKnownLocalHost ? "http" : "https");
+
+    return `${protocol}://${host}`;
+  }
+
+  return (
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
+    normalizeBaseUrl(process.env.SITE_URL) ||
+    normalizeBaseUrl(process.env.VERCEL_URL) ||
+    "https://www.sitguru.com"
+  );
+}
+
+async function callAmbassadorPayoutSetupApi({
+  accessToken,
+  method = "GET",
+  provider,
+  destinationType,
+  destinationValue,
+}: {
+  accessToken: string;
+  method?: "GET" | "PATCH";
+  provider?: AmbassadorPayoutProvider;
+  destinationType?: "email" | "mobile_number";
+  destinationValue?: string;
+}): Promise<AmbassadorPayoutSetupResponse> {
+  try {
+    const origin = await getSharedApiOrigin();
+    const response = await fetch(
+      `${origin}/api/payouts/setup?role=ambassador`,
+      {
+        method,
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          ...(method === "PATCH"
+            ? { "Content-Type": "application/json" }
+            : {}),
+        },
+        body:
+          method === "PATCH"
+            ? JSON.stringify({
+                role: "ambassador",
+                preferredProvider: provider,
+                ...(destinationType ? { destinationType } : {}),
+                ...(destinationValue ? { destinationValue } : {}),
+              })
+            : undefined,
+      },
+    );
+
+    const responseText = await response.text();
+    let payload: AmbassadorPayoutSetupResponse | null = null;
+
+    try {
+      payload = responseText
+        ? (JSON.parse(responseText) as AmbassadorPayoutSetupResponse)
+        : null;
+    } catch {
+      console.error("Ambassador payout setup returned non-JSON data:", {
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+        responseText: responseText.slice(0, 1000),
+      });
+    }
+
+    if (!payload) {
+      return {
+        success: false,
+        error: "SitGuru could not read your payout setup response.",
+      };
+    }
+
+    if (!response.ok || !payload.success) {
+      return {
+        ...payload,
+        success: false,
+        error: payload.error || "SitGuru could not update your payout setup.",
+      };
+    }
+
+    return payload;
+  } catch (error) {
+    console.error("Ambassador payout setup request failed:", error);
+
+    return {
+      success: false,
+      error: "SitGuru could not connect to payout setup.",
+    };
+  }
 }
 
 function getStripeAccountId(ambassador: AmbassadorRecord | null) {
@@ -757,6 +937,7 @@ async function getCanonicalRewards(
   };
 }
 
+
 async function startStripeOnboardingAction() {
   "use server";
 
@@ -770,10 +951,30 @@ async function startStripeOnboardingAction() {
     const loginParams = new URLSearchParams({
       mode: "phone",
       role: "ambassador",
-      next: "/ambassador/dashboard/payouts",
+      next: "/ambassador/dashboard/payouts?provider=stripe",
     });
 
     redirect(`/login?${loginParams.toString()}`);
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    redirect("/login/route?preferred=ambassador");
+  }
+
+  const preferenceResult = await callAmbassadorPayoutSetupApi({
+    accessToken: session.access_token,
+    method: "PATCH",
+    provider: "stripe",
+  });
+
+  if (!preferenceResult.success) {
+    redirect(
+      "/ambassador/dashboard/payouts?provider=stripe&payout_error=save",
+    );
   }
 
   const ambassador = await getAmbassadorForUser(user.id, user.email);
@@ -816,7 +1017,7 @@ async function startStripeOnboardingAction() {
             saveError.message,
           );
           redirect(
-            "/ambassador/dashboard/payouts?stripe_error=account_save_failed",
+            "/ambassador/dashboard/payouts?provider=stripe&stripe_error=account_save_failed",
           );
         }
       }
@@ -831,65 +1032,157 @@ async function startStripeOnboardingAction() {
         : "stripe_request_failed";
 
     redirect(
-      `/ambassador/dashboard/payouts?stripe_error=${encodeURIComponent(
+      `/ambassador/dashboard/payouts?provider=stripe&stripe_error=${encodeURIComponent(
         code,
       )}`,
     );
   }
 }
 
-function StatusPill({
-  readiness,
-}: {
-  readiness: PayoutReadiness;
-}) {
-  if (readiness.ready && readiness.liveVerified) {
-    return (
-      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-700">
-        Live Stripe status: payout ready
-      </span>
+async function saveQuickPayoutDestinationAction(formData: FormData) {
+  "use server";
+
+  const requestedProvider = asString(formData.get("provider")).toLowerCase();
+  const provider =
+    requestedProvider === "paypal" || requestedProvider === "venmo"
+      ? requestedProvider
+      : null;
+  const destinationValue = asString(formData.get("destinationValue"));
+
+  if (!provider) {
+    redirect("/ambassador/dashboard/payouts?payout_error=provider");
+  }
+
+  if (!destinationValue) {
+    redirect(
+      `/ambassador/dashboard/payouts?provider=${provider}&payout_error=missing`,
     );
   }
 
-  if (readiness.ready) {
-    return (
-      <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-black !text-sky-700">
-        Saved status: payout ready
-      </span>
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    redirect("/login/route?preferred=ambassador");
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    redirect("/login/route?preferred=ambassador");
+  }
+
+  const result = await callAmbassadorPayoutSetupApi({
+    accessToken: session.access_token,
+    method: "PATCH",
+    provider,
+    destinationType: provider === "paypal" ? "email" : "mobile_number",
+    destinationValue,
+  });
+
+  revalidatePath("/ambassador/dashboard/earnings");
+  revalidatePath("/ambassador/dashboard/payouts");
+
+  if (!result.success) {
+    redirect(
+      `/ambassador/dashboard/payouts?provider=${provider}&payout_error=save`,
     );
   }
 
-  return (
-    <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black !text-amber-700">
-      Payout setup needed
-    </span>
+  redirect(
+    `/ambassador/dashboard/payouts?provider=${provider}&saved=${provider}`,
   );
 }
 
-function SetupStep({
-  number,
+function normalizeProvider(
+  value: string,
+): Exclude<AmbassadorPayoutProvider, "set_up_later"> | null {
+  if (value === "stripe" || value === "paypal" || value === "venmo") {
+    return value;
+  }
+
+  return null;
+}
+
+function providerLabel(
+  provider: Exclude<AmbassadorPayoutProvider, "set_up_later">,
+) {
+  if (provider === "stripe") return "Bank or card";
+  if (provider === "paypal") return "PayPal";
+  return "Venmo";
+}
+
+function providerLogo(
+  provider: Exclude<AmbassadorPayoutProvider, "set_up_later">,
+) {
+  if (provider === "stripe") return "/images/payments/stripe.svg";
+  if (provider === "paypal") return "/images/payments/paypal.svg";
+  return "/images/payments/venmo.svg";
+}
+
+function payoutDestination(account?: AmbassadorPayoutAccount | null) {
+  if (!account) return "";
+  return (
+    account.providerEmail ||
+    account.providerPhone ||
+    account.providerAccountId ||
+    ""
+  );
+}
+
+function QuickProviderCard({
+  provider,
+  selected,
   title,
-  detail,
-  complete,
+  subtitle,
 }: {
-  number: string;
+  provider: Exclude<AmbassadorPayoutProvider, "set_up_later">;
+  selected: boolean;
   title: string;
-  detail: string;
-  complete: boolean;
+  subtitle: string;
 }) {
   return (
-    <div className="flex gap-3 rounded-2xl border border-emerald-100 bg-white px-4 py-3 shadow-sm">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-black !text-emerald-800">
-        {complete ? <CheckCircle2 className="h-5 w-5" /> : number}
-      </div>
+    <Link
+      href={`/ambassador/dashboard/payouts?provider=${provider}`}
+      className={`group flex min-h-[116px] items-center gap-4 rounded-[1.35rem] border p-4 transition active:scale-[0.99] ${
+        selected
+          ? "border-emerald-400 bg-emerald-50 shadow-[0_12px_30px_rgba(5,150,105,0.12)] ring-2 ring-emerald-100"
+          : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
+      }`}
+    >
+      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200">
+        <Image
+          src={providerLogo(provider)}
+          alt=""
+          width={72}
+          height={32}
+          className="max-h-8 w-auto object-contain"
+        />
+      </span>
 
-      <div>
-        <p className="text-sm font-black !text-slate-950">{title}</p>
-        <p className="mt-1 text-xs font-bold leading-5 !text-slate-600">
-          {detail}
-        </p>
-      </div>
-    </div>
+      <span className="min-w-0">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="text-base font-black !text-slate-950 sm:text-lg">
+            {title}
+          </span>
+          {selected ? (
+            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] !text-white">
+              Selected
+            </span>
+          ) : null}
+        </span>
+        <span className="mt-1 block text-sm font-semibold leading-5 !text-slate-600">
+          {subtitle}
+        </span>
+      </span>
+
+      <ArrowRight className="ml-auto h-5 w-5 shrink-0 !text-emerald-700 transition group-hover:translate-x-0.5" />
+    </Link>
   );
 }
 
@@ -918,84 +1211,62 @@ function RewardStatusPill({
 
 function RewardList({
   title,
-  description,
-  rewards,
   total,
+  rewards,
   emptyMessage,
   icon,
 }: {
   title: string;
-  description: string;
-  rewards: NormalizedReward[];
   total: number;
+  rewards: NormalizedReward[];
   emptyMessage: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
 }) {
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 !text-emerald-700 ring-1 ring-emerald-100">
             {icon}
-          </div>
-
-          <div>
-            <h2 className="text-xl font-black !text-slate-950">
-              {title}
-            </h2>
-            <p className="mt-1 text-sm font-semibold leading-6 !text-slate-700">
-              {description}
-            </p>
-          </div>
+          </span>
+          <h2 className="truncate text-xl font-black !text-slate-950">
+            {title}
+          </h2>
         </div>
-
-        <div className="shrink-0 text-left sm:text-right">
-          <p className="text-2xl font-black !text-slate-950">
-            {money(total)}
-          </p>
-          <p className="mt-1 text-xs font-black uppercase tracking-[0.14em] !text-slate-500">
-            {rewards.length} record{rewards.length === 1 ? "" : "s"}
-          </p>
-        </div>
+        <p className="shrink-0 text-2xl font-black !text-slate-950">
+          {money(total)}
+        </p>
       </div>
 
       {rewards.length > 0 ? (
-        <div className="mt-5 grid gap-3">
+        <div className="mt-4 grid gap-3">
           {rewards.map((reward) => (
             <article
               key={reward.id}
-              className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4"
+              className="rounded-[1.2rem] border border-slate-200 bg-slate-50 p-4"
             >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-base font-black !text-slate-950">
+                  <p className="truncate text-sm font-black !text-slate-950">
                     {reward.rewardType}
                   </p>
-                  <p className="mt-1 break-words text-xs font-semibold !text-slate-500">
-                    {reward.date} · {reward.source}
-                  </p>
-                  <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
-                    {reward.note}
+                  <p className="mt-1 text-xs font-semibold !text-slate-500">
+                    {reward.date}
                   </p>
                 </div>
-
-                <div className="shrink-0 text-left sm:text-right">
-                  <p className="text-2xl font-black !text-emerald-700">
-                    {money(reward.amount)}
-                  </p>
-                  <div className="mt-2">
-                    <RewardStatusPill reward={reward} />
-                  </div>
-                </div>
+                <p className="shrink-0 text-lg font-black !text-emerald-700">
+                  {money(reward.amount)}
+                </p>
+              </div>
+              <div className="mt-3">
+                <RewardStatusPill reward={reward} />
               </div>
             </article>
           ))}
         </div>
       ) : (
-        <div className="mt-5 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-          <p className="text-sm font-bold leading-6 !text-slate-700">
-            {emptyMessage}
-          </p>
+        <div className="mt-4 rounded-[1.2rem] border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
+          <p className="text-sm font-bold !text-slate-600">{emptyMessage}</p>
         </div>
       )}
     </section>
@@ -1006,14 +1277,21 @@ function getStripeErrorMessage(code: string) {
   if (!code) return "";
 
   if (code === "stripe_not_configured") {
-    return "Stripe payout setup is temporarily unavailable because SitGuru’s Stripe configuration is incomplete.";
+    return "Bank payout setup is temporarily unavailable.";
   }
 
   if (code === "account_save_failed") {
-    return "Stripe created an account, but SitGuru could not save the account connection. Please contact support before trying again.";
+    return "Your Stripe account opened, but SitGuru could not save it.";
   }
 
-  return "Stripe could not open the payout setup flow. Please try again or contact SitGuru Support.";
+  return "Stripe could not open. Please try again.";
+}
+
+function getPayoutErrorMessage(code: string) {
+  if (!code) return "";
+  if (code === "missing") return "Add your payout email or mobile number.";
+  if (code === "provider") return "Choose a payout option.";
+  return "That did not save. Check the information and try again.";
 }
 
 export default async function AmbassadorPayoutsPage({
@@ -1022,8 +1300,15 @@ export default async function AmbassadorPayoutsPage({
   searchParams?: Promise<PayoutSearchParams>;
 }) {
   const queryParams = (await searchParams) || {};
+  const requestedProvider = normalizeProvider(
+    firstParam(queryParams.provider).toLowerCase(),
+  );
   const stripeReturn = firstParam(queryParams.stripe);
   const stripeErrorCode = firstParam(queryParams.stripe_error);
+  const payoutErrorCode = firstParam(queryParams.payout_error);
+  const savedProvider = normalizeProvider(
+    firstParam(queryParams.saved).toLowerCase(),
+  );
 
   const supabase = await createClient();
   const {
@@ -1047,10 +1332,22 @@ export default async function AmbassadorPayoutsPage({
     redirect("/login/route?preferred=ambassador");
   }
 
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
   const accountId = getStripeAccountId(ambassador);
-  const [stripeAccount, rewardsResult] = await Promise.all([
+  const [stripeAccount, rewardsResult, payoutSetupResponse] = await Promise.all([
     retrieveStripeAccount(accountId),
     getCanonicalRewards(ambassador.id),
+    session?.access_token
+      ? callAmbassadorPayoutSetupApi({
+          accessToken: session.access_token,
+        })
+      : Promise.resolve({
+          success: false,
+          error: "Your payout session could not be loaded.",
+        } satisfies AmbassadorPayoutSetupResponse),
   ]);
 
   if (accountId && stripeAccount) {
@@ -1065,6 +1362,19 @@ export default async function AmbassadorPayoutsPage({
     ambassador,
     stripeAccount,
   });
+  const payoutSetup = payoutSetupResponse.success
+    ? payoutSetupResponse.setup || null
+    : null;
+  const storedProvider = normalizeProvider(
+    payoutSetup?.selectedProvider || "",
+  );
+  const selectedProvider =
+    requestedProvider || storedProvider || "stripe";
+  const readyAccount = payoutSetup?.readyAccount || null;
+  const readyProvider = readyAccount?.provider
+    ? normalizeProvider(readyAccount.provider)
+    : null;
+
   const rewards = normalizeRewards(rewardsResult.rows);
   const approvedRewards = rewards.filter(
     (reward) => reward.bucket === "approved",
@@ -1080,351 +1390,365 @@ export default async function AmbassadorPayoutsPage({
   );
 
   const approvedAmount = roundMoney(
-    approvedRewards.reduce(
-      (sum, reward) => sum + reward.amount,
-      0,
-    ),
+    approvedRewards.reduce((sum, reward) => sum + reward.amount, 0),
   );
   const paidAmount = roundMoney(
     paidRewards.reduce((sum, reward) => sum + reward.amount, 0),
   );
 
   const stripeErrorMessage = getStripeErrorMessage(stripeErrorCode);
+  const payoutErrorMessage = getPayoutErrorMessage(payoutErrorCode);
+  const defaultPayPalEmail =
+    asString(user.email) ||
+    asString(ambassador.login_email) ||
+    asString(ambassador.contact_email) ||
+    asString(ambassador.email);
+  const defaultVenmoPhone = asString(user.phone);
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] px-4 py-6 !text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <Link
-          href="/ambassador/dashboard/earnings"
-          className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-black !text-emerald-800 shadow-sm transition hover:bg-emerald-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Earnings
-        </Link>
+    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_48%,#ecfdf5_100%)] px-3 py-4 !text-slate-950 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href="/ambassador/dashboard/earnings"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-black !text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            My Earnings
+          </Link>
 
-        {stripeErrorMessage ? (
-          <section className="rounded-[1.5rem] border border-rose-200 bg-rose-50 p-4">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-black !text-slate-600 shadow-sm ring-1 ring-slate-200">
+            <ShieldCheck className="h-4 w-4 !text-emerald-600" />
+            Secure payout setup
+          </span>
+        </div>
+
+        {stripeErrorMessage || payoutErrorMessage ? (
+          <section className="rounded-[1.25rem] border border-rose-200 bg-rose-50 px-4 py-3">
             <div className="flex items-start gap-3">
-              <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-700" />
-              <p className="text-sm font-bold leading-6 text-rose-900">
-                {stripeErrorMessage}
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 !text-rose-700" />
+              <p className="text-sm font-bold !text-rose-900">
+                {stripeErrorMessage || payoutErrorMessage}
+              </p>
+            </div>
+          </section>
+        ) : null}
+
+        {savedProvider ? (
+          <section
+            role="status"
+            className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-3"
+          >
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 !text-emerald-700" />
+              <p className="text-sm font-bold !text-emerald-900">
+                {providerLabel(savedProvider)} saved. SitGuru will verify it
+                before your first payout.
               </p>
             </div>
           </section>
         ) : null}
 
         {stripeReturn === "return" ? (
-          <section className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-4">
+          <section
+            role="status"
+            className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-3"
+          >
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
-              <p className="text-sm font-bold leading-6 text-emerald-900">
-                Stripe returned you to SitGuru and the account status was
-                refreshed. Payout readiness below reflects the latest status
-                SitGuru could verify.
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 !text-emerald-700" />
+              <p className="text-sm font-bold !text-emerald-900">
+                Stripe status refreshed.
               </p>
             </div>
           </section>
         ) : null}
 
         {stripeReturn === "refresh" ? (
-          <section className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4">
+          <section className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3">
             <div className="flex items-start gap-3">
-              <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-              <p className="text-sm font-bold leading-6 text-amber-900">
-                The Stripe onboarding link expired or setup was interrupted.
-                Use the setup button below to open a new secure Stripe link.
+              <Clock3 className="mt-0.5 h-5 w-5 shrink-0 !text-amber-700" />
+              <p className="text-sm font-bold !text-amber-900">
+                Your Stripe link expired. Tap connect to open a fresh one.
               </p>
             </div>
           </section>
         ) : null}
 
-        {rewardsResult.warning ? (
-          <section className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-              <p className="text-sm font-bold leading-6 text-amber-900">
-                {rewardsResult.warning}
-              </p>
-            </div>
-          </section>
-        ) : null}
-
-        {payoutReadiness.warning ? (
-          <section className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-              <p className="text-sm font-bold leading-6 text-amber-900">
-                {payoutReadiness.warning}
-              </p>
-            </div>
-          </section>
-        ) : null}
-
-        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="grid gap-8 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(120deg,#b9f8df_0%,#d9f8ef_48%,#bde9ff_100%)] px-8 py-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-center xl:px-10">
+        <section className="overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+          <div className="grid gap-5 bg-[radial-gradient(circle_at_90%_10%,rgba(255,255,255,0.95),transparent_22%),linear-gradient(120deg,#c9f9e6_0%,#e2fbf2_50%,#d7efff_100%)] p-5 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.26em] !text-emerald-800">
-                Ambassador Payouts
+              <p className="text-xs font-black uppercase tracking-[0.18em] !text-emerald-700">
+                My payout
               </p>
-
-              <h1 className="mt-4 text-5xl font-black tracking-[-0.055em] !text-slate-950 md:text-6xl xl:text-7xl">
-                Setup and payout history, clearly separated.
+              <h1 className="mt-2 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl lg:text-5xl">
+                Get paid your way.
               </h1>
-
-              <p className="mt-5 max-w-4xl text-base font-semibold leading-8 !text-slate-800 md:text-lg">
-                Stripe setup controls whether SitGuru can send money. Canonical
-                ambassador_rewards records control whether money is pending,
-                approved, or paid. Stripe readiness never changes a reward to
-                paid on this page.
+              <p className="mt-2 text-sm font-semibold !text-slate-700 sm:text-base">
+                Pick one. Switch anytime.
               </p>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <StatusPill readiness={payoutReadiness} />
-
-                {accountId ? (
-                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black !text-slate-700">
-                    Stripe account connected
-                  </span>
-                ) : null}
-
-                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-black !text-sky-700">
-                  Approved waiting: {money(approvedAmount)}
-                </span>
-
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-700">
-                  Recorded paid: {money(paidAmount)}
-                </span>
-              </div>
             </div>
 
-            <div className="rounded-[2rem] border border-white/70 bg-white/95 p-7 shadow-xl backdrop-blur">
-              <div className="flex items-start gap-5">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-emerald-100 !text-emerald-700 ring-1 ring-emerald-200">
-                  <Wallet className="h-8 w-8" />
-                </div>
-
-                <div>
-                  <h2 className="text-2xl font-black tracking-tight !text-slate-950 md:text-3xl">
-                    Current payout readiness
-                  </h2>
-
-                  <p className="mt-4 text-sm font-semibold leading-7 !text-slate-800">
-                    {payoutReadiness.ready
-                      ? payoutReadiness.liveVerified
-                        ? "Stripe currently reports that onboarding is complete and payouts are enabled."
-                        : "Saved SitGuru fields indicate that payout setup is complete, but the live Stripe status could not be confirmed."
-                      : accountId
-                        ? "A Stripe account is connected, but one or more payout requirements remain incomplete."
-                        : "No Stripe payout account is connected yet."}
-                  </p>
-                </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <div className="rounded-2xl bg-white/95 px-4 py-3 shadow-sm ring-1 ring-white">
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] !text-slate-500">
+                  Ready
+                </p>
+                <p className="mt-1 text-xl font-black !text-slate-950">
+                  {money(approvedAmount)}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/95 px-4 py-3 shadow-sm ring-1 ring-white">
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] !text-slate-500">
+                  Paid
+                </p>
+                <p className="mt-1 text-xl font-black !text-emerald-700">
+                  {money(paidAmount)}
+                </p>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-          <section className="space-y-6">
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-3">
-                <ShieldCheck className="h-6 w-6 text-emerald-700" />
-                <h2 className="text-2xl font-black !text-slate-950">
-                  Stripe Setup Checklist
-                </h2>
-              </div>
-
-              <div className="mt-5 grid gap-3">
-                <SetupStep
-                  number="1"
-                  title="Connect Stripe Express"
-                  detail="Create or continue the Stripe Express account assigned to this Ambassador record."
-                  complete={Boolean(payoutReadiness.accountId)}
-                />
-                <SetupStep
-                  number="2"
-                  title="Complete identity and banking"
-                  detail="Stripe may request legal identity, tax, address, phone, and bank-account information."
-                  complete={payoutReadiness.detailsSubmitted}
-                />
-                <SetupStep
-                  number="3"
-                  title="Enable payouts"
-                  detail="Stripe must report payouts enabled before SitGuru can process approved rewards."
-                  complete={payoutReadiness.payoutsEnabled}
-                />
-              </div>
-
-              {payoutReadiness.blockers.length > 0 ? (
-                <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-sm font-black text-amber-950">
-                    Remaining setup items
+        {payoutSetup?.setupComplete && readyAccount && readyProvider ? (
+          <section className="rounded-[1.4rem] border border-emerald-300 bg-emerald-50 p-4 shadow-sm sm:p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white p-2 ring-1 ring-emerald-200">
+                  <Image
+                    src={providerLogo(readyProvider)}
+                    alt=""
+                    width={72}
+                    height={32}
+                    className="max-h-7 w-auto object-contain"
+                  />
+                </span>
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 text-base font-black !text-emerald-950">
+                    <CheckCircle2 className="h-5 w-5 shrink-0" />
+                    Ready to get paid
                   </p>
-
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs font-bold leading-5 text-amber-900">
-                    {payoutReadiness.blockers.map((blocker) => (
-                      <li key={blocker}>{blocker}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              {payoutReadiness.currentlyDue.length > 0 ? (
-                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-600">
-                    Stripe currently due
+                  <p className="mt-1 truncate text-sm font-semibold !text-emerald-800">
+                    {providerLabel(readyProvider)}
+                    {payoutDestination(readyAccount)
+                      ? ` · ${payoutDestination(readyAccount)}`
+                      : ""}
                   </p>
-
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs font-bold leading-5 text-slate-700">
-                    {payoutReadiness.currentlyDue.map((item) => (
-                      <li key={item}>
-                        {titleCase(item.replace(/[._-]+/g, " "))}
-                      </li>
-                    ))}
-                  </ul>
                 </div>
-              ) : null}
-
-              <form action={startStripeOnboardingAction} className="mt-6">
-                <button
-                  type="submit"
-                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black !text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
-                >
-                  {accountId
-                    ? "Continue or Review Stripe Setup"
-                    : "Connect Stripe Now"}
-                  <ExternalLink className="h-4 w-4" />
-                </button>
-              </form>
-
-              <p className="mt-4 text-xs font-bold leading-5 !text-slate-600">
-                Stripe onboarding links are short-lived and hosted by Stripe.
-                Opening setup does not approve, pay, or change any Ambassador
-                reward record.
+              </div>
+              <p className="text-sm font-black !text-emerald-800">
+                You can still switch below.
               </p>
             </div>
+          </section>
+        ) : null}
 
-            <div className="rounded-[2rem] border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
-              <div className="flex items-start gap-4">
-                <HelpCircle className="mt-1 h-6 w-6 shrink-0 text-emerald-700" />
+        {!payoutSetupResponse.success ? (
+          <section className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-bold !text-amber-900">
+              {payoutSetupResponse.error ||
+                "Your saved payout choice could not be loaded."}
+            </p>
+          </section>
+        ) : null}
 
-                <div>
-                  <h2 className="text-xl font-black !text-emerald-950">
-                    Need payout help?
-                  </h2>
+        <section className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <div className="grid gap-3 lg:grid-cols-3">
+            <QuickProviderCard
+              provider="stripe"
+              selected={selectedProvider === "stripe"}
+              title="Bank or card"
+              subtitle="Secure setup with Stripe"
+            />
+            <QuickProviderCard
+              provider="paypal"
+              selected={selectedProvider === "paypal"}
+              title="PayPal"
+              subtitle="Use your PayPal email"
+            />
+            <QuickProviderCard
+              provider="venmo"
+              selected={selectedProvider === "venmo"}
+              title="Venmo"
+              subtitle="Use your U.S. mobile number"
+            />
+          </div>
 
-                  <p className="mt-2 text-sm font-semibold leading-6 !text-emerald-900">
-                    SitGuru can explain your saved reward and payout status.
-                    Stripe controls identity, tax, bank verification, and
-                    connected-account requirements.
-                  </p>
-
-                  <Link
-                    href="/ambassador/dashboard/messages?role=ambassador&support=admin"
-                    className="mt-4 inline-flex rounded-2xl bg-white px-4 py-3 text-sm font-black !text-emerald-800 shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-100"
-                  >
-                    Message SitGuru Support
-                  </Link>
+          <div className="mt-4 overflow-hidden rounded-[1.45rem] border border-emerald-200 bg-[linear-gradient(135deg,#f0fdf7_0%,#ffffff_72%)] p-4 sm:p-6">
+            {selectedProvider === "stripe" ? (
+              <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div className="flex items-start gap-4">
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200">
+                    <Image
+                      src="/images/payments/stripe.svg"
+                      alt="Stripe"
+                      width={76}
+                      height={32}
+                      className="max-h-8 w-auto object-contain"
+                    />
+                  </span>
+                  <div>
+                    <h2 className="text-xl font-black !text-slate-950 sm:text-2xl">
+                      Bank or card
+                    </h2>
+                    <p className="mt-1 text-sm font-semibold !text-slate-600">
+                      Tap once, then finish securely with Stripe.
+                    </p>
+                    <p className="mt-2 text-xs font-bold !text-slate-500">
+                      {payoutReadiness.ready
+                        ? "Your Stripe payout account is ready."
+                        : accountId
+                          ? "Your Stripe setup still needs attention."
+                          : "No bank payout account connected yet."}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </section>
 
-          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-sm font-black uppercase tracking-[0.18em] !text-emerald-700">
-                  Ambassador guide
-                </p>
-                <h2 className="mt-1 text-3xl font-black tracking-tight !text-slate-950">
-                  Stripe Setup Guide
-                </h2>
-                <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
-                  Review the SitGuru Ambassador Stripe guide before opening the
-                  Stripe-hosted onboarding flow.
-                </p>
+                <form action={startStripeOnboardingAction}>
+                  <button
+                    type="submit"
+                    className="inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-6 py-3 text-sm font-black !text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 active:scale-[0.99] lg:w-auto"
+                  >
+                    {accountId ? "Continue Stripe" : "Connect Stripe"}
+                    <ExternalLink className="h-4 w-4" />
+                  </button>
+                </form>
               </div>
+            ) : (
+              <form
+                action={saveQuickPayoutDestinationAction}
+                className="grid gap-4 lg:grid-cols-[1fr_minmax(260px,420px)_auto] lg:items-end"
+              >
+                <input
+                  type="hidden"
+                  name="provider"
+                  value={selectedProvider}
+                />
 
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href={GUIDE_IMAGE_PATH}
-                  target="_blank"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black !text-emerald-800 transition hover:bg-emerald-50"
+                <div className="flex items-start gap-4">
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200">
+                    {selectedProvider === "venmo" ? (
+                      <Smartphone className="h-7 w-7 !text-sky-600" />
+                    ) : (
+                      <Image
+                        src="/images/payments/paypal.svg"
+                        alt="PayPal"
+                        width={76}
+                        height={32}
+                        className="max-h-8 w-auto object-contain"
+                      />
+                    )}
+                  </span>
+                  <div>
+                    <h2 className="text-xl font-black !text-slate-950 sm:text-2xl">
+                      {selectedProvider === "paypal" ? "PayPal" : "Venmo"}
+                    </h2>
+                    <p className="mt-1 text-sm font-semibold !text-slate-600">
+                      {selectedProvider === "paypal"
+                        ? "Add the email on your PayPal account."
+                        : "Add the U.S. mobile number on your Venmo account."}
+                    </p>
+                  </div>
+                </div>
+
+                <label className="block">
+                  <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] !text-slate-600">
+                    {selectedProvider === "paypal"
+                      ? "PayPal email"
+                      : "Venmo mobile"}
+                  </span>
+                  <input
+                    type={selectedProvider === "paypal" ? "email" : "tel"}
+                    name="destinationValue"
+                    inputMode={
+                      selectedProvider === "paypal" ? "email" : "tel"
+                    }
+                    autoComplete={
+                      selectedProvider === "paypal" ? "email" : "tel"
+                    }
+                    defaultValue={
+                      selectedProvider === "paypal"
+                        ? defaultPayPalEmail
+                        : defaultVenmoPhone
+                    }
+                    placeholder={
+                      selectedProvider === "paypal"
+                        ? "you@example.com"
+                        : "(555) 555-1234"
+                    }
+                    required
+                    className="min-h-[52px] w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold !text-slate-950 outline-none transition placeholder:font-semibold placeholder:!text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  className="inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-6 py-3 text-sm font-black !text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 active:scale-[0.99] lg:w-auto"
                 >
-                  <ExternalLink className="h-4 w-4" />
-                  View Guide
-                </Link>
+                  Save {selectedProvider === "paypal" ? "PayPal" : "Venmo"}
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </form>
+            )}
+          </div>
 
-                <a
-                  href={GUIDE_IMAGE_PATH}
-                  download
-                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black !text-white transition hover:bg-emerald-800"
-                >
-                  <Download className="h-4 w-4" />
-                  Download
-                </a>
-              </div>
+          <div className="mt-4 flex flex-col gap-3 rounded-[1.25rem] bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-5 w-5 shrink-0 !text-amber-500" />
+              <p className="text-sm font-bold !text-slate-700">
+                One choice. One quick setup. Then keep earning.
+              </p>
             </div>
-
-            <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50">
-              <Image
-                src={GUIDE_IMAGE_PATH}
-                alt="SitGuru Ambassador Stripe Setup Guide"
-                width={900}
-                height={1400}
-                className="h-auto w-full"
-                priority
-              />
-            </div>
-          </section>
+            <Link
+              href="/ambassador/dashboard/earnings"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-black !text-slate-700 transition hover:bg-slate-100"
+            >
+              Do this later
+            </Link>
+          </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-2">
+        {rewardsResult.warning ? (
+          <section className="rounded-[1.25rem] border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-bold !text-amber-900">
+              {rewardsResult.warning}
+            </p>
+          </section>
+        ) : null}
+
+        <section className="grid gap-5 lg:grid-cols-2">
           <RewardList
-            title="Approved, Waiting for Payout"
-            description="These canonical rewards are approved but are not displayed as paid."
-            rewards={approvedRewards}
+            title="Ready to pay"
             total={approvedAmount}
-            emptyMessage="No approved unpaid rewards are currently recorded."
+            rewards={approvedRewards}
+            emptyMessage="No rewards ready yet."
             icon={<BadgeDollarSign className="h-5 w-5" />}
           />
-
           <RewardList
-            title="Recorded Payout History"
-            description="Only canonical rewards with an exact paid status or paid_at date appear here."
-            rewards={paidRewards}
+            title="Paid"
             total={paidAmount}
-            emptyMessage="No paid Ambassador rewards are currently recorded."
+            rewards={paidRewards}
+            emptyMessage="No payouts yet."
             icon={<History className="h-5 w-5" />}
           />
         </section>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-2xl font-black !text-slate-950">
-                Other reward records
-              </h2>
-              <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
-                Pending and excluded records remain outside approved balances
-                and payout history.
-              </p>
-
-              <div className="mt-4 flex flex-wrap gap-3">
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
-                  Pending: {pendingRewards.length}
-                </span>
-                <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black text-rose-700">
-                  Excluded: {excludedRewards.length}
-                </span>
-              </div>
+        <section className="rounded-[1.35rem] border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black !text-amber-700">
+                Pending: {pendingRewards.length}
+              </span>
+              <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black !text-rose-700">
+                Not eligible: {excludedRewards.length}
+              </span>
             </div>
 
             <Link
               href="/ambassador/dashboard/earnings"
-              className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black !text-emerald-800 transition hover:bg-emerald-100"
+              className="inline-flex items-center gap-2 text-sm font-black !text-emerald-700"
             >
-              View Full Earnings Breakdown
-              <ArrowRight className="ml-2 h-4 w-4" />
+              Full earnings
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </section>
