@@ -955,6 +955,13 @@ function CompactPartnerSection({
       imageClassName: "h-16 w-full object-contain",
       imageWrapperClassName: "bg-white",
     },
+    {
+      name: "Zeppa Studios",
+      href: "https://zeppastudios.com/",
+      image: "/images/partners/zeppa-studios.jpg",
+      imageClassName: "h-auto max-h-16 w-full object-contain",
+      imageWrapperClassName: "bg-black",
+    },
   ] as const;
 
   return (
