@@ -594,7 +594,7 @@ export default function MapContent({
   const mapRef = useRef<L.Map | null>(null);
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
   const lastViewportSignatureRef = useRef("");
-  const lastHighlightedMarkerIdRef = useRef<string | undefined>(undefined);
+  const lastHoverTargetSignatureRef = useRef("");
   const [mapError, setMapError] = useState("");
 
   const normalizedMarkers = useMemo(
@@ -764,6 +764,15 @@ export default function MapContent({
     const map = mapRef.current;
 
     if (!map) return;
+
+    const hoverIsActive =
+      Boolean(highlightedMarkerId) ||
+      isValidCenter(highlightedMarkerPosition);
+
+    // Never let a routine marker/search refit cancel an active card-hover zoom.
+    // The latest marker bounds will be applied when the pointer leaves the card.
+    if (hoverIsActive) return;
+
     if (lastViewportSignatureRef.current === viewportSignature) return;
 
     lastViewportSignatureRef.current = viewportSignature;
@@ -779,48 +788,74 @@ export default function MapContent({
     }, 150);
 
     return () => window.clearTimeout(timer);
-  }, [center, normalizedMarkers, viewportSignature]);
+  }, [
+    center,
+    highlightedMarkerId,
+    highlightedMarkerPosition,
+    normalizedMarkers,
+    viewportSignature,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;
 
     if (!map) return;
-    if (lastHighlightedMarkerIdRef.current === highlightedMarkerId) return;
 
-    lastHighlightedMarkerIdRef.current = highlightedMarkerId;
+    const highlightedMarker = highlightedMarkerId
+      ? normalizedMarkers.find(
+          (marker) => marker.id === highlightedMarkerId,
+        )
+      : undefined;
 
-    if (highlightedMarkerId || isValidCenter(highlightedMarkerPosition)) {
-      const highlightedMarker = highlightedMarkerId
-        ? normalizedMarkers.find(
-            (marker) => marker.id === highlightedMarkerId,
-          )
-        : undefined;
+    // Coordinates sent directly from the hovered card are the source of truth.
+    // Marker ID matching remains a fallback for visual highlighting and older rows.
+    const hoverTarget = isValidCenter(highlightedMarkerPosition)
+      ? (highlightedMarkerPosition as [number, number])
+      : highlightedMarker
+        ? [highlightedMarker.latitude, highlightedMarker.longitude] as [
+            number,
+            number,
+          ]
+        : null;
 
-      const hoverTarget = isValidCenter(highlightedMarkerPosition)
-        ? (highlightedMarkerPosition as [number, number])
-        : highlightedMarker
-          ? [highlightedMarker.latitude, highlightedMarker.longitude] as [
-              number,
-              number,
-            ]
-          : null;
+    if (hoverTarget) {
+      const hoverTargetSignature = [
+        highlightedMarkerId || "coordinate-only",
+        hoverTarget[0].toFixed(6),
+        hoverTarget[1].toFixed(6),
+      ].join(":");
 
-      if (hoverTarget) {
+      if (
+        lastHoverTargetSignatureRef.current === hoverTargetSignature
+      ) {
+        return;
+      }
+
+      lastHoverTargetSignatureRef.current = hoverTargetSignature;
+
+      const timer = window.setTimeout(() => {
+        map.invalidateSize({ animate: false });
         map.stop();
         map.flyTo(
-          hoverTarget,
-          Math.max(map.getZoom(), HOVER_ZOOM),
+          L.latLng(hoverTarget[0], hoverTarget[1]),
+          HOVER_ZOOM,
           {
             animate: true,
             duration: 0.55,
           },
         );
-      }
+      }, 0);
 
-      return;
+      return () => window.clearTimeout(timer);
     }
 
+    // Do not refit on initial render. Refit only after an actual hover ends.
+    if (!lastHoverTargetSignatureRef.current) return;
+
+    lastHoverTargetSignatureRef.current = "";
+
     const timer = window.setTimeout(() => {
+      map.invalidateSize({ animate: false });
       map.stop();
       fitMapToMarkers({
         map,
