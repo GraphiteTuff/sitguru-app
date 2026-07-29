@@ -139,6 +139,14 @@ const DEMO_GURU_NAMES = new Set([
 
 const PLACEHOLDER_EMAIL_DOMAIN = "@placeholder.sitguru.local";
 
+const LOCATION_MISSING_SETUP_PREVIEW_EMAILS = new Set([
+  "elenitsa.vayos@gmail.com",
+  "jaylagermany2@gmail.com",
+  "kalilamnazeer@gmail.com",
+  "jesusemiloreo@gmail.com",
+  "orhoades1971@gmail.com",
+]);
+
 const FALLBACK_LOCATION_COORDINATES: Record<
   string,
   { latitude: number; longitude: number }
@@ -280,6 +288,12 @@ function isUsablePhone(value: unknown) {
 
 function hasUsableContact(guru: GuruRow) {
   return isUsableEmail(guru.email) || isUsablePhone(getGuruPhone(guru));
+}
+
+function isApprovedLocationMissingSetupPreview(guru: GuruRow) {
+  return LOCATION_MISSING_SETUP_PREVIEW_EMAILS.has(
+    normalizeStatus(guru.email),
+  );
 }
 
 function parseServiceArea(value: unknown) {
@@ -491,6 +505,11 @@ function isPlaceholderSearchGuru(guru: GuruRow) {
 
 function shouldDisplaySearchGuru(guru: GuruRow) {
   if (isBlockedGuruAccount(guru)) return false;
+
+  if (isApprovedLocationMissingSetupPreview(guru)) {
+    return true;
+  }
+
   if (!hasBasicLocationSignal(guru)) return false;
 
   return (
@@ -1104,18 +1123,28 @@ function getDisplayStatus(
 function normalizeGuruForPublicSearch(guru: GuruRow) {
   const isPlaceholder =
     isPlaceholderSearchGuru(guru) || isDemoSearchGuru(guru);
-  const canBook = isBookableSearchGuru(guru);
-  const listingState = getPublicListingState(
-    guru,
-    canBook,
-    isPlaceholder,
-  );
+  const isApprovedLocationMissingPreview =
+    isApprovedLocationMissingSetupPreview(guru);
+  const canBook = isApprovedLocationMissingPreview
+    ? false
+    : isBookableSearchGuru(guru);
+  const listingState = isApprovedLocationMissingPreview
+    ? "preview"
+    : getPublicListingState(
+        guru,
+        canBook,
+        isPlaceholder,
+      );
   const isListedOnly = listingState === "listed_only";
-  const radius = readNumber(
-    guru.service_radius_miles || guru.radius_miles,
-    isPlaceholder ? 50 : 25,
-  );
-  const coordinates = getGuruCoordinates(guru);
+  const radius = isApprovedLocationMissingPreview
+    ? null
+    : readNumber(
+        guru.service_radius_miles || guru.radius_miles,
+        isPlaceholder ? 50 : 25,
+      );
+  const coordinates = isApprovedLocationMissingPreview
+    ? null
+    : getGuruCoordinates(guru);
   const publicSlug = getGuruPublicSlug(guru);
   const profileUrl = getGuruProfileUrl(guru);
   const bookingUrl = getGuruBookingUrl(guru, canBook);
@@ -1138,19 +1167,36 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
     service_state: guru.service_state || guru.state || null,
     service_zip: guru.service_zip || guru.service_zip_code || guru.zip_code || null,
     service_zip_code: guru.service_zip_code || guru.service_zip || guru.zip_code || null,
-    status: isPlaceholder ? "active" : guru.status || (canBook ? "bookable" : "active"),
-    application_status: isPlaceholder
+    status: isPlaceholder || isApprovedLocationMissingPreview
+      ? "active"
+      : guru.status || (canBook ? "bookable" : "active"),
+    application_status: isPlaceholder || isApprovedLocationMissingPreview
       ? "preview"
       : guru.application_status || (canBook ? "bookable" : "public"),
-    booking_status: isPlaceholder
+    booking_status: isPlaceholder || isApprovedLocationMissingPreview
       ? "listed_only"
       : canBook
         ? "bookable"
         : "listed_only",
-    admin_status: guru.admin_status || (isPlaceholder ? "placeholder" : "approved"),
-    public_status: guru.public_status || "public",
+    admin_status:
+      guru.admin_status ||
+      (isPlaceholder
+        ? "placeholder"
+        : isApprovedLocationMissingPreview
+          ? "more_info_needed"
+          : "approved"),
+    public_status: isApprovedLocationMissingPreview
+      ? "visible_setup_in_progress"
+      : guru.public_status || "public",
     profile_quality_status:
-      guru.profile_quality_status || (isPlaceholder ? "placeholder" : canBook ? "bookable" : "public"),
+      guru.profile_quality_status ||
+      (isPlaceholder
+        ? "placeholder"
+        : isApprovedLocationMissingPreview
+          ? "setup_in_progress"
+          : canBook
+            ? "bookable"
+            : "public"),
     is_public: true,
     is_public_visible: true,
     is_active: isPlaceholder ? true : guru.is_active ?? true,
@@ -1174,9 +1220,25 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
       : isListedOnly
         ? "This Guru is visible while finishing setup and is not accepting bookings yet."
         : "This profile is available for preview only.",
-    service_area_enabled: guru.service_area_enabled ?? true,
-    service_radius_miles: Math.max(Number(radius || 25), isPlaceholder ? 50 : 1),
-    radius_miles: Math.max(Number(radius || 25), isPlaceholder ? 50 : 1),
+    has_service_location: !isApprovedLocationMissingPreview,
+    location_status: isApprovedLocationMissingPreview
+      ? "coming_soon"
+      : "ready",
+    location_display: isApprovedLocationMissingPreview
+      ? "Location coming soon"
+      : [getGuruCity(guru), getGuruState(guru), getGuruZip(guru)]
+          .filter(Boolean)
+          .join(" "),
+    map_ready: Boolean(coordinates),
+    service_area_enabled: isApprovedLocationMissingPreview
+      ? false
+      : guru.service_area_enabled ?? true,
+    service_radius_miles: isApprovedLocationMissingPreview
+      ? null
+      : Math.max(Number(radius || 25), isPlaceholder ? 50 : 1),
+    radius_miles: isApprovedLocationMissingPreview
+      ? null
+      : Math.max(Number(radius || 25), isPlaceholder ? 50 : 1),
     service_latitude: coordinates?.latitude ?? guru.service_latitude ?? guru.latitude ?? guru.lat ?? null,
     service_longitude: coordinates?.longitude ?? guru.service_longitude ?? guru.longitude ?? guru.lng ?? null,
     latitude: coordinates?.latitude ?? guru.latitude ?? guru.service_latitude ?? guru.lat ?? null,
@@ -1200,7 +1262,13 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
     services: Array.isArray(guru.services) && guru.services.length > 0
       ? guru.services
       : ["Dog Walking", "Pet Sitting", "Drop-In Visits"],
-    search_source: guru.search_source || (isPlaceholder ? "placeholder_search" : "public_search"),
+    search_source:
+      guru.search_source ||
+      (isPlaceholder
+        ? "placeholder_search"
+        : isApprovedLocationMissingPreview
+          ? "approved_location_missing_preview"
+          : "public_search"),
   };
 }
 
@@ -1306,7 +1374,14 @@ export async function GET(request: NextRequest) {
                 placeholder_count: normalizedGurus.filter(
                   (guru) => guru.is_placeholder,
                 ).length,
-                mapped_count: normalizedGurus.filter((guru) => guru.map_latitude && guru.map_longitude).length,
+                approved_location_missing_preview_count: normalizedGurus.filter(
+                  (guru) =>
+                    guru.search_source ===
+                    "approved_location_missing_preview",
+                ).length,
+                mapped_count: normalizedGurus.filter(
+                  (guru) => guru.map_latitude && guru.map_longitude,
+                ).length,
                 source_results: sourceResults,
               },
             }
