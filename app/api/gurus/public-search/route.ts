@@ -9,7 +9,14 @@ type GuruRow = {
   id?: string | number | null;
   user_id?: string | null;
   email?: string | null;
+  phone?: string | null;
+  phone_number?: string | null;
+  phone_e164?: string | null;
+  mobile?: string | null;
+  mobile_phone?: string | null;
+  contact_phone?: string | null;
   role?: string | null;
+  primary_role?: string | null;
   user_role?: string | null;
   account_type?: string | null;
   slug?: string | null;
@@ -28,6 +35,7 @@ type GuruRow = {
   service_state?: string | null;
   service_zip?: string | null;
   service_zip_code?: string | null;
+  service_area?: string | null;
   status?: string | null;
   application_status?: string | null;
   admin_status?: string | null;
@@ -236,20 +244,129 @@ function isValidEmail(value: unknown) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanString(value));
 }
 
+function isUsableEmail(value: unknown) {
+  const email = normalizeStatus(value);
+
+  if (!isValidEmail(email)) return false;
+
+  return !(
+    email.endsWith(PLACEHOLDER_EMAIL_DOMAIN) ||
+    email.endsWith("@example.com") ||
+    email.includes("placeholder") ||
+    email.startsWith("paste_")
+  );
+}
+
+function normalizePhoneDigits(value: unknown) {
+  return cleanString(value).replace(/\D/g, "");
+}
+
+function isUsablePhone(value: unknown) {
+  const rawPhone = cleanString(value);
+  const digits = normalizePhoneDigits(value);
+
+  if (!rawPhone || /x{3}/i.test(rawPhone)) return false;
+  if (digits.length < 10 || digits.length > 15) return false;
+  if (/^(\d)\1+$/.test(digits)) return false;
+
+  return true;
+}
+
+function getGuruPhone(guru: GuruRow) {
+  return cleanString(
+    guru.phone_e164 ||
+      guru.phone_number ||
+      guru.phone ||
+      guru.mobile_phone ||
+      guru.mobile ||
+      guru.contact_phone,
+  );
+}
+
+function hasUsableContact(guru: GuruRow) {
+  return isUsableEmail(guru.email) || isUsablePhone(getGuruPhone(guru));
+}
+
+function parseServiceArea(value: unknown) {
+  const raw = cleanString(value);
+
+  if (!raw) {
+    return {
+      city: "",
+      state: "",
+      zip: "",
+    };
+  }
+
+  const zip = cleanZip(raw);
+  const withoutZip = raw
+    .replace(/\b\d{5}(?:-\d{4})?\b/g, "")
+    .replace(/[·|]/g, ",")
+    .replace(/\s+/g, " ")
+    .replace(/^[,\s]+|[,\s]+$/g, "")
+    .trim();
+
+  const commaParts = withoutZip
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (commaParts.length >= 2) {
+    return {
+      city: commaParts[0],
+      state: commaParts[1],
+      zip,
+    };
+  }
+
+  const stateMatch = withoutZip.match(/\b([A-Za-z]{2})$/);
+
+  if (stateMatch) {
+    return {
+      city: withoutZip.slice(0, stateMatch.index).trim(),
+      state: stateMatch[1],
+      zip,
+    };
+  }
+
+  return {
+    city: withoutZip,
+    state: "",
+    zip,
+  };
+}
+
 function getGuruName(guru: GuruRow) {
   return cleanString(guru.display_name || guru.full_name || guru.name || "Guru");
 }
 
 function getGuruCity(guru: GuruRow) {
-  return cleanString(guru.service_city || guru.city);
+  const parsedServiceArea = parseServiceArea(guru.service_area);
+
+  return cleanString(
+    guru.service_city ||
+      guru.city ||
+      parsedServiceArea.city,
+  );
 }
 
 function getGuruState(guru: GuruRow) {
-  return cleanString(guru.service_state || guru.state);
+  const parsedServiceArea = parseServiceArea(guru.service_area);
+
+  return cleanString(
+    guru.service_state ||
+      guru.state ||
+      parsedServiceArea.state,
+  );
 }
 
 function getGuruRole(guru: GuruRow) {
-  return normalizeStatus(guru.role || guru.user_role || guru.account_type);
+  return normalizeStatus(
+    guru.role ||
+      guru.primary_role ||
+      guru.user_role ||
+      guru.account_type,
+  );
 }
 
 function sourceRowLooksLikeGuru(tableName: string, guru: GuruRow) {
@@ -274,12 +391,44 @@ function sourceRowLooksLikeGuru(tableName: string, guru: GuruRow) {
 function isSearchSuppressedGuru(guru: GuruRow) {
   const status = normalizeStatus(guru.status);
   const applicationStatus = normalizeStatus(guru.application_status);
+  const adminStatus = normalizeStatus(guru.admin_status);
+  const publicStatus = normalizeStatus(guru.public_status);
+  const searchSource = normalizeStatus(guru.search_source);
 
-  if (hasExplicitFalse(guru.is_public)) return true;
-  if (hasExplicitFalse(guru.is_public_visible)) return true;
   if (hasExplicitFalse(guru.is_active)) return true;
 
-  return isNegativeGuruStatus(status) || isNegativeGuruStatus(applicationStatus);
+  if (
+    isNegativeGuruStatus(status) ||
+    isNegativeGuruStatus(applicationStatus) ||
+    isNegativeGuruStatus(adminStatus)
+  ) {
+    return true;
+  }
+
+  if (
+    ["hidden", "private", "suppressed", "not_listed"].includes(publicStatus)
+  ) {
+    return true;
+  }
+
+  if (
+    searchSource.includes("admin_visibility_override") &&
+    hasExplicitFalse(guru.is_public_visible)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function isSetupVisibleGuru(guru: GuruRow) {
+  if (isBlockedGuruAccount(guru)) return false;
+  if (isSearchSuppressedGuru(guru)) return false;
+  if (isPlaceholderSearchGuru(guru)) return false;
+  if (!hasUsableContact(guru)) return false;
+  if (!hasBasicLocationSignal(guru)) return false;
+
+  return true;
 }
 
 function isPublicSearchGuru(guru: GuruRow) {
@@ -289,12 +438,14 @@ function isPublicSearchGuru(guru: GuruRow) {
   const publicStatus = normalizeStatus(guru.public_status);
 
   if (isSearchSuppressedGuru(guru)) return false;
+  if (isSetupVisibleGuru(guru)) return true;
 
   return (
     guru.is_public === true ||
     guru.is_public_visible === true ||
     publicStatus === "public" ||
     publicStatus === "visible" ||
+    publicStatus === "visible_setup_in_progress" ||
     adminStatus === "approved" ||
     applicationStatus === "public" ||
     applicationStatus === "visible" ||
@@ -313,7 +464,7 @@ function isBookableSearchGuru(guru: GuruRow) {
   const adminStatus = normalizeStatus(guru.admin_status);
   const qualityStatus = normalizeStatus(guru.profile_quality_status);
 
-  if (!isPublicSearchGuru(guru)) return false;
+  if (!shouldDisplaySearchGuru(guru)) return false;
   if (isPlaceholderSearchGuru(guru)) return false;
   if (bookingStatus === "listed_only" || bookingStatus === "not_listed") return false;
   if (adminStatus === "placeholder" || qualityStatus === "placeholder") return false;
@@ -384,13 +535,23 @@ function isPlaceholderSearchGuru(guru: GuruRow) {
 
 function shouldDisplaySearchGuru(guru: GuruRow) {
   if (isBlockedGuruAccount(guru)) return false;
+  if (isSearchSuppressedGuru(guru)) return false;
   if (!hasBasicLocationSignal(guru)) return false;
 
-  return isPublicSearchGuru(guru) || isDemoSearchGuru(guru);
+  if (isDemoSearchGuru(guru)) return true;
+
+  return isSetupVisibleGuru(guru);
 }
 
 function getGuruZip(guru: GuruRow) {
-  return cleanZip(guru.service_zip || guru.service_zip_code || guru.zip_code);
+  const parsedServiceArea = parseServiceArea(guru.service_area);
+
+  return cleanZip(
+    guru.service_zip ||
+      guru.service_zip_code ||
+      guru.zip_code ||
+      parsedServiceArea.zip,
+  );
 }
 
 function getGuruPhotoUrl(guru: GuruRow) {
@@ -574,6 +735,24 @@ function mergeDuplicateGuruRows(current: GuruRow, incoming: GuruRow): GuruRow {
     id: chooseTextValue(primary.id, secondary.id) as string | number,
     user_id: chooseTextValue(primary.user_id, secondary.user_id) as string | null,
     email: chooseTextValue(primary.email, secondary.email) as string | null,
+    phone: chooseTextValue(primary.phone, secondary.phone) as string | null,
+    phone_number: chooseTextValue(
+      primary.phone_number,
+      secondary.phone_number,
+    ) as string | null,
+    phone_e164: chooseTextValue(
+      primary.phone_e164,
+      secondary.phone_e164,
+    ) as string | null,
+    mobile: chooseTextValue(primary.mobile, secondary.mobile) as string | null,
+    mobile_phone: chooseTextValue(
+      primary.mobile_phone,
+      secondary.mobile_phone,
+    ) as string | null,
+    contact_phone: chooseTextValue(
+      primary.contact_phone,
+      secondary.contact_phone,
+    ) as string | null,
     slug: chooseTextValue(primary.slug, secondary.slug) as string | null,
     display_name: chooseTextValue(primary.display_name, secondary.display_name) as string | null,
     full_name: chooseTextValue(primary.full_name, secondary.full_name) as string | null,
@@ -587,6 +766,10 @@ function mergeDuplicateGuruRows(current: GuruRow, incoming: GuruRow): GuruRow {
     service_state: chooseTextValue(primary.service_state, secondary.service_state) as string | null,
     service_zip: chooseTextValue(primary.service_zip, secondary.service_zip) as string | null,
     service_zip_code: chooseTextValue(primary.service_zip_code, secondary.service_zip_code) as string | null,
+    service_area: chooseTextValue(
+      primary.service_area,
+      secondary.service_area,
+    ) as string | null,
     profile_photo_url: chooseTextValue(primary.profile_photo_url, secondary.profile_photo_url) as string | null,
     photo_url: chooseTextValue(primary.photo_url, secondary.photo_url) as string | null,
     avatar_url: chooseTextValue(primary.avatar_url, secondary.avatar_url) as string | null,
@@ -936,16 +1119,7 @@ function getPublicListingState(
 ) {
   if (isPlaceholder) return "preview";
   if (canBook) return "bookable";
-
-  const bookingStatus = normalizeStatus(guru.booking_status);
-
-  if (
-    bookingStatus === "listed_only" ||
-    guru.is_public_visible === true ||
-    guru.is_public === true
-  ) {
-    return "listed_only";
-  }
+  if (shouldDisplaySearchGuru(guru)) return "listed_only";
 
   return "preview";
 }
@@ -1004,10 +1178,27 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
       : canBook
         ? "bookable"
         : "listed_only",
-    admin_status: guru.admin_status || (isPlaceholder ? "placeholder" : "approved"),
-    public_status: guru.public_status || "public",
+    admin_status:
+      guru.admin_status ||
+      (isPlaceholder
+        ? "placeholder"
+        : canBook
+          ? "approved"
+          : "setup_in_progress"),
+    public_status:
+      guru.public_status ||
+      (isPlaceholder
+        ? "preview"
+        : canBook
+          ? "public"
+          : "visible_setup_in_progress"),
     profile_quality_status:
-      guru.profile_quality_status || (isPlaceholder ? "placeholder" : canBook ? "bookable" : "public"),
+      guru.profile_quality_status ||
+      (isPlaceholder
+        ? "placeholder"
+        : canBook
+          ? "bookable"
+          : "setup_in_progress"),
     is_public: true,
     is_public_visible: true,
     is_active: isPlaceholder ? true : guru.is_active ?? true,
@@ -1087,14 +1278,14 @@ async function loadGuruRowsFromTable(
   const loadedRows = ((data || []) as GuruRow[])
     .filter((guru) => sourceRowLooksLikeGuru(tableName, guru))
     .map((guru) => applyOverrideToGuru(guru, overrideMap));
-  const displayRows = loadedRows.filter(shouldDisplaySearchGuru);
+  const individuallyEligibleRows = loadedRows.filter(shouldDisplaySearchGuru);
 
   return {
-    rows: displayRows,
+    rows: loadedRows,
     result: {
       tableName,
       loaded: loadedRows.length,
-      displayed: displayRows.length,
+      displayed: individuallyEligibleRows.length,
     },
   };
 }
@@ -1116,12 +1307,12 @@ export async function GET(request: NextRequest) {
 
     const standaloneOverrideRows = overrides
       .map(overrideToStandaloneGuru)
-      .map((guru) => applyOverrideToGuru(guru, overrideMap))
-      .filter(shouldDisplaySearchGuru);
+      .map((guru) => applyOverrideToGuru(guru, overrideMap));
 
     guruRows = [...guruRows, ...standaloneOverrideRows];
 
     const normalizedGurus = dedupeGuruRows(guruRows)
+      .filter(shouldDisplaySearchGuru)
       .map(normalizeGuruForPublicSearch)
       .sort((a, b) => {
         const rank = (guru: {
@@ -1150,8 +1341,13 @@ export async function GET(request: NextRequest) {
           ? {
               debug: {
                 overrides_loaded: overrides.length,
-                standalone_overrides_displayed: standaloneOverrideRows.length,
+                standalone_overrides_displayed: standaloneOverrideRows.filter(
+                  shouldDisplaySearchGuru,
+                ).length,
                 can_book_count: normalizedGurus.filter((guru) => guru.can_book).length,
+                setup_visible_count: normalizedGurus.filter(
+                  (guru) => guru.is_listed_only && !guru.is_placeholder,
+                ).length,
                 listed_only_count: normalizedGurus.filter(
                   (guru) => guru.is_listed_only && !guru.is_placeholder,
                 ).length,
