@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
@@ -19,7 +18,6 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { getAmbassadorRewardMethods } from "@/lib/payments/payment-methods";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +92,10 @@ type AmbassadorPayoutAccount = {
   onboardingStatus?: string | null;
   accountStatus?: string | null;
   payoutsEnabled?: boolean;
+  isDefault?: boolean;
+  isLive?: boolean;
+  verifiedAt?: string | null;
+  updatedAt?: string | null;
 };
 
 type AmbassadorPayoutSetup = {
@@ -274,64 +276,6 @@ async function callAmbassadorPayoutSetupApi({
           : "SitGuru could not connect to reward payout setup.",
     };
   }
-}
-
-async function saveAmbassadorPayoutProvider(formData: FormData) {
-  "use server";
-
-  const requestedProvider = String(formData.get("provider") || "");
-  const continueToSetup =
-    String(formData.get("continueToSetup") || "") === "true";
-  const provider: AmbassadorPayoutProvider | null =
-    requestedProvider === "stripe" ||
-    requestedProvider === "paypal" ||
-    requestedProvider === "venmo" ||
-    requestedProvider === "set_up_later"
-      ? requestedProvider
-      : null;
-
-  if (!provider) {
-    redirect("/ambassador/dashboard/earnings?payoutStatus=invalid");
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    redirect("/login/route?preferred=ambassador");
-  }
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session?.access_token) {
-    redirect("/login/route?preferred=ambassador");
-  }
-
-  const result = await callAmbassadorPayoutSetupApi({
-    accessToken: session.access_token,
-    method: "PATCH",
-    provider,
-  });
-
-  revalidatePath("/ambassador/dashboard/earnings");
-  revalidatePath("/ambassador/dashboard/payouts");
-
-  if (!result.success) {
-    redirect("/ambassador/dashboard/earnings?payoutStatus=error");
-  }
-
-  if (continueToSetup && provider !== "set_up_later") {
-    redirect(`/ambassador/dashboard/payouts?provider=${provider}`);
-  }
-
-  redirect(
-    `/ambassador/dashboard/earnings?payoutSaved=${provider}`,
-  );
 }
 
 function asString(value: unknown) {
@@ -784,94 +728,46 @@ function RewardGroup({
   );
 }
 
-type RewardPaymentChoice = {
-  provider: Exclude<AmbassadorPayoutProvider, "set_up_later">;
-  label: string;
-  shortLabel: string;
-  description: string;
-  setupSummary: string;
-  logoPath: string;
-  buttonLabel: string;
-};
+type PayoutVisualStatus = "ready" | "pending" | "attention" | "not_set";
 
-const QUICK_REWARD_SETUP_STEPS = [
-  {
-    step: 1,
-    title: "Pick a way",
-    description: "Choose bank or card, PayPal, or Venmo.",
-  },
-  {
-    step: 2,
-    title: "Connect it",
-    description: "Finish the secure setup with your provider.",
-  },
-  {
-    step: 3,
-    title: "Get paid",
-    description: "Approved rewards go to the option you picked.",
-  },
-] as const;
+function normalizePayoutProvider(
+  value: unknown,
+): AmbassadorPayoutProvider | null {
+  const normalized = asString(value).toLowerCase();
 
-function getRewardPaymentChoices(): RewardPaymentChoice[] {
-  const sharedMethods = getAmbassadorRewardMethods();
-  const sharedPayPal = sharedMethods.find(
-    (method) => method.id === "paypal_rewards",
-  );
-  const sharedVenmo = sharedMethods.find(
-    (method) => method.id === "venmo_rewards",
-  );
+  if (
+    normalized === "stripe" ||
+    normalized === "paypal" ||
+    normalized === "venmo" ||
+    normalized === "set_up_later"
+  ) {
+    return normalized;
+  }
 
-  return [
-    {
-      provider: "stripe",
-      label: "Bank or debit card",
-      shortLabel: "Bank or card",
-      description: "Send rewards to your bank or eligible debit card.",
-      setupSummary: "Powered securely by Stripe.",
-      logoPath: "/images/payments/stripe.svg",
-      buttonLabel: "Pick bank or card",
-    },
-    {
-      provider: "paypal",
-      label: sharedPayPal?.label || "PayPal",
-      shortLabel: "PayPal",
-      description: "Send rewards straight to your PayPal.",
-      setupSummary:
-        sharedPayPal?.setupSummary || "Use the PayPal account you already have.",
-      logoPath: "/images/payments/paypal.svg",
-      buttonLabel: "Pick PayPal",
-    },
-    {
-      provider: "venmo",
-      label: sharedVenmo?.label || "Venmo",
-      shortLabel: "Venmo",
-      description: "Get approved rewards through Venmo.",
-      setupSummary:
-        sharedVenmo?.setupSummary || "Connect an eligible U.S. mobile number.",
-      logoPath: "/images/payments/venmo.svg",
-      buttonLabel: "Pick Venmo",
-    },
-  ];
+  return null;
 }
 
-function rewardProviderDetails(account: AmbassadorPayoutAccount) {
-  if (account.provider === "stripe") {
+function payoutProviderDetails(
+  provider: Exclude<AmbassadorPayoutProvider, "set_up_later">,
+  account?: AmbassadorPayoutAccount | null,
+) {
+  if (provider === "stripe") {
     return {
-      label: "Bank or debit card",
+      label: "Bank or card",
       logoPath: "/images/payments/stripe.svg",
       destination:
-        account.providerAccountId || "Connected securely with Stripe",
+        account?.providerAccountId || "Connected securely through Stripe",
     };
   }
 
-  if (account.provider === "venmo") {
+  if (provider === "venmo") {
     return {
       label: "Venmo",
       logoPath: "/images/payments/venmo.svg",
       destination:
-        account.providerPhone ||
-        account.providerEmail ||
-        "Connected Venmo account",
+        account?.providerPhone ||
+        account?.providerEmail ||
+        "U.S. mobile number saved",
     };
   }
 
@@ -879,13 +775,161 @@ function rewardProviderDetails(account: AmbassadorPayoutAccount) {
     label: "PayPal",
     logoPath: "/images/payments/paypal.svg",
     destination:
-      account.providerEmail ||
-      account.providerPhone ||
-      "Connected PayPal account",
+      account?.providerEmail ||
+      account?.providerPhone ||
+      "PayPal email saved",
   };
 }
 
-function RewardPayoutSetupCard({
+function getCurrentPayoutAccount(
+  setup: AmbassadorPayoutSetup | null,
+  provider: AmbassadorPayoutProvider,
+) {
+  if (provider === "set_up_later") return null;
+
+  const matchingAccounts = (setup?.accounts || []).filter(
+    (account) => account.provider === provider,
+  );
+
+  return (
+    matchingAccounts.find((account) => account.isDefault === true) ||
+    matchingAccounts.find((account) => account.payoutsEnabled === true) ||
+    matchingAccounts[0] ||
+    (setup?.readyAccount?.provider === provider ? setup.readyAccount : null)
+  );
+}
+
+function getPayoutVisualStatus({
+  provider,
+  account,
+  loadError,
+}: {
+  provider: AmbassadorPayoutProvider;
+  account: AmbassadorPayoutAccount | null;
+  loadError?: string | null;
+}): {
+  state: PayoutVisualStatus;
+  badge: string;
+  headline: string;
+  description: string;
+} {
+  if (loadError) {
+    return {
+      state: "attention",
+      badge: "Needs attention",
+      headline: "Payout status unavailable",
+      description: "Open payout settings and try again.",
+    };
+  }
+
+  if (provider === "set_up_later") {
+    return {
+      state: "not_set",
+      badge: "Not set up",
+      headline: "Choose how you get paid",
+      description:
+        "Pick bank or card, PayPal, or Venmo before your first reward is sent.",
+    };
+  }
+
+  const onboardingStatus = normalizeStatus(account?.onboardingStatus);
+  const accountStatus = normalizeStatus(account?.accountStatus);
+  const needsAttention =
+    ["restricted", "disabled", "disconnected", "failed", "rejected"].some(
+      (status) =>
+        onboardingStatus.includes(status) || accountStatus.includes(status),
+    );
+
+  if (needsAttention) {
+    return {
+      state: "attention",
+      badge: "Needs attention",
+      headline: "Update your payout method",
+      description:
+        "Open payout settings to finish the steps needed before a reward can be sent.",
+    };
+  }
+
+  const ready =
+    account?.payoutsEnabled === true ||
+    ["ready", "verified", "complete", "completed"].some(
+      (status) =>
+        onboardingStatus === status || accountStatus === status,
+    );
+
+  if (ready) {
+    return {
+      state: "ready",
+      badge: "Ready",
+      headline: "Connected and ready",
+      description: "Approved rewards can be sent to this payout method.",
+    };
+  }
+
+  if (account) {
+    return {
+      state: "pending",
+      badge: "Connected",
+      headline: "Verification pending",
+      description:
+        "Your payout method is saved. SitGuru will verify it before your first payout.",
+    };
+  }
+
+  return {
+    state: "attention",
+    badge: "Finish setup",
+    headline: "Payout method selected",
+    description:
+      "Finish connecting this payout method before your first reward is sent.",
+  };
+}
+
+function payoutCardClasses(state: PayoutVisualStatus) {
+  if (state === "ready") {
+    return {
+      section:
+        "border-emerald-300 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_70%)]",
+      icon: "bg-emerald-100 ring-emerald-200",
+      badge:
+        "border-emerald-300 bg-emerald-600 !text-white",
+      statusIcon: "bg-emerald-100 !text-emerald-700 ring-emerald-200",
+      text: "!text-emerald-800",
+    };
+  }
+
+  if (state === "pending") {
+    return {
+      section:
+        "border-emerald-300 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_72%)]",
+      icon: "bg-emerald-100 ring-emerald-200",
+      badge:
+        "border-emerald-300 bg-emerald-50 !text-emerald-800",
+      statusIcon: "bg-amber-100 !text-amber-700 ring-amber-200",
+      text: "!text-amber-800",
+    };
+  }
+
+  if (state === "attention") {
+    return {
+      section: "border-rose-200 bg-rose-50",
+      icon: "bg-white ring-rose-200",
+      badge: "border-rose-200 bg-white !text-rose-700",
+      statusIcon: "bg-rose-100 !text-rose-700 ring-rose-200",
+      text: "!text-rose-800",
+    };
+  }
+
+  return {
+    section: "border-amber-200 bg-amber-50",
+    icon: "bg-white ring-amber-200",
+    badge: "border-amber-200 bg-white !text-amber-700",
+    statusIcon: "bg-amber-100 !text-amber-700 ring-amber-200",
+    text: "!text-amber-800",
+  };
+}
+
+function CurrentPayoutMethodCard({
   setup,
   loadError,
   saveStatus,
@@ -896,284 +940,139 @@ function RewardPayoutSetupCard({
   saveStatus?: string | null;
   approvedAmount: number;
 }) {
-  const choices = getRewardPaymentChoices();
-  const selectedProvider = setup?.selectedProvider || "set_up_later";
-  const readyAccount = setup?.readyAccount || null;
-  const setupComplete = Boolean(setup?.setupComplete);
+  const selectedProvider =
+    normalizePayoutProvider(setup?.selectedProvider) || "set_up_later";
+  const currentAccount = getCurrentPayoutAccount(setup, selectedProvider);
+  const visualStatus = getPayoutVisualStatus({
+    provider: selectedProvider,
+    account: currentAccount,
+    loadError,
+  });
+  const classes = payoutCardClasses(visualStatus.state);
+  const providerDetails =
+    selectedProvider === "set_up_later"
+      ? null
+      : payoutProviderDetails(selectedProvider, currentAccount);
+  const manageHref =
+    selectedProvider === "set_up_later"
+      ? "/ambassador/dashboard/payouts"
+      : `/ambassador/dashboard/payouts?provider=${selectedProvider}`;
 
   const successMessage =
     saveStatus === "stripe"
-      ? "Bank or card is now your payout choice."
+      ? "Bank or card is now your payout method."
       : saveStatus === "paypal"
-        ? "PayPal is now your payout choice."
+        ? "PayPal is now your payout method."
         : saveStatus === "venmo"
-          ? "Venmo is now your payout choice."
-          : saveStatus === "set_up_later"
-            ? "Saved. You can finish this later."
-            : null;
-
-  const errorMessage =
-    saveStatus === "error"
-      ? "That did not save. Try again."
-      : saveStatus === "invalid"
-        ? "Pick bank or card, PayPal, Venmo, or do this later."
-        : loadError || null;
-
-  if (setupComplete && readyAccount) {
-    const provider = rewardProviderDetails(readyAccount);
-
-    return (
-      <section className="rounded-[1.4rem] border border-emerald-200 bg-white p-4 shadow-sm sm:p-5">
-        {successMessage ? (
-          <div
-            role="status"
-            className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold !text-emerald-800"
-          >
-            {successMessage}
-          </div>
-        ) : null}
-
-        {errorMessage ? (
-          <div
-            role="alert"
-            className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold !text-rose-700"
-          >
-            {errorMessage}
-          </div>
-        ) : null}
-
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,430px)] lg:items-center">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 p-2 ring-1 ring-emerald-100">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={provider.logoPath}
-                alt={provider.label}
-                className="max-h-7 max-w-[76px] object-contain"
-              />
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-lg font-black !text-slate-950">
-                  You&apos;re ready to get paid
-                </p>
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-emerald-700">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Ready
-                </span>
-              </div>
-
-              <p className="mt-1 truncate text-sm font-semibold !text-slate-700">
-                {provider.label} · {provider.destination}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-            <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
-                Ready to pay
-              </p>
-              <p className="mt-1 text-2xl font-black text-sky-950">
-                {money(approvedAmount)}
-              </p>
-            </div>
-
-            <Link
-              href="/ambassador/dashboard/payouts"
-              className="inline-flex min-h-[50px] items-center justify-center rounded-full border border-emerald-300 bg-white px-5 py-3 text-sm font-black !text-emerald-800 transition hover:bg-emerald-50"
-            >
-              Manage payout
-            </Link>
-          </div>
-        </div>
-      </section>
-    );
-  }
+          ? "Venmo is now your payout method."
+          : null;
 
   return (
-    <section className="overflow-hidden rounded-[1.5rem] border border-emerald-200 bg-white p-4 shadow-sm sm:rounded-[2rem] sm:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700 sm:text-sm">
-            Get paid
-          </p>
-          <h2 className="mt-1.5 text-2xl font-black tracking-tight !text-slate-950 sm:text-3xl">
-            Pick how you get paid
-          </h2>
-          <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
-            Choose one now. You can switch later.
-          </p>
-        </div>
-
-        <span className="inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-black !text-amber-700">
-          Pick one
-        </span>
-      </div>
-
+    <section
+      className={`overflow-hidden rounded-[1.6rem] border p-4 shadow-sm sm:p-6 ${classes.section}`}
+    >
       {successMessage ? (
         <div
           role="status"
-          className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold !text-emerald-800"
+          className="mb-4 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-3"
         >
-          {successMessage}
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 !text-emerald-700" />
+          <p className="text-sm font-bold !text-emerald-900">
+            {successMessage}
+          </p>
         </div>
       ) : null}
 
-      {errorMessage ? (
-        <div
-          role="alert"
-          className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold !text-rose-700"
-        >
-          {errorMessage}
-        </div>
-      ) : null}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-700">
+              My payout method
+            </p>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${classes.badge}`}
+            >
+              {visualStatus.state === "ready" || visualStatus.state === "pending" ? (
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              ) : visualStatus.state === "attention" ? (
+                <AlertTriangle className="h-3.5 w-3.5" />
+              ) : (
+                <Clock3 className="h-3.5 w-3.5" />
+              )}
+              {visualStatus.badge}
+            </span>
+          </div>
 
-      <div className="mt-4 rounded-[1.25rem] border border-sky-100 bg-sky-50 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
+          <div className="mt-4 flex min-w-0 items-start gap-4">
+            <div
+              className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl p-2.5 shadow-sm ring-1 ${classes.icon}`}
+            >
+              {providerDetails ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={providerDetails.logoPath}
+                  alt={providerDetails.label}
+                  className="max-h-8 max-w-[78px] object-contain"
+                />
+              ) : (
+                <Wallet className="h-7 w-7 !text-amber-700" />
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <h2 className="text-2xl font-black tracking-tight !text-slate-950 sm:text-3xl">
+                {providerDetails?.label || "Set up your payout"}
+              </h2>
+              <p className="mt-1 break-words text-sm font-bold !text-slate-700">
+                {providerDetails?.destination ||
+                  "Choose one payout method in your payout settings."}
+              </p>
+
+              <div className="mt-3 flex items-start gap-2">
+                <span
+                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1 ${classes.statusIcon}`}
+                >
+                  {visualStatus.state === "ready" ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : visualStatus.state === "attention" ? (
+                    <AlertTriangle className="h-4 w-4" />
+                  ) : (
+                    <Clock3 className="h-4 w-4" />
+                  )}
+                </span>
+                <div>
+                  <p className={`text-sm font-black ${classes.text}`}>
+                    {visualStatus.headline}
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold leading-6 !text-slate-700">
+                    {visualStatus.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-[minmax(180px,1fr)_auto] sm:items-center lg:min-w-[420px]">
+          <div className="rounded-2xl border border-sky-100 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] !text-sky-700">
               Ready to pay
             </p>
-            <p className="mt-1 text-2xl font-black text-sky-950 sm:text-3xl">
+            <p className="mt-1 text-2xl font-black !text-sky-950">
               {money(approvedAmount)}
             </p>
           </div>
-          <p className="max-w-[180px] text-right text-xs font-bold leading-5 text-sky-800">
-            Approved rewards waiting for your payout choice.
-          </p>
-        </div>
-      </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {choices.map((choice) => {
-          const selected = selectedProvider === choice.provider;
-
-          return (
-            <article
-              key={choice.provider}
-              className={`flex h-full flex-col rounded-[1.35rem] border p-4 sm:p-5 ${
-                selected
-                  ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-100"
-                  : "border-slate-200 bg-slate-50"
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={choice.logoPath}
-                    alt={choice.label}
-                    className="max-h-7 max-w-[78px] object-contain"
-                  />
-                </div>
-
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-base font-black !text-slate-950 sm:text-lg">
-                      {choice.label}
-                    </p>
-                    {selected ? (
-                      <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] !text-white">
-                        Picked
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <p className="mt-1.5 text-sm font-semibold leading-5 !text-slate-700">
-                    {choice.description}
-                  </p>
-                  <p className="mt-1 text-xs font-bold leading-5 !text-slate-500">
-                    {choice.setupSummary}
-                  </p>
-                </div>
-              </div>
-
-              <form
-                action={saveAmbassadorPayoutProvider}
-                className="mt-auto pt-4"
-              >
-                <input
-                  type="hidden"
-                  name="provider"
-                  value={choice.provider}
-                />
-                <input
-                  type="hidden"
-                  name="continueToSetup"
-                  value="true"
-                />
-                <button
-                  type="submit"
-                  className={`inline-flex min-h-[52px] w-full touch-manipulation items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-black transition active:scale-[0.99] ${
-                    selected
-                      ? "border border-emerald-300 bg-white !text-emerald-800"
-                      : "bg-emerald-700 !text-white shadow-sm hover:bg-emerald-800"
-                  }`}
-                >
-                  {selected ? `Continue ${choice.shortLabel}` : choice.buttonLabel}
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              </form>
-            </article>
-          );
-        })}
-      </div>
-
-      <div className="mt-4 rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm font-black !text-slate-950">
-          Three quick steps
-        </p>
-
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          {QUICK_REWARD_SETUP_STEPS.map((step) => (
-            <div
-              key={step.step}
-              className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:block sm:p-4"
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-sm font-black text-white">
-                {step.step}
-              </span>
-              <div>
-                <p className="sm:mt-3 text-sm font-black !text-slate-950">
-                  {step.title}
-                </p>
-                <p className="mt-1 text-xs font-semibold leading-5 !text-slate-600">
-                  {step.description}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-3 rounded-[1.2rem] border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-black !text-slate-950">
-            Not ready yet?
-          </p>
-          <p className="mt-1 text-sm font-semibold leading-5 !text-slate-700">
-            Keep earning. Finish this before we send your first approved reward.
-          </p>
-        </div>
-
-        <form action={saveAmbassadorPayoutProvider}>
-          <input type="hidden" name="provider" value="set_up_later" />
-          <button
-            type="submit"
-            className="inline-flex min-h-[48px] w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-black !text-slate-800 transition hover:bg-slate-100 sm:w-auto"
+          <Link
+            href={manageHref}
+            className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 py-3 text-sm font-black !text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99]"
           >
-            Do this later
-          </button>
-        </form>
-      </div>
-
-      <div className="mt-4 flex items-start gap-2 text-xs font-semibold leading-5 !text-slate-500">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 !text-emerald-600" />
-        <p>
-          Your bank, PayPal, or Venmo login stays with the provider—not SitGuru.
-        </p>
+            {selectedProvider === "set_up_later"
+              ? "Set up payout"
+              : "Manage payout"}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
     </section>
   );
@@ -1392,7 +1291,7 @@ export default async function AmbassadorDashboardEarningsPage({
           />
         </section>
 
-        <RewardPayoutSetupCard
+        <CurrentPayoutMethodCard
           setup={payoutSetup}
           loadError={payoutSetupError}
           saveStatus={payoutSaveStatus}
