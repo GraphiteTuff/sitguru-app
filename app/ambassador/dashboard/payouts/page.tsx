@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import PayoutDestinationInput from "./PayoutDestinationInput";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -1418,7 +1419,6 @@ export default async function AmbassadorPayoutsPage({
     asString(ambassador.login_email) ||
     asString(ambassador.contact_email) ||
     asString(ambassador.email);
-  const defaultVenmoPhone = asString(user.phone);
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_48%,#ecfdf5_100%)] px-3 py-4 !text-slate-950 sm:px-6 sm:py-6 lg:px-8">
@@ -1665,35 +1665,11 @@ export default async function AmbassadorPayoutsPage({
                   </div>
                 </div>
 
-                <label className="block">
-                  <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] !text-slate-600">
-                    {selectedProvider === "paypal"
-                      ? "PayPal email"
-                      : "Venmo mobile"}
-                  </span>
-                  <input
-                    type={selectedProvider === "paypal" ? "email" : "tel"}
-                    name="destinationValue"
-                    inputMode={
-                      selectedProvider === "paypal" ? "email" : "tel"
-                    }
-                    autoComplete={
-                      selectedProvider === "paypal" ? "email" : "tel"
-                    }
-                    defaultValue={
-                      selectedProvider === "paypal"
-                        ? defaultPayPalEmail
-                        : defaultVenmoPhone
-                    }
-                    placeholder={
-                      selectedProvider === "paypal"
-                        ? "you@example.com"
-                        : "(555) 555-1234"
-                    }
-                    required
-                    className="min-h-[52px] w-full rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold !text-slate-950 outline-none transition placeholder:font-semibold placeholder:!text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                  />
-                </label>
+                <PayoutDestinationInput
+                  key={selectedProvider}
+                  provider={selectedProvider}
+                  defaultPayPalEmail={defaultPayPalEmail}
+                />
 
                 <button
                   type="submit"
