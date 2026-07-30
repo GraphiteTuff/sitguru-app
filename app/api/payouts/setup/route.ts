@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
 
-const PAYOUT_SETUP_API_VERSION = "2026-07-29.1";
+const PAYOUT_SETUP_API_VERSION = "2026-07-29.2";
 
 type FinancialRole = "guru" | "ambassador";
 type RoleContext = FinancialRole | "multi_role" | "unknown";
@@ -132,7 +132,14 @@ type PayoutDestinationRow = {
   user_id: string;
   destination_purpose: "ambassador_reward" | "guru_reward" | "general_payout";
   workspace_role?: FinancialRole | null;
-  provider: "paypal" | "venmo";
+
+  /*
+    Production stores Ambassador PayPal and Venmo destinations on the
+    PayPal Payouts rail. The logical choice lives in channel.
+  */
+  provider: "paypal_payouts" | "paypal" | "venmo";
+  channel?: AmbassadorDestinationProvider | null;
+
   destination_type: DestinationType;
   destination_value?: string | null;
   display_value: string | null;
@@ -369,6 +376,36 @@ function maskIdentifier(value: string) {
 
   if (value.length <= 4) return "••••";
   return `${value.slice(0, 2)}${"•".repeat(Math.max(2, value.length - 4))}${value.slice(-2)}`;
+}
+
+function getDestinationChannel(
+  destination: PayoutDestinationRow,
+): AmbassadorDestinationProvider | null {
+  const channel = safeString(destination.channel).toLowerCase();
+
+  if (channel === "paypal" || channel === "venmo") {
+    return channel;
+  }
+
+  const legacyProvider = safeString(destination.provider).toLowerCase();
+
+  if (legacyProvider === "paypal" || legacyProvider === "venmo") {
+    return legacyProvider;
+  }
+
+  return null;
+}
+
+function normalizeStoredDestinationType(value: unknown) {
+  const normalized = safeString(value).toLowerCase();
+
+  if (normalized === "mobile") return "mobile_number";
+  return normalized;
+}
+
+function getLegacyRecipientType(input: SaveDestinationInput) {
+  if (input.provider === "venmo") return "mobile";
+  return input.destinationType === "paypal_id" ? "paypal_id" : "email";
 }
 
 function isValidEmail(value: string) {
@@ -829,11 +866,12 @@ function publicDestination(destination: PayoutDestinationRow) {
     (destination.destination_value
       ? maskIdentifier(destination.destination_value)
       : null);
+  const provider = getDestinationChannel(destination);
 
   return {
     id: destination.id,
     destinationPurpose: destination.destination_purpose,
-    provider: destination.provider,
+    provider,
     destinationType: destination.destination_type,
     displayValue: masked,
     verificationStatus: destination.verification_status,
@@ -850,16 +888,15 @@ function publicDestination(destination: PayoutDestinationRow) {
 
 function publicAmbassadorReadyAccount(destination: PayoutDestinationRow) {
   const publicValue = publicDestination(destination);
-  const usesEmail = ["email", "paypal_id"].includes(
-    destination.destination_type,
+  const storedType = normalizeStoredDestinationType(
+    destination.destination_type || destination.recipient_type,
   );
-  const usesPhone = ["mobile_number", "venmo_account"].includes(
-    destination.destination_type,
-  );
+  const usesEmail = ["email", "paypal_id"].includes(storedType);
+  const usesPhone = ["mobile_number", "venmo_account"].includes(storedType);
 
   return {
     id: destination.id,
-    provider: destination.provider,
+    provider: getDestinationChannel(destination),
     providerEmail: usesEmail ? publicValue.displayValue : null,
     providerPhone: usesPhone ? publicValue.displayValue : null,
     onboardingStatus: destination.verification_status,
@@ -1004,7 +1041,8 @@ async function loadFinancialSetup(
   const readySelectedDestination =
     selectedProvider === "paypal" || selectedProvider === "venmo"
       ? readyDestinations.find(
-          (destination) => destination.provider === selectedProvider,
+          (destination) =>
+            getDestinationChannel(destination) === selectedProvider,
         ) || null
       : null;
   const readyDefaultDestination =
@@ -1288,7 +1326,8 @@ async function saveAmbassadorDestination({
     .from("user_payout_destinations")
     .select("*")
     .eq("user_id", userId)
-    .eq("provider", input.provider)
+    .eq("provider", "paypal_payouts")
+    .eq("channel", input.provider)
     .neq("destination_status", "removed");
 
   if (matchingError) {
@@ -1297,9 +1336,9 @@ async function saveAmbassadorDestination({
 
   const existing = ((matchingRows || []) as PayoutDestinationRow[]).find(
     (row) => {
-      const savedType = safeString(
+      const savedType = normalizeStoredDestinationType(
         row.destination_type || row.recipient_type,
-      ).toLowerCase();
+      );
       const savedValue = safeString(
         row.destination_value || row.recipient_value,
       ).toLowerCase();
@@ -1313,7 +1352,7 @@ async function saveAmbassadorDestination({
 
   const now = new Date().toISOString();
   const displayValue = maskIdentifier(input.destinationValue);
-  const legacyStatus = "pending";
+  const legacyStatus = "unverified";
 
   function missingDestinationColumn(message: string) {
     return (
@@ -1389,7 +1428,8 @@ async function saveAmbassadorDestination({
   const sharedPayload: Record<string, unknown> = {
     destination_purpose: "ambassador_reward",
     workspace_role: "ambassador",
-    provider: input.provider,
+    provider: "paypal_payouts",
+    channel: input.provider,
     destination_type: input.destinationType,
     destination_value: input.destinationValue,
     display_value: displayValue,
@@ -1397,8 +1437,8 @@ async function saveAmbassadorDestination({
     destination_status: "active",
     is_default: false,
 
-    // Legacy destination columns retained for compatibility with older rows.
-    recipient_type: input.destinationType,
+    // Production legacy constraints use email, mobile, or paypal_id.
+    recipient_type: getLegacyRecipientType(input),
     recipient_value: input.destinationValue,
     masked_value: displayValue,
     status: legacyStatus,
