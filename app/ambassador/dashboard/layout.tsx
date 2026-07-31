@@ -9,6 +9,7 @@ import {
   CalendarDays,
   GraduationCap,
   LayoutDashboard,
+  LineChart,
   MessageCircle,
   QrCode,
   Share2,
@@ -28,6 +29,13 @@ type AmbassadorNavItem = {
 };
 
 const navItems: AmbassadorNavItem[] = [
+  {
+    label: "Performance",
+    href: "/ambassador/dashboard/performance",
+    icon: <LineChart size={16} />,
+    isActive: (pathname) =>
+      pathname.startsWith("/ambassador/dashboard/performance"),
+  },
   {
     label: "Dashboard",
     href: "/ambassador/dashboard",

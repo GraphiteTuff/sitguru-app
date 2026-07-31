@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import Header from "@/components/Header";
+import {
+  PawReportLiveCard,
+  PetParentLiveWalkViewer,
+} from "@/components/pawreport";
 import VisitUpdateTimeline from "@/components/visit-updates/VisitUpdateTimeline";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
@@ -122,9 +126,15 @@ export default async function CustomerVisitUpdatesPage({ params }: PageProps) {
           </Link>
         </div>
 
+        {/* SSE realtime walk map + snackbars (no polling) */}
+        <PetParentLiveWalkViewer bookingId={bookingId} />
+
+        {/* Aggregated PawReport card (distance / photos / checklist) */}
+        <PawReportLiveCard bookingId={bookingId} roleHint="pet_parent" />
+
         <div className="rounded-3xl border border-sky-200 bg-sky-50 p-4 text-sm font-bold leading-6 text-sky-900">
-          This page shows the latest saved updates. Your dashboard refreshes the
-          live care card automatically while a PawReport or walk is active.
+          The live walk viewer streams from your Guru&apos;s phone over SSE.
+          Potty and break events drop map markers and show a banner instantly.
         </div>
 
         <VisitUpdateTimeline

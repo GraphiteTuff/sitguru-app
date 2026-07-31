@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import PaymentMethodStrip from "@/components/payments/PaymentMethodStrip";
+import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
@@ -824,6 +824,7 @@ function PawReportSection({
     <section className="bg-gradient-to-br from-emerald-50 via-white to-sky-50 py-12 sm:py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid overflow-hidden rounded-[34px] border border-emerald-100 bg-white shadow-[0_22px_60px_rgba(15,23,42,0.09)] lg:grid-cols-[0.9fr_1.1fr]">
+          {/* Marketing mock only — live PawReport lives on booking dashboards */}
           <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-700 p-6 sm:p-8 lg:p-10">
             <div className="mx-auto max-w-md overflow-hidden rounded-[28px] border border-white/15 bg-white shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
               <div className="border-b border-slate-100 bg-emerald-50 p-5">
@@ -2153,14 +2154,20 @@ export default function HomePage() {
       </section>
 
       <section
-        aria-label="Ways you can pay for your SitGuru booking"
-        className="bg-white pb-8"
+        aria-label="SitGuru premium payment integrations"
+        className="relative overflow-hidden bg-gradient-to-b from-[#f8fcfd] via-emerald-50/40 to-white py-12 sm:py-16"
       >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <PaymentMethodStrip
-            placement="homepage"
-            variant="default"
-            ariaLabel="Secure payment options available for your SitGuru booking"
+        {/* Soft atmospheric wash behind the showcase card */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-sky-100/40 to-transparent"
+        />
+
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <PaymentIntegrationsGrid
+            heading="Premium payments"
+            description="Book with confidence using SitGuru’s trusted payment stack — Stripe, PayPal, Apple Pay, Google Pay, Venmo, and Plaid — with Trust & Safety built into every booking."
+            ariaLabel="Secure payment options for SitGuru bookings"
           />
         </div>
       </section>

@@ -3399,6 +3399,23 @@ export default async function AdminAmbassadorsPage({
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5f8f3] px-3 py-5 text-[#17351f] sm:px-5 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
+        <Link
+          href="/admin/ambassadors/ledger"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-emerald-200 bg-gradient-to-r from-emerald-950 to-emerald-800 px-5 py-4 text-white shadow-sm"
+        >
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200">
+              New · Performance ledger
+            </p>
+            <p className="mt-1 text-sm font-bold">
+              Open traffic clicks, conversion %, and Stripe Connect payout
+              batch actions
+            </p>
+          </div>
+          <span className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-emerald-900">
+            Open ledger →
+          </span>
+        </Link>
         <section className="rounded-[2rem] border border-[#dbe8d5] bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0">

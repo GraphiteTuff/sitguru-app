@@ -23,6 +23,35 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+
+  async redirects() {
+    return [
+      {
+        source: "/help-center",
+        destination: "/help",
+        permanent: true,
+      },
+      {
+        source: "/help-center/:path*",
+        destination: "/help",
+        permanent: true,
+      },
+    ];
+  },
+
+  async headers() {
+    return [
+      {
+        source: "/help/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=300, stale-while-revalidate=86400",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -291,6 +291,26 @@ export async function GET(
         error,
       );
     }
+
+    // Keep performance ledger in sync with short-link traffic
+    try {
+      const { recordAmbassadorClick } = await import(
+        "@/lib/ambassador/ledger"
+      );
+      await recordAmbassadorClick({
+        slug: referralCode,
+        landingPath: `/r/${encodeURIComponent(referralCode)}/${type}?via=${via}`,
+        utmSource: "sitguru_ambassador",
+        utmMedium: via,
+        utmCampaign:
+          type === "pet-parent"
+            ? "ambassador_pet_parent_referral"
+            : "ambassador_guru_referral",
+        skipLegacyDualWrite: true,
+      });
+    } catch (error) {
+      console.warn("Ambassador ledger short-link sync skipped:", error);
+    }
   }
 
   const destination = getSignupDestination({

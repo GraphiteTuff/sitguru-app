@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
 
 export const dynamic = "force-dynamic";
 
@@ -1162,6 +1163,11 @@ export default async function AmbassadorDashboardPage() {
   return (
     <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
+        <div className="lg:hidden">
+          <AmbassadorSelfServicePortal />
+        </div>
+        <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-4">
+          <div className="min-w-0 space-y-4">
         <section className="overflow-hidden rounded-[28px] border border-green-100 bg-white shadow-sm">
           <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
             <div className="bg-[radial-gradient(circle_at_95%_10%,rgba(16,185,129,0.16),transparent_28%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_100%)] p-5 sm:p-6">
@@ -1640,6 +1646,13 @@ export default async function AmbassadorDashboardPage() {
             </DashboardCard>
           </div>
         </details>
+          </div>
+          <aside className="hidden min-w-0 lg:block">
+            <div className="sticky top-4">
+              <AmbassadorSelfServicePortal />
+            </div>
+          </aside>
+        </div>
       </div>
     </main>
   );

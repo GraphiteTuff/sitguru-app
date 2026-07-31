@@ -24,6 +24,7 @@ import {
   MessageCircle,
   PawPrint,
   PieChart,
+  Radio,
   Search,
   Settings,
   ShieldCheck,
@@ -36,10 +37,12 @@ import AdminAccountMenu from "@/components/AdminAccountMenu";
 
 const adminRoutes = {
   dashboard: "/admin",
+  liveWalks: "/admin/dashboard/live-walks",
   bookings: "/admin/bookings",
   petParents: "/admin/customers",
   gurus: "/admin/gurus",
   ambassadors: "/admin/ambassadors",
+  ambassadorLedger: "/admin/ambassadors/ledger",
   messages: "/admin/messages",
   settings: "/admin/settings",
   trustSafety: "/admin/background-checks",
@@ -78,10 +81,16 @@ const navSections = [
     title: "Operations",
     items: [
       { label: "Dashboard", href: adminRoutes.dashboard, icon: Home },
+      { label: "Live Walks", href: adminRoutes.liveWalks, icon: Radio },
       { label: "Bookings", href: adminRoutes.bookings, icon: CalendarDays },
       { label: "Pet Parents", href: adminRoutes.petParents, icon: Users },
       { label: "Gurus", href: adminRoutes.gurus, icon: PawPrint },
       { label: "Ambassadors", href: adminRoutes.ambassadors, icon: UserPlus },
+      {
+        label: "Ambassador Ledger",
+        href: adminRoutes.ambassadorLedger,
+        icon: LineChart,
+      },
       { label: "Human Resources", href: adminRoutes.hr, icon: HeartHandshake },
       {
         label: "SitGuru University",
@@ -180,6 +189,7 @@ const navSections = [
 const topHeaderLinks = [
   { label: "Homepage", href: "/" },
   { label: "Dashboard", href: adminRoutes.dashboard },
+  { label: "Live Walks", href: adminRoutes.liveWalks },
   { label: "Bookings", href: adminRoutes.bookings },
   { label: "Pet Parents", href: adminRoutes.petParents },
   { label: "Gurus", href: adminRoutes.gurus },
@@ -510,6 +520,7 @@ function AdminFooter() {
       title: "Operations",
       links: [
         { label: "Dashboard", href: adminRoutes.dashboard },
+        { label: "Live Walks", href: adminRoutes.liveWalks },
         { label: "Bookings", href: adminRoutes.bookings },
         { label: "Pet Parents", href: adminRoutes.petParents },
         { label: "Gurus", href: adminRoutes.gurus },

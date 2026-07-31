@@ -260,6 +260,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Capture ?ref= on any public hit and set 30-day attribution cookie (non-blocking).
+  const refParam =
+    request.nextUrl.searchParams.get("ref") ||
+    request.nextUrl.searchParams.get("referral") ||
+    request.nextUrl.searchParams.get("ambassador");
+  const normalizedRef = String(refParam || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, "");
+
   const requiresAdminAccess = isProtectedAdminPath(pathname);
   const requiresGuruAccess =
     isProtectedGuruDashboardPath(pathname) && !isGuruLoginPath(pathname);
@@ -272,7 +282,29 @@ export async function middleware(request: NextRequest) {
     !requiresGuruAccess &&
     !requiresAmbassadorAccess
   ) {
-    return NextResponse.next();
+    const passthrough = NextResponse.next();
+    if (normalizedRef) {
+      passthrough.cookies.set({
+        name: "sitguru_ambassador_ref",
+        value: normalizedRef,
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+      // Canonical cookie already consumed by signup + /r/ flows
+      passthrough.cookies.set({
+        name: "sitguru_ambassador_code",
+        value: normalizedRef,
+        httpOnly: false,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    }
+    return passthrough;
   }
 
   const responseRef = {

@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "baseUrl": "..",
+    "paths": {
+      "@/lib/supabase/admin": ["scripts/stubs/mock-admin-user.ts"],
+      "@/*": ["*"]
+    }
+  },
+  "include": [
+    "../app/api/admin/broadcast/route.ts",
+    "./stubs/mock-admin-user.ts",
+    "./mock-admin-broadcast-check.mjs"
+  ]
+}

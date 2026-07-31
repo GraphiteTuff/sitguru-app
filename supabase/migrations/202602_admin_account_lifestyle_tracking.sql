@@ -76,7 +76,7 @@ check (
     'guru_reactivated',
     'admin_status_change'
   )
-);
+) not valid;
 
 create index if not exists account_lifecycle_events_user_id_idx
 on public.account_lifecycle_events(user_id);

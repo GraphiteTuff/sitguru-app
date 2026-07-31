@@ -1,6 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+
 function getRequiredEnv(name: string): string {
   const value = process.env[name];
 
@@ -46,9 +48,12 @@ function makeSessionCookieOptions(options: CookieOptions): CookieOptions {
   return sessionOptions;
 }
 
-export async function createClient() {
-  const cookieStore = await cookies();
-
+/**
+ * Build a Supabase server client from an already-resolved cookie store.
+ * Call `cookies()` at the route handler entry gate, then pass the store here
+ * so App Router sync/dynamic scope rules are never violated inside streams.
+ */
+export function createClientFromCookieStore(cookieStore: CookieStore) {
   return createServerClient(
     getRequiredEnv("NEXT_PUBLIC_SUPABASE_URL"),
     getSupabaseAnonKey(),
@@ -72,4 +77,9 @@ export async function createClient() {
       },
     },
   );
+}
+
+export async function createClient() {
+  const cookieStore = await cookies();
+  return createClientFromCookieStore(cookieStore);
 }

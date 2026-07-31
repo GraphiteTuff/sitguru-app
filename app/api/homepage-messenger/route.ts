@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { runAiAssistIfEnabled } from "@/lib/messaging/conversation-ai";
+import { isSitGuruAiConfigured } from "@/lib/messaging/ai-engine";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -417,20 +419,43 @@ async function createHomepageMessengerSession(params: {
   const visitorName = params.fullName || params.email || params.phone || "Homepage Visitor";
   const preview = truncate(params.message, 240);
 
-  const { data: conversation, error: conversationError } = await supabaseAdmin
-    .from("conversations")
-    .insert({
-      subject: `Homepage Messenger · ${topicLabel}`,
-      status: "open",
-      topic: "homepage_messenger",
-      started_by_user_id: params.adminUserId,
-      last_message_at: now,
-      last_message_preview: preview || "Homepage messenger conversation",
-      created_at: now,
-      updated_at: now,
-    })
-    .select("id")
-    .single();
+  const conversationInsertBase = {
+    subject: `Homepage Messenger · ${topicLabel}`,
+    status: "open",
+    topic: "homepage_messenger",
+    started_by_user_id: params.adminUserId,
+    last_message_at: now,
+    last_message_preview: preview || "Homepage messenger conversation",
+    created_at: now,
+    updated_at: now,
+  };
+
+  let conversation: { id: string } | null = null;
+  let conversationError: { message?: string } | null = null;
+
+  {
+    const first = await supabaseAdmin
+      .from("conversations")
+      .insert({
+        ...conversationInsertBase,
+        ai_assist_enabled: true,
+        sms_phone_e164: normalizeUsPhone(params.phone) || null,
+      })
+      .select("id")
+      .single();
+    conversation = first.data as { id: string } | null;
+    conversationError = first.error;
+  }
+
+  if (conversationError || !conversation?.id) {
+    const retry = await supabaseAdmin
+      .from("conversations")
+      .insert(conversationInsertBase)
+      .select("id")
+      .single();
+    conversation = retry.data as { id: string } | null;
+    conversationError = retry.error;
+  }
 
   if (conversationError || !conversation?.id) {
     throw new Error(conversationError?.message || "Unable to create homepage messenger conversation.");
@@ -665,6 +690,21 @@ export async function POST(request: Request) {
     );
   }
 
+  // SitGuru AI concierge for public landing funnel (AI_ASSIST_ENABLED rooms)
+  let aiAssist: unknown = null;
+  if (isSitGuruAiConfigured()) {
+    try {
+      aiAssist = await runAiAssistIfEnabled({
+        conversationId,
+        userMessage: message,
+        recipientUserId: adminProfile.id,
+        audienceHint: "homepage visitor / public landing funnel",
+      });
+    } catch (error) {
+      console.error("Homepage messenger AI assist failed:", error);
+    }
+  }
+
   const [emailResult, smsResult, messagesResult] = await Promise.allSettled([
     sendAdminEmail({ conversationId, fullName, email, phone, topic, message, source }),
     sendAdminSms({ conversationId, fullName, email, phone, topic, message, source }),
@@ -693,6 +733,7 @@ export async function POST(request: Request) {
     token,
     conversationStatus: "open",
     messages,
+    aiAssist,
     alerts: {
       emailSent,
       smsSent,

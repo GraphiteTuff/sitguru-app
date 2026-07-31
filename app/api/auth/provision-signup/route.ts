@@ -1944,6 +1944,31 @@ export async function POST(request: NextRequest) {
       intent: requestedIntent,
     });
 
+    // Brand Ambassador performance ledger (cookie or submitted code)
+    try {
+      const { attributeSignupToAmbassador } = await import(
+        "@/lib/ambassador/ledger"
+      );
+      const cookieCode = cleanText(
+        request.cookies.get("sitguru_ambassador_code")?.value ||
+          request.cookies.get("sitguru_ambassador_ref")?.value ||
+          "",
+      );
+      const ledgerCode =
+        cookieCode ||
+        resolvedAmbassadorReferralCode ||
+        submittedReferralCode;
+      if (ledgerCode) {
+        await attributeSignupToAmbassador({
+          newUserId: userId,
+          referralSlug: ledgerCode,
+          referredRole: requestedIntent,
+        });
+      }
+    } catch (ledgerError) {
+      console.warn("Ambassador ledger attribution skipped:", ledgerError);
+    }
+
     await updateReferralMetadata({
       userId,
       existingMetadata: metadata,

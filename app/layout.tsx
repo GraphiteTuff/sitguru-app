@@ -5,6 +5,7 @@ import Script from "next/script";
 import "./globals.css";
 import CrispWidget from "@/components/CrispWidget";
 import RouteShell from "@/components/RouteShell";
+import AmbassadorReferralCapture from "@/components/ambassador/AmbassadorReferralCapture";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -152,6 +153,7 @@ export default function RootLayout({
         />
 
         <RouteShell>{children}</RouteShell>
+        <AmbassadorReferralCapture />
         <CrispWidget />
       </body>
     </html>

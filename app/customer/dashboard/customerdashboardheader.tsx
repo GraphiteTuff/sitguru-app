@@ -67,8 +67,8 @@ const navItems: CustomerNavItem[] = [
   },
   {
     label: "PawPerks",
-    href: "/customer/dashboard/pawperks",
-    activePaths: ["/customer/dashboard/pawperks"],
+    href: "/parent/perks",
+    activePaths: ["/parent/perks", "/customer/dashboard/pawperks"],
   },
   {
     label: "My Profile",
