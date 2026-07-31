@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -11,6 +11,7 @@ import {
   startVisitAction,
   startWalkTrackAction,
 } from "@/app/actions/visit-updates";
+import { PawIcon } from "@/components/ui/PawIcon";
 
 type VisitSession = {
   id: string;
@@ -38,7 +39,7 @@ type QuickAction = {
   type: string;
   title: string;
   helper: string;
-  icon: string;
+  icon: ReactNode;
   note: string;
 };
 
@@ -54,7 +55,7 @@ const pottyActions: QuickAction[] = [
     type: "poop",
     title: "Poop",
     helper: "Bathroom update",
-    icon: "🐾",
+    icon: <PawIcon size={22} contrast="light" solid />,
     note: "Poop update added.",
   },
 ];

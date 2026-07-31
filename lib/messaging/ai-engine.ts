@@ -64,6 +64,11 @@ export async function completeSitGuruAiReply(params: {
   history?: AiChatTurn[];
   audienceHint?: string;
   bookingId?: string | null;
+  persona?: "default" | "pack";
+  /** Optional Anthropic model override (e.g. dated production id) */
+  model?: string;
+  /** Extra system-prompt context appended after the catalog digest */
+  systemExtra?: string;
 }): Promise<{ ok: true; text: string; model: string } | { ok: false; error: string }> {
   const client = getAnthropicClient();
   if (!client) {
@@ -73,11 +78,18 @@ export async function completeSitGuruAiReply(params: {
     };
   }
 
-  const model = getSitGuruAiModel();
-  const system = buildSitGuruAiSystemPrompt({
-    audienceHint: params.audienceHint,
-    bookingId: params.bookingId,
-  });
+  const model = String(params.model || "").trim() || getSitGuruAiModel();
+  const system = [
+    buildSitGuruAiSystemPrompt({
+      audienceHint: params.audienceHint,
+      bookingId: params.bookingId,
+      persona: params.persona,
+    }),
+    params.systemExtra ? `\n\n${params.systemExtra}` : "",
+  ]
+    .filter(Boolean)
+    .join("");
+
 
   try {
     const response = await client.messages.create({
@@ -115,6 +127,9 @@ export async function* streamSitGuruAiReply(params: {
   history?: AiChatTurn[];
   audienceHint?: string;
   bookingId?: string | null;
+  persona?: "default" | "pack";
+  model?: string;
+  systemExtra?: string;
 }): AsyncGenerator<
   { type: "delta"; text: string } | { type: "done"; text: string; model: string },
   void,
@@ -125,11 +140,17 @@ export async function* streamSitGuruAiReply(params: {
     throw new Error("SitGuru AI is not configured (missing ANTHROPIC_API_KEY).");
   }
 
-  const model = getSitGuruAiModel();
-  const system = buildSitGuruAiSystemPrompt({
-    audienceHint: params.audienceHint,
-    bookingId: params.bookingId,
-  });
+  const model = String(params.model || "").trim() || getSitGuruAiModel();
+  const system = [
+    buildSitGuruAiSystemPrompt({
+      audienceHint: params.audienceHint,
+      bookingId: params.bookingId,
+      persona: params.persona,
+    }),
+    params.systemExtra ? `\n\n${params.systemExtra}` : "",
+  ]
+    .filter(Boolean)
+    .join("");
 
   const stream = client.messages.stream({
     model,

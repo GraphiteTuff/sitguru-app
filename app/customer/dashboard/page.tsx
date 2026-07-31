@@ -20,7 +20,6 @@ import {
   HeartHandshake,
   LockKeyhole,
   MessageCircle,
-  PawPrint,
   Receipt,
   ShieldCheck,
   Sparkles,
@@ -29,6 +28,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
+import { PawIcon } from "@/components/ui/PawIcon";
 
 type CustomerProfile = {
   first_name: string | null;
@@ -2379,7 +2379,12 @@ function BookingCard({
                       className="h-full w-full object-cover object-center"
                     />
                   ) : (
-                    <PawPrint className="h-7 w-7 text-emerald-600" />
+                    <PawIcon
+                      className="h-7 w-7 text-emerald-600"
+                      size={28}
+                      contrast="light"
+                      solid
+                    />
                   )}
                 </div>
 
@@ -3560,10 +3565,10 @@ export default function CustomerDashboardPage() {
                                 className="h-full w-full object-cover"
                               />
                             ) : (
-                              <PawPrint className="h-6 w-6 text-emerald-600" />
+                              <PawIcon className="h-6 w-6 text-emerald-600" />
                             );
                           })()
-                        : <PawPrint className="h-6 w-6 text-emerald-600" />}
+                        : <PawIcon className="h-6 w-6 text-emerald-600" />}
                     </div>
                     <div>
                       <p className="text-sm font-black text-slate-950">
@@ -3666,7 +3671,7 @@ export default function CustomerDashboardPage() {
                 label: "Find Care",
                 helper: "Nearby Gurus",
                 href: routes.findGuru,
-                icon: <PawPrint className="h-5 w-5" />,
+                icon: <PawIcon className="h-5 w-5" />,
               },
               {
                 label: "My Bookings",
@@ -3684,7 +3689,7 @@ export default function CustomerDashboardPage() {
                 label: "My Pets",
                 helper: `${pets.length} pets`,
                 href: routes.pets,
-                icon: <PawPrint className="h-5 w-5" />,
+                icon: <PawIcon className="h-5 w-5" />,
               },
               {
                 label: "My PawPerks",
@@ -3869,7 +3874,7 @@ export default function CustomerDashboardPage() {
 
               {pets.length === 0 ? (
                 <div className="mt-5 rounded-[1.6rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-7 text-center">
-                  <PawPrint className="mx-auto h-9 w-9 text-emerald-600" />
+                  <PawIcon className="mx-auto h-9 w-9 text-emerald-600" />
                   <p className="mt-3 text-lg font-black text-slate-950">
                     Add your first pet
                   </p>
@@ -3895,7 +3900,7 @@ export default function CustomerDashboardPage() {
                           />
                         ) : (
                           <div className="flex h-full items-center justify-center">
-                            <PawPrint className="h-10 w-10 text-emerald-500" />
+                            <PawIcon className="h-10 w-10 text-emerald-500" />
                           </div>
                         )}
                         {pet.medications ? (
@@ -4401,7 +4406,7 @@ export default function CustomerDashboardPage() {
                               className="h-full w-full object-cover"
                             />
                           ) : (
-                            <PawPrint className="h-6 w-6 text-emerald-600" />
+                            <PawIcon className="h-6 w-6 text-emerald-600" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -4439,7 +4444,7 @@ export default function CustomerDashboardPage() {
 
         <nav className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-5 rounded-[1.5rem] border border-slate-200 bg-white/95 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.2)] backdrop-blur md:hidden">
           {[
-            { label: "Home", href: routes.dashboard, icon: <PawPrint className="h-5 w-5" /> },
+            { label: "Home", href: routes.dashboard, icon: <PawIcon className="h-5 w-5" /> },
             { label: "Find", href: routes.findGuru, icon: <Sparkles className="h-5 w-5" /> },
             { label: "Care", href: routes.bookings, icon: <CalendarDays className="h-5 w-5" /> },
             { label: "Messages", href: routes.messages, icon: <MessageCircle className="h-5 w-5" /> },

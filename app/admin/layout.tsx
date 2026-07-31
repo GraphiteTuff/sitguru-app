@@ -74,6 +74,7 @@ const adminRoutes = {
   programs: "/admin/programs",
   partners: "/admin/partners",
   analytics: "/admin/analytics",
+  insights: "/admin/insights",
 };
 
 const navSections = [
@@ -121,6 +122,11 @@ const navSections = [
       { label: "Programs", href: adminRoutes.programs, icon: ShieldCheck },
       { label: "Partners", href: adminRoutes.partners, icon: HandCoins },
       { label: "Analytics", href: adminRoutes.analytics, icon: Gauge },
+      {
+        label: "Chat Insights",
+        href: adminRoutes.insights,
+        icon: MessageCircle,
+      },
     ],
   },
   {

@@ -23,11 +23,46 @@ const SAFETY_PATTERNS: Array<{ trigger: HandoffTrigger; re: RegExp; label: strin
     label: "explicit human request",
   },
   {
+    trigger: "signup_intent",
+    re: /\b((sign|signing)[- ]?up|create (an? )?account|join (as|sitguru|the pack)|become (a )?(guru|ambassador|partner|handler)|register (now|today)?|join the pack)\b/i,
+    label: "signup intent",
+  },
+  {
+    trigger: "booking_intent",
+    re: /\b((book|booking|schedule|reserve).{0,24}(walk|sit|sitting|boarding|visit|guru)|book (a |an )?(walk|sitter|boarding)|need (a )?(walk|sitter) (today|tomorrow|asap|now)|schedule (a )?sit)\b/i,
+    label: "booking intent",
+  },
+  {
     trigger: "negative_sentiment",
     re: /\b(scam|fraud|lawsuit|lawyer|attorney|refund now|worst|horrible|terrible|furious|angry|frustrated|frustration|rip[- ]?off|never again|hate (this|sitguru)|unacceptable|ridiculous)\b/i,
     label: "strong negative sentiment / frustration",
   },
 ];
+
+const EMAIL_RE =
+  /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
+const PHONE_RE =
+  /(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}\b/;
+
+export function extractLeadContact(messageText: string): {
+  email: string | null;
+  phone: string | null;
+} {
+  const text = String(messageText || "");
+  const emailMatch = text.match(EMAIL_RE);
+  const phoneMatch = text.match(PHONE_RE);
+  let phone: string | null = null;
+  if (phoneMatch?.[0]) {
+    const digits = phoneMatch[0].replace(/\D/g, "");
+    if (digits.length === 10) phone = `+1${digits}`;
+    else if (digits.length === 11 && digits.startsWith("1")) phone = `+${digits}`;
+    else if (phoneMatch[0].startsWith("+")) phone = phoneMatch[0].replace(/[^\d+]/g, "");
+  }
+  return {
+    email: emailMatch?.[0]?.toLowerCase() || null,
+    phone,
+  };
+}
 
 export function evaluateHandoffNeed(messageText: string): HandoffEvaluation {
   const text = String(messageText || "").trim();

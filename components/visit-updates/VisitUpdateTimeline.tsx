@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+import { PawIcon } from "@/components/ui/PawIcon";
+
 type VisitSession = {
   id: string;
   booking_id: string;
@@ -23,7 +26,7 @@ type VisitUpdateTimelineProps = {
 
 type UpdateStyle = {
   label: string;
-  icon: string;
+  icon: ReactNode;
   helper: string;
   chipClassName: string;
   iconClassName: string;
@@ -53,7 +56,7 @@ const UPDATE_STYLES: Record<string, UpdateStyle> = {
   },
   poop: {
     label: "Poop update",
-    icon: "🐾",
+    icon: <PawIcon size={22} contrast="light" solid />,
     helper: "Potty update recorded.",
     chipClassName: "border-amber-200 bg-amber-50 !text-amber-800",
     iconClassName: "bg-amber-50 ring-amber-100",
@@ -398,7 +401,9 @@ export default function VisitUpdateTimeline({
 
         {updates.length === 0 ? (
           <div className="mt-5 rounded-2xl border border-dashed border-slate-300 !bg-slate-50 p-8 text-center">
-            <p className="text-4xl !text-[#061638]">🐾</p>
+            <div className="mx-auto flex h-14 w-14 items-center justify-center">
+              <PawIcon size={40} contrast="light" solid />
+            </div>
             <h3 className="mt-3 text-xl font-black !text-[#061638]">
               No PawReport updates yet
             </h3>

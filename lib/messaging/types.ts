@@ -42,6 +42,8 @@ export type HandoffTrigger =
   | "negative_sentiment"
   | "manager_request"
   | "explicit_human"
+  | "signup_intent"
+  | "booking_intent"
   | "keyword";
 
 export type HandoffEvaluation = {

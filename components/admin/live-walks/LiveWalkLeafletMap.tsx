@@ -13,6 +13,7 @@ import type {
   AdminMapCoordinate,
   AdminMapEventPin,
 } from "@/hooks/useAdminWalkMapData";
+import { pawIconSvgMarkup } from "@/components/ui/PawIcon";
 
 type LiveWalkLeafletMapProps = {
   path: AdminMapCoordinate[];
@@ -36,7 +37,7 @@ function guruIconHtml(isCompleted: boolean) {
 function eventIconHtml(kind: AdminMapEventPin["kind"], label: string) {
   const glyph =
     kind === "potty"
-      ? "💩"
+      ? pawIconSvgMarkup({ size: 16, contrast: "light", solid: true })
       : kind === "break"
         ? "🌲"
         : kind === "start"

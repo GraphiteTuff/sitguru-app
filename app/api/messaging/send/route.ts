@@ -10,6 +10,7 @@ import { supabaseAdmin } from "@/utils/supabase/admin";
 import { runAiAssistIfEnabled } from "@/lib/messaging/conversation-ai";
 import { routeMessageOutfall } from "@/lib/messaging/outfall";
 import { touchUserPresence } from "@/lib/messaging/presence";
+import { recordGlobalChatInsightAsync } from "@/lib/chat/insights";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -202,6 +203,14 @@ export async function POST(req: NextRequest) {
         { ok: false, error: messageError?.message || "Failed to save message." },
         { status: 500 },
       );
+    }
+
+    // Omnichannel intelligence — ACTIVE_WALK ledger (non-blocking)
+    if (messageText) {
+      recordGlobalChatInsightAsync({
+        text: messageText,
+        channel: "ACTIVE_WALK",
+      });
     }
 
     await supabaseAdmin

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import HelpSearchBar from "@/components/help/HelpSearchBar";
-import { HELP_ARTICLES, HELP_CATEGORIES } from "@/lib/help/articles";
+import { HELP_CATEGORIES } from "@/lib/help/articles";
+import { loadMergedHelpArticles } from "@/lib/help/load-articles";
 
 export const metadata: Metadata = {
   title: "Help Center",
@@ -9,10 +10,14 @@ export const metadata: Metadata = {
     "Search SitGuru’s Knowledge Base for PawReport Live, billing, bookings, accounts, and trust & safety.",
 };
 
+export const dynamic = "force-dynamic";
+
 /**
  * Google-style Help Center index — large centered search + category gateways.
  */
-export default function HelpIndexPage() {
+export default async function HelpIndexPage() {
+  const articles = await loadMergedHelpArticles();
+
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center py-6 sm:py-12">
       <div className="w-full max-w-3xl text-center">
@@ -31,6 +36,7 @@ export default function HelpIndexPage() {
           <HelpSearchBar
             autoFocus
             placeholder="Search articles, tags, and topics…"
+            articles={articles}
           />
         </div>
 
@@ -59,10 +65,10 @@ export default function HelpIndexPage() {
 
         <div className="mt-12 text-left">
           <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-400">
-            All articles ({HELP_ARTICLES.length})
+            All articles ({articles.length})
           </h2>
           <ul className="mt-3 max-h-[28rem] space-y-1 overflow-y-auto overscroll-contain pr-1">
-            {HELP_ARTICLES.map((article) => (
+            {articles.map((article) => (
               <li key={article.slug}>
                 <Link
                   href={article.href}
@@ -79,21 +85,6 @@ export default function HelpIndexPage() {
             ))}
           </ul>
         </div>
-
-        <p className="mt-10 text-xs font-semibold text-slate-400">
-          Still stuck?{" "}
-          <a
-            href="mailto:support@sitguru.com"
-            className="font-bold text-emerald-800"
-          >
-            Email support@sitguru.com
-          </a>{" "}
-          or{" "}
-          <Link href="/contact" className="font-bold text-emerald-800">
-            contact SitGuru
-          </Link>
-          .
-        </p>
       </div>
     </div>
   );

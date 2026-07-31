@@ -1,12 +1,15 @@
 // components/pawreport/StatusUpdates.tsx
 "use client";
 
+import type { ReactNode } from "react";
+import { PawIcon } from "@/components/ui/PawIcon";
+
 type CareStatusKey = "food" | "water" | "potty" | "medication";
 
 type CareStatusItem = {
   key: CareStatusKey;
   label: string;
-  icon: string;
+  icon: ReactNode;
   detail: string;
   done: boolean;
 };
@@ -37,7 +40,7 @@ const DEFAULT_ITEMS: CareStatusItem[] = [
   {
     key: "potty",
     label: "Potty",
-    icon: "🐾",
+    icon: <PawIcon size={20} contrast="light" solid />,
     detail: "Break completed",
     done: true,
   },

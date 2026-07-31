@@ -8,6 +8,7 @@ import StatusUpdates, {
   type CareStatusKey,
 } from "@/components/pawreport/StatusUpdates";
 import WalkTracker from "@/components/pawreport/WalkTracker";
+import { PawIcon } from "@/components/ui/PawIcon";
 
 export type PawReportRole = "guru" | "pet_parent";
 
@@ -61,7 +62,7 @@ const INITIAL_STATUSES: CareStatusItem[] = [
   {
     key: "potty",
     label: "Potty",
-    icon: "🐾",
+    icon: <PawIcon size={20} contrast="light" solid />,
     detail: "Break completed",
     done: true,
   },

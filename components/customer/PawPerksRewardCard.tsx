@@ -9,7 +9,6 @@ import {
   Link2,
   Mail,
   MessageCircle,
-  PawPrint,
   Send,
   ShieldCheck,
   Sparkles,
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 
 import type { PawPerksAudience } from "@/components/customer/PawPerksRewardStates";
+import { PawIcon } from "@/components/ui/PawIcon";
 
 type PawPerksRewardCardProps = {
   selectedAudience: PawPerksAudience;
@@ -32,7 +32,7 @@ const audienceContent = {
     subtitle:
       "Your friend or family member gets $10 toward eligible SitGuru care, and you earn $10 after they complete their first eligible paid booking with a Guru.",
     urlType: "customer",
-    icon: PawPrint,
+    icon: PawIcon,
     badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-800",
     panelClass: "border-emerald-100 bg-emerald-50/70",
   },
@@ -177,7 +177,7 @@ export default function PawPerksRewardCard({
           number="2"
           title="Sign up"
           description="Create your free account."
-          icon={<PawPrint className="h-7 w-7" aria-hidden="true" />}
+          icon={<PawIcon size={28} contrast="light" aria-hidden="true" />}
         />
 
         <StepCard
@@ -196,7 +196,7 @@ export default function PawPerksRewardCard({
       >
         <div className="flex items-start gap-4">
           <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-white text-emerald-700 shadow-sm">
-            <SelectedIcon className="h-9 w-9" aria-hidden="true" />
+            <SelectedIcon className="h-9 w-9" size={36} aria-hidden="true" />
           </div>
 
           <div>
@@ -220,7 +220,7 @@ export default function PawPerksRewardCard({
             selected.badgeClass,
           ].join(" ")}
         >
-          <PawPrint className="h-4 w-4" aria-hidden="true" />
+          <PawIcon size={16} contrast="light" solid aria-hidden="true" />
           {selected.badge}
         </div>
       </div>

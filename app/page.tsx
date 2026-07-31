@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
+import { PawIcon } from "@/components/ui/PawIcon";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 
@@ -1609,13 +1610,14 @@ function HomepageAssistPopup({
             setIsOpen(true);
             setHasNewAdminReply(false);
           }}
-          className={`flex min-h-11 items-center justify-center rounded-full px-4 py-2.5 text-xs font-black text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] transition ${
+          className={`flex min-h-11 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-black text-white shadow-[0_12px_30px_rgba(15,23,42,0.22)] transition ${
             hasNewAdminReply
               ? "bg-amber-500 hover:bg-amber-600"
               : "bg-emerald-700 hover:bg-emerald-800"
           }`}
         >
-          {hasNewAdminReply ? "🐾 SitGuru replied" : "🐾 Questions?"}
+          <PawIcon size={14} contrast="dark" solid />
+          {hasNewAdminReply ? "SitGuru replied" : "Questions?"}
         </button>
       )}
     </div>
@@ -2220,7 +2222,7 @@ export default function HomePage() {
             </div>
 
             <div className="rounded-[32px] border border-emerald-100 bg-emerald-50 p-7 sm:p-8">
-              <p className="text-3xl">🐾</p>
+              <PawIcon size={36} contrast="light" solid />
               <h2 className="mt-3 text-2xl font-black text-slate-950">
                 Want to earn caring for pets?
               </h2>
@@ -2271,8 +2273,6 @@ export default function HomePage() {
       </section>
 
       <CompactPartnerSection onTrack={trackHomepageClick} />
-
-      <HomepageAssistPopup source={source} onTrack={trackHomepageClick} />
     </main>
   );
 }

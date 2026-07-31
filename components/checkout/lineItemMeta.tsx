@@ -1,12 +1,14 @@
+import type { ReactNode } from "react";
 import type {
   PricingLineItem,
   PricingLineItemCode,
 } from "@/lib/billing/pricingCalculator";
+import { PawIcon } from "@/components/ui/PawIcon";
 
-export function lineItemIcon(code: PricingLineItemCode): string {
+export function lineItemIcon(code: PricingLineItemCode): ReactNode {
   switch (code) {
     case "BASE_VISIT":
-      return "🐾";
+      return <PawIcon size={16} contrast="light" solid aria-hidden />;
     case "ADDITIONAL_PET":
       return "🐕";
     case "HOLIDAY_SURGE":

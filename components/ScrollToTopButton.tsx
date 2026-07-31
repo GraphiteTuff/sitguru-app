@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
 
-export default function ScrollToTopButton() {
+type ScrollToTopButtonProps = {
+  /** When true, omit fixed positioning (parent FloatingActionStack owns dock). */
+  nested?: boolean;
+};
+
+export default function ScrollToTopButton({
+  nested = false,
+}: ScrollToTopButtonProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -37,7 +44,11 @@ export default function ScrollToTopButton() {
       onClick={scrollToTop}
       aria-label="Scroll back to top"
       title="Back to top"
-      className="fixed bottom-5 right-4 z-[90] h-[72px] w-[72px] transition hover:-translate-y-0.5 focus:outline-none sm:bottom-6 sm:right-6"
+      className={
+        nested
+          ? "pointer-events-auto relative h-[60px] w-[60px] shrink-0 transition hover:-translate-y-0.5 focus:outline-none md:h-[72px] md:w-[72px]"
+          : "pointer-events-auto fixed bottom-4 right-4 z-50 h-[60px] w-[60px] transition hover:-translate-y-0.5 focus:outline-none md:bottom-6 md:right-6 md:h-[72px] md:w-[72px]"
+      }
     >
       <span className="relative block h-full w-full drop-shadow-[0_16px_30px_rgba(15,23,42,0.28)]">
         <svg

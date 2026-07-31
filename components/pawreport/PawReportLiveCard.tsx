@@ -10,7 +10,7 @@
  * Guru writes go through mutateGuruPawReport → /api/guru/pawreports/[bookingId].
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import MediaGalleryCarousel from "@/components/pawreport/MediaGalleryCarousel";
 import StatusUpdates, {
   type CareStatusItem,
@@ -22,6 +22,7 @@ import {
   usePawReportLive,
 } from "@/hooks/usePawReportLive";
 import type { PawReportLivePayload } from "@/lib/pawreport/types";
+import { PawIcon } from "@/components/ui/PawIcon";
 
 type PawReportLiveCardProps = {
   bookingId: string;
@@ -30,10 +31,10 @@ type PawReportLiveCardProps = {
   className?: string;
 };
 
-const STATUS_ICONS: Record<CareStatusKey, string> = {
+const STATUS_ICONS: Record<CareStatusKey, ReactNode> = {
   food: "🍽️",
   water: "💧",
-  potty: "🐾",
+  potty: <PawIcon size={20} contrast="light" solid />,
   medication: "💊",
 };
 

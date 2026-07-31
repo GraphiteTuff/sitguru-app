@@ -16,13 +16,17 @@ type HelpSearchBarProps = {
   variant?: "hero" | "header";
   placeholder?: string;
   autoFocus?: boolean;
+  /** Optional merged catalog (static + DB published insights) */
+  articles?: HelpArticle[];
 };
 
 export default function HelpSearchBar({
   variant = "hero",
   placeholder,
   autoFocus = false,
+  articles,
 }: HelpSearchBarProps) {
+  const catalog = articles?.length ? articles : HELP_ARTICLES;
   const resolvedPlaceholder =
     placeholder ??
     (variant === "hero"
@@ -30,10 +34,28 @@ export default function HelpSearchBar({
       : HELP_SEARCH_CONFIG.placeholderHeader);
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  const results = useMemo(
-    () => searchHelpArticles(deferredQuery),
-    [deferredQuery],
-  );
+  const results = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
+    if (!q) return catalog;
+    // Prefer catalog-aware filter when custom articles are provided
+    if (articles?.length) {
+      const parts = q.split(/\s+/).filter(Boolean);
+      return catalog.filter((article) => {
+        const haystack = [
+          article.title,
+          article.summary,
+          article.category,
+          ...article.tags,
+          ...article.keywords,
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (haystack.includes(q)) return true;
+        return parts.every((part) => haystack.includes(part));
+      });
+    }
+    return searchHelpArticles(deferredQuery);
+  }, [deferredQuery, catalog, articles]);
   const showResults = query.trim().length > 0;
 
   const isHero = variant === "hero";
@@ -93,7 +115,7 @@ export default function HelpSearchBar({
           )}
           {HELP_SEARCH_CONFIG.showResultCount ? (
             <p className="sticky bottom-0 border-t border-slate-100 bg-white/95 px-4 py-2 text-[11px] font-semibold text-slate-400 backdrop-blur">
-              Showing {results.length} of {HELP_ARTICLES.length} articles
+              Showing {results.length} of {catalog.length} articles
             </p>
           ) : null}
         </div>

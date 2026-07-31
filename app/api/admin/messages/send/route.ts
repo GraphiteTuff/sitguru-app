@@ -450,6 +450,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Omnichannel intelligence — ADMIN_SUPPORT ledger (non-blocking)
+    try {
+      const { recordGlobalChatInsightAsync } = await import(
+        "@/lib/chat/insights"
+      );
+      recordGlobalChatInsightAsync({
+        text: body,
+        channel: "ADMIN_SUPPORT",
+      });
+    } catch {
+      /* soft-fail */
+    }
+
     const conversationUpdateError = await updateConversationWithColumnFallback({
       conversationId,
       payload: {

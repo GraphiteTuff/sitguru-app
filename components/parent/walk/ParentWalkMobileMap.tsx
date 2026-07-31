@@ -6,6 +6,7 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import type { WalkGeoPoint, WalkMapMarker } from "@/lib/pawreport/walk-events";
+import { pawIconSvgMarkup } from "@/components/ui/PawIcon";
 
 type ParentWalkMobileMapProps = {
   path: WalkGeoPoint[];
@@ -45,6 +46,7 @@ function ensureStyles() {
       display: grid; place-items: center; font-size: 15px;
       box-shadow: 0 8px 16px rgba(15,23,42,.18);
     }
+    .sg-parent-event svg { display: block; }
     @keyframes sgParentPulse {
       0% { transform: scale(.7); opacity: .95; }
       100% { transform: scale(1.75); opacity: 0; }
@@ -54,7 +56,9 @@ function ensureStyles() {
 }
 
 function eventGlyph(kind: WalkMapMarker["kind"]) {
-  if (kind === "potty_pee" || kind === "potty_poop") return "💩";
+  if (kind === "potty_pee" || kind === "potty_poop") {
+    return pawIconSvgMarkup({ size: 16, contrast: "light", solid: true });
+  }
   if (kind === "break" || kind === "break_end") return "⏸";
   if (kind === "start") return "▶️";
   if (kind === "end") return "🏡";

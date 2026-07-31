@@ -4,3 +4,4 @@ export { default as ChatBottomSheet } from "@/components/messaging/ChatBottomShe
 export { default as WalkChatBridge } from "@/components/messaging/WalkChatBridge";
 export { default as MediaAttachmentDrawer } from "@/components/messaging/MediaAttachmentDrawer";
 export { default as AdminWalkChatPanel } from "@/components/messaging/AdminWalkChatPanel";
+export { default as HomepageChatBubble } from "@/components/messaging/HomepageChatBubble";

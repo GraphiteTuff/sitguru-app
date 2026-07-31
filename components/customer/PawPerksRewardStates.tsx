@@ -1,6 +1,8 @@
 "use client";
 
-import { Check, GraduationCap, PawPrint } from "lucide-react";
+import type { ComponentType, SVGProps } from "react";
+import { Check, GraduationCap } from "lucide-react";
+import { PawIcon } from "@/components/ui/PawIcon";
 
 export type PawPerksAudience = "pet-parent" | "future-guru";
 
@@ -9,6 +11,8 @@ type PawPerksRewardStatesProps = {
   onAudienceChange: (audience: PawPerksAudience) => void;
 };
 
+type RewardIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
+
 const rewardStates = [
   {
     id: "pet-parent" as const,
@@ -16,7 +20,7 @@ const rewardStates = [
     title: "Give $10. Get $10.",
     description:
       "Your friend or family member gets $10 toward care. You earn $10 after their first eligible paid booking.",
-    icon: PawPrint,
+    icon: PawIcon as RewardIcon,
     selectedClass:
       "border-emerald-500 bg-emerald-50/80 shadow-[0_18px_40px_rgba(16,185,129,0.12)]",
     iconClass: "bg-emerald-100 text-emerald-700",
@@ -28,7 +32,7 @@ const rewardStates = [
     title: "Refer a Guru. Earn $20.",
     description:
       "You earn $20 after they are approved and complete their first eligible paid booking.",
-    icon: GraduationCap,
+    icon: GraduationCap as RewardIcon,
     selectedClass:
       "border-sky-500 bg-sky-50/80 shadow-[0_18px_40px_rgba(14,165,233,0.12)]",
     iconClass: "bg-sky-100 text-sky-700",
@@ -72,7 +76,11 @@ export default function PawPerksRewardStates({
                 reward.iconClass,
               ].join(" ")}
             >
-              <Icon className="h-7 w-7" aria-hidden="true" />
+              {reward.id === "pet-parent" ? (
+                <PawIcon size={28} contrast="light" solid aria-hidden="true" />
+              ) : (
+                <Icon className="h-7 w-7" aria-hidden="true" />
+              )}
             </div>
 
             <p

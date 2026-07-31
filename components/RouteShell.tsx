@@ -6,9 +6,13 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 import GlobalMessageNotifier from "@/components/GlobalMessageNotifier";
+import FloatingActionStack from "@/components/FloatingActionStack";
+import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
 
 export default function RouteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+
+  const isHomePage = pathname === "/";
 
   const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
 
@@ -131,12 +135,19 @@ export default function RouteShell({ children }: { children: ReactNode }) {
 
   const shouldShowGlobalMessageNotifier = !isAuthPage;
 
+  const floatingControls = (
+    <FloatingActionStack>
+      <ScrollToTopButton nested />
+      {isHomePage ? <HomepageChatBubble /> : null}
+    </FloatingActionStack>
+  );
+
   if (isAdminPage) {
     return (
       <>
         <main className="admin-theme site-main min-h-screen">{children}</main>
         {shouldShowGlobalMessageNotifier ? <GlobalMessageNotifier /> : null}
-        <ScrollToTopButton />
+        {floatingControls}
       </>
     );
   }
@@ -145,7 +156,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     return (
       <>
         <main className="site-main min-h-screen">{children}</main>
-        <ScrollToTopButton />
+        {floatingControls}
       </>
     );
   }
@@ -156,7 +167,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
         <div className="site-main min-h-screen bg-white">{children}</div>
         <Footer />
         {shouldShowGlobalMessageNotifier ? <GlobalMessageNotifier /> : null}
-        <ScrollToTopButton />
+        {floatingControls}
       </>
     );
   }
@@ -167,7 +178,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
       <main className="site-main min-h-[70vh]">{children}</main>
       <Footer />
       {shouldShowGlobalMessageNotifier ? <GlobalMessageNotifier /> : null}
-      <ScrollToTopButton />
+      {floatingControls}
     </>
   );
 }
