@@ -55,6 +55,7 @@ async function hashInsightText(text: string): Promise<string> {
 async function recordChatInsight(
   text: string,
   channel: "ACTIVE_WALK" | "HOMEPAGE_LEAD",
+  category = "General Inquiry",
 ) {
   const clean = String(text || "").trim().slice(0, 2000);
   if (clean.length < 8) return;
@@ -64,7 +65,7 @@ async function recordChatInsight(
     await supabaseAdmin.rpc("upsert_global_chat_insight", {
       p_text_hash: hash,
       p_summary: clean,
-      p_category: "General Inquiry",
+      p_category: category,
       p_channel: channel,
       p_is_friction: false,
     });
@@ -73,8 +74,40 @@ async function recordChatInsight(
   }
 }
 
+function formatTranscript(
+  messages: CoreMessage[],
+  clientFirstName?: string,
+): string {
+  const header = clientFirstName
+    ? `Visitor: ${clientFirstName}\n`
+    : "Visitor: (anonymous)\n";
+  const lines = messages
+    .map((m) => {
+      const role = String((m as { role?: string }).role || "unknown");
+      return `${role}: ${messageContent(m)}`;
+    })
+    .filter((line) => !line.endsWith(": "));
+  return `${header}${lines.join("\n")}`.slice(0, 2000);
+}
+
 export async function handleAuthenticatedAiSend(req: Request): Promise<Response> {
   try {
+    if (!String(process.env.ANTHROPIC_API_KEY || "").trim()) {
+      console.warn(
+        "[stream-send] ANTHROPIC_API_KEY is undefined — cannot stream Claude replies.",
+      );
+      return new Response(
+        JSON.stringify({
+          error:
+            "🐾 can you bark that at me one more time? my ears hit a little static, or you can drop a note to our pack leaders at pack@sitguru.com",
+        }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -82,19 +115,24 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       data: { user: null },
     }));
 
-    // Auth is preferred but not required — homepage CTO guests may stream anonymously.
     const userId = user?.id || null;
 
     const body = (await req.json()) as {
       messages?: CoreMessage[];
       walkId?: string;
       conversationId?: string;
+      client_first_name?: string;
+      channel?: string;
     };
 
     const messages = Array.isArray(body?.messages) ? body.messages : [];
     const walkId = safeString(body?.walkId);
     const conversationId = safeString(body?.conversationId);
-    const insightChannel = walkId ? "ACTIVE_WALK" : "HOMEPAGE_LEAD";
+    const clientFirstName = safeString(body?.client_first_name).slice(0, 40);
+    const insightChannel =
+      walkId || safeString(body?.channel) === "ACTIVE_WALK"
+        ? "ACTIVE_WALK"
+        : "HOMEPAGE_LEAD";
 
     if (messages.length === 0) {
       return new Response(JSON.stringify({ error: "messages are required." }), {
@@ -105,6 +143,13 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
     const lastUserMessage = messages[messages.length - 1];
     const lastUserText = messageContent(lastUserMessage);
+
+    // Always persist a HOMEPAGE_LEAD / ACTIVE_WALK transcript snapshot for CRM audit
+    void recordChatInsight(
+      formatTranscript(messages, clientFirstName),
+      insightChannel,
+      clientFirstName ? `Lead:${clientFirstName}` : "Homepage Chat Transcript",
+    );
 
     if (conversationId && userId && lastUserText) {
       void supabase
@@ -130,55 +175,80 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       void recordChatInsight(lastUserText, insightChannel);
     }
 
-    const result = streamText({
-      model: anthropic("claude-3-5-sonnet-latest"),
-      messages,
-      system: `You are the Chief Treat Officer for SitGuru. Keep responses professional, helpful, brief, and warm.
+    const nameDirective = clientFirstName
+      ? `\nVISITOR PREFERRED NAME: ${clientFirstName}.
+MANDATORY: This chat participant wants to be called "${clientFirstName}" (first name, nickname, or whatever they said they go by). Address them as ${clientFirstName} in EVERY reply (naturally, once per message). Do not rename or formalize it. Never reply without using their preferred name. Examples: "i am so stoked to guide you through this, ${clientFirstName}!", "let's get you set up in our pet community, ${clientFirstName}!", "we got you ${clientFirstName}!".\n`
+      : `\nNo preferred name yet — ask what they like to be called before deeper guidance.\n`;
 
-BUSINESS CONTEXT & KNOWLEDGE BASE:
-- SitGuru connects pet parents with professional pet care providers called "Gurus".
-- If a user is looking for Pet Care, ask them specifically what type they need: Drop-in Visits, Dog Walks, or Overnight stays.
-- If they are a future pet parent looking for care, proactively guide them to find and browse available "Gurus" on our platform.
-- If a user wants to join the pack, screen for their specific interest: Are they looking to be a Sitter, a Dog Walker, or a Trainer? Direct them to our registration/onboarding flows.
-- If an issue cannot be resolved or they ask to contact us directly, provide the email pack@sitguru.com.
+    let result;
+    try {
+      result = streamText({
+        model: anthropic("claude-3-5-sonnet-latest"),
+        messages,
+        system: `You are Rogue, Chief Treat Officer 🦴 for SitGuru — a high-energy, pet-friendly, hip, lowercase-conversational pack guide helping future members join the SitGuru Pet Community.
+${nameDirective}
+Always introduce yourself as Rogue, Chief Treat Officer when needed. Keep replies short (2–3 sentences), warm, and personalized to this chat participant.
+Use hardcoded SitGuru definitions for Guru meaning, mission, PawPerks checkout redemption, and care types (Drop-in Visits, Dog Walks, Overnight stays).
+If unresolved or they ask for a human, share pack@sitguru.com.
 ${walkId ? `\nACTIVE WALK CONTEXT:\n- Current walk ID: ${walkId}. Prefer walk-aware guidance when relevant.\n` : ""}
-CONSTRAINTS:
-- Keep answers short and direct.
-- Do not use overly informal filler words or slang.
 
 ${HOMEPAGE_CTO_VOICE_RULES}`,
-      onFinish: async ({ text }) => {
-        try {
-          const assistantText = String(text || "").trim();
-          if (!assistantText) return;
+        onFinish: async ({ text }) => {
+          try {
+            const assistantText = String(text || "").trim();
+            const withAssistant = [
+              ...messages,
+              { role: "assistant" as const, content: assistantText },
+            ];
+            await recordChatInsight(
+              formatTranscript(withAssistant, clientFirstName),
+              insightChannel,
+              clientFirstName
+                ? `Lead:${clientFirstName}`
+                : "Homepage Chat Transcript",
+            );
 
-          if (conversationId && userId) {
-            const { error } = await supabase.from("messages").insert({
-              conversation_id: conversationId,
-              sender_id: userId,
-              content: assistantText,
-              body: assistantText,
-              is_ai: true,
-              channel: "ai",
-              message_type: "ai_assist",
-              topic: walkId ? "active_walk" : "ai_assist",
-            });
-            if (error) {
-              console.error(
-                "[stream-send] assistant message soft-failed:",
-                error.message,
-              );
+            if (!assistantText) return;
+
+            if (conversationId && userId) {
+              const { error } = await supabase.from("messages").insert({
+                conversation_id: conversationId,
+                sender_id: userId,
+                content: assistantText,
+                body: assistantText,
+                is_ai: true,
+                channel: "ai",
+                message_type: "ai_assist",
+                topic: walkId ? "active_walk" : "ai_assist",
+              });
+              if (error) {
+                console.error(
+                  "[stream-send] assistant message soft-failed:",
+                  error.message,
+                );
+              }
             }
+          } catch (dbError) {
+            console.error("Failed to save data asynchronously:", dbError);
           }
-
-          if (lastUserText) {
-            await recordChatInsight(lastUserText, insightChannel);
-          }
-        } catch (dbError) {
-          console.error("Failed to save data asynchronously:", dbError);
-        }
-      },
-    });
+        },
+      });
+    } catch (error) {
+      console.warn(
+        "[stream-send] Anthropic authorization/stream setup failed:",
+        error instanceof Error ? error.message : error,
+      );
+      return new Response(
+        JSON.stringify({
+          error:
+            "🐾 can you bark that at me one more time? my ears hit a little static, or you can drop a note to our pack leaders at pack@sitguru.com",
+        }),
+        {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
 
     return result.toDataStreamResponse();
   } catch (error) {

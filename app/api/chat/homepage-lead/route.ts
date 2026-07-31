@@ -25,7 +25,7 @@ import {
   extractLeadContact,
 } from "@/lib/messaging/handoff";
 import { HELP_ARTICLES, HELP_CATEGORIES } from "@/lib/help/articles";
-import { recordHomepageChatInsightAsync } from "@/lib/chat/insights";
+import { recordHomepageChatInsightAsync, recordGlobalChatInsightAsync } from "@/lib/chat/insights";
 import { HOMEPAGE_CTO_VOICE_RULES } from "@/lib/chat/homepage-cta";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +42,9 @@ const AUDIENCE_HINT =
 const CONTACT_PROMPT =
   "Happy to connect you with a Pack Coordinator. What is the best email or phone number to reach you?";
 
+const FRIENDLY_ROUTE_ERROR =
+  "🐾 can you bark that at me one more time? my ears hit a little static, or you can drop a note to our pack leaders at pack@sitguru.com";
+
 const PACK_PERSONA = "pack" as const;
 
 /**
@@ -55,10 +58,10 @@ CORE PLATFORM DEFINITIONS & CONTEXT:
 `.trim();
 
 /**
- * Dual-source system injection for The Chief Treat Officer:
- * Inline site context (first) + hip voice rules + Help Center catalog.
+ * Dual-source system injection for Rogue, Chief Treat Officer:
+ * Inline site context (first) + voice rules + Help Center catalog.
  */
-function buildCompleteKnowledgeInjection(): string {
+function buildCompleteKnowledgeInjection(clientFirstName?: string): string {
   const categories = Array.isArray(HELP_CATEGORIES) ? HELP_CATEGORIES : [];
   const articles = Array.isArray(HELP_ARTICLES) ? HELP_ARTICLES : [];
 
@@ -82,10 +85,18 @@ function buildCompleteKnowledgeInjection(): string {
     )
     .join("\n\n");
 
+  const nameBlock = clientFirstName
+    ? `\nVISITOR PREFERRED NAME: ${clientFirstName}.
+MANDATORY: This chat participant wants to be called "${clientFirstName}" (first name, nickname, or whatever they said they go by). Address them as ${clientFirstName} in EVERY reply (naturally, once per message). Do not rename or formalize it. Never reply without using their preferred name. Examples: "i am so stoked to guide you through this, ${clientFirstName}!", "let's get you set up in our pet community, ${clientFirstName}!", "we got you ${clientFirstName}!".\n`
+    : "";
+
   return [
-    "# PRIORITY SITE CONTEXT — SCAN THIS FIRST (claude-3-5-sonnet-20241022)",
-    "You MUST prioritize this block for any question about what a Guru is, SitGuru's mission, or where care happens.",
-    "Reply in an ultra-short, energetic, hip, conversational lowercase tone — 2–3 sentences max.",
+    "# IDENTITY — ROGUE, CHIEF TREAT OFFICER 🦴",
+    "You are Rogue, Chief Treat Officer for SitGuru. High-energy, pet-friendly, hip, lowercase slang conversational.",
+    "Guide the visitor as a future member of the SitGuru Pet Community. Keep replies to 2–3 short sentences.",
+    nameBlock,
+    "# PRIORITY SITE CONTEXT — SCAN THIS FIRST",
+    "Use these hardcoded definitions for platform questions (What is a Guru?, mission, PawPerks):",
     SIT_GURU_SITE_CONTEXT,
     "",
     HOMEPAGE_CTO_VOICE_RULES,
@@ -106,6 +117,32 @@ function buildCompleteKnowledgeInjection(): string {
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function formatLeadTranscript(
+  turns: AiChatTurn[],
+  clientFirstName?: string,
+): string {
+  const header = clientFirstName
+    ? `Visitor: ${clientFirstName}\n`
+    : "Visitor: (anonymous)\n";
+  const body = turns
+    .map((t) => `${t.role}: ${safeString(t.content)}`)
+    .filter((line) => line.length > 8)
+    .join("\n");
+  return `${header}${body}`.slice(0, 2000);
+}
+
+function recordLeadTranscriptAsync(
+  turns: AiChatTurn[],
+  clientFirstName?: string,
+) {
+  const transcript = formatLeadTranscript(turns, clientFirstName);
+  if (transcript.length < 12) return;
+  recordGlobalChatInsightAsync({
+    text: transcript,
+    channel: "HOMEPAGE_LEAD",
+  });
 }
 
 function sseEncode(data: Record<string, unknown>) {
@@ -315,8 +352,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        error:
-          "details got a little twisted! let's shake it off and try that again, or bark at us directly at pack@sitguru.com",
+        error: FRIENDLY_ROUTE_ERROR,
       },
       { status: 500 },
     );
@@ -338,6 +374,35 @@ async function handleHomepageLeadPost(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
+  const clientFirstName = safeString(body.client_first_name).slice(0, 40);
+  const history = parseHistory(body.history || body.messages);
+  const auditOnly = body.auditTranscript === true;
+
+  // Persist full visitor transcript for CRM audit (close / cancel / terminate)
+  if (auditOnly || history.length > 0) {
+    try {
+      const turns =
+        history.length > 0
+          ? history
+          : ([
+              {
+                role: "user" as const,
+                content: safeString(body.message) || "[session_closed]",
+              },
+            ] as AiChatTurn[]);
+      recordLeadTranscriptAsync(turns, clientFirstName || undefined);
+    } catch (error) {
+      console.warn(
+        "[homepage-lead] transcript audit soft-failed:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  if (auditOnly) {
+    return NextResponse.json({ ok: true, audited: true });
+  }
+
   const message = safeString(body.message || body.text || body.content);
   if (!message || message.length > 4000) {
     return NextResponse.json(
@@ -353,7 +418,6 @@ async function handleHomepageLeadPost(req: NextRequest) {
     // never block the chat path on analytics
   }
 
-  const history = parseHistory(body.history);
   const requestedConversationId = safeString(body.conversationId);
   const wantStream = body.stream !== false;
 
@@ -532,9 +596,11 @@ async function handleHomepageLeadPost(req: NextRequest) {
     return response;
   }
 
-  if (!isSitGuruAiConfigured()) {
-    const fallback =
-      "Hi — I'm the Chief Treat Officer. Live AI is warming up. Share your email for a Pack Coordinator, or browse /help for pricing, Live Map tracking, Ambassadors, and PawPerks.";
+  if (!isSitGuruAiConfigured() || !String(process.env.ANTHROPIC_API_KEY || "").trim()) {
+    console.warn(
+      "[homepage-lead] ANTHROPIC_API_KEY is undefined or AI is not configured — returning friendly fallback without crashing.",
+    );
+    const fallback = FRIENDLY_ROUTE_ERROR;
     const response = NextResponse.json({
       ok: true,
       conversationId,
@@ -555,7 +621,9 @@ async function handleHomepageLeadPost(req: NextRequest) {
     return response;
   }
 
-  const systemExtra = buildCompleteKnowledgeInjection();
+  const systemExtra = buildCompleteKnowledgeInjection(
+    clientFirstName || undefined,
+  );
 
   if (!wantStream) {
     const { completeSitGuruAiReply } = await import("@/lib/messaging/ai-engine");
@@ -636,6 +704,14 @@ async function handleHomepageLeadPost(req: NextRequest) {
                 text: full,
               }).catch(() => null);
             }
+            recordLeadTranscriptAsync(
+              [
+                ...history,
+                { role: "user", content: message },
+                { role: "assistant", content: full },
+              ],
+              clientFirstName || undefined,
+            );
             send({
               type: "done",
               text: full,
@@ -646,14 +722,13 @@ async function handleHomepageLeadPost(req: NextRequest) {
           }
         }
       } catch (error) {
-        console.error(
-          "[homepage-lead] stream failure:",
+        console.warn(
+          "[homepage-lead] Anthropic stream failed:",
           error instanceof Error ? error.message : error,
         );
         send({
           type: "error",
-          error:
-            "details got a little twisted! let's shake it off and try that again, or bark at us directly at pack@sitguru.com",
+          error: FRIENDLY_ROUTE_ERROR,
         });
       } finally {
         controller.close();

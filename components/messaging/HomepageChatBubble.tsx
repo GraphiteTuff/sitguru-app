@@ -5,7 +5,7 @@
  * Streams via Vercel AI SDK useChat → /api/chat/send.
  */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { useChat, type Message } from "ai/react";
@@ -16,10 +16,15 @@ import {
 
 const BRAND_GREEN = "#0D5C3A";
 const STORAGE_KEY = "sitguru-homepage-lead-chat";
+const NAME_STORAGE_KEY = "sitguru_client_first_name";
+const LEGACY_HISTORY_KEY = "sitguru_chat_history";
 const SITGURU_AVATAR_SRC = "/images/sitguru-message-avatar.jpg";
 
 const FRIENDLY_STATIC_ERROR =
-  "details got a little twisted! let's shake it off and try that again, or bark at us directly at pack@sitguru.com";
+  "🐾 can you bark that at me one more time? my ears hit a little static, or you can drop a note to our pack leaders at pack@sitguru.com";
+
+const NAME_PROMPT =
+  "hey! welcome to the pack 🐾 i'm rogue, chief treat officer — what should i call you? first name, nickname, whatever you go by works.";
 
 const CARE_INTENT_CHIPS = [
   {
@@ -33,6 +38,10 @@ const CARE_INTENT_CHIPS = [
   {
     label: "🌙 Overnight",
     content: "Looking for Overnight Stays",
+  },
+  {
+    label: "🏠 Boarding",
+    content: "Looking for Boarding",
   },
 ] as const;
 
@@ -51,12 +60,68 @@ const JOIN_PACK_CHIPS = [
   },
 ] as const;
 
-const WELCOME: Message = {
-  id: "welcome",
-  role: "assistant",
-  content:
-    "Hi — I'm the Chief Treat Officer. I can help with pet care bookings, becoming a Guru, or Ambassadors and PawPerks. What can I help with today?",
-};
+const AMBASSADOR_CHIPS = [
+  {
+    label: "Community",
+    content: "Want to join as a Community Ambassador",
+  },
+  {
+    label: "Student",
+    content: "Want to join as a Student Ambassador",
+  },
+  {
+    label: "Veteran",
+    content: "Want to join as a Veteran Ambassador",
+  },
+] as const;
+
+function sanitizeFirstName(raw: string): string {
+  return String(raw || "")
+    .replace(/[^a-zA-Z0-9\s'.\-]/g, "")
+    .trim()
+    .slice(0, 40);
+}
+
+function readStoredFirstName(): string {
+  try {
+    const fromLocal = sanitizeFirstName(
+      localStorage.getItem(NAME_STORAGE_KEY) || "",
+    );
+    if (fromLocal) return fromLocal;
+    const fromSession = sanitizeFirstName(
+      sessionStorage.getItem(NAME_STORAGE_KEY) || "",
+    );
+    return fromSession;
+  } catch {
+    return "";
+  }
+}
+
+function persistFirstName(name: string) {
+  const clean = sanitizeFirstName(name);
+  if (!clean) return;
+  try {
+    localStorage.setItem(NAME_STORAGE_KEY, clean);
+    sessionStorage.setItem(NAME_STORAGE_KEY, clean);
+  } catch {
+    // ignore quota
+  }
+}
+
+function buildWelcome(name: string): Message {
+  if (!name) {
+    return {
+      id: "welcome-name",
+      role: "assistant",
+      content: NAME_PROMPT,
+    };
+  }
+  return {
+    id: "welcome",
+    role: "assistant",
+    content: `hey ${name}! rogue here 🦴 so stoked you're back — drop-ins, dog walks, overnight stays, guru signup, ambassadors, pawperks… what's the move?`,
+  };
+}
 
 function SitGuruAvatar({
   className = "h-8 w-8",
@@ -119,26 +184,55 @@ function AssistantRow({
   );
 }
 
+async function auditTranscriptToBackend(params: {
+  messages: Message[];
+  clientFirstName: string;
+}) {
+  try {
+    await fetch("/api/chat/homepage-lead", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        auditTranscript: true,
+        client_first_name: params.clientFirstName || undefined,
+        history: params.messages
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({ role: m.role, content: m.content })),
+        message: "[session_closed]",
+      }),
+      keepalive: true,
+    });
+  } catch {
+    // never block UI close on audit
+  }
+}
+
 export default function HomepageChatBubble() {
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const [showTip, setShowTip] = useState(true);
+  const [clientFirstName, setClientFirstName] = useState("");
+  const [awaitingName, setAwaitingName] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const restoredRef = useRef(false);
+  const clientFirstNameRef = useRef("");
 
   const {
     messages,
     setMessages,
     input,
+    setInput,
     handleInputChange,
     handleSubmit,
     append,
     isLoading,
   } = useChat({
     api: "/api/chat/send",
-    initialMessages: [WELCOME],
+    initialMessages: [buildWelcome("")],
+    body: {
+      channel: "HOMEPAGE_LEAD",
+    },
     onError: () => {
       setMessages((prev) => [
         ...prev,
@@ -152,31 +246,73 @@ export default function HomepageChatBubble() {
   });
 
   useEffect(() => {
+    clientFirstNameRef.current = clientFirstName;
+  }, [clientFirstName]);
+
+  /** Always send the latest preferred name so Rogue can address this participant. */
+  function chatRequestOptions() {
+    const name = clientFirstNameRef.current || clientFirstName;
+    return {
+      body: {
+        channel: "HOMEPAGE_LEAD",
+        client_first_name: name || undefined,
+      },
+    };
+  }
+
+  useEffect(() => {
     setMounted(true);
+
+    const storedName = readStoredFirstName();
+    if (storedName) {
+      setClientFirstName(storedName);
+      setAwaitingName(false);
+    } else {
+      setAwaitingName(true);
+    }
 
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as { messages?: Message[] };
+      if (!raw) {
+        setMessages([buildWelcome(storedName)]);
+        return;
+      }
+      const parsed = JSON.parse(raw) as {
+        messages?: Message[];
+        client_first_name?: string;
+      };
+      const restoredName =
+        sanitizeFirstName(parsed.client_first_name || "") || storedName;
+      if (restoredName) {
+        setClientFirstName(restoredName);
+        setAwaitingName(false);
+      }
       if (Array.isArray(parsed.messages) && parsed.messages.length > 0) {
         setMessages(parsed.messages);
         setHasUnread(false);
         setShowTip(false);
-        restoredRef.current = true;
+      } else {
+        setMessages([buildWelcome(restoredName)]);
       }
     } catch {
-      // ignore corrupt session
+      setMessages([buildWelcome(storedName)]);
     }
   }, [setMessages]);
 
   useEffect(() => {
     if (!mounted) return;
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ messages }));
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          messages,
+          client_first_name: clientFirstName || undefined,
+        }),
+      );
     } catch {
       // ignore quota
     }
-  }, [mounted, messages]);
+  }, [mounted, messages, clientFirstName]);
 
   useEffect(() => {
     if (!open) return;
@@ -191,12 +327,19 @@ export default function HomepageChatBubble() {
     return () => window.clearTimeout(t);
   }, [open]);
 
+  const showIntentChips = useMemo(
+    () => Boolean(clientFirstName) && !awaitingName && !isLoading,
+    [clientFirstName, awaitingName, isLoading],
+  );
+
   function openPanel() {
     setOpen(true);
     setHasUnread(false);
     setShowTip(false);
     if (messages.length === 0) {
-      setMessages([WELCOME]);
+      const name = clientFirstName || readStoredFirstName();
+      setMessages([buildWelcome(name)]);
+      setAwaitingName(!name);
     }
   }
 
@@ -207,24 +350,57 @@ export default function HomepageChatBubble() {
 
     if (!confirmClose) return;
 
-    // 1. Wipe current messages
-    setMessages([]);
+    void auditTranscriptToBackend({
+      messages,
+      clientFirstName: clientFirstNameRef.current,
+    });
 
-    // 2. Clear persisted conversation cache
+    setMessages([]);
     try {
       sessionStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem("sitguru_chat_history");
+      localStorage.removeItem(LEGACY_HISTORY_KEY);
     } catch {
-      // ignore storage access errors
+      // ignore
     }
-
-    // 3. Close the visual UI window
     setOpen(false);
   }
 
+  function captureFirstName(raw: string) {
+    const name = sanitizeFirstName(raw);
+    if (!name) return false;
+    persistFirstName(name);
+    clientFirstNameRef.current = name;
+    setClientFirstName(name);
+    setAwaitingName(false);
+    setMessages((prev) => [
+      ...prev,
+      { id: `user-name-${Date.now()}`, role: "user", content: name },
+      {
+        id: `assistant-name-${Date.now()}`,
+        role: "assistant",
+        content: `i am so stoked to guide you through this, ${name}! 🐾 let's get you set up in our pet community — book care or join as a guru whenever you're ready.`,
+      },
+    ]);
+    setInput("");
+    return true;
+  }
+
   async function sendChip(content: string) {
-    if (!content.trim() || isLoading) return;
-    await append({ role: "user", content });
+    if (!content.trim() || isLoading || awaitingName) return;
+    await append({ role: "user", content }, chatRequestOptions());
+  }
+
+  function onComposerSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || isLoading) return;
+
+    if (awaitingName || !clientFirstName) {
+      captureFirstName(text);
+      return;
+    }
+
+    handleSubmit(e, chatRequestOptions());
   }
 
   if (!mounted) return null;
@@ -245,18 +421,18 @@ export default function HomepageChatBubble() {
         >
           <span className="homepage-chat-tip__pulse" aria-hidden />
           <span className="homepage-chat-tip__text">
-            Need help? Chat with the Chief Treat Officer
+            Need help? Chat with Rogue, Chief Treat Officer
           </span>
         </button>
       ) : null}
 
       {open ? (
         <div
-          className="homepage-chat-panel"
+          className="homepage-chat-panel fixed inset-0 z-50 flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[600px] sm:w-[400px] sm:rounded-2xl sm:shadow-2xl"
           role="dialog"
-          aria-label="SitGuru AI Concierge chat"
+          aria-label="Rogue, Chief Treat Officer chat"
         >
-          <header className="homepage-chat-panel__header">
+          <header className="homepage-chat-panel__header relative shrink-0">
             <div className="homepage-chat-panel__brand">
               <span
                 className="homepage-chat-panel__avatar homepage-chat-panel__avatar--dog"
@@ -264,14 +440,13 @@ export default function HomepageChatBubble() {
               >
                 <SitGuruAvatar className="h-full w-full rounded-full overflow-hidden flex-shrink-0" />
               </span>
-              <div className="min-w-0">
+              <div className="min-w-0 pr-10">
                 <p className="homepage-chat-panel__title">
-                  The Chief Treat Officer • Active
+                  Rogue, Chief Treat Officer 🦴
                 </p>
                 <p className="homepage-chat-panel__sub">
-                  {streaming
-                    ? "Finding a helpful answer…"
-                    : "Professional, brief, warm support"}
+                  Your personalized Assistant to help you with your journey to
+                  become part of our SitGuru Pet Community.
                 </p>
               </div>
             </div>
@@ -286,7 +461,10 @@ export default function HomepageChatBubble() {
             </button>
           </header>
 
-          <div className="homepage-chat-panel__messages" ref={listRef}>
+          <div
+            className="homepage-chat-panel__messages min-h-0 flex-1"
+            ref={listRef}
+          >
             {messages.map((m) => {
               if (m.role === "user") {
                 return (
@@ -300,10 +478,7 @@ export default function HomepageChatBubble() {
               }
 
               if (m.role !== "assistant") return null;
-
-              if (!m.content && streaming) {
-                return null;
-              }
+              if (!m.content && streaming) return null;
 
               return (
                 <AssistantRow key={m.id}>
@@ -328,64 +503,87 @@ export default function HomepageChatBubble() {
             ) : null}
           </div>
 
-          <div className="flex flex-col gap-2 border-b border-t border-gray-100 bg-gray-50 p-3">
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                Book Pet Care
-              </span>
-              <div className="flex flex-wrap gap-1">
-                {CARE_INTENT_CHIPS.map((chip) => (
-                  <button
-                    key={chip.label}
-                    type="button"
-                    disabled={streaming}
-                    onClick={() => void sendChip(chip.content)}
-                    className="rounded-full border border-green-600 bg-white px-2.5 py-1 text-xs text-green-700 transition-colors hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {chip.label}
-                  </button>
-                ))}
+          {showIntentChips ? (
+            <div className="flex shrink-0 flex-col gap-2 border-b border-t border-gray-100 bg-gray-50 p-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  Book Pet Care
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {CARE_INTENT_CHIPS.map((chip) => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      disabled={streaming}
+                      onClick={() => void sendChip(chip.content)}
+                      className="rounded-full border border-green-600 bg-white px-2.5 py-1 text-xs text-green-700 transition-colors hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div className="mt-1 flex flex-col gap-1">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                Join as a Provider
-              </span>
-              <div className="flex flex-wrap gap-1">
-                {JOIN_PACK_CHIPS.map((chip) => (
-                  <button
-                    key={chip.label}
-                    type="button"
-                    disabled={streaming}
-                    onClick={() => void sendChip(chip.content)}
-                    className="rounded-full border border-blue-600 bg-white px-2.5 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {chip.label}
-                  </button>
-                ))}
+              <div className="mt-1 flex flex-col gap-1">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  Join as a Provider
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {JOIN_PACK_CHIPS.map((chip) => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      disabled={streaming}
+                      onClick={() => void sendChip(chip.content)}
+                      className="rounded-full border border-blue-600 bg-white px-2.5 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-1 flex flex-col gap-1">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  Join as an Ambassador
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {AMBASSADOR_CHIPS.map((chip) => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      disabled={streaming}
+                      onClick={() => void sendChip(chip.content)}
+                      className="rounded-full border border-amber-600 bg-white px-2.5 py-1 text-xs text-amber-800 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
 
           <form
-            className="homepage-chat-panel__composer"
-            onSubmit={handleSubmit}
+            className="homepage-chat-panel__composer shrink-0"
+            onSubmit={onComposerSubmit}
           >
             <textarea
               ref={inputRef}
               rows={1}
               value={input}
               disabled={streaming}
-              placeholder="Ask about care, Gurus, or joining the pack…"
+              placeholder={
+                awaitingName
+                  ? "Type the name you go by…"
+                  : "Ask about care, Gurus, or joining the pack…"
+              }
               onChange={handleInputChange}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   const form = e.currentTarget.form;
-                  if (form) {
-                    form.requestSubmit();
-                  }
+                  if (form) form.requestSubmit();
                 }
               }}
             />
