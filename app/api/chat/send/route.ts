@@ -1,7 +1,13 @@
 // app/api/chat/send/route.ts
 /**
- * Platform messaging engine alias — same handler as /api/messaging/send,
- * which also records ACTIVE_WALK rows into the global chat intelligence ledger.
+ * Chat send — authenticated Vercel AI SDK stream (Claude).
  */
 
-export { POST, dynamic, runtime } from "@/app/api/messaging/send/route";
+import { handleAuthenticatedAiSend } from "@/lib/messaging/stream-send";
+
+export const dynamic = "force-dynamic";
+export const runtime = "edge";
+
+export async function POST(req: Request) {
+  return handleAuthenticatedAiSend(req);
+}
