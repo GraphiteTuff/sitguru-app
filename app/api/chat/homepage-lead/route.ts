@@ -42,9 +42,6 @@ const AUDIENCE_HINT =
 const CONTACT_PROMPT =
   "Happy to connect you with a Pack Coordinator. What is the best email or phone number to reach you?";
 
-const FRIENDLY_ROUTE_ERROR =
-  "🐾 can you bark that at me one more time? my ears hit a little static, or you can drop a note to our pack leaders at pack@sitguru.com";
-
 const PACK_PERSONA = "pack" as const;
 
 /**
@@ -52,10 +49,38 @@ const PACK_PERSONA = "pack" as const;
  * Claude must process this FIRST for Guru / mission questions.
  */
 const SIT_GURU_SITE_CONTEXT = `
+CORE CONTEXT: A Guru is an expert pet care provider on the SitGuru platform. This includes highly verified local sitters, dog walkers, pet trainers, groomers, boarding providers, and experienced neighborhood caregivers who lead with absolute reliability, communication, and deep respect for each pet's unique daily routine and personality.
 CORE PLATFORM DEFINITIONS & CONTEXT:
 - What is a Guru?: A Guru is an expert pet care provider on the SitGuru platform. This includes highly verified local sitters, dog walkers, pet trainers, groomers, boarding providers, and experienced neighborhood caregivers who lead with absolute reliability, communication, and deep respect for each pet's unique daily routine and personality.
 - Mission: To make premium pet care feel deeply personal, safe, community-supported, and easily trackable across every neighborhood.
 `.trim();
+
+const SIMULATION_WELCOME =
+  "hey! welcome to the pack 🐾 what's your first name (or what do you like to be called) so we can kick off your journey into our sitguru pet community?";
+
+function buildSimulationReply(opts: {
+  clientFirstName?: string;
+  lastUserText?: string;
+}): string {
+  const preferred = safeString(opts.clientFirstName).slice(0, 40);
+  const text = safeString(opts.lastUserText).toLowerCase();
+
+  if (!preferred) return SIMULATION_WELCOME;
+
+  if (/guru|what is a guru|provider|sitter|walker|trainer|boarding|groomer/.test(text)) {
+    return `hey ${preferred}! a guru is an expert pet care provider on sitguru — verified local sitters, dog walkers, trainers, groomers, boarding providers, and neighborhood caregivers who lead with reliability, communication, and respect for each pet's routine. what's the move?`;
+  }
+
+  if (/ambassador|referral|student|veteran|community/.test(text)) {
+    return `hey ${preferred}! love that ambassador energy — community, student, or veteran tracks welcome. i can point you to apply + the onboarding video whenever you're ready.`;
+  }
+
+  if (/drop-?in|walk|overnight|boarding|pet care|book/.test(text)) {
+    return `hey ${preferred}! we can set you up with drop-in visits, dog walks, overnight stays, or boarding with local gurus. which care type feels right?`;
+  }
+
+  return `hey ${preferred}! i got you — book care, join as a guru, or hop into ambassadors. what should we dig into first?`;
+}
 
 /**
  * Dual-source system injection for Rogue, Chief Treat Officer:
@@ -346,16 +371,14 @@ export async function POST(req: NextRequest) {
     return await handleHomepageLeadPost(req);
   } catch (error) {
     console.error(
-      "[homepage-lead] unhandled route failure:",
+      "[homepage-lead] unhandled route failure — simulation fallback:",
       error instanceof Error ? error.message : error,
     );
-    return NextResponse.json(
-      {
-        ok: false,
-        error: FRIENDLY_ROUTE_ERROR,
-      },
-      { status: 500 },
-    );
+    return NextResponse.json({
+      ok: true,
+      reply: SIMULATION_WELCOME,
+      simulated: true,
+    });
   }
 }
 
@@ -598,9 +621,12 @@ async function handleHomepageLeadPost(req: NextRequest) {
 
   if (!isSitGuruAiConfigured() || !String(process.env.ANTHROPIC_API_KEY || "").trim()) {
     console.warn(
-      "[homepage-lead] ANTHROPIC_API_KEY is undefined or AI is not configured — returning friendly fallback without crashing.",
+      "[homepage-lead] ANTHROPIC_API_KEY is undefined or AI is not configured — returning simulation fallback without crashing.",
     );
-    const fallback = FRIENDLY_ROUTE_ERROR;
+    const fallback = buildSimulationReply({
+      clientFirstName: clientFirstName || undefined,
+      lastUserText: message,
+    });
     const response = NextResponse.json({
       ok: true,
       conversationId,
@@ -608,6 +634,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
       reply: fallback,
       aiAssistEnabled,
       model: HOMEPAGE_LEAD_MODEL,
+      simulated: true,
     });
     if (setGuestCookie) {
       response.cookies.set(GUEST_COOKIE, guestId, {
@@ -723,12 +750,21 @@ async function handleHomepageLeadPost(req: NextRequest) {
         }
       } catch (error) {
         console.warn(
-          "[homepage-lead] Anthropic stream failed:",
+          "[homepage-lead] Anthropic stream failed — using simulation fallback:",
           error instanceof Error ? error.message : error,
         );
+        const simulated = buildSimulationReply({
+          clientFirstName: clientFirstName || undefined,
+          lastUserText: message,
+        });
+        send({ type: "delta", text: simulated });
         send({
-          type: "error",
-          error: FRIENDLY_ROUTE_ERROR,
+          type: "done",
+          text: simulated,
+          model: "simulation-fallback",
+          conversationId,
+          aiAssistEnabled,
+          simulated: true,
         });
       } finally {
         controller.close();

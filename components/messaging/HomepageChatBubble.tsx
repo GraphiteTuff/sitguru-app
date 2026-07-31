@@ -21,7 +21,7 @@ const LEGACY_HISTORY_KEY = "sitguru_chat_history";
 const SITGURU_AVATAR_SRC = "/images/sitguru-message-avatar.jpg";
 
 const FRIENDLY_STATIC_ERROR =
-  "🐾 can you bark that at me one more time? my ears hit a little static, or you can drop a note to our pack leaders at pack@sitguru.com";
+  "hey! welcome to the pack 🐾 what's your first name (or what do you like to be called) so we can kick off your journey into our sitguru pet community?";
 
 const NAME_PROMPT =
   "hey! welcome to the pack 🐾 i'm rogue, chief treat officer — what should i call you? first name, nickname, whatever you go by works.";
@@ -74,6 +74,27 @@ const AMBASSADOR_CHIPS = [
     content: "Want to join as a Veteran Ambassador",
   },
 ] as const;
+
+type IntentChipTone = "care" | "provider" | "ambassador";
+
+const ALL_INTENT_CHIPS: ReadonlyArray<{
+  label: string;
+  content: string;
+  tone: IntentChipTone;
+}> = [
+  ...CARE_INTENT_CHIPS.map((chip) => ({ ...chip, tone: "care" as const })),
+  ...JOIN_PACK_CHIPS.map((chip) => ({ ...chip, tone: "provider" as const })),
+  ...AMBASSADOR_CHIPS.map((chip) => ({
+    ...chip,
+    tone: "ambassador" as const,
+  })),
+];
+
+const INTENT_CHIP_TONE_CLASS: Record<IntentChipTone, string> = {
+  care: "border-green-600 text-green-700 hover:bg-green-50",
+  provider: "border-blue-600 text-blue-700 hover:bg-blue-50",
+  ambassador: "border-amber-600 text-amber-800 hover:bg-amber-50",
+};
 
 function sanitizeFirstName(raw: string): string {
   return String(raw || "")
@@ -430,7 +451,7 @@ export default function HomepageChatBubble() {
         <div
           className="homepage-chat-panel fixed inset-0 z-50 flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[600px] sm:w-[400px] sm:rounded-2xl sm:shadow-2xl"
           role="dialog"
-          aria-label="Rogue, Chief Treat Officer chat"
+          aria-label="Rogue, Your Chief Treat Officer chat"
         >
           <header className="homepage-chat-panel__header relative shrink-0">
             <div className="homepage-chat-panel__brand">
@@ -442,7 +463,7 @@ export default function HomepageChatBubble() {
               </span>
               <div className="min-w-0 pr-10">
                 <p className="homepage-chat-panel__title">
-                  Rogue, Chief Treat Officer 🦴
+                  Rogue, Your Chief Treat Officer 🦴
                 </p>
                 <p className="homepage-chat-panel__sub">
                   Your personalized Assistant to help you with your journey to
@@ -504,63 +525,22 @@ export default function HomepageChatBubble() {
           </div>
 
           {showIntentChips ? (
-            <div className="flex shrink-0 flex-col gap-2 border-b border-t border-gray-100 bg-gray-50 p-3">
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                  Book Pet Care
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {CARE_INTENT_CHIPS.map((chip) => (
-                    <button
-                      key={chip.label}
-                      type="button"
-                      disabled={streaming}
-                      onClick={() => void sendChip(chip.content)}
-                      className="rounded-full border border-green-600 bg-white px-2.5 py-1 text-xs text-green-700 transition-colors hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-1 flex flex-col gap-1">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                  Join as a Provider
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {JOIN_PACK_CHIPS.map((chip) => (
-                    <button
-                      key={chip.label}
-                      type="button"
-                      disabled={streaming}
-                      onClick={() => void sendChip(chip.content)}
-                      className="rounded-full border border-blue-600 bg-white px-2.5 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-1 flex flex-col gap-1">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                  Join as an Ambassador
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {AMBASSADOR_CHIPS.map((chip) => (
-                    <button
-                      key={chip.label}
-                      type="button"
-                      disabled={streaming}
-                      onClick={() => void sendChip(chip.content)}
-                      className="rounded-full border border-amber-600 bg-white px-2.5 py-1 text-xs text-amber-800 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div
+              className="flex shrink-0 flex-row items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-gray-50 p-2 scrollbar-none"
+              role="toolbar"
+              aria-label="Quick intents"
+            >
+              {ALL_INTENT_CHIPS.map((chip) => (
+                <button
+                  key={`${chip.tone}-${chip.label}`}
+                  type="button"
+                  disabled={streaming}
+                  onClick={() => void sendChip(chip.content)}
+                  className={`shrink-0 rounded-full border bg-white px-2.5 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${INTENT_CHIP_TONE_CLASS[chip.tone]}`}
+                >
+                  {chip.label}
+                </button>
+              ))}
             </div>
           ) : null}
 
