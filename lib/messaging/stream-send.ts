@@ -1,5 +1,6 @@
 /**
- * Shared authenticated Claude stream for messaging / chat send routes.
+ * Shared Claude stream for messaging / chat send routes.
+ * Supports authenticated members and anonymous homepage CTO guests.
  * Edge-compatible: Web Crypto hashing + soft-fail DB side effects.
  */
 
@@ -7,6 +8,7 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { streamText, type CoreMessage } from "ai";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { HOMEPAGE_CTO_VOICE_RULES } from "@/lib/chat/homepage-cta";
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -50,7 +52,10 @@ async function hashInsightText(text: string): Promise<string> {
     .slice(0, 64);
 }
 
-async function recordActiveWalkInsight(text: string) {
+async function recordChatInsight(
+  text: string,
+  channel: "ACTIVE_WALK" | "HOMEPAGE_LEAD",
+) {
   const clean = String(text || "").trim().slice(0, 2000);
   if (clean.length < 8) return;
 
@@ -60,11 +65,11 @@ async function recordActiveWalkInsight(text: string) {
       p_text_hash: hash,
       p_summary: clean,
       p_category: "General Inquiry",
-      p_channel: "ACTIVE_WALK",
+      p_channel: channel,
       p_is_friction: false,
     });
   } catch (error) {
-    console.error("[stream-send] ACTIVE_WALK insight soft-failed:", error);
+    console.error("[stream-send] insight soft-failed:", error);
   }
 }
 
@@ -73,15 +78,12 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     const supabase = await createClient();
     const {
       data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getUser().catch(() => ({
+      data: { user: null },
+    }));
 
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    // Auth is preferred but not required — homepage CTO guests may stream anonymously.
+    const userId = user?.id || null;
 
     const body = (await req.json()) as {
       messages?: CoreMessage[];
@@ -92,6 +94,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     const messages = Array.isArray(body?.messages) ? body.messages : [];
     const walkId = safeString(body?.walkId);
     const conversationId = safeString(body?.conversationId);
+    const insightChannel = walkId ? "ACTIVE_WALK" : "HOMEPAGE_LEAD";
 
     if (messages.length === 0) {
       return new Response(JSON.stringify({ error: "messages are required." }), {
@@ -103,13 +106,12 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     const lastUserMessage = messages[messages.length - 1];
     const lastUserText = messageContent(lastUserMessage);
 
-    // Soft-persist the latest user turn when a conversation is present
-    if (conversationId && lastUserText) {
+    if (conversationId && userId && lastUserText) {
       void supabase
         .from("messages")
         .insert({
           conversation_id: conversationId,
-          sender_id: user.id,
+          sender_id: userId,
           content: lastUserText,
           body: lastUserText,
           is_ai: false,
@@ -125,7 +127,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     }
 
     if (lastUserText) {
-      void recordActiveWalkInsight(lastUserText);
+      void recordChatInsight(lastUserText, insightChannel);
     }
 
     const result = streamText({
@@ -142,16 +144,18 @@ BUSINESS CONTEXT & KNOWLEDGE BASE:
 ${walkId ? `\nACTIVE WALK CONTEXT:\n- Current walk ID: ${walkId}. Prefer walk-aware guidance when relevant.\n` : ""}
 CONSTRAINTS:
 - Keep answers short and direct.
-- Do not use overly informal filler words or slang.`,
+- Do not use overly informal filler words or slang.
+
+${HOMEPAGE_CTO_VOICE_RULES}`,
       onFinish: async ({ text }) => {
         try {
           const assistantText = String(text || "").trim();
           if (!assistantText) return;
 
-          if (conversationId) {
+          if (conversationId && userId) {
             const { error } = await supabase.from("messages").insert({
               conversation_id: conversationId,
-              sender_id: user.id,
+              sender_id: userId,
               content: assistantText,
               body: assistantText,
               is_ai: true,
@@ -167,10 +171,8 @@ CONSTRAINTS:
             }
           }
 
-          if (walkId || conversationId) {
-            await recordActiveWalkInsight(
-              lastUserText || assistantText,
-            );
+          if (lastUserText) {
+            await recordChatInsight(lastUserText, insightChannel);
           }
         } catch (dbError) {
           console.error("Failed to save data asynchronously:", dbError);
