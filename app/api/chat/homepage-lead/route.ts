@@ -40,7 +40,7 @@ const AUDIENCE_HINT =
 
 /** Exact conversion copy when visitor wants to book / join without contact yet */
 const CONTACT_PROMPT =
-  "bet — drop your email or phone and a pack coordinator will scoop you up";
+  "Happy to connect you with a Pack Coordinator. What is the best email or phone number to reach you?";
 
 const PACK_PERSONA = "pack" as const;
 
@@ -534,7 +534,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
 
   if (!isSitGuruAiConfigured()) {
     const fallback =
-      "yo — chief treat officer is warming up. drop your email for a pack coordinator, or sniff around /help for pricing, live maps, ambassadors, and pawperks.";
+      "Hi — I'm the Chief Treat Officer. Live AI is warming up. Share your email for a Pack Coordinator, or browse /help for pricing, Live Map tracking, Ambassadors, and PawPerks.";
     const response = NextResponse.json({
       ok: true,
       conversationId,

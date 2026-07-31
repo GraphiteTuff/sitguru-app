@@ -34,17 +34,41 @@ const SITGURU_AVATAR_SRC = "/images/sitguru-message-avatar.jpg";
 const FRIENDLY_STATIC_ERROR =
   "details got a little twisted! let's shake it off and try that again, or bark at us directly at pack@sitguru.com";
 
-const SUGGESTION_CHIPS = [
-  "how do i join the pack?",
-  "how do pawperks work?",
-  "show me live map tracking!",
+const CARE_INTENT_CHIPS = [
+  {
+    label: "🪟 Drop-in Visits",
+    content: "Looking for Drop-in Visits",
+  },
+  {
+    label: "🦮 Dog Walks",
+    content: "Looking for Dog Walks",
+  },
+  {
+    label: "🌙 Overnight",
+    content: "Looking for Overnight Stays",
+  },
+] as const;
+
+const JOIN_PACK_CHIPS = [
+  {
+    label: "🏡 Sitter",
+    content: "Want to register as a Sitter",
+  },
+  {
+    label: "🏃‍♂️ Dog Walker",
+    content: "Want to register as a Dog Walker",
+  },
+  {
+    label: "🎓 Trainer",
+    content: "Want to register as a Trainer",
+  },
 ] as const;
 
 const WELCOME: BubbleMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "yo — chief treat officer here 🦴 ready to help with gurus, ambassadors, pawperks, or live walk tracking. what's the vibe?",
+    "Hi — I'm the Chief Treat Officer. I can help with pet care bookings, becoming a Guru, or Ambassadors and PawPerks. What can I help with today?",
 };
 
 function uid() {
@@ -141,12 +165,6 @@ export default function HomepageChatBubble() {
   const [showTip, setShowTip] = useState(true);
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-
-  const showChips =
-    messages.length <= 1 &&
-    messages[0]?.id === "welcome" &&
-    !streaming &&
-    !typing;
 
   useEffect(() => {
     setMounted(true);
@@ -341,7 +359,7 @@ export default function HomepageChatBubble() {
         >
           <span className="homepage-chat-tip__pulse" aria-hidden />
           <span className="homepage-chat-tip__text">
-            sniffing around? chat with the pack leader
+            Need help? Chat with the Chief Treat Officer
           </span>
         </button>
       ) : null}
@@ -366,8 +384,8 @@ export default function HomepageChatBubble() {
                 </p>
                 <p className="homepage-chat-panel__sub">
                   {streaming || typing
-                    ? "sniffing that up…"
-                    : "short answers. real links. let's goooo"}
+                    ? "Finding a helpful answer…"
+                    : "Professional, brief, warm support"}
                 </p>
               </div>
             </div>
@@ -407,23 +425,6 @@ export default function HomepageChatBubble() {
               );
             })}
 
-            {showChips ? (
-              <div className="homepage-chat-chips" role="list">
-                {SUGGESTION_CHIPS.map((chip) => (
-                  <button
-                    key={chip}
-                    type="button"
-                    role="listitem"
-                    className="homepage-chat-chip"
-                    disabled={streaming}
-                    onClick={() => void sendMessage(chip)}
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
             {typing ? (
               <AssistantRow>
                 <div
@@ -438,6 +439,48 @@ export default function HomepageChatBubble() {
             ) : null}
           </div>
 
+          <div className="flex flex-col gap-2 border-b border-t border-gray-100 bg-gray-50 p-3">
+            {/* Row 1: Care Inquiries */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                Book Pet Care
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {CARE_INTENT_CHIPS.map((chip) => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    disabled={streaming}
+                    onClick={() => void sendMessage(chip.content)}
+                    className="rounded-full border border-green-600 bg-white px-2.5 py-1 text-xs text-green-700 transition-colors hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Row 2: Service Provider Inquiries */}
+            <div className="mt-1 flex flex-col gap-1">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                Join as a Provider
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {JOIN_PACK_CHIPS.map((chip) => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    disabled={streaming}
+                    onClick={() => void sendMessage(chip.content)}
+                    className="rounded-full border border-blue-600 bg-white px-2.5 py-1 text-xs text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <form
             className="homepage-chat-panel__composer"
             onSubmit={(e) => {
@@ -450,7 +493,7 @@ export default function HomepageChatBubble() {
               rows={1}
               value={input}
               disabled={streaming}
-              placeholder="bark it out here…"
+              placeholder="Ask about care, Gurus, or joining the pack…"
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
