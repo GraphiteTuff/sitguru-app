@@ -4,6 +4,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  isTrustSafetyScreeningBypassed,
+  TRUST_SAFETY_SCREENING_BYPASS,
+} from "@/lib/config/trust-safety";
 
 export const dynamic = "force-dynamic";
 
@@ -310,6 +314,10 @@ function hasGuruProfileReady(guru: GuruRow, profile?: ProfileRow) {
 }
 
 function getBackgroundCheckStatus(guru: GuruRow, check?: BackgroundCheckRow) {
+  if (isTrustSafetyScreeningBypassed()) {
+    return TRUST_SAFETY_SCREENING_BYPASS.status;
+  }
+
   return (
     asTrimmedString(guru.background_check_status) ||
     asTrimmedString(check?.status) ||
@@ -318,6 +326,10 @@ function getBackgroundCheckStatus(guru: GuruRow, check?: BackgroundCheckRow) {
 }
 
 function hasGuruCheckrStarted(guru: GuruRow, check?: BackgroundCheckRow) {
+  if (isTrustSafetyScreeningBypassed()) {
+    return true;
+  }
+
   const status = getBackgroundCheckStatus(guru, check);
 
   return Boolean(
@@ -435,6 +447,10 @@ function getGuruApprovalStatus(guru: GuruRow) {
 }
 
 function getBackgroundCheckLabel(status: string) {
+  if (isTrustSafetyScreeningBypassed()) {
+    return "Bypassed (Complete)";
+  }
+
   switch (status) {
     case "clear":
       return "Clear";
@@ -1393,6 +1409,12 @@ export default async function AdminGuruApprovalsPage({
               pending reports, and manually override status when Admin review is
               required.
             </p>
+
+            {isTrustSafetyScreeningBypassed() ? (
+              <p className="mt-3 max-w-3xl rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold leading-6 text-emerald-900">
+                {TRUST_SAFETY_SCREENING_BYPASS.adminNote}
+              </p>
+            ) : null}
           </div>
 
           <Link

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import {
+  isTrustSafetyScreeningBypassed,
+  TRUST_SAFETY_SCREENING_BYPASS,
+} from "@/lib/config/trust-safety";
 
 export const dynamic = "force-dynamic";
 
@@ -263,6 +267,10 @@ function formatDate(value?: string | null) {
 }
 
 function normalizeStatus(value?: string | null) {
+  if (isTrustSafetyScreeningBypassed()) {
+    return TRUST_SAFETY_SCREENING_BYPASS.status;
+  }
+
   const normalized = asTrimmedString(value).toLowerCase();
 
   if (!normalized) return "not_started";
@@ -275,6 +283,10 @@ function normalizeStatus(value?: string | null) {
 }
 
 function getStatusLabel(status?: string | null) {
+  if (isTrustSafetyScreeningBypassed()) {
+    return "Bypassed (Complete)";
+  }
+
   const normalized = normalizeStatus(status);
 
   switch (normalized) {
@@ -1325,6 +1337,12 @@ export default async function AdminBackgroundChecksPage({
                 approvals, remaining balances, booking deduction exposure,
                 Checkr invitation readiness, and background check status.
               </p>
+
+              {isTrustSafetyScreeningBypassed() ? (
+                <p className="mt-4 max-w-3xl rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold leading-6 text-emerald-900">
+                  {TRUST_SAFETY_SCREENING_BYPASS.adminNote}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap gap-3">
