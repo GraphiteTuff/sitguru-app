@@ -1,9 +1,20 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
+
+type PageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function firstParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return String(value[0] || "").trim();
+  return String(value || "").trim();
+}
 
 type GuruRow = Record<string, unknown>;
 type ProfileRow = Record<string, unknown>;
@@ -162,6 +173,12 @@ function getGuruId(guru: GuruRow) {
 }
 
 function getGuruName(guru: GuruRow, profile?: ProfileRow) {
+  const firstName =
+    asTrimmedString(guru.first_name) || asTrimmedString(profile?.first_name);
+  const lastName =
+    asTrimmedString(guru.last_name) || asTrimmedString(profile?.last_name);
+  const combined = `${firstName} ${lastName}`.trim();
+
   return (
     asTrimmedString(guru.display_name) ||
     asTrimmedString(guru.full_name) ||
@@ -169,6 +186,7 @@ function getGuruName(guru: GuruRow, profile?: ProfileRow) {
     asTrimmedString(profile?.display_name) ||
     asTrimmedString(profile?.full_name) ||
     asTrimmedString(profile?.name) ||
+    combined ||
     asTrimmedString(guru.email).split("@")[0] ||
     asTrimmedString(profile?.email).split("@")[0] ||
     "Guru Applicant"
@@ -553,26 +571,71 @@ function getSiteUrl() {
 async function startCheckrInvite(formData: FormData) {
   "use server";
 
-  const guruId = String(formData.get("guruId") || "");
+  const guruId = String(formData.get("guruId") || "").trim();
 
-  if (!guruId) return;
+  if (!guruId) {
+    redirect("/admin/guru-approvals?checkr_error=missing_guru");
+  }
 
   try {
-    await fetch(`${getSiteUrl()}/api/checkr/create-invitation`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    const cookieStore = await cookies();
+    const cookieHeader = cookieStore
+      .getAll()
+      .map((cookie) => `${cookie.name}=${cookie.value}`)
+      .join("; ");
+
+    const response = await fetch(
+      `${getSiteUrl()}/api/checkr/create-invitation`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        },
+        body: JSON.stringify({ guruId }),
+        cache: "no-store",
       },
-      body: JSON.stringify({ guruId }),
-      cache: "no-store",
-    });
+    );
+
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string;
+      invitation_url?: string;
+    } | null;
+
+    if (!response.ok) {
+      const message =
+        payload?.error || `Checkr invite failed (${response.status}).`;
+      redirect(
+        `/admin/guru-approvals?checkr_error=${encodeURIComponent(message.slice(0, 160))}&user=${encodeURIComponent(guruId)}`,
+      );
+    }
   } catch (error) {
+    // Next.js redirect() throws; rethrow those.
+    if (
+      error &&
+      typeof error === "object" &&
+      "digest" in error &&
+      String((error as { digest?: string }).digest || "").startsWith(
+        "NEXT_REDIRECT",
+      )
+    ) {
+      throw error;
+    }
+
     console.error("Failed to start Checkr invite from admin:", error);
+    const message =
+      error instanceof Error ? error.message : "Unable to start Checkr invite.";
+    redirect(
+      `/admin/guru-approvals?checkr_error=${encodeURIComponent(message.slice(0, 160))}&user=${encodeURIComponent(guruId)}`,
+    );
   }
 
   revalidatePath("/admin/guru-approvals");
   revalidatePath("/admin/gurus");
   revalidatePath("/admin/background-checks");
+  redirect(
+    `/admin/guru-approvals?checkr_success=1&user=${encodeURIComponent(guruId)}`,
+  );
 }
 
 async function updateBackgroundCheckStatus(formData: FormData) {
@@ -674,6 +737,7 @@ function AdminNavigationPanel() {
           primary
         />
         <AdminNavButton href="/admin/gurus" label="All Guru Records" />
+        <AdminNavButton href="/admin/gurus/new" label="Add Guru" />
         <AdminNavButton
           href="/admin/gurus?queue=pending-reviews"
           label="Pending Reviews"
@@ -1170,7 +1234,9 @@ const reviewChecklist = [
   "Approve only profiles ready to convert customer trust",
 ];
 
-export default async function AdminGuruApprovalsPage() {
+export default async function AdminGuruApprovalsPage({
+  searchParams,
+}: PageProps) {
   const supabase = await createClient();
 
   const {
@@ -1182,11 +1248,61 @@ export default async function AdminGuruApprovalsPage() {
     return null;
   }
 
+  const params = searchParams ? await searchParams : {};
+  const scopedUser = firstParam(params.user);
+  const scopedEmail = firstParam(params.email).toLowerCase();
+  const scopedName = firstParam(params.name).toLowerCase();
+  const checkrError = firstParam(params.checkr_error);
+  const checkrSuccess = firstParam(params.checkr_success) === "1";
+
   const approvalData = await getGuruApprovalData();
+
+  const scopedRows =
+    scopedUser || scopedEmail || scopedName
+      ? approvalData.tableRows.filter((row) => {
+          const idMatch = scopedUser
+            ? row.id === scopedUser || row.href.includes(scopedUser)
+            : false;
+          const emailMatch = scopedEmail
+            ? row.name.toLowerCase().includes(scopedEmail) ||
+              row.id.toLowerCase().includes(scopedEmail)
+            : false;
+          const nameMatch = scopedName
+            ? row.name.toLowerCase().includes(scopedName)
+            : false;
+          return idMatch || emailMatch || nameMatch;
+        })
+      : approvalData.tableRows;
+
+  const tableRows =
+    scopedRows.length > 0 ? scopedRows : approvalData.tableRows;
 
   return (
     <main className="space-y-8">
       <AdminNavigationPanel />
+
+      {checkrError ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+          Checkr invite failed: {decodeURIComponent(checkrError)}
+        </div>
+      ) : null}
+
+      {checkrSuccess ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+          Checkr invite started. Refresh the row if the invite link is not
+          visible yet.
+        </div>
+      ) : null}
+
+      {scopedUser || scopedEmail || scopedName ? (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800">
+          Showing approvals scoped from User Directory
+          {scopedName ? ` for ${firstParam(params.name)}` : ""}.{" "}
+          <Link href="/admin/guru-approvals" className="font-black underline">
+            Clear scope
+          </Link>
+        </div>
+      ) : null}
 
       <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.13),transparent_28%),linear-gradient(135deg,#ecfdf5_0%,#ffffff_52%,#f8fafc_100%)] p-6 shadow-sm sm:p-8">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
@@ -1207,6 +1323,13 @@ export default async function AdminGuruApprovalsPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <Link
+              href="/admin/gurus/new"
+              className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100"
+            >
+              Add Guru
+            </Link>
+
             <Link
               href="/admin/gurus"
               className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
@@ -1420,7 +1543,88 @@ export default async function AdminGuruApprovalsPage() {
           </Link>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200">
+        <div className="mt-6 space-y-4 lg:hidden">
+          {tableRows.length ? (
+            tableRows.map((application) => {
+              const scoped =
+                Boolean(scopedUser) &&
+                (application.id === scopedUser ||
+                  application.href.includes(scopedUser));
+
+              return (
+                <article
+                  key={`mobile-${application.id}-${application.name}`}
+                  className={`rounded-[1.5rem] border p-4 shadow-sm ${
+                    scoped
+                      ? "border-emerald-300 bg-emerald-50/60"
+                      : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="truncate text-lg font-black text-slate-950">
+                        {application.name}
+                      </h4>
+                      <p className="mt-1 break-all text-xs font-semibold text-slate-500">
+                        {application.id}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex shrink-0 rounded-full border px-3 py-1 text-xs font-black ${statusClasses(
+                        application.status,
+                      )}`}
+                    >
+                      {application.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid gap-2 text-sm font-semibold text-slate-600">
+                    <p>
+                      <span className="font-black text-slate-800">Services:</span>{" "}
+                      {application.specialty}
+                    </p>
+                    <p>
+                      <span className="font-black text-slate-800">Location:</span>{" "}
+                      {application.location}
+                    </p>
+                    <p>
+                      <span className="font-black text-slate-800">Background:</span>{" "}
+                      {application.backgroundCheckLabel}
+                    </p>
+                    <p>
+                      <span className="font-black text-slate-800">Joined:</span>{" "}
+                      {application.joined}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 grid gap-2">
+                    <form action={startCheckrInvite}>
+                      <input type="hidden" name="guruId" value={application.id} />
+                      <button
+                        type="submit"
+                        className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-700"
+                      >
+                        Start Checkr
+                      </button>
+                    </form>
+                    <Link
+                      href={application.href}
+                      className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-700 transition hover:bg-emerald-100"
+                    >
+                      Review
+                    </Link>
+                  </div>
+                </article>
+              );
+            })
+          ) : (
+            <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-white p-8 text-center text-sm font-semibold text-slate-500">
+              No Guru applications found yet.
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 hidden overflow-hidden rounded-3xl border border-slate-200 lg:block">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50">
@@ -1456,11 +1660,19 @@ export default async function AdminGuruApprovalsPage() {
               </thead>
 
               <tbody className="divide-y divide-slate-200 bg-white">
-                {approvalData.tableRows.length ? (
-                  approvalData.tableRows.map((application) => (
+                {tableRows.length ? (
+                  tableRows.map((application) => {
+                    const scoped =
+                      Boolean(scopedUser) &&
+                      (application.id === scopedUser ||
+                        application.href.includes(scopedUser));
+
+                    return (
                     <tr
                       key={`${application.id}-${application.name}`}
-                      className="transition hover:bg-emerald-50/40"
+                      className={`transition hover:bg-emerald-50/40 ${
+                        scoped ? "bg-emerald-50/70" : ""
+                      }`}
                     >
                       <td className="px-5 py-5 align-top">
                         <div className="font-black text-slate-950">
@@ -1578,7 +1790,8 @@ export default async function AdminGuruApprovalsPage() {
                         </Link>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 ) : (
                   <tr>
                     <td
