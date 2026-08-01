@@ -481,7 +481,7 @@ export default async function SalesMarketingAdminPage() {
               <div>
                 <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800">
                   <Megaphone className="h-4 w-4" aria-hidden="true" />
-                  Sales & Marketing Command Center
+                  Sales & Marketing Dashboard
                 </div>
 
                 <h1 className="max-w-4xl text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">

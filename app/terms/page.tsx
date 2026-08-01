@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   ArrowRight,
   Bell,
@@ -181,7 +182,7 @@ const sections = [
   {
     title: "11. Programs, Applications, and Pathways",
     body: [
-      "SitGuru may offer or promote pathways such as Student Hire, Community Hire, Military Hire, partner referrals, waitlists, pilot programs, ambassador opportunities, outreach programs, or other programs.",
+      `SitGuru may offer or promote pathways such as Student Hire, Community Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.displayName}, partner referrals, waitlists, pilot programs, ambassador opportunities, outreach programs, or other programs.`,
       "Applying to a SitGuru program does not guarantee acceptance, approval, employment, independent contractor status, bookings, earnings, compensation, referral rewards, Pet Guru activation, or continued access to the platform.",
       "Program applicants may be asked to provide information for review, onboarding, trust and safety steps, eligibility assessment, communications, and pathway support.",
       "SitGuru may change, pause, expand, combine, rename, or end programs at any time, subject to applicable law.",

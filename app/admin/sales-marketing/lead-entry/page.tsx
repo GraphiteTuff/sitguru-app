@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   ArrowLeft,
   CalendarHeart,
@@ -74,7 +75,7 @@ const growthChannels = [
   "Affiliate Program",
   "PawPerks / Local Awareness",
   "Student Hire Program",
-  "Veterans Hire Program",
+  VETERANS_MILITARY_FAMILIES_PROGRAM.displayName,
   "Community Hire Program",
   "Direct Outreach",
   "Friends & Family",
@@ -83,7 +84,7 @@ const growthChannels = [
 const programInterests = [
   "Ambassador Program",
   "Student Hire Program",
-  "Veterans Hire Program",
+  VETERANS_MILITARY_FAMILIES_PROGRAM.displayName,
   "Community Hire Program",
   "Programs to Guru Status",
   "Partner Network",

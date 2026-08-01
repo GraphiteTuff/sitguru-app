@@ -15,6 +15,7 @@ import {
   Sparkles,
   UsersRound,
 } from "lucide-react";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 type ProgramKey =
   | "student-hire"
@@ -84,15 +85,14 @@ const programs: ProgramDefinition[] = [
   },
   {
     key: "veterans-hire",
-    title: "Military-Connected Pathway",
+    title: VETERANS_MILITARY_FAMILIES_PROGRAM.displayName,
     campaign: "Serve the Pack",
-    description:
-      "A flexible pathway for veterans, military spouses, Guard, Reserve, qualified dependents age 18+, and transitioning service members.",
+    description: VETERANS_MILITARY_FAMILIES_PROGRAM.description,
     imageSrc: "/images/programs/veterans-hire.jpg",
     imageAlt: "Military-connected family spending time with a dog",
     imagePosition: "center 34%",
     icon: <Medal size={24} />,
-    applyHref: "/programs/apply?program=veterans-hire",
+    applyHref: VETERANS_MILITARY_FAMILIES_PROGRAM.applyHref,
     idealFor: [
       "Veterans and transitioning service members",
       "Military spouses and qualified dependents",
@@ -350,7 +350,7 @@ export default function ProgramsPage() {
                   },
                   {
                     icon: <Medal size={19} />,
-                    title: "Military-connected",
+                    title: VETERANS_MILITARY_FAMILIES_PROGRAM.shortName,
                     text: "A pathway built around transferable experience.",
                     href: "#veterans-hire",
                   },

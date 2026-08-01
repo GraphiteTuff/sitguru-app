@@ -1957,7 +1957,7 @@ export default async function GuruDashboardPage() {
 
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] !text-emerald-700 sm:text-xs">
-                    SitGuru Guru Command Center
+                    SitGuru Guru Dashboard
                   </p>
                   <h1 className="mt-1 text-3xl font-black tracking-tight !text-emerald-950 sm:text-4xl">
                     Hey, {welcomeName} 👋

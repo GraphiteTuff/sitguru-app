@@ -22,11 +22,17 @@ import {
   UserRound,
 } from "lucide-react";
 import Header from "@/components/Header";
+import { VeteransMilitaryFamiliesOptIn } from "@/components/programs/VeteransMilitaryFamiliesOptIn";
 import {
   formatFlexiblePhone,
   isValidInternationalPhone,
   isValidPostalCode,
 } from "@/components/dashboard/internationalFieldRules";
+import {
+  readVeteransMilitaryFamiliesOptIn,
+  VETERANS_MILITARY_FAMILIES_OPT_IN_KEY,
+  VETERANS_MILITARY_FAMILIES_PROGRAM,
+} from "@/lib/programs/veterans-military-families";
 import { supabase } from "@/lib/supabase";
 
 type PhotoColumn = "avatar_url" | "profile_photo_url" | "photo_url" | "image_url";
@@ -609,6 +615,8 @@ export default function CustomerBasicInfoPage() {
   const [photoFailed, setPhotoFailed] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [joinedVeteransMilitaryFamilies, setJoinedVeteransMilitaryFamilies] =
+    useState(false);
 
   const fullNameComplete = Boolean(form.full_name.trim());
   const emailComplete = Boolean(profile?.email);
@@ -648,6 +656,11 @@ export default function CustomerBasicInfoPage() {
 
       setProfile(profileData);
       setForm(profileToForm(profileData));
+      setJoinedVeteransMilitaryFamilies(
+        readVeteransMilitaryFamiliesOptIn(
+          (user.user_metadata || {}) as Record<string, unknown>,
+        ),
+      );
       setSetupStatus(setupData);
       setPhotoFailed(false);
     } catch (error) {
@@ -762,6 +775,13 @@ export default function CustomerBasicInfoPage() {
 
     try {
       await saveBasicInfo(profile, form);
+
+      await supabase.auth.updateUser({
+        data: {
+          [VETERANS_MILITARY_FAMILIES_OPT_IN_KEY]:
+            joinedVeteransMilitaryFamilies,
+        },
+      });
 
       const refreshedProfile = await fetchBasicInfoProfile({
         id: profile.id,
@@ -1004,6 +1024,24 @@ export default function CustomerBasicInfoPage() {
                       className="w-full rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3.5 text-sm font-bold text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
                     />
                   </label>
+
+                  <VeteransMilitaryFamiliesOptIn
+                    checked={joinedVeteransMilitaryFamilies}
+                    onChange={setJoinedVeteransMilitaryFamilies}
+                  />
+                  {joinedVeteransMilitaryFamilies ? (
+                    <p className="text-xs font-semibold leading-5 text-slate-600">
+                      Optional pathway details stay off the main Pet Parent
+                      experience. Learn more about{" "}
+                      <a
+                        href={VETERANS_MILITARY_FAMILIES_PROGRAM.programsAnchorHref}
+                        className="font-black text-emerald-700 hover:underline"
+                      >
+                        {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}
+                      </a>
+                      .
+                    </p>
+                  ) : null}
 
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <p className="text-sm font-black text-slate-950">

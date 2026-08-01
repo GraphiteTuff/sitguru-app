@@ -27,6 +27,10 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  VETERANS_MILITARY_FAMILIES_PROGRAM,
+  isVeteransMilitaryFamiliesProgram,
+} from "@/lib/programs/veterans-military-families";
 
 export const dynamic = "force-dynamic";
 
@@ -91,7 +95,8 @@ const adminRoutes = {
   ambassadors: "/admin/ambassadors",
 };
 
-const programOrder = ["Student Hire", "Community Hire", "Military Hire"];
+const VETERANS_PROGRAM_LABEL = VETERANS_MILITARY_FAMILIES_PROGRAM.shortName;
+const programOrder = ["Student Hire", "Community Hire", VETERANS_PROGRAM_LABEL];
 
 const statusOrder = [
   "New",
@@ -1643,6 +1648,7 @@ function getProgramLabel(row: AnyRow) {
   );
 
   if (programOrder.includes(explicitProgram)) return explicitProgram;
+  if (isVeteransMilitaryFamiliesProgram(explicitProgram)) return VETERANS_PROGRAM_LABEL;
 
   if (text.includes("student")) return "Student Hire";
   if (text.includes("community")) return "Community Hire";
@@ -1655,7 +1661,7 @@ function getProgramLabel(row: AnyRow) {
     text.includes("guard") ||
     text.includes("reserve")
   ) {
-    return "Military Hire";
+    return VETERANS_PROGRAM_LABEL;
   }
 
   return "Community Hire";
@@ -2319,8 +2325,9 @@ async function getAmbassadorLeadData() {
     community: normalizedLeads.filter(
       (lead) => lead.program === "Community Hire",
     ).length,
-    military: normalizedLeads.filter((lead) => lead.program === "Military Hire")
-      .length,
+    military: normalizedLeads.filter((lead) =>
+      isVeteransMilitaryFamiliesProgram(lead.program),
+    ).length,
     newCount: normalizedLeads.filter((lead) => lead.status === "New").length,
     contacted: normalizedLeads.filter((lead) => lead.status === "Contacted")
       .length,
@@ -2542,8 +2549,9 @@ export default async function AmbassadorLeadsPage({
       .length,
     community: filteredLeads.filter((lead) => lead.program === "Community Hire")
       .length,
-    military: filteredLeads.filter((lead) => lead.program === "Military Hire")
-      .length,
+    military: filteredLeads.filter((lead) =>
+      isVeteransMilitaryFamiliesProgram(lead.program),
+    ).length,
   };
 
   return (
@@ -2568,7 +2576,7 @@ export default async function AmbassadorLeadsPage({
           </div>
 
           <p className="mt-2 max-w-4xl text-base font-semibold leading-7 text-slate-600">
-            Track Student Hire, Community Hire, and Military Hire ambassador
+            Track Student Hire, Community Hire, and {VETERANS_PROGRAM_LABEL} ambassador
             applicants from Indeed, ZipRecruiter, PA CareerLink, social media,
             referrals, events, and website interest forms.
           </p>
@@ -2619,7 +2627,7 @@ export default async function AmbassadorLeadsPage({
           value={number(filteredMetrics.community)}
         />
         <DataHealthTile
-          label="Military Hire"
+          label={VETERANS_PROGRAM_LABEL}
           value={number(filteredMetrics.military)}
         />
         <DataHealthTile
@@ -2938,7 +2946,7 @@ export default async function AmbassadorLeadsPage({
               <div className="flex flex-wrap gap-2">
                 <StatusPill label="Student Hire" />
                 <StatusPill label="Community Hire" />
-                <StatusPill label="Military Hire" />
+                <StatusPill label={VETERANS_PROGRAM_LABEL} />
               </div>
             </div>
 
@@ -2956,7 +2964,7 @@ export default async function AmbassadorLeadsPage({
                 icon={<Users size={18} />}
               />
               <ProgramMiniCard
-                title="Military Hire"
+                title={VETERANS_PROGRAM_LABEL}
                 detail="Veterans, spouses, and service families."
                 value={number(filteredMetrics.military)}
                 icon={<ShieldCheck size={18} />}
@@ -3184,8 +3192,8 @@ export default async function AmbassadorLeadsPage({
         <DashboardCard>
           <ActionCard
             icon={<ClipboardList size={20} />}
-            title="Program Command Center"
-            detail="Review Student Hire, Community Hire, Military Hire, PawPerks, referrals, and growth programs."
+            title="Program Dashboard"
+            detail={`Review Student Hire, Community Hire, ${VETERANS_PROGRAM_LABEL}, PawPerks, referrals, and growth programs.`}
             href={adminRoutes.programs}
             action="Open Programs"
           />
@@ -3756,7 +3764,7 @@ function ProgramBadge({ program }: { program: string }) {
   const styles =
     program === "Student Hire"
       ? "bg-blue-50 text-blue-800 border-blue-100"
-      : program === "Military Hire"
+      : isVeteransMilitaryFamiliesProgram(program)
         ? "bg-emerald-50 text-emerald-800 border-emerald-100"
         : "bg-green-50 text-green-800 border-green-100";
 
@@ -3764,7 +3772,9 @@ function ProgramBadge({ program }: { program: string }) {
     <span
       className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${styles}`}
     >
-      {program}
+      {isVeteransMilitaryFamiliesProgram(program)
+        ? VETERANS_PROGRAM_LABEL
+        : program}
     </span>
   );
 }

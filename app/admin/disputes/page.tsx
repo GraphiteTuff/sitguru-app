@@ -991,7 +991,7 @@ export default async function AdminDisputesPage({
             <StatCard
               label="Open Disputes"
               value={data.totals.open.toLocaleString()}
-              detail="Cases currently under HQ review."
+              detail="Cases currently under admin review."
               tone="rose"
             />
             <StatCard

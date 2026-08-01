@@ -163,7 +163,7 @@ export default function AmbassadorDashboardLayout({
                   <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-600">
                     Schedule activities, manage your calendar, record events and
                     marketing, submit leads, track hours and results, and request
-                    help from SitGuru Headquarters.
+                    help from SitGuru Support.
                   </p>
 
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -189,7 +189,7 @@ export default function AmbassadorDashboardLayout({
                         icon: <QrCode size={13} />,
                       },
                       {
-                        label: "Headquarters",
+                        label: "Support",
                         icon: <MessageCircle size={13} />,
                       },
                     ].map((item) => (

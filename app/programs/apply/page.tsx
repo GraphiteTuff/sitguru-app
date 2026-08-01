@@ -28,7 +28,9 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
+import { VeteransMilitaryFamiliesOptIn } from "@/components/programs/VeteransMilitaryFamiliesOptIn";
 import { trackEvent } from "@/lib/analytics/track";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 const openSans = {
   className: "font-sans",
@@ -83,6 +85,7 @@ type ApplicationFormState = {
   servicesInterested: string[];
   experience: string;
   militaryConnectedBackground: string;
+  joinVeteransMilitaryFamilies: boolean;
   schoolName: string;
   studentStatus: string;
   graduationYearOrAvailability: string;
@@ -180,9 +183,9 @@ const programOptions: ProgramOption[] = [
   },
   {
     key: "veterans-hire",
-    title: "Veterans Hire Program",
-    shortTitle: "Veterans Hire",
-    eyebrow: "Military-connected pathway",
+    title: VETERANS_MILITARY_FAMILIES_PROGRAM.displayName,
+    shortTitle: VETERANS_MILITARY_FAMILIES_PROGRAM.shortName,
+    eyebrow: VETERANS_MILITARY_FAMILIES_PROGRAM.eyebrow,
     icon: <Medal size={28} />,
     description:
       "For veterans, eligible service members, National Guard, reservists, military spouses, qualified dependents over 18, and approved SkillBridge applicants who want flexible pet care opportunities and a path to grow with SitGuru.",
@@ -195,10 +198,10 @@ const programOptions: ProgramOption[] = [
       "Military spouses",
       "Qualified dependents over 18",
       "Approved SkillBridge applicants",
-      "Military-connected applicants ready to work, learn, and grow",
+      "Applicants ready to work, learn, and grow",
     ],
     growthPath: [
-      "Apply through the Veterans Hire Program",
+      VETERANS_MILITARY_FAMILIES_PROGRAM.applyCta,
       "Share transferable experience you would like SitGuru to consider",
       "Upload a resume and optional supporting documents",
       "Complete onboarding and training guidance",
@@ -237,8 +240,8 @@ const programOptions: ProgramOption[] = [
   },
   {
     key: "skillbridge-interest",
-    title: "SkillBridge Interest / Veterans Pathway",
-    shortTitle: "SkillBridge Interest",
+    title: VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName,
+    shortTitle: VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.shortName,
     eyebrow: "Exploring future SkillBridge pathway",
     icon: <ShieldCheck size={28} />,
     description:
@@ -254,7 +257,7 @@ const programOptions: ProgramOption[] = [
       "People planning post-transition flexible opportunities",
     ],
     growthPath: [
-      "Join the SkillBridge Interest / Veterans Pathway list",
+      `Join the ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName} list`,
       "Share your transition timeline and transferable experience",
       "Upload optional supporting documents if you choose",
       "Receive updates if SitGuru launches or partners on a SkillBridge pathway",
@@ -319,6 +322,7 @@ const initialFormState: ApplicationFormState = {
   servicesInterested: [],
   experience: "",
   militaryConnectedBackground: "",
+  joinVeteransMilitaryFamilies: false,
   schoolName: "",
   studentStatus: "",
   graduationYearOrAvailability: "",
@@ -328,6 +332,12 @@ const initialFormState: ApplicationFormState = {
   backgroundCheckConsent: false,
   notes: "",
 };
+
+function normalizeProgramParam(value: string | null): ProgramKey | "" {
+  if (!value) return "";
+  if (value === "military-hire") return "veterans-hire";
+  return isProgramKey(value) ? value : "";
+}
 
 function isProgramKey(value: string | null): value is ProgramKey {
   return (
@@ -400,9 +410,7 @@ function ProgramApplyContent() {
   const confirmationRef = useRef<HTMLDivElement | null>(null);
   const schoolSearchContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const selectedProgramFromUrl = isProgramKey(programParam)
-    ? programParam
-    : "";
+  const selectedProgramFromUrl = normalizeProgramParam(programParam);
 
   const [formState, setFormState] = useState<ApplicationFormState>({
     ...initialFormState,
@@ -438,8 +446,11 @@ function ProgramApplyContent() {
   const isStudentProgram = formState.program === "student-hire";
   const isAmbassadorProgram = formState.program === "ambassador-program";
   const isSkillBridgeProgram = formState.program === "skillbridge-interest";
-  const shouldShowMilitaryBackground =
+  const programImpliesVeteransOptIn =
     isVeteransProgram || isSkillBridgeProgram;
+  const joinedVeteransMilitaryFamilies =
+    programImpliesVeteransOptIn || formState.joinVeteransMilitaryFamilies;
+  const shouldShowMilitaryBackground = joinedVeteransMilitaryFamilies;
 
   useEffect(() => {
     setFormState((prev) => ({
@@ -932,8 +943,26 @@ function ProgramApplyContent() {
       if (additionalDocumentError) throw new Error(additionalDocumentError);
 
       const applicationData = new FormData();
+      const optedIn = programImpliesVeteransOptIn
+        ? true
+        : formState.joinVeteransMilitaryFamilies;
+      const submissionState: ApplicationFormState = {
+        ...formState,
+        joinVeteransMilitaryFamilies: optedIn,
+        militaryConnectedBackground: optedIn
+          ? formState.militaryConnectedBackground
+          : "",
+        notes: [
+          formState.notes.trim(),
+          optedIn
+            ? `Opted into ${VETERANS_MILITARY_FAMILIES_PROGRAM.displayName}.`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      };
 
-      Object.entries(formState).forEach(([key, value]) => {
+      Object.entries(submissionState).forEach(([key, value]) => {
         if (key === "servicesInterested" && Array.isArray(value)) {
           applicationData.append("servicesInterested", value.join(", "));
           applicationData.append(
@@ -1096,7 +1125,7 @@ function ProgramApplyContent() {
                     : isAmbassadorProgram
                       ? "Help SitGuru grow in the pet community."
                       : isSkillBridgeProgram
-                        ? "Join the SkillBridge Interest / Veterans Pathway."
+                        ? `Join the ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}.`
                         : `Apply for the ${selectedProgram.title}.`
                   : "Choose your SitGuru program."}
               </h1>
@@ -1110,7 +1139,7 @@ function ProgramApplyContent() {
                       : isSkillBridgeProgram
                         ? "SitGuru is exploring a future SkillBridge-style training pathway. Join the interest list to share your background, transition goals, and areas of interest."
                         : `You are applying for the ${selectedProgram.title}. Qualified applicants complete onboarding, SitGuru trust and safety review steps when required, and may grow into full Guru status with greater commissions and future benefits over time.`
-                  : "Select Student Hire, Veterans Hire, Ambassador Program, or SkillBridge Interest / Veterans Pathway before submitting. This keeps your application routed correctly."}
+                  : `Select Student Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, Ambassador Program, or ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName} before submitting. This keeps your application routed correctly.`}
               </p>
 
               <div className="mt-7 grid gap-3 sm:grid-cols-3">
@@ -1527,7 +1556,7 @@ function ProgramApplyContent() {
                             : isAmbassadorProgram
                               ? "Apply to become a SitGuru Ambassador"
                               : isSkillBridgeProgram
-                                ? "Join the SkillBridge Interest / Veterans Pathway"
+                                ? `Join the ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}`
                                 : `Apply for ${selectedProgram.title}`
                           : "Choose a program to start"}
                       </h2>
@@ -1539,9 +1568,9 @@ function ProgramApplyContent() {
                             : isAmbassadorProgram
                               ? "This application will be submitted as Ambassador Program. Tell us your pet-care background, referral network, and how you want to help SitGuru grow."
                               : isSkillBridgeProgram
-                                ? "This will be submitted as SkillBridge Interest / Veterans Pathway."
+                                ? `This will be submitted as ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}.`
                                 : `This application will be submitted as ${selectedProgram.title}.`
-                          : "Pick Student Hire, Veterans Hire, Ambassador Program, or SkillBridge Interest / Veterans Pathway before submitting."}
+                          : `Pick Student Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, Ambassador Program, or ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName} before submitting.`}
                       </p>
                     </div>
 
@@ -1987,11 +2016,35 @@ function ProgramApplyContent() {
                       ) : null}
                     </div>
 
+                    {!programImpliesVeteransOptIn ? (
+                      <VeteransMilitaryFamiliesOptIn
+                        checked={formState.joinVeteransMilitaryFamilies}
+                        onChange={(checked) => {
+                          updateField("joinVeteransMilitaryFamilies", checked);
+                          if (!checked) {
+                            updateField("militaryConnectedBackground", "");
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm font-semibold leading-6 text-emerald-900">
+                        You selected{" "}
+                        {isSkillBridgeProgram
+                          ? VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge
+                              .displayName
+                          : VETERANS_MILITARY_FAMILIES_PROGRAM.displayName}
+                        . Optional background details below stay private to SitGuru
+                        review.
+                      </div>
+                    )}
+
                     {shouldShowMilitaryBackground ? (
                       <div className="rounded-[28px] border border-green-100 bg-green-50 p-4">
                         <label className="mb-2 block text-sm font-black text-green-950">
-                          Military-connected background or transferable
-                          experience
+                          Background or transferable experience
+                          <span className="ml-1 font-semibold text-green-800">
+                            (optional)
+                          </span>
                         </label>
                         <textarea
                           value={formState.militaryConnectedBackground}
@@ -2003,7 +2056,7 @@ function ProgramApplyContent() {
                           }
                           rows={4}
                           className="min-h-[110px] w-full resize-y rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
-                          placeholder="Optional: Share military, spouse, veteran, Guard, reserve, leadership, customer service, pet care, operations, transition timeline, or community experience you’d like us to know about."
+                          placeholder="Optional: Share service, spouse, veteran, Guard, reserve, leadership, customer service, pet care, operations, transition timeline, or community experience you’d like us to know about."
                         />
                       </div>
                     ) : null}
@@ -2286,7 +2339,7 @@ function ProgramApplyContent() {
                             : isAmbassadorProgram
                               ? "Apply to Become an Ambassador"
                               : isSkillBridgeProgram
-                                ? "Join SkillBridge Interest / Veterans Pathway"
+                                ? `Join ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}`
                                 : `Apply to ${getProgramLabel(formState.program)}`
                           : "Choose Program to Apply"}
                       {!isSubmitting ? <ArrowRight size={18} /> : null}

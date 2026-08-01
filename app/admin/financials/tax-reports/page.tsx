@@ -759,7 +759,7 @@ export default async function AdminFinancialsTaxReportsPage() {
           <SectionHeader
             eyebrow="Tax Payment Workflow"
             title="How SitGuru should organize quarterly, annual, and local tax readiness"
-            description="Use this as the admin tax command center. It does not replace CPA advice or file returns automatically, but it keeps each tax area organized, linked, and supported with the financial records already wired into SitGuru."
+            description="Use this as the admin tax dashboard. It does not replace CPA advice or file returns automatically, but it keeps each tax area organized, linked, and supported with the financial records already wired into SitGuru."
           />
 
           <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">

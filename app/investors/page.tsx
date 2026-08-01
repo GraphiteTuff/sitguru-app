@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   ArrowRight,
   BadgeCheck,
@@ -84,7 +85,7 @@ const growthAreas: GrowthArea[] = [
     title: "Guru Programs",
     eyebrow: "Supply expansion",
     description:
-      "Military Hire, Student Hire, and Community Hire programs help SitGuru attract, train, support, and graduate more qualified Gurus.",
+      `${VETERANS_MILITARY_FAMILIES_PROGRAM.displayName}, Student Hire, and Community Hire programs help SitGuru attract, train, support, and graduate more qualified Gurus.`,
     icon: <HeartHandshake size={26} />,
     items: [
       "Military-connected applicants",
@@ -474,7 +475,7 @@ export default function InvestorsPage() {
               </h2>
 
               <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-                SitGuru’s Military Hire, Student Hire, and Community Hire
+                SitGuru’s {VETERANS_MILITARY_FAMILIES_PROGRAM.displayName}, Student Hire, and Community Hire
                 programs are designed to welcome qualified applicants, provide
                 onboarding and training support, and help productive participants
                 graduate into full Guru status.

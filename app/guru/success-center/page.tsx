@@ -273,7 +273,7 @@ const fallbackGuruResources: GuruResource[] = [
   },
   {
     id: "bookings-command-center",
-    title: "Use the Bookings & PawReports command center",
+    title: "Use the Bookings & PawReports dashboard",
     description:
       "Open a booking, message the Pet Parent, start or continue a PawReport, begin a live walk, add updates, and complete the care summary.",
     category: "Bookings",
@@ -293,7 +293,7 @@ const fallbackGuruResources: GuruResource[] = [
       },
       {
         title: "What to save during care",
-        body: "Use the command center to record what matters for the visit and make the Pet Parent feel connected.",
+        body: "Use the dashboard to record what matters for the visit and make the Pet Parent feel connected.",
         bullets: ["Photos", "Potty details", "Food and water", "Medication if applicable", "Mood and play", "Walk duration and distance when used"],
       },
     ],
@@ -945,7 +945,7 @@ export default function GuruSuccessCenterPage() {
                 PawReport Live + Live Walk Tracking
               </div>
               <p className="sgsc-pawreport-copy">
-                PawReport Live is the Guru care command center. It helps Gurus start booking updates, track walks when walking is part of the service, add photos and care notes, and give Pet Parents a clear view from their dashboard.
+                PawReport Live is the Guru care dashboard. It helps Gurus start booking updates, track walks when walking is part of the service, add photos and care notes, and give Pet Parents a clear view from their dashboard.
               </p>
             </div>
             <div className="sgsc-pawreport-badge">🐾 Live Care Ready</div>

@@ -1,5 +1,6 @@
 
 import Link from "next/link";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   ArrowLeft,
   ArrowRight,
@@ -494,7 +495,7 @@ export default async function AdminReferralApplicationsPage() {
     eyebrow: "Admin / Referrals / Applications",
     title: "Program Applications",
     description:
-      "Drill-down view for Ambassador, Student Hire, Veterans Hire, SkillBridge, partner, and affiliate application activity.",
+      `Drill-down view for Ambassador, Student Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, SkillBridge, partner, and affiliate application activity.`,
     icon: ClipboardList,
     children: (
       <>
@@ -503,7 +504,7 @@ export default async function AdminReferralApplicationsPage() {
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <KpiCard label="Total applications" value={formatNumber(rows.length)} detail="Program and partner application rows loaded." icon={ClipboardList} />
           <KpiCard label="Ambassador" value={formatNumber(ambassadorRows.length)} detail="Ambassador application rows." icon={Megaphone} />
-          <KpiCard label="Student / Veteran" value={formatNumber(studentRows.length + veteranRows.length)} detail="Student Hire, Veterans Hire, Military, and SkillBridge rows." icon={Users} />
+          <KpiCard label="Student / Veteran" value={formatNumber(studentRows.length + veteranRows.length)} detail={`Student Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, Military, and SkillBridge rows.`} icon={Users} />
           <KpiCard label="Partner / Affiliate" value={formatNumber(partnerRows.length)} detail="Partner and affiliate application rows." icon={HeartHandshake} />
         </section>
 

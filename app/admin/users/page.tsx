@@ -373,7 +373,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
-                HQ Department Messaging
+                Admin Department Messaging
               </p>
               <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                 Message internal teams from the directory.
@@ -384,7 +384,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                 & Marketing.
               </p>
             </div>
-            <ActionLink href="/admin/settings" label="Manage HQ Access" />
+            <ActionLink href="/admin/settings" label="Manage Admin Access" />
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">

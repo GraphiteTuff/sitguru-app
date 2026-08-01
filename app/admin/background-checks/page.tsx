@@ -1317,7 +1317,7 @@ export default async function AdminBackgroundChecksPage({
               </span>
 
               <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-                Trust & Safety Command Center
+                Trust & Safety Dashboard
               </h1>
 
               <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
@@ -1425,7 +1425,7 @@ export default async function AdminBackgroundChecksPage({
               </p>
 
               <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
-                Background check command center
+                Background check dashboard
               </h2>
 
               <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">

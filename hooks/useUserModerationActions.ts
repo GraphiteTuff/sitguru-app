@@ -186,7 +186,7 @@ export function useUserModerationActions(
       fallbackHref: buildInternalComposeHref(selectedUser),
       optimisticMessage: selectedUser
         ? `Opening internal thread for ${selectedUser.name || selectedUser.email || "user"}…`
-        : "Opening internal HQ thread…",
+        : "Opening internal staff thread…",
     });
   }, [selectedUser, startConversation]);
 

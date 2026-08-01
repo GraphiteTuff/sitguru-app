@@ -1062,7 +1062,7 @@ function DepartmentCard({
         </Pill>
       </div>
       <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-        {department.description || "SitGuru HQ department."}
+        {department.description || "SitGuru admin department."}
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-slate-100 bg-[#fbfefd] p-3">
@@ -1098,7 +1098,7 @@ function AssignAccessForm({
         disabled={disabled}
         className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
       >
-        <option value="">Choose HQ role...</option>
+        <option value="">Choose admin role...</option>
         {roles.map((role) => (
           <option key={role.role_key} value={role.role_key}>
             {role.name} — {getAccessLabel(asTrimmedString(role.access_level) || "viewer")}
@@ -1145,10 +1145,10 @@ function UserAccessTable({
                 User
               </th>
               <th className="px-4 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                HQ Department
+                Admin Department
               </th>
               <th className="px-4 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                HQ Role
+                Admin Role
               </th>
               <th className="px-4 py-4 text-xs font-black uppercase tracking-[0.18em]">
                 Access
@@ -1290,7 +1290,7 @@ function UserAccessTable({
                             disabled={!canManageUsers}
                             className="inline-flex w-full items-center justify-center rounded-2xl border border-rose-200 bg-white px-4 py-2.5 text-xs font-black text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                           >
-                            Deactivate HQ Access
+                            Deactivate Admin Access
                           </button>
                         </form>
                       ) : null}
@@ -1623,10 +1623,10 @@ async function getAdminSettingsData() {
 
   const systemChecks = [
     {
-      label: "HQ Access Tables",
+      label: "Admin Access Tables",
       status: accessRows.length > 0 || rolesRows.length > 0,
       detail:
-        "admin_departments, admin_roles, admin_role_permissions, and admin_user_access support corporate HQ access control.",
+        "admin_departments, admin_roles, admin_role_permissions, and admin_user_access support corporate admin access control.",
     },
     {
       label: "Supabase Service Role",
@@ -1705,11 +1705,11 @@ export default async function AdminSettingsPage() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
-                Admin / Settings / Corporate HQ Access
+                Admin / Settings / Admin Access
               </p>
 
               <h1 className="mt-3 max-w-5xl text-4xl font-black leading-[0.96] tracking-tight text-slate-950 sm:text-5xl">
-                SitGuru Corporate HQ Access Control.
+                SitGuru Admin Access Control.
               </h1>
 
               <p className="mt-4 max-w-4xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
@@ -1731,7 +1731,7 @@ export default async function AdminSettingsPage() {
                 Role: {actor.role}
               </p>
               <p className="mt-1 text-xs font-semibold text-slate-500">
-                {actor.canManageUsers ? "Can manage HQ access" : "Viewer access only"}
+                {actor.canManageUsers ? "Can manage admin access" : "Viewer access only"}
               </p>
             </div>
           </div>
@@ -1797,7 +1797,7 @@ export default async function AdminSettingsPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
-                HQ Departments
+                Admin Departments
               </p>
               <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
                 Corporate departments and access boundaries.
@@ -1841,8 +1841,8 @@ export default async function AdminSettingsPage() {
                 User access management.
               </h2>
               <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
-                Assign users to HQ departments, set official internal roles,
-                send password reset emails, view MFA status, and deactivate HQ
+                Assign users to admin departments, set official internal roles,
+                send password reset emails, view MFA status, and deactivate admin
                 access when needed. Admin should never view or manually store
                 user passwords.
               </p>
@@ -1873,7 +1873,7 @@ export default async function AdminSettingsPage() {
                 Department role permissions.
               </h2>
               <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
-                This matrix shows the current permissions available by HQ role.
+                This matrix shows the current permissions available by admin role.
                 Sidebar enforcement can be wired next so users only see the
                 Admin areas their role allows.
               </p>
@@ -1902,7 +1902,7 @@ export default async function AdminSettingsPage() {
               <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
                 These checks confirm whether Admin dependencies are configured
                 for access management, payments, Trust & Safety, banking,
-                emails, redirects, and HQ role management.
+                emails, redirects, and admin role management.
               </p>
             </div>
 
@@ -1938,7 +1938,7 @@ export default async function AdminSettingsPage() {
             Next Access Control Step
           </p>
           <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
-            This page now supports Corporate HQ departments, official internal
+            This page now supports Admin departments, official internal
             roles, role assignment, password reset support, and permission
             visibility. Next we should update the Admin sidebar so Financials,
             Trust & Safety, Customer Service, Sales & Marketing, Tech Support,

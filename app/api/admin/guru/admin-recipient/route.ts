@@ -35,9 +35,9 @@ function normalizeAdminProfile(profile: SafeProfileRow) {
     email: profile.email || null,
     role: profile.role || "admin",
     account_type: profile.account_type || "admin",
-    full_name: profile.full_name || "Admin HQ",
-    display_name: "Admin HQ",
-    name: "Admin HQ",
+    full_name: profile.full_name || "SitGuru Admin",
+    display_name: "SitGuru Admin",
+    name: "SitGuru Admin",
     first_name: null,
     last_name: null,
     avatar_url: null,
@@ -163,7 +163,7 @@ export async function GET() {
   return NextResponse.json(
     {
       error:
-        "Admin HQ profile was not found. Set one profile row to role='admin' or account_type='admin'.",
+        "SitGuru Admin profile was not found. Set one profile row to role='admin' or account_type='admin'.",
     },
     { status: 404 }
   );

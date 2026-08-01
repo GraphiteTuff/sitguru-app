@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 const guruLoginLink = "/login?role=guru&next=/guru/dashboard";
 
@@ -549,9 +550,18 @@ export default async function BecomeAGuruPage({
                   href="/programs"
                   className="mt-6 inline-flex items-center gap-2 text-sm font-black !text-emerald-700 transition hover:!text-emerald-800 hover:underline"
                 >
-                  Student, community, or military-connected? Explore SitGuru
-                  Programs →
+                  Looking for a specialized pathway? Explore SitGuru Programs →
                 </Link>
+                <p className="mt-2 text-xs font-semibold text-slate-500">
+                  Includes student, community, and optional{" "}
+                  <Link
+                    href={VETERANS_MILITARY_FAMILIES_PROGRAM.programsAnchorHref}
+                    className="font-black text-emerald-700 hover:underline"
+                  >
+                    {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}
+                  </Link>
+                  .
+                </p>
               </div>
 
               <div>

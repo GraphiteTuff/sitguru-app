@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   ArrowRight,
   BadgeCheck,
@@ -74,7 +75,7 @@ const ambassadorPaths = [
       "Great for local connectors, neighborhood promoters, parent groups, pet groups, community leaders, and event helpers.",
   },
   {
-    title: "Military Hire",
+    title: VETERANS_MILITARY_FAMILIES_PROGRAM.shortName,
     description:
       "Great for military spouses, veterans, service members, and military-connected communities who want to support SitGuru growth.",
   },

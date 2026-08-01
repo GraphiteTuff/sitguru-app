@@ -67,7 +67,7 @@ export const ADMIN_DEPARTMENT_ACTIONS: AdminDepartmentAction[] = [
 export const ADMIN_INTERNAL_MESSAGE_ACTION = {
   key: "internal" as const,
   label: "Start Internal Message",
-  description: "Open an HQ staff thread from the User Directory.",
+  description: "Open an internal staff thread from the User Directory.",
   toneClass:
     "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 focus-visible:ring-emerald-300",
 };
@@ -114,7 +114,7 @@ export function asActionString(value: unknown) {
 
 export function getDepartmentLabel(key: string) {
   const normalized = asActionString(key) as AdminDepartmentKey;
-  return DEPARTMENT_LABELS[normalized] || asActionString(key) || "SitGuru HQ";
+  return DEPARTMENT_LABELS[normalized] || asActionString(key) || "SitGuru Admin";
 }
 
 export function isAdminDepartmentKey(value: string): value is AdminDepartmentKey {

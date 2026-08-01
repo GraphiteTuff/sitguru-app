@@ -706,7 +706,7 @@ async function loadCommandCenter({
     },
     warning:
       errors.length > 0
-        ? "Some Command Center records could not be loaded."
+        ? "Some dashboard records could not be loaded."
         : "",
   };
 }

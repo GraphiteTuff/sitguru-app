@@ -103,7 +103,7 @@ function buildSubject(params: {
   if (params.recipientName) {
     return `Direct Message: SitGuru Admin ↔ ${params.recipientName}`;
   }
-  return "Internal Message: SitGuru HQ";
+  return "Internal Message: SitGuru Admin";
 }
 
 async function findExistingUserThread(params: {
@@ -308,7 +308,7 @@ export async function createOrGetAdminConversation(
     asActionString(input.opener) ||
     (departmentLabel
       ? `Thread opened for ${departmentLabel} from the Admin User Directory.`
-      : "Internal HQ thread opened from the Admin User Directory.");
+      : "Internal staff thread opened from the Admin User Directory.");
 
   if (existing?.id) {
     const conversationId = existing.id;

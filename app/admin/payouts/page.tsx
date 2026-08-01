@@ -418,7 +418,7 @@ export default async function AdminPayoutsPage() {
             <div className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-600">
               <Link href="/admin" className="text-emerald-800 hover:text-emerald-900">Admin</Link>
               <span>/</span>
-              <span className="text-slate-950">Payout Command Center</span>
+              <span className="text-slate-950">Payout Dashboard</span>
             </div>
 
             <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -427,7 +427,7 @@ export default async function AdminPayoutsPage() {
                   Live Supabase Payouts
                 </span>
                 <h1 className="mt-4 max-w-5xl text-5xl font-black tracking-[-0.05em] text-slate-950 lg:text-7xl">
-                  Payout Command Center
+                  Payout Dashboard
                 </h1>
                 <p className="mt-4 max-w-4xl text-base font-semibold leading-8 text-slate-700">
                   Manage real Guru payouts, partner commissions, Ambassador rewards, PawPerks rewards,

@@ -198,7 +198,7 @@ export function UserDirectoryActionPanels({
 
   const contextLabel = actions.selectedUser
     ? `Scoped to ${actions.selectedUser.name || actions.selectedUser.email || "selected user"}`
-    : "No user selected — starts HQ / department threads";
+    : "No user selected — starts admin / department threads";
 
   return (
     <aside className={`space-y-5 ${className}`.trim()}>

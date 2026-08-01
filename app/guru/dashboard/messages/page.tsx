@@ -206,7 +206,7 @@ function normalizeRole(value?: string | null) {
 function getReadableRole(profile?: Profile | null) {
   const role = normalizeRole(profile?.role || profile?.account_type);
 
-  if (role === "admin") return "Admin HQ";
+  if (role === "admin") return "SitGuru Admin";
   if (role === "customer") return "Pet Parent";
   if (role === "guru") return "Guru";
 
@@ -443,15 +443,15 @@ async function fetchAdminRecipientProfile() {
       ...data.admin,
       role: "admin",
       account_type: data.admin.account_type || "admin",
-      display_name: "Admin HQ",
+      display_name: "SitGuru Admin",
       full_name:
         data.admin.full_name ||
         data.admin.display_name ||
         data.admin.name ||
-        "Admin HQ",
+        "SitGuru Admin",
     } as Profile;
   } catch (error) {
-    console.warn("Could not load Admin HQ recipient:", error);
+    console.warn("Could not load SitGuru Admin recipient:", error);
     return null;
   }
 }
@@ -661,7 +661,7 @@ async function fetchProfilesForGuruInbox({
     if (fallbackAdmin?.id && fallbackAdmin.id !== userId) {
       profileMap.set(fallbackAdmin.id, {
         ...fallbackAdmin,
-        full_name: fallbackAdmin.full_name || "Admin HQ",
+        full_name: fallbackAdmin.full_name || "SitGuru Admin",
         role: "admin",
         account_type: fallbackAdmin.account_type || "admin",
       });
@@ -1128,7 +1128,7 @@ function GuruDashboardMessagesPageContent() {
       }
 
       const label = `${
-        isAdmin ? "Admin HQ" : getName(item.profile)
+        isAdmin ? "SitGuru Admin" : getName(item.profile)
       } · ${item.isBookedCustomer ? "Pet Parent" : getReadableRole(item.profile)}`;
 
       const labelKey = label.toLowerCase();
@@ -1451,7 +1451,7 @@ function GuruDashboardMessagesPageContent() {
                     href="/messages/admin?role=guru"
                     className="inline-flex h-12 items-center justify-center rounded-2xl bg-emerald-600 px-4 text-sm font-black text-white transition hover:bg-emerald-700 sm:self-end"
                   >
-                    Message Admin HQ
+                    Message SitGuru Admin
                   </Link>
 
                   <Link
@@ -1468,7 +1468,7 @@ function GuruDashboardMessagesPageContent() {
               <div className="flex-1 space-y-3 overflow-y-auto bg-white p-5">
                 {!selectedUser ? (
                   <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-bold leading-6 !text-slate-800">
-                    Choose Admin HQ or select a Pet Parent conversation from
+                    Choose SitGuru Admin or select a Pet Parent conversation from
                     the list to continue messaging.
                   </div>
                 ) : null}
@@ -1563,7 +1563,7 @@ function GuruDashboardMessagesPageContent() {
                     placeholder={
                       selectedUser
                         ? "Type your message here..."
-                        : "Choose Admin HQ or a Pet Parent recipient first..."
+                        : "Choose SitGuru Admin or a Pet Parent recipient first..."
                     }
                     disabled={!selectedUser || sending}
                     rows={3}

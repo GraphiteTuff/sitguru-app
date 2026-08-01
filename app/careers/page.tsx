@@ -15,6 +15,7 @@ import {
   Trophy,
   UsersRound,
 } from "lucide-react";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 type OpportunityCard = {
   title: string;
@@ -75,12 +76,12 @@ const guruOpportunities: OpportunityCard[] = [
     ],
   },
   {
-    title: "Military Hire Program",
-    eyebrow: "Military-connected Guru pathway",
+    title: VETERANS_MILITARY_FAMILIES_PROGRAM.displayName,
+    eyebrow: VETERANS_MILITARY_FAMILIES_PROGRAM.eyebrow,
     description:
       "For veterans, eligible service members, National Guard, reservists, military spouses, and qualified dependents over 18 who want to grow into trusted SitGuru Gurus.",
     icon: <Medal size={28} />,
-    href: "/programs/apply?program=military-hire",
+    href: VETERANS_MILITARY_FAMILIES_PROGRAM.applyHref,
     cta: "Apply Today",
     highlights: [
       "Veterans and military families welcome",
@@ -96,7 +97,7 @@ const quickStats = [
   "Guru opportunities",
   "Student Hire",
   "Community Hire",
-  "Military Hire",
+  VETERANS_MILITARY_FAMILIES_PROGRAM.shortName,
 ];
 
 const providerServices = [
@@ -275,7 +276,8 @@ export default function CareersPage() {
 
             <p className="mt-4 max-w-3xl text-base font-semibold leading-8 !text-white/80">
               Most opportunities today start with becoming a Guru. You can also
-              apply through Student Hire, Community Hire, or Military Hire
+              apply through Student Hire, Community Hire, or{" "}
+              {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}
               pathways as SitGuru grows.
             </p>
 
@@ -389,7 +391,7 @@ export default function CareersPage() {
           <StepCard
             numberLabel="04"
             icon={<Medal size={22} />}
-            title="Military Hire"
+            title={VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}
             description="A pathway for veterans, military families, and eligible military-connected applicants."
           />
         </section>
@@ -527,7 +529,7 @@ export default function CareersPage() {
 
               <p className="mt-3 max-w-4xl text-sm font-semibold leading-6 !text-white/85 sm:text-base sm:leading-7">
                 Become a Guru, apply through Student Hire, Community Hire, or
-                Military Hire, or help someone you know discover a SitGuru
+                {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, or help someone you know discover a SitGuru
                 opportunity.
               </p>
             </div>

@@ -372,7 +372,7 @@ const activityTypes = [
   "Flyer or QR Distribution",
   "Lead Follow-Up",
   "Training",
-  "Headquarters Assignment",
+  "Support Assignment",
   "Weekly Review",
   "Other",
 ];
@@ -397,7 +397,7 @@ const activityCategories = [
   "Lead Follow-Up",
   "Partnership",
   "Training",
-  "Headquarters",
+  "Support",
   "Administration",
 ];
 
@@ -552,6 +552,15 @@ function titleCase(value: string | null | undefined) {
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+const LEAD_STATUS_LABELS: Record<string, string> = {
+  received_by_headquarters: "Received by SitGuru Support",
+};
+
+function leadStatusLabel(value: string | null | undefined) {
+  const key = (value || "new").toLowerCase();
+  return LEAD_STATUS_LABELS[key] || titleCase(value);
 }
 
 function numberValue(value: string) {
@@ -837,12 +846,14 @@ function SelectInput({
   onChange,
   options,
   required = false,
+  formatOption,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: string[];
   required?: boolean;
+  formatOption?: (value: string) => string;
 }) {
   return (
     <label className="block">
@@ -855,7 +866,7 @@ function SelectInput({
       >
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {formatOption ? formatOption(option) : option}
           </option>
         ))}
       </select>
@@ -1009,7 +1020,7 @@ function ActivityCard({
           {activity.needs_admin_help ? (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-900">
               <AlertCircle className="mr-1.5 inline h-4 w-4" />
-              Headquarters assistance requested
+              SitGuru Support assistance requested
               {activity.admin_help_reason
                 ? `: ${activity.admin_help_reason}`
                 : "."}
@@ -1076,7 +1087,7 @@ function LeadCard({
                 lead.lead_status,
               )}`}
             >
-              {titleCase(lead.lead_status || "new")}
+              {leadStatusLabel(lead.lead_status || "new")}
             </span>
             <span className="text-xs font-black text-emerald-700">
               {titleCase(lead.lead_type)}
@@ -1118,7 +1129,7 @@ function LeadCard({
           {lead.admin_assistance_requested ? (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-900">
               <Headphones className="mr-1.5 inline h-4 w-4" />
-              Sent to Headquarters for assistance
+              Sent to SitGuru Support for assistance
               {lead.admin_assistance_reason
                 ? `: ${lead.admin_assistance_reason}`
                 : "."}
@@ -1766,7 +1777,7 @@ export default function AmbassadorCommandCenterPage() {
         tone: "success",
         message:
           result.message ||
-          "Lead saved and sent to SitGuru Headquarters.",
+          "Lead saved and sent to SitGuru Support.",
       });
       await loadData(true);
     } catch (error) {
@@ -1877,7 +1888,7 @@ export default function AmbassadorCommandCenterPage() {
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
             >
               <Headphones className="h-4 w-4" />
-              Headquarters Help
+              Support Help
             </Link>
             <button
               type="button"
@@ -1914,7 +1925,7 @@ export default function AmbassadorCommandCenterPage() {
 
               <p className="mt-3 max-w-4xl text-sm font-semibold leading-7 text-slate-800 sm:text-base">
                 Plan your day, schedule outreach, log events and marketing,
-                send leads to Headquarters, request help, and see the impact
+                send leads to SitGuru Support, request help, and see the impact
                 of your work in one place.
               </p>
 
@@ -1964,7 +1975,7 @@ export default function AmbassadorCommandCenterPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Headphones className="h-4 w-4 text-emerald-700" />
-                  {summary.leadsNeedingAdmin} leads need Headquarters help
+                  {summary.leadsNeedingAdmin} leads need SitGuru Support help
                 </div>
               </div>
 
@@ -2149,7 +2160,7 @@ export default function AmbassadorCommandCenterPage() {
                 ) : (
                   <EmptyState
                     title="No upcoming activities"
-                    description="Add a campus visit, professional outreach, event, expo, social effort, lead follow-up, or Headquarters assignment."
+                    description="Add a campus visit, professional outreach, event, expo, social effort, lead follow-up, or Support assignment."
                     actionLabel="Schedule activity"
                     onAction={() => openActivity()}
                   />
@@ -2198,7 +2209,7 @@ export default function AmbassadorCommandCenterPage() {
                   ) : (
                     <EmptyState
                       title="No urgent follow-ups"
-                      description="New leads and Headquarters-assisted follow-ups will appear here."
+                      description="New leads and Support-assisted follow-ups will appear here."
                       actionLabel="Add lead"
                       onAction={openLead}
                     />
@@ -2208,7 +2219,7 @@ export default function AmbassadorCommandCenterPage() {
 
               <section className="rounded-[1.7rem] border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                  Remote Headquarters
+                  Remote Support
                 </p>
                 <h2 className="mt-2 text-xl font-black text-emerald-950">
                   Help is built into your workflow.
@@ -2225,7 +2236,7 @@ export default function AmbassadorCommandCenterPage() {
                     className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-black text-white"
                   >
                     <Headphones className="h-4 w-4" />
-                    Ask Headquarters
+                    Ask SitGuru Support
                   </Link>
                   <Link
                     href="/ambassador/dashboard/training"
@@ -2431,7 +2442,7 @@ export default function AmbassadorCommandCenterPage() {
               ) : (
                 <EmptyState
                   title="No activities found"
-                  description="Schedule outreach, events, professional visits, campus work, marketing, lead follow-ups, training, or Headquarters assignments."
+                  description="Schedule outreach, events, professional visits, campus work, marketing, lead follow-ups, training, or Support assignments."
                   actionLabel="Add activity"
                   onAction={() => openActivity()}
                 />
@@ -2547,7 +2558,7 @@ export default function AmbassadorCommandCenterPage() {
                   Lead Generator
                 </p>
                 <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
-                  Send opportunities to SitGuru Headquarters
+                  Send opportunities to SitGuru Support
                 </h2>
                 <p className="mt-2 text-sm font-semibold text-slate-600">
                   Leads remain attributed to you while Admin can follow up,
@@ -2638,7 +2649,7 @@ export default function AmbassadorCommandCenterPage() {
           >
             <Headphones className="h-5 w-5 text-amber-700" />
             <h2 className="mt-3 font-black text-amber-950">
-              Headquarters support
+              SitGuru Support
             </h2>
             <p className="mt-1 text-sm font-semibold leading-6 text-amber-900">
               Request lead, event, material, account, or payout help.
@@ -2666,7 +2677,7 @@ export default function AmbassadorCommandCenterPage() {
           </span>
           <span className="inline-flex items-center gap-2 text-emerald-700">
             <BadgeCheck className="h-4 w-4" />
-            Connected to SitGuru Headquarters
+            Connected to SitGuru Support
           </span>
         </footer>
       </div>
@@ -2674,7 +2685,7 @@ export default function AmbassadorCommandCenterPage() {
       {composer === "activity" ? (
         <ComposerShell
           title={editingId ? "Update activity" : "Add activity"}
-          description="Schedule or record outreach, events, professional visits, training, marketing, follow-ups, and Headquarters assignments."
+          description="Schedule or record outreach, events, professional visits, training, marketing, follow-ups, and Support assignments."
           saving={saving}
           onClose={() => {
             setComposer(null);
@@ -3002,7 +3013,7 @@ export default function AmbassadorCommandCenterPage() {
             />
 
             <CheckboxInput
-              label="Request Headquarters assistance"
+              label="Request SitGuru Support assistance"
               checked={activityForm.needs_admin_help}
               onChange={(checked) =>
                 setActivityForm((current) => ({
@@ -3023,7 +3034,7 @@ export default function AmbassadorCommandCenterPage() {
                     admin_help_reason: value,
                   }))
                 }
-                placeholder="Tell SitGuru Headquarters what action or decision is needed."
+                placeholder="Tell SitGuru Support what action or decision is needed."
               />
             ) : null}
           </div>
@@ -3267,7 +3278,7 @@ export default function AmbassadorCommandCenterPage() {
 
             <div className="sm:col-span-2">
               <CheckboxInput
-                label="Request Headquarters assistance"
+                label="Request SitGuru Support assistance"
                 checked={marketingForm.needs_admin_help}
                 onChange={(checked) =>
                   setMarketingForm((current) => ({
@@ -3285,7 +3296,7 @@ export default function AmbassadorCommandCenterPage() {
       {composer === "lead" ? (
         <ComposerShell
           title={editingId ? "Update lead" : "Add lead"}
-          description="Capture the opportunity quickly. Headquarters receives the lead while attribution remains connected to your Ambassador record."
+          description="Capture the opportunity quickly. SitGuru Support receives the lead while attribution remains connected to your Ambassador record."
           saving={saving}
           onClose={() => {
             setComposer(null);
@@ -3316,6 +3327,7 @@ export default function AmbassadorCommandCenterPage() {
                   lead_status: value,
                 }))
               }
+              formatOption={leadStatusLabel}
               options={[
                 "new",
                 "received_by_headquarters",
@@ -3552,7 +3564,7 @@ export default function AmbassadorCommandCenterPage() {
                     next_action: value,
                   }))
                 }
-                placeholder="Example: Headquarters should call about a partnership"
+                placeholder="Example: SitGuru Support should call about a partnership"
               />
             </div>
 
@@ -3582,7 +3594,7 @@ export default function AmbassadorCommandCenterPage() {
             />
 
             <CheckboxInput
-              label="Request Headquarters assistance"
+              label="Request SitGuru Support assistance"
               checked={leadForm.admin_assistance_requested}
               onChange={(checked) =>
                 setLeadForm((current) => ({

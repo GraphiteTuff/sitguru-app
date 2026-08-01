@@ -1,6 +1,8 @@
 // lib/help/content.ts
 /** Structured FAQ / step bodies migrated from legacy /help-center (modernized). */
 
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
+
 export type HelpFaqItem = { question: string; answer: string };
 export type HelpStepBlock = {
   title: string;
@@ -381,9 +383,9 @@ export const programFaqs: HelpFaqItem[] = [
       "Ambassadors help introduce SitGuru to Pet Parents, future Gurus, local partners, students, community groups, and military-connected networks by sharing referral links, answering basic questions, and routing people to the correct signup path.",
   },
   {
-    question: "What are Student Hire, Community Hire, and Military Hire?",
+    question: `What are Student Hire, Community Hire, and ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}?`,
     answer:
-      "These are SitGuru program pathways for students and recent grads, local community members, and military-connected applicants such as veterans, spouses, and eligible dependents. Applications do not guarantee approval, placement, bookings, or payouts.",
+      `These are SitGuru program pathways for students and recent grads, local community members, and military-connected applicants such as veterans, spouses, and eligible dependents through the ${VETERANS_MILITARY_FAMILIES_PROGRAM.displayName}. Applications do not guarantee approval, placement, bookings, or payouts.`,
   },
   {
     question: "How do Ambassador referrals work?",

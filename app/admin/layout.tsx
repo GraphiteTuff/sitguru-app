@@ -709,7 +709,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
               <div className="mt-3">
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-green-700">
-                  SitGuru HQ
+                  SitGuru Admin
                 </p>
 
                 <h2 className="mt-1 text-[2.05rem] font-black leading-[0.92] tracking-tight text-green-950 xl:text-[2.35rem]">

@@ -857,8 +857,8 @@ async function createReferralCode(formData: FormData) {
     payout_trigger: emptyToNull(formData.get("payout_trigger")),
     payout_notes: emptyToNull(formData.get("payout_notes")),
     notes: emptyToNull(formData.get("notes")),
-    created_by_name: "Admin Command Center",
-    updated_by_name: "Admin Command Center",
+    created_by_name: "Admin Portal",
+    updated_by_name: "Admin Portal",
   };
 
   const { data, error } = await supabaseAdmin
@@ -874,8 +874,8 @@ async function createReferralCode(formData: FormData) {
       action_label: "Generated or issued referral code",
       new_status: "active",
       new_values: payload,
-      performed_by_name: "Admin Command Center",
-      notes: "Code generated or safely updated from Referral Command Center.",
+      performed_by_name: "Admin Portal",
+      notes: "Code generated or safely updated from Referral Dashboard.",
     });
   }
 
@@ -911,7 +911,7 @@ async function updateReferralCode(formData: FormData) {
     payout_trigger: emptyToNull(formData.get("payout_trigger")),
     payout_notes: emptyToNull(formData.get("payout_notes")),
     notes: emptyToNull(formData.get("notes")),
-    updated_by_name: "Admin Command Center",
+    updated_by_name: "Admin Portal",
   };
 
   await supabaseAdmin.from("referral_codes").update(payload).eq("id", id);
@@ -922,8 +922,8 @@ async function updateReferralCode(formData: FormData) {
     action_label: "Updated referral code record",
     new_status: payload.status,
     new_values: payload,
-    performed_by_name: "Admin Command Center",
-    notes: "Referral code updated from command center.",
+    performed_by_name: "Admin Portal",
+    notes: "Referral code updated from dashboard.",
   });
 
   revalidatePath(adminRoutes.referrals);
@@ -941,26 +941,26 @@ async function changeReferralCodeStatus(formData: FormData) {
   const now = new Date().toISOString();
 
   const payload: Record<string, unknown> = {
-    updated_by_name: "Admin Command Center",
+    updated_by_name: "Admin Portal",
   };
 
   if (actionType === "archive") {
     payload.status = "archived";
     payload.archived_at = now;
-    payload.archived_reason = reason || "Archived from Referral Command Center.";
+    payload.archived_reason = reason || "Archived from Referral Dashboard.";
   }
 
   if (actionType === "void") {
     payload.status = "voided";
     payload.voided_at = now;
-    payload.void_reason = reason || "Voided from Referral Command Center.";
+    payload.void_reason = reason || "Voided from Referral Dashboard.";
   }
 
   if (actionType === "delete_test") {
     payload.status = "deleted";
     payload.deleted_at = now;
     payload.delete_reason =
-      reason || "Marked as deleted/test record from Referral Command Center.";
+      reason || "Marked as deleted/test record from Referral Dashboard.";
   }
 
   if (actionType === "reactivate") {
@@ -981,7 +981,7 @@ async function changeReferralCodeStatus(formData: FormData) {
     action_label: `Referral code ${actionType}`,
     new_status: asString(payload.status),
     new_values: payload,
-    performed_by_name: "Admin Command Center",
+    performed_by_name: "Admin Portal",
     notes: reason,
   });
 
@@ -1035,8 +1035,8 @@ async function addReferralActivity(formData: FormData) {
     payout_status: asString(formData.get("payout_status")) || "not_eligible",
     payout_notes: emptyToNull(formData.get("payout_notes")),
     notes: emptyToNull(formData.get("notes")),
-    created_by_name: "Admin Command Center",
-    updated_by_name: "Admin Command Center",
+    created_by_name: "Admin Portal",
+    updated_by_name: "Admin Portal",
   };
 
   const { data: activity } = await supabaseAdmin
@@ -1083,7 +1083,7 @@ async function addReferralActivity(formData: FormData) {
           payload.payout_status !== "not_eligible"
             ? payload.payout_status
             : current.payout_status,
-        updated_by_name: "Admin Command Center",
+        updated_by_name: "Admin Portal",
       })
       .eq("id", current.id);
 
@@ -1094,7 +1094,7 @@ async function addReferralActivity(formData: FormData) {
       action_label: "Added referral activity",
       new_status: stage,
       new_values: payload,
-      performed_by_name: "Admin Command Center",
+      performed_by_name: "Admin Portal",
       notes: "Manual activity added and code counts updated.",
     });
   }
@@ -1124,7 +1124,7 @@ export default async function AdminReferralCommandCenter({
 
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl xl:text-5xl">
-                Referral Command Center
+                Referral Dashboard
               </h1>
               <span className="rounded-full bg-green-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-green-800 sm:text-xs">
                 Accountability Hub
@@ -2522,7 +2522,7 @@ function StatusActionForm({
     <form action={changeReferralCodeStatus}>
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="action_type" value={actionType} />
-      <input type="hidden" name="reason" value={`${label} from command center`} />
+      <input type="hidden" name="reason" value={`${label} from dashboard`} />
       <button
         type="submit"
         className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50"

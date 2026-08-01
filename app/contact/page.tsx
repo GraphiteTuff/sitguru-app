@@ -6,6 +6,7 @@
 
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   BriefcaseBusiness,
   Lightbulb,
@@ -94,7 +95,7 @@ const personas: Array<{
 const programOptions = [
   "Student Hire Program",
   "Community Hire Program",
-  "Military Hire Program",
+  VETERANS_MILITARY_FAMILIES_PROGRAM.displayName,
   "Ambassador Program",
   "Not sure yet",
 ];

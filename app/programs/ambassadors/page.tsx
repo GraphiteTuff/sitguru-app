@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   ArrowRight,
   BadgeCheck,
@@ -60,7 +61,7 @@ const primaryAmbassadorPaths = [
   },
   {
     title: "Military & Veteran Ambassadors",
-    eyebrow: "Military Hire",
+    eyebrow: VETERANS_MILITARY_FAMILIES_PROGRAM.shortName,
     description:
       "Veterans, military spouses, Guard and Reserve members, transitioning service members, and military-connected advocates can help SitGuru reach trusted local networks and mission-driven communities.",
     icon: <ShieldCheck size={24} />,
@@ -230,7 +231,7 @@ const howItWorks = [
     step: "01",
     title: "Choose your path",
     description:
-      "Start with the Ambassador path that fits you best: Student Hire, Community Hire, or Military Hire. SitGuru can also route pet professionals and local advocates into the right fit.",
+      `Start with the Ambassador path that fits you best: Student Hire, Community Hire, or ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}. SitGuru can also route pet professionals and local advocates into the right fit.`,
   },
   {
     step: "02",
@@ -258,7 +259,7 @@ const ambassadorActivities = [
   "Refer future Pet Gurus",
   "Promote Student Hire",
   "Promote Community Hire",
-  "Promote Military Hire",
+  `Promote ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}`,
   "Spread campus awareness",
   "Support community events",
   "Introduce local partners",
@@ -463,7 +464,7 @@ export default function AmbassadorProgramPage() {
             <div className="mt-6 flex flex-wrap gap-2">
               <Pill>Student Hire</Pill>
               <Pill>Community Hire</Pill>
-              <Pill>Military Hire</Pill>
+              <Pill>{VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}</Pill>
               <Pill>Referral growth</Pill>
               <Pill>QR sharing</Pill>
               <Pill>Local awareness</Pill>
@@ -860,7 +861,7 @@ export default function AmbassadorProgramPage() {
           <SectionHeader
             eyebrow="More Ambassador voices"
             title="Pet professionals, Gurus, rescues, and referral leaders can all help SitGuru grow."
-            description="Student, Community, and Military Hire are the main program paths. These additional Ambassador voices help SitGuru reach more trusted pet care circles."
+            description={`Student, Community, and ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName} are the main program paths. These additional Ambassador voices help SitGuru reach more trusted pet care circles.`}
           />
 
           <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -1281,7 +1282,7 @@ export default function AmbassadorProgramPage() {
                         "Help local pet families discover SitGuru.",
                       ],
                       [
-                        "Military Hire",
+                        VETERANS_MILITARY_FAMILIES_PROGRAM.shortName,
                         "Support veteran and military-connected awareness.",
                       ],
                       ["Gurus", "Represent the brand and refer trusted people."],

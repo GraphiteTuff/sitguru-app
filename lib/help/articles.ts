@@ -3,6 +3,8 @@
  * SitGuru Help Center article catalog — used by client search + category hubs.
  */
 
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
+
 export type HelpAudience = "parent" | "guru" | "ambassador" | "all";
 
 export type HelpCategory =
@@ -308,7 +310,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     href: "/help/safety/programs-and-ambassadors",
     title: "Ambassadors, Student Hire & Community Pathways",
     summary:
-      "How Ambassadors grow SitGuru locally, and what Student Hire, Community Hire, and Military Hire pathways mean.",
+      `How Ambassadors grow SitGuru locally, and what Student Hire, Community Hire, and ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName} pathways mean.`,
     audience: "ambassador",
     category: "Trust & Safety",
     tags: ["insurance", "emergency phone", "incident report", "compliance"],

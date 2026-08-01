@@ -1686,7 +1686,7 @@ export default async function GuruBookingsPage({
                       </div>
                       <div>
                         <p className="text-xs font-black uppercase tracking-[0.18em] !text-emerald-50">
-                          Live Care Command Center
+                          Live Care Dashboard
                         </p>
                         <h3 className="mt-1 text-3xl font-black tracking-tight !text-white">
                           {selectedPawReportLabel}
