@@ -943,7 +943,7 @@ export default async function AdminBookingsPage({ searchParams }: PageProps) {
                     Admin / Booking Operations
                   </p>
                   <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-5xl">
-                    SitGuru Booking Command Center
+                    SitGuru Booking Dashboard
                   </h1>
                   <p className="mt-1 max-w-5xl text-base font-semibold leading-7 text-slate-600">
                     Review all live booking requests, Pet Parent details, Guru assignments,

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import SiteLogo from "@/components/SiteLogo";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   FaFacebookF,
   FaInstagram,
@@ -47,7 +48,10 @@ const programLinks = [
   { label: "Programs Overview", href: "/programs", featured: true },
   { label: "Student Hire", href: "/programs#student-hire" },
   { label: "Community Hire", href: "/programs#community-hire" },
-  { label: "Military Hire", href: "/programs#military-hire" },
+  {
+    label: VETERANS_MILITARY_FAMILIES_PROGRAM.navLabel,
+    href: VETERANS_MILITARY_FAMILIES_PROGRAM.footerHref,
+  },
   { label: "Ambassador Program", href: "/ambassadors", featured: true },
   { label: "Partner Network", href: "/partners" },
 ];

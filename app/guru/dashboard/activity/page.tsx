@@ -453,7 +453,7 @@ export default function GuruActivityPage() {
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-200 sm:text-base">
                 Track what changed across bookings, messages, payments, trust,
-                profile quality, and growth in one clean guru command center.
+                profile quality, and growth in one clean guru dashboard.
               </p>
             </div>
 

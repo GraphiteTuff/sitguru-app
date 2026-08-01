@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 type HeaderMode = "public" | "customer" | "guru" | "ambassador" | "admin";
 
@@ -724,7 +725,7 @@ export default function Header({ user = null }: HeaderProps) {
         : "SitGuru Pet Parent";
 
   const logoHref = "/";
-  const userName = activeUser?.name || (isAdmin ? "Admin HQ" : "My Account");
+  const userName = activeUser?.name || (isAdmin ? "SitGuru Admin" : "My Account");
   const userEmail = activeUser?.email || "";
   const userAvatarUrl = normalizeAvatarUrl(activeUser?.avatarUrl);
   const userInitials = getInitials(userName, userEmail);
@@ -1124,7 +1125,8 @@ export default function Header({ user = null }: HeaderProps) {
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
                   Find trusted local pet care, become a Pet Guru, or explore
-                  Student, Community, and Military programs.
+                  Student, Community, and {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}{" "}
+                  programs.
                 </p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <Link

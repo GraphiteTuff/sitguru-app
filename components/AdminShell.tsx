@@ -49,7 +49,7 @@ const primaryNav: AdminNavItem[] = [
     label: "Growth & Referrals",
     href: "/admin/programs",
     icon: Sparkles,
-    pageTitle: "Growth & Referral Command Center",
+    pageTitle: "Growth & Referral Dashboard",
   },
   {
     label: "Partner Network",

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   ArrowRight,
   BadgeCheck,
@@ -478,7 +479,7 @@ export default async function PressPage() {
                 {[
                   "Trusted pet care and better customer confidence",
                   "Guru training, readiness, and service quality",
-                  "Military, Student, and Community program pathways",
+                  `${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, Student, and Community program pathways`,
                   "Local stories, partnerships, photos, videos, and positive care moments",
                 ].map((item) => (
                   <div

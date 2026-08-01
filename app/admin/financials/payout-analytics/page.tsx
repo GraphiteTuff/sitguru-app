@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   AlertTriangle,
   BarChart3,
@@ -1630,7 +1631,7 @@ export default async function PayoutsAnalyticsPage({
           />
           <TypeBreakdownCard
             title="Payouts by Program / Campaign"
-            description="Separates hiring-program referrals, Student Hire, Veterans Hire, SkillBridge, Ambassador campaigns, and general referral rewards when those fields are present."
+            description={`Separates hiring-program referrals, Student Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, SkillBridge, Ambassador campaigns, and general referral rewards when those fields are present.`}
             items={programTypeSummaries}
             emptyLabel="No program or campaign payout rows found yet."
           />

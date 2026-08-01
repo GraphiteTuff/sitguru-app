@@ -25,6 +25,12 @@ import {
   UserCircle2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { VeteransMilitaryFamiliesOptIn } from "@/components/programs/VeteransMilitaryFamiliesOptIn";
+import {
+  readVeteransMilitaryFamiliesOptIn,
+  VETERANS_MILITARY_FAMILIES_OPT_IN_KEY,
+  VETERANS_MILITARY_FAMILIES_PROGRAM,
+} from "@/lib/programs/veterans-military-families";
 
 type GuruProfile = {
   id?: string | null;
@@ -852,6 +858,8 @@ function GuruDashboardProfilePageContent() {
   );
   const [isPublic, setIsPublic] = useState(false);
   const [isGuruAcademyGraduate, setIsGuruAcademyGraduate] = useState(false);
+  const [joinedVeteransMilitaryFamilies, setJoinedVeteransMilitaryFamilies] =
+    useState(false);
 
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -890,6 +898,11 @@ function GuruDashboardProfilePageContent() {
 
         setUserId(user.id);
         setSignedInEmail(user.email ?? "");
+        setJoinedVeteransMilitaryFamilies(
+          readVeteransMilitaryFamiliesOptIn(
+            (user.user_metadata || {}) as Record<string, unknown>,
+          ),
+        );
         setIsGuruAcademyGraduate(await loadGuruAcademyGraduate(user.id));
 
         const { data, error } = await supabase
@@ -1419,6 +1432,13 @@ function GuruDashboardProfilePageContent() {
         userId,
         profileExists,
         payload,
+      });
+
+      await supabase.auth.updateUser({
+        data: {
+          [VETERANS_MILITARY_FAMILIES_OPT_IN_KEY]:
+            joinedVeteransMilitaryFamilies,
+        },
       });
 
       const { data: freshRows } = await supabase
@@ -2111,6 +2131,27 @@ function GuruDashboardProfilePageContent() {
                             </div>
                           )}
                         </div>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <VeteransMilitaryFamiliesOptIn
+                          checked={joinedVeteransMilitaryFamilies}
+                          onChange={setJoinedVeteransMilitaryFamilies}
+                        />
+                        {joinedVeteransMilitaryFamilies ? (
+                          <p className="mt-3 text-xs font-semibold leading-5 text-slate-600">
+                            Thanks for opting in. Apply or learn more at{" "}
+                            <Link
+                              href={
+                                VETERANS_MILITARY_FAMILIES_PROGRAM.applyHref
+                              }
+                              className="font-black text-emerald-700 hover:underline"
+                            >
+                              {VETERANS_MILITARY_FAMILIES_PROGRAM.displayName}
+                            </Link>
+                            .
+                          </p>
+                        ) : null}
                       </div>
 
                       <div className="md:col-span-2">

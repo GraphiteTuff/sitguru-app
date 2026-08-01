@@ -115,7 +115,7 @@ export const SITE_PAGE_CONTEXT: SitePageContextEntry[] = [
       "Stay organized: booking conversations, PawReports, reviews, and rebooking stay connected in SitGuru.",
       "Eligible paid bookings and Guru payouts are handled through SitGuru after required payout setup.",
       "SitGuru welcomes experienced providers and responsible local pet lovers prepared to complete profile and trust steps.",
-      "Student, community, or military-connected applicants can explore SitGuru programs.",
+      "Student, community, or military-connected applicants can explore SitGuru programs, including the Veterans & Military Families Program.",
     ].join("\n"),
   },
   {

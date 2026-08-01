@@ -18,6 +18,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 export const dynamic = "force-dynamic";
 
@@ -101,7 +102,7 @@ const militaryGoals = [
     metric: "Applications",
     target: 50,
     action:
-      "Promote Military Hire through transition offices, veteran organizations, spouse networks, Guard/reserve contacts, and community partners.",
+      `Promote ${VETERANS_MILITARY_FAMILIES_PROGRAM.displayName} through transition offices, veteran organizations, spouse networks, Guard/reserve contacts, and community partners.`,
   },
   {
     key: "documents",
@@ -608,7 +609,7 @@ async function getMilitaryApplications() {
     .limit(5000);
 
   if (error) {
-    console.error("Military Hire ops load error:", error.message);
+    console.error(`${VETERANS_MILITARY_FAMILIES_PROGRAM.displayName} ops load error:`, error.message);
     return {
       applications: [] as MilitaryApplication[],
       error: error.message,
@@ -1089,7 +1090,7 @@ export default async function AdminMilitaryHireProgramPage({
                     WebkitTextFillColor: "#bbf7d0",
                   }}
                 >
-                  Admin / Programs / Military Hire
+                  Admin / Programs / {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}
                 </p>
 
                 <h1
@@ -1099,7 +1100,7 @@ export default async function AdminMilitaryHireProgramPage({
                     WebkitTextFillColor: "#ffffff",
                   }}
                 >
-                  Military Hire Program Ops
+                  {VETERANS_MILITARY_FAMILIES_PROGRAM.displayName} Ops
                 </h1>
 
                 <p
@@ -1161,7 +1162,7 @@ export default async function AdminMilitaryHireProgramPage({
                 SitGuru welcomes qualified military-connected applicants.
               </h2>
               <p className="mt-2 max-w-5xl text-sm font-bold leading-6 text-green-950">
-                Military Hire is a supported pathway for veterans, eligible
+                {VETERANS_MILITARY_FAMILIES_PROGRAM.displayName} is a supported pathway for veterans, eligible
                 service members, transitioning service members, National Guard,
                 reservists, military spouses, and qualified dependents over 18.
                 Applicants may apply for flexible local pet care opportunities.
@@ -1185,7 +1186,7 @@ export default async function AdminMilitaryHireProgramPage({
             icon={<UsersRound size={22} />}
             label="Applications"
             value={number(total)}
-            detail="Total Military Hire applicants"
+            detail={`Total ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName} applicants`}
             href={adminRoutes.militaryApplications}
           />
 
@@ -1335,7 +1336,7 @@ export default async function AdminMilitaryHireProgramPage({
         <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
           <SectionHeader
             eyebrow="Program goals"
-            title="Military Hire goal progress"
+            title={`${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName} goal progress`}
             description="Measure military-connected pipeline growth, document readiness, onboarding, background readiness, and approvals."
             icon={<BarChart3 size={24} />}
           />
@@ -1679,7 +1680,7 @@ export default async function AdminMilitaryHireProgramPage({
                       colSpan={10}
                       className="px-4 py-10 text-center text-sm font-bold text-slate-500"
                     >
-                      No Military Hire applicants found yet.
+                      No {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName} applicants found yet.
                     </td>
                   </tr>
                 )}

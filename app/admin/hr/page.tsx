@@ -23,6 +23,10 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  VETERANS_MILITARY_FAMILIES_PROGRAM,
+  isVeteransMilitaryFamiliesProgram,
+} from "@/lib/programs/veterans-military-families";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +56,8 @@ const adminRoutes = {
   exports: "/admin/exports",
 };
 
-const programOrder = ["Student Hire", "Community Hire", "Military Hire"];
+const VETERANS_PROGRAM_LABEL = VETERANS_MILITARY_FAMILIES_PROGRAM.shortName;
+const programOrder = ["Student Hire", "Community Hire", VETERANS_PROGRAM_LABEL];
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -259,6 +264,7 @@ function getProgramLabel(row: AnyRow) {
   );
 
   if (programOrder.includes(explicitProgram)) return explicitProgram;
+  if (isVeteransMilitaryFamiliesProgram(explicitProgram)) return VETERANS_PROGRAM_LABEL;
 
   if (text.includes("student")) return "Student Hire";
   if (text.includes("community")) return "Community Hire";
@@ -271,7 +277,7 @@ function getProgramLabel(row: AnyRow) {
     text.includes("guard") ||
     text.includes("reserve")
   ) {
-    return "Military Hire";
+    return VETERANS_PROGRAM_LABEL;
   }
 
   return "Community Hire";
@@ -648,8 +654,8 @@ async function getHrData() {
     communityHire: ambassadorRecords.filter(
       (record) => record.program === "Community Hire",
     ).length,
-    militaryHire: ambassadorRecords.filter(
-      (record) => record.program === "Military Hire",
+    militaryHire: ambassadorRecords.filter((record) =>
+      isVeteransMilitaryFamiliesProgram(record.program),
     ).length,
     activeStudentHire: activeAmbassadorRecords.filter(
       (record) => record.program === "Student Hire",
@@ -657,8 +663,8 @@ async function getHrData() {
     activeCommunityHire: activeAmbassadorRecords.filter(
       (record) => record.program === "Community Hire",
     ).length,
-    activeMilitaryHire: activeAmbassadorRecords.filter(
-      (record) => record.program === "Military Hire",
+    activeMilitaryHire: activeAmbassadorRecords.filter((record) =>
+      isVeteransMilitaryFamiliesProgram(record.program),
     ).length,
     activeGuruApplicants: guruRecords.filter((record) => !record.archived).length,
     pendingGuruApplicants: pendingGuruRecords.length,
@@ -710,7 +716,7 @@ export default async function AdminHrPage() {
                 Human Resources
               </h1>
               <span className="rounded-full bg-green-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-green-800 sm:text-xs">
-                Hiring Command Center
+                Hiring Dashboard
               </span>
             </div>
 
@@ -963,7 +969,7 @@ export default async function AdminHrPage() {
                   Ambassador Program Pipeline
                 </h2>
                 <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                  Active order: Student Hire, Community Hire, Military Hire.
+                  Active order: Student Hire, Community Hire, {VETERANS_PROGRAM_LABEL}.
                   Archived applicants stay retained but are not treated as
                   active.
                 </p>
@@ -995,7 +1001,7 @@ export default async function AdminHrPage() {
               />
               <ProgramRow
                 icon={<ShieldCheck size={19} />}
-                title="Military Hire"
+                title={VETERANS_PROGRAM_LABEL}
                 detail="Veterans, military spouses, service families, Guard, Reserve, and supporters."
                 value={number(data.metrics.activeMilitaryHire)}
                 subvalue={`${number(data.metrics.militaryHire)} total`}
@@ -1290,7 +1296,7 @@ export default async function AdminHrPage() {
                 href={adminRoutes.gurus}
                 icon={<PawPrint size={18} />}
                 title="Review Guru onboarding"
-                detail="Check Guru applicants, trust readiness, service setup, and approval status from the same HR command center."
+                detail="Check Guru applicants, trust readiness, service setup, and approval status from the same HR dashboard."
               />
             </div>
           </DashboardCard>
@@ -1305,7 +1311,7 @@ export default async function AdminHrPage() {
                 Hiring Command Notes
               </h2>
               <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                Use HR as the main command center for applicant intake,
+                Use HR as the main dashboard for applicant intake,
                 ambassador recruiting, contractor readiness, Guru onboarding,
                 and retained records.
               </p>
@@ -1353,7 +1359,7 @@ export default async function AdminHrPage() {
                 href={adminRoutes.ambassadorLeads}
                 icon={<UserPlus size={18} />}
                 title="Add or review ambassador leads"
-                detail="Indeed, PA CareerLink, Student Hire, Community Hire, and Military Hire."
+                detail="Indeed, PA CareerLink, Student Hire, Community Hire, and Veterans & Military Families."
               />
               <QuickAction
                 href={adminRoutes.ambassadors}
@@ -1644,7 +1650,7 @@ function ProgramBadge({ program }: { program: string }) {
   const styles =
     program === "Student Hire"
       ? "border-blue-100 bg-blue-50 text-blue-800"
-      : program === "Military Hire"
+      : isVeteransMilitaryFamiliesProgram(program)
         ? "border-emerald-100 bg-emerald-50 text-emerald-800"
         : "border-green-100 bg-green-50 text-green-800";
 
@@ -1652,7 +1658,9 @@ function ProgramBadge({ program }: { program: string }) {
     <span
       className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${styles}`}
     >
-      {program}
+      {isVeteransMilitaryFamiliesProgram(program)
+        ? VETERANS_PROGRAM_LABEL
+        : program}
     </span>
   );
 }

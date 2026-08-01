@@ -23,6 +23,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 export const dynamic = "force-dynamic";
 
@@ -141,8 +142,8 @@ const programOptions: {
   },
   {
     key: "veterans-hire",
-    label: "Veterans Hire Program",
-    shortLabel: "Veterans",
+    label: VETERANS_MILITARY_FAMILIES_PROGRAM.displayName,
+    shortLabel: VETERANS_MILITARY_FAMILIES_PROGRAM.shortName,
     icon: <Medal size={18} />,
     description:
       "Veterans, eligible service members, spouses, dependents, Guard, reserve, and military-connected applicants.",
@@ -157,8 +158,8 @@ const programOptions: {
   },
   {
     key: "skillbridge-interest",
-    label: "SkillBridge Interest / Veterans Pathway",
-    shortLabel: "SkillBridge",
+    label: VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName,
+    shortLabel: VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.shortName,
     icon: <ShieldCheck size={18} />,
     description: "Future SkillBridge-style transition pathway interest.",
   },
@@ -2092,7 +2093,7 @@ export default async function AdminProgramApplicationsPage({
                 </h1>
 
                 <p className="mt-1 max-w-5xl text-base font-semibold text-slate-600">
-                  Review and action Student Hire, Veterans Hire, Ambassador
+                  Review and action Student Hire, {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, Ambassador
                   Program, and SkillBridge Interest applicants. Student Hire
                   now includes program applications, Ambassador Leads, and
                   active Ambassador dashboard records so the Indeed/HR pipeline
@@ -2217,7 +2218,7 @@ export default async function AdminProgramApplicationsPage({
 
           <StatCard
             icon={<Medal size={22} />}
-            label="Veterans Hire"
+            label={VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}
             value={number(counts.veterans)}
             detail="Military-connected applicants"
             href={adminRoutes.veteransApplications}

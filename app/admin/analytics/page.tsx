@@ -1457,7 +1457,7 @@ export default async function AdminAnalyticsPage() {
             description="Track referral-code creation, click/conversion events, Ambassador referrals, Pet Parent referrals, Guru referrals, and partner/referral payout signals."
             actions={
               <>
-                <ActionLink href="/admin/referrals" label="Referral Command Center" primary />
+                <ActionLink href="/admin/referrals" label="Referral Dashboard" primary />
                 <ActionLink href="/admin/referrals/payouts" label="Payouts" />
               </>
             }
@@ -1610,7 +1610,7 @@ export default async function AdminAnalyticsPage() {
           eyebrow="Campaign ROI Detail"
           title="Top growth campaigns"
           description="Detailed campaign table for admin decision-making: scale profitable channels, improve weak conversion points, and pause spend that is not producing signups or bookings."
-          actions={<ActionLink href="/admin/referrals" label="Growth Command Center" primary />}
+          actions={<ActionLink href="/admin/referrals" label="Growth & Referral Dashboard" primary />}
         >
           <TableCard
             headers={["Campaign", "Channel", "Clicks", "Signups", "Bookings", "Revenue", "Cost", "ROI", "Signal", "Recommendation"]}

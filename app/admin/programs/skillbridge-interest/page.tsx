@@ -17,6 +17,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 export const dynamic = "force-dynamic";
 
@@ -136,7 +137,7 @@ const skillbridgeGoals = [
     metric: "Onboarding/review",
     target: 15,
     action:
-      "Move strong candidates into review, onboarding, Military Hire, or future SkillBridge-style evaluation based on SitGuru needs.",
+      `Move strong candidates into review, onboarding, ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, or future SkillBridge-style evaluation based on SitGuru needs.`,
   },
 ];
 
@@ -1259,7 +1260,7 @@ export default async function AdminSkillBridgeInterestProgramPage({
                 evaluation area. It does not guarantee SkillBridge participation,
                 placement, approval, bookings, earnings, commissions, benefits,
                 employment, or full Guru status. Applicants may be routed into
-                future training, Military Hire, onboarding, or other SitGuru
+                future training, {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, onboarding, or other SitGuru
                 pathways based on eligibility, timing, documents, onboarding,
                 background check results, market needs, and SitGuru program
                 readiness.

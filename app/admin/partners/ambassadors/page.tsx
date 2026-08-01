@@ -19,6 +19,10 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  VETERANS_MILITARY_FAMILIES_PROGRAM,
+  isVeteransMilitaryFamiliesProgram,
+} from "@/lib/programs/veterans-military-families";
 import BackToPartnersButton from "../_components/back-to-partners-button";
 
 export const dynamic = "force-dynamic";
@@ -255,7 +259,7 @@ function getProgram(row: AnyRow) {
     combined.includes("guard") ||
     combined.includes("reserve")
   ) {
-    return "Military Hire";
+    return VETERANS_MILITARY_FAMILIES_PROGRAM.shortName;
   }
   if (combined.includes("community") || combined.includes("neighborhood")) {
     return "Community Hire";
@@ -1411,7 +1415,7 @@ function ProgramBadge({ program }: { program: string }) {
   const styles =
     program === "Student Hire"
       ? "border-blue-100 bg-blue-50 text-blue-800"
-      : program === "Military Hire"
+      : isVeteransMilitaryFamiliesProgram(program)
         ? "border-emerald-100 bg-emerald-50 text-emerald-800"
         : "border-green-100 bg-green-50 text-green-800";
 
@@ -1419,7 +1423,9 @@ function ProgramBadge({ program }: { program: string }) {
     <span
       className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${styles}`}
     >
-      {program}
+      {isVeteransMilitaryFamiliesProgram(program)
+        ? VETERANS_MILITARY_FAMILIES_PROGRAM.shortName
+        : program}
     </span>
   );
 }

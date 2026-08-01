@@ -1189,7 +1189,7 @@ export default async function AmbassadorDashboardPage() {
 
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-700 sm:text-xs">
-                    SitGuru Ambassador Command Center
+                    SitGuru Ambassador Dashboard
                   </p>
                   <h1 className="mt-1 text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
                     Hi, {firstName}

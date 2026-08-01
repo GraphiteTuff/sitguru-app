@@ -360,7 +360,7 @@ export default async function AdminModerationPage() {
               </p>
 
               <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
-                SitGuru moderation command center.
+                SitGuru moderation dashboard.
               </h1>
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">

@@ -448,7 +448,7 @@ const activityTypes = [
   'Flyer or QR Distribution',
   'Lead Follow-Up',
   'Training',
-  'Headquarters Assignment',
+  'Support Assignment',
   'Weekly Review',
   'Other',
 ];
@@ -473,7 +473,7 @@ const categories = [
   'Lead Follow-Up',
   'Partnership',
   'Training',
-  'Headquarters',
+  'Support',
   'Administration',
 ];
 
@@ -583,6 +583,15 @@ function titleCase(value?: string | null) {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+const LEAD_STATUS_LABELS: Record<string, string> = {
+  received_by_headquarters: 'Received by SitGuru Support',
+};
+
+function leadStatusLabel(value?: string | null) {
+  const key = (value || 'new').toLowerCase();
+  return LEAD_STATUS_LABELS[key] || titleCase(value);
 }
 
 function numberValue(value: string) {
@@ -718,11 +727,13 @@ function ChipRow({
   values,
   onChange,
   styles,
+  formatLabel = titleCase,
 }: {
   value: string;
   values: string[];
   onChange: (value: string) => void;
   styles: ReturnType<typeof createStyles>;
+  formatLabel?: (value: string) => string;
 }) {
   return (
     <ScrollView
@@ -737,7 +748,7 @@ function ChipRow({
             onPress={() => onChange(item)}
             style={[styles.chip, active ? styles.chipActive : null]}>
             <Text style={[styles.chipText, active ? styles.chipTextActive : null]}>
-              {titleCase(item)}
+              {formatLabel(item)}
             </Text>
           </Pressable>
         );
@@ -966,7 +977,7 @@ function ActivityCard({
         <View style={styles.helpBanner}>
           <Headphones color={theme.colors.warning} size={16} strokeWidth={2.4} />
           <Text style={styles.helpText}>
-            Headquarters assistance requested
+            SitGuru Support assistance requested
             {record.admin_help_reason ? `: ${record.admin_help_reason}` : '.'}
           </Text>
         </View>
@@ -1022,7 +1033,7 @@ function LeadCard({
     <View style={styles.recordCard}>
       <View style={styles.badgeRow}>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>{titleCase(record.lead_status || 'new')}</Text>
+          <Text style={styles.badgeText}>{leadStatusLabel(record.lead_status || 'new')}</Text>
         </View>
         <Text style={styles.recordDate}>{titleCase(record.lead_type)}</Text>
       </View>
@@ -1045,7 +1056,7 @@ function LeadCard({
         <View style={styles.helpBanner}>
           <Headphones color={theme.colors.warning} size={16} strokeWidth={2.4} />
           <Text style={styles.helpText}>
-            Sent to Headquarters for assistance
+            Sent to SitGuru Support for assistance
             {record.admin_assistance_reason ? `: ${record.admin_assistance_reason}` : '.'}
           </Text>
         </View>
@@ -1666,7 +1677,7 @@ export default function AmbassadorCommandCenterScreen() {
       setEditingId(null);
       setFeedback({
         tone: 'success',
-        message: result.message || 'Lead saved and sent to Headquarters.',
+        message: result.message || 'Lead saved and sent to SitGuru Support.',
       });
       await loadData(true);
     } catch (error) {
@@ -2145,7 +2156,7 @@ export default function AmbassadorCommandCenterScreen() {
 
               <PortalLinkButton
                 label="Message Center"
-                detail="Contact Headquarters and review Ambassador conversations"
+                detail="Contact SitGuru Support and review Ambassador conversations"
                 icon={
                   <MessageCircle
                     color={theme.colors.primary}
@@ -2159,7 +2170,7 @@ export default function AmbassadorCommandCenterScreen() {
               />
 
               <PortalLinkButton
-                label="Headquarters Support"
+                label="SitGuru Support"
                 detail="Request account, lead, event, materials, or payout help"
                 icon={
                   <Headphones
@@ -2245,7 +2256,7 @@ export default function AmbassadorCommandCenterScreen() {
                     <View style={styles.sectionCopy}>
                       <Text style={styles.eyebrow}>Follow-up</Text>
                       <Text style={styles.sectionTitle}>Leads needing attention</Text>
-                      <Text style={styles.sectionBody}>Upcoming follow-ups and Headquarters-assisted opportunities.</Text>
+                      <Text style={styles.sectionBody}>Upcoming follow-ups and Support-assisted opportunities.</Text>
                     </View>
                     <Pressable onPress={openLead} style={styles.roundAdd}>
                       <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
@@ -2282,7 +2293,7 @@ export default function AmbassadorCommandCenterScreen() {
                     Ask SitGuru for help with an activity, lead, event, or payout.
                   </Text>
                   <Button
-                    label="Ask Headquarters"
+                    label="Ask SitGuru Support"
                     primary
                     onPress={() => go('/support')}
                     styles={styles}
@@ -2490,7 +2501,7 @@ export default function AmbassadorCommandCenterScreen() {
                 <View style={styles.sectionHeader}>
                   <View style={styles.sectionCopy}>
                     <Text style={styles.eyebrow}>Lead generator</Text>
-                    <Text style={styles.sectionTitle}>Send opportunities to Headquarters</Text>
+                    <Text style={styles.sectionTitle}>Send opportunities to SitGuru Support</Text>
                   </View>
                   <Pressable onPress={openLead} style={styles.roundAdd}>
                     <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
@@ -2786,7 +2797,7 @@ export default function AmbassadorCommandCenterScreen() {
                 ],
                 [
                   'Add lead',
-                  'Send a person, business, or organization to Headquarters.',
+                  'Send a person, business, or organization to SitGuru Support.',
                   UserPlus,
                   () => closeAddMenuThen(openLead),
                 ],
@@ -2834,7 +2845,7 @@ export default function AmbassadorCommandCenterScreen() {
                 </View>
                 <View style={styles.sheetCopy}>
                   <Text style={styles.sheetItemTitle}>
-                    Request Headquarters help
+                    Request SitGuru Support help
                   </Text>
                   <Text style={styles.sheetItemBody}>
                     Ask for help with a lead, event, materials, account, or payout.
@@ -2880,7 +2891,7 @@ export default function AmbassadorCommandCenterScreen() {
                 ],
                 [
                   'Add lead',
-                  'Send a person, business, or organization to Headquarters.',
+                  'Send a person, business, or organization to SitGuru Support.',
                   UserPlus,
                   () => closeAddMenuThen(openLead),
                 ],
@@ -2928,7 +2939,7 @@ export default function AmbassadorCommandCenterScreen() {
                 </View>
                 <View style={styles.sheetCopy}>
                   <Text style={styles.sheetItemTitle}>
-                    Request Headquarters help
+                    Request SitGuru Support help
                   </Text>
                   <Text style={styles.sheetItemBody}>
                     Ask for help with a lead, event, materials, account, or payout.
@@ -3022,7 +3033,7 @@ export default function AmbassadorCommandCenterScreen() {
         <Field label="Outcome summary" value={activityForm.outcome_summary} onChangeText={(value) => setActivityForm((current) => ({ ...current, outcome_summary: value }))} multiline styles={styles} />
         <Field label="Notes" value={activityForm.notes} onChangeText={(value) => setActivityForm((current) => ({ ...current, notes: value }))} multiline styles={styles} />
         <SwitchField
-          label="Request Headquarters assistance"
+          label="Request SitGuru Support assistance"
           detail="Use this for event approvals, materials, partnerships, safety concerns, or follow-up assistance."
           value={activityForm.needs_admin_help}
           onChange={(value) => setActivityForm((current) => ({ ...current, needs_admin_help: value }))}
@@ -3037,7 +3048,7 @@ export default function AmbassadorCommandCenterScreen() {
       <FormModal
         visible={composer === 'lead'}
         title={editingId ? 'Update lead' : 'Add lead'}
-        subtitle="Capture the opportunity quickly. Headquarters receives it while your Ambassador attribution remains connected."
+        subtitle="Capture the opportunity quickly. SitGuru Support receives it while your Ambassador attribution remains connected."
         saving={saving}
         styles={styles}
         theme={theme}
@@ -3049,7 +3060,7 @@ export default function AmbassadorCommandCenterScreen() {
         <Text style={styles.fieldLabel}>Lead type</Text>
         <ChipRow value={leadForm.lead_type} values={leadTypes} onChange={(value) => setLeadForm((current) => ({ ...current, lead_type: value }))} styles={styles} />
         <Text style={styles.fieldLabel}>Status</Text>
-        <ChipRow value={leadForm.lead_status} values={['new', 'received_by_headquarters', 'admin_assigned', 'contacted', 'follow_up', 'converted', 'closed']} onChange={(value) => setLeadForm((current) => ({ ...current, lead_status: value }))} styles={styles} />
+        <ChipRow value={leadForm.lead_status} values={['new', 'received_by_headquarters', 'admin_assigned', 'contacted', 'follow_up', 'converted', 'closed']} onChange={(value) => setLeadForm((current) => ({ ...current, lead_status: value }))} styles={styles} formatLabel={leadStatusLabel} />
         <Field label="First name" value={leadForm.first_name} onChangeText={(value) => setLeadForm((current) => ({ ...current, first_name: value }))} styles={styles} />
         <Field label="Last name" value={leadForm.last_name} onChangeText={(value) => setLeadForm((current) => ({ ...current, last_name: value }))} styles={styles} />
         <Field label="Email" value={leadForm.email} onChangeText={(value) => setLeadForm((current) => ({ ...current, email: value }))} keyboardType="email-address" styles={styles} />
@@ -3068,7 +3079,7 @@ export default function AmbassadorCommandCenterScreen() {
         <Field label="Next action" value={leadForm.next_action} onChangeText={(value) => setLeadForm((current) => ({ ...current, next_action: value }))} styles={styles} />
         <Field label="Notes" value={leadForm.notes} onChangeText={(value) => setLeadForm((current) => ({ ...current, notes: value }))} multiline styles={styles} />
         <SwitchField label="Permission to contact" detail="Confirm the person or organization agreed to receive SitGuru follow-up." value={leadForm.consent_to_contact} onChange={(value) => setLeadForm((current) => ({ ...current, consent_to_contact: value }))} styles={styles} theme={theme} />
-        <SwitchField label="Request Headquarters assistance" detail="Admin will see this lead in the assistance queue." value={leadForm.admin_assistance_requested} onChange={(value) => setLeadForm((current) => ({ ...current, admin_assistance_requested: value }))} styles={styles} theme={theme} />
+        <SwitchField label="Request SitGuru Support assistance" detail="Admin will see this lead in the assistance queue." value={leadForm.admin_assistance_requested} onChange={(value) => setLeadForm((current) => ({ ...current, admin_assistance_requested: value }))} styles={styles} theme={theme} />
         {leadForm.admin_assistance_requested ? (
           <Field label="What assistance is needed?" value={leadForm.admin_assistance_reason} onChangeText={(value) => setLeadForm((current) => ({ ...current, admin_assistance_reason: value }))} multiline styles={styles} />
         ) : null}
@@ -3121,7 +3132,7 @@ export default function AmbassadorCommandCenterScreen() {
         <ChipRow value={marketingForm.status} values={['planned', 'draft', 'published', 'completed', 'cancelled']} onChange={(value) => setMarketingForm((current) => ({ ...current, status: value }))} styles={styles} />
         <Field label="Outcome summary" value={marketingForm.outcome_summary} onChangeText={(value) => setMarketingForm((current) => ({ ...current, outcome_summary: value }))} multiline styles={styles} />
         <Field label="Notes" value={marketingForm.notes} onChangeText={(value) => setMarketingForm((current) => ({ ...current, notes: value }))} multiline styles={styles} />
-        <SwitchField label="Request Headquarters assistance" detail="Use this for approved content, brand guidance, campaign support, or follow-up." value={marketingForm.needs_admin_help} onChange={(value) => setMarketingForm((current) => ({ ...current, needs_admin_help: value }))} styles={styles} theme={theme} />
+        <SwitchField label="Request SitGuru Support assistance" detail="Use this for approved content, brand guidance, campaign support, or follow-up." value={marketingForm.needs_admin_help} onChange={(value) => setMarketingForm((current) => ({ ...current, needs_admin_help: value }))} styles={styles} theme={theme} />
       </FormModal>
     </View>
   );

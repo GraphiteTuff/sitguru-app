@@ -425,7 +425,7 @@ export default async function AdminOperationsDashboard() {
             className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-emerald-50 sm:text-base"
             style={{ color: "#ecfdf5", WebkitTextFillColor: "#ecfdf5" }}
           >
-            Daily command center for marketplace operations, people queues,
+            Daily dashboard for marketplace operations, people queues,
             bookings, messages, reviews, payouts, readiness, Trust & Safety, and growth
             work.
           </p>

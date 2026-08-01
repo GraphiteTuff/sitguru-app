@@ -19,6 +19,10 @@ import {
   UsersRound,
 } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  VETERANS_MILITARY_FAMILIES_PROGRAM,
+  isVeteransMilitaryFamiliesProgram,
+} from "@/lib/programs/veterans-military-families";
 
 export const dynamic = "force-dynamic";
 
@@ -205,10 +209,10 @@ const programDefinitions: ProgramDefinition[] = [
   },
   {
     key: "veterans-hire",
-    title: "Military Hire Program",
-    shortTitle: "Military Hire",
+    title: VETERANS_MILITARY_FAMILIES_PROGRAM.displayName,
+    shortTitle: VETERANS_MILITARY_FAMILIES_PROGRAM.shortName,
     campaign: "Serve with the Pack",
-    eyebrow: "Military and veteran-connected pathway",
+    eyebrow: VETERANS_MILITARY_FAMILIES_PROGRAM.eyebrow,
     description:
       "A SitGuru pathway for veterans, transitioning service members, eligible service members, National Guard, reservists, military spouses, qualified dependents over 18, and SkillBridge-interested active-duty members exploring future pet care, operations, and local service opportunities.",
     href: adminRoutes.veteransHire,
@@ -704,7 +708,8 @@ function getAmbassadorLeadProgram(row: AnyRow) {
 
   if (studentProgram && rowMatchesProgram(row, studentProgram)) return "Student Hire";
   if (communityProgram && rowMatchesProgram(row, communityProgram)) return "Community Hire";
-  if (militaryProgram && rowMatchesProgram(row, militaryProgram)) return "Military Hire";
+  if (militaryProgram && rowMatchesProgram(row, militaryProgram))
+    return VETERANS_MILITARY_FAMILIES_PROGRAM.shortName;
 
   return "Ambassador Program";
 }
@@ -1127,7 +1132,8 @@ async function getProgramData() {
     (row) => getAmbassadorLeadProgram(row) === "Community Hire",
   );
   const militaryAmbassadorRows = ambassadorLeadRows.filter(
-    (row) => getAmbassadorLeadProgram(row) === "Military Hire",
+    (row) =>
+      isVeteransMilitaryFamiliesProgram(getAmbassadorLeadProgram(row)),
   );
 
   const ambassadorLeadStatusTotals = {
@@ -1417,10 +1423,10 @@ function ProgramCard({
 
             <div>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">
-                Military Hire includes veterans, military families, and SkillBridge interest
+                {VETERANS_MILITARY_FAMILIES_PROGRAM.displayName} includes veterans, military families, and SkillBridge interest
               </p>
               <p className="mt-1 text-sm font-bold leading-6 text-amber-950">
-                This program tracks Military Hire, veteran-connected applicants, and
+                This program tracks {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, veteran-connected applicants, and
                 SkillBridge Interest List signals in one admin pathway.
                 SkillBridge remains an interest-tracking pathway unless SitGuru
                 later creates a formally approved training program.
@@ -1514,12 +1520,12 @@ function AmbassadorLeadPipeline({
               PA CareerLink / Ambassador Leads
             </p>
             <h2 className="mt-1 text-2xl font-black text-green-950">
-              Track Student, Community, and Military Ambassador applicants.
+              Track Student, Community, and {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName} Ambassador applicants.
             </h2>
             <p className="mt-2 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
               Use this section to monitor applicant and referral signals from PA CareerLink,
               website forms, partner referrals, and ambassador outreach. Program order stays
-              aligned to SitGuru operations: Student Hire, Community Hire, Military Hire.
+              aligned to SitGuru operations: Student Hire, Community Hire, {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}.
             </p>
           </div>
         </div>
@@ -1563,7 +1569,7 @@ function AmbassadorLeadPipeline({
           detail="Community Ambassador and workforce leads"
         />
         <PipelineMiniCard
-          label="Military Hire"
+          label={VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}
           value={number(pipeline.military)}
           detail="Military Ambassador and veteran-connected leads"
         />
@@ -1786,11 +1792,11 @@ export default async function AdminProgramsPage() {
                 </p>
 
                 <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-                  SitGuru Growth Programs Command Center
+                  SitGuru Growth Programs Dashboard
                 </h1>
 
                 <p className="mt-1 max-w-5xl text-base font-semibold text-slate-600">
-                  Track Student Hire, Community Hire, Military Hire, and
+                  Track Student Hire, Community Hire, {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, and
                   Ambassador Program applications, referrals, onboarding,
                   Checkr / background check readiness, Pack Leader recognition,
                   commission costs, and progress toward bookable Guru status.

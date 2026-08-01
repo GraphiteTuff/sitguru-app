@@ -68,7 +68,7 @@ export default function SitGuruRoleStatus({
 
       {role === 'ambassador' ? (
         <Pressable
-          accessibilityHint="Opens your calendar, activities, marketing, leads, and Headquarters tools."
+          accessibilityHint="Opens your calendar, activities, marketing, leads, and Support tools."
           accessibilityLabel="Open SitGuru Ambassador Portal"
           accessibilityRole="button"
           onPress={openAmbassadorPortal}

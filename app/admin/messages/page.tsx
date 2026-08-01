@@ -252,7 +252,7 @@ const filterLinks = [
   { key: "all", label: "All", href: "/admin/messages" },
   {
     key: "internal",
-    label: "Internal HQ",
+    label: "Internal",
     href: "/admin/messages?filter=internal",
   },
   {
@@ -1032,7 +1032,7 @@ function isEscalationThread(thread: AdminThreadCard) {
 }
 
 function getThreadTypeLabel(type: AdminThreadCard["type"]) {
-  if (type === "internal") return "Internal HQ";
+  if (type === "internal") return "Internal";
   if (type === "guru-admin") return "Guru ↔ Admin";
   if (type === "guru-customer") return "Guru ↔ Pet Parent";
   if (type === "customer-admin") return "Pet Parent ↔ Admin";
@@ -3715,7 +3715,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
                   </h1>
                   <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
                     Manage Pet Parent, Guru, Ambassador, support, safety,
-                    payment, technical, partner, and internal HQ conversations
+                    payment, technical, partner, and internal staff conversations
                     from one Admin inbox. Archive hides threads from KPIs;
                     Delete forever permanently removes them.
                   </p>
@@ -3791,7 +3791,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
           />
           <StatCard
             icon={<MessagesSquare size={22} />}
-            label="Internal HQ"
+            label="Internal"
             value={number(internalThreads)}
             detail="Department and staff conversations"
             href="/admin/messages?filter=internal"
@@ -3808,7 +3808,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-xl font-black text-slate-950">
-                HQ Department Messaging
+                Admin Department Messaging
               </h2>
               <p className="mt-1 max-w-4xl text-sm font-semibold text-slate-500">
                 Start internal conversations with SitGuru departments directly
@@ -3820,7 +3820,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
               href={adminRoutes.settings}
               className="inline-flex items-center justify-center rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-black text-green-900 transition hover:bg-green-100"
             >
-              Manage HQ Access
+              Manage Admin Access
             </Link>
           </div>
 

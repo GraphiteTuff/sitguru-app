@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 export const runtime = "nodejs";
 
@@ -82,9 +83,10 @@ const allowedPrograms: ProgramKey[] = [
 
 const programLabels: Record<ProgramKey, string> = {
   "student-hire": "Student Hire Program",
-  "veterans-hire": "Veterans Hire Program",
+  "veterans-hire": VETERANS_MILITARY_FAMILIES_PROGRAM.displayName,
   "ambassador-program": "Ambassador Program",
-  "skillbridge-interest": "SkillBridge Interest / Veterans Pathway",
+  "skillbridge-interest":
+    VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName,
 };
 
 function getSupabaseAdminClient() {

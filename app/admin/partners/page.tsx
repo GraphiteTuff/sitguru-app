@@ -370,7 +370,7 @@ export default async function AdminPartnersOverviewPage() {
               </div>
 
               <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
-                SitGuru HQ Partner Growth
+                SitGuru Admin Partner Growth
               </p>
 
               <h1 className="mt-3 text-4xl font-black leading-tight tracking-tight text-[#17382B] sm:text-5xl lg:text-6xl">
@@ -380,7 +380,7 @@ export default async function AdminPartnersOverviewPage() {
               <p className="mt-4 max-w-3xl text-base font-semibold leading-7 text-slate-700 sm:text-lg">
                 Track local partners, national partners, affiliates,
                 ambassadors, campaigns, rewards, payouts, applications, and
-                partner messages from one stronger SitGuru admin command center.
+                partner messages from one stronger SitGuru admin dashboard.
               </p>
             </div>
 

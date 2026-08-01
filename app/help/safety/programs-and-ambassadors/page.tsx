@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import HelpArticleChrome from "@/components/help/HelpArticleChrome";
 import { HelpFaqList } from "@/components/help/HelpFaqList";
 import { programFaqs } from "@/lib/help/content";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 export const metadata: Metadata = {
   title: "Ambassadors & Program Pathways",
   description:
-    "Ambassador referrals, Student Hire, Community Hire, and Military Hire.",
+    `Ambassador referrals, Student Hire, Community Hire, and ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}.`,
 };
 
 export default function ProgramsAndAmbassadorsPage() {

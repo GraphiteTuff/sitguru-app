@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   Bell,
   Cookie,
@@ -86,7 +87,7 @@ const sections = [
       "SitGuru may share information with service providers and vendors who help us operate the platform, including hosting providers, analytics tools, customer support tools, email service providers, messaging providers, payment processors, security providers, background or trust and safety providers, and similar business partners.",
       "We may share information between users where necessary to support platform functionality, such as facilitating communication, bookings, account setup, care instructions, or service-related interactions between Pet Parents and Pet Gurus.",
       "For example, a Pet Parent may share pet care details with a Pet Guru, and a Pet Guru may share profile, service, location, availability, and experience details with Pet Parents.",
-      "We may share limited program or referral information where reasonably needed to support Student Hire, Community Hire, Military Hire, Ambassador activity, partner referrals, or workforce/community outreach.",
+      `We may share limited program or referral information where reasonably needed to support Student Hire, Community Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.displayName}, Ambassador activity, partner referrals, or workforce/community outreach.`,
       "We may also disclose information if required by law, legal process, court order, government request, or where we believe disclosure is reasonably necessary to protect SitGuru, our users, pets, or the public.",
       "We do not sell personal information in the ordinary meaning of that phrase.",
     ],
@@ -221,7 +222,7 @@ const privacyPathways = [
   {
     title: "Programs and Ambassadors",
     description:
-      "Student Hire, Community Hire, Military Hire, and Ambassador submissions may include referral, partner, school, or eligibility details.",
+      `Student Hire, Community Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.displayName}, and Ambassador submissions may include referral, partner, school, or eligibility details.`,
     icon: <Sparkles className="h-5 w-5" />,
   },
 ];
