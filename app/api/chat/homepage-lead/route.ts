@@ -1,7 +1,7 @@
 // app/api/chat/homepage-lead/route.ts
 /**
  * Anonymous homepage lead funnel — guest UUID cookie + LEAD_FUNNEL conversation
- * bootstrap, then Claude SSE stream (claude-3-5-sonnet-20241022 via ai-engine).
+ * bootstrap, then Claude SSE stream (via ai-engine model resolver).
  *
  * Cookie rule: resolve `cookies()` at absolute POST entry before any stream work.
  */
@@ -16,6 +16,7 @@ import {
   streamSitGuruAiReply,
   type AiChatTurn,
 } from "@/lib/messaging/ai-engine";
+import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
 import {
   disableAiAssist,
   insertAiMessage,
@@ -41,8 +42,10 @@ export const runtime = "nodejs";
 
 const GUEST_COOKIE = "sitguru_lead_guest_id";
 const LEAD_CHANNEL = "LEAD_FUNNEL";
-/** Verified Anthropic production model id for homepage CTO funnel */
-const HOMEPAGE_LEAD_MODEL = "claude-3-5-sonnet-20241022";
+/** Anthropic model for homepage CTO funnel (resolved per request). */
+function homepageLeadModel() {
+  return getSitGuruAiModel();
+}
 const AUDIENCE_HINT =
   "cold homepage leads, young pup parents, future Gurus, and Brand Ambassadors sniffing around the SitGuru pack";
 
@@ -562,7 +565,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
       triggers: handoff.triggers,
       reply: notice,
       contact,
-      model: HOMEPAGE_LEAD_MODEL,
+      model: homepageLeadModel(),
     });
     if (setGuestCookie) {
       response.cookies.set(GUEST_COOKIE, guestId, {
@@ -603,7 +606,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
       aiAssistEnabled: true,
       triggers: handoff.triggers,
       reply,
-      model: HOMEPAGE_LEAD_MODEL,
+      model: homepageLeadModel(),
     });
     if (setGuestCookie) {
       response.cookies.set(GUEST_COOKIE, guestId, {
@@ -631,7 +634,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
       guestId,
       reply: fallback,
       aiAssistEnabled,
-      model: HOMEPAGE_LEAD_MODEL,
+      model: homepageLeadModel(),
       simulated: true,
     });
     if (setGuestCookie) {
@@ -657,7 +660,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
       history,
       audienceHint: AUDIENCE_HINT,
       persona: PACK_PERSONA,
-      model: HOMEPAGE_LEAD_MODEL,
+      model: homepageLeadModel(),
       systemExtra,
     });
     if (completion.ok && adminUserId) {
@@ -674,7 +677,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
       reply: completion.ok ? completion.text : undefined,
       error: completion.ok ? undefined : completion.error,
       aiAssistEnabled,
-      model: HOMEPAGE_LEAD_MODEL,
+      model: homepageLeadModel(),
     });
     if (setGuestCookie) {
       response.cookies.set(GUEST_COOKIE, guestId, {
@@ -703,7 +706,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
           type: "meta",
           conversationId,
           guestId: streamGuestId,
-          model: HOMEPAGE_LEAD_MODEL,
+          model: homepageLeadModel(),
           channelType: LEAD_CHANNEL,
           systemDigest: "SIT_GURU_SITE_CONTEXT + help catalog injected",
         });
@@ -714,7 +717,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
           history,
           audienceHint: AUDIENCE_HINT,
           persona: PACK_PERSONA,
-          model: HOMEPAGE_LEAD_MODEL,
+          model: homepageLeadModel(),
           systemExtra,
         })) {
           if (event.type === "delta") {

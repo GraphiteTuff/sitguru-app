@@ -6,30 +6,22 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { buildSitGuruAiSystemPrompt } from "@/lib/messaging/help-context";
+import {
+  getSitGuruAiModel,
+  isSitGuruAiConfigured,
+} from "@/lib/messaging/ai-model";
 
 export type AiChatTurn = {
   role: "user" | "assistant" | "system";
   content: string;
 };
 
-const DEFAULT_MODEL = "claude-3-5-sonnet-latest";
+export { getSitGuruAiModel, isSitGuruAiConfigured } from "@/lib/messaging/ai-model";
 
 function getAnthropicClient() {
   const apiKey = String(process.env.ANTHROPIC_API_KEY || "").trim();
   if (!apiKey) return null;
   return new Anthropic({ apiKey });
-}
-
-export function getSitGuruAiModel() {
-  return (
-    String(process.env.ANTHROPIC_MODEL || "").trim() ||
-    String(process.env.SITGURU_AI_MODEL || "").trim() ||
-    DEFAULT_MODEL
-  );
-}
-
-export function isSitGuruAiConfigured() {
-  return Boolean(String(process.env.ANTHROPIC_API_KEY || "").trim());
 }
 
 function toClaudeMessages(history: AiChatTurn[] | undefined, userMessage: string) {

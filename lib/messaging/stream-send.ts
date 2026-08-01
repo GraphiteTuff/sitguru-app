@@ -14,10 +14,8 @@ import {
   isReservedPreferredName,
   sanitizePreferredName,
 } from "@/lib/chat/homepage-name";
-
-/** Hardcoded marketing context — never depends on DB lookups. */
-const CORE_SITE_CONTEXT =
-  "CORE CONTEXT: A Guru is an expert pet care provider on the SitGuru platform. This includes highly verified local sitters, dog walkers, pet trainers, groomers, boarding providers, and experienced neighborhood caregivers who lead with absolute reliability, communication, and deep respect for each pet's unique daily routine and personality.";
+import { buildRogueKnowledgeBlock } from "@/lib/chat/rogue-knowledge";
+import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -262,22 +260,27 @@ If they say hi/hey/hello, answer like live text: ask how they are, say you're do
 CRITICAL: You are Rogue. NEVER address the visitor as Rogue. If they say "Hi Rogue", they are greeting YOU — reply with hi/how are you, say you're doing great, then ask what to call THEM.
 Do not invent a name. Stay interactive and collect their preferred name before deep booking help.\n`;
 
+    const knowledgeBlock = buildRogueKnowledgeBlock({
+      lastUserText,
+      maxChars: 18000,
+    });
+
     let result;
     try {
       result = streamText({
-        model: anthropic("claude-3-5-sonnet-latest"),
+        model: anthropic(getSitGuruAiModel()),
         messages,
-        system: `You are Rogue, Your Chief Treat Officer 🦴 for SitGuru — a high-energy, pet-friendly, hip, lowercase-conversational pack guide helping future members join the SitGuru Pet Community.
+        system: `You are Rogue, Your Chief Treat Officer 🦴 for SitGuru — a warm, witty, real-time conversational pack guide.
 ${nameDirective}
-${CORE_SITE_CONTEXT}
-Always introduce yourself as Rogue, Your Chief Treat Officer when needed. Capitalize "Rogue" when saying your name. Keep replies short (2–3 sentences), warm, and personalized to this chat participant.
-Talk like a live chat: react to greetings (hi, hey, hello, what's up) in real time — never ignore them or dump a menu.
-When they select a care service or ask for pet care, open with "great choice!" (or similar), then say we can help them find a Pet Guru to get the care they need right away — stress that we're fast, accurate, and here to help — then add one short service detail + next step.
-Use hardcoded SitGuru definitions for Guru meaning, mission, PawPerks checkout redemption, and care types (Drop-in Visits, Dog Walks, Overnight stays, Boarding).
-If unresolved or they ask for a human, share pack@sitguru.com.
+You have full SitGuru website + Help Center knowledge below. Use it to answer specifically — do not give the same generic reply to different questions.
+Be communicative: usually 3–6 short sentences, react to their latest message, vary phrasing, ask one natural follow-up.
+When they want care, explain the service with real platform details and help them find a Pet Guru quickly — fast, accurate, and here to help.
+Capitalize "Rogue" when saying your name. If unresolved or they ask for a human, share pack@sitguru.com.
 ${walkId ? `\nACTIVE WALK CONTEXT:\n- Current walk ID: ${walkId}. Prefer walk-aware guidance when relevant.\n` : ""}
 
-${HOMEPAGE_CTO_VOICE_RULES}`,
+${HOMEPAGE_CTO_VOICE_RULES}
+
+${knowledgeBlock}`,
         onFinish: async ({ text }) => {
           try {
             const assistantText = String(text || "").trim();

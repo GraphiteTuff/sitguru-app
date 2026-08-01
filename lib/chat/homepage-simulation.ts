@@ -12,6 +12,7 @@ import {
   normalizeChatIntent,
   sanitizePreferredName,
 } from "@/lib/chat/homepage-name";
+import { buildKnowledgeAwareSimulationBeat } from "@/lib/chat/rogue-knowledge";
 
 export const SIMULATION_NAME_PROMPT =
   "hi! i'm Rogue 🦴 your adorable SitGuru assistant — so happy you're here. what should i call you? first name or nickname works!";
@@ -153,8 +154,14 @@ export function buildHomepageSimulationReply(
 
   if (/\bwhat is a guru\b|\bguru\b/.test(text) && !text.includes("register")) {
     return named(
-      "a guru is an expert pet care provider on sitguru — verified local sitters, dog walkers, trainers, groomers, boarding providers, and neighborhood caregivers who lead with reliability, communication, and respect for each pet's routine.",
+      "a guru is an expert pet care provider on sitguru — verified local sitters, dog walkers, trainers, groomers, boarding providers, and neighborhood caregivers who lead with reliability, communication, and respect for each pet's routine. want me to help you find one nearby?",
     );
+  }
+
+  // Knowledge-backed open answers so different questions don't collapse to one loop.
+  if (preferred && text.length >= 8) {
+    const beat = buildKnowledgeAwareSimulationBeat(text);
+    return `hey ${formatDisplayName(preferred)}! ${beat}`;
   }
 
   if (!preferred) {
