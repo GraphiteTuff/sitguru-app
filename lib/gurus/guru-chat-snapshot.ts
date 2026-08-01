@@ -36,6 +36,14 @@ export type LookupGurusResult = {
   note?: string;
 };
 
+/** Matches complete + slightly messy model-emitted guru card markers. */
+export const GURU_CARD_MARKER_PATTERN =
+  /(?:`{1,3})?\[\[\s*guru_card\s*:\s*([A-Za-z0-9_+\/=-]+)\s*\]\](?:`{1,3})?/gi;
+
+/** Incomplete / truncated markers (no closing brackets) — strip from UI. */
+const GURU_CARD_ORPHAN_PATTERN =
+  /(?:`{1,3})?\[\[\s*guru_card\s*:\s*[A-Za-z0-9_+\/=-]{8,}(?:`{1,3})?/gi;
+
 function toBase64Url(text: string) {
   const bytes = new TextEncoder().encode(text);
   let binary = "";
@@ -49,28 +57,149 @@ function toBase64Url(text: string) {
 }
 
 function fromBase64Url(payload: string) {
-  const padded = payload.replace(/-/g, "+").replace(/_/g, "/");
+  const cleaned = String(payload || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
   const pad =
-    padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
-  const binary = atob(padded + pad);
+    cleaned.length % 4 === 0 ? "" : "=".repeat(4 - (cleaned.length % 4));
+  const binary = atob(cleaned + pad);
   const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
   return new TextDecoder().decode(bytes);
 }
 
+/** Compact wire format — keeps markers short so models don't truncate mid-token. */
+type CompactGuruCard = {
+  i?: string;
+  n: string;
+  s: string;
+  p?: string | null;
+  v?: string[];
+  r?: number | null;
+  l?: string;
+  a?: number | null;
+  c?: number;
+  b?: boolean;
+  u?: string;
+  k?: string | null;
+};
+
+function toCompact(guru: GuruChatSnapshot): CompactGuruCard {
+  const photo =
+    guru.photoUrl && guru.photoUrl.length <= 180 ? guru.photoUrl : null;
+  return {
+    i: guru.id,
+    n: guru.name,
+    s: guru.slug,
+    p: photo,
+    v: guru.services.slice(0, 3),
+    r: guru.rate,
+    l: guru.location,
+    a: guru.rating,
+    c: guru.reviewCount,
+    b: guru.canBook,
+    u: guru.profileUrl || `/guru/${guru.slug}`,
+    k: guru.bookingUrl,
+  };
+}
+
+function fromCompact(
+  raw: CompactGuruCard | GuruChatSnapshot,
+): GuruChatSnapshot | null {
+  // Support both compact wire format and legacy full snapshots.
+  if ("slug" in raw && "name" in raw && raw.slug && raw.name) {
+    const full = raw as GuruChatSnapshot;
+    return {
+      id: full.id || full.slug,
+      name: full.name,
+      slug: full.slug,
+      photoUrl: full.photoUrl ?? null,
+      services: Array.isArray(full.services) ? full.services : [],
+      rate: full.rate ?? null,
+      location: full.location || "Local area",
+      rating: full.rating ?? null,
+      reviewCount: full.reviewCount || 0,
+      canBook: Boolean(full.canBook),
+      profileUrl: full.profileUrl || `/guru/${full.slug}`,
+      bookingUrl: full.bookingUrl ?? null,
+      blurb: full.blurb ?? null,
+    };
+  }
+
+  const compact = raw as CompactGuruCard;
+  const slug = String(compact.s || "").trim();
+  const name = String(compact.n || "").trim();
+  if (!slug || !name) return null;
+
+  return {
+    id: String(compact.i || slug),
+    name,
+    slug,
+    photoUrl: compact.p ?? null,
+    services: Array.isArray(compact.v) ? compact.v : [],
+    rate: compact.r ?? null,
+    location: compact.l || "Local area",
+    rating: compact.a ?? null,
+    reviewCount: compact.c || 0,
+    canBook: Boolean(compact.b),
+    profileUrl: compact.u || `/guru/${slug}`,
+    bookingUrl: compact.k ?? null,
+    blurb: null,
+  };
+}
+
 /** Encode snapshot for chat marker parsing. */
 export function encodeGuruCardMarker(guru: GuruChatSnapshot): string {
-  const payload = toBase64Url(JSON.stringify(guru));
+  const payload = toBase64Url(JSON.stringify(toCompact(guru)));
   return `[[guru_card:${payload}]]`;
 }
 
 export function decodeGuruCardMarker(payload: string): GuruChatSnapshot | null {
   try {
-    const parsed = JSON.parse(fromBase64Url(payload)) as GuruChatSnapshot;
-    if (!parsed?.slug || !parsed?.name) return null;
-    return parsed;
+    const parsed = JSON.parse(fromBase64Url(payload)) as
+      | CompactGuruCard
+      | GuruChatSnapshot;
+    return fromCompact(parsed);
   } catch {
     return null;
   }
+}
+
+/**
+ * Pull every [[guru_card:...]] out of assistant text, decode cards, and
+ * return cleaned copy with markers fully removed (including truncated ones).
+ */
+export function extractGuruCardsFromText(raw: string): {
+  text: string;
+  cards: GuruChatSnapshot[];
+} {
+  let text = String(raw || "");
+  const cards: GuruChatSnapshot[] = [];
+  const seen = new Set<string>();
+
+  text = text.replace(GURU_CARD_MARKER_PATTERN, (_full, payload: string) => {
+    const card = decodeGuruCardMarker(payload);
+    if (card && !seen.has(card.slug)) {
+      seen.add(card.slug);
+      cards.push(card);
+    }
+    return " ";
+  });
+  GURU_CARD_MARKER_PATTERN.lastIndex = 0;
+
+  // Never leave raw token fragments in the bubble.
+  text = text.replace(GURU_CARD_ORPHAN_PATTERN, " ");
+  GURU_CARD_ORPHAN_PATTERN.lastIndex = 0;
+  text = text.replace(/\bmarker\s*:\s*/gi, " ");
+
+  text = text
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+
+  return { text, cards };
 }
 
 function clean(value: unknown) {

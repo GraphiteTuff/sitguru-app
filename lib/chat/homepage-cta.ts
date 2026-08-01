@@ -1,5 +1,5 @@
 import {
-  decodeGuruCardMarker,
+  extractGuruCardsFromText,
   type GuruChatSnapshot,
 } from "@/lib/gurus/guru-chat-snapshot";
 
@@ -85,28 +85,16 @@ export type ParsedHomepageChatContent = {
   guruCards: GuruChatSnapshot[];
 };
 
-const GURU_CARD_PATTERN = /\[\[guru_card:([A-Za-z0-9_-]+)\]\]/gi;
-
 /**
- * Strip CTA markers from assistant copy and return unique action buttons.
+ * Strip CTA + guru_card markers from assistant copy and return UI parts.
  */
 export function parseHomepageChatContent(
   raw: string,
 ): ParsedHomepageChatContent {
-  let text = String(raw || "");
+  const extracted = extractGuruCardsFromText(raw);
+  let text = extracted.text;
+  const guruCards = extracted.cards;
   const found = new Map<HomepageCtaId, HomepageCtaDef>();
-  const guruCards: GuruChatSnapshot[] = [];
-  const seenGuru = new Set<string>();
-
-  text = text.replace(GURU_CARD_PATTERN, (_full, payload: string) => {
-    const card = decodeGuruCardMarker(payload);
-    if (card && !seenGuru.has(card.slug)) {
-      seenGuru.add(card.slug);
-      guruCards.push(card);
-    }
-    return " ";
-  });
-  GURU_CARD_PATTERN.lastIndex = 0;
 
   for (const def of HOMEPAGE_CTA_DEFS) {
     for (const pattern of def.patterns) {

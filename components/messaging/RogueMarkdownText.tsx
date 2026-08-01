@@ -1,9 +1,11 @@
 /**
  * Lightweight, safe Markdown for Rogue chat bubbles.
  * Supports **bold** and short line breaks — no HTML injection.
+ * Strips any leftover [[guru_card:...]] tokens as a safety net.
  */
 
 import type { ReactNode } from "react";
+import { extractGuruCardsFromText } from "@/lib/gurus/guru-chat-snapshot";
 
 function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = [];
@@ -47,8 +49,9 @@ export function RogueMarkdownText({
   text: string;
   className?: string;
 }) {
-  const normalized = String(text || "")
-    .replace(/\r\n/g, "\n")
+  // Safety net: never paint raw guru_card tokens even if upstream missed them.
+  const normalized = extractGuruCardsFromText(text)
+    .text.replace(/\r\n/g, "\n")
     .trim();
 
   if (!normalized) return null;

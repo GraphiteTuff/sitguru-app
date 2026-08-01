@@ -12,6 +12,8 @@ export function GuruProfileSnapshotCard({ guru }: { guru: GuruChatSnapshot }) {
     guru.rating != null
       ? `${guru.rating.toFixed(1)}${guru.reviewCount ? ` · ${guru.reviewCount} reviews` : ""}`
       : null;
+  const rebookHref =
+    guru.bookingUrl || guru.profileUrl || `/guru/${guru.slug}`;
 
   return (
     <div className="mt-2 overflow-hidden rounded-2xl border border-[#0D5C3A]/20 bg-white shadow-sm">
@@ -23,6 +25,7 @@ export function GuruProfileSnapshotCard({ guru }: { guru: GuruChatSnapshot }) {
               src={guru.photoUrl}
               alt=""
               className="h-full w-full object-cover"
+              style={{ objectPosition: "50% 28%" }}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-lg font-bold text-[#0D5C3A]">
@@ -42,11 +45,6 @@ export function GuruProfileSnapshotCard({ guru }: { guru: GuruChatSnapshot }) {
             {rateLabel ? ` · from ${rateLabel}` : ""}
             {ratingLabel ? ` · ★ ${ratingLabel}` : ""}
           </p>
-          {guru.blurb ? (
-            <p className="m-0 mt-1 line-clamp-2 text-xs text-slate-500">
-              {guru.blurb}
-            </p>
-          ) : null}
         </div>
       </div>
       <p className="m-0 border-t border-slate-100 px-3 pt-2 text-[10px] font-medium uppercase tracking-wide text-slate-500">
@@ -54,19 +52,17 @@ export function GuruProfileSnapshotCard({ guru }: { guru: GuruChatSnapshot }) {
       </p>
       <div className="flex gap-2 px-3 pb-2 pt-1.5">
         <Link
-          href={guru.profileUrl}
+          href={guru.profileUrl || `/guru/${guru.slug}`}
+          className="inline-flex flex-1 items-center justify-center rounded-full border border-[#0D5C3A] px-3 py-1.5 text-center text-xs font-semibold text-[#0D5C3A]"
+        >
+          View profile
+        </Link>
+        <Link
+          href={rebookHref}
           className="inline-flex flex-1 items-center justify-center rounded-full bg-[#0D5C3A] px-3 py-1.5 text-center text-xs font-semibold text-white"
         >
-          View on SitGuru
+          Rebook
         </Link>
-        {guru.canBook && guru.bookingUrl ? (
-          <Link
-            href={guru.bookingUrl}
-            className="inline-flex flex-1 items-center justify-center rounded-full border border-[#0D5C3A] px-3 py-1.5 text-center text-xs font-semibold text-[#0D5C3A]"
-          >
-            Book Guru
-          </Link>
-        ) : null}
       </div>
     </div>
   );
