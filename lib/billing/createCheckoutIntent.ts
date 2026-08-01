@@ -193,7 +193,11 @@ export async function createCheckoutPaymentIntent(
     endDate: cleanText(input.endDate) || undefined,
   });
 
-  const currency = (cleanText(input.currency) || "usd").toLowerCase();
+  const currency = (
+    cleanText(input.currency) ||
+    cleanText(bookingRow.currency) ||
+    "usd"
+  ).toLowerCase();
   const stripe = getStripeServer();
   const customerId = await resolveStripeCustomerId({
     userId: input.userId,

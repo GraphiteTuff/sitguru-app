@@ -3,6 +3,10 @@ import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { calculateDistanceMiles } from "@/lib/distance/calculateDistanceMiles";
+import {
+  getCurrencyIsoForCountry,
+  resolveRegionalConfig,
+} from "@/lib/i18n/regional-config";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +30,7 @@ const SITGURU_STRIPE_TAX_CODE = "txcd_20030000";
 type BookingRow = Record<string, unknown>;
 
 type LocalityFeeRuleRow = {
-  id?: string;
+  id?: string | null;
   locality_name?: string | null;
   state?: string | null;
   city?: string | null;
@@ -50,7 +54,7 @@ type MarketplaceFeeResolution = {
 
 type CheckoutLineItem = {
   price_data: {
-    currency: "usd";
+    currency: string;
     unit_amount: number;
     tax_behavior: "exclusive";
     product_data: {
@@ -1316,6 +1320,7 @@ async function updateCheckoutStarted(
   bookingId: string,
   values: {
     stripeSessionId: string;
+    currency: string;
     subtotalAmount: number;
     sitguruFeeAmount: number;
     guruNetAmount: number;
@@ -1359,7 +1364,7 @@ async function updateCheckoutStarted(
     payment_status: "checkout_started",
     stripe_session_id: values.stripeSessionId,
     stripe_checkout_session_id: values.stripeSessionId,
-    currency: "usd",
+    currency: values.currency,
     subtotal_amount: values.subtotalAmount,
     sitguru_fee_amount: values.sitguruFeeAmount,
     platform_fee: values.sitguruFeeAmount,
@@ -1599,10 +1604,30 @@ export async function POST(req: NextRequest) {
     const bookingCareLongitude = getBookingLongitude(booking);
     const bookingCareLocalityName = getBookingLocalityName(booking);
 
+    const regional = resolveRegionalConfig({
+      country:
+        (typeof body?.country === "string" && body.country) ||
+        (typeof body?.country_code === "string" && body.country_code) ||
+        (typeof body?.countryCode === "string" && body.countryCode) ||
+        (typeof booking.country_code === "string" && booking.country_code) ||
+        (typeof booking.care_country === "string" && booking.care_country) ||
+        null,
+      headers: req.headers,
+    });
+
+    const currencyIso = (
+      (typeof body?.currency === "string" && body.currency.trim()) ||
+      (typeof booking.currency === "string" && booking.currency.trim()) ||
+      regional.currencyIso ||
+      getCurrencyIsoForCountry("US")
+    )
+      .toLowerCase()
+      .trim();
+
     const checkoutLineItems: CheckoutLineItem[] = [
       {
         price_data: {
-          currency: "usd",
+          currency: currencyIso,
           unit_amount: subtotalCents,
           tax_behavior: "exclusive",
           product_data: {
@@ -1618,7 +1643,7 @@ export async function POST(req: NextRequest) {
     if (sitguruFeeCents > 0) {
       checkoutLineItems.push({
         price_data: {
-          currency: "usd",
+          currency: currencyIso,
           unit_amount: sitguruFeeCents,
           tax_behavior: "exclusive",
           product_data: {
@@ -1635,7 +1660,7 @@ export async function POST(req: NextRequest) {
     if (tipCents > 0) {
       checkoutLineItems.push({
         price_data: {
-          currency: "usd",
+          currency: currencyIso,
           unit_amount: tipCents,
           tax_behavior: "exclusive",
           product_data: {
@@ -1652,6 +1677,8 @@ export async function POST(req: NextRequest) {
       booking_id: bookingIdString,
       booking_owner_id: bookingOwnerId,
       checkout_auth_source: authSource,
+      currency: currencyIso,
+      country_code: regional.countryCode,
       mobile_return_url: checkoutRedirects.mobileReturnUrl.slice(0, 480),
       mobile_cancel_url: checkoutRedirects.mobileCancelUrl.slice(0, 480),
       guru_id: asTrimmedString(booking.guru_id),
@@ -1755,6 +1782,7 @@ export async function POST(req: NextRequest) {
 
     await updateCheckoutStarted(bookingIdString, {
       stripeSessionId: session.id,
+      currency: currencyIso,
       subtotalAmount: centsToDollars(subtotalCents),
       sitguruFeeAmount: centsToDollars(sitguruFeeCents),
       guruNetAmount: centsToDollars(guruNetCents),

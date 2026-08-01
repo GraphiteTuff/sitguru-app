@@ -4,6 +4,11 @@ import { supabaseAdmin } from "@/utils/supabase/admin";
 import { calculateDistanceMiles } from "@/lib/distance/calculateDistanceMiles";
 import { buildBookingPetWriteCache } from "@/lib/bookings/load-booking-pets";
 import type { LivePetProfile } from "@/lib/bookings/booking-pet";
+import {
+  formatRegionalMoney,
+  resolveRegionalConfig,
+  toStripeAmountCents,
+} from "@/lib/i18n/regional-config";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -743,6 +748,7 @@ async function createCheckoutForBooking({
   tipAmount,
   tipChoice,
   paymentSelection,
+  currencyIso,
   checkoutMetadata = {},
 }: {
   req: NextRequest;
@@ -751,6 +757,7 @@ async function createCheckoutForBooking({
   tipAmount: number;
   tipChoice: string;
   paymentSelection: CheckoutPaymentSelection;
+  currencyIso: string;
   checkoutMetadata?: Record<string, unknown>;
 }) {
   const checkoutUrl = new URL(
@@ -771,6 +778,7 @@ async function createCheckoutForBooking({
     body: JSON.stringify({
       bookingId,
       booking_id: bookingId,
+      currency: currencyIso,
       paymentMethod: paymentSelection.paymentMethod,
       payment_method: paymentSelection.paymentMethod,
       paymentOption: paymentSelection.uiOption,
@@ -786,6 +794,7 @@ async function createCheckoutForBooking({
       ...checkoutMetadata,
       metadata: {
         booking_id: bookingId,
+        currency: currencyIso,
         payment_provider: paymentSelection.provider,
         payment_method: paymentSelection.paymentMethod,
         payment_option: paymentSelection.uiOption,
@@ -1214,9 +1223,26 @@ export async function POST(req: NextRequest) {
       0,
     );
 
+    const regional = resolveRegionalConfig({
+      country:
+        getBodyString(body, [
+          "country",
+          "country_code",
+          "countryCode",
+          "account_country",
+          "accountCountry",
+          "care_country",
+          "careCountry",
+        ]) || null,
+      headers: req.headers,
+    });
+    const currencyIso = regional.currencyIso;
+    const money = (amount: number) =>
+      formatRegionalMoney(amount, regional.countryCode);
+
     const tipCents =
       toSafeCents(body.tip_cents ?? body.tipCents) ||
-      Math.round(tipAmount * 100);
+      toStripeAmountCents(tipAmount, currencyIso);
 
     const tipChoice = getBodyString(body, ["tip_choice", "tipChoice"], "none");
 
@@ -1275,6 +1301,7 @@ export async function POST(req: NextRequest) {
       amount_total: customerTotalAmount,
       total: customerTotalAmount,
       price: subtotalAmount,
+      currency: currencyIso,
 
       subtotal_amount: subtotalAmount,
       service_price: subtotalAmount,
@@ -1410,9 +1437,11 @@ export async function POST(req: NextRequest) {
           ? "Custom quote requested. No checkout should be created until the final price is approved."
           : "",
         "",
-        "Internal SitGuru marketplace fee tracking amount: $0",
-        `Guru tip selected: $${tipAmount.toFixed(2)}. 100% of the tip goes directly to the Guru.`,
-        `Estimated Guru payout: $${guruEstimatedTotalPayout.toFixed(2)}`,
+        "Internal SitGuru marketplace fee tracking amount: 0",
+        `Guru tip selected: ${money(tipAmount)}. 100% of the tip goes directly to the Guru.`,
+        `Estimated Guru payout: ${money(guruEstimatedTotalPayout)}`,
+        `Checkout currency: ${regional.currency} (${regional.currencySymbol})`,
+        `Marketplace region: ${regional.countryName}`,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -1531,6 +1560,7 @@ export async function POST(req: NextRequest) {
       tipAmount,
       tipChoice,
       paymentSelection,
+      currencyIso,
       checkoutMetadata: {
         sitter_id: resolvedGuruId,
         guru_id: resolvedGuruId,
@@ -1554,6 +1584,9 @@ export async function POST(req: NextRequest) {
         selected_dates: selectedDates.join(","),
         service_type: serviceType,
         service_key: serviceKey,
+        currency: currencyIso,
+        currency_symbol: regional.currencySymbol,
+        country_code: regional.countryCode,
         customer_total_amount: customerTotalAmount,
         marketplace_fee_amount: marketplaceFeeAmount,
         marketplace_fee_percent: marketplaceFeePercent,

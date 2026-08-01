@@ -27,6 +27,7 @@ import CardBrandIcons, {
   normalizeCardBrand,
 } from "@/components/checkout/CardBrandIcons";
 import { Gift } from "lucide-react";
+import { isValidPostalCode } from "@/lib/i18n/regional-config";
 
 const ZIP_STORAGE_KEY = "sitguru_checkout_zip";
 
@@ -51,10 +52,12 @@ type CheckoutPaymentFormProps = {
   onError?: (message: string) => void;
   /** Shown directly above Confirm & Pay when a PawPerks discount is active. */
   pawPerksDiscountBanner?: string | null;
+  /** Optional ISO country for postal validation (GB, IE, FR, …). */
+  countryCode?: string | null;
 };
 
-function isValidUsZip(value: string) {
-  return /^\d{5}(-\d{4})?$/.test(value.trim());
+function isValidCheckoutPostal(value: string, countryCode?: string | null) {
+  return isValidPostalCode(value, countryCode || undefined);
 }
 
 export default function CheckoutPaymentForm({
@@ -66,6 +69,7 @@ export default function CheckoutPaymentForm({
   onSuccess,
   onError,
   pawPerksDiscountBanner = null,
+  countryCode = null,
 }: CheckoutPaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -100,7 +104,10 @@ export default function CheckoutPaymentForm({
     return () => window.clearTimeout(timer);
   }, [elements, walletAvailable, clientSecret]);
 
-  const postalValid = useMemo(() => isValidUsZip(postalCode), [postalCode]);
+  const postalValid = useMemo(
+    () => isValidCheckoutPostal(postalCode, countryCode),
+    [postalCode, countryCode],
+  );
   const cardReady =
     cardComplete.number &&
     cardComplete.expiry &&
@@ -159,7 +166,7 @@ export default function CheckoutPaymentForm({
 
     if (!postalValid) {
       setPostalTouched(true);
-      const text = "Enter a valid ZIP code (12345 or 12345-6789).";
+      const text = "Enter a valid postal / ZIP code for your region.";
       setMessage(text);
       onError?.(text);
       return;
@@ -339,9 +346,9 @@ export default function CheckoutPaymentForm({
             </label>
             <input
               id="checkout-zip"
-              inputMode="numeric"
+              inputMode="text"
               autoComplete="postal-code"
-              placeholder="12345"
+              placeholder="Postal / ZIP"
               value={postalCode}
               onChange={(event) => setPostalCode(event.target.value)}
               onBlur={() => setPostalTouched(true)}
@@ -354,7 +361,8 @@ export default function CheckoutPaymentForm({
             />
             {postalTouched && !postalValid ? (
               <p className="mt-1 text-xs font-medium text-rose-600">
-                Use a valid US ZIP so we can verify the card.
+                Enter a valid postal code for your region (US ZIP, UK postcode,
+                Eircode, and EU formats supported).
               </p>
             ) : null}
           </div>

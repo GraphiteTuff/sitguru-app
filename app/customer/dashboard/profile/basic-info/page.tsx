@@ -22,6 +22,11 @@ import {
   UserRound,
 } from "lucide-react";
 import Header from "@/components/Header";
+import {
+  formatFlexiblePhone,
+  isValidInternationalPhone,
+  isValidPostalCode,
+} from "@/components/dashboard/internationalFieldRules";
 import { supabase } from "@/lib/supabase";
 
 type PhotoColumn = "avatar_url" | "profile_photo_url" | "photo_url" | "image_url";
@@ -139,12 +144,7 @@ function normalizePhotoUrl(value: string | null) {
 }
 
 function formatPhoneWithDashes(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 10);
-
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-
-  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return formatFlexiblePhone(value);
 }
 
 function getFileExtension(file: File) {
@@ -748,6 +748,14 @@ export default function CustomerBasicInfoPage() {
 
     if (!form.phone.trim()) {
       setErrorMessage("Please enter your phone number.");
+      setSaving(false);
+      return false;
+    }
+
+    if (!isValidInternationalPhone(form.phone)) {
+      setErrorMessage(
+        "Enter a valid phone number (international formats with + and spaces are welcome).",
+      );
       setSaving(false);
       return false;
     }
