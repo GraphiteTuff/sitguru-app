@@ -34,6 +34,7 @@ import {
   type PetTraitTabId,
 } from "@/lib/pets/canonical";
 import { supabase } from "@/lib/supabase";
+import PetMediaManager from "@/components/media/PetMediaManager";
 
 type ParentTelemetry = {
   userId: string;
@@ -519,20 +520,6 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
                     onChange={(e) => patchForm("weight", e.target.value)}
                   />
                 </Field>
-                <Field label="Photo URL">
-                  <input
-                    className={inputClass}
-                    value={form.photo_url}
-                    onChange={(e) => patchForm("photo_url", e.target.value)}
-                  />
-                </Field>
-                <Field label="Video URL">
-                  <input
-                    className={inputClass}
-                    value={form.video_url}
-                    onChange={(e) => patchForm("video_url", e.target.value)}
-                  />
-                </Field>
                 <Field label="General notes">
                   <textarea
                     rows={3}
@@ -542,6 +529,24 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
                   />
                 </Field>
               </div>
+            ) : null}
+
+            {editingId ? (
+              <div className="mt-4">
+                <PetMediaManager
+                  petId={editingId}
+                  userId={parent.userId}
+                  onPrimaryMediaChange={(mediaKind, url) => {
+                    if (mediaKind === "photo") patchForm("photo_url", url || "");
+                    else patchForm("video_url", url || "");
+                  }}
+                />
+              </div>
+            ) : traitTab === "basics" ? (
+              <p className="mt-3 text-xs font-semibold text-slate-500">
+                Save the pet passport first to unlock the photo gallery and video
+                vault.
+              </p>
             ) : null}
 
             {traitTab === "behavior" ? (
