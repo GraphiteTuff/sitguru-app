@@ -232,6 +232,26 @@ const knownPlaceholderNames = new Set([
   "suzy q",
 ]);
 
+/** Default / generic labels that must never create name-only duplicate matches. */
+const genericDuplicateNames = new Set([
+  "guru",
+  "member",
+  "user",
+  "sitguru",
+  "sitguru member",
+  "sitguru user",
+  "sitguru guru",
+  "pet parent",
+  "customer",
+  "test",
+  "test user",
+  "demo",
+  "demo user",
+  "admin",
+  "new user",
+  "unknown",
+]);
+
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -728,7 +748,9 @@ function getNextAction({
   bookable: boolean;
 }) {
   if (category === "account_repair") return "Create or repair Guru workspace";
-  if (category === "possible_duplicate") return "Review possible duplicate accounts";
+  if (category === "possible_duplicate") {
+    return "Review possible duplicates by shared email, phone, or real name";
+  }
   if (category === "needs_identity") return "Confirm name and contact details";
   if (category === "placeholder") return "Keep out of live Guru totals";
   if (category === "internal") return "Review internal role assignment";
@@ -813,17 +835,58 @@ function findProfileForGuru(guru: GuruRow, profileMap: Map<string, ProfileRow>) 
   return undefined;
 }
 
+function isGenericDuplicateName(name: string) {
+  const normalized = normalizeText(name);
+  if (!normalized) return true;
+  if (genericDuplicateNames.has(normalized)) return true;
+  if (knownPlaceholderNames.has(normalized)) return true;
+  if (normalized.startsWith("sitguru ")) return true;
+  if (normalized.endsWith(" member") && normalized.split(" ").length <= 2) {
+    return true;
+  }
+  return false;
+}
+
+function isStrongPersonalName(name: string) {
+  const normalized = normalizeText(name);
+  if (!normalized || isGenericDuplicateName(normalized)) return false;
+
+  const parts = normalized.split(" ").filter(Boolean);
+  // Require first + last style names so single-token defaults never cluster.
+  return parts.length >= 2 && parts.every((part) => part.length >= 2);
+}
+
 function getNormalizedDuplicateKeys(name: string, email: string, phone: string) {
   const keys: string[] = [];
   const normalizedEmail = email.toLowerCase();
   const normalizedPhone = phone.replace(/\D/g, "");
-  const normalizedName = normalizeText(name);
 
   if (hasUsableEmail(email)) keys.push(`email:${normalizedEmail}`);
   if (hasUsablePhone(phone)) keys.push(`phone:${normalizedPhone}`);
-  if (normalizedName && normalizedName !== "guru") keys.push(`name:${normalizedName}`);
+  // Name-only collisions on defaults like "SitGuru Member" caused false positives.
+  if (isStrongPersonalName(name)) {
+    keys.push(`name:${normalizeText(name)}`);
+  }
 
   return keys;
+}
+
+function describeDuplicateMatch(keys: string[]) {
+  const reasons = Array.from(
+    new Set(
+      keys
+        .map((key) => {
+          if (key.startsWith("email:")) return "shared email";
+          if (key.startsWith("phone:")) return "shared phone";
+          if (key.startsWith("name:")) return "shared real name";
+          return "";
+        })
+        .filter(Boolean),
+    ),
+  );
+
+  if (!reasons.length) return "Review possible duplicate accounts";
+  return `Review possible duplicates (${reasons.join(", ")})`;
 }
 
 function getActiveQueue(searchParams: SearchParams) {
@@ -1058,9 +1121,11 @@ async function getGuruManagementData(searchParams: SearchParams) {
       (toBoolean(guru.is_bookable) || applicationStatus === "bookable") &&
       !hasExplicitFalse(guru.is_public_visible) &&
       !hasExplicitFalse(guru.is_public);
-    const duplicate = getNormalizedDuplicateKeys(name, email, phone).some(
+    const duplicateKeys = getNormalizedDuplicateKeys(name, email, phone);
+    const matchedDuplicateKeys = duplicateKeys.filter(
       (key) => (duplicateCounts.get(key) || 0) > 1,
     );
+    const duplicate = matchedDuplicateKeys.length > 0;
     const quality = validateGuruProfileForBookability({
       guru,
       profile,
@@ -1108,14 +1173,17 @@ async function getGuruManagementData(searchParams: SearchParams) {
       !operationalBookable &&
       completionPercentage >= 75 &&
       !flaggedForReview;
-    const nextAction = getNextAction({
-      category: recordCategory,
-      applicationStatus,
-      missingRequirements,
-      readyForReview,
-      flaggedForReview,
-      bookable: operationalBookable,
-    });
+    const nextAction =
+      recordCategory === "possible_duplicate"
+        ? describeDuplicateMatch(matchedDuplicateKeys)
+        : getNextAction({
+            category: recordCategory,
+            applicationStatus,
+            missingRequirements,
+            readyForReview,
+            flaggedForReview,
+            bookable: operationalBookable,
+          });
     const setupStep = getSetupStep({ guru, profile, backgroundCheck });
     const slug = getGuruSlug(guru, profile) || slugify(name || id);
     const publicIdentifier = slug || userId || id;
