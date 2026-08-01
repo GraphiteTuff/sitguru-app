@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -39,10 +40,20 @@ const toneClasses: Record<NonNullable<MetricCard["tone"]>, string> = {
   violet: "border-violet-200 bg-violet-50 text-violet-900",
 };
 
+const priorityTone: Record<ActionCard["priority"], string> = {
+  High: "bg-rose-100 text-rose-800",
+  Review: "bg-amber-100 text-amber-900",
+  Monitor: "bg-slate-100 text-slate-700",
+};
+
 function formatCount(result: CountResult, fallback = "Review") {
   return result.available && result.value !== null
     ? result.value.toLocaleString()
     : fallback;
+}
+
+function numericCount(result: CountResult) {
+  return result.available && result.value !== null ? result.value : 0;
 }
 
 async function safeCount(
@@ -99,14 +110,16 @@ function Section({
   title,
   description,
   children,
+  action,
 }: {
   title: string;
   description: string;
   children: React.ReactNode;
+  action?: React.ReactNode;
 }) {
   return (
     <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-black tracking-[-0.03em] text-slate-950">
             {title}
@@ -115,6 +128,7 @@ function Section({
             {description}
           </p>
         </div>
+        {action}
       </div>
       {children}
     </section>
@@ -122,9 +136,22 @@ function Section({
 }
 
 export default async function AdminOperationsDashboard() {
-  await createClient();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/admin/login");
+  }
 
   const nowIso = new Date().toISOString();
+  const todayLabel = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
+
   const [
     petParents,
     gurus,
@@ -201,66 +228,90 @@ export default async function AdminOperationsDashboard() {
       { column: "is_public", operator: "eq", value: true },
     ]),
     safeCount("booking_reviews", [
-      { column: "status", operator: "in", value: ["pending_review", "hidden", "removed"] },
+      {
+        column: "status",
+        operator: "in",
+        value: ["pending_review", "hidden", "removed"],
+      },
     ]),
   ]);
 
-  const summaryCards: MetricCard[] = [
+  const attentionItems = [
     {
-      label: "Total Pet Parents",
+      label: "Pending Gurus",
+      value: pendingGurus,
+      href: "/admin/guru-approvals",
+    },
+    {
+      label: "Unread Messages",
+      value: unreadMessages,
+      href: "/admin/messages",
+    },
+    {
+      label: "Payouts Review",
+      value: payoutsReview,
+      href: "/admin/payouts",
+    },
+    {
+      label: "Review Moderation",
+      value: pendingReviewModeration,
+      href: "/admin/reviews?status=moderation",
+    },
+    {
+      label: "Stripe Gaps",
+      value: stripeIssues,
+      href: "/admin/financials/stripe",
+    },
+    {
+      label: "PawPerks Conflicts",
+      value: pawPerksConflicts,
+      href: "/admin/referrals",
+    },
+  ].filter((item) => numericCount(item.value) > 0 || !item.value.available);
+
+  const needsAttentionCount = attentionItems.reduce(
+    (sum, item) => sum + numericCount(item.value),
+    0,
+  );
+
+  const peopleCards: MetricCard[] = [
+    {
+      label: "Pet Parents",
       value: formatCount(petParents, "Needs setup"),
-      helper: "Registered Pet Parent accounts",
+      helper: "Customer accounts and lifecycle",
       href: "/admin/customers",
       tone: "emerald",
     },
     {
-      label: "Total Gurus",
+      label: "Gurus",
       value: formatCount(gurus, "Needs setup"),
-      helper: "Guru records in the marketplace",
+      helper: `${formatCount(bookableGurus, "—")} bookable · ${formatCount(pendingGurus, "—")} pending`,
       href: "/admin/gurus",
       tone: "sky",
     },
     {
-      label: "Bookable Gurus",
-      value: formatCount(bookableGurus, "Review"),
-      helper: "Gurus currently ready for public booking",
-      href: "/admin/gurus?queue=bookable",
-      tone: "emerald",
-    },
-    {
-      label: "Pending Guru Reviews",
-      value: formatCount(pendingGurus, "Review"),
-      helper: "Applications or profiles needing Admin review",
-      href: "/admin/gurus?queue=pending-reviews",
-      tone: "amber",
-    },
-    {
-      label: "Active Ambassadors",
+      label: "Ambassadors",
       value: formatCount(activeAmbassadors, "Needs setup"),
-      helper: "Ambassadors supporting growth",
+      helper: "Active ambassador growth network",
       href: "/admin/ambassadors",
       tone: "violet",
     },
     {
-      label: "Unread Admin Messages",
+      label: "User Directory",
+      value: "Open",
+      helper: "Search, message, and moderate accounts",
+      href: "/admin/users",
+      tone: "slate",
+    },
+  ];
+
+  const opsCards: MetricCard[] = [
+    {
+      label: "Unread Messages",
       value: formatCount(unreadMessages, "Review"),
-      helper: "Open support and operations threads",
+      helper: "Support and operations threads",
       href: "/admin/messages",
       tone: "rose",
-    },
-    {
-      label: "Reviews",
-      value: formatCount(totalReviews, "Review"),
-      helper: "Booking reviews and public trust signals",
-      href: "/admin/reviews",
-      tone: "violet",
-    },
-    {
-      label: "Review Moderation",
-      value: formatCount(pendingReviewModeration, "Review"),
-      helper: "Hidden, removed, or pending-review items",
-      href: "/admin/reviews?status=moderation",
-      tone: "amber",
     },
     {
       label: "Upcoming Bookings",
@@ -269,181 +320,255 @@ export default async function AdminOperationsDashboard() {
         formatCount(recentBookings, "Review"),
       ),
       helper: upcomingBookings.available
-        ? "Bookings scheduled from today forward"
+        ? "Scheduled from today forward"
         : "Recent booking queue",
       href: "/admin/bookings",
-      tone: "slate",
-    },
-    {
-      label: "Payment Options",
-      value: formatCount(paymentOptionBookings, "Review"),
-      helper: "Bookings with selected card, wallet, Link, saved method, ACH placeholder, or checkout choice",
-      href: "/admin/payments",
       tone: "sky",
     },
     {
-      label: "Credits / Promo",
-      value: formatCount(promoCreditBookings, "Review"),
-      helper: "Promo code, PawPerks, referral, gift card, or SitGuru credit review",
-      href: "/admin/payments?focus=credits",
+      label: "Reviews",
+      value: formatCount(totalReviews, "Review"),
+      helper: `${formatCount(publishedReviews, "—")} public · ${formatCount(pendingReviewModeration, "—")} moderation`,
+      href: "/admin/reviews",
       tone: "violet",
-    },
-    {
-      label: "Tips",
-      value: formatCount(tipBookings, "Review"),
-      helper: "Bookings with optional Guru tip amounts",
-      href: "/admin/payments?focus=tips",
-      tone: "emerald",
     },
     {
       label: "Payouts Needing Review",
       value: formatCount(payoutsReview, "Review"),
       helper: "Pending, failed, or review-needed payouts",
-      href: "/admin/partners/payouts",
+      href: "/admin/payouts",
       tone: "amber",
     },
     {
-      label: "Stripe Readiness Issues",
+      label: "Payments / Credits",
+      value: formatCount(paymentOptionBookings, "Review"),
+      helper: `${formatCount(promoCreditBookings, "—")} promo · ${formatCount(tipBookings, "—")} tips`,
+      href: "/admin/payments",
+      tone: "emerald",
+    },
+    {
+      label: "Stripe Readiness",
       value: formatCount(stripeIssues, "Review"),
       helper: "Gurus with payout readiness gaps",
       href: "/admin/financials/stripe",
       tone: "rose",
     },
-    {
-      label: "PawPerks Conflicts",
-      value: formatCount(pawPerksConflicts, "Review"),
-      helper: "Referral conflicts or cleanup items",
-      href: "/admin/referrals",
-      tone: "violet",
-    },
   ];
 
   const actions: ActionCard[] = [
     {
-      title: "Review pending Gurus",
-      description: "Approve, request fixes, or verify Guru applications.",
-      href: "/admin/gurus?queue=pending-reviews",
+      title: "Review Guru Approvals",
+      description: "Approve, request fixes, or send Checkr invites.",
+      href: "/admin/guru-approvals",
       priority: "High",
     },
     {
-      title: "Review Pet Parent accounts",
-      description: "Find Pet Parents needing account attention or cleanup.",
-      href: "/admin/customers",
-      priority: "Review",
-    },
-    {
       title: "Check messages",
-      description:
-        "Respond to unread Admin, booking, support, and partner messages.",
+      description: "Respond to unread admin, booking, and support threads.",
       href: "/admin/messages",
       priority: "High",
     },
     {
-      title: "Review ratings and reviews",
-      description:
-        "Monitor Guru reviews, public/private status, ratings, and would-book-again feedback.",
+      title: "Check payouts",
+      description: "Review Guru and partner payout queues before release.",
+      href: "/admin/payouts",
+      priority: "High",
+    },
+    {
+      title: "Open Trust & Safety",
+      description: "Background checks, readiness, disputes, and safety queues.",
+      href: "/admin/background-checks",
+      priority: "High",
+    },
+    {
+      title: "Review Pet Parents",
+      description: "Customer intelligence, lifecycle, and account cleanup.",
+      href: "/admin/customers",
+      priority: "Review",
+    },
+    {
+      title: "Open User Directory",
+      description: "Search accounts, start threads, and run moderation actions.",
+      href: "/admin/users",
+      priority: "Review",
+    },
+    {
+      title: "Review ratings & reviews",
+      description: "Monitor public trust signals and moderation items.",
       href: "/admin/reviews",
       priority: "Review",
     },
     {
-      title: "Check payouts",
-      description: "Review partner and Guru payout queues before release.",
-      href: "/admin/partners/payouts",
-      priority: "High",
-    },
-    {
-      title: "Review payment options",
-      description: "Audit checkout method, PawPerks/referral credit, promo codes, gift card/SitGuru credit, and Guru tips from desktop and mobile booking flows.",
-      href: "/admin/payments",
-      priority: "Review",
-    },
-    {
-      title: "Check Stripe readiness",
-      description: "Audit Stripe Connect and payout readiness gaps.",
-      href: "/admin/financials/stripe",
-      priority: "Review",
-    },
-    {
-      title: "Review PawPerks conflicts",
-      description:
-        "Resolve referral inventory, conflicts, and attribution issues.",
-      href: "/admin/referrals",
-      priority: "Review",
-    },
-    {
-      title: "Open Growth & Referrals",
-      description:
-        "Monitor referrals, ambassadors, campaigns, and marketing leads.",
-      href: "/admin/sales-marketing",
+      title: "Programs & growth",
+      description: "Student, community, veterans pathways, and ambassador leads.",
+      href: "/admin/programs",
       priority: "Monitor",
-    },
-    {
-      title: "Open Trust & Safety",
-      description: "Review readiness, disputes, fraud, and safety queues.",
-      href: "/admin/trust-safety",
-      priority: "High",
     },
   ];
 
-  const quickLinks = [
-    ["Pet Parents", "/admin/customers"],
-    ["Gurus", "/admin/gurus"],
-    ["Ambassadors", "/admin/ambassadors"],
-    ["Bookings", "/admin/bookings"],
-    ["Reviews", "/admin/reviews"],
-    ["Messages", "/admin/messages"],
-    ["Financials", "/admin/financials"],
-    ["Payments", "/admin/payments"],
-    ["Partner Payouts", "/admin/partners/payouts"],
-    ["Referrals", "/admin/referrals"],
-    ["Referral Inventory", "/admin/referrals/inventory"],
-    ["Rewards Auditor", "/admin/rewards"],
-    ["Trust & Safety", "/admin/trust-safety"],
-    ["Analytics", "/admin/analytics"],
-    ["Sales & Marketing", "/admin/sales-marketing"],
-    ["HR", "/admin/hr"],
-    ["SitGuru University", "/admin/university-progress"],
+  const quickLinkGroups = [
+    {
+      title: "People",
+      links: [
+        ["Pet Parents", "/admin/customers"],
+        ["User Directory", "/admin/users"],
+        ["Gurus", "/admin/gurus"],
+        ["Guru Approvals", "/admin/guru-approvals"],
+        ["Ambassadors", "/admin/ambassadors"],
+        ["HR", "/admin/hr"],
+      ],
+    },
+    {
+      title: "Marketplace",
+      links: [
+        ["Bookings", "/admin/bookings"],
+        ["Live Walks", "/admin/dashboard/live-walks"],
+        ["Messages", "/admin/messages"],
+        ["Reviews", "/admin/reviews"],
+        ["Payments", "/admin/payments"],
+      ],
+    },
+    {
+      title: "Money",
+      links: [
+        ["Financials", "/admin/financials"],
+        ["Payouts", "/admin/payouts"],
+        ["Stripe", "/admin/financials/stripe"],
+        ["Commissions", "/admin/commissions"],
+        ["Partner Payouts", "/admin/partners/payouts"],
+      ],
+    },
+    {
+      title: "Growth",
+      links: [
+        ["Programs", "/admin/programs"],
+        ["Referrals", "/admin/referrals"],
+        ["Sales & Marketing", "/admin/sales-marketing"],
+        ["Partners", "/admin/partners"],
+        ["Analytics", "/admin/analytics"],
+        ["SitGuru University", "/admin/university-progress"],
+      ],
+    },
   ];
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <div className="rounded-[32px] bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 p-6 text-white shadow-xl sm:p-8">
-          <p
-            className="text-xs font-black uppercase tracking-[0.24em] text-emerald-100"
-            style={{ color: "#ecfdf5", WebkitTextFillColor: "#ecfdf5" }}
-          >
-            Admin Control
-          </p>
-          <h1
-            className="mt-3 text-3xl font-black tracking-[-0.05em] text-white sm:text-5xl"
-            style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }}
-          >
-            SitGuru Operations Dashboard
-          </h1>
-          <p
-            className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-emerald-50 sm:text-base"
-            style={{ color: "#ecfdf5", WebkitTextFillColor: "#ecfdf5" }}
-          >
-            Daily dashboard for marketplace operations, people queues,
-            bookings, messages, reviews, payouts, readiness, Trust & Safety, and growth
-            work.
-          </p>
+        <div className="overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 p-6 text-white shadow-xl sm:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-100">
+                SitGuru Admin Portal · {todayLabel}
+              </p>
+              <h1 className="mt-3 text-3xl font-black tracking-[-0.05em] text-white sm:text-5xl">
+                Operations Dashboard
+              </h1>
+              <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-emerald-50 sm:text-base">
+                Daily dashboard for marketplace operations, people queues,
+                bookings, messages, reviews, payouts, readiness, Trust & Safety,
+                and growth work.
+              </p>
+            </div>
+
+            <div className="grid w-full grid-cols-2 gap-3 sm:max-w-md">
+              <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+                <p className="text-[10px] font-black uppercase tracking-wide text-emerald-100">
+                  Needs Attention
+                </p>
+                <p className="mt-1 text-3xl font-black text-white">
+                  {needsAttentionCount.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+                <p className="text-[10px] font-black uppercase tracking-wide text-emerald-100">
+                  Bookable Gurus
+                </p>
+                <p className="mt-1 text-3xl font-black text-white">
+                  {formatCount(bookableGurus, "—")}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Link
+              href="/admin/guru-approvals"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-4 py-2 text-sm font-black text-emerald-950 transition hover:bg-emerald-50"
+            >
+              Guru Approvals
+            </Link>
+            <Link
+              href="/admin/messages"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
+            >
+              Messages
+            </Link>
+            <Link
+              href="/admin/users"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
+            >
+              User Directory
+            </Link>
+            <Link
+              href="/admin/customers"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
+            >
+              Pet Parents
+            </Link>
+          </div>
         </div>
 
+        {attentionItems.length > 0 ? (
+          <Section
+            title="Attention Queue"
+            description="Queues with open work. Tap any card to jump straight into review."
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {attentionItems.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="rounded-3xl border border-rose-100 bg-rose-50 p-4 transition hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-sm"
+                >
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-rose-700">
+                    {item.label}
+                  </p>
+                  <p className="mt-2 text-2xl font-black text-rose-950">
+                    {formatCount(item.value, "Review")}
+                  </p>
+                  <p className="mt-2 text-sm font-black text-rose-700">
+                    Open queue →
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </Section>
+        ) : null}
+
         <Section
-          title="Top Operations Summary"
-          description="The highest-signal operating metrics and review queues for today."
+          title="People"
+          description="Core SitGuru roles and the User Directory for search, messaging, and moderation."
         >
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            {summaryCards.map((card) => (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {peopleCards.map((card) => (
               <MetricCardView key={card.label} card={card} />
             ))}
           </div>
         </Section>
 
         <Section
-          title="Daily Action Center"
+          title="Marketplace & Money"
+          description="Bookings, messaging, reviews, payments, payouts, and Stripe readiness."
+        >
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {opsCards.map((card) => (
+              <MetricCardView key={card.label} card={card} />
+            ))}
+          </div>
+        </Section>
+
+        <Section
+          title="Daily Actions"
           description="Start here for high-priority SitGuru operating tasks."
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -453,7 +578,9 @@ export default async function AdminOperationsDashboard() {
                 href={action.href}
                 className="rounded-3xl border border-slate-200 bg-slate-50 p-5 transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50"
               >
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-800 shadow-sm">
+                <span
+                  className={`inline-flex rounded-xl px-3 py-1 text-xs font-black ${priorityTone[action.priority]}`}
+                >
                   {action.priority}
                 </span>
                 <h3 className="mt-4 text-lg font-black text-slate-950">
@@ -470,121 +597,20 @@ export default async function AdminOperationsDashboard() {
           </div>
         </Section>
 
-        <div className="grid gap-6 xl:grid-cols-2">
-          <Section
-            title="Business Health Snapshot"
-            description="Simple readout for bookings, revenue-adjacent queues, payouts, referrals, and growth."
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <MetricCardView
-                card={{
-                  label: "Bookings",
-                  value: formatCount(
-                    upcomingBookings,
-                    formatCount(recentBookings, "Review"),
-                  ),
-                  helper: "Upcoming or recent booking activity",
-                  href: "/admin/bookings",
-                  tone: "sky",
-                }}
-              />
-              <MetricCardView
-                card={{
-                  label: "Public Reviews",
-                  value: formatCount(publishedReviews, "Review"),
-                  helper: "Published public reviews shown as trust signals",
-                  href: "/admin/reviews",
-                  tone: "violet",
-                }}
-              />
-              <MetricCardView
-                card={{
-                  label: "Revenue / Spend",
-                  value: "Review",
-                  helper:
-                    "Open Financials for detailed revenue, ledger, and spend reporting",
-                  href: "/admin/financials",
-                  tone: "emerald",
-                }}
-              />
-              <MetricCardView
-                card={{
-                  label: "Guru Payout Status",
-                  value: formatCount(payoutsReview, "Review"),
-                  helper: "Payouts pending review or remediation",
-                  href: "/admin/financials/payouts",
-                  tone: "amber",
-                }}
-              />
-              <MetricCardView
-                card={{
-                  label: "Referral / PawPerks",
-                  value: formatCount(pawPerksConflicts, "Review"),
-                  helper: "Referral activity and conflicts",
-                  href: "/admin/referrals",
-                  tone: "violet",
-                }}
-              />
-            </div>
-          </Section>
-
-          <Section
-            title="People & Roles Overview"
-            description="Grouped navigation for the core SitGuru roles Admin manages."
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <MetricCardView
-                card={{
-                  label: "Pet Parents",
-                  value: formatCount(petParents, "Open"),
-                  helper: "Customer accounts and lifecycle",
-                  href: "/admin/customers",
-                  tone: "emerald",
-                }}
-              />
-              <MetricCardView
-                card={{
-                  label: "Gurus",
-                  value: formatCount(gurus, "Open"),
-                  helper: "Guru records, onboarding, and readiness",
-                  href: "/admin/gurus",
-                  tone: "sky",
-                }}
-              />
-              <MetricCardView
-                card={{
-                  label: "Ambassadors",
-                  value: formatCount(activeAmbassadors, "Open"),
-                  helper: "Ambassador programs and partner growth",
-                  href: "/admin/ambassadors",
-                  tone: "violet",
-                }}
-              />
-              <MetricCardView
-                card={{
-                  label: "Admin / Super Users",
-                  value: "Review",
-                  helper: "User permissions, security, and Admin accounts",
-                  href: "/admin/users",
-                  tone: "slate",
-                }}
-              />
-            </div>
-          </Section>
-        </div>
-
         <Section
           title="Trust & Safety / Readiness"
           description="Fast paths to verification, Stripe Connect, payout methods, profile completeness, and cleanup queues."
         >
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              ["Guru verification", "/admin/gurus?queue=pending-reviews"],
+              ["Guru verification", "/admin/guru-approvals"],
+              ["Background checks", "/admin/background-checks"],
               ["Stripe Connect readiness", "/admin/financials/stripe"],
-              ["Payout method readiness", "/admin/partners/payouts"],
+              ["Payout method readiness", "/admin/payouts"],
               ["Profile completeness", "/admin/gurus?queue=profile-updates"],
               ["Review moderation", "/admin/reviews?status=moderation"],
-              ["Admin cleanup queues", "/admin/trust-safety"],
+              ["Disputes", "/admin/disputes"],
+              ["Incomplete profiles", "/admin/incomplete-profiles"],
             ].map(([label, href]) => (
               <Link
                 key={label}
@@ -600,17 +626,26 @@ export default async function AdminOperationsDashboard() {
 
         <Section
           title="Quick Links"
-          description="Jump directly to the detailed Admin areas without crowding the main dashboard."
+          description="Jump to detailed Admin areas without crowding the main dashboard."
         >
-          <div className="flex flex-wrap gap-3">
-            {quickLinks.map(([label, href]) => (
-              <Link
-                key={href}
-                href={href}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-800 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
-              >
-                {label}
-              </Link>
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {quickLinkGroups.map((group) => (
+              <div key={group.title}>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  {group.title}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {group.links.map(([label, href]) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-800 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </Section>
