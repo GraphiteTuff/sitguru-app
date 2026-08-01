@@ -657,6 +657,13 @@ export default async function SalesMarketingSignupLeadsPage() {
                 Review field entries from Jason and Danette.
               </h1>
 
+              <p className="mt-4 max-w-3xl text-base font-semibold leading-7 text-slate-600">
+                High-priority pet profiles (multi-pet, premium breeds, special
+                care, CEO/High flags) automatically alert the team via webhook,
+                email, and in-app CRM notifications for personalized conversion
+                outreach.
+              </p>
+
               <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
                 This page shows signup leads, referrals, optional pet information,
                 message-ready status, CEO priority, next actions, and follow-ups
@@ -769,8 +776,9 @@ export default async function SalesMarketingSignupLeadsPage() {
 
                 return (
                   <article
+                    id={`lead-${lead.id}`}
                     key={lead.id}
-                    className={`rounded-2xl border p-4 ${
+                    className={`scroll-mt-24 rounded-2xl border p-4 ${
                       lead.ceo_priority
                         ? "border-rose-200 bg-rose-50/50"
                         : "border-slate-200 bg-slate-50"

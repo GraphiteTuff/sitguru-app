@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { notifyHighPriorityPetLeadSignup } from "@/lib/marketing/notify-high-priority-lead";
 
 type EntryKind = "signup_lead" | "outreach_contact" | "referral";
 
@@ -383,6 +384,53 @@ export async function createLeadEntry(formData: FormData) {
 
     if (petError) {
       throw new Error(`Lead saved, but pet details could not be saved: ${petError.message}`);
+    }
+
+    // Fire-and-forget CRM hook — never block lead capture on alert failures.
+    try {
+      const alertResult = await notifyHighPriorityPetLeadSignup({
+        leadId: String(signupLead.id),
+        lead: {
+          id: String(signupLead.id),
+          full_name: fullName,
+          first_name: firstName || null,
+          last_name: lastName || null,
+          email: email || null,
+          phone: phone || null,
+          city: city || null,
+          state: state || null,
+          zip_code: zipCode || null,
+          market_area: marketArea || null,
+          lead_type: leadType || relationshipCategory || null,
+          relationship_category: relationshipCategory || null,
+          priority_level: priorityLevel,
+          referral_potential: referralPotential,
+          ceo_priority: ceoPriority,
+          campaign_source: campaignSource || null,
+          growth_channel: growthChannel || null,
+          notes: notes || null,
+        },
+        pets: petEntries,
+      });
+
+      if (alertResult.triggered) {
+        console.info("[marketing-crm] high-priority pet lead alert sent", {
+          leadId: signupLead.id,
+          score: alertResult.assessment.score,
+          reasons: alertResult.assessment.reasons.map((reason) => reason.code),
+          channels: Object.fromEntries(
+            Object.entries(alertResult.channels).map(([key, value]) => [
+              key,
+              value && "ok" in value ? value.ok : false,
+            ]),
+          ),
+        });
+      }
+    } catch (alertError) {
+      console.warn(
+        "[marketing-crm] high-priority alert failed (non-fatal):",
+        alertError instanceof Error ? alertError.message : alertError,
+      );
     }
   }
 
