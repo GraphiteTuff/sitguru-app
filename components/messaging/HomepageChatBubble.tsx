@@ -155,9 +155,10 @@ function SitGuruAvatar({
     <img
       src={ROGUE_AVATAR_SRC}
       alt="Rogue"
-      width={32}
-      height={32}
-      className={`rounded-full overflow-hidden flex-shrink-0 object-cover object-top ${className}`}
+      width={64}
+      height={64}
+      className={`rounded-full overflow-hidden flex-shrink-0 object-cover ${className}`}
+      style={{ objectPosition: "50% 18%" }}
       aria-hidden="true"
     />
   );
@@ -474,9 +475,9 @@ export default function HomepageChatBubble() {
                 className="homepage-chat-panel__avatar homepage-chat-panel__avatar--dog"
                 aria-hidden
               >
-                <SitGuruAvatar className="h-full w-full rounded-full overflow-hidden flex-shrink-0" />
+                <SitGuruAvatar className="!h-full !w-full max-h-full max-w-full rounded-full" />
               </span>
-              <div className="min-w-0 pr-10">
+              <div className="min-w-0 flex-1">
                 <p className="homepage-chat-panel__title">
                   Rogue, Your Chief Treat Officer 🦴
                 </p>
@@ -489,7 +490,7 @@ export default function HomepageChatBubble() {
             <button
               type="button"
               onClick={handleCloseChat}
-              className="homepage-chat-panel__close absolute top-2 right-2"
+              className="homepage-chat-panel__close absolute top-2 right-2 z-10"
               aria-label="Close chat and clear history"
               title="Close conversation"
             >
