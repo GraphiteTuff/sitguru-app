@@ -2,11 +2,20 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import UserDirectoryActionPanels from "@/components/admin/users/UserDirectoryActionPanels";
+import UsersDirectoryList from "@/components/admin/users/UsersDirectoryList";
+import UsersFilterBar from "@/components/admin/users/UsersFilterBar";
+import UsersPagination from "@/components/admin/users/UsersPagination";
 import {
   buildDepartmentComposeHref,
   type AdminDepartmentKey,
   type DirectoryUserContext,
 } from "@/lib/admin/user-directory-actions";
+import {
+  buildDirectoryHref,
+  firstSearchParam,
+  parseDirectoryFilters,
+} from "@/lib/admin/users/normalize";
+import { getAdminUsersDirectory } from "@/lib/admin/users/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -14,350 +23,7 @@ type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-function firstParam(value: string | string[] | undefined) {
-  if (Array.isArray(value)) return String(value[0] || "").trim();
-  return String(value || "").trim();
-}
-
 type Tone = "emerald" | "sky" | "violet" | "amber" | "rose";
-
-type ProfileRow = Record<string, unknown>;
-type GuruRow = Record<string, unknown>;
-type BookingRow = Record<string, unknown>;
-type LaunchSignupRow = Record<string, unknown>;
-
-type SafeQueryResponse = {
-  data: unknown;
-  error: unknown;
-};
-
-type UserDisplayRow = {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  status: string;
-  risk: string;
-  joined: string;
-  source: string;
-  messageHref: string;
-  profileHref: string;
-};
-
-function asTrimmedString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function formatDateShort(value?: string | null) {
-  if (!value) return "—";
-
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) return "—";
-
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function isWithinLastDays(value: unknown, days: number) {
-  const dateValue = asTrimmedString(value);
-
-  if (!dateValue) return false;
-
-  const parsed = new Date(dateValue);
-
-  if (Number.isNaN(parsed.getTime())) return false;
-
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-
-  return parsed >= cutoff;
-}
-
-async function safeRows<T>(
-  query: PromiseLike<SafeQueryResponse>,
-  label: string,
-): Promise<T[]> {
-  try {
-    const result = await query;
-
-    if (result.error) {
-      console.warn(`Admin users query skipped for ${label}:`, result.error);
-      return [];
-    }
-
-    return Array.isArray(result.data) ? (result.data as T[]) : [];
-  } catch (error) {
-    console.warn(`Admin users query skipped for ${label}:`, error);
-    return [];
-  }
-}
-
-function getProfileId(profile: ProfileRow) {
-  return (
-    asTrimmedString(profile.id) ||
-    asTrimmedString(profile.user_id) ||
-    asTrimmedString(profile.profile_id) ||
-    asTrimmedString(profile.email).toLowerCase()
-  );
-}
-
-function getProfileName(profile: ProfileRow) {
-  return (
-    asTrimmedString(profile.full_name) ||
-    asTrimmedString(profile.display_name) ||
-    asTrimmedString(profile.name) ||
-    asTrimmedString(profile.email).split("@")[0] ||
-    "SitGuru User"
-  );
-}
-
-function getProfileEmail(profile: ProfileRow) {
-  return asTrimmedString(profile.email) || "—";
-}
-
-function getProfileRole(profile: ProfileRow) {
-  const rawRole = (
-    asTrimmedString(profile.role) ||
-    asTrimmedString(profile.user_role) ||
-    asTrimmedString(profile.account_type) ||
-    asTrimmedString(profile.user_type) ||
-    asTrimmedString(profile.type) ||
-    "customer"
-  ).toLowerCase();
-
-  if (rawRole.includes("admin")) return "Admin";
-  if (rawRole.includes("guru") || rawRole.includes("sitter")) return "Guru";
-  if (rawRole.includes("vendor")) return "Vendor";
-  if (rawRole.includes("educator")) return "Educator";
-  if (rawRole.includes("medical") || rawRole.includes("vet")) return "Medical Pro";
-  if (rawRole.includes("customer") || rawRole.includes("parent")) {
-    return "Pet Parent";
-  }
-
-  return "Pet Parent";
-}
-
-function getProfileStatus(profile: ProfileRow) {
-  const rawStatus = (
-    asTrimmedString(profile.status) ||
-    asTrimmedString(profile.account_status) ||
-    asTrimmedString(profile.approval_status) ||
-    ""
-  ).toLowerCase();
-
-  const isVerified = Boolean(profile.is_verified || profile.verified);
-  const isActive = profile.is_active !== false && profile.active !== false;
-  const isSuspended = Boolean(profile.is_suspended || profile.suspended);
-
-  if (isSuspended || rawStatus.includes("suspend") || rawStatus.includes("ban")) {
-    return "Suspended";
-  }
-
-  if (rawStatus.includes("pending")) return "Pending Approval";
-  if (rawStatus.includes("review")) return "Under Review";
-  if (isVerified || rawStatus.includes("verified")) return "Verified";
-  if (isActive || rawStatus.includes("active")) return "Active";
-
-  return "Active";
-}
-
-function getRiskLabel(row: Record<string, unknown>) {
-  const rawRisk = (
-    asTrimmedString(row.risk) ||
-    asTrimmedString(row.risk_level) ||
-    asTrimmedString(row.trust_risk) ||
-    ""
-  ).toLowerCase();
-
-  const flagged = Boolean(row.flagged || row.is_flagged || row.account_flagged);
-  const suspended = Boolean(row.suspended || row.is_suspended);
-
-  if (suspended || rawRisk.includes("high")) return "High";
-  if (flagged || rawRisk.includes("medium") || rawRisk.includes("review")) {
-    return "Medium";
-  }
-
-  return "Low";
-}
-
-function getGuruId(guru: GuruRow) {
-  return (
-    asTrimmedString(guru.user_id) ||
-    asTrimmedString(guru.profile_id) ||
-    asTrimmedString(guru.id) ||
-    asTrimmedString(guru.email).toLowerCase()
-  );
-}
-
-function getGuruStatus(guru: GuruRow) {
-  const rawStatus = (
-    asTrimmedString(guru.status) ||
-    asTrimmedString(guru.approval_status) ||
-    ""
-  ).toLowerCase();
-
-  const isVerified = Boolean(guru.is_verified || guru.verified);
-  const isActive = guru.is_active !== false && guru.active !== false;
-
-  if (rawStatus.includes("pending")) return "Pending Approval";
-  if (rawStatus.includes("review")) return "Under Review";
-  if (isVerified) return "Verified";
-  if (isActive) return "Active";
-
-  return "Under Review";
-}
-
-function getLaunchIdentity(row: LaunchSignupRow) {
-  return (
-    asTrimmedString(row.id) ||
-    asTrimmedString(row.email).toLowerCase() ||
-    asTrimmedString(row.user_id) ||
-    asTrimmedString(row.created_at)
-  );
-}
-
-function getLaunchRole(row: LaunchSignupRow) {
-  const rawRole = (
-    asTrimmedString(row.role) ||
-    asTrimmedString(row.interest_type) ||
-    asTrimmedString(row.interestType) ||
-    asTrimmedString(row.joining_as) ||
-    asTrimmedString(row.user_type) ||
-    asTrimmedString(row.segment) ||
-    "customer"
-  ).toLowerCase();
-
-  if (rawRole.includes("both")) return "Customer + Guru Lead";
-  if (rawRole.includes("guru")) return "Future Guru Lead";
-  return "Pet Parent Lead";
-}
-
-function getLaunchName(row: LaunchSignupRow) {
-  return (
-    asTrimmedString(row.name) ||
-    asTrimmedString(row.full_name) ||
-    asTrimmedString(row.fullName) ||
-    asTrimmedString(row.email).split("@")[0] ||
-    "Launch Signup"
-  );
-}
-
-function mergeLaunchRows(...groups: LaunchSignupRow[][]) {
-  const seen = new Set<string>();
-  const merged: LaunchSignupRow[] = [];
-
-  for (const group of groups) {
-    for (const row of group) {
-      const key = getLaunchIdentity(row);
-
-      if (key && seen.has(key)) continue;
-      if (key) seen.add(key);
-
-      merged.push(row);
-    }
-  }
-
-  return merged.sort((a, b) => {
-    const aDate = new Date(asTrimmedString(a.created_at)).getTime();
-    const bDate = new Date(asTrimmedString(b.created_at)).getTime();
-
-    return (
-      (Number.isFinite(bDate) ? bDate : 0) -
-      (Number.isFinite(aDate) ? aDate : 0)
-    );
-  });
-}
-
-function statusStyle(status: string) {
-  if (status.includes("Active") || status.includes("Verified")) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (status.includes("Pending") || status.includes("Review")) {
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
-  if (status.includes("Suspended")) {
-    return "border-rose-200 bg-rose-50 text-rose-700";
-  }
-
-  return "border-slate-200 bg-slate-50 text-slate-700";
-}
-
-function riskStyle(risk: string) {
-  if (risk === "High") {
-    return "border-rose-200 bg-rose-50 text-rose-700";
-  }
-
-  if (risk === "Medium") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
-  return "border-emerald-200 bg-emerald-50 text-emerald-700";
-}
-
-function statToneClasses(tone: Tone) {
-  if (tone === "emerald") {
-    return {
-      card: "border-emerald-100 bg-emerald-50",
-      icon: "bg-emerald-100 text-emerald-800",
-      accent: "text-emerald-700",
-    };
-  }
-
-  if (tone === "sky") {
-    return {
-      card: "border-sky-100 bg-sky-50",
-      icon: "bg-sky-100 text-sky-800",
-      accent: "text-sky-700",
-    };
-  }
-
-  if (tone === "violet") {
-    return {
-      card: "border-violet-100 bg-violet-50",
-      icon: "bg-violet-100 text-violet-800",
-      accent: "text-violet-700",
-    };
-  }
-
-  if (tone === "amber") {
-    return {
-      card: "border-amber-100 bg-amber-50",
-      icon: "bg-amber-100 text-amber-800",
-      accent: "text-amber-700",
-    };
-  }
-
-  return {
-    card: "border-rose-100 bg-rose-50",
-    icon: "bg-rose-100 text-rose-800",
-    accent: "text-rose-700",
-  };
-}
-
-function getMessageHref(user: {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  source: string;
-}) {
-  const params = new URLSearchParams({
-    threadType: "internal",
-    recipientId: user.id,
-    recipientEmail: user.email,
-    recipientName: user.name,
-    recipientRole: user.role,
-    source: user.source,
-  });
-
-  return `/admin/messages?${params.toString()}`;
-}
 
 function getDepartmentMessageHref(params: {
   department: string;
@@ -369,27 +35,6 @@ function getDepartmentMessageHref(params: {
     departmentLabel: params.label,
     user: params.user,
   });
-}
-
-function getProfileHref(user: {
-  id: string;
-  email: string;
-  role: string;
-  source: string;
-}) {
-  if (user.role === "Guru") {
-    return `/admin/gurus?guru=${encodeURIComponent(user.id)}`;
-  }
-
-  if (user.role.includes("Pet Parent")) {
-    return `/admin/customers?user=${encodeURIComponent(user.id)}`;
-  }
-
-  if (user.source === "Launch") {
-    return `/admin/launch-signups?email=${encodeURIComponent(user.email)}`;
-  }
-
-  return `/admin/users?user=${encodeURIComponent(user.id)}`;
 }
 
 function ActionLink({
@@ -415,257 +60,46 @@ function ActionLink({
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50"
     >
       {label}
     </Link>
   );
 }
 
-async function getAdminUsersData() {
-  const [
-    profiles,
-    gurus,
-    bookings,
-    launchSignups,
-    launchWaitlist,
-  ] = await Promise.all([
-    safeRows<ProfileRow>(
-      supabaseAdmin
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "profiles",
-    ),
-    safeRows<GuruRow>(
-      supabaseAdmin
-        .from("gurus")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "gurus",
-    ),
-    safeRows<BookingRow>(
-      supabaseAdmin
-        .from("bookings")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "bookings",
-    ),
-    safeRows<LaunchSignupRow>(
-      supabaseAdmin
-        .from("launch_signups")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "launch_signups",
-    ),
-    safeRows<LaunchSignupRow>(
-      supabaseAdmin
-        .from("launch_waitlist")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "launch_waitlist",
-    ),
-  ]);
-
-  const launchRows = mergeLaunchRows(launchSignups, launchWaitlist);
-  const guruIdSet = new Set<string>();
-
-  for (const guru of gurus) {
-    const id = getGuruId(guru);
-
-    if (id) {
-      guruIdSet.add(id);
-    }
-  }
-
-  const customerIds = new Set<string>();
-
-  for (const booking of bookings) {
-    const customerId =
-      asTrimmedString(booking.customer_id) ||
-      asTrimmedString(booking.pet_owner_id) ||
-      asTrimmedString(booking.user_id);
-
-    if (customerId) {
-      customerIds.add(customerId);
-    }
-  }
-
-  const profileRows: UserDisplayRow[] = profiles.map((profile) => {
-    const id = getProfileId(profile);
-    const role = guruIdSet.has(id) ? "Guru" : getProfileRole(profile);
-    const email = getProfileEmail(profile);
-    const name = getProfileName(profile);
-    const source = "Profile";
-
-    const baseUser = {
-      id: id || email,
-      email,
-      name,
-      role,
-      source,
-    };
-
+function statToneClasses(tone: Tone) {
+  if (tone === "emerald") {
     return {
-      ...baseUser,
-      status: role === "Guru" ? "Active" : getProfileStatus(profile),
-      risk: getRiskLabel(profile),
-      joined: formatDateShort(asTrimmedString(profile.created_at)),
-      messageHref: getMessageHref(baseUser),
-      profileHref: getProfileHref(baseUser),
+      card: "border-emerald-100 bg-emerald-50",
+      icon: "bg-emerald-100 text-emerald-800",
+      accent: "text-emerald-700",
     };
-  });
-
-  const knownUserKeys = new Set(
-    profileRows.flatMap((row) => [
-      row.id.toLowerCase(),
-      row.email.toLowerCase(),
-    ]),
-  );
-
-  const guruRows: UserDisplayRow[] = gurus
-    .filter((guru) => {
-      const id = getGuruId(guru).toLowerCase();
-      const email = asTrimmedString(guru.email).toLowerCase();
-
-      return !knownUserKeys.has(id) && !knownUserKeys.has(email);
-    })
-    .map((guru) => {
-      const id = getGuruId(guru) || asTrimmedString(guru.slug) || "guru";
-      const email = asTrimmedString(guru.email) || "—";
-      const name =
-        asTrimmedString(guru.display_name) ||
-        asTrimmedString(guru.full_name) ||
-        asTrimmedString(guru.name) ||
-        "Guru";
-      const source = "Guru";
-      const role = "Guru";
-
-      const baseUser = {
-        id,
-        email,
-        name,
-        role,
-        source,
-      };
-
-      return {
-        ...baseUser,
-        status: getGuruStatus(guru),
-        risk: getRiskLabel(guru),
-        joined: formatDateShort(asTrimmedString(guru.created_at)),
-        messageHref: getMessageHref(baseUser),
-        profileHref: getProfileHref(baseUser),
-      };
-    });
-
-  const knownAfterGurus = new Set(
-    [...profileRows, ...guruRows].flatMap((row) => [
-      row.id.toLowerCase(),
-      row.email.toLowerCase(),
-    ]),
-  );
-
-  const launchDisplayRows: UserDisplayRow[] = launchRows
-    .filter((row) => {
-      const id = getLaunchIdentity(row).toLowerCase();
-      const email = asTrimmedString(row.email).toLowerCase();
-
-      return !knownAfterGurus.has(id) && !knownAfterGurus.has(email);
-    })
-    .slice(0, 250)
-    .map((row) => {
-      const id = getLaunchIdentity(row) || asTrimmedString(row.email) || "launch";
-      const email = asTrimmedString(row.email) || "—";
-      const name = getLaunchName(row);
-      const role = getLaunchRole(row);
-      const source =
-        asTrimmedString(row.source) ||
-        asTrimmedString(row.utm_source) ||
-        "Launch";
-
-      const baseUser = {
-        id,
-        email,
-        name,
-        role,
-        source,
-      };
-
-      return {
-        ...baseUser,
-        status: "Lead",
-        risk: "Low",
-        joined: formatDateShort(asTrimmedString(row.created_at)),
-        messageHref: getMessageHref(baseUser),
-        profileHref: getProfileHref(baseUser),
-      };
-    });
-
-  const users = [...profileRows, ...guruRows, ...launchDisplayRows];
-
-  const totalUsers = users.length;
-  const newThisWeek =
-    profiles.filter((row) => isWithinLastDays(row.created_at, 7)).length +
-    gurus.filter((row) => isWithinLastDays(row.created_at, 7)).length +
-    launchRows.filter((row) => isWithinLastDays(row.created_at, 7)).length;
-
-  const verifiedGurus = gurus.filter(
-    (guru) =>
-      Boolean(guru.is_verified || guru.verified) ||
-      getGuruStatus(guru) === "Verified",
-  ).length;
-
-  const flaggedAccounts = users.filter(
-    (user) => user.risk === "High" || user.status === "Suspended",
-  ).length;
-
-  const roleCounts = {
-    petParents: users.filter(
-      (user) =>
-        user.role === "Pet Parent" ||
-        user.role === "Pet Parent Lead" ||
-        user.role === "Customer + Guru Lead",
-    ).length,
-    gurus: users.filter(
-      (user) =>
-        user.role === "Guru" ||
-        user.role === "Future Guru Lead" ||
-        user.role === "Customer + Guru Lead",
-    ).length,
-    vendors: users.filter((user) => user.role === "Vendor").length,
-    educators: users.filter((user) => user.role === "Educator").length,
-    medical: users.filter((user) => user.role === "Medical Pro").length,
-    admins: users.filter((user) => user.role === "Admin").length,
-  };
-
-  const healthScore =
-    totalUsers === 0
-      ? 0
-      : Math.max(
-          0,
-          Math.min(100, Math.round(100 - (flaggedAccounts / totalUsers) * 100)),
-        );
-
+  }
+  if (tone === "sky") {
+    return {
+      card: "border-sky-100 bg-sky-50",
+      icon: "bg-sky-100 text-sky-800",
+      accent: "text-sky-700",
+    };
+  }
+  if (tone === "violet") {
+    return {
+      card: "border-violet-100 bg-violet-50",
+      icon: "bg-violet-100 text-violet-800",
+      accent: "text-violet-700",
+    };
+  }
+  if (tone === "amber") {
+    return {
+      card: "border-amber-100 bg-amber-50",
+      icon: "bg-amber-100 text-amber-800",
+      accent: "text-amber-700",
+    };
+  }
   return {
-    users: users.slice(0, 75),
-    totals: {
-      totalUsers,
-      newThisWeek,
-      verifiedGurus,
-      flaggedAccounts,
-      healthScore,
-      launchLeads: launchRows.length,
-      customerIds: customerIds.size,
-      profileCount: profiles.length,
-      guruCount: gurus.length,
-    },
-    roleCounts,
+    card: "border-rose-100 bg-rose-50",
+    icon: "bg-rose-100 text-rose-800",
+    accent: "text-rose-700",
   };
 }
 
@@ -682,10 +116,11 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     return null;
   }
 
-  const selectedUserId = firstParam(params.user);
-  const selectedEmail = firstParam(params.email);
-  const selectedName = firstParam(params.name);
-  const selectedRole = firstParam(params.role);
+  const filters = parseDirectoryFilters(params);
+  const selectedUserId = firstSearchParam(params.user);
+  const selectedEmail = firstSearchParam(params.email);
+  const selectedName = firstSearchParam(params.name);
+  const selectedRole = firstSearchParam(params.scopedRole);
 
   let selectedUser: DirectoryUserContext | null = null;
 
@@ -724,7 +159,13 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     }
   }
 
-  const data = await getAdminUsersData();
+  const data = await getAdminUsersDirectory(filters);
+  const preserve = {
+    user: selectedUser?.id || undefined,
+    email: selectedUser?.email || undefined,
+    name: selectedUser?.name || undefined,
+    scopedRole: selectedUser?.role || undefined,
+  };
 
   const stats = [
     {
@@ -736,7 +177,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     {
       label: "New This Week",
       value: data.totals.newThisWeek.toLocaleString(),
-      sub: "Recent profiles, Gurus, and leads",
+      sub: "Recent profiles and leads",
       tone: "sky" as Tone,
     },
     {
@@ -757,55 +198,61 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     {
       title: "Pet Parents",
       value: data.roleCounts.petParents,
-      href: "/admin/users/pet-owners",
+      href: buildDirectoryHref({ role: "pet_parent" }),
       messageHref: getDepartmentMessageHref({
         department: "customer_service",
         label: "Pet Parents / Customer Service",
+        user: selectedUser,
       }),
     },
     {
       title: "Gurus",
       value: data.roleCounts.gurus,
-      href: "/admin/gurus",
+      href: buildDirectoryHref({ role: "guru" }),
       messageHref: getDepartmentMessageHref({
         department: "trust_safety",
         label: "Gurus / Trust & Safety",
+        user: selectedUser,
       }),
     },
     {
       title: "Vendors",
       value: data.roleCounts.vendors,
-      href: "/admin/vendor-approvals",
+      href: buildDirectoryHref({ role: "vendor" }),
       messageHref: getDepartmentMessageHref({
-        department: "partners",
+        department: "sales_marketing",
         label: "Vendors / Partners",
+        user: selectedUser,
       }),
     },
     {
       title: "Educators",
       value: data.roleCounts.educators,
-      href: "/admin/users/educators",
+      href: buildDirectoryHref({ role: "educator" }),
       messageHref: getDepartmentMessageHref({
-        department: "programs",
+        department: "sales_marketing",
         label: "Educators / Programs",
+        user: selectedUser,
       }),
     },
     {
       title: "Medical Pros",
       value: data.roleCounts.medical,
-      href: "/admin/users/medical",
+      href: buildDirectoryHref({ role: "medical" }),
       messageHref: getDepartmentMessageHref({
         department: "trust_safety",
         label: "Medical Pros / Trust & Safety",
+        user: selectedUser,
       }),
     },
     {
       title: "Admins",
       value: data.roleCounts.admins,
-      href: "/admin/users/admins",
+      href: buildDirectoryHref({ role: "admin" }),
       messageHref: getDepartmentMessageHref({
         department: "executive",
         label: "Admins / Executive",
+        user: selectedUser,
       }),
     },
   ];
@@ -851,7 +298,8 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     },
     {
       title: "Tech Support",
-      description: "Login issues, MFA, bugs, integrations, webhooks, and system health.",
+      description:
+        "Login issues, MFA, bugs, integrations, webhooks, and system health.",
       href: getDepartmentMessageHref({
         department: "tech_support",
         label: "Tech Support",
@@ -878,16 +326,13 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
               <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
                 User Directory / Internal Communications
               </p>
-
               <h1 className="mt-3 max-w-5xl text-4xl font-black leading-[0.96] tracking-tight text-slate-950 sm:text-5xl">
                 Live SitGuru users, roles, trust signals, and messaging.
               </h1>
-
               <p className="mt-4 max-w-4xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-                This page is wired to SitGuru profiles, Gurus, bookings, and
-                launch signups. It connects directly into the Admin Message
-                Center so HQ teams can message users, departments, and role
-                groups from one clean directory.
+                Search, filter, and page through profiles and launch leads without
+                loading the full directory at once. Communication and moderation
+                actions stay scoped to the selected user across desktop and mobile.
               </p>
             </div>
 
@@ -903,7 +348,6 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {stats.map((stat) => {
               const tone = statToneClasses(stat.tone);
-
               return (
                 <div
                   key={stat.label}
@@ -940,7 +384,6 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                 & Marketing.
               </p>
             </div>
-
             <ActionLink href="/admin/settings" label="Manage HQ Access" />
           </div>
 
@@ -966,150 +409,49 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
         </section>
 
         <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="order-2 rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8 xl:order-1">
+          <div className="order-2 space-y-4 rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8 xl:order-1">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
-                  Recent Accounts
+                  Directory
                 </p>
                 <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-                  Live user activity and trust signals.
+                  Searchable user activity and trust signals.
                 </h2>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Each row includes message and review actions for internal
-                  SitGuru support, customer care, Trust & Safety, and Tech
-                  Support.
+                  Server-side search, role/status filters, and pagination keep the
+                  directory fast on desktop, webapp, and mobile.
                   {selectedUser ? (
                     <>
                       {" "}
-                      Actions are currently scoped to{" "}
+                      Actions are scoped to{" "}
                       <span className="font-black text-slate-900">
-                        {selectedUser.name || selectedUser.email || selectedUser.id}
+                        {selectedUser.name ||
+                          selectedUser.email ||
+                          selectedUser.id}
                       </span>
                       .
                     </>
                   ) : null}
                 </p>
               </div>
-
-              <ActionLink href="/admin/users" label="Refresh" />
+              <ActionLink href={buildDirectoryHref({})} label="Clear filters" />
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
-              <div className="overflow-x-auto">
-                <table className="min-w-[1180px] text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-600">
-                    <tr>
-                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                        Name
-                      </th>
-                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                        Email
-                      </th>
-                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                        Role
-                      </th>
-                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                        Status
-                      </th>
-                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                        Risk
-                      </th>
-                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                        Source
-                      </th>
-                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                        Joined
-                      </th>
-                      <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
+            <UsersFilterBar
+              filters={data.filters}
+              filteredTotal={data.totals.filteredTotal}
+              preserve={preserve}
+            />
 
-                  <tbody className="divide-y divide-slate-100">
-                    {data.users.length ? (
-                      data.users.map((sitGuruUser) => (
-                        <tr
-                          key={`${sitGuruUser.id}-${sitGuruUser.email}-${sitGuruUser.source}`}
-                          className="transition hover:bg-emerald-50/40"
-                        >
-                          <td className="px-5 py-4">
-                            <div className="font-black text-slate-950">
-                              {sitGuruUser.name}
-                            </div>
-                            <div className="mt-1 max-w-[260px] break-all text-xs font-semibold text-slate-400">
-                              {sitGuruUser.id}
-                            </div>
-                          </td>
-                          <td className="px-5 py-4 font-semibold text-slate-600">
-                            {sitGuruUser.email}
-                          </td>
-                          <td className="px-5 py-4 font-black text-slate-700">
-                            {sitGuruUser.role}
-                          </td>
-                          <td className="px-5 py-4">
-                            <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${statusStyle(
-                                sitGuruUser.status,
-                              )}`}
-                            >
-                              {sitGuruUser.status}
-                            </span>
-                          </td>
-                          <td className="px-5 py-4">
-                            <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${riskStyle(
-                                sitGuruUser.risk,
-                              )}`}
-                            >
-                              {sitGuruUser.risk}
-                            </span>
-                          </td>
-                          <td className="px-5 py-4 font-semibold text-slate-500">
-                            {sitGuruUser.source}
-                          </td>
-                          <td className="px-5 py-4 font-semibold text-slate-500">
-                            {sitGuruUser.joined}
-                          </td>
-                          <td className="px-5 py-4">
-                            <div className="flex min-w-[190px] flex-col gap-2">
-                              <Link
-                                href={`/admin/users?user=${encodeURIComponent(sitGuruUser.id)}&email=${encodeURIComponent(sitGuruUser.email !== "—" ? sitGuruUser.email : "")}&name=${encodeURIComponent(sitGuruUser.name)}&role=${encodeURIComponent(sitGuruUser.role)}`}
-                                className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
-                              >
-                                Scope Actions
-                              </Link>
-                              <Link
-                                href={sitGuruUser.messageHref}
-                                className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
-                              >
-                                Message
-                              </Link>
-                              <Link
-                                href={sitGuruUser.profileHref}
-                                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-50"
-                              >
-                                Review
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={8}
-                          className="px-5 py-12 text-center text-slate-500"
-                        >
-                          No SitGuru users found yet.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <UsersDirectoryList users={data.users} />
+
+            <UsersPagination
+              filters={data.filters}
+              pageCount={data.pageCount}
+              filteredTotal={data.totals.filteredTotal}
+              preserve={preserve}
+            />
           </div>
 
           <aside className="order-1 space-y-5 xl:order-2">
@@ -1140,8 +482,8 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                 Manage and message live SitGuru user groups.
               </h2>
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                Counts are calculated from profiles, Guru records, bookings, and
-                launch lead data.
+                Role cards now filter this directory instead of linking to missing
+                sub-routes.
               </p>
             </div>
           </div>
@@ -1162,7 +504,6 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                       {role.value === 1 ? "" : "s"} detected.
                     </p>
                   </div>
-
                   <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
                     {role.value.toLocaleString()}
                   </span>
@@ -1171,13 +512,13 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                 <div className="mt-5 grid gap-2 sm:grid-cols-2">
                   <Link
                     href={role.href}
-                    className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+                    className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-50"
                   >
-                    Manage
+                    Filter
                   </Link>
                   <Link
                     href={role.messageHref}
-                    className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-800"
+                    className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-800"
                   >
                     Message
                   </Link>
@@ -1185,17 +526,6 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
               </div>
             ))}
           </div>
-        </section>
-
-        <section className="rounded-[2rem] border border-sky-100 bg-sky-50 p-5 shadow-sm sm:p-6 lg:p-8">
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-sky-700">
-            User Directory Messaging Notes
-          </p>
-          <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
-            Message links pass recipient, role, source, thread type, and
-            department details into `/admin/messages`. The Message Center can
-            now read those values and create internal HQ threads.
-          </p>
         </section>
       </div>
     </main>
