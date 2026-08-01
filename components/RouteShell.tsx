@@ -8,6 +8,7 @@ import ScrollToTopButton from "@/components/ScrollToTopButton";
 import GlobalMessageNotifier from "@/components/GlobalMessageNotifier";
 import FloatingActionStack from "@/components/FloatingActionStack";
 import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
+import GuruLiveUpdatesBridge from "@/components/gurus/GuruLiveUpdatesBridge";
 
 export default function RouteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -179,6 +180,8 @@ export default function RouteShell({ children }: { children: ReactNode }) {
       <main className="site-main min-h-[70vh]">{children}</main>
       <Footer />
       {shouldShowGlobalMessageNotifier ? <GlobalMessageNotifier /> : null}
+      {/* Browser-safe Realtime: Guru status / pricing / photo → search + profiles */}
+      <GuruLiveUpdatesBridge />
       {floatingControls}
     </>
   );

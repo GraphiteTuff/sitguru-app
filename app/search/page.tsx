@@ -15,6 +15,7 @@ import ProviderMap from "@/components/ProviderMap";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
+import { useGuruSearchLivePatches } from "@/hooks/useGuruSearchLivePatches";
 
 type GuruRow = {
   [key: string]: unknown;
@@ -1738,6 +1739,12 @@ function SearchPageContent() {
   const hasTrackedSearchPageVisit = useRef(false);
   const lastTrackedSearchKey = useRef("");
   const hoveredGuruIds = useRef<Set<string>>(new Set());
+
+  useGuruSearchLivePatches({
+    enabled: !loading && gurus.length > 0,
+    setGurus,
+    setServiceRatesByGuru,
+  });
 
   useEffect(() => {
     if (hasTrackedSearchPageVisit.current) return;

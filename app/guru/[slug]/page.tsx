@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
+import GuruProfileLiveRefresh from "@/components/gurus/GuruProfileLiveRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -3369,6 +3370,12 @@ function PublicGuruProfilePage({
       className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light text-slate-900"
       style={SITE_FONT_STYLE}
     >
+      <GuruProfileLiveRefresh
+        guruId={
+          guruProfile.id != null ? String(guruProfile.id) : null
+        }
+        userId={guruProfile.user_id || null}
+      />
       <section className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <Link
           href="/search"
