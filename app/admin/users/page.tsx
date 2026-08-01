@@ -1,8 +1,23 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import UserDirectoryActionPanels from "@/components/admin/users/UserDirectoryActionPanels";
+import {
+  buildDepartmentComposeHref,
+  type AdminDepartmentKey,
+  type DirectoryUserContext,
+} from "@/lib/admin/user-directory-actions";
 
 export const dynamic = "force-dynamic";
+
+type PageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function firstParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return String(value[0] || "").trim();
+  return String(value || "").trim();
+}
 
 type Tone = "emerald" | "sky" | "violet" | "amber" | "rose";
 
@@ -347,14 +362,13 @@ function getMessageHref(user: {
 function getDepartmentMessageHref(params: {
   department: string;
   label: string;
+  user?: DirectoryUserContext | null;
 }) {
-  const query = new URLSearchParams({
-    threadType: "internal_department",
-    department: params.department,
+  return buildDepartmentComposeHref({
+    department: params.department as AdminDepartmentKey | string,
     departmentLabel: params.label,
+    user: params.user,
   });
-
-  return `/admin/messages?${query.toString()}`;
 }
 
 function getProfileHref(user: {
@@ -655,8 +669,9 @@ async function getAdminUsersData() {
   };
 }
 
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({ searchParams }: PageProps) {
   const supabase = await createClient();
+  const params = searchParams ? await searchParams : {};
 
   const {
     data: { user },
@@ -665,6 +680,48 @@ export default async function AdminUsersPage() {
 
   if (error || !user) {
     return null;
+  }
+
+  const selectedUserId = firstParam(params.user);
+  const selectedEmail = firstParam(params.email);
+  const selectedName = firstParam(params.name);
+  const selectedRole = firstParam(params.role);
+
+  let selectedUser: DirectoryUserContext | null = null;
+
+  if (selectedUserId || selectedEmail) {
+    selectedUser = {
+      id: selectedUserId || null,
+      email: selectedEmail || null,
+      name: selectedName || null,
+      role: selectedRole || null,
+      source: "directory",
+    };
+
+    if (selectedUserId) {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("id, email, full_name, display_name, name, role")
+        .eq("id", selectedUserId)
+        .maybeSingle();
+
+      if (profile) {
+        selectedUser = {
+          id: String(profile.id),
+          email: String(profile.email || selectedEmail || "") || null,
+          name:
+            String(
+              profile.full_name ||
+                profile.display_name ||
+                profile.name ||
+                selectedName ||
+                "",
+            ) || null,
+          role: String(profile.role || selectedRole || "") || null,
+          source: "profile",
+        };
+      }
+    }
   }
 
   const data = await getAdminUsersData();
@@ -760,6 +817,7 @@ export default async function AdminUsersPage() {
       href: getDepartmentMessageHref({
         department: "executive",
         label: "Executive / Founder",
+        user: selectedUser,
       }),
     },
     {
@@ -769,6 +827,7 @@ export default async function AdminUsersPage() {
       href: getDepartmentMessageHref({
         department: "billing_finance",
         label: "Billing & Finance",
+        user: selectedUser,
       }),
     },
     {
@@ -777,6 +836,7 @@ export default async function AdminUsersPage() {
       href: getDepartmentMessageHref({
         department: "customer_service",
         label: "Customer Service",
+        user: selectedUser,
       }),
     },
     {
@@ -786,6 +846,7 @@ export default async function AdminUsersPage() {
       href: getDepartmentMessageHref({
         department: "trust_safety",
         label: "Trust & Safety",
+        user: selectedUser,
       }),
     },
     {
@@ -794,6 +855,7 @@ export default async function AdminUsersPage() {
       href: getDepartmentMessageHref({
         department: "tech_support",
         label: "Tech Support",
+        user: selectedUser,
       }),
     },
     {
@@ -802,6 +864,7 @@ export default async function AdminUsersPage() {
       href: getDepartmentMessageHref({
         department: "sales_marketing",
         label: "Sales & Marketing",
+        user: selectedUser,
       }),
     },
   ];
@@ -903,7 +966,7 @@ export default async function AdminUsersPage() {
         </section>
 
         <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="order-2 rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8 xl:order-1">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
@@ -916,6 +979,16 @@ export default async function AdminUsersPage() {
                   Each row includes message and review actions for internal
                   SitGuru support, customer care, Trust & Safety, and Tech
                   Support.
+                  {selectedUser ? (
+                    <>
+                      {" "}
+                      Actions are currently scoped to{" "}
+                      <span className="font-black text-slate-900">
+                        {selectedUser.name || selectedUser.email || selectedUser.id}
+                      </span>
+                      .
+                    </>
+                  ) : null}
                 </p>
               </div>
 
@@ -1002,6 +1075,12 @@ export default async function AdminUsersPage() {
                           <td className="px-5 py-4">
                             <div className="flex min-w-[190px] flex-col gap-2">
                               <Link
+                                href={`/admin/users?user=${encodeURIComponent(sitGuruUser.id)}&email=${encodeURIComponent(sitGuruUser.email !== "—" ? sitGuruUser.email : "")}&name=${encodeURIComponent(sitGuruUser.name)}&role=${encodeURIComponent(sitGuruUser.role)}`}
+                                className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
+                              >
+                                Scope Actions
+                              </Link>
+                              <Link
                                 href={sitGuruUser.messageHref}
                                 className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
                               >
@@ -1033,94 +1112,8 @@ export default async function AdminUsersPage() {
             </div>
           </div>
 
-          <aside className="space-y-5">
-            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
-                Communication Actions
-              </p>
-              <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
-                Directory-powered messaging.
-              </h3>
-              <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
-                Route issues between Customer Service, Trust & Safety, Finance,
-                Tech Support, and leadership without leaving the Admin portal.
-              </p>
-
-              <div className="mt-5 space-y-3">
-                <Link
-                  href="/admin/messages?threadType=internal"
-                  className="flex w-full items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
-                >
-                  Start Internal Message
-                </Link>
-
-                <Link
-                  href={getDepartmentMessageHref({
-                    department: "tech_support",
-                    label: "Tech Support",
-                  })}
-                  className="flex w-full items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-black text-sky-800 transition hover:bg-sky-100"
-                >
-                  Message Tech Support
-                </Link>
-
-                <Link
-                  href={getDepartmentMessageHref({
-                    department: "customer_service",
-                    label: "Customer Service",
-                  })}
-                  className="flex w-full items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-black text-violet-800 transition hover:bg-violet-100"
-                >
-                  Message Customer Service
-                </Link>
-
-                <Link
-                  href={getDepartmentMessageHref({
-                    department: "billing_finance",
-                    label: "Billing & Finance",
-                  })}
-                  className="flex w-full items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800 transition hover:bg-amber-100"
-                >
-                  Message Billing & Finance
-                </Link>
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
-                Moderation
-              </p>
-              <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950">
-                Account actions.
-              </h3>
-              <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
-                Use linked Admin areas to review Gurus, support users, and
-                monitor account health.
-              </p>
-
-              <div className="mt-5 space-y-3">
-                <Link
-                  href="/admin/guru-approvals"
-                  className="flex w-full items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-800 transition hover:bg-amber-100"
-                >
-                  Review Guru Applications
-                </Link>
-
-                <Link
-                  href="/admin/messages"
-                  className="flex w-full items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-black text-sky-800 transition hover:bg-sky-100"
-                >
-                  Open Message Center
-                </Link>
-
-                <Link
-                  href="/admin/fraud"
-                  className="flex w-full items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-800 transition hover:bg-rose-100"
-                >
-                  Fraud / Trust Review
-                </Link>
-              </div>
-            </div>
+          <aside className="order-1 space-y-5 xl:order-2">
+            <UserDirectoryActionPanels selectedUser={selectedUser} />
 
             <div className="rounded-[2rem] border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
               <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
