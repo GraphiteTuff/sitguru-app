@@ -6,13 +6,11 @@ import { Archive, Loader2, Trash2, X } from "lucide-react";
 type AdminQueueCardActionsProps = {
   conversationId: string;
   threadSubject?: string;
-  onRemoved?: () => void;
 };
 
 export default function AdminQueueCardActions({
   conversationId,
   threadSubject,
-  onRemoved,
 }: AdminQueueCardActionsProps) {
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState(false);
@@ -47,7 +45,6 @@ export default function AdminQueueCardActions({
     try {
       await postAction("/api/admin/messages/delete");
       setConfirmDeleteOpen(false);
-      onRemoved?.();
       // Hard navigation so Threads / Inquiry KPIs reload from the server.
       window.location.assign(
         `/admin/messages?compose_success=deleted&t=${Date.now()}`,
@@ -65,7 +62,6 @@ export default function AdminQueueCardActions({
 
     try {
       await postAction("/api/admin/messages/archive");
-      onRemoved?.();
       window.location.assign(
         `/admin/messages?compose_success=archived&t=${Date.now()}`,
       );

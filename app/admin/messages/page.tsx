@@ -30,7 +30,6 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AdminMessageRealtimeNotifier from "@/components/admin/AdminMessageRealtimeNotifier";
 import AdminQueueCardActions from "@/components/admin/AdminQueueCardActions";
-import AdminQueueCardShell from "@/components/admin/AdminQueueCardShell";
 import ClearAllMessagesForm from "@/components/admin/ClearAllMessagesForm";
 import {
   clearAdminMessageCenter,
@@ -2994,143 +2993,141 @@ function getThreadCommunicationParties(thread: AdminThreadCard): [ThreadParty, T
 function MessageBubblePreview({ thread }: { thread: AdminThreadCard }) {
   const canSendThread = Boolean(thread.contactEmail);
   const [senderParty, receiverParty] = getThreadCommunicationParties(thread);
+  const conversationId = String(thread.id || "").trim();
+
+  if (!conversationId) return null;
 
   return (
-    <AdminQueueCardShell>
-      {({ remove }) => (
-        <article className="block rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span
-                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getThreadTypeClasses(
-                    thread.type,
-                  )}`}
-                >
-                  {getThreadTypeLabel(thread.type)}
-                </span>
+    <article className="block rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getThreadTypeClasses(
+                thread.type,
+              )}`}
+            >
+              {getThreadTypeLabel(thread.type)}
+            </span>
 
-                <span
-                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getInquiryClasses(
-                    thread.inquiryType,
-                  )}`}
-                >
-                  {thread.inquiryLabel}
-                </span>
+            <span
+              className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getInquiryClasses(
+                thread.inquiryType,
+              )}`}
+            >
+              {thread.inquiryLabel}
+            </span>
 
-                {thread.topic ? (
-                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
-                    {thread.topic}
-                  </span>
-                ) : null}
-
-                {thread.unreadCount > 0 ? (
-                  <span className="inline-flex rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-black text-green-800">
-                    {number(thread.unreadCount)} unread
-                  </span>
-                ) : (
-                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">
-                    Read
-                  </span>
-                )}
-
-                {isEscalationThread(thread) ? (
-                  <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black text-rose-800">
-                    Review
-                  </span>
-                ) : null}
-
-                <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
-                  {formatRelativeTime(thread.lastActivity)}
-                </span>
-              </div>
-
-              <h2 className="truncate text-xl font-black text-slate-950">
-                {thread.subject}
-              </h2>
-
-              <div className="mt-4 max-w-4xl rounded-[24px] bg-[#f8fbf6] p-4">
-                <p className="line-clamp-3 text-sm font-semibold leading-6 text-slate-600">
-                  {thread.preview}
-                </p>
-              </div>
-
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <ParticipantPill
-                  label={senderParty.label}
-                  name={senderParty.name}
-                  avatar={senderParty.avatar}
-                  icon={senderParty.icon}
-                />
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                  ↔
-                </span>
-                <ParticipantPill
-                  label={receiverParty.label}
-                  name={receiverParty.name}
-                  avatar={receiverParty.avatar}
-                  icon={receiverParty.icon}
-                />
-              </div>
-            </div>
-
-            <div className="flex shrink-0 flex-col gap-2 lg:w-[360px] lg:items-end">
-              <Link
-                href={thread.href}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-green-100 bg-[#f7faf4] px-4 py-3 text-sm font-black text-green-900 transition hover:border-green-200 hover:bg-green-50"
-              >
-                Open Chat →
-              </Link>
-
-              <div className="grid w-full gap-2 sm:grid-cols-3">
-                <form action={sendConversationThread}>
-                  <input type="hidden" name="conversationId" value={thread.id} />
-                  <input
-                    type="hidden"
-                    name="recipientEmail"
-                    value={thread.contactEmail}
-                  />
-                  <input
-                    type="hidden"
-                    name="recipientName"
-                    value={thread.contactName}
-                  />
-                  <button
-                    type="submit"
-                    disabled={!canSendThread}
-                    title={
-                      canSendThread
-                        ? "Email this thread to the contact"
-                        : "No contact email available"
-                    }
-                    className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-900 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    <Send size={14} />
-                    Send
-                  </button>
-                </form>
-
-                <div className="sm:col-span-2">
-                  <AdminQueueCardActions
-                    conversationId={thread.id}
-                    threadSubject={thread.subject}
-                    onRemoved={remove}
-                  />
-                </div>
-              </div>
-
-              <span className="text-xs font-bold text-slate-400">
-                {number(thread.messageCount)} messages ·{" "}
-                {thread.contactEmail
-                  ? `Sendable to ${thread.contactEmail}`
-                  : "No email on file"}{" "}
-                · Last activity {formatDate(thread.lastActivity)}
+            {thread.topic ? (
+              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
+                {thread.topic}
               </span>
+            ) : null}
+
+            {thread.unreadCount > 0 ? (
+              <span className="inline-flex rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-black text-green-800">
+                {number(thread.unreadCount)} unread
+              </span>
+            ) : (
+              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">
+                Read
+              </span>
+            )}
+
+            {isEscalationThread(thread) ? (
+              <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black text-rose-800">
+                Review
+              </span>
+            ) : null}
+
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+              {formatRelativeTime(thread.lastActivity)}
+            </span>
+          </div>
+
+          <h2 className="truncate text-xl font-black text-slate-950">
+            {thread.subject || "SitGuru Message Thread"}
+          </h2>
+
+          <div className="mt-4 max-w-4xl rounded-[24px] bg-[#f8fbf6] p-4">
+            <p className="line-clamp-3 text-sm font-semibold leading-6 text-slate-600">
+              {thread.preview || "No message preview available yet."}
+            </p>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <ParticipantPill
+              label={senderParty.label}
+              name={senderParty.name || "SitGuru Contact"}
+              avatar={senderParty.avatar || ""}
+              icon={senderParty.icon}
+            />
+            <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+              ↔
+            </span>
+            <ParticipantPill
+              label={receiverParty.label}
+              name={receiverParty.name || "SitGuru Contact"}
+              avatar={receiverParty.avatar || ""}
+              icon={receiverParty.icon}
+            />
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-col gap-2 lg:w-[360px] lg:items-end">
+          <Link
+            href={thread.href}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-green-100 bg-[#f7faf4] px-4 py-3 text-sm font-black text-green-900 transition hover:border-green-200 hover:bg-green-50"
+          >
+            Open Chat →
+          </Link>
+
+          <div className="grid w-full gap-2 sm:grid-cols-3">
+            <form action={sendConversationThread}>
+              <input type="hidden" name="conversationId" value={conversationId} />
+              <input
+                type="hidden"
+                name="recipientEmail"
+                value={thread.contactEmail || ""}
+              />
+              <input
+                type="hidden"
+                name="recipientName"
+                value={thread.contactName || ""}
+              />
+              <button
+                type="submit"
+                disabled={!canSendThread}
+                title={
+                  canSendThread
+                    ? "Email this thread to the contact"
+                    : "No contact email available"
+                }
+                className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-900 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <Send size={14} />
+                Send
+              </button>
+            </form>
+
+            <div className="sm:col-span-2">
+              <AdminQueueCardActions
+                conversationId={conversationId}
+                threadSubject={thread.subject || "SitGuru Message Thread"}
+              />
             </div>
           </div>
-        </article>
-      )}
-    </AdminQueueCardShell>
+
+          <span className="text-xs font-bold text-slate-400">
+            {number(thread.messageCount)} messages ·{" "}
+            {thread.contactEmail
+              ? `Sendable to ${thread.contactEmail}`
+              : "No email on file"}{" "}
+            · Last activity {formatDate(thread.lastActivity)}
+          </span>
+        </div>
+      </div>
+    </article>
   );
 }
 
