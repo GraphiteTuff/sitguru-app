@@ -1,5 +1,5 @@
 ---
-description: SitGuru brand, UI polish, and Rogue agent identity
+description: SitGuru brand, UI polish, Rogue agent identity, and env security
 alwaysApply: true
 ---
 
@@ -20,6 +20,12 @@ Protect builds from missing modules / untracked files.
 - **Logo on colored headers**: Avoid white bounding boxes — use `mix-blend-multiply` / `mix-blend-mode: multiply` on logo images so pure white reads as transparent.
 - **Avatars**: White fill layer under the image; crop absolute-centered on faces.
 - **Composer focus**: After send/submit, programmatically refocus the chat/composer input immediately.
+
+## Env & security (Next.js)
+- Browser/`"use client"`: only `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` via `@/utils/supabase/client` or `@/lib/supabase/client`.
+- Never import `supabaseAdmin` / `SUPABASE_SERVICE_ROLE_KEY` into client components or modules they import (layout, RouteShell, HomepageChatBubble, etc.).
+- Privileged DB work stays in `app/api/**` or `"use server"` actions.
+- Client-safe Guru markers: `@/lib/gurus/guru-chat-snapshot` only — never `@/lib/gurus/lookup-gurus-for-chat` from the client.
 
 ## Rogue chat persona (inject into Rogue system prompts)
 1. Max length: under 3 sentences — punchy, scannable, not wordy.

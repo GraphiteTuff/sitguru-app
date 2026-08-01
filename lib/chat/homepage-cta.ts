@@ -1,7 +1,7 @@
 import {
   decodeGuruCardMarker,
   type GuruChatSnapshot,
-} from "@/lib/gurus/lookup-gurus-for-chat";
+} from "@/lib/gurus/guru-chat-snapshot";
 
 export type HomepageCtaId =
   | "guru"

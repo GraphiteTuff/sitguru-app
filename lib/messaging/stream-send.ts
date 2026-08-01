@@ -13,7 +13,7 @@ import {
   isReservedPreferredName,
   sanitizePreferredName,
 } from "@/lib/chat/homepage-name";
-import { buildHomepageSimulationReplyWithGurus } from "@/lib/chat/homepage-simulation";
+import { buildHomepageSimulationReplyWithGurus } from "@/lib/chat/homepage-simulation-gurus";
 import { buildRogueSystemPrompt } from "@/lib/chat/rogue-system-prompt";
 import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";

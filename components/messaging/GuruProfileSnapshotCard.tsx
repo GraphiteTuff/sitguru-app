@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { GuruChatSnapshot } from "@/lib/gurus/lookup-gurus-for-chat";
+import type { GuruChatSnapshot } from "@/lib/gurus/guru-chat-snapshot";
 
 export function GuruProfileSnapshotCard({ guru }: { guru: GuruChatSnapshot }) {
   const rateLabel =
