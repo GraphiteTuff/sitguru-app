@@ -470,48 +470,236 @@ function StatusPill({ value }: { value: string }) {
 }
 
 export default async function AdminGuruReferralsPage() {
-  const [profilesResult, gurusResult, bookingsResult, rewardsResult] = await Promise.all([
+  const [
+    profilesResult,
+    gurusResult,
+    bookingsResult,
+    rewardsResult,
+    guruReferralsResult,
+  ] = await Promise.all([
     safeRows<DbRow>(supabaseAdmin.from("profiles").select("*").limit(5000), "profiles"),
     safeRows<DbRow>(supabaseAdmin.from("gurus").select("*").limit(5000), "gurus"),
     safeRows<DbRow>(supabaseAdmin.from("bookings").select("*").limit(5000), "bookings"),
-    safeRows<DbRow>(supabaseAdmin.from("referral_rewards").select("*").limit(5000), "referral_rewards"),
+    safeRows<DbRow>(
+      supabaseAdmin.from("referral_rewards").select("*").limit(5000),
+      "referral_rewards",
+    ),
+    safeRows<DbRow>(
+      supabaseAdmin
+        .from("guru_referrals")
+        .select(
+          "id, referrer_user_id, referred_user_id, referred_guru_id, referral_code, referred_name, referred_email, status, payout_status, reward_amount, total_reward_amount, created_at, updated_at, qualified_at, reward_paid_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(2000),
+      "guru_referrals",
+    ),
   ]);
 
-  const profileRows = profilesResult.rows.filter((row) => hasReferralSignal(row) && isGuruProfile(row));
+  const profileRows = profilesResult.rows.filter(
+    (row) => hasReferralSignal(row) && isGuruProfile(row),
+  );
   const guruRows = gurusResult.rows.filter(hasReferralSignal);
-  const bookingRows = bookingsResult.rows.filter((row) => hasReferralSignal(row) && Boolean(firstString(row, ["guru_id", "provider_id", "sitter_id"])));
-  const rewardRows = rewardsResult.rows.filter((row) => getSource(row).toLowerCase().includes("guru") || isGuruProfile(row));
-  const rows = [...profileRows, ...guruRows, ...rewardRows, ...bookingRows];
+  const bookingRows = bookingsResult.rows.filter(
+    (row) =>
+      hasReferralSignal(row) &&
+      Boolean(firstString(row, ["guru_id", "provider_id", "sitter_id"])),
+  );
+  const rewardRows = rewardsResult.rows.filter(
+    (row) => getSource(row).toLowerCase().includes("guru") || isGuruProfile(row),
+  );
+  const guruReferralRows = guruReferralsResult.rows;
+
+  const pendingPayoutLiability = guruReferralRows
+    .filter((row) => {
+      const payout = firstString(row, ["payout_status"]).toLowerCase();
+      const status = firstString(row, ["status"]).toLowerCase();
+      return (
+        payout === "pending" ||
+        payout === "approved" ||
+        status === "reward_pending" ||
+        status === "qualified"
+      );
+    })
+    .reduce((sum, row) => sum + getAmount(row), 0);
+
+  const paidPayoutTotal = guruReferralRows
+    .filter((row) => {
+      const payout = firstString(row, ["payout_status"]).toLowerCase();
+      const status = firstString(row, ["status"]).toLowerCase();
+      return payout === "paid" || status === "reward_paid";
+    })
+    .reduce((sum, row) => sum + getAmount(row), 0);
 
   return pageShell({
     eyebrow: "Admin / Referrals / Gurus",
     title: "Guru Referrals",
     description:
-      "Drill-down view for referred Gurus, approval progress, first completed booking activity, and Guru referral reward eligibility.",
+      "Flat referrer ↔ referred audit ledger for Guru-to-Guru invites, approval progress, and Stripe-linked payout eligibility.",
     icon: ShieldCheck,
     children: (
       <>
-        <WarningBox warnings={[profilesResult.warning, gurusResult.warning, bookingsResult.warning, rewardsResult.warning].filter(Boolean) as string[]} />
+        <WarningBox
+          warnings={
+            [
+              profilesResult.warning,
+              gurusResult.warning,
+              bookingsResult.warning,
+              rewardsResult.warning,
+              guruReferralsResult.warning,
+            ].filter(Boolean) as string[]
+          }
+        />
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <KpiCard label="Referred Guru profiles" value={formatNumber(profileRows.length + guruRows.length)} detail="Guru profile rows with referral signals." icon={ShieldCheck} />
-          <KpiCard label="Guru booking signals" value={formatNumber(bookingRows.length)} detail="Referral-coded bookings tied to a Guru/provider." icon={CheckCircle2} />
-          <KpiCard label="Pending rewards" value={money(rewardRows.filter(isPending).reduce((sum, row) => sum + getAmount(row), 0))} detail="Pending Guru referral reward liability." icon={BadgeDollarSign} />
-          <KpiCard label="Issued rewards" value={money(rewardRows.filter(isCompleted).reduce((sum, row) => sum + getAmount(row), 0))} detail="Issued or paid Guru referral rewards." icon={HandCoins} />
+          <KpiCard
+            label="Guru referral rows"
+            value={formatNumber(guruReferralRows.length)}
+            detail="Direct guru_referrals ledger with referrer_user_id links."
+            icon={ShieldCheck}
+          />
+          <KpiCard
+            label="Linked referred users"
+            value={formatNumber(
+              guruReferralRows.filter((row) =>
+                Boolean(firstString(row, ["referred_user_id"])),
+              ).length,
+            )}
+            detail="Rows with referred_user_id populated at registration."
+            icon={Users}
+          />
+          <KpiCard
+            label="Pending payouts"
+            value={money(
+              pendingPayoutLiability ||
+                rewardRows.filter(isPending).reduce((sum, row) => sum + getAmount(row), 0),
+            )}
+            detail="Pending Guru referral reward liability."
+            icon={BadgeDollarSign}
+          />
+          <KpiCard
+            label="Paid cash"
+            value={money(
+              paidPayoutTotal ||
+                rewardRows
+                  .filter(isCompleted)
+                  .reduce((sum, row) => sum + getAmount(row), 0),
+            )}
+            detail="Issued or paid Guru referral rewards."
+            icon={HandCoins}
+          />
         </section>
 
-        <DataTable
-          rows={rows}
-          emptyText="No Guru referral rows found yet."
-          columns={[
-            { label: "Guru / Email", render: (row) => <div><p className="font-black text-slate-950">{getDisplayName(row, "Guru")}</p><p className="text-xs text-slate-500">{getEmail(row) || "—"}</p></div> },
-            { label: "Referral Code", render: (row) => getReferralCode(row) },
-            { label: "Source", render: (row) => getSource(row) },
-            { label: "Status", render: (row) => <StatusPill value={getStatus(row)} /> },
-            { label: "Amount", render: (row) => money(getAmount(row)) },
-            { label: "Date", render: (row) => formatDate(getDate(row)) },
-          ]}
-        />
+        <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">
+                Guru referral audit ledger
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-slate-600">
+                Un-nested referrer_user_id → referred_user_id for fast payout approval.
+              </p>
+            </div>
+            <Link
+              href="/admin/referrals/payouts"
+              className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900"
+            >
+              Open payouts
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <DataTable
+            rows={guruReferralRows}
+            emptyText="No guru_referrals rows yet. Share links write referrer_user_id when a referred Guru registers."
+            columns={[
+              {
+                label: "Referrer user_id",
+                render: (row) => (
+                  <p className="font-mono text-xs font-bold text-slate-800">
+                    {firstString(row, ["referrer_user_id"]) || "—"}
+                  </p>
+                ),
+              },
+              {
+                label: "Referred user_id",
+                render: (row) => (
+                  <p className="font-mono text-xs font-bold text-slate-800">
+                    {firstString(row, ["referred_user_id"]) || "—"}
+                  </p>
+                ),
+              },
+              {
+                label: "Referred Guru",
+                render: (row) => (
+                  <div>
+                    <p className="font-black text-slate-950">
+                      {firstString(row, ["referred_name"], "Guru")}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {firstString(row, ["referred_email"]) || "—"}
+                    </p>
+                  </div>
+                ),
+              },
+              {
+                label: "Code",
+                render: (row) => getReferralCode(row),
+              },
+              {
+                label: "Status",
+                render: (row) => <StatusPill value={getStatus(row)} />,
+              },
+              {
+                label: "Payout",
+                render: (row) => (
+                  <StatusPill
+                    value={firstString(row, ["payout_status"], getStatus(row))}
+                  />
+                ),
+              },
+              {
+                label: "Amount",
+                render: (row) => money(getAmount(row)),
+              },
+              {
+                label: "Date",
+                render: (row) => formatDate(getDate(row)),
+              },
+            ]}
+          />
+        </section>
+
+        <section className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <h2 className="mb-4 text-lg font-black text-slate-950">
+            Legacy referral signals
+          </h2>
+          <DataTable
+            rows={[...profileRows, ...guruRows, ...rewardRows, ...bookingRows]}
+            emptyText="No Guru referral signal rows found yet."
+            columns={[
+              {
+                label: "Guru / Email",
+                render: (row) => (
+                  <div>
+                    <p className="font-black text-slate-950">
+                      {getDisplayName(row, "Guru")}
+                    </p>
+                    <p className="text-xs text-slate-500">{getEmail(row) || "—"}</p>
+                  </div>
+                ),
+              },
+              { label: "Referral Code", render: (row) => getReferralCode(row) },
+              { label: "Source", render: (row) => getSource(row) },
+              {
+                label: "Status",
+                render: (row) => <StatusPill value={getStatus(row)} />,
+              },
+              { label: "Amount", render: (row) => money(getAmount(row)) },
+              { label: "Date", render: (row) => formatDate(getDate(row)) },
+            ]}
+          />
+        </section>
       </>
     ),
   });

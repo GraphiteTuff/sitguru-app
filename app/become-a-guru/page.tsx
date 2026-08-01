@@ -1,7 +1,21 @@
 import Link from "next/link";
 
-const guruApplyLink = "/signup?role=guru&next=/guru/dashboard";
 const guruLoginLink = "/login?role=guru&next=/guru/dashboard";
+
+function buildGuruApplyLink(refCode?: string | null) {
+  const params = new URLSearchParams({
+    role: "guru",
+    next: "/guru/dashboard",
+  });
+
+  const cleaned = typeof refCode === "string" ? refCode.trim() : "";
+  if (cleaned) {
+    params.set("ref", cleaned);
+    params.set("type", "guru");
+  }
+
+  return `/signup?${params.toString()}`;
+}
 
 const coreBenefits = [
   {
@@ -152,15 +166,17 @@ const faqs = [
 ];
 
 function PrimaryButton({
+  href,
   label = "Start Free Guru Profile",
   className = "",
 }: {
+  href: string;
   label?: string;
   className?: string;
 }) {
   return (
     <Link
-      href={guruApplyLink}
+      href={href}
       className={`inline-flex min-h-14 items-center justify-center rounded-full bg-emerald-600 px-7 py-4 text-base font-black !text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200 ${className}`}
     >
       {label}
@@ -287,11 +303,21 @@ function GuruProfilePreview() {
   );
 }
 
-export default function BecomeAGuruPage() {
+export default async function BecomeAGuruPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const resolved: Record<string, string | string[] | undefined> =
+    (await Promise.resolve(searchParams)) || {};
+  const rawRef = resolved.ref;
+  const refCode = Array.isArray(rawRef) ? rawRef[0] : rawRef;
+  const guruApplyLink = buildGuruApplyLink(refCode);
+
   return (
     <main className="public-page min-h-screen bg-white pb-24 !text-slate-950 sm:pb-0">
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden">
-        <PrimaryButton className="w-full" />
+        <PrimaryButton href={guruApplyLink} className="w-full" />
       </div>
 
       <section className="relative overflow-hidden border-b border-emerald-100 bg-gradient-to-br from-white via-emerald-50/45 to-sky-50">
@@ -317,7 +343,7 @@ export default function BecomeAGuruPage() {
               </p>
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <PrimaryButton className="w-full sm:w-auto" />
+                <PrimaryButton href={guruApplyLink} className="w-full sm:w-auto" />
                 <GuruLoginButton className="w-full sm:w-auto" />
               </div>
 
@@ -400,7 +426,7 @@ export default function BecomeAGuruPage() {
               </p>
 
               <div className="mt-6">
-                <PrimaryButton className="w-full sm:w-auto" />
+                <PrimaryButton href={guruApplyLink} className="w-full sm:w-auto" />
               </div>
             </div>
 
@@ -480,7 +506,7 @@ export default function BecomeAGuruPage() {
               </p>
 
               <div className="mt-6">
-                <PrimaryButton className="w-full bg-emerald-400 !text-emerald-950 hover:bg-emerald-300 sm:w-auto" />
+                <PrimaryButton href={guruApplyLink} className="w-full bg-emerald-400 !text-emerald-950 hover:bg-emerald-300 sm:w-auto" />
               </div>
             </div>
 
@@ -600,7 +626,7 @@ export default function BecomeAGuruPage() {
             </p>
 
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <PrimaryButton className="w-full bg-emerald-400 !text-emerald-950 hover:bg-emerald-300 sm:w-auto" />
+              <PrimaryButton href={guruApplyLink} className="w-full bg-emerald-400 !text-emerald-950 hover:bg-emerald-300 sm:w-auto" />
               <GuruLoginButton className="w-full border-white/30 bg-white/10 !text-white hover:bg-white/15 sm:w-auto" />
             </div>
           </div>
