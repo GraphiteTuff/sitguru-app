@@ -1,6 +1,6 @@
-// app/referrals/page.tsx
 import { redirect } from "next/navigation";
 
-export default function ReferralsRedirectPage() {
-  redirect("/customer/dashboard/pawperks");
+/** Pet Passports are managed on the dashboard Multi-Pet Profile Center. */
+export default function DashboardPetsRedirectPage() {
+  redirect("/customer/dashboard#multi-pet-center");
 }

@@ -121,8 +121,16 @@ type PetRow = {
   user_id?: string | null;
   name?: string | null;
   pet_name?: string | null;
+  species?: string | null;
   type?: string | null;
+  pet_type?: string | null;
   breed?: string | null;
+  size?: string | null;
+  size_category?: string | null;
+  medical_notes?: string | null;
+  medications?: string | null;
+  feeding_routine?: string | null;
+  potty_routine?: string | null;
   created_at?: string | null;
 };
 

@@ -449,9 +449,13 @@ function getPetName(row: AnyRow) {
 function getPetDescription(row: AnyRow) {
   return (
     [
-      getText(row, ["type", "species", "pet_type"]),
+      getText(row, ["species", "type", "pet_type"]),
       getText(row, ["breed"]),
+      getText(row, ["size", "size_category"]),
       getText(row, ["birthday", "birth_month_year", "date_of_birth"]),
+      getText(row, ["medical_notes", "medications"])
+        ? "medical_notes"
+        : "",
     ]
       .filter(Boolean)
       .join(" • ") || "Pet details not completed"

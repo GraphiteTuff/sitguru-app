@@ -353,7 +353,7 @@ function getPetName(row: AnyRow) {
 function getPetDescription(row: AnyRow) {
   return (
     [
-      getText(row, ["type", "species", "pet_type"]),
+      getText(row, ["species", "type", "pet_type"]),
       getText(row, ["breed"]),
       getText(row, ["age"]),
       getText(row, ["weight"]),

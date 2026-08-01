@@ -29,6 +29,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
 import { PawIcon } from "@/components/ui/PawIcon";
+import MultiPetProfileCenter from "@/components/customer/MultiPetProfileCenter";
+import { normalizeCanonicalPet } from "@/lib/pets/canonical";
 
 type CustomerProfile = {
   first_name: string | null;
@@ -99,8 +101,11 @@ type Pet = {
   species: string | null;
   breed: string | null;
   age: string | null;
+  size: string | null;
   weight: string | null;
   temperament: string | null;
+  medical_notes: string | null;
+  /** @deprecated Prefer medical_notes — kept for legacy UI badges. */
   medications: string | null;
   notes: string | null;
   photo_url: string | null;
@@ -245,14 +250,22 @@ type RawPetRow = {
   id?: string | number | null;
   name?: string | null;
   species?: string | null;
+  pet_type?: string | null;
   breed?: string | null;
   age?: string | null;
+  size?: string | null;
+  size_category?: string | null;
   weight?: string | null;
   temperament?: string | null;
+  medical_notes?: string | null;
   medications?: string | null;
   notes?: string | null;
   photo_url?: string | null;
   video_url?: string | null;
+  user_id?: string | null;
+  owner_id?: string | null;
+  feeding_routine?: string | null;
+  potty_routine?: string | null;
 };
 
 type RawReferralProfileRow = {
@@ -380,7 +393,7 @@ const routes = {
   allBookings: "/customer/dashboard/bookings",
   messages: "/customer/dashboard/messages",
   adminMessages: "/customer/dashboard/messages?support=admin",
-  pets: "/customer/dashboard/pets",
+  pets: "/customer/dashboard#multi-pet-center",
   profile: "/customer/dashboard/profile",
   accountSecurity: "/customer/dashboard/account-security",
   pawPerks: "/customer/dashboard/pawperks",
@@ -1467,14 +1480,35 @@ function normalizeBookingRow(row: RawBookingRow): Booking {
 }
 
 function normalizePetRow(row: RawPetRow): Pet {
+  const canonical = normalizeCanonicalPet(row as Record<string, unknown>);
+  if (canonical) {
+    return {
+      id: canonical.id,
+      name: canonical.name,
+      species: canonical.species,
+      breed: canonical.breed,
+      age: canonical.age,
+      size: canonical.size,
+      weight: canonical.weight,
+      temperament: canonical.temperament,
+      medical_notes: canonical.medical_notes,
+      medications: canonical.medical_notes,
+      notes: canonical.notes,
+      photo_url: canonical.photo_url,
+      video_url: canonical.video_url,
+    };
+  }
+
   return {
     id: String(row.id ?? crypto.randomUUID()),
     name: row.name?.trim() || "Pet",
     species: row.species ?? null,
     breed: row.breed ?? null,
     age: row.age ?? null,
+    size: null,
     weight: row.weight ?? null,
     temperament: row.temperament ?? null,
+    medical_notes: row.medications ?? null,
     medications: row.medications ?? null,
     notes: row.notes ?? null,
     photo_url: row.photo_url ?? null,
@@ -1977,7 +2011,7 @@ async function fetchPetsForUser(userId: string) {
     let query = supabase
       .from("pets")
       .select(
-        "id, name, species, breed, age, weight, temperament, medications, notes, photo_url, video_url",
+        "id, name, species, pet_type, breed, age, size, size_category, weight, temperament, medical_notes, medications, notes, photo_url, video_url, user_id, owner_id, feeding_routine, potty_routine",
       )
       .eq(attempt.matchColumn, userId);
 
@@ -2548,6 +2582,7 @@ export default function CustomerDashboardPage() {
     PawReportSummary[]
   >([]);
   const [pets, setPets] = useState<Pet[]>([]);
+  const [authUserId, setAuthUserId] = useState("");
   const [referralProfile, setReferralProfile] =
     useState<ReferralProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -2651,6 +2686,7 @@ export default function CustomerDashboardPage() {
     setCustomerProfile(profileData);
     setProfileForm(customerProfileToForm(profileData));
     setFirstName(getSafeFirstName(profileData, user.email));
+    setAuthUserId(user.id);
     setBookings(bookingsData);
     setPawReportSummaries(pawReportSummaryData);
     setPets(petsData);
@@ -3722,266 +3758,41 @@ export default function CustomerDashboardPage() {
             ))}
           </section>
 
-          <section className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-            <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                    My Pets
-                  </p>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                    My Pets
-                  </h2>
-                </div>
-                <div className="flex gap-2">
-                  <Link
-                    href={routes.pets}
-                    className="inline-flex min-h-[42px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-800 transition hover:bg-slate-50"
-                  >
-                    Pet Passports
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => setShowPetForm((value) => !value)}
-                    className="inline-flex min-h-[42px] items-center justify-center rounded-2xl bg-emerald-600 px-4 text-xs font-black text-white transition hover:bg-emerald-700"
-                  >
-                    {showPetForm ? "Close" : "+ Add Pet"}
-                  </button>
-                </div>
-              </div>
+          {authUserId ? (
+            <section className="mt-4">
+              <MultiPetProfileCenter
+                parent={{
+                  userId: authUserId,
+                  displayName: customerDisplayName,
+                  email: customerProfile?.email ?? null,
+                  phone: customerProfile?.phone ?? null,
+                  zip: careZip || null,
+                  profileCompletion,
+                }}
+                onPetsChange={(rows) => {
+                  setPets(
+                    rows.map((pet) => ({
+                      id: pet.id,
+                      name: pet.name,
+                      species: pet.species,
+                      breed: pet.breed,
+                      age: pet.age,
+                      size: pet.size,
+                      weight: pet.weight,
+                      temperament: pet.temperament,
+                      medical_notes: pet.medical_notes,
+                      medications: pet.medical_notes,
+                      notes: pet.notes,
+                      photo_url: pet.photo_url,
+                      video_url: pet.video_url,
+                    })),
+                  );
+                }}
+              />
+            </section>
+          ) : null}
 
-              {formError ? (
-                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                  {formError}
-                </div>
-              ) : null}
-              {petMediaMessage ? (
-                <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
-                  {petMediaMessage}
-                </div>
-              ) : null}
-              {petMediaError ? (
-                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                  {petMediaError}
-                </div>
-              ) : null}
-
-              {showPetForm ? (
-                <form
-                  onSubmit={handleAddPet}
-                  className="mt-5 grid gap-3 rounded-[1.6rem] bg-slate-50 p-4 ring-1 ring-slate-200 sm:grid-cols-2"
-                >
-                  <input
-                    required
-                    type="text"
-                    placeholder="Pet name"
-                    value={petForm.name}
-                    onChange={(e) =>
-                      setPetForm({ ...petForm, name: e.target.value })
-                    }
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Species"
-                    value={petForm.species}
-                    onChange={(e) =>
-                      setPetForm({ ...petForm, species: e.target.value })
-                    }
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Breed"
-                    value={petForm.breed}
-                    onChange={(e) =>
-                      setPetForm({ ...petForm, breed: e.target.value })
-                    }
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Age"
-                    value={petForm.age}
-                    onChange={(e) =>
-                      setPetForm({ ...petForm, age: e.target.value })
-                    }
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Weight"
-                    value={petForm.weight}
-                    onChange={(e) =>
-                      setPetForm({ ...petForm, weight: e.target.value })
-                    }
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Temperament"
-                    value={petForm.temperament}
-                    onChange={(e) =>
-                      setPetForm({ ...petForm, temperament: e.target.value })
-                    }
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Medications"
-                    value={petForm.medications}
-                    onChange={(e) =>
-                      setPetForm({ ...petForm, medications: e.target.value })
-                    }
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500 sm:col-span-2"
-                  />
-                  <input
-                    type="url"
-                    placeholder="Optional photo URL"
-                    value={petForm.photo_url}
-                    onChange={(e) =>
-                      setPetForm({ ...petForm, photo_url: e.target.value })
-                    }
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
-                  />
-                  <input
-                    type="url"
-                    placeholder="Optional video URL"
-                    value={petForm.video_url}
-                    onChange={(e) =>
-                      setPetForm({ ...petForm, video_url: e.target.value })
-                    }
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500"
-                  />
-                  <textarea
-                    placeholder="Care notes for your Guru"
-                    rows={4}
-                    value={petForm.notes}
-                    onChange={(e) =>
-                      setPetForm({ ...petForm, notes: e.target.value })
-                    }
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-500 sm:col-span-2"
-                  />
-                  <button
-                    type="submit"
-                    disabled={savingPet}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-black text-white transition hover:bg-slate-800 disabled:opacity-60 sm:col-span-2"
-                  >
-                    {savingPet ? "Saving pet..." : "Save Pet Profile"}
-                  </button>
-                </form>
-              ) : null}
-
-              {pets.length === 0 ? (
-                <div className="mt-5 rounded-[1.6rem] border border-dashed border-emerald-200 bg-emerald-50/60 p-7 text-center">
-                  <PawIcon className="mx-auto h-9 w-9 text-emerald-600" />
-                  <p className="mt-3 text-lg font-black text-slate-950">
-                    Add your first pet
-                  </p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                    Pet Passports help Gurus understand routines, medication,
-                    photos, and comfort needs before care begins.
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-5 flex gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-3 lg:overflow-visible">
-                  {pets.slice(0, 6).map((pet) => (
-                    <article
-                      key={pet.id}
-                      className="min-w-[245px] overflow-hidden rounded-[1.6rem] border border-slate-200 bg-slate-50 lg:min-w-0"
-                    >
-                      <div className="relative h-36 bg-emerald-50">
-                        {pet.photo_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={pet.photo_url}
-                            alt={pet.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center">
-                            <PawIcon className="h-10 w-10 text-emerald-500" />
-                          </div>
-                        )}
-                        {pet.medications ? (
-                          <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-[10px] font-black text-rose-700 shadow-sm">
-                            Medication note
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="p-4">
-                        <div className="flex items-center justify-between gap-2">
-                          <h3 className="truncate text-lg font-black text-slate-950">
-                            {pet.name}
-                          </h3>
-                          {pet.video_url ? (
-                            <span className="rounded-full bg-sky-50 px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-sky-700 ring-1 ring-sky-100">
-                              Video
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-1 truncate text-xs font-bold text-slate-500">
-                          {[pet.breed, pet.age, pet.weight]
-                            .filter(Boolean)
-                            .join(" • ") || "Add profile details"}
-                        </p>
-                        <div className="mt-4 grid grid-cols-2 gap-2">
-                          <Link
-                            href={buildPetBookingHref(pet)}
-                            className="inline-flex min-h-[38px] items-center justify-center rounded-xl bg-emerald-600 px-3 text-xs font-black text-white transition hover:bg-emerald-700"
-                          >
-                            Book Care
-                          </Link>
-                          <Link
-                            href={routes.pets}
-                            className="inline-flex min-h-[38px] items-center justify-center rounded-xl bg-white px-3 text-xs font-black text-slate-800 ring-1 ring-slate-200 transition hover:bg-slate-50"
-                          >
-                            Passport
-                          </Link>
-                        </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          <label className="inline-flex cursor-pointer min-h-[36px] items-center justify-center rounded-xl bg-white px-2 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-50">
-                            {uploadingPetMedia?.petId === pet.id &&
-                            uploadingPetMedia.kind === "photo"
-                              ? "Uploading..."
-                              : pet.photo_url
-                                ? "Change Photo"
-                                : "Add Photo"}
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/png"
-                              disabled={Boolean(uploadingPetMedia)}
-                              onChange={(event) =>
-                                handlePetMediaUpload(event, pet, "photo")
-                              }
-                              className="sr-only"
-                            />
-                          </label>
-                          <label className="inline-flex cursor-pointer min-h-[36px] items-center justify-center rounded-xl bg-white px-2 text-[10px] font-black text-sky-700 ring-1 ring-sky-100 transition hover:bg-sky-50">
-                            {uploadingPetMedia?.petId === pet.id &&
-                            uploadingPetMedia.kind === "video"
-                              ? "Uploading..."
-                              : pet.video_url
-                                ? "Change Video"
-                                : "Add Video"}
-                            <input
-                              type="file"
-                              accept="video/mp4,video/quicktime,video/webm"
-                              disabled={Boolean(uploadingPetMedia)}
-                              onChange={(event) =>
-                                handlePetMediaUpload(event, pet, "video")
-                              }
-                              className="sr-only"
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </article>
-
+          <section className="mt-4 grid gap-4 lg:grid-cols-1">
             <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>

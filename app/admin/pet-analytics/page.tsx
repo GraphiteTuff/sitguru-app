@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import PetCanonicalFilters from "@/components/admin/PetCanonicalFilters";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -155,9 +156,9 @@ function getPercent(part: number, total: number) {
 
 function getPetTypeFromPet(row: GenericRow) {
   return getString(row, [
+    "species",
     "pet_type",
     "type",
-    "species",
     "animal_type",
     "animal",
     "petType",
@@ -166,6 +167,10 @@ function getPetTypeFromPet(row: GenericRow) {
 
 function getBreedFromPet(row: GenericRow) {
   return getString(row, ["breed", "pet_breed", "primary_breed", "breed_name"]);
+}
+
+function getSizeFromPet(row: GenericRow) {
+  return getString(row, ["size", "size_category", "pet_size"]);
 }
 
 function getSexFromPet(row: GenericRow) {
@@ -187,12 +192,13 @@ function getAgeFromPet(row: GenericRow) {
 
 function hasSpecialCare(row: GenericRow) {
   const specialCareText = getString(row, [
-    "special_needs",
-    "special_care",
-    "care_notes",
     "medical_notes",
     "medications",
     "allergies",
+    "medical_conditions",
+    "special_needs",
+    "special_care",
+    "care_notes",
     "behavior_notes",
     "notes",
   ]).toLowerCase();
@@ -212,7 +218,7 @@ function hasSpecialCare(row: GenericRow) {
 }
 
 function getBookingPetType(row: GenericRow) {
-  return getString(row, ["pet_type", "petType", "type", "animal_type"]);
+  return getString(row, ["species", "pet_type", "petType", "type", "animal_type"]);
 }
 
 function getBookingService(row: GenericRow) {
@@ -584,6 +590,7 @@ export default async function AdminPetAnalyticsPage() {
 
   const topPetTypes = getTopItems(petTypeValues);
   const topBreeds = getTopItems(pets.map(getBreedFromPet).filter(Boolean));
+  const topSizes = getTopItems(pets.map(getSizeFromPet).filter(Boolean));
   const topSex = getTopItems(pets.map(getSexFromPet).filter(Boolean));
   const topAgeGroups = getTopItems(pets.map(getAgeFromPet).filter(Boolean));
 
@@ -800,12 +807,14 @@ export default async function AdminPetAnalyticsPage() {
           />
         </section>
 
+        <PetCanonicalFilters pets={pets} />
+
         <section className="grid gap-6 xl:grid-cols-3">
           <TopFiveCard
-            title="Top 5 pet types"
-            eyebrow="Pet demographics"
+            title="Top 5 species"
+            eyebrow="Canonical species"
             items={topPetTypes}
-            emptyText="No pet type data found yet. Add pet profiles or booking pet_type values to populate this chart."
+            emptyText="No species data found yet. Add pet profiles with species (preferred over pet_type)."
             icon={PawPrint}
           />
 
@@ -815,6 +824,14 @@ export default async function AdminPetAnalyticsPage() {
             items={topBreeds}
             emptyText="No breed data found yet. This will populate from the pets table when breed fields are available."
             icon={Dog}
+          />
+
+          <TopFiveCard
+            title="Top 5 sizes"
+            eyebrow="Canonical size"
+            items={topSizes}
+            emptyText="No size data found yet. Prefer pets.size over size_category."
+            icon={BarChart3}
           />
 
           <TopFiveCard
