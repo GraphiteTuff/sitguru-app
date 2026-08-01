@@ -8,13 +8,13 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { streamText, type CoreMessage } from "ai";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { HOMEPAGE_CTO_VOICE_RULES } from "@/lib/chat/homepage-cta";
-import { buildHomepageSimulationReply } from "@/lib/chat/homepage-simulation";
 import {
   isReservedPreferredName,
   sanitizePreferredName,
 } from "@/lib/chat/homepage-name";
-import { buildRogueKnowledgeBlock } from "@/lib/chat/rogue-knowledge";
+import { buildHomepageSimulationReply } from "@/lib/chat/homepage-simulation";
+import { buildRogueSystemPrompt } from "@/lib/chat/rogue-system-prompt";
+import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
 
 function safeString(value: unknown) {
@@ -177,6 +177,9 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       walkId?: string;
       conversationId?: string;
       client_first_name?: string;
+      user_role?: string;
+      user_type?: string;
+      userRole?: string;
       channel?: string;
     };
 
@@ -190,6 +193,9 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       ? ""
       : clientFirstNameRaw;
     parsedClientFirstName = clientFirstName;
+    const userTypeLabel = normalizeRogueUserType(
+      body?.userRole || body?.user_type || body?.user_role || "Guest Pet Parent",
+    );
     const insightChannel =
       walkId || safeString(body?.channel) === "ACTIVE_WALK"
         ? "ACTIVE_WALK"
@@ -252,17 +258,11 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       void recordChatInsight(lastUserText, insightChannel);
     }
 
-    const nameDirective = clientFirstName
-      ? `\nVISITOR PREFERRED NAME: ${clientFirstName}.
-MANDATORY: Address them as ${clientFirstName} in EVERY reply. NEVER call them Rogue — Rogue is your name only.
-If they say hi/hey/hello, answer like live text: ask how they are, say you're doing great, keep it warm and interactive.\n`
-      : `\nNo visitor preferred name yet.
-CRITICAL: You are Rogue. NEVER address the visitor as Rogue. If they say "Hi Rogue", they are greeting YOU — reply with hi/how are you, say you're doing great, then ask what to call THEM.
-Do not invent a name. Stay interactive and collect their preferred name before deep booking help.\n`;
-
-    const knowledgeBlock = buildRogueKnowledgeBlock({
+    const systemPrompt = buildRogueSystemPrompt({
+      clientFirstName,
+      userRole: userTypeLabel,
       lastUserText,
-      maxChars: 18000,
+      walkId: walkId || undefined,
     });
 
     let result;
@@ -270,17 +270,8 @@ Do not invent a name. Stay interactive and collect their preferred name before d
       result = streamText({
         model: anthropic(getSitGuruAiModel()),
         messages,
-        system: `You are Rogue, Your Chief Treat Officer 🦴 for SitGuru — a warm, witty, real-time conversational pack guide.
-${nameDirective}
-You have full SitGuru website + Help Center knowledge below. Use it to answer specifically — do not give the same generic reply to different questions.
-Be communicative: usually 3–6 short sentences, react to their latest message, vary phrasing, ask one natural follow-up.
-When they want care, explain the service with real platform details and help them find a Pet Guru quickly — fast, accurate, and here to help.
-Capitalize "Rogue" when saying your name. If unresolved or they ask for a human, share pack@sitguru.com.
-${walkId ? `\nACTIVE WALK CONTEXT:\n- Current walk ID: ${walkId}. Prefer walk-aware guidance when relevant.\n` : ""}
-
-${HOMEPAGE_CTO_VOICE_RULES}
-
-${knowledgeBlock}`,
+        system: systemPrompt,
+        maxTokens: 400,
         onFinish: async ({ text }) => {
           try {
             const assistantText = String(text || "").trim();

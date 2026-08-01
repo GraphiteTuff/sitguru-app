@@ -9,13 +9,13 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } 
 import Link from "next/link";
 import { X } from "lucide-react";
 import { useChat, type Message } from "ai/react";
+import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
 import {
   parseHomepageChatContent,
   type HomepageCtaDef,
 } from "@/lib/chat/homepage-cta";
 import {
   SIMULATION_NAME_PROMPT,
-  buildActiveAssistanceGreeting,
   buildHomepageSimulationReply,
 } from "@/lib/chat/homepage-simulation";
 import {
@@ -26,14 +26,26 @@ import {
   isWellbeingReply,
   sanitizePreferredName,
 } from "@/lib/chat/homepage-name";
+import {
+  clearRogueOpeningGreetingSession,
+  isRogueOpeningGreeting,
+  pickRogueOpeningGreeting,
+  pickRogueReturningGreeting,
+} from "@/lib/chat/rogue-greetings";
+import {
+  inferRogueUserTypeFromIntent,
+  normalizeRogueUserType,
+  persistRogueUserType,
+  readStoredRogueUserType,
+  type RogueUserTypeLabel,
+} from "@/lib/chat/rogue-user-type";
+import { supabase } from "@/lib/supabase";
 
 const BRAND_GREEN = "#0D5C3A";
 const STORAGE_KEY = "sitguru-homepage-lead-chat";
 const NAME_STORAGE_KEY = "sitguru_client_first_name";
 const LEGACY_HISTORY_KEY = "sitguru_chat_history";
 const ROGUE_AVATAR_SRC = "/images/rogue-avatar.png";
-
-const NAME_PROMPT = SIMULATION_NAME_PROMPT;
 
 /** Clean Title Case chip labels for the compact horizontal rail. */
 const CARE_INTENT_CHIPS = [
@@ -141,20 +153,20 @@ function persistFirstName(name: string) {
   }
 }
 
-function buildWelcome(name: string): Message {
+function buildWelcome(name: string, opts?: { forceNewGreeting?: boolean }): Message {
   const safe = name && !isReservedPreferredName(name) ? formatDisplayName(name) : "";
-  // Named session → skip name collection; open in active assistance.
+  // Named session → skip name collection; open with a fresh returning vibe.
   if (!safe) {
     return {
       id: "welcome-name",
       role: "assistant",
-      content: NAME_PROMPT,
+      content: pickRogueOpeningGreeting(Boolean(opts?.forceNewGreeting)),
     };
   }
   return {
     id: "welcome",
     role: "assistant",
-    content: buildActiveAssistanceGreeting(safe),
+    content: pickRogueReturningGreeting(safe),
   };
 }
 
@@ -193,7 +205,7 @@ function AssistantBubbleBody({ content }: { content: string }) {
 
   return (
     <div className="space-y-1">
-      {text ? <p className="m-0 whitespace-pre-wrap">{text}</p> : null}
+      {text ? <RogueMarkdownText text={text} /> : null}
       {ctas.length > 0 ? (
         <div className="flex flex-col gap-1.5 pt-1">
           {ctas.map((cta) => (
@@ -249,9 +261,11 @@ export default function HomepageChatBubble() {
   const [hasUnread, setHasUnread] = useState(true);
   const [clientFirstName, setClientFirstName] = useState("");
   const [awaitingName, setAwaitingName] = useState(false);
+  const [userType, setUserType] = useState<RogueUserTypeLabel>("Guest Pet Parent");
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const clientFirstNameRef = useRef("");
+  const userTypeRef = useRef<RogueUserTypeLabel>("Guest Pet Parent");
 
   const {
     messages,
@@ -279,8 +293,9 @@ export default function HomepageChatBubble() {
         });
         // Guard: named visitors must never see the name-collection fallback string.
         const safeContent =
-          name && content === SIMULATION_NAME_PROMPT
-            ? buildActiveAssistanceGreeting(name)
+          name &&
+          (content === SIMULATION_NAME_PROMPT || isRogueOpeningGreeting(content))
+            ? pickRogueReturningGreeting(name)
             : content;
         return [
           ...prev,
@@ -298,13 +313,27 @@ export default function HomepageChatBubble() {
     clientFirstNameRef.current = clientFirstName;
   }, [clientFirstName]);
 
-  /** Always send the latest preferred name so Rogue can address this participant. */
+  useEffect(() => {
+    userTypeRef.current = userType;
+    persistRogueUserType(userType);
+  }, [userType]);
+
+  function setRogueUserType(next: RogueUserTypeLabel) {
+    userTypeRef.current = next;
+    setUserType(next);
+  }
+
+  /** Always send the latest preferred name + audience type so Rogue can adapt. */
   function chatRequestOptions() {
     const name = clientFirstNameRef.current || clientFirstName;
+    const role = userTypeRef.current || userType || "Guest Pet Parent";
     return {
       body: {
         channel: "HOMEPAGE_LEAD",
         client_first_name: name || undefined,
+        user_role: role,
+        user_type: role,
+        userRole: role,
       },
     };
   }
@@ -319,6 +348,30 @@ export default function HomepageChatBubble() {
     } else {
       setAwaitingName(true);
     }
+
+    const storedType = readStoredRogueUserType();
+    setRogueUserType(storedType);
+
+    // Resolve logged-in SitGuru role when available (Guest Pet Parent otherwise).
+    void (async () => {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const uid = auth.user?.id;
+        if (!uid) return;
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", uid)
+          .limit(5);
+        const primary =
+          roles?.map((r) => String(r.role || "")).find(Boolean) || "";
+        if (primary) {
+          setRogueUserType(normalizeRogueUserType(primary));
+        }
+      } catch {
+        // stay on guest / stored type
+      }
+    })();
 
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -385,7 +438,7 @@ export default function HomepageChatBubble() {
     setHasUnread(false);
     if (messages.length === 0) {
       const name = clientFirstName || readStoredFirstName();
-      setMessages([buildWelcome(name)]);
+      setMessages([buildWelcome(name, { forceNewGreeting: true })]);
       setAwaitingName(!name);
     }
   }
@@ -406,6 +459,7 @@ export default function HomepageChatBubble() {
     try {
       sessionStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(LEGACY_HISTORY_KEY);
+      clearRogueOpeningGreetingSession();
     } catch {
       // ignore
     }
@@ -451,6 +505,8 @@ export default function HomepageChatBubble() {
 
   async function sendChip(content: string) {
     if (!content.trim() || isLoading || awaitingName) return;
+    const inferred = inferRogueUserTypeFromIntent(content);
+    if (inferred) setRogueUserType(inferred);
     await append({ role: "user", content }, chatRequestOptions());
   }
 
@@ -493,6 +549,8 @@ export default function HomepageChatBubble() {
       return;
     }
 
+    const inferred = inferRogueUserTypeFromIntent(text);
+    if (inferred) setRogueUserType(inferred);
     handleSubmit(e, chatRequestOptions());
   }
 
