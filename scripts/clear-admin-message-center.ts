@@ -3,9 +3,12 @@
  *
  * Usage:
  *   npx tsx --env-file=.env.local scripts/clear-admin-message-center.ts
+ *
+ * Kept outside the Next.js tsconfig include (see tsconfig.json exclude)
+ * so CLI `main()` helpers do not collide during `next build` typechecks.
  */
 
-async function main() {
+async function clearAdminMessageCenterMain() {
   const { clearAdminMessageCenter } = await import(
     "../lib/messaging/admin-thread-purge"
   );
@@ -32,7 +35,7 @@ async function main() {
   );
 }
 
-main().catch((error) => {
+clearAdminMessageCenterMain().catch((error) => {
   console.error(error);
   process.exit(1);
 });
