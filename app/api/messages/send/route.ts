@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { scanMessageForOffPlatformContact } from "@/lib/messaging/contact-guard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -1402,6 +1403,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { ok: false, error: "Please keep messages under 5,000 characters.", delivery },
         { status: 400 },
+      );
+    }
+
+    const contactScan = scanMessageForOffPlatformContact(messageText);
+    if (contactScan.blocked) {
+      return NextResponse.json(
+        { ok: false, error: contactScan.alert, delivery },
+        { status: 422 },
       );
     }
 

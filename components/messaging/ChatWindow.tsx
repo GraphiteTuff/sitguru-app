@@ -22,6 +22,9 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import MediaAttachmentDrawer from "@/components/messaging/MediaAttachmentDrawer";
+import {
+  scanMessageForOffPlatformContact,
+} from "@/lib/messaging/contact-guard";
 import type {
   ChatLayoutMode,
   ChatMediaItem,
@@ -87,6 +90,7 @@ export default function ChatWindow({
   const [error, setError] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(aiAssistEnabled);
+  const [guardAlert, setGuardAlert] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -191,10 +195,20 @@ export default function ChatWindow({
     const text = draft.trim();
     if ((!text && pendingMedia.length === 0) || sending) return;
 
+    if (text) {
+      const scan = scanMessageForOffPlatformContact(text);
+      if (scan.blocked) {
+        setGuardAlert(scan.alert);
+        setDraft("");
+        return;
+      }
+    }
+
     setSending(true);
     setError("");
+    setGuardAlert("");
     try {
-      const res = await fetch("/api/messaging/send", {
+      const res = await fetch("/api/messages/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -202,6 +216,7 @@ export default function ChatWindow({
           message: text,
           media: pendingMedia,
           clientMessageKey: crypto.randomUUID(),
+          source: "chat_window",
         }),
       });
       const json = (await res.json().catch(() => null)) as {
@@ -346,6 +361,15 @@ export default function ChatWindow({
         <p className="px-4 text-xs font-semibold text-red-600">{error}</p>
       ) : null}
 
+      {guardAlert ? (
+        <p
+          role="alert"
+          className="mx-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-950"
+        >
+          {guardAlert}
+        </p>
+      ) : null}
+
       {pendingMedia.length > 0 ? (
         <div className="flex gap-2 overflow-x-auto border-t border-slate-50 px-3 py-2">
           {pendingMedia.map((m) => (
@@ -377,7 +401,17 @@ export default function ChatWindow({
           </button>
           <textarea
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              const scan = scanMessageForOffPlatformContact(next);
+              if (scan.blocked) {
+                setGuardAlert(scan.alert);
+                setDraft("");
+                return;
+              }
+              if (guardAlert) setGuardAlert("");
+              setDraft(next);
+            }}
             rows={1}
             placeholder="Message…"
             className="max-h-28 min-h-12 flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400"
