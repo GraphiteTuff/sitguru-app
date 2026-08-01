@@ -18,6 +18,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import {
+  isTrustSafetyScreeningBypassed,
+  TRUST_SAFETY_SCREENING_BYPASS,
+} from "@/lib/config/trust-safety";
 
 type GuruProfile = {
   id?: string | number | null;
@@ -153,6 +157,16 @@ function formatMoney(value: number | string | null | undefined) {
 }
 
 function normalizeCheckrStatus(profile: GuruProfile | null): FriendlyStatus {
+  if (isTrustSafetyScreeningBypassed()) {
+    return {
+      label: TRUST_SAFETY_SCREENING_BYPASS.label,
+      tone: "complete",
+      title: TRUST_SAFETY_SCREENING_BYPASS.title,
+      description: TRUST_SAFETY_SCREENING_BYPASS.description,
+      helper: TRUST_SAFETY_SCREENING_BYPASS.helper,
+    };
+  }
+
   const raw = String(
     profile?.background_check_status ||
       profile?.checkr_report_status ||
@@ -417,7 +431,7 @@ export default function GuruBackgroundCheckPage() {
     profile?.background_check_fee_payment_option,
   );
 
-  const canStartCheckr = true;
+  const canStartCheckr = !isTrustSafetyScreeningBypassed();
 
   async function loadPage() {
     try {

@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
 import GuruRecognitionBadge from "@/components/guru/GuruRecognitionBadge";
+import {
+  isTrustSafetyScreeningBypassed,
+  TRUST_SAFETY_SCREENING_BYPASS,
+} from "@/lib/config/trust-safety";
 
 export const dynamic = "force-dynamic";
 
@@ -741,6 +745,14 @@ function isTrustSafetyFeeWaivedThrough2026() {
 }
 
 function getBackgroundCheckDisplay(profile: GuruProfile | null) {
+  if (isTrustSafetyScreeningBypassed()) {
+    return {
+      label: TRUST_SAFETY_SCREENING_BYPASS.label,
+      status: "complete" as const,
+      href: "/guru/dashboard/background-check",
+    };
+  }
+
   const statusValues = [
     profile?.background_check_status,
     profile?.background_check_fee_status,
@@ -1667,11 +1679,13 @@ function GuruSetupChecklist({
       title: "Trust & Safety",
       status: background.status,
       statusLabel: background.label,
-      helper: background.label.includes("Waived")
-        ? "Launch-year fee waiver applied."
-        : background.status === "complete"
-          ? "Screening is complete."
-          : "Check your screening status.",
+      helper: isTrustSafetyScreeningBypassed()
+        ? "Temporarily marked complete for all Gurus."
+        : background.label.includes("Waived")
+          ? "Launch-year fee waiver applied."
+          : background.status === "complete"
+            ? "Screening is complete."
+            : "Check your screening status.",
       href: background.href,
       icon: "🛡️",
     },
