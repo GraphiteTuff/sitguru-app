@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { getPlaidEnvironment, plaidClient } from "@/lib/plaid";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 
 type PlaidLinkMetadata = {
   institution?: {
@@ -38,54 +38,24 @@ function getErrorMessage(error: unknown) {
   return "Unable to exchange Plaid public token.";
 }
 
-async function requireAdminUser() {
-  const supabase = await createClient();
+async function requireAdminUser(): Promise<
+  | { user: { id: string; email?: string | null }; response: null }
+  | { user: null; response: NextResponse }
+> {
+  const financeCheck = await requireFinanceAdminApi();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  if (!financeCheck.identity) {
     return {
       user: null,
-      response: NextResponse.json(
-        { error: "Unauthorized. Please sign in as admin again." },
-        { status: 401 },
-      ),
-    };
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role, email")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError) {
-    console.error("Plaid exchange profile lookup error:", profileError);
-
-    return {
-      user: null,
-      response: NextResponse.json(
-        { error: "Unable to verify admin profile." },
-        { status: 500 },
-      ),
-    };
-  }
-
-  if (profile?.role !== "admin") {
-    return {
-      user: null,
-      response: NextResponse.json(
-        { error: "Admin access required." },
-        { status: 403 },
-      ),
+      response: financeCheck.response,
     };
   }
 
   return {
-    user,
+    user: {
+      id: financeCheck.identity.id,
+      email: financeCheck.identity.email,
+    },
     response: null,
   };
 }
@@ -269,7 +239,7 @@ async function savePlaidAccount({
 export async function POST(request: NextRequest) {
   const adminCheck = await requireAdminUser();
 
-  if (adminCheck.response || !adminCheck.user) {
+  if (!adminCheck.user) {
     return adminCheck.response;
   }
 

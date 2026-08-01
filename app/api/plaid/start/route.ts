@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import {
   assertPlaidConfigured,
   getPlaidCountryCodes,
   getPlaidProducts,
   plaidClient,
 } from "@/lib/plaid";
+import { requireFinanceAdminRedirect } from "@/lib/admin/financials/access";
 
 function getBaseUrl(request: NextRequest) {
   const forwardedProto = request.headers.get("x-forwarded-proto");
@@ -78,46 +78,22 @@ function getPlaidRedirectUri() {
   return redirectUri;
 }
 
-async function requireAdminUser() {
-  const supabase = await createClient();
+async function requireAdminUser(): Promise<
+  | { user: { id: string }; response: null; error: null }
+  | { user: null; response: NextResponse; error: string }
+> {
+  const financeCheck = await requireFinanceAdminRedirect("/admin/login");
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  if (!financeCheck.identity) {
     return {
       user: null,
-      response: NextResponse.redirect("/admin/login"),
-      error: "Unauthorized. Please sign in as admin again.",
-    };
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError) {
-    return {
-      user: null,
-      response: null,
-      error: "Unable to verify admin profile.",
-    };
-  }
-
-  if (profile?.role !== "admin") {
-    return {
-      user: null,
-      response: null,
-      error: "Admin access required.",
+      response: financeCheck.response,
+      error: "Finance admin access required.",
     };
   }
 
   return {
-    user,
+    user: { id: financeCheck.identity.id },
     response: null,
     error: null,
   };
@@ -360,16 +336,8 @@ function buildPlaidLaunchHtml({
 export async function GET(request: NextRequest) {
   const adminCheck = await requireAdminUser();
 
-  if (adminCheck.response) {
-    return adminCheck.response;
-  }
-
   if (!adminCheck.user) {
-    return redirectToPlaidPage(
-      request,
-      "error",
-      adminCheck.error || "Admin access required.",
-    );
+    return adminCheck.response;
   }
 
   try {
