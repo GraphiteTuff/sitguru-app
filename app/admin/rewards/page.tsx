@@ -21,7 +21,10 @@ function asNumber(value: unknown) {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function safeSelect(table: string, columns = "*") {
+async function safeSelect(
+  table: string,
+  columns = "*",
+): Promise<AnyRow[]> {
   try {
     const { data, error } = await supabaseAdmin
       .from(table)
@@ -29,12 +32,16 @@ async function safeSelect(table: string, columns = "*") {
       .limit(500);
     if (error) {
       console.warn(`[admin/rewards] ${table} skipped:`, error.message);
-      return [] as AnyRow[];
+      return [];
     }
-    return (data || []) as AnyRow[];
+    if (!data || (typeof data === "object" && "error" in data)) {
+      return [];
+    }
+    // Dynamic table names resolve to GenericStringError[]; bridge via unknown.
+    return data as unknown as AnyRow[];
   } catch (error) {
     console.warn(`[admin/rewards] ${table} failed:`, error);
-    return [] as AnyRow[];
+    return [];
   }
 }
 
