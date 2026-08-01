@@ -550,149 +550,175 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
             ) : null}
 
             {traitTab === "behavior" ? (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {(
-                  [
-                    ["personality", "Personality"],
-                    ["temperament", "Temperament"],
-                    ["energy_level", "Energy level"],
-                    ["good_with_people", "Good with people"],
-                    ["good_with_pets", "Good with pets"],
-                    ["separation_anxiety", "Separation anxiety"],
-                    ["triggers", "Triggers"],
-                    ["favorite_things", "Favorite things"],
-                    ["bite_history", "Bite history"],
-                    ["escape_risk", "Escape risk"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <Field key={key} label={label}>
-                    <textarea
-                      rows={2}
-                      className={inputClass}
-                      value={form[key]}
-                      onChange={(e) => patchForm(key, e.target.value)}
-                    />
-                  </Field>
-                ))}
-              </div>
+              <details className="rounded-2xl border border-slate-200 bg-slate-50/70 open:bg-white" open>
+                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-slate-900 [&::-webkit-details-marker]:hidden">
+                  Behavioral options
+                  <span className="ml-2 text-xs font-bold text-slate-500">
+                    Advanced
+                  </span>
+                </summary>
+                <div className="grid grid-cols-1 gap-3 border-t border-slate-200 p-4 md:grid-cols-2">
+                  {(
+                    [
+                      ["personality", "Personality"],
+                      ["temperament", "Temperament"],
+                      ["energy_level", "Energy level"],
+                      ["good_with_people", "Good with people"],
+                      ["good_with_pets", "Good with pets"],
+                      ["separation_anxiety", "Separation anxiety"],
+                      ["triggers", "Triggers"],
+                      ["favorite_things", "Favorite things"],
+                      ["bite_history", "Bite history"],
+                      ["escape_risk", "Escape risk"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <Field key={key} label={label}>
+                      <textarea
+                        rows={2}
+                        className={inputClass}
+                        value={form[key]}
+                        onChange={(e) => patchForm(key, e.target.value)}
+                      />
+                    </Field>
+                  ))}
+                </div>
+              </details>
             ) : null}
 
             {traitTab === "routines" ? (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {(
-                  [
-                    ["feeding_routine", "Feeding routine"],
-                    ["potty_routine", "Potty routine"],
-                    ["walking_instructions", "Walking instructions"],
-                    ["sleeping_location", "Sleeping location"],
-                    ["crate_trained", "Crate trained"],
-                    ["care_instructions", "Care instructions"],
-                    ["entry_notes", "Entry / access notes"],
-                    ["supplies_location", "Supplies location"],
-                    ["restricted_areas", "Restricted areas"],
-                    ["house-adjacent", "Booking notes for Gurus"],
-                  ] as const
-                ).map(([key, label]) =>
-                  key === "house-adjacent" ? (
-                    <Field key={key} label={label}>
-                      <textarea
-                        rows={2}
-                        className={inputClass}
-                        value={form.booking_notes}
-                        onChange={(e) =>
-                          patchForm("booking_notes", e.target.value)
-                        }
-                      />
-                    </Field>
-                  ) : (
-                    <Field key={key} label={label}>
-                      <textarea
-                        rows={2}
-                        className={inputClass}
-                        value={form[key as keyof CanonicalPetForm] as string}
-                        onChange={(e) =>
-                          patchForm(
-                            key as keyof CanonicalPetForm,
-                            e.target.value,
-                          )
-                        }
-                      />
-                    </Field>
-                  ),
-                )}
-              </div>
+              <details className="rounded-2xl border border-slate-200 bg-slate-50/70 open:bg-white">
+                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-slate-900 [&::-webkit-details-marker]:hidden">
+                  Routines & access notes
+                  <span className="ml-2 text-xs font-bold text-slate-500">
+                    Advanced
+                  </span>
+                </summary>
+                <div className="grid grid-cols-1 gap-3 border-t border-slate-200 p-4 md:grid-cols-2">
+                  {(
+                    [
+                      ["feeding_routine", "Feeding routine"],
+                      ["potty_routine", "Potty routine"],
+                      ["walking_instructions", "Walking instructions"],
+                      ["sleeping_location", "Sleeping location"],
+                      ["crate_trained", "Crate trained"],
+                      ["care_instructions", "Care instructions"],
+                      ["entry_notes", "Entry / access notes"],
+                      ["supplies_location", "Supplies location"],
+                      ["restricted_areas", "Restricted areas"],
+                      ["house-adjacent", "Booking notes for Gurus"],
+                    ] as const
+                  ).map(([key, label]) =>
+                    key === "house-adjacent" ? (
+                      <Field key={key} label={label}>
+                        <textarea
+                          rows={2}
+                          className={inputClass}
+                          value={form.booking_notes}
+                          onChange={(e) =>
+                            patchForm("booking_notes", e.target.value)
+                          }
+                        />
+                      </Field>
+                    ) : (
+                      <Field key={key} label={label}>
+                        <textarea
+                          rows={2}
+                          className={inputClass}
+                          value={form[key as keyof CanonicalPetForm] as string}
+                          onChange={(e) =>
+                            patchForm(
+                              key as keyof CanonicalPetForm,
+                              e.target.value,
+                            )
+                          }
+                        />
+                      </Field>
+                    ),
+                  )}
+                </div>
+              </details>
             ) : null}
 
             {traitTab === "medical" ? (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <Field label="Medical notes">
-                  <textarea
-                    rows={3}
-                    className={inputClass}
-                    value={form.medical_notes}
-                    onChange={(e) => patchForm("medical_notes", e.target.value)}
-                    placeholder="Medications, dosing, special handling"
-                  />
-                </Field>
-                <Field label="Allergies">
-                  <textarea
-                    rows={3}
-                    className={inputClass}
-                    value={form.allergies}
-                    onChange={(e) => patchForm("allergies", e.target.value)}
-                  />
-                </Field>
-                <Field label="Medical conditions">
-                  <textarea
-                    rows={2}
-                    className={inputClass}
-                    value={form.medical_conditions}
-                    onChange={(e) =>
-                      patchForm("medical_conditions", e.target.value)
-                    }
-                  />
-                </Field>
-                <Field label="Safety notes">
-                  <textarea
-                    rows={2}
-                    className={inputClass}
-                    value={form.safety_notes}
-                    onChange={(e) => patchForm("safety_notes", e.target.value)}
-                  />
-                </Field>
-                <Field label="Vet name">
-                  <input
-                    className={inputClass}
-                    value={form.vet_name}
-                    onChange={(e) => patchForm("vet_name", e.target.value)}
-                  />
-                </Field>
-                <Field label="Vet phone">
-                  <input
-                    className={inputClass}
-                    value={form.vet_phone}
-                    onChange={(e) => patchForm("vet_phone", e.target.value)}
-                  />
-                </Field>
-                <Field label="Emergency contact name">
-                  <input
-                    className={inputClass}
-                    value={form.emergency_contact_name}
-                    onChange={(e) =>
-                      patchForm("emergency_contact_name", e.target.value)
-                    }
-                  />
-                </Field>
-                <Field label="Emergency contact phone">
-                  <input
-                    className={inputClass}
-                    value={form.emergency_contact_phone}
-                    onChange={(e) =>
-                      patchForm("emergency_contact_phone", e.target.value)
-                    }
-                  />
-                </Field>
-              </div>
+              <details className="rounded-2xl border border-slate-200 bg-slate-50/70 open:bg-white">
+                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-slate-900 [&::-webkit-details-marker]:hidden">
+                  Medical & safety notes
+                  <span className="ml-2 text-xs font-bold text-slate-500">
+                    Advanced
+                  </span>
+                </summary>
+                <div className="grid grid-cols-1 gap-3 border-t border-slate-200 p-4 md:grid-cols-2">
+                  <Field label="Medical notes">
+                    <textarea
+                      rows={3}
+                      className={inputClass}
+                      value={form.medical_notes}
+                      onChange={(e) =>
+                        patchForm("medical_notes", e.target.value)
+                      }
+                      placeholder="Medications, dosing, special handling"
+                    />
+                  </Field>
+                  <Field label="Allergies">
+                    <textarea
+                      rows={3}
+                      className={inputClass}
+                      value={form.allergies}
+                      onChange={(e) => patchForm("allergies", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Medical conditions">
+                    <textarea
+                      rows={2}
+                      className={inputClass}
+                      value={form.medical_conditions}
+                      onChange={(e) =>
+                        patchForm("medical_conditions", e.target.value)
+                      }
+                    />
+                  </Field>
+                  <Field label="Safety notes">
+                    <textarea
+                      rows={2}
+                      className={inputClass}
+                      value={form.safety_notes}
+                      onChange={(e) => patchForm("safety_notes", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Vet name">
+                    <input
+                      className={inputClass}
+                      value={form.vet_name}
+                      onChange={(e) => patchForm("vet_name", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Vet phone">
+                    <input
+                      className={inputClass}
+                      value={form.vet_phone}
+                      onChange={(e) => patchForm("vet_phone", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Emergency contact name">
+                    <input
+                      className={inputClass}
+                      value={form.emergency_contact_name}
+                      onChange={(e) =>
+                        patchForm("emergency_contact_name", e.target.value)
+                      }
+                    />
+                  </Field>
+                  <Field label="Emergency contact phone">
+                    <input
+                      className={inputClass}
+                      value={form.emergency_contact_phone}
+                      onChange={(e) =>
+                        patchForm("emergency_contact_phone", e.target.value)
+                      }
+                    />
+                  </Field>
+                </div>
+              </details>
             ) : null}
 
             <button

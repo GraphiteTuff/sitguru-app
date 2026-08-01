@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   CalendarDays,
@@ -1293,6 +1294,9 @@ export default function BookGuruClient({
   initialGuruResponseRate = null,
 }: BookGuruClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const expressMode = searchParams.get("express") === "1";
+  const queryPetId = String(searchParams.get("pet_id") || "").trim();
 
   const resolvedCalendarUsername = calendarUsername || calUsername || "";
   const resolvedCalendarEventTypeSlug =
@@ -1828,10 +1832,19 @@ export default function BookGuruClient({
       setAuthChecked(true);
 
       if (profileData?.full_name) setCustomerName(profileData.full_name);
+
+      const preferredPetId =
+        queryPetId ||
+        (petData && petData.length === 1 ? String(petData[0].id) : "");
+      if (preferredPetId && (petData || []).some((pet) => pet.id === preferredPetId)) {
+        setSelectedPetId(preferredPetId);
+        const match = (petData || []).find((pet) => pet.id === preferredPetId);
+        if (match?.name) setPetName(match.name);
+      }
     }
 
     loadPetsAndCustomer();
-  }, []);
+  }, [queryPetId]);
 
   useEffect(() => {
     async function loadGuruAvailability() {
@@ -2663,14 +2676,21 @@ export default function BookGuruClient({
             <StepBadge step={step} />
 
             <h1 className="mt-5 max-w-4xl text-4xl font-black leading-[0.96] tracking-[-0.05em] text-slate-950 md:text-6xl">
-              Request trusted
-              <br />
-              pet care with confidence.
+              {expressMode ? (
+                <>Quick Book with {guruName || "your Guru"}</>
+              ) : (
+                <>
+                  Request trusted
+                  <br />
+                  pet care with confidence.
+                </>
+              )}
             </h1>
 
             <p className="mt-4 max-w-2xl text-lg font-semibold leading-8 text-slate-700">
-              Request trusted care with secure checkout, organized booking
-              details, optional tipping, and SitGuru support when needed.
+              {expressMode
+                ? "Express checkout — confirm pet, date, and payment."
+                : "Request trusted care with secure checkout, organized booking details, optional tipping, and SitGuru support when needed."}
             </p>
           </div>
 
@@ -3336,49 +3356,59 @@ export default function BookGuruClient({
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-5">
-                  <div>
-                    <div className="flex items-center justify-between gap-4">
-                      <label className={labelClass()} htmlFor="care-notes">
-                        Care Notes
-                      </label>
+                <details className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/80 open:bg-white">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-slate-900 marker:content-none [&::-webkit-details-marker]:hidden">
+                    <span className="inline-flex w-full items-center justify-between gap-3">
+                      Advanced notes
                       <span className="text-xs font-bold text-slate-500">
-                        {notes.length}/500
+                        Optional
                       </span>
+                    </span>
+                  </summary>
+                  <div className="grid gap-5 border-t border-slate-200 px-4 py-4">
+                    <div>
+                      <div className="flex items-center justify-between gap-4">
+                        <label className={labelClass()} htmlFor="care-notes">
+                          Care Notes
+                        </label>
+                        <span className="text-xs font-bold text-slate-500">
+                          {notes.length}/500
+                        </span>
+                      </div>
+                      <textarea
+                        id="care-notes"
+                        value={notes}
+                        onChange={(event) => setNotes(event.target.value)}
+                        rows={expressMode ? 3 : 4}
+                        maxLength={500}
+                        className={fieldClass()}
+                        placeholder="Anything your Guru should know before the booking."
+                      />
                     </div>
-                    <textarea
-                      id="care-notes"
-                      value={notes}
-                      onChange={(event) => setNotes(event.target.value)}
-                      rows={4}
-                      maxLength={500}
-                      className={fieldClass()}
-                      placeholder="Anything your Guru should know before the booking."
-                    />
-                  </div>
 
-                  <div>
-                    <div className="flex items-center justify-between gap-4">
-                      <label className={labelClass()} htmlFor="emergency-notes">
-                        Emergency / Special Instructions
-                      </label>
-                      <span className="text-xs font-bold text-slate-500">
-                        {emergencyNotes.length}/500
-                      </span>
+                    <div>
+                      <div className="flex items-center justify-between gap-4">
+                        <label className={labelClass()} htmlFor="emergency-notes">
+                          Emergency / Special Instructions
+                        </label>
+                        <span className="text-xs font-bold text-slate-500">
+                          {emergencyNotes.length}/500
+                        </span>
+                      </div>
+                      <textarea
+                        id="emergency-notes"
+                        value={emergencyNotes}
+                        onChange={(event) =>
+                          setEmergencyNotes(event.target.value)
+                        }
+                        rows={expressMode ? 3 : 4}
+                        maxLength={500}
+                        className={fieldClass()}
+                        placeholder="Medication, allergies, emergency contact, behavior notes, access instructions, etc."
+                      />
                     </div>
-                    <textarea
-                      id="emergency-notes"
-                      value={emergencyNotes}
-                      onChange={(event) =>
-                        setEmergencyNotes(event.target.value)
-                      }
-                      rows={4}
-                      maxLength={500}
-                      className={fieldClass()}
-                      placeholder="Medication, allergies, emergency contact, behavior notes, access instructions, etc."
-                    />
                   </div>
-                </div>
+                </details>
 
                 <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4">
                   <div className="flex items-start gap-3">

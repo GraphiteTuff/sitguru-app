@@ -11,8 +11,12 @@ import {
   type ReactNode,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import { Zap } from "lucide-react";
 import ProviderMap from "@/components/ProviderMap";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
+import QuickBookOverlay, {
+  buildExpressBookUrl,
+} from "@/components/booking/QuickBookOverlay";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 import { useGuruSearchLivePatches } from "@/hooks/useGuruSearchLivePatches";
@@ -1728,6 +1732,11 @@ function SearchPageContent() {
   const [zipLookupStatus, setZipLookupStatus] = useState<
     "idle" | "loading" | "found" | "not_found"
   >("idle");
+  const [quickPetId, setQuickPetId] = useState<string | null>(null);
+  const [quickBook, setQuickBook] = useState<{
+    url: string;
+    guruName: string;
+  } | null>(null);
 
   const [highlightedGuruId, setHighlightedGuruId] = useState<
     string | undefined
@@ -1745,6 +1754,35 @@ function SearchPageContent() {
     setGurus,
     setServiceRatesByGuru,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadQuickPet() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
+      const attempts = ["user_id", "owner_id"] as const;
+      for (const column of attempts) {
+        const { data, error } = await supabase
+          .from("pets")
+          .select("id")
+          .eq(column, user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!error && data?.id && !cancelled) {
+          setQuickPetId(String(data.id));
+          return;
+        }
+      }
+    }
+    void loadQuickPet();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (hasTrackedSearchPageVisit.current) return;
@@ -2645,7 +2683,7 @@ function SearchPageContent() {
                   return (
                     <Card
                       key={guruMapMarkerId}
-                      className={`overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md md:h-[380px] ${
+                      className={`relative overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-md md:h-[380px] ${
                         isSelectedGuru
                           ? "border-emerald-400 ring-4 ring-emerald-100"
                           : ""
@@ -2662,6 +2700,26 @@ function SearchPageContent() {
                         setHighlightedGuruPosition(undefined);
                       }}
                     >
+                      {!bookingDisabled ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            trackBookingCtaClick(guru);
+                            setQuickBook({
+                              url: buildExpressBookUrl(
+                                getBookGuruHref(guru),
+                                quickPetId,
+                              ),
+                              guruName: guruFirstName,
+                            });
+                          }}
+                          className="absolute right-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700"
+                        >
+                          <Zap className="h-3.5 w-3.5" />
+                          Quick Book
+                        </button>
+                      ) : null}
+
                       <div className="flex min-h-[380px] flex-col md:h-full md:min-h-0 md:flex-row md:items-stretch">
                         <GuruResultPhoto
                           photoUrl={photoUrl}
@@ -2815,6 +2873,7 @@ function SearchPageContent() {
                           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                             <Link
                               href={getGuruHref(guru)}
+                              prefetch={true}
                               onClick={() =>
                                 trackGuruProfileClick(guru, `Meet ${guruFirstName}`)
                               }
@@ -2834,7 +2893,11 @@ function SearchPageContent() {
                               </button>
                             ) : (
                               <Link
-                                href={getBookGuruHref(guru)}
+                                href={buildExpressBookUrl(
+                                  getBookGuruHref(guru),
+                                  quickPetId,
+                                )}
+                                prefetch={true}
                                 onClick={() => {
                                   trackBookingCtaClick(guru);
                                 }}
@@ -2923,6 +2986,7 @@ function SearchPageContent() {
 
             <Link
               href="/ambassadors"
+              prefetch={true}
               className="inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
             >
               Learn About Ambassadors
@@ -2930,6 +2994,13 @@ function SearchPageContent() {
           </div>
         </Card>
       </section>
+
+      <QuickBookOverlay
+        open={Boolean(quickBook)}
+        bookUrl={quickBook?.url || ""}
+        guruName={quickBook?.guruName}
+        onClose={() => setQuickBook(null)}
+      />
     </main>
   );
 }

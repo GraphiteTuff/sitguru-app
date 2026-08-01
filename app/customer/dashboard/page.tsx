@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   Clock3,
   CreditCard,
-  GraduationCap,
   HeartHandshake,
   LockKeyhole,
   MessageCircle,
@@ -30,6 +29,7 @@ import { supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
 import { PawIcon } from "@/components/ui/PawIcon";
 import MultiPetProfileCenter from "@/components/customer/MultiPetProfileCenter";
+import UniversityExpress from "@/components/dashboard/UniversityExpress";
 import { normalizeCanonicalPet } from "@/lib/pets/canonical";
 import {
   findPetForBooking as findLinkedPetForBooking,
@@ -3346,6 +3346,25 @@ export default function CustomerDashboardPage() {
         <Header />
 
         <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 md:py-6 lg:px-8">
+          <UniversityExpress
+            variant="banner"
+            progressPercent={universityProgress.progressPercent}
+            petProfileDone={pets.length > 0 && profileCompletion >= 60}
+            guruVibeDone={Boolean(stats.nextBooking) || bookings.length > 0}
+            safeBookingDone={
+              universityProgress.isComplete ||
+              bookings.some((booking) =>
+                ["confirmed", "completed", "paid", "succeeded"].includes(
+                  String(booking.status || booking.payment_status || "").toLowerCase(),
+                ),
+              )
+            }
+            petProfileHref={routes.pets}
+            guruVibeHref={routes.findGuru}
+            safeBookingHref={routes.findGuru}
+            academyHref={routes.university}
+          />
+
           <section className="relative overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-[0_20px_70px_rgba(15,118,110,0.10)] sm:rounded-[2.4rem]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(52,211,153,0.22),transparent_30%),radial-gradient(circle_at_92%_12%,rgba(251,191,36,0.18),transparent_26%),linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#fff7ed_100%)]" />
             <div className="relative grid gap-5 px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-center lg:px-10 lg:py-9">
@@ -4116,63 +4135,27 @@ export default function CustomerDashboardPage() {
               ) : null}
             </article>
 
-            <article className="overflow-hidden rounded-[2rem] border border-sky-100 bg-white shadow-sm">
-              <div className="h-full bg-[radial-gradient(circle_at_90%_0%,rgba(56,189,248,0.24),transparent_28%),linear-gradient(135deg,#eff6ff_0%,#ffffff_55%,#ecfdf5_100%)] p-5 sm:p-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-lg">
-                    <GraduationCap className="h-7 w-7" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
-                      My Academy
-                    </p>
-                    <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
-                      My Academy
-                    </h2>
-                  </div>
-                </div>
-
-                <p className="mt-4 text-sm font-semibold leading-7 text-slate-600">
-                  Quick lessons for safer, smoother bookings.
-                </p>
-
-                <div className="mt-5 rounded-[1.4rem] bg-white p-4 shadow-sm ring-1 ring-sky-100">
-                  <div className="flex items-end justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">
-                        Progress
-                      </p>
-                      <p className="mt-1 text-3xl font-black text-slate-950">
-                        {universityProgress.progressPercent}%
-                      </p>
-                    </div>
-                    <p className="text-right text-xs font-bold text-slate-500">
-                      {universityProgress.completedSteps} of {universityProgress.totalSteps} steps
-                    </p>
-                  </div>
-                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-sky-50">
-                    <div
-                      className="h-full rounded-full bg-sky-500"
-                      style={{ width: `${universityProgress.progressPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-5 grid grid-cols-2 gap-2">
-                  <Link
-                    href={routes.university}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-slate-950 px-4 text-xs font-black text-white transition hover:bg-slate-800"
-                  >
-                    {universityProgress.academyButtonLabel}
-                  </Link>
-                  <Link
-                    href={routes.adminMessages}
-                    className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-800 transition hover:bg-slate-50"
-                  >
-                    Ask Support
-                  </Link>
-                </div>
-              </div>
+            <article className="hidden md:block">
+              <UniversityExpress
+                variant="sidebar"
+                progressPercent={universityProgress.progressPercent}
+                petProfileDone={pets.length > 0 && profileCompletion >= 60}
+                guruVibeDone={Boolean(stats.nextBooking) || bookings.length > 0}
+                safeBookingDone={
+                  universityProgress.isComplete ||
+                  bookings.some((booking) =>
+                    ["confirmed", "completed", "paid", "succeeded"].includes(
+                      String(
+                        booking.status || booking.payment_status || "",
+                      ).toLowerCase(),
+                    ),
+                  )
+                }
+                petProfileHref={routes.pets}
+                guruVibeHref={routes.findGuru}
+                safeBookingHref={routes.findGuru}
+                academyHref={routes.university}
+              />
             </article>
           </section>
 
