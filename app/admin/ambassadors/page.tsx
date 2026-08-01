@@ -1535,12 +1535,29 @@ function trainingClass(percent: number) {
 }
 
 function getAmbassadorName(ambassador: AmbassadorSummaryRow) {
-  return (
-    asString(ambassador.display_name) ||
-    asString(ambassador.full_name) ||
-    asString(ambassador.email) ||
-    "Unnamed Ambassador"
-  );
+  const displayName = asString(ambassador.display_name);
+  const fullName = asString(ambassador.full_name);
+  const email = asString(ambassador.email);
+
+  if (displayName && !/^sitguru(\s|$)/i.test(displayName)) return displayName;
+  if (fullName && !/^sitguru(\s|$)/i.test(fullName)) return fullName;
+  if (email.includes("@")) {
+    const local = email
+      .split("@")[0]
+      .replace(/[._-]+/g, " ")
+      .replace(/\d+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (local) {
+      return local
+        .split(" ")
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+    }
+  }
+
+  return displayName || fullName || "Unnamed Ambassador";
 }
 
 function buildAmbassadorDirectMessageHref(ambassador: AmbassadorSummaryRow) {
@@ -1879,7 +1896,7 @@ async function updateAmbassadorPipelineStatus(formData: FormData) {
           ...(nextStatus === "active" ? { activated_at: now } : {}),
         };
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from("ambassadors")
     .update(statusPatch)
     .eq("id", ambassadorId);
@@ -1894,7 +1911,7 @@ async function updateAmbassadorPipelineStatus(formData: FormData) {
       ? "Ambassador archived"
       : `Ambassador status updated to ${prettyStatus(nextStatus)}`;
 
-  await supabase.from("ambassador_activity_log").insert({
+  await supabaseAdmin.from("ambassador_activity_log").insert({
     ambassador_id: ambassadorId,
     activity_type: "status_update",
     activity_title: activityTitle,
@@ -2583,7 +2600,7 @@ function SignupHealthSection({
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 xl:min-w-[430px]">
+        <div className="grid w-full grid-cols-3 gap-2 sm:max-w-md">
           <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3">
             <p className="text-[10px] font-black uppercase tracking-wide text-rose-700">
               Missing Workspace
@@ -3267,7 +3284,7 @@ export default async function AdminAmbassadorsPage({
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const notice = getNotice(resolvedSearchParams);
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("admin_ambassador_dashboard_summary")
     .select("*")
     .order("created_at", { ascending: false });
@@ -3437,7 +3454,7 @@ export default async function AdminAmbassadorsPage({
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:min-w-[520px] xl:grid-cols-3">
+            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 xl:max-w-xl">
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
                   Active
@@ -3490,6 +3507,27 @@ export default async function AdminAmbassadorsPage({
                 </p>
               </div>
             </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link
+              href="/admin/ambassador-leads"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-black text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+            >
+              Add / View Leads
+            </Link>
+            <Link
+              href="/admin/ambassador-training"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-black text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+            >
+              Training
+            </Link>
+            <Link
+              href="/admin/ambassadors/ledger"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2f6f3e] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#255b33]"
+            >
+              Performance Ledger
+            </Link>
           </div>
         </section>
 
