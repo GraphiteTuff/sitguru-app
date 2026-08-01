@@ -1634,37 +1634,88 @@ export default async function AdminMessageThreadPage({
             Thread Participants
           </h2>
           <p className="mt-1 text-sm font-semibold text-slate-600">
-            People connected to this conversation. Avatars and role labels are
-            kept clear for Admin, Gurus, Pet Parents, and Ambassadors.
+            One sender and one receiver for this conversation.
           </p>
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            {participantCards.map((participant) => (
-              <div
-                key={participant.user_id}
-                className="flex items-center gap-3 rounded-2xl border border-[#e3ece5] bg-[#fbfcf9] px-4 py-3 shadow-sm"
-              >
-                <Avatar
-                  name={participant.name}
-                  src={participant.avatar}
-                  role={participant.role}
-                />
-                <div>
-                  <p className="text-sm font-black text-green-950">
-                    {participant.name}
-                  </p>
-                  <p className="text-xs font-bold capitalize text-slate-500">
-                    {getRoleLabel(participant.role)}
-                    {participant.isSnapshotOnly ? " · Snapshot Contact" : ""}
-                  </p>
-                  {participant.email ? (
-                    <p className="text-xs font-semibold text-slate-400">
-                      {participant.email}
-                    </p>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            {(() => {
+              const nonAdmin =
+                participantCards.find(
+                  (participant) => normalizeRole(participant.role) !== "admin",
+                ) || null;
+              const adminCard =
+                participantCards.find(
+                  (participant) => normalizeRole(participant.role) === "admin",
+                ) || null;
+
+              const left = adminCard || {
+                user_id: "admin",
+                name: "SitGuru Admin",
+                avatar: defaultAdminAvatar,
+                role: "admin",
+                email: "",
+                isSnapshotOnly: false,
+              };
+
+              const right = nonAdmin
+                ? nonAdmin
+                : replyRecipientFallback
+                  ? {
+                      user_id: "contact",
+                      name: replyRecipientFallback.name || "SitGuru Contact",
+                      avatar: "",
+                      role: replyRecipientFallback.role || "user",
+                      email: replyRecipientFallback.email || "",
+                      isSnapshotOnly: Boolean(replyRecipientFallback.isSnapshotOnly),
+                    }
+                  : null;
+
+              return (
+                <>
+                  <div
+                    key={left.user_id}
+                    className="flex items-center gap-3 rounded-2xl border border-[#e3ece5] bg-[#fbfcf9] px-4 py-3 shadow-sm"
+                  >
+                    <Avatar name={left.name} src={left.avatar} role={left.role} />
+                    <div>
+                      <p className="text-sm font-black text-green-950">{left.name}</p>
+                      <p className="text-xs font-bold capitalize text-slate-500">
+                        {getRoleLabel(left.role)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                    ↔
+                  </span>
+                  {right ? (
+                    <div
+                      key={right.user_id}
+                      className="flex items-center gap-3 rounded-2xl border border-[#e3ece5] bg-[#fbfcf9] px-4 py-3 shadow-sm"
+                    >
+                      <Avatar
+                        name={right.name}
+                        src={right.avatar}
+                        role={right.role}
+                      />
+                      <div>
+                        <p className="text-sm font-black text-green-950">
+                          {right.name}
+                        </p>
+                        <p className="text-xs font-bold capitalize text-slate-500">
+                          {getRoleLabel(right.role)}
+                          {right.isSnapshotOnly ? " · Snapshot Contact" : ""}
+                        </p>
+                        {right.email ? (
+                          <p className="text-xs font-semibold text-slate-400">
+                            {right.email}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
                   ) : null}
-                </div>
-              </div>
-            ))}
+                </>
+              );
+            })()}
           </div>
         </section>
 

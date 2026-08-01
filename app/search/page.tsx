@@ -17,6 +17,7 @@ import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import QuickBookOverlay, {
   buildExpressBookUrl,
 } from "@/components/booking/QuickBookOverlay";
+import GuruSearchMatchBadge from "@/components/search/GuruSearchCard";
 import { trackEvent } from "@/lib/analytics/track";
 import { supabase } from "@/lib/supabase";
 import { useGuruSearchLivePatches } from "@/hooks/useGuruSearchLivePatches";
@@ -99,6 +100,10 @@ type GuruRow = {
   map_latitude?: number | string | null;
   map_longitude?: number | string | null;
   display_status?: string | null;
+  match_score?: number | null;
+  match_headline?: string | null;
+  match_reasons?: string[] | null;
+  match_pet_name?: string | null;
 };
 
 type GuruServiceRate = {
@@ -1733,6 +1738,7 @@ function SearchPageContent() {
     "idle" | "loading" | "found" | "not_found"
   >("idle");
   const [quickPetId, setQuickPetId] = useState<string | null>(null);
+  const [quickPetName, setQuickPetName] = useState<string | null>(null);
   const [quickBook, setQuickBook] = useState<{
     url: string;
     guruName: string;
@@ -1763,17 +1769,33 @@ function SearchPageContent() {
       } = await supabase.auth.getUser();
       if (!user || cancelled) return;
 
+      const urlPetId = new URLSearchParams(window.location.search).get("petId");
       const attempts = ["user_id", "owner_id"] as const;
+
+      if (urlPetId) {
+        const { data } = await supabase
+          .from("pets")
+          .select("id, name")
+          .eq("id", urlPetId)
+          .maybeSingle();
+        if (!cancelled && data?.id) {
+          setQuickPetId(String(data.id));
+          setQuickPetName(String(data.name || "").trim() || null);
+          return;
+        }
+      }
+
       for (const column of attempts) {
         const { data, error } = await supabase
           .from("pets")
-          .select("id")
+          .select("id, name")
           .eq(column, user.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
         if (!error && data?.id && !cancelled) {
           setQuickPetId(String(data.id));
+          setQuickPetName(String(data.name || "").trim() || null);
           return;
         }
       }
@@ -1824,15 +1846,36 @@ function SearchPageContent() {
       let gurusErrorMessage = "";
 
       try {
-        const response = await fetch("/api/gurus/public-search", {
+        const searchUrl = new URL("/api/search/gurus", window.location.origin);
+        if (quickPetId) searchUrl.searchParams.set("petId", quickPetId);
+        if (initialZip) searchUrl.searchParams.set("zip", initialZip);
+        if (initialCity) searchUrl.searchParams.set("city", initialCity);
+        if (initialState) searchUrl.searchParams.set("state", initialState);
+
+        const response = await fetch(searchUrl.toString(), {
           cache: "no-store",
         });
 
         if (response.ok) {
-          const payload = (await response.json()) as { gurus?: GuruRow[] };
+          const payload = (await response.json()) as {
+            gurus?: GuruRow[];
+            pet?: { name?: string | null } | null;
+          };
           guruRows = Array.isArray(payload.gurus) ? payload.gurus : [];
+          if (payload.pet?.name && !quickPetName) {
+            setQuickPetName(String(payload.pet.name));
+          }
         } else {
-          gurusErrorMessage = `Public Guru API returned ${response.status}`;
+          // Fallback to legacy public search
+          const legacy = await fetch("/api/gurus/public-search", {
+            cache: "no-store",
+          });
+          if (legacy.ok) {
+            const payload = (await legacy.json()) as { gurus?: GuruRow[] };
+            guruRows = Array.isArray(payload.gurus) ? payload.gurus : [];
+          } else {
+            gurusErrorMessage = `Public Guru API returned ${response.status}`;
+          }
         }
       } catch (apiError) {
         gurusErrorMessage =
@@ -1954,7 +1997,7 @@ function SearchPageContent() {
     }
 
     loadGurus();
-  }, [initialService, initialZip, initialCity, initialState]);
+  }, [initialService, initialZip, initialCity, initialState, quickPetId]);
 
   useEffect(() => {
     const cleanedZip = cleanZip(zipFilter);
@@ -2186,6 +2229,12 @@ function SearchPageContent() {
 
         if (aSelected && !bSelected) return -1;
         if (!aSelected && bSelected) return 1;
+
+        const aMatch =
+          typeof a.match_score === "number" ? a.match_score : -1;
+        const bMatch =
+          typeof b.match_score === "number" ? b.match_score : -1;
+        if (aMatch !== bMatch) return bMatch - aMatch;
 
         const aDistance =
           typeof a.distance_miles === "number"
@@ -2769,6 +2818,17 @@ function SearchPageContent() {
                                     </span>
                                   )}
                                 </div>
+
+                                {quickPetId ? (
+                                  <GuruSearchMatchBadge
+                                    className="mt-2"
+                                    matchScore={guru.match_score}
+                                    petName={
+                                      guru.match_pet_name || quickPetName
+                                    }
+                                    headline={guru.match_headline}
+                                  />
+                                ) : null}
 
                                 <p className="mt-1 line-clamp-1 text-sm text-slate-600 sm:text-base">
                                   {guru.title || "Pet Care Guru"}

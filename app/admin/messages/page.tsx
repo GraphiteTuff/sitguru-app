@@ -29,6 +29,13 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AdminMessageRealtimeNotifier from "@/components/admin/AdminMessageRealtimeNotifier";
+import AdminQueueCardActions from "@/components/admin/AdminQueueCardActions";
+import AdminQueueCardShell from "@/components/admin/AdminQueueCardShell";
+import ClearAllMessagesForm from "@/components/admin/ClearAllMessagesForm";
+import {
+  clearAdminMessageCenter,
+  hardDeleteConversation,
+} from "@/lib/messaging/admin-thread-purge";
 
 export const dynamic = "force-dynamic";
 
@@ -277,7 +284,6 @@ const filterLinks = [
   { key: "unread", label: "Unread", href: "/admin/messages?filter=unread" },
   { key: "read", label: "Read", href: "/admin/messages?filter=read" },
   { key: "archived", label: "Archived", href: "/admin/messages?filter=archived" },
-  { key: "deleted", label: "Deleted", href: "/admin/messages?filter=deleted" },
   {
     key: "escalations",
     label: "Escalations",
@@ -1884,7 +1890,8 @@ async function archiveConversationThread(formData: FormData) {
     .update({
       status: "archived",
     })
-    .eq("conversation_id", conversationId);
+    .eq("conversation_id", conversationId)
+    .neq("is_deleted", true);
 
   revalidatePath("/admin/messages");
   revalidatePath(`/admin/messages/${conversationId}`);
@@ -1892,7 +1899,6 @@ async function archiveConversationThread(formData: FormData) {
   redirect(
     buildQueueActionRedirect({
       composeSuccess: "archived",
-      conversationId,
     }),
   );
 }
@@ -1908,23 +1914,12 @@ async function deleteConversationThread(formData: FormData) {
     redirect(buildQueueActionRedirect({ composeError: "missing_conversation" }));
   }
 
-  const now = new Date().toISOString();
+  const result = await hardDeleteConversation(conversationId);
 
-  await supabaseAdmin
-    .from("conversations")
-    .update({
-      status: "deleted",
-      updated_at: now,
-    })
-    .eq("id", conversationId);
-
-  await supabaseAdmin
-    .from("messages")
-    .update({
-      is_deleted: true,
-      status: "deleted",
-    })
-    .eq("conversation_id", conversationId);
+  if (!result.ok) {
+    console.error("Permanent conversation delete failed:", result.error);
+    redirect(buildQueueActionRedirect({ composeError: "delete_failed" }));
+  }
 
   revalidatePath("/admin/messages");
   revalidatePath(`/admin/messages/${conversationId}`);
@@ -1932,7 +1927,33 @@ async function deleteConversationThread(formData: FormData) {
   redirect(
     buildQueueActionRedirect({
       composeSuccess: "deleted",
-      conversationId,
+    }),
+  );
+}
+
+async function clearAllAdminMessageCenter(formData: FormData) {
+  "use server";
+
+  await getAdminActionUser();
+
+  const confirmation = String(formData.get("confirmation") || "").trim();
+
+  if (confirmation !== "CLEAR ALL") {
+    redirect(buildQueueActionRedirect({ composeError: "clear_confirm_required" }));
+  }
+
+  const result = await clearAdminMessageCenter();
+
+  if (!result.ok) {
+    console.error("Admin message center clear failed:", result.error);
+    redirect(buildQueueActionRedirect({ composeError: "clear_failed" }));
+  }
+
+  revalidatePath("/admin/messages");
+
+  redirect(
+    buildQueueActionRedirect({
+      composeSuccess: "cleared",
     }),
   );
 }
@@ -2409,7 +2430,11 @@ function AdminComposeNotice({
   composeSuccess?: string;
   conversationId?: string;
 }) {
-  if (["sent", "archived", "deleted", "thread_sent"].includes(composeSuccess || "")) {
+  const successKey = String(composeSuccess || "").trim();
+  const isDeletedSuccess =
+    successKey === "deleted" || successKey === "cleared" || successKey === "archived";
+
+  if (["sent", "archived", "deleted", "cleared", "thread_sent"].includes(successKey)) {
     const successMessages: Record<string, { title: string; body: string }> = {
       sent: {
         title: "Message sent successfully",
@@ -2418,22 +2443,28 @@ function AdminComposeNotice({
       },
       archived: {
         title: "Thread archived",
-        body: "The conversation was moved out of the active Admin queue.",
+        body:
+          "The conversation was archived and removed from active queues and KPI counts. Open the Archived filter to review it.",
       },
       deleted: {
-        title: "Thread deleted from queue",
+        title: "Message thread deleted",
         body:
-          "The conversation was soft-deleted from the active Admin queue while preserving database history.",
+          "The conversation was permanently removed. Threads and KPI counts have been updated.",
+      },
+      cleared: {
+        title: "Message Center cleared",
+        body:
+          "All conversations and messages were permanently deleted. Queues and KPIs now start from an empty baseline.",
       },
       thread_sent: {
         title: "Thread sent",
         body: "A copy of the conversation thread was emailed to the selected contact.",
       },
     };
-    const success = successMessages[composeSuccess || "sent"] || successMessages.sent;
+    const success = successMessages[successKey] || successMessages.sent;
 
     return (
-      <section className="rounded-[26px] border border-emerald-200 bg-emerald-50 p-5 text-emerald-950 shadow-sm">
+      <section className="sticky top-3 z-30 rounded-[26px] border border-emerald-200 bg-emerald-50 p-5 text-emerald-950 shadow-lg shadow-emerald-900/10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex gap-3">
             <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-700" />
@@ -2445,7 +2476,7 @@ function AdminComposeNotice({
             </div>
           </div>
 
-          {conversationId ? (
+          {conversationId && !isDeletedSuccess ? (
             <Link
               href={`/admin/messages/${conversationId}`}
               className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
@@ -2471,6 +2502,12 @@ function AdminComposeNotice({
       "The conversation was created, but the first message could not be saved. Please try again or check the messages table requirements.",
     missing_conversation:
       "The conversation could not be confirmed. Please refresh and try again.",
+    delete_failed:
+      "SitGuru could not permanently delete this thread. Please refresh and try again.",
+    clear_confirm_required:
+      "Type CLEAR ALL exactly in the confirmation field before wiping the Message Center.",
+    clear_failed:
+      "SitGuru could not clear the Message Center. Please refresh and try again.",
     missing_thread_email:
       "This thread does not have an email address available for sending. Ask the contact for an email or open the thread first.",
     missing_resend_key:
@@ -2484,7 +2521,13 @@ function AdminComposeNotice({
       <div className="flex gap-3">
         <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-rose-700" />
         <div>
-          <h2 className="text-lg font-black">Message was not sent</h2>
+          <h2 className="text-lg font-black">
+            {composeError === "delete_failed" ||
+            composeError === "clear_failed" ||
+            composeError === "clear_confirm_required"
+              ? "Message Center action failed"
+              : "Message was not sent"}
+          </h2>
           <p className="mt-1 text-sm font-semibold leading-6 text-rose-900">
             {friendlyMessages[composeError] ||
               "The message could not be sent. Please check the recipient and try again."}
@@ -2850,174 +2893,244 @@ function InternalComposer({
   );
 }
 
+type ThreadParty = {
+  label: string;
+  name: string;
+  avatar: string;
+  icon: ReactNode;
+};
+
+/** Exactly one sender + one receiver party for the communication pair. */
+function getThreadCommunicationParties(thread: AdminThreadCard): [ThreadParty, ThreadParty] {
+  const adminParty: ThreadParty = {
+    label: "Admin",
+    name: thread.adminName || "SitGuru Admin",
+    avatar: thread.adminAvatar || "",
+    icon: <ShieldAlert size={16} />,
+  };
+
+  if (thread.type === "guru-customer") {
+    return [
+      {
+        label: "Guru",
+        name: thread.guruName || "Guru",
+        avatar: thread.guruAvatar || "",
+        icon: <UsersRound size={16} />,
+      },
+      {
+        label: "Pet Parent",
+        name: thread.customerName || thread.contactName || "Pet Parent",
+        avatar: thread.customerAvatar || "",
+        icon: <UserRound size={16} />,
+      },
+    ];
+  }
+
+  if (thread.type === "homepage-visitor" || thread.visitorName) {
+    return [
+      adminParty,
+      {
+        label: thread.visitorRoleLabel || "Website Visitor",
+        name: thread.visitorName || thread.contactName || "Visitor",
+        avatar: thread.visitorAvatar || "",
+        icon: <UserRound size={16} />,
+      },
+    ];
+  }
+
+  if (
+    thread.type === "guru-admin" ||
+    (thread.guruName && !thread.customerName && !thread.ambassadorName)
+  ) {
+    return [
+      adminParty,
+      {
+        label: "Guru",
+        name: thread.guruName || thread.contactName || "Guru",
+        avatar: thread.guruAvatar || "",
+        icon: <UsersRound size={16} />,
+      },
+    ];
+  }
+
+  if (
+    thread.type === "ambassador-admin" ||
+    (thread.ambassadorName && !thread.customerName && !thread.guruName)
+  ) {
+    return [
+      adminParty,
+      {
+        label: "Ambassador",
+        name: thread.ambassadorName || thread.contactName || "Ambassador",
+        avatar: thread.ambassadorAvatar || "",
+        icon: <Handshake size={16} />,
+      },
+    ];
+  }
+
+  if (thread.customerName || thread.type === "customer-admin") {
+    return [
+      adminParty,
+      {
+        label: "Pet Parent",
+        name: thread.customerName || thread.contactName || "Pet Parent",
+        avatar: thread.customerAvatar || "",
+        icon: <UserRound size={16} />,
+      },
+    ];
+  }
+
+  return [
+    adminParty,
+    {
+      label: "Contact",
+      name: thread.contactName || "SitGuru Contact",
+      avatar: "",
+      icon: <UserRound size={16} />,
+    },
+  ];
+}
+
 function MessageBubblePreview({ thread }: { thread: AdminThreadCard }) {
   const canSendThread = Boolean(thread.contactEmail);
+  const [senderParty, receiverParty] = getThreadCommunicationParties(thread);
 
   return (
-    <article className="block rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span
-              className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getThreadTypeClasses(
-                thread.type,
-              )}`}
-            >
-              {getThreadTypeLabel(thread.type)}
-            </span>
+    <AdminQueueCardShell>
+      {({ remove }) => (
+        <article className="block rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getThreadTypeClasses(
+                    thread.type,
+                  )}`}
+                >
+                  {getThreadTypeLabel(thread.type)}
+                </span>
 
-            <span
-              className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getInquiryClasses(
-                thread.inquiryType,
-              )}`}
-            >
-              {thread.inquiryLabel}
-            </span>
+                <span
+                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getInquiryClasses(
+                    thread.inquiryType,
+                  )}`}
+                >
+                  {thread.inquiryLabel}
+                </span>
 
-            {thread.topic ? (
-              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
-                {thread.topic}
-              </span>
-            ) : null}
+                {thread.topic ? (
+                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
+                    {thread.topic}
+                  </span>
+                ) : null}
 
-            {thread.unreadCount > 0 ? (
-              <span className="inline-flex rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-black text-green-800">
-                {number(thread.unreadCount)} unread
-              </span>
-            ) : (
-              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">
-                Read
-              </span>
-            )}
+                {thread.unreadCount > 0 ? (
+                  <span className="inline-flex rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-black text-green-800">
+                    {number(thread.unreadCount)} unread
+                  </span>
+                ) : (
+                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600">
+                    Read
+                  </span>
+                )}
 
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Quick Chat Ready
-            </span>
+                {isEscalationThread(thread) ? (
+                  <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black text-rose-800">
+                    Review
+                  </span>
+                ) : null}
 
-            {isEscalationThread(thread) ? (
-              <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-black text-rose-800">
-                Review
-              </span>
-            ) : null}
+                <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                  {formatRelativeTime(thread.lastActivity)}
+                </span>
+              </div>
 
-            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
-              {formatRelativeTime(thread.lastActivity)}
-            </span>
-          </div>
+              <h2 className="truncate text-xl font-black text-slate-950">
+                {thread.subject}
+              </h2>
 
-          <h2 className="truncate text-xl font-black text-slate-950">
-            {thread.subject}
-          </h2>
+              <div className="mt-4 max-w-4xl rounded-[24px] bg-[#f8fbf6] p-4">
+                <p className="line-clamp-3 text-sm font-semibold leading-6 text-slate-600">
+                  {thread.preview}
+                </p>
+              </div>
 
-          <div className="mt-4 max-w-4xl rounded-[24px] bg-[#f8fbf6] p-4">
-            <p className="line-clamp-3 text-sm font-semibold leading-6 text-slate-600">
-              {thread.preview}
-            </p>
-          </div>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <ParticipantPill
+                  label={senderParty.label}
+                  name={senderParty.name}
+                  avatar={senderParty.avatar}
+                  icon={senderParty.icon}
+                />
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                  ↔
+                </span>
+                <ParticipantPill
+                  label={receiverParty.label}
+                  name={receiverParty.name}
+                  avatar={receiverParty.avatar}
+                  icon={receiverParty.icon}
+                />
+              </div>
+            </div>
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            {thread.visitorName ? (
-              <ParticipantPill
-                label={thread.visitorRoleLabel || "Website Visitor"}
-                name={thread.visitorName}
-                avatar={thread.visitorAvatar}
-                icon={<UserRound size={16} />}
-              />
-            ) : null}
-
-            {thread.customerName ? (
-              <ParticipantPill
-                label="Pet Parent"
-                name={thread.customerName}
-                avatar={thread.customerAvatar}
-                icon={<UserRound size={16} />}
-              />
-            ) : null}
-
-            {thread.guruName ? (
-              <ParticipantPill
-                label="Guru"
-                name={thread.guruName}
-                avatar={thread.guruAvatar}
-                icon={<UsersRound size={16} />}
-              />
-            ) : null}
-
-            {thread.ambassadorName ? (
-              <ParticipantPill
-                label="Ambassador"
-                name={thread.ambassadorName}
-                avatar={thread.ambassadorAvatar}
-                icon={<Handshake size={16} />}
-              />
-            ) : null}
-
-            {thread.adminName ? (
-              <ParticipantPill
-                label="Admin"
-                name={thread.adminName}
-                avatar={thread.adminAvatar}
-                icon={<ShieldAlert size={16} />}
-              />
-            ) : null}
-          </div>
-        </div>
-
-        <div className="flex shrink-0 flex-col gap-2 lg:items-end">
-          <Link
-            href={thread.href}
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-green-100 bg-[#f7faf4] px-4 py-3 text-sm font-black text-green-900 transition hover:border-green-200 hover:bg-green-50"
-          >
-            Open Chat →
-          </Link>
-
-          <div className="grid w-full gap-2 sm:grid-cols-3 lg:w-[360px]">
-            <form action={sendConversationThread}>
-              <input type="hidden" name="conversationId" value={thread.id} />
-              <input type="hidden" name="recipientEmail" value={thread.contactEmail} />
-              <input type="hidden" name="recipientName" value={thread.contactName} />
-              <button
-                type="submit"
-                disabled={!canSendThread}
-                title={canSendThread ? "Email this thread to the contact" : "No contact email available"}
-                className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-900 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-45"
+            <div className="flex shrink-0 flex-col gap-2 lg:w-[360px] lg:items-end">
+              <Link
+                href={thread.href}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-green-100 bg-[#f7faf4] px-4 py-3 text-sm font-black text-green-900 transition hover:border-green-200 hover:bg-green-50"
               >
-                <Send size={14} />
-                Send
-              </button>
-            </form>
+                Open Chat →
+              </Link>
 
-            <form action={archiveConversationThread}>
-              <input type="hidden" name="conversationId" value={thread.id} />
-              <button
-                type="submit"
-                className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-900 transition hover:bg-amber-100"
-              >
-                <Archive size={14} />
-                Archive
-              </button>
-            </form>
+              <div className="grid w-full gap-2 sm:grid-cols-3">
+                <form action={sendConversationThread}>
+                  <input type="hidden" name="conversationId" value={thread.id} />
+                  <input
+                    type="hidden"
+                    name="recipientEmail"
+                    value={thread.contactEmail}
+                  />
+                  <input
+                    type="hidden"
+                    name="recipientName"
+                    value={thread.contactName}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!canSendThread}
+                    title={
+                      canSendThread
+                        ? "Email this thread to the contact"
+                        : "No contact email available"
+                    }
+                    className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-900 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    <Send size={14} />
+                    Send
+                  </button>
+                </form>
 
-            <form action={deleteConversationThread}>
-              <input type="hidden" name="conversationId" value={thread.id} />
-              <button
-                type="submit"
-                className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800 transition hover:bg-rose-100"
-              >
-                <Trash2 size={14} />
-                Delete
-              </button>
-            </form>
+                <div className="sm:col-span-2">
+                  <AdminQueueCardActions
+                    conversationId={thread.id}
+                    threadSubject={thread.subject}
+                    onRemoved={remove}
+                  />
+                </div>
+              </div>
+
+              <span className="text-xs font-bold text-slate-400">
+                {number(thread.messageCount)} messages ·{" "}
+                {thread.contactEmail
+                  ? `Sendable to ${thread.contactEmail}`
+                  : "No email on file"}{" "}
+                · Last activity {formatDate(thread.lastActivity)}
+              </span>
+            </div>
           </div>
-
-          <span className="text-xs font-bold text-slate-400">
-            {number(thread.messageCount)} messages · {thread.contactEmail ? `Sendable to ${thread.contactEmail}` : "No email on file"} · Last activity{" "}
-            {formatDate(thread.lastActivity)}
-          </span>
-        </div>
-      </div>
-    </article>
+        </article>
+      )}
+    </AdminQueueCardShell>
   );
 }
 
@@ -3142,10 +3255,13 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
 
   const safeConversations = (
     (conversationsResult.data || []) as ConversationRow[]
-  ).filter(Boolean);
+  ).filter((conversation) => {
+    if (!conversation) return false;
+    return asString(conversation.status).toLowerCase() !== "deleted";
+  });
 
   const safeMessages = ((messagesResult.data || []) as MessageRow[]).filter(
-    (message) => Boolean(message),
+    (message) => Boolean(message) && message.is_deleted !== true,
   );
 
   const safeParticipants = (
@@ -3162,6 +3278,14 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
 
   safeMessages.forEach((message) => {
     const threadKey = getThreadKeyFromMessage(message);
+    const conversationId = asString(message.conversation_id);
+
+    // If the conversation was deleted/filtered out, do not rebuild the card
+    // from leftover messages (this made Delete look like a no-op).
+    if (conversationId && !conversationMap.has(conversationId)) {
+      return;
+    }
+
     const existing = threadMessageMap.get(threadKey) || [];
     existing.push(message);
     threadMessageMap.set(threadKey, existing);
@@ -3169,8 +3293,13 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
 
   const allThreadKeys = Array.from(
     new Set([
-      ...safeConversations.map((conversation) => conversation.id),
-      ...Array.from(threadMessageMap.keys()),
+      ...safeConversations.map((conversation) => conversation.id).filter(Boolean),
+      ...Array.from(threadMessageMap.keys()).filter((key) => {
+        // Keep synthetic orphan keys (no conversation row), drop keys for
+        // conversations that are no longer in the active map.
+        if (key.startsWith("direct-message-")) return true;
+        return conversationMap.has(key);
+      }),
     ]),
   );
 
@@ -3488,8 +3617,9 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       const isDeleted = normalizedStatus === "deleted";
 
       if (activeFilter === "archived") return isArchived;
-      if (activeFilter === "deleted") return isDeleted;
-      if (isArchived || isDeleted) return false;
+      // Permanent deletes are removed from the database; ignore legacy deleted status.
+      if (isDeleted) return false;
+      if (isArchived) return false;
       if (activeFilter === "unread") return thread.unreadCount > 0;
       if (activeFilter === "read") return thread.unreadCount === 0;
       if (activeFilter === "escalations") return isEscalationThread(thread);
@@ -3538,18 +3668,28 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       );
     });
 
-  const unreadMessages = allThreads.reduce(
+  // KPIs only count active (non-archived, non-deleted) threads.
+  const kpiThreads = allThreads.filter((thread) => {
+    const normalizedStatus = asString(thread.status).toLowerCase();
+    return normalizedStatus !== "archived" && normalizedStatus !== "deleted";
+  });
+
+  const unreadMessages = kpiThreads.reduce(
     (sum, thread) => sum + thread.unreadCount,
     0,
   );
-  const unreadThreads = allThreads.filter((thread) => thread.unreadCount > 0).length;
-  const escalationThreads = allThreads.filter(isEscalationThread).length;
-  const internalThreads = allThreads.filter((thread) => thread.type === "internal").length;
-  const homepageVisitorThreads = allThreads.filter((thread) => thread.type === "homepage-visitor").length;
+  const unreadThreads = kpiThreads.filter((thread) => thread.unreadCount > 0).length;
+  const escalationThreads = kpiThreads.filter(isEscalationThread).length;
+  const internalThreads = kpiThreads.filter((thread) => thread.type === "internal").length;
+  const homepageVisitorThreads = kpiThreads.filter((thread) => thread.type === "homepage-visitor").length;
+  const activeMessagesLoaded = kpiThreads.reduce(
+    (sum, thread) => sum + thread.messageCount,
+    0,
+  );
   const latestLoadedMessageId = safeMessages[0]?.id || "";
-  const threadTypeChart = buildThreadTypeChart(allThreads);
-  const inquiryChart = buildInquiryChart(allThreads);
-  const unreadInquiryChart = buildUnreadInquiryChart(allThreads);
+  const threadTypeChart = buildThreadTypeChart(kpiThreads);
+  const inquiryChart = buildInquiryChart(kpiThreads);
+  const unreadInquiryChart = buildUnreadInquiryChart(kpiThreads);
 
   return (
     <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
@@ -3579,14 +3719,14 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
                   <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
                     Manage Pet Parent, Guru, Ambassador, support, safety,
                     payment, technical, partner, and internal HQ conversations
-                    from one Admin inbox. Open any thread as a quick chat while
-                    keeping the full message history available.
+                    from one Admin inbox. Archive hides threads from KPIs;
+                    Delete forever permanently removes them.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Link
                 href={adminRoutes.users}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
@@ -3612,6 +3752,8 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
               </Link>
             </div>
           </div>
+
+          <ClearAllMessagesForm />
         </section>
 
         <AdminMessageRealtimeNotifier
@@ -3632,7 +3774,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
           <StatCard
             icon={<Inbox size={22} />}
             label="Threads"
-            value={number(allThreads.length)}
+            value={number(kpiThreads.length)}
             detail={`${number(filteredThreads.length)} visible with current filters`}
             href="/admin/messages"
           />
@@ -3660,8 +3802,8 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
           <StatCard
             icon={<MessageCircle size={22} />}
             label="Messages Loaded"
-            value={number(safeMessages.length)}
-            detail="Synced from SitGuru message threads"
+            value={number(activeMessagesLoaded)}
+            detail="Active (non-archived / non-deleted) messages"
           />
         </section>
 
@@ -3744,7 +3886,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
 
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {inquiryTypes.map((inquiry) => {
-                  const matching = allThreads.filter(
+                  const matching = kpiThreads.filter(
                     (thread) => thread.inquiryType === inquiry.key,
                   );
                   const unread = matching.reduce(
