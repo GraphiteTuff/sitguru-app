@@ -9,13 +9,11 @@ import { streamText, type CoreMessage } from "ai";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { HOMEPAGE_CTO_VOICE_RULES } from "@/lib/chat/homepage-cta";
+import { buildHomepageSimulationReply } from "@/lib/chat/homepage-simulation";
 
 /** Hardcoded marketing context — never depends on DB lookups. */
 const CORE_SITE_CONTEXT =
   "CORE CONTEXT: A Guru is an expert pet care provider on the SitGuru platform. This includes highly verified local sitters, dog walkers, pet trainers, groomers, boarding providers, and experienced neighborhood caregivers who lead with absolute reliability, communication, and deep respect for each pet's unique daily routine and personality.";
-
-const SIMULATION_WELCOME =
-  "hey! welcome to the pack 🐾 what's your first name (or what do you like to be called) so we can kick off your journey into our sitguru pet community?";
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -25,28 +23,7 @@ function buildSimulationReply(opts: {
   clientFirstName?: string;
   lastUserText?: string;
 }): string {
-  const preferred = safeString(opts.clientFirstName).slice(0, 40);
-  const text = safeString(opts.lastUserText).toLowerCase();
-
-  if (!preferred) return SIMULATION_WELCOME;
-
-  if (
-    /guru|what is a guru|provider|sitter|walker|trainer|boarding|groomer/.test(
-      text,
-    )
-  ) {
-    return `hey ${preferred}! a guru is an expert pet care provider on sitguru — verified local sitters, dog walkers, trainers, groomers, boarding providers, and neighborhood caregivers who lead with reliability, communication, and respect for each pet's routine. what's the move?`;
-  }
-
-  if (/ambassador|referral|student|veteran|community/.test(text)) {
-    return `hey ${preferred}! love that ambassador energy — community, student, or veteran tracks welcome. i can point you to apply + the onboarding video whenever you're ready.`;
-  }
-
-  if (/drop-?in|walk|overnight|boarding|pet care|book/.test(text)) {
-    return `hey ${preferred}! we can set you up with drop-in visits, dog walks, overnight stays, or boarding with local gurus. which care type feels right?`;
-  }
-
-  return `hey ${preferred}! i got you — book care, join as a guru, or hop into ambassadors. what should we dig into first?`;
+  return buildHomepageSimulationReply(opts);
 }
 
 /** AI SDK v4 data-stream payload so useChat renders a normal assistant bubble. */

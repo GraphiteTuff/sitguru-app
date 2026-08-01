@@ -3,7 +3,11 @@
  * and the chat bubble turns into action buttons.
  */
 
-export type HomepageCtaId = "guru" | "ambassador" | "ambassador_video";
+export type HomepageCtaId =
+  | "guru"
+  | "parent"
+  | "ambassador"
+  | "ambassador_video";
 
 export type HomepageCtaDef = {
   id: HomepageCtaId;
@@ -23,6 +27,17 @@ export const HOMEPAGE_CTA_DEFS: readonly HomepageCtaDef[] = [
       /\[Become a Guru[^\]]*\](?:\([^)]*\))?/gi,
       /\[Become a Handler[^\]]*\](?:\([^)]*\))?/gi,
       /(?:^|\s)(?:https?:\/\/[^\s]+)?\/register\?role=guru(?:\s|$)/gi,
+    ],
+  },
+  {
+    id: "parent",
+    href: "/register?role=parent",
+    label: "Create Pet Parent Account",
+    patterns: [
+      /\[\[cta:parent\]\]/gi,
+      /\[Create Pet Parent Account[^\]]*\](?:\([^)]*\))?/gi,
+      /\[Set up an account[^\]]*\](?:\([^)]*\))?/gi,
+      /(?:^|\s)(?:https?:\/\/[^\s]+)?\/register\?role=parent(?:\s|$)/gi,
     ],
   },
   {
@@ -117,9 +132,10 @@ BUSINESS CONTEXT & KNOWLEDGE BASE (USE HARDCODED SITE DEFINITIONS FIRST):
 
 ONBOARDING CTA MARKERS (REQUIRED WHEN THEY SHOW ROLE INTEREST):
 Guru / handler / sitter / walker / trainer interest → append [[cta:guru]]
+Pet parent / book care / dog walks / drop-ins / overnight / boarding interest → append [[cta:parent]]
 Ambassador / referral interest → append [[cta:ambassador_video]] and [[cta:ambassador]]
 Video-only ask → append [[cta:ambassador_video]]
 
 Never invent other marker names. Never wrap markers in code fences.
-Canonical destinations: /register?role=guru · /ambassador/join · /ambassador/onboarding-video
+Canonical destinations: /register?role=guru · /register?role=parent · /ambassador/join · /ambassador/onboarding-video
 `.trim();

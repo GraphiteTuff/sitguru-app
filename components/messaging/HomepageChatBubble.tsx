@@ -13,6 +13,11 @@ import {
   parseHomepageChatContent,
   type HomepageCtaDef,
 } from "@/lib/chat/homepage-cta";
+import {
+  SIMULATION_NAME_PROMPT,
+  buildActiveAssistanceGreeting,
+  buildHomepageSimulationReply,
+} from "@/lib/chat/homepage-simulation";
 
 const BRAND_GREEN = "#0D5C3A";
 const STORAGE_KEY = "sitguru-homepage-lead-chat";
@@ -20,42 +25,40 @@ const NAME_STORAGE_KEY = "sitguru_client_first_name";
 const LEGACY_HISTORY_KEY = "sitguru_chat_history";
 const SITGURU_AVATAR_SRC = "/images/sitguru-message-avatar.jpg";
 
-const FRIENDLY_STATIC_ERROR =
-  "hey! welcome to the pack 🐾 what's your first name (or what do you like to be called) so we can kick off your journey into our sitguru pet community?";
-
 const NAME_PROMPT =
-  "hey! welcome to the pack 🐾 i'm rogue, chief treat officer — what should i call you? first name, nickname, whatever you go by works.";
+  "hey! welcome to the pack 🐾 i'm rogue, your chief treat officer — what should i call you? first name, nickname, whatever you go by works.";
 
+/** Clean Title Case chip labels for the compact horizontal rail. */
 const CARE_INTENT_CHIPS = [
   {
-    label: "🪟 Drop-in Visits",
+    label: "Drop-in Visits",
     content: "Looking for Drop-in Visits",
   },
   {
-    label: "🦮 Dog Walks",
+    label: "Dog Walks",
     content: "Looking for Dog Walks",
   },
   {
-    label: "🌙 Overnight",
+    label: "Overnight",
     content: "Looking for Overnight Stays",
   },
   {
-    label: "🏠 Boarding",
+    label: "Boarding",
     content: "Looking for Boarding",
   },
 ] as const;
 
 const JOIN_PACK_CHIPS = [
   {
-    label: "🏡 Sitter",
+    label: "Sitter",
     content: "Want to register as a Sitter",
   },
   {
-    label: "🏃‍♂️ Dog Walker",
+    label: "Dog Walker",
     content: "Want to register as a Dog Walker",
   },
   {
-    label: "🎓 Trainer",
+    label: "Trainer",
     content: "Want to register as a Trainer",
   },
 ] as const;
@@ -130,6 +133,7 @@ function persistFirstName(name: string) {
 }
 
 function buildWelcome(name: string): Message {
+  // Named session → skip name collection entirely; open in active assistance.
   if (!name) {
     return {
       id: "welcome-name",
@@ -140,7 +144,7 @@ function buildWelcome(name: string): Message {
   return {
     id: "welcome",
     role: "assistant",
-    content: `hey ${name}! rogue here 🦴 so stoked you're back — drop-ins, dog walks, overnight stays, guru signup, ambassadors, pawperks… what's the move?`,
+    content: buildActiveAssistanceGreeting(name),
   };
 }
 
@@ -255,14 +259,28 @@ export default function HomepageChatBubble() {
       channel: "HOMEPAGE_LEAD",
     },
     onError: () => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `error-${Date.now()}`,
-          role: "assistant",
-          content: FRIENDLY_STATIC_ERROR,
-        },
-      ]);
+      // Never re-ask for a name when session already has one; prefer chip-aware sim.
+      setMessages((prev) => {
+        const lastUser = [...prev].reverse().find((m) => m.role === "user");
+        const name = clientFirstNameRef.current || readStoredFirstName();
+        const content = buildHomepageSimulationReply({
+          clientFirstName: name || undefined,
+          lastUserText: lastUser?.content || undefined,
+        });
+        // Guard: named visitors must never see the name-collection fallback string.
+        const safeContent =
+          name && content === SIMULATION_NAME_PROMPT
+            ? buildActiveAssistanceGreeting(name)
+            : content;
+        return [
+          ...prev,
+          {
+            id: `sim-${Date.now()}`,
+            role: "assistant" as const,
+            content: safeContent,
+          },
+        ];
+      });
     },
   });
 
