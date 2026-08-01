@@ -6,6 +6,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import GuruProfileLiveRefresh from "@/components/gurus/GuruProfileLiveRefresh";
+import {
+  isTrustSafetyScreeningBypassed,
+  TRUST_SAFETY_SCREENING_BYPASS,
+} from "@/lib/config/trust-safety";
 
 export const dynamic = "force-dynamic";
 
@@ -2290,6 +2294,14 @@ function isTrustSafetyFeeWaivedThrough2026() {
 }
 
 function getBackgroundCheckDisplay(profile: GuruProfile | null) {
+  if (isTrustSafetyScreeningBypassed()) {
+    return {
+      label: TRUST_SAFETY_SCREENING_BYPASS.label,
+      status: "complete" as const,
+      href: "/guru/dashboard/background-check",
+    };
+  }
+
   const statusValues = [
     profile?.background_check_status,
     profile?.background_check_fee_status,
@@ -2961,8 +2973,12 @@ function GuruSetupChecklist({
     },
     {
       number: 4,
-      title: "Complete Trust & Safety Screening",
-      body: "Your Trust & Safety Screening fee is waived through December 31, 2026 during SitGuru's launch year.",
+      title: isTrustSafetyScreeningBypassed()
+        ? "Trust & Safety Screening"
+        : "Complete Trust & Safety Screening",
+      body: isTrustSafetyScreeningBypassed()
+        ? TRUST_SAFETY_SCREENING_BYPASS.description
+        : "Your Trust & Safety Screening fee is waived through December 31, 2026 during SitGuru's launch year.",
       status: background.status,
       statusLabel: background.label,
       href: background.href,

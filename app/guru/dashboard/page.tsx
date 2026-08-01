@@ -5,6 +5,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
 import GuruRecognitionBadge from "@/components/guru/GuruRecognitionBadge";
 import {
+  getTrustSafetyBypassStatusPayload,
+  isGuruTrustSafetyAlreadyBypassed,
   isTrustSafetyScreeningBypassed,
   TRUST_SAFETY_SCREENING_BYPASS,
 } from "@/lib/config/trust-safety";
@@ -561,6 +563,49 @@ async function getGuruProfile(
   }
 
   return null;
+}
+
+async function applyTrustSafetyBypassToGuruProfile(
+  profile: GuruProfile | null,
+): Promise<GuruProfile | null> {
+  if (!profile || !isTrustSafetyScreeningBypassed()) return profile;
+
+  const bypassPayload = getTrustSafetyBypassStatusPayload();
+  const guruId = String(profile.id || "").trim();
+
+  if (!guruId || guruId === String(profile.user_id || "").trim()) {
+    return {
+      ...profile,
+      ...bypassPayload,
+    };
+  }
+
+  if (isGuruTrustSafetyAlreadyBypassed(profile)) {
+    return {
+      ...profile,
+      ...bypassPayload,
+    };
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("gurus")
+    .update(bypassPayload)
+    .eq("id", guruId)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Could not persist Trust & Safety bypass for Guru:", error);
+    return {
+      ...profile,
+      ...bypassPayload,
+    };
+  }
+
+  return (data as GuruProfile) || {
+    ...profile,
+    ...bypassPayload,
+  };
 }
 
 async function getGuruBookings(
@@ -1907,7 +1952,15 @@ export default async function GuruDashboardPage() {
     redirect("/guru/login");
   }
 
-  const guruProfile = await getGuruProfile(user.id, user.email);
+  const loadedGuruProfile = await getGuruProfile(user.id, user.email);
+
+  if (!loadedGuruProfile) {
+    redirect("/guru/application");
+  }
+
+  const guruProfile = await applyTrustSafetyBypassToGuruProfile(
+    loadedGuruProfile,
+  );
 
   if (!guruProfile) {
     redirect("/guru/application");
