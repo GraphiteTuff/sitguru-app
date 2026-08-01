@@ -26,6 +26,7 @@ import type {
 import CardBrandIcons, {
   normalizeCardBrand,
 } from "@/components/checkout/CardBrandIcons";
+import { Gift } from "lucide-react";
 
 const ZIP_STORAGE_KEY = "sitguru_checkout_zip";
 
@@ -48,6 +49,8 @@ type CheckoutPaymentFormProps = {
   onSaveCardChange: (value: boolean) => void;
   onSuccess?: (paymentIntentId: string) => void;
   onError?: (message: string) => void;
+  /** Shown directly above Confirm & Pay when a PawPerks discount is active. */
+  pawPerksDiscountBanner?: string | null;
 };
 
 function isValidUsZip(value: string) {
@@ -62,6 +65,7 @@ export default function CheckoutPaymentForm({
   onSaveCardChange,
   onSuccess,
   onError,
+  pawPerksDiscountBanner = null,
 }: CheckoutPaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -373,6 +377,21 @@ export default function CheckoutPaymentForm({
           <p className="text-sm font-medium text-rose-700" role="alert">
             {message}
           </p>
+        ) : null}
+
+        {pawPerksDiscountBanner ? (
+          <div
+            role="status"
+            className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm"
+          >
+            <Gift
+              className="mt-0.5 h-5 w-5 shrink-0 text-amber-700"
+              aria-hidden
+            />
+            <p className="text-sm font-black leading-6 tracking-tight sm:text-base">
+              {pawPerksDiscountBanner}
+            </p>
+          </div>
         ) : null}
 
         <button

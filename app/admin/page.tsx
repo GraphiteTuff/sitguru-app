@@ -397,6 +397,7 @@ export default async function AdminOperationsDashboard() {
     ["Partner Payouts", "/admin/partners/payouts"],
     ["Referrals", "/admin/referrals"],
     ["Referral Inventory", "/admin/referrals/inventory"],
+    ["Rewards Auditor", "/admin/rewards"],
     ["Trust & Safety", "/admin/trust-safety"],
     ["Analytics", "/admin/analytics"],
     ["Sales & Marketing", "/admin/sales-marketing"],

@@ -35,6 +35,11 @@ import {
   findPetForBooking as findLinkedPetForBooking,
   resolveBookingPet,
 } from "@/lib/bookings/booking-pet";
+import {
+  buildPawPerksDashboardState,
+  bumpSharedLinkCounter,
+  readStoredPetPerksRef,
+} from "@/lib/rewards/perks-broker";
 
 type CustomerProfile = {
   first_name: string | null;
@@ -2641,6 +2646,11 @@ export default function CustomerDashboardPage() {
 
   const referralCode = referralProfile?.referral_code || "COMMUNITY";
 
+  const pawPerksState = useMemo(
+    () => buildPawPerksDashboardState(referralProfile, readStoredPetPerksRef()),
+    [referralProfile],
+  );
+
   const profileCompletion = useMemo(() => {
     const fields = [
       customerProfile?.full_name || customerProfile?.first_name,
@@ -3071,6 +3081,7 @@ export default function CustomerDashboardPage() {
 
     try {
       await navigator.clipboard.writeText(link);
+      bumpSharedLinkCounter(referralCode);
       setReferralMessage(`${label} copied. Share it with your community.`);
     } catch {
       setReferralMessage(
@@ -3213,11 +3224,11 @@ export default function CustomerDashboardPage() {
       });
     }
 
-    if ((referralProfile?.pending_rewards ?? 0) > 0) {
+    if (pawPerksState.pendingReferrals > 0) {
       updates.push({
         label: "PawPerks pending",
         detail: `${formatMoney(
-          referralProfile?.pending_rewards ?? 0,
+          pawPerksState.pendingReferrals,
           true,
         )} pending`,
         href: routes.pawPerks,
@@ -3258,7 +3269,7 @@ export default function CustomerDashboardPage() {
     pawReportMap,
     stats.nextBooking,
     pets,
-    referralProfile?.pending_rewards,
+    pawPerksState.pendingReferrals,
     profileCompletion,
     universityProgress.completedSteps,
     universityProgress.isComplete,
@@ -3462,7 +3473,7 @@ export default function CustomerDashboardPage() {
                     className="rounded-2xl bg-amber-100 p-3 text-center ring-1 ring-amber-200 transition hover:bg-amber-200"
                   >
                     <p className="text-xl font-black text-slate-950">
-                      {formatMoney(referralProfile?.available_credit ?? 0)}
+                      {formatMoney(pawPerksState.redeemedCashCredits)}
                     </p>
                     <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">PawPerks</p>
                   </Link>
@@ -3668,10 +3679,10 @@ export default function CustomerDashboardPage() {
                       PawPerks
                     </p>
                     <p className="mt-2 text-5xl font-black tracking-tight text-slate-950">
-                      {formatMoney(referralProfile?.available_credit ?? 0, true)}
+                      {formatMoney(pawPerksState.redeemedCashCredits, true)}
                     </p>
                     <p className="mt-1 text-sm font-bold text-slate-600">
-                      Available credit
+                      Redeemed cash credits
                     </p>
                   </div>
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-200 text-2xl shadow-sm ring-1 ring-amber-300">
@@ -3681,22 +3692,31 @@ export default function CustomerDashboardPage() {
 
                 <div className="mt-5 grid grid-cols-2 gap-2">
                   <div className="rounded-2xl bg-white p-3 ring-1 ring-amber-100">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">Pending</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">Pending referrals</p>
                     <p className="mt-1 text-xl font-black text-slate-950">
-                      {formatMoney(referralProfile?.pending_rewards ?? 0, true)}
+                      {formatMoney(pawPerksState.pendingReferrals, true)}
                     </p>
                   </div>
                   <div className="rounded-2xl bg-white p-3 ring-1 ring-emerald-100">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Referrals</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">Completed</p>
                     <p className="mt-1 text-xl font-black text-slate-950">
-                      {referralProfile?.completed_referrals ?? 0}
+                      {pawPerksState.completedReferrals}
                     </p>
                   </div>
                 </div>
 
+                {pawPerksState.attributedFromPetPerks ? (
+                  <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-bold leading-5 text-emerald-900">
+                    PetPerks invite {pawPerksState.attributedRefCode} saved
+                    {pawPerksState.welcomeCreditHintUsd > 0
+                      ? ` — up to $${pawPerksState.welcomeCreditHintUsd} welcome credit after your first eligible booking.`
+                      : "."}
+                  </div>
+                ) : null}
+
                 <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-amber-100">
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">Your code</p>
-                  <p className="mt-1 break-all text-base font-black text-slate-950">{referralCode}</p>
+                  <p className="mt-1 break-all text-base font-black text-slate-950">{pawPerksState.referralCode}</p>
                 </div>
 
                 <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -3754,7 +3774,7 @@ export default function CustomerDashboardPage() {
               },
               {
                 label: "My PawPerks",
-                helper: formatMoney(referralProfile?.available_credit ?? 0),
+                helper: formatMoney(pawPerksState.redeemedCashCredits),
                 href: routes.pawPerks,
                 icon: <Star className="h-5 w-5" />,
               },

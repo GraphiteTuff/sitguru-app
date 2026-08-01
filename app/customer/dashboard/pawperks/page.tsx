@@ -6,6 +6,11 @@ import type { ReactNode } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import {
+  buildPawPerksDashboardState,
+  bumpSharedLinkCounter,
+  readStoredPetPerksRef,
+} from "@/lib/rewards/perks-broker";
 
 type CustomerProfile = {
   full_name: string | null;
@@ -19,6 +24,7 @@ type ReferralStats = {
   referral_link: string;
   invited_count: number;
   completed_referrals: number;
+  pending_rewards: number;
   available_credit: number;
   lifetime_credit: number;
 };
@@ -35,6 +41,7 @@ type RawReferralRow = {
   referral_code?: string | null;
   invited_count?: number | null;
   completed_referrals?: number | null;
+  pending_rewards?: number | null;
   available_credit?: number | null;
   lifetime_credit?: number | null;
 };
@@ -137,6 +144,7 @@ async function fetchReferralStats(
     referral_link: `${origin}/signup?ref=${fallbackCode}`,
     invited_count: 0,
     completed_referrals: 0,
+    pending_rewards: 0,
     available_credit: 0,
     lifetime_credit: 0,
   };
@@ -144,7 +152,7 @@ async function fetchReferralStats(
   const { data, error } = await supabase
     .from("referral_profiles")
     .select(
-      "referral_code, invited_count, completed_referrals, available_credit, lifetime_credit",
+      "referral_code, invited_count, completed_referrals, pending_rewards, available_credit, lifetime_credit",
     )
     .eq("user_id", userId)
     .maybeSingle();
@@ -161,6 +169,7 @@ async function fetchReferralStats(
     referral_link: `${origin}/signup?ref=${referralCode}`,
     invited_count: readNumber(row.invited_count),
     completed_referrals: readNumber(row.completed_referrals),
+    pending_rewards: readNumber(row.pending_rewards),
     available_credit: readNumber(row.available_credit),
     lifetime_credit: readNumber(row.lifetime_credit),
   };
@@ -435,6 +444,11 @@ export default function CustomerPawPerksPage() {
     return Math.max(0, 2 - completed);
   }, [stats?.completed_referrals]);
 
+  const pawPerksState = useMemo(
+    () => buildPawPerksDashboardState(stats, readStoredPetPerksRef()),
+    [stats],
+  );
+
   const loadPawPerks = useCallback(async () => {
     setLoading(true);
     setMessage("");
@@ -493,6 +507,7 @@ export default function CustomerPawPerksPage() {
 
     try {
       await navigator.clipboard.writeText(stats.referral_link);
+      bumpSharedLinkCounter(stats.referral_code);
       setMessage("Referral link copied.");
     } catch {
       setCopyError("Could not copy automatically. Highlight the link and copy it.");
@@ -514,6 +529,7 @@ export default function CustomerPawPerksPage() {
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share(shareData);
+        bumpSharedLinkCounter(stats.referral_code);
         setMessage("Referral link shared.");
         return;
       } catch {
@@ -609,17 +625,28 @@ export default function CustomerPawPerksPage() {
                 <div className="mt-7 grid max-w-2xl gap-3 sm:grid-cols-3">
                   <HeroMiniStat
                     label="Your Code"
-                    value={stats?.referral_code || "SITGURU"}
+                    value={pawPerksState.referralCode}
                   />
                   <HeroMiniStat
-                    label="Available Rewards"
-                    value={formatCurrency(stats?.available_credit || 0)}
+                    label="Redeemed Cash Credits"
+                    value={formatCurrency(pawPerksState.redeemedCashCredits)}
                   />
                   <HeroMiniStat
-                    label="Qualified Referrals"
-                    value={`${stats?.completed_referrals || 0}`}
+                    label="Pending Referrals"
+                    value={formatCurrency(pawPerksState.pendingReferrals)}
                   />
                 </div>
+
+                {pawPerksState.attributedFromPetPerks ? (
+                  <div className="mt-4 max-w-2xl rounded-2xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-sm font-bold text-emerald-900">
+                    PetPerks invite{" "}
+                    <span className="font-black">{pawPerksState.attributedRefCode}</span>{" "}
+                    is linked to this account
+                    {pawPerksState.welcomeCreditHintUsd > 0
+                      ? ` — welcome credit up to $${pawPerksState.welcomeCreditHintUsd} after your first eligible booking.`
+                      : "."}
+                  </div>
+                ) : null}
 
                 <div className="mt-6 rounded-2xl border border-emerald-100 bg-white/84 px-4 py-4 shadow-sm backdrop-blur-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1013,22 +1040,22 @@ export default function CustomerPawPerksPage() {
               helper="Thanks for spreading the word!"
             />
             <StatCard
-              icon="🏅"
-              value={`${stats?.completed_referrals || 0}`}
-              label="Qualified Referrals"
-              helper="They’ve completed care. Nice work!"
+              icon="⏳"
+              value={formatCurrency(pawPerksState.pendingReferrals)}
+              label="Pending Referrals"
+              helper="Waiting on first eligible paid booking."
             />
             <StatCard
               icon="💳"
-              value={formatCurrency(stats?.available_credit || 0)}
-              label="Available Rewards"
-              helper="Ready to use on your next booking."
+              value={formatCurrency(pawPerksState.redeemedCashCredits)}
+              label="Redeemed Cash Credits"
+              helper="Ready to apply at checkout."
             />
             <StatCard
-              icon="⭐"
-              value={formatCurrency(stats?.lifetime_credit || 0)}
-              label="Lifetime PawPerks"
-              helper="Total future credits earned so far."
+              icon="🏅"
+              value={`${pawPerksState.completedReferrals}`}
+              label="Qualified Referrals"
+              helper="They’ve completed care. Nice work!"
             />
           </div>
 

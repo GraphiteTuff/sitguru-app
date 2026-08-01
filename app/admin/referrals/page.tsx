@@ -212,6 +212,7 @@ const adminRoutes = {
   applications: "/admin/referrals/applications",
   payouts: "/admin/referrals/payouts",
   inventory: "/admin/referrals/inventory",
+  rewards: "/admin/rewards",
 };
 
 const programOptions = [
@@ -1145,6 +1146,14 @@ export default async function AdminReferralCommandCenter({
             >
               <Search size={17} />
               PawPerks Inventory
+            </Link>
+
+            <Link
+              href={adminRoutes.rewards}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
+            >
+              <Gift size={17} />
+              Rewards Auditor
             </Link>
 
             <a

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import {
   CheckCircle2,
   Gift,
@@ -7,6 +8,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import PetPerksRefCapture from "@/components/rewards/PetPerksRefCapture";
 
 const PETPERKS_IMAGES = {
   hero: "/images/petperks/petperks-hero-sharing.jpg",
@@ -42,6 +44,9 @@ const generalTerms = [
 export default function PetPerksPage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-white via-emerald-50/40 to-slate-50 text-slate-950">
+      <Suspense fallback={null}>
+        <PetPerksRefCapture />
+      </Suspense>
       <section className="relative overflow-hidden px-5 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-24">
         <div className="pointer-events-none absolute left-0 top-0 h-72 w-72 rounded-full bg-emerald-200/50 blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 right-0 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl" />

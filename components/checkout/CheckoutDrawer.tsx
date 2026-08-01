@@ -18,6 +18,7 @@ import {
   type CheckoutBookingContext,
 } from "@/lib/checkout/bookingContext";
 import { clampRedeemablePoints } from "@/lib/pawperks/constants";
+import { formatPawPerksDiscountBanner } from "@/lib/rewards/perks-broker";
 import { getStripeBrowser } from "@/lib/stripe/browser";
 import CheckoutCostBreakdown from "@/components/checkout/CheckoutCostBreakdown";
 import CheckoutPaymentForm from "@/components/checkout/CheckoutPaymentForm";
@@ -135,6 +136,10 @@ export default function CheckoutDrawer({
 
   const display = serverPricing || preview;
   const amountLabel = formatUsd(display.total);
+  const pawPerksDiscountBanner =
+    display.discountTotal > 0
+      ? formatPawPerksDiscountBanner(display.discountTotal)
+      : null;
 
   const createIntent = useCallback(
     async (nextSaveCard: boolean, nextPoints: number) => {
@@ -381,6 +386,7 @@ export default function CheckoutDrawer({
                     clientSecret={clientSecret}
                     saveCard={saveCard}
                     onSaveCardChange={handleSaveCardChange}
+                    pawPerksDiscountBanner={pawPerksDiscountBanner}
                     onError={setError}
                     onSuccess={(paymentIntentId) => {
                       setPaid(true);
