@@ -33,6 +33,7 @@ import {
   isRogueOpeningGreeting,
   pickRogueOpeningGreeting,
   pickRogueReturningGreeting,
+  ROGUE_GREETING_PLACEHOLDER,
 } from "@/lib/chat/rogue-greetings";
 import {
   inferRogueUserTypeFromIntent,
@@ -162,13 +163,29 @@ function buildWelcome(name: string, opts?: { forceNewGreeting?: boolean }): Mess
     return {
       id: "welcome-name",
       role: "assistant",
-      content: pickRogueOpeningGreeting(Boolean(opts?.forceNewGreeting)),
+      // Random matrix is selected only after client mount (see useEffect).
+      content:
+        typeof window === "undefined"
+          ? ROGUE_GREETING_PLACEHOLDER
+          : pickRogueOpeningGreeting(Boolean(opts?.forceNewGreeting)),
     };
   }
   return {
     id: "welcome",
     role: "assistant",
-    content: pickRogueReturningGreeting(safe),
+    content:
+      typeof window === "undefined"
+        ? ROGUE_GREETING_PLACEHOLDER
+        : pickRogueReturningGreeting(safe),
+  };
+}
+
+/** Pre-mount / SSR-safe first thread message — randomized greeting injected in useEffect. */
+function buildGreetingPlaceholder(): Message {
+  return {
+    id: "welcome-pending",
+    role: "assistant",
+    content: ROGUE_GREETING_PLACEHOLDER,
   };
 }
 
@@ -319,7 +336,8 @@ export default function HomepageChatBubble() {
     isLoading,
   } = useChat({
     api: "/api/chat/send",
-    initialMessages: [buildWelcome("")],
+    // Stable placeholder — real randomized matrix greeting is injected after mount.
+    initialMessages: [buildGreetingPlaceholder()],
     body: {
       channel: "HOMEPAGE_LEAD",
     },
@@ -414,6 +432,7 @@ export default function HomepageChatBubble() {
       }
     })();
 
+    // Client-only: inject randomized Rogue greeting as the first assistant message.
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
       if (!raw) {
@@ -431,8 +450,17 @@ export default function HomepageChatBubble() {
         setAwaitingName(false);
       }
       if (Array.isArray(parsed.messages) && parsed.messages.length > 0) {
-        setMessages(parsed.messages);
-        setHasUnread(false);
+        const onlyPlaceholder =
+          parsed.messages.length === 1 &&
+          parsed.messages[0]?.role === "assistant" &&
+          (parsed.messages[0]?.content === ROGUE_GREETING_PLACEHOLDER ||
+            !String(parsed.messages[0]?.content || "").trim());
+        if (onlyPlaceholder) {
+          setMessages([buildWelcome(restoredName)]);
+        } else {
+          setMessages(parsed.messages);
+          setHasUnread(false);
+        }
       } else {
         setMessages([buildWelcome(restoredName)]);
       }
@@ -500,7 +528,13 @@ export default function HomepageChatBubble() {
   function openPanel() {
     setOpen(true);
     setHasUnread(false);
-    if (messages.length === 0) {
+    const onlyPlaceholder =
+      messages.length === 0 ||
+      (messages.length === 1 &&
+        messages[0]?.role === "assistant" &&
+        (messages[0]?.content === ROGUE_GREETING_PLACEHOLDER ||
+          !String(messages[0]?.content || "").trim()));
+    if (onlyPlaceholder) {
       const name = clientFirstName || readStoredFirstName();
       setMessages([buildWelcome(name, { forceNewGreeting: true })]);
       setAwaitingName(!name);
