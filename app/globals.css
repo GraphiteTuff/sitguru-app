@@ -1724,11 +1724,13 @@ p {
   height: 60px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(145deg, var(--hcb-green) 0%, var(--hcb-green-deep) 100%);
+  background: transparent;
   color: #fff;
+  padding: 0;
+  overflow: hidden;
   box-shadow:
-    0 12px 28px rgba(13, 92, 58, 0.35),
-    0 2px 6px rgba(7, 40, 26, 0.2);
+    0 12px 28px rgba(7, 40, 26, 0.28),
+    0 0 0 2px #fff;
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -1740,8 +1742,8 @@ p {
 .homepage-chat-launcher:hover {
   transform: translateY(-2px) scale(1.03);
   box-shadow:
-    0 16px 32px rgba(13, 92, 58, 0.4),
-    0 2px 8px rgba(7, 40, 26, 0.25);
+    0 16px 32px rgba(7, 40, 26, 0.32),
+    0 0 0 2px #fff;
 }
 
 .homepage-chat-launcher:active {
@@ -1754,6 +1756,16 @@ p {
   display: grid;
   place-items: center;
   color: #fff;
+  width: 100%;
+  height: 100%;
+}
+
+.homepage-chat-launcher__icon img {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  object-fit: cover;
+  object-position: top center;
 }
 
 .homepage-chat-launcher__badge {
@@ -1802,25 +1814,36 @@ p {
 }
 
 .homepage-chat-panel__avatar {
-  width: 2.55rem;
-  height: 2.55rem;
+  width: 3rem;
+  height: 3rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: transparent;
   display: grid;
   place-items: center;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   flex-shrink: 0;
+  overflow: hidden;
+  padding: 0;
 }
 
 .homepage-chat-panel__avatar--dog {
   font-size: 1.35rem;
-  background: rgba(255, 255, 255, 0.14);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.22);
-  animation: homepage-chat-avatar-wiggle 3.2s ease-in-out infinite;
+  background: transparent;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
+  animation: none;
   overflow: hidden;
   padding: 0;
+}
+
+.homepage-chat-panel__avatar--dog img {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
 }
 
 .homepage-chat-panel__avatar-svg {

@@ -481,8 +481,8 @@ export default function HomepageChatBubble() {
                   Rogue, Your Chief Treat Officer 🦴
                 </p>
                 <p className="homepage-chat-panel__sub">
-                  Your personalized instant AI Assistant for your SitGuru Pet
-                  Community journey.
+                  I&apos;m your adorable assistant here during your SitGuru
+                  journey 🐾
                 </p>
               </div>
             </div>
@@ -609,7 +609,7 @@ export default function HomepageChatBubble() {
           <span className="homepage-chat-launcher__icon">×</span>
         ) : (
           <span className="homepage-chat-launcher__icon" aria-hidden>
-            <SitGuruAvatar className="h-9 w-9 rounded-full overflow-hidden flex-shrink-0" />
+            <SitGuruAvatar className="h-full w-full rounded-full overflow-hidden flex-shrink-0" />
           </span>
         )}
       </button>
