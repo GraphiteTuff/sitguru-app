@@ -132,7 +132,7 @@ SELECT
   p.temperament AS live_pet_temperament,
   p.feeding_routine AS live_pet_feeding_routine,
   p.potty_routine AS live_pet_potty_routine,
-  p.user_id AS live_pet_user_id,
+  b.user_id AS live_pet_user_id,
   COALESCE(p.name, b.pet_name, 'Pet') AS display_pet_name,
   COALESCE(p.photo_url, b.pet_photo_url) AS display_pet_photo_url
 FROM public.bookings b
