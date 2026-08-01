@@ -303,17 +303,15 @@ function AdminLogo() {
 
 function SearchBar() {
   return (
-    <div className="flex min-w-0 flex-1 items-center rounded-2xl border border-[#dfe7df] bg-white px-4 py-3 shadow-sm xl:max-w-[460px]">
-      <Search size={18} className="shrink-0 text-slate-400" />
+    <label className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-green-50 hover:text-green-800 xl:w-[13.5rem] xl:justify-start xl:gap-2 xl:rounded-xl xl:bg-transparent xl:px-3 2xl:w-[15.5rem]">
+      <Search size={18} className="shrink-0" aria-hidden />
       <input
-        type="text"
-        placeholder="Search admin..."
-        className="ml-3 w-full min-w-0 bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
+        type="search"
+        placeholder="Search admin…"
+        className="hidden min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400 xl:block"
+        aria-label="Search admin"
       />
-      <span className="ml-3 hidden rounded-lg bg-slate-100 px-2 py-1 text-xs font-black text-slate-500 sm:inline-flex">
-        ⌘K
-      </span>
-    </div>
+    </label>
   );
 }
 
@@ -776,78 +774,68 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         <div className="flex min-w-0 flex-col overflow-x-hidden">
           <header className="sticky top-0 z-40 border-b border-[#e5ebe2] bg-[#fcfdfb]/95 backdrop-blur">
-            <div className="flex flex-col gap-4 px-3 py-3 sm:px-5 lg:px-6">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex items-center justify-between gap-4 lg:hidden">
-                  <AdminLogo />
-
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={adminRoutes.messages}
-                      className="relative flex h-11 w-11 items-center justify-center rounded-full bg-green-800 text-white shadow-sm transition hover:bg-green-900"
-                      aria-label="Admin messages"
-                    >
-                      <MessageCircle size={19} />
-                      <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-white" />
-                    </Link>
-
-                    <div className="rounded-full border border-[#dfe7df] bg-white p-1 shadow-sm">
-                      <NotificationBell />
-                    </div>
+            <div className="px-3 py-3 sm:px-5 lg:px-6">
+              <div className="flex items-center gap-3 xl:gap-4">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <div className="flex shrink-0 items-center justify-between gap-3 lg:hidden">
+                    <AdminLogo />
                   </div>
+
+                  <nav className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm lg:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {topHeaderLinks.map((item) => {
+                      const active = isActivePath(pathname, item.href);
+
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm font-black transition 2xl:px-3.5 ${
+                            active
+                              ? "bg-green-800 text-white shadow-sm"
+                              : "text-slate-600 hover:bg-green-50 hover:text-green-900"
+                          }`}
+                        >
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </nav>
                 </div>
 
-                <nav className="hidden min-w-0 max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm lg:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {topHeaderLinks.map((item) => {
-                    const active = isActivePath(pathname, item.href);
+                <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+                  <div className="flex items-center gap-2 rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm">
+                    <SearchBar />
 
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-black transition xl:px-4 ${
-                          active
-                            ? "bg-green-800 text-white shadow-sm"
-                            : "text-slate-600 hover:bg-green-50 hover:text-green-900"
-                        }`}
-                      >
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                </nav>
+                    <Link
+                      href="/admin/gurus/new"
+                      title="Add Guru"
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-transparent px-2.5 text-sm font-black text-green-900 transition hover:border-[#dfe7df] hover:bg-green-50 sm:px-3"
+                    >
+                      <UserPlus size={16} className="shrink-0" />
+                      <span className="hidden 2xl:inline">Add Guru</span>
+                    </Link>
 
-                <div className="flex min-w-0 flex-1 items-center gap-2 xl:justify-end">
-                  <SearchBar />
-
-                  <Link
-                    href="/admin/gurus/new"
-                    className="hidden items-center gap-2 rounded-2xl border border-[#dfe7df] bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:border-green-300 hover:bg-white sm:inline-flex"
-                  >
-                    <UserPlus size={16} />
-                    Add Guru
-                  </Link>
-
-                  <Link
-                    href={adminRoutes.financialExports}
-                    className="hidden items-center gap-2 rounded-2xl border border-[#dfe7df] bg-white px-4 py-3 text-sm font-black text-green-900 shadow-sm transition hover:border-green-300 hover:bg-white sm:inline-flex"
-                  >
-                    <BarChart3 size={16} />
-                    Export
-                  </Link>
+                    <Link
+                      href={adminRoutes.financialExports}
+                      title="Export"
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-transparent px-2.5 text-sm font-black text-green-900 transition hover:border-[#dfe7df] hover:bg-green-50 sm:px-3"
+                    >
+                      <BarChart3 size={16} className="shrink-0" />
+                      <span className="hidden 2xl:inline">Export</span>
+                    </Link>
+                  </div>
 
                   <Link
                     href={adminRoutes.messages}
-                    className="relative hidden h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-800 text-white shadow-sm transition hover:bg-green-900 lg:flex"
+                    className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-800 text-white shadow-sm transition hover:bg-green-900"
                     aria-label="Admin messages"
+                    title="Messages"
                   >
-                    <MessageCircle size={20} />
-                    <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-white" />
+                    <MessageCircle size={18} />
+                    <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-white" />
                   </Link>
 
-                  <div className="hidden shrink-0 rounded-full border border-[#dfe7df] bg-white p-1 shadow-sm lg:flex">
-                    <NotificationBell />
-                  </div>
+                  <NotificationBell />
 
                   <AdminAccountMenu />
                 </div>

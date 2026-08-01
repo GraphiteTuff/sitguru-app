@@ -287,34 +287,34 @@ export default function AdminAccountMenu() {
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex items-center gap-4 rounded-[1.35rem] border border-green-800 bg-green-800 px-4 py-3 text-white shadow-sm transition hover:bg-green-900 focus:outline-none focus:ring-4 focus:ring-green-100"
+        className="flex h-11 max-w-[11.5rem] items-center gap-2 rounded-full border border-green-800 bg-green-800 pl-1.5 pr-2.5 text-white shadow-sm transition hover:bg-green-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-green-100 xl:max-w-[13rem] xl:pr-3"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Open admin account menu"
       >
-        <span className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-emerald-100 bg-white shadow-sm ring-2 ring-white/40">
+        <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-white">
           <Image
             src="/images/sitguru-admin-avatar.jpg"
             alt="SitGuru Admin Avatar"
             fill
-            sizes="56px"
+            sizes="32px"
             priority
             className="object-cover"
           />
         </span>
 
-        <span className="min-w-0 pr-1 text-left">
-          <span className="block max-w-[9rem] truncate text-sm font-black text-white">
+        <span className="min-w-0 flex-1 text-left">
+          <span className="block truncate text-xs font-black leading-tight text-white">
             {account.displayName}
           </span>
 
-          <span className="block max-w-[9rem] truncate text-xs font-semibold text-white/85">
+          <span className="hidden truncate text-[10px] font-semibold leading-tight text-white/80 xl:block">
             {topButtonRoleLabel}
           </span>
         </span>
 
-        <span className="text-white">
-          {open ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+        <span className="shrink-0 text-white/90">
+          {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </span>
       </button>
 
