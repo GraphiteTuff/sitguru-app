@@ -12,6 +12,7 @@ import { useChat, type Message } from "ai/react";
 import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
 import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
 import { SocialFollowPack } from "@/components/messaging/SocialFollowPack";
+import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 import {
   parseHomepageChatContent,
   type HomepageCtaDef,
@@ -256,18 +257,26 @@ function AssistantBubbleBody({ content }: { content: string }) {
 
   return (
     <div className="space-y-1">
-      {text ? <RogueMarkdownText text={text} /> : null}
+      {text ? (
+        <SafeAssistantBubble contentHint={content}>
+          <RogueMarkdownText text={text} />
+        </SafeAssistantBubble>
+      ) : null}
       {guruCards.length > 0 ? (
         <div className="flex flex-col gap-2 pt-1">
           {guruCards.map((guru) => (
-            <GuruProfileSnapshotCard key={guru.slug} guru={guru} />
+            <SafeAssistantBubble key={guru.slug} contentHint={guru.slug}>
+              <GuruProfileSnapshotCard guru={guru} />
+            </SafeAssistantBubble>
           ))}
         </div>
       ) : null}
       {ctas.length > 0 ? (
         <div className="flex flex-col gap-1.5 pt-1">
           {ctas.map((cta) => (
-            <CtaActionButton key={cta.id} cta={cta} />
+            <SafeAssistantBubble key={cta.id} contentHint={cta.id}>
+              <CtaActionButton cta={cta} />
+            </SafeAssistantBubble>
           ))}
         </div>
       ) : null}
@@ -739,7 +748,9 @@ export default function HomepageChatBubble() {
               return (
                 <AssistantRow key={m.id}>
                   <div className="homepage-chat-bubble homepage-chat-bubble--ai">
-                    <AssistantBubbleBody content={m.content} />
+                    <SafeAssistantBubble contentHint={m.content}>
+                      <AssistantBubbleBody content={m.content} />
+                    </SafeAssistantBubble>
                   </div>
                 </AssistantRow>
               );
