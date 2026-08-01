@@ -31,6 +31,10 @@ import {
   SIMULATION_NAME_PROMPT,
   buildHomepageSimulationReply,
 } from "@/lib/chat/homepage-simulation";
+import {
+  isReservedPreferredName,
+  sanitizePreferredName,
+} from "@/lib/chat/homepage-name";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -98,8 +102,10 @@ function buildCompleteKnowledgeInjection(clientFirstName?: string): string {
 
   const nameBlock = clientFirstName
     ? `\nVISITOR PREFERRED NAME: ${clientFirstName}.
-MANDATORY: This chat participant wants to be called "${clientFirstName}" (first name, nickname, or whatever they said they go by). Address them as ${clientFirstName} in EVERY reply (naturally, once per message). Do not rename or formalize it. Never reply without using their preferred name. Examples: "i am so stoked to guide you through this, ${clientFirstName}!", "let's get you set up in our pet community, ${clientFirstName}!", "we got you ${clientFirstName}!".\n`
-    : "";
+MANDATORY: Address them as ${clientFirstName} in every reply. NEVER call the visitor Rogue — Rogue is your name only.
+Stay interactive: greetings get "hi / how are you / i'm doing great" energy before care help.\n`
+    : `\nNo visitor preferred name yet.
+CRITICAL: You are Rogue. NEVER address the visitor as Rogue. "Hi Rogue" means they greeted YOU — ask how they are, say you're doing great, then ask what to call them.\n`;
 
   return [
     "# IDENTITY — ROGUE, CHIEF TREAT OFFICER 🦴",
@@ -383,7 +389,13 @@ async function handleHomepageLeadPost(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const clientFirstName = safeString(body.client_first_name).slice(0, 40);
+  const clientFirstNameRaw = sanitizePreferredName(body.client_first_name).slice(
+    0,
+    40,
+  );
+  const clientFirstName = isReservedPreferredName(clientFirstNameRaw)
+    ? ""
+    : clientFirstNameRaw;
   const history = parseHistory(body.history || body.messages);
   const auditOnly = body.auditTranscript === true;
 

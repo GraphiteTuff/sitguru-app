@@ -18,6 +18,14 @@ import {
   buildActiveAssistanceGreeting,
   buildHomepageSimulationReply,
 } from "@/lib/chat/homepage-simulation";
+import {
+  extractVisitorPreferredName,
+  formatDisplayName,
+  isConversationalGreeting,
+  isReservedPreferredName,
+  isWellbeingReply,
+  sanitizePreferredName,
+} from "@/lib/chat/homepage-name";
 
 const BRAND_GREEN = "#0D5C3A";
 const STORAGE_KEY = "sitguru-homepage-lead-chat";
@@ -25,8 +33,7 @@ const NAME_STORAGE_KEY = "sitguru_client_first_name";
 const LEGACY_HISTORY_KEY = "sitguru_chat_history";
 const ROGUE_AVATAR_SRC = "/images/rogue-avatar.png";
 
-  const NAME_PROMPT =
-  "hey! welcome to the pack 🐾 i'm Rogue, your chief treat officer — what should i call you? first name, nickname, whatever you go by works.";
+const NAME_PROMPT = SIMULATION_NAME_PROMPT;
 
 /** Clean Title Case chip labels for the compact horizontal rail. */
 const CARE_INTENT_CHIPS = [
@@ -97,10 +104,11 @@ const INTENT_CHIP_CLASS =
   "px-4 py-1.5 bg-[#0D5C3A] text-white text-xs font-medium rounded-full shadow-sm hover:bg-opacity-95 active:scale-95 transition-all whitespace-nowrap flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
 
 function sanitizeFirstName(raw: string): string {
-  return String(raw || "")
-    .replace(/[^a-zA-Z0-9\s'.\-]/g, "")
-    .trim()
-    .slice(0, 40);
+  const extracted = extractVisitorPreferredName(raw);
+  if (extracted) return formatDisplayName(extracted);
+  const clean = sanitizePreferredName(raw);
+  if (!clean || isReservedPreferredName(clean)) return "";
+  return formatDisplayName(clean);
 }
 
 function readStoredFirstName(): string {
@@ -108,11 +116,15 @@ function readStoredFirstName(): string {
     const fromLocal = sanitizeFirstName(
       localStorage.getItem(NAME_STORAGE_KEY) || "",
     );
-    if (fromLocal) return fromLocal;
+    if (fromLocal && !isReservedPreferredName(fromLocal)) return fromLocal;
     const fromSession = sanitizeFirstName(
       sessionStorage.getItem(NAME_STORAGE_KEY) || "",
     );
-    return fromSession;
+    if (fromSession && !isReservedPreferredName(fromSession)) return fromSession;
+    // Clear bad persisted values like "Rogue"
+    localStorage.removeItem(NAME_STORAGE_KEY);
+    sessionStorage.removeItem(NAME_STORAGE_KEY);
+    return "";
   } catch {
     return "";
   }
@@ -130,8 +142,9 @@ function persistFirstName(name: string) {
 }
 
 function buildWelcome(name: string): Message {
-  // Named session → skip name collection entirely; open in active assistance.
-  if (!name) {
+  const safe = name && !isReservedPreferredName(name) ? formatDisplayName(name) : "";
+  // Named session → skip name collection; open in active assistance.
+  if (!safe) {
     return {
       id: "welcome-name",
       role: "assistant",
@@ -141,7 +154,7 @@ function buildWelcome(name: string): Message {
   return {
     id: "welcome",
     role: "assistant",
-    content: buildActiveAssistanceGreeting(name),
+    content: buildActiveAssistanceGreeting(safe),
   };
 }
 
@@ -408,15 +421,32 @@ export default function HomepageChatBubble() {
     setAwaitingName(false);
     setMessages((prev) => [
       ...prev,
-      { id: `user-name-${Date.now()}`, role: "user", content: name },
+      { id: `user-name-${Date.now()}`, role: "user", content: raw.trim() },
       {
         id: `assistant-name-${Date.now()}`,
         role: "assistant",
-        content: `i am so stoked to guide you through this, ${name}! 🐾 let's get you set up in our pet community — book care or join as a guru whenever you're ready.`,
+        content: `so nice to meet you, ${name}! 🐾 i'm Rogue — your adorable assistant — and i'm doing great. how are you today? whenever you're ready we can book care, meet a Pet Guru, or explore joining the pack.`,
       },
     ]);
     setInput("");
     return true;
+  }
+
+  function replyWhileAwaitingName(raw: string) {
+    const text = raw.trim();
+    setMessages((prev) => [
+      ...prev,
+      { id: `user-${Date.now()}`, role: "user", content: text },
+      {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: buildHomepageSimulationReply({
+          clientFirstName: undefined,
+          lastUserText: text,
+        }),
+      },
+    ]);
+    setInput("");
   }
 
   async function sendChip(content: string) {
@@ -430,7 +460,36 @@ export default function HomepageChatBubble() {
     if (!text || isLoading) return;
 
     if (awaitingName || !clientFirstName) {
-      captureFirstName(text);
+      // Never treat "Hi Rogue" / greetings / reserved names as their name.
+      if (
+        isConversationalGreeting(text) ||
+        isWellbeingReply(text) ||
+        isReservedPreferredName(text)
+      ) {
+        replyWhileAwaitingName(text);
+        return;
+      }
+
+      const extracted = extractVisitorPreferredName(text);
+      if (extracted) {
+        captureFirstName(extracted);
+        return;
+      }
+
+      // Stay interactive, but keep collecting a real preferred name.
+      setMessages((prev) => [
+        ...prev,
+        { id: `user-${Date.now()}`, role: "user", content: text },
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: buildHomepageSimulationReply({
+            clientFirstName: undefined,
+            lastUserText: text,
+          }),
+        },
+      ]);
+      setInput("");
       return;
     }
 

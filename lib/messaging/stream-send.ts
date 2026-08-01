@@ -10,6 +10,10 @@ import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { HOMEPAGE_CTO_VOICE_RULES } from "@/lib/chat/homepage-cta";
 import { buildHomepageSimulationReply } from "@/lib/chat/homepage-simulation";
+import {
+  isReservedPreferredName,
+  sanitizePreferredName,
+} from "@/lib/chat/homepage-name";
 
 /** Hardcoded marketing context — never depends on DB lookups. */
 const CORE_SITE_CONTEXT =
@@ -181,7 +185,12 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     const messages = Array.isArray(body?.messages) ? body.messages : [];
     const walkId = safeString(body?.walkId);
     const conversationId = safeString(body?.conversationId);
-    const clientFirstName = safeString(body?.client_first_name).slice(0, 40);
+    const clientFirstNameRaw = sanitizePreferredName(
+      body?.client_first_name,
+    ).slice(0, 40);
+    const clientFirstName = isReservedPreferredName(clientFirstNameRaw)
+      ? ""
+      : clientFirstNameRaw;
     parsedClientFirstName = clientFirstName;
     const insightChannel =
       walkId || safeString(body?.channel) === "ACTIVE_WALK"
@@ -247,9 +256,11 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
     const nameDirective = clientFirstName
       ? `\nVISITOR PREFERRED NAME: ${clientFirstName}.
-MANDATORY: This chat participant wants to be called "${clientFirstName}" (first name, nickname, or whatever they said they go by). Address them as ${clientFirstName} in EVERY reply (naturally, once per message). Do not rename or formalize it. Never reply without using their preferred name. Examples: "i am so stoked to guide you through this, ${clientFirstName}!", "let's get you set up in our pet community, ${clientFirstName}!", "we got you ${clientFirstName}!".
-If they say hi/hey/hello/what's up, answer like a live text thread — warm, present, one follow-up question.\n`
-      : `\nNo preferred name yet — if they greet you, greet back warmly then ask what they like to be called. Otherwise ask for their preferred name before deeper guidance.\n`;
+MANDATORY: Address them as ${clientFirstName} in EVERY reply. NEVER call them Rogue — Rogue is your name only.
+If they say hi/hey/hello, answer like live text: ask how they are, say you're doing great, keep it warm and interactive.\n`
+      : `\nNo visitor preferred name yet.
+CRITICAL: You are Rogue. NEVER address the visitor as Rogue. If they say "Hi Rogue", they are greeting YOU — reply with hi/how are you, say you're doing great, then ask what to call THEM.
+Do not invent a name. Stay interactive and collect their preferred name before deep booking help.\n`;
 
     let result;
     try {
