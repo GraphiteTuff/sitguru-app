@@ -20,6 +20,7 @@ type ReportCard = {
   description: string;
   href: string;
   tone: "green" | "blue" | "purple" | "orange" | "red" | "slate";
+  wiring?: "live" | "next";
 };
 
 type PeriodCard = {
@@ -593,6 +594,7 @@ const coreStatements: ReportCard[] = [
       "Track revenue, refunds, guru payouts, partner commissions, operating expenses, and net income by period.",
     href: "/admin/financials/profit-loss",
     tone: "green",
+    wiring: "live",
   },
   {
     eyebrow: "Assets = Liabilities + Equity",
@@ -601,6 +603,7 @@ const coreStatements: ReportCard[] = [
       "Review SitGuru assets, liabilities, owner equity, retained earnings, receivables, payables, and cash position.",
     href: "/admin/financials/balance-sheet",
     tone: "blue",
+    wiring: "live",
   },
   {
     eyebrow: "Liquidity",
@@ -609,6 +612,7 @@ const coreStatements: ReportCard[] = [
       "Understand cash coming in and out across operations, investing, financing, Stripe activity, and bank deposits.",
     href: "/admin/financials/cash-flow",
     tone: "blue",
+    wiring: "live",
   },
   {
     eyebrow: "Forecasting",
@@ -617,6 +621,7 @@ const coreStatements: ReportCard[] = [
       "Model projected bookings, platform revenue, Guru payouts, refunds, operating expenses, cash runway, and break-even timing.",
     href: "/admin/financials/pro-forma",
     tone: "green",
+    wiring: "live",
   },
   {
     eyebrow: "Ownership",
@@ -625,6 +630,7 @@ const coreStatements: ReportCard[] = [
       "Track ownership contributions, retained earnings, distributions, equity changes, and founder investment history.",
     href: "/admin/financials/equity",
     tone: "purple",
+    wiring: "next",
   },
 ];
 
@@ -635,6 +641,7 @@ const supportingRecords: ReportCard[] = [
     description:
       "Monitor customer balances, open invoices, unpaid bookings, failed payments, chargebacks, and collection risk.",
     href: "/admin/financials/accounts-receivable",
+    wiring: "next",
     tone: "orange",
   },
   {
@@ -643,6 +650,7 @@ const supportingRecords: ReportCard[] = [
     description:
       "Track vendor bills, platform expenses, contractor obligations, subscription costs, and upcoming payment due dates.",
     href: "/admin/financials/accounts-payable",
+    wiring: "next",
     tone: "orange",
   },
   {
@@ -651,6 +659,7 @@ const supportingRecords: ReportCard[] = [
     description:
       "Compare projected revenue, operating spend, partner growth, payroll, marketing, and technology costs against actuals.",
     href: "/admin/financials/budget-vs-actual",
+    wiring: "next",
     tone: "blue",
   },
   {
@@ -659,6 +668,7 @@ const supportingRecords: ReportCard[] = [
     description:
       "View accounting-ready transaction detail across customers, gurus, partners, admins, vendors, payouts, and adjustments.",
     href: "/admin/financials/general-ledger",
+    wiring: "live",
     tone: "slate",
   },
   {
@@ -667,6 +677,7 @@ const supportingRecords: ReportCard[] = [
     description:
       "Reconcile Stripe settlements, NFCU/Plaid business banking, credit card transactions, deposits, and fees.",
     href: "/admin/financials/reconciliation",
+    wiring: "live",
     tone: "green",
   },
   {
@@ -675,6 +686,7 @@ const supportingRecords: ReportCard[] = [
     description:
       "Separate employee payroll, contractor payments, guru earnings, taxes, benefits, and quarterly reporting support.",
     href: "/admin/financials/payroll",
+    wiring: "next",
     tone: "red",
   },
 ];
@@ -686,6 +698,7 @@ const operatingFinance: ReportCard[] = [
     description:
       "Track completed stays, payable guru balances, payout batches, payout status, exceptions, and payment references.",
     href: "/admin/financials/payouts",
+    wiring: "live",
     tone: "green",
   },
   {
@@ -694,6 +707,7 @@ const operatingFinance: ReportCard[] = [
     description:
       "Review ambassador payments, affiliate commissions, partner referrals, commission rates, and approved payout batches.",
     href: "/admin/financials/commissions",
+    wiring: "live",
     tone: "green",
   },
   {
@@ -702,6 +716,7 @@ const operatingFinance: ReportCard[] = [
     description:
       "Track gross payments, fees, refunds, disputes, chargebacks, transfers, payout reconciliation, and customer payment status.",
     href: "/admin/financials/stripe",
+    wiring: "live",
     tone: "purple",
   },
   {
@@ -710,6 +725,7 @@ const operatingFinance: ReportCard[] = [
     description:
       "Review desktop/mobile checkout preferences, wallet options, saved methods, ACH placeholders, PawPerks, referral credits, promo codes, gift/SitGuru credits, and Guru tips.",
     href: "/admin/payments",
+    wiring: "live",
     tone: "blue",
   },
   {
@@ -718,6 +734,7 @@ const operatingFinance: ReportCard[] = [
     description:
       "Review connected NFCU Business Checking/Savings accounts, masks, balances, posted/pending transactions, review status, and sync health.",
     href: "/admin/financials/plaid",
+    wiring: "live",
     tone: "green",
   },
   {
@@ -726,6 +743,7 @@ const operatingFinance: ReportCard[] = [
     description:
       "Categorize software, insurance, supplies, marketing, background checks, banking fees, and administrative expenses.",
     href: "/admin/financials/vendors",
+    wiring: "next",
     tone: "slate",
   },
   {
@@ -734,6 +752,7 @@ const operatingFinance: ReportCard[] = [
     description:
       "Review Paw in Full, Pawstep, and Book & Bark plan revenue, balances, approvals, and Checkr-ready financial clearance.",
     href: "/admin/background-checks",
+    wiring: "live",
     tone: "green",
   },
 ];
@@ -973,13 +992,26 @@ function ReportCardTile({ card }: { card: ReportCard }) {
       className="group flex min-h-[190px] flex-col justify-between rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg"
     >
       <div>
-        <span
-          className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] ${toneClasses(
-            card.tone,
-          )}`}
-        >
-          {card.eyebrow}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] ${toneClasses(
+              card.tone,
+            )}`}
+          >
+            {card.eyebrow}
+          </span>
+          {card.wiring ? (
+            <span
+              className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${
+                card.wiring === "live"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-amber-200 bg-amber-50 text-amber-800"
+              }`}
+            >
+              {card.wiring === "live" ? "Live" : "Next"}
+            </span>
+          ) : null}
+        </div>
 
         <h3 className="mt-4 text-xl font-black leading-tight text-slate-950">
           {card.title}
@@ -991,7 +1023,9 @@ function ReportCardTile({ card }: { card: ReportCard }) {
       </div>
 
       <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-        <span className="text-sm font-black text-emerald-800">Open report</span>
+        <span className="text-sm font-black text-emerald-800">
+          {card.wiring === "next" ? "View roadmap" : "Open report"}
+        </span>
         <ArrowCircle />
       </div>
     </Link>

@@ -311,7 +311,56 @@ function categoryBadgeClasses(transaction: PlaidTransaction) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-async function getCurrentAdminUserId() {
+type FinanceAdminIdentity = {
+  id: string;
+  email: string;
+  role: string;
+  canAccessFinancials: boolean;
+};
+
+const FINANCE_ROLES = [
+  "owner",
+  "super_admin",
+  "admin",
+  "finance_admin",
+  "finance",
+  "accounting",
+  "bookkeeper",
+];
+
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getOptionalBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(normalized)) return true;
+    if (["false", "no", "0"].includes(normalized)) return false;
+  }
+
+  return false;
+}
+
+function getEnvAdminEmails() {
+  return String(
+    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
+      process.env.ADMIN_EMAILS ||
+      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
+      "",
+  )
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function hasFinancialRole(role: string) {
+  return FINANCE_ROLES.includes(role.trim().toLowerCase());
+}
+
+async function getFinanceAdminIdentity(): Promise<FinanceAdminIdentity | null> {
   const supabase = await createClient();
 
   const {
@@ -323,25 +372,66 @@ async function getCurrentAdminUserId() {
     return null;
   }
 
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  const userEmail = (user.email || "").toLowerCase();
+  const envAdminEmails = getEnvAdminEmails();
 
-  if (profileError || profile?.role !== "admin") {
+  const [adminUserResult, profileResult, usersResult] = await Promise.all([
+    supabaseAdmin
+      .from("admin_users")
+      .select("role,email,is_active,can_access_financials")
+      .eq("user_id", user.id)
+      .limit(1),
+    supabaseAdmin
+      .from("profiles")
+      .select("role,email,is_active,can_access_financials")
+      .eq("id", user.id)
+      .limit(1),
+    supabaseAdmin
+      .from("users")
+      .select("role,email,is_active,can_access_financials")
+      .eq("id", user.id)
+      .limit(1),
+  ]);
+
+  const profile =
+    adminUserResult.data?.[0] ||
+    profileResult.data?.[0] ||
+    usersResult.data?.[0] ||
+    null;
+
+  if (!profile) {
     return null;
   }
 
-  return user.id;
+  const role = asTrimmedString(profile.role) || "admin";
+  const active =
+    profile.is_active === undefined
+      ? true
+      : getOptionalBoolean(profile.is_active);
+  const explicitFinanceAccess = getOptionalBoolean(profile.can_access_financials);
+  const envAllowed = envAdminEmails.includes(userEmail);
+
+  const canAccessFinancials =
+    active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed);
+
+  if (!canAccessFinancials) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    email: userEmail,
+    role,
+    canAccessFinancials,
+  };
 }
 
 async function getBankingData(
   selectedFilter: TransactionFilter,
 ): Promise<BankingData> {
-  const userId = await getCurrentAdminUserId();
+  const actor = await getFinanceAdminIdentity();
 
-  if (!userId) {
+  if (!actor) {
     return {
       accounts: [],
       items: [],
@@ -367,7 +457,6 @@ async function getBankingData(
     .select(
       "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, plaid_environment, created_at, updated_at",
     )
-    .eq("user_id", userId)
     .eq("plaid_environment", currentEnvironment)
     .order("created_at", { ascending: false });
 
@@ -391,7 +480,6 @@ async function getBankingData(
       .select(
         "item_id, institution_name, plaid_environment, transactions_last_synced_at, created_at, updated_at",
       )
-      .eq("user_id", userId)
       .eq("plaid_environment", currentEnvironment)
       .in("item_id", itemIds)
       .order("created_at", { ascending: false });
@@ -414,7 +502,6 @@ async function getBankingData(
         .select(
           "id, transaction_id, item_id, account_id, name, merchant_name, amount, iso_currency_code, date, pending, payment_channel, created_at, sitguru_category, sitguru_category_type, sitguru_report_section, sitguru_notes, review_status, is_excluded_from_reports, manually_categorized",
         )
-        .eq("user_id", userId)
         .in("account_id", accountIds)
         .is("removed_at", null)
         .order("date", { ascending: false })

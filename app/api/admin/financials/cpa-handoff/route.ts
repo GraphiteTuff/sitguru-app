@@ -1,7 +1,148 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
+
+type AnyRow = Record<string, unknown>;
+
+type AdminIdentity = {
+  id: string;
+  email: string;
+  role: string;
+  canAccessFinancials: boolean;
+};
+
+const FINANCE_ROLES = [
+  "owner",
+  "super_admin",
+  "admin",
+  "finance_admin",
+  "finance",
+  "accounting",
+  "bookkeeper",
+];
+
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getOptionalBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(normalized)) return true;
+    if (["false", "no", "0"].includes(normalized)) return false;
+  }
+
+  return false;
+}
+
+function getEnvAdminEmails() {
+  return String(
+    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
+      process.env.ADMIN_EMAILS ||
+      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
+      "",
+  )
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function hasFinancialRole(role: string) {
+  return FINANCE_ROLES.includes(role.trim().toLowerCase());
+}
+
+async function safeRows<T>(
+  query: PromiseLike<{ data: unknown; error: unknown }>,
+  label: string,
+): Promise<T[]> {
+  try {
+    const result = await query;
+
+    if (result.error) {
+      console.warn(`CPA handoff query skipped for ${label}:`, result.error);
+      return [];
+    }
+
+    return Array.isArray(result.data) ? (result.data as T[]) : [];
+  } catch (error) {
+    console.warn(`CPA handoff query skipped for ${label}:`, error);
+    return [];
+  }
+}
+
+async function getAdminIdentity(): Promise<AdminIdentity | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+
+  const userEmail = (user.email || "").toLowerCase();
+  const envAdminEmails = getEnvAdminEmails();
+
+  const profileChecks = await Promise.all([
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("user_id", user.id)
+        .limit(1),
+      "admin_users_cpa_handoff_access",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("profiles")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "profiles_cpa_handoff_access",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "users_cpa_handoff_access",
+    ),
+  ]);
+
+  const profile = profileChecks.flat().find(Boolean) || {};
+  const role = asTrimmedString(profile.role) || "admin";
+  const active =
+    profile.is_active === undefined
+      ? true
+      : getOptionalBoolean(profile.is_active);
+  const explicitFinanceAccess = getOptionalBoolean(
+    profile.can_access_financials,
+  );
+  const envAllowed = envAdminEmails.includes(userEmail);
+
+  return {
+    id: user.id,
+    email: userEmail,
+    role,
+    canAccessFinancials:
+      active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed),
+  };
+}
+
+async function requireFinancialAdmin() {
+  const identity = await getAdminIdentity();
+
+  if (!identity?.canAccessFinancials) {
+    return null;
+  }
+
+  return identity;
+}
 
 type CpaHandoffStatus =
   | "not_started"
@@ -564,9 +705,7 @@ function buildAlerts(items: CpaHandoffItem[]): CpaHandoffAlert[] {
 }
 
 async function readCpaReminders() {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("cpa_reminders")
     .select("*")
     .order("due_date", { ascending: true })
@@ -591,9 +730,7 @@ async function readCpaReminders() {
 }
 
 async function readExportHistory() {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("financial_export_history")
     .select("*")
     .order("created_at", { ascending: false })
@@ -618,6 +755,15 @@ async function readExportHistory() {
 }
 
 export async function GET() {
+  const actor = await requireFinancialAdmin();
+
+  if (!actor) {
+    return NextResponse.json(
+      { ok: false, message: "Not authorized to view CPA handoff data." },
+      { status: 403 },
+    );
+  }
+
   const generatedAt = new Date().toISOString();
 
   try {
@@ -693,6 +839,15 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const actor = await requireFinancialAdmin();
+
+  if (!actor) {
+    return NextResponse.json(
+      { ok: false, record: null, message: "Not authorized to create CPA reminders." },
+      { status: 403 },
+    );
+  }
+
   try {
     const body = (await request.json()) as Record<string, unknown>;
 
@@ -708,8 +863,6 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-
-    const supabase = await createClient();
 
     const payload = {
       title,
@@ -734,11 +887,13 @@ export async function POST(request: Request) {
       metadata: {
         ...getObject(body.metadata),
         createdFrom: "admin_financials_cpa_handoff_api",
+        createdByUserId: actor.id,
+        createdByEmail: actor.email,
         generatedAt: new Date().toISOString(),
       },
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("cpa_reminders")
       .insert(payload)
       .select("*")
@@ -781,6 +936,15 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const actor = await requireFinancialAdmin();
+
+  if (!actor) {
+    return NextResponse.json(
+      { ok: false, record: null, message: "Not authorized to update CPA reminders." },
+      { status: 403 },
+    );
+  }
+
   try {
     const body = (await request.json()) as Record<string, unknown>;
 
@@ -799,8 +963,6 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-
     const updatePayload: Record<string, unknown> = {
       status,
       notes,
@@ -811,7 +973,7 @@ export async function PATCH(request: Request) {
       updatePayload.completed_at = new Date().toISOString();
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("cpa_reminders")
       .update(updatePayload)
       .eq("id", reminderId)

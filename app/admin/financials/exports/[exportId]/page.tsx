@@ -1,9 +1,144 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import ExportStatusActions from "./ExportStatusActions";
 import ExportPackageActions from "./ExportPackageActions";
 
 export const dynamic = "force-dynamic";
+
+type AnyRow = Record<string, unknown>;
+
+type AdminIdentity = {
+  id: string;
+  email: string;
+  role: string;
+  canAccessFinancials: boolean;
+};
+
+const FINANCE_ROLES = [
+  "owner",
+  "super_admin",
+  "admin",
+  "finance_admin",
+  "finance",
+  "accounting",
+  "bookkeeper",
+];
+
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getOptionalBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(normalized)) return true;
+    if (["false", "no", "0"].includes(normalized)) return false;
+  }
+
+  return false;
+}
+
+function getEnvAdminEmails() {
+  return String(
+    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
+      process.env.ADMIN_EMAILS ||
+      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
+      "",
+  )
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function hasFinancialRole(role: string) {
+  return FINANCE_ROLES.includes(role.trim().toLowerCase());
+}
+
+async function safeRows<T>(
+  query: PromiseLike<{ data: unknown; error: unknown }>,
+  label: string,
+): Promise<T[]> {
+  try {
+    const result = await query;
+
+    if (result.error) {
+      console.warn(`Export detail query skipped for ${label}:`, result.error);
+      return [];
+    }
+
+    return Array.isArray(result.data) ? (result.data as T[]) : [];
+  } catch (error) {
+    console.warn(`Export detail query skipped for ${label}:`, error);
+    return [];
+  }
+}
+
+async function requireFinancialAdmin() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+
+  const userEmail = (user.email || "").toLowerCase();
+  const envAdminEmails = getEnvAdminEmails();
+
+  const profileChecks = await Promise.all([
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("user_id", user.id)
+        .limit(1),
+      "admin_users_export_detail_access",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("profiles")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "profiles_export_detail_access",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "users_export_detail_access",
+    ),
+  ]);
+
+  const profile = profileChecks.flat().find(Boolean) || {};
+  const role = asTrimmedString(profile.role) || "admin";
+  const active =
+    profile.is_active === undefined
+      ? true
+      : getOptionalBoolean(profile.is_active);
+  const explicitFinanceAccess = getOptionalBoolean(
+    profile.can_access_financials,
+  );
+  const envAllowed = envAdminEmails.includes(userEmail);
+
+  const canAccessFinancials =
+    active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed);
+
+  if (!canAccessFinancials) return null;
+
+  return {
+    id: user.id,
+    email: userEmail,
+    role,
+    canAccessFinancials,
+  } satisfies AdminIdentity;
+}
 
 type ExportRecord = {
   id: string;
@@ -399,8 +534,7 @@ function getPackageLinks(record: ExportRecord) {
 
 async function safeSelect<T>(table: string, query = "*") {
   try {
-    const supabase = await createClient();
-    const { data, error } = await supabase.from(table).select(query).limit(500);
+    const { data, error } = await supabaseAdmin.from(table).select(query).limit(500);
 
     if (error || !data) return [] as T[];
     return data as unknown as T[];
@@ -410,11 +544,9 @@ async function safeSelect<T>(table: string, query = "*") {
 }
 
 async function getExportRecord(exportId: string) {
-  const supabase = await createClient();
-
   for (const table of exportTables) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from(table)
         .select("*")
         .eq("id", exportId)
@@ -544,7 +676,38 @@ function DetailCard({ label, value, helper }: { label: string; value: string; he
   );
 }
 
+function AccessRestricted() {
+  return (
+    <main className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+      <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+        <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+          Access Restricted
+        </p>
+        <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+          Financial access required.
+        </h1>
+        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+          Sign in with a finance-enabled admin account to view export package
+          details.
+        </p>
+        <Link
+          href="/admin/financials/exports"
+          className="mt-6 inline-flex rounded-full bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
+        >
+          Back to Export Center
+        </Link>
+      </div>
+    </main>
+  );
+}
+
 export default async function AdminFinancialExportDetailPage({ params }: PageProps) {
+  const actor = await requireFinancialAdmin();
+
+  if (!actor) {
+    return <AccessRestricted />;
+  }
+
   const { exportId } = await params;
   const record = await getExportRecord(exportId);
 
