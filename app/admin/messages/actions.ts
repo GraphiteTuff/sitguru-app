@@ -100,5 +100,5 @@ export async function clearAllAdminMessageCenterAction(confirmation: string) {
   }
 
   revalidatePath("/admin/messages");
-  return { ok: true as const, ...result };
+  return result;
 }
