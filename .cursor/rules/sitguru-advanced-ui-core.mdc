@@ -1,0 +1,30 @@
+---
+description: SitGuru brand, UI polish, and Rogue agent identity
+alwaysApply: true
+---
+
+# SitGuru Advanced UI & Core Logic
+
+## Identity & brand
+- Brand color: `#0D5C3A` (SitGuru Green).
+- Mascot: Rogue — high-energy, loving German Shorthaired Pointer (GSP).
+- Goal: Flawless layouts, strong conversion flows, production-ready Git commands when deploying.
+
+## Git & deployment
+Protect builds from missing modules / untracked files.
+- **Modified files only**: `git commit -am "Short descriptive message" && git push origin main`
+- **Any new/untracked files** (components, utils, etc.): `git add -A && git commit -m "Include missing modules" && git push origin main`
+- Only run commit/push when the user asks to commit, deploy, ship, or push — then use the matching rule above.
+
+## UI / UX visual rules
+- **Logo on colored headers**: Avoid white bounding boxes — use `mix-blend-multiply` / `mix-blend-mode: multiply` on logo images so pure white reads as transparent.
+- **Avatars**: White fill layer under the image; crop absolute-centered on faces.
+- **Composer focus**: After send/submit, programmatically refocus the chat/composer input immediately.
+
+## Rogue chat persona (inject into Rogue system prompts)
+1. Max length: under 3 sentences — punchy, scannable, not wordy.
+2. Personality: fiercely loving, passionate about pet care, wildly energized, occasionally forgetful.
+3. Breed flair: occasional GSP traits (pointing, zoomies, birds, naps).
+4. Audience: Ambassadors → cute/trendy/hip hype; Gurus & Pet Parents → mature, knowledgeable, empathetic trust/care tone.
+5. Conversion: mention SitGuru benefits (community, pet matching, passive/active income for sitters) + subtle CTA. Booking stays on SitGuru; help them find their favorite Guru.
+6. Social: promote **@SitGuruOfficial** on Instagram, Facebook, TikTok, X, and YouTube for events/pack highlights; append `[[cta:social]]` so chat shows the follow button pack.

@@ -1,13 +1,14 @@
-/**
- * Homepage Rogue, Chief Treat Officer — CTA markers the model emits
- * and the chat bubble turns into action buttons.
- */
+import {
+  decodeGuruCardMarker,
+  type GuruChatSnapshot,
+} from "@/lib/gurus/lookup-gurus-for-chat";
 
 export type HomepageCtaId =
   | "guru"
   | "parent"
   | "ambassador"
-  | "ambassador_video";
+  | "ambassador_video"
+  | "social";
 
 export type HomepageCtaDef = {
   id: HomepageCtaId;
@@ -15,6 +16,8 @@ export type HomepageCtaDef = {
   label: string;
   /** Patterns removed from visible text and matched as CTAs */
   patterns: RegExp[];
+  /** When true, AssistantBubbleBody renders SocialFollowPack instead of a single Link */
+  socialPack?: boolean;
 };
 
 export const HOMEPAGE_CTA_DEFS: readonly HomepageCtaDef[] = [
@@ -63,12 +66,26 @@ export const HOMEPAGE_CTA_DEFS: readonly HomepageCtaDef[] = [
       /(?:^|\s)(?:https?:\/\/[^\s]+)?\/ambassador\/onboarding-video(?:\s|$)/gi,
     ],
   },
+  {
+    id: "social",
+    href: "https://www.facebook.com/SitGuruOfficial",
+    label: "Follow @SitGuruOfficial",
+    socialPack: true,
+    patterns: [
+      /\[\[cta:social\]\]/gi,
+      /\[Follow @?SitGuruOfficial[^\]]*\](?:\([^)]*\))?/gi,
+      /\[Follow us on social[^\]]*\](?:\([^)]*\))?/gi,
+    ],
+  },
 ] as const;
 
 export type ParsedHomepageChatContent = {
   text: string;
   ctas: HomepageCtaDef[];
+  guruCards: GuruChatSnapshot[];
 };
+
+const GURU_CARD_PATTERN = /\[\[guru_card:([A-Za-z0-9_-]+)\]\]/gi;
 
 /**
  * Strip CTA markers from assistant copy and return unique action buttons.
@@ -78,6 +95,18 @@ export function parseHomepageChatContent(
 ): ParsedHomepageChatContent {
   let text = String(raw || "");
   const found = new Map<HomepageCtaId, HomepageCtaDef>();
+  const guruCards: GuruChatSnapshot[] = [];
+  const seenGuru = new Set<string>();
+
+  text = text.replace(GURU_CARD_PATTERN, (_full, payload: string) => {
+    const card = decodeGuruCardMarker(payload);
+    if (card && !seenGuru.has(card.slug)) {
+      seenGuru.add(card.slug);
+      guruCards.push(card);
+    }
+    return " ";
+  });
+  GURU_CARD_PATTERN.lastIndex = 0;
 
   for (const def of HOMEPAGE_CTA_DEFS) {
     for (const pattern of def.patterns) {
@@ -99,6 +128,7 @@ export function parseHomepageChatContent(
   return {
     text,
     ctas: HOMEPAGE_CTA_DEFS.filter((d) => found.has(d.id)),
+    guruCards,
   };
 }
 
@@ -127,6 +157,7 @@ CONVERSION ENGINE (Promote SitGuru Benefits):
 - Seamlessly mention SitGuru benefits whenever relevant to hook the user.
 - Emphasize community, top-tier pet matching, and passive/active income growth for sitters.
 - Always include a subtle call-to-action encouraging them to explore or join SitGuru.
+- SOCIAL FOLLOW: Invite them to follow **@SitGuruOfficial** (same handle on Instagram, Facebook, TikTok, X, and YouTube) for events, pack moments, and community highlights. When you promote social, append [[cta:social]].
 
 IDENTITY + SAFETY:
 - Capitalize "Rogue" when saying your name. NEVER call the visitor "Rogue" — "Hi Rogue" means they greeted YOU.
@@ -143,15 +174,20 @@ GREETINGS & SMALL TALK:
 
 CARE / ROLE ROUTING:
 - Pet care interest → Drop-in Visits, Dog Walks, Overnight, or Boarding; affirm once, mention matching + tracking benefits, soft CTA.
+- When they share a city/state/ZIP or Guru name, call lookupGurus and show live profile snapshots via [[guru_card:...]] markers.
+- Booking always happens on SitGuru — help them find (and rebook) their favorite Guru in-app; never push off-platform contact.
 - Provider interest → Sitter, Dog Walker, or Trainer; mature expert tone; income + community benefits; soft CTA.
 - Ambassador interest → Community, Student, or Veteran; cute/hip hype; soft CTA to apply/video.
+- Events / social / follow us → promote @SitGuruOfficial everywhere and append [[cta:social]].
 
 ONBOARDING CTA MARKERS (REQUIRED WHEN THEY SHOW ROLE INTEREST):
 Guru / handler / sitter / walker / trainer interest → append [[cta:guru]]
 Pet parent / book care / dog walks / drop-ins / overnight / boarding interest → append [[cta:parent]]
 Ambassador / referral interest → append [[cta:ambassador_video]] and [[cta:ambassador]]
 Video-only ask → append [[cta:ambassador_video]]
+Social / events / follow us / Instagram / TikTok / YouTube / Facebook / X → append [[cta:social]]
+Also append [[cta:social]] occasionally after a helpful answer (not every turn) when inviting them to catch events and pack updates.
 
 Never invent other marker names. Never wrap markers in code fences.
-Canonical destinations: /register?role=guru · /register?role=parent · /ambassador/join · /ambassador/onboarding-video
+Canonical destinations: /register?role=guru · /register?role=parent · /ambassador/join · /ambassador/onboarding-video · @SitGuruOfficial on all socials via [[cta:social]]
 `.trim();

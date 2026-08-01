@@ -10,6 +10,8 @@ import Link from "next/link";
 import { X } from "lucide-react";
 import { useChat, type Message } from "ai/react";
 import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
+import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
+import { SocialFollowPack } from "@/components/messaging/SocialFollowPack";
 import {
   parseHomepageChatContent,
   type HomepageCtaDef,
@@ -190,6 +192,22 @@ function SitGuruAvatar({
 }
 
 function CtaActionButton({ cta }: { cta: HomepageCtaDef }) {
+  if (cta.socialPack) {
+    return <SocialFollowPack />;
+  }
+  const external = /^https?:\/\//i.test(cta.href);
+  if (external) {
+    return (
+      <a
+        href={cta.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 inline-flex w-full items-center justify-center rounded-full bg-[#0D5C3A] px-4 py-2 text-center text-sm font-medium text-white transition-all hover:bg-opacity-90"
+      >
+        {cta.label}
+      </a>
+    );
+  }
   return (
     <Link
       href={cta.href}
@@ -201,11 +219,18 @@ function CtaActionButton({ cta }: { cta: HomepageCtaDef }) {
 }
 
 function AssistantBubbleBody({ content }: { content: string }) {
-  const { text, ctas } = parseHomepageChatContent(content);
+  const { text, ctas, guruCards } = parseHomepageChatContent(content);
 
   return (
     <div className="space-y-1">
       {text ? <RogueMarkdownText text={text} /> : null}
+      {guruCards.length > 0 ? (
+        <div className="flex flex-col gap-2 pt-1">
+          {guruCards.map((guru) => (
+            <GuruProfileSnapshotCard key={guru.slug} guru={guru} />
+          ))}
+        </div>
+      ) : null}
       {ctas.length > 0 ? (
         <div className="flex flex-col gap-1.5 pt-1">
           {ctas.map((cta) => (

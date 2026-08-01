@@ -8,11 +8,12 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { streamText, type CoreMessage } from "ai";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
 import {
   isReservedPreferredName,
   sanitizePreferredName,
 } from "@/lib/chat/homepage-name";
-import { buildHomepageSimulationReply } from "@/lib/chat/homepage-simulation";
+import { buildHomepageSimulationReplyWithGurus } from "@/lib/chat/homepage-simulation";
 import { buildRogueSystemPrompt } from "@/lib/chat/rogue-system-prompt";
 import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
@@ -21,11 +22,11 @@ function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function buildSimulationReply(opts: {
+async function buildSimulationReply(opts: {
   clientFirstName?: string;
   lastUserText?: string;
-}): string {
-  return buildHomepageSimulationReply(opts);
+}): Promise<string> {
+  return buildHomepageSimulationReplyWithGurus(opts);
 }
 
 /** AI SDK v4 data-stream payload so useChat renders a normal assistant bubble. */
@@ -212,9 +213,9 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     const lastUserText = messageContent(lastUserMessage);
     parsedLastUserText = lastUserText;
 
-    const simulationPayload = () =>
+    const simulationPayload = async () =>
       simulationDataStreamResponse(
-        buildSimulationReply({
+        await buildSimulationReply({
           clientFirstName,
           lastUserText,
         }),
@@ -224,7 +225,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       console.warn(
         "[stream-send] ANTHROPIC_API_KEY is undefined — serving simulation fallback stream.",
       );
-      return simulationPayload();
+      return await simulationPayload();
     }
 
     // Always persist a HOMEPAGE_LEAD / ACTIVE_WALK transcript snapshot for CRM audit
@@ -271,7 +272,11 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
         model: anthropic(getSitGuruAiModel()),
         messages,
         system: systemPrompt,
-        maxTokens: 400,
+        maxTokens: 500,
+        tools: {
+          lookupGurus: lookupGurusTool,
+        },
+        maxSteps: 3,
         onFinish: async ({ text }) => {
           try {
             const assistantText = String(text || "").trim();
@@ -319,7 +324,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
         error instanceof Error ? error.message : error,
         isRecoverableAiFailure(error) ? "(recoverable)" : "(unexpected)",
       );
-      return simulationPayload();
+      return await simulationPayload();
     }
   } catch (error) {
     console.error(
@@ -327,7 +332,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       error instanceof Error ? error.message : error,
     );
     return simulationDataStreamResponse(
-      buildSimulationReply({
+      await buildSimulationReply({
         clientFirstName: parsedClientFirstName,
         lastUserText: parsedLastUserText,
       }),

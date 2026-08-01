@@ -13,6 +13,11 @@ import {
   sanitizePreferredName,
 } from "@/lib/chat/homepage-name";
 import { buildKnowledgeAwareSimulationBeat } from "@/lib/chat/rogue-knowledge";
+import {
+  encodeGuruCardMarker,
+  inferLookupParamsFromChat,
+  lookupGurusForChat,
+} from "@/lib/gurus/lookup-gurus-for-chat";
 
 export const SIMULATION_NAME_PROMPT =
   "hi! i'm Rogue 🦴 your adorable SitGuru assistant — so happy you're here. what should i call you? first name or nickname works!";
@@ -65,8 +70,13 @@ export type HomepageSimulationOpts = {
   lastUserText?: string;
 };
 
+function appendGuruCards(base: string, markers: string[]) {
+  if (!markers.length) return base;
+  return `${base.trim()} ${markers.join(" ")}`.trim();
+}
+
 /**
- * Build a simulation reply.
+ * Sync simulation reply (client-safe — no Supabase admin).
  * Chip intents + greetings are handled before any name-ask loop.
  */
 export function buildHomepageSimulationReply(
@@ -99,7 +109,7 @@ export function buildHomepageSimulationReply(
     /\bdog walks?\b/.test(text)
   ) {
     const dogWalkCopy =
-      "great choice! we can help you find a Pet Guru to get you the care you need right away — we're fast, accurate, and right here with you. 🐕 dog walks with our local gurus include real-time live map tracking, potty alerts, and automated updates sent straight to your phone. want to set up an account to meet a nearby handler?";
+      "great choice! we match you with Pet Gurus and you book everything through SitGuru — find your favorite walker, then rebook anytime. 🐕 walks include live map tracking, potty alerts, and phone updates. share a city or ZIP and i'll pull live profiles!";
     const lead = preferred ? `hey ${formatDisplayName(preferred)}! ` : "";
     return `${lead}${dogWalkCopy} [[cta:parent]]`;
   }
@@ -110,7 +120,7 @@ export function buildHomepageSimulationReply(
     text.includes("drop in visits")
   ) {
     return `${named(
-      "great choice! we can help you find a Pet Guru to get you the care you need right away — fast, accurate matching, and i'm here to help. drop-in visits keep routines tight with feeding, potty, play, and photo updates. ready to meet someone nearby?",
+      "great choice! SitGuru matches you fast — you book on the platform and can keep your favorite Guru for next time. drop-ins cover feeding, potty, play, and photo updates. drop a city or ZIP and i'll show live snapshots!",
     )} [[cta:parent]]`;
   }
 
@@ -120,13 +130,13 @@ export function buildHomepageSimulationReply(
     text === "overnight"
   ) {
     return `${named(
-      "great choice! we can help you find a Pet Guru to get you the care you need right away — we're fast, accurate, and on it with you. overnight stays mean a trusted guru stays close through the night so your pup keeps their bedtime vibe. want to set up an account to book?",
+      "great choice! overnight care is booked through SitGuru — find a trusted Guru who stays close overnight, then rebook your favorite anytime. share a city or ZIP for live matches!",
     )} [[cta:parent]]`;
   }
 
   if (text.includes("looking for boarding") || text === "boarding") {
     return `${named(
-      "great choice! we can help you find a Pet Guru to get you the care you need right away — quick matching, clear updates, and real support from me. boarding with sitguru gurus is home-style care — not a chaotic kennel vibe. want to register and meet a nearby boarding guru?",
+      "great choice! boarding is home-style care booked on SitGuru — not a kennel vibe — so you can find and keep your favorite Boarding Guru. share a city or ZIP and i'll fetch live profiles!",
     )} [[cta:parent]]`;
   }
 
@@ -152,6 +162,20 @@ export function buildHomepageSimulationReply(
     )} [[cta:ambassador_video]] [[cta:ambassador]]`;
   }
 
+  if (
+    /\bfollow\b/.test(text) ||
+    /\bsocial\b/.test(text) ||
+    /\bevents?\b/.test(text) ||
+    /\binstagram\b|\btiktok\b|\byoutube\b|\bfacebook\b|\btwitter\b|\bx\.com\b/.test(
+      text,
+    ) ||
+    text.includes("sitguruofficial")
+  ) {
+    return `${named(
+      "follow **@SitGuruOfficial** everywhere — Instagram, Facebook, TikTok, X, and YouTube — for events, pack moments, and community highlights. tap a platform below and come hang with us!",
+    )} [[cta:social]]`;
+  }
+
   if (/\bwhat is a guru\b|\bguru\b/.test(text) && !text.includes("register")) {
     return named(
       "a guru is an expert pet care provider on sitguru — verified local sitters, dog walkers, trainers, groomers, boarding providers, and neighborhood caregivers who lead with reliability, communication, and respect for each pet's routine. want me to help you find one nearby?",
@@ -169,4 +193,58 @@ export function buildHomepageSimulationReply(
   }
 
   return buildActiveAssistanceGreeting(preferred);
+}
+
+/**
+ * Server-only simulation with live Guru snapshots when city/state/ZIP/name is present.
+ */
+export async function buildHomepageSimulationReplyWithGurus(
+  opts: HomepageSimulationOpts,
+): Promise<string> {
+  const base = buildHomepageSimulationReply(opts);
+  const lookupParams = inferLookupParamsFromChat(opts.lastUserText);
+  if (
+    !lookupParams ||
+    !(lookupParams.city || lookupParams.state || lookupParams.zip || lookupParams.name)
+  ) {
+    return base;
+  }
+
+  try {
+    const result = await lookupGurusForChat(lookupParams);
+    if (!result.gurus.length) {
+      let preferred = sanitizePreferredName(opts.clientFirstName);
+      if (isReservedPreferredName(preferred)) preferred = "";
+      const extracted = extractVisitorPreferredName(opts.lastUserText);
+      if (extracted) preferred = extracted;
+      const name = formatDisplayName(preferred);
+      const lead = name ? `hey ${name}! ` : "";
+      return `${lead}i checked our live Guru catalog for that filter — nothing public yet in that slice. try a nearby ZIP or browse /search, and i'll keep hunting with you.`;
+    }
+
+    const markers = result.gurus.map((g) => encodeGuruCardMarker(g));
+    const serviceBit = lookupParams.service
+      ? ` for **${lookupParams.service}**`
+      : "";
+    const intro = `found live Guru matches${serviceBit} — book through **SitGuru**, tap a snapshot, and you can always find your favorite Guru again in-app.`;
+    let preferred = sanitizePreferredName(opts.clientFirstName);
+    if (isReservedPreferredName(preferred)) preferred = "";
+    const extracted = extractVisitorPreferredName(opts.lastUserText);
+    if (extracted) preferred = extracted;
+    const name = formatDisplayName(preferred);
+    const lead = name ? `hey ${name}! ` : "";
+
+    // Prefer a short match intro + cards over the longer care pitch when we have hits.
+    if (
+      /\b(walk|drop|overnight|board|sit|zip|\d{5}|near|in )\b/i.test(
+        String(opts.lastUserText || ""),
+      )
+    ) {
+      return appendGuruCards(`${lead}${intro} [[cta:parent]]`, markers);
+    }
+    return appendGuruCards(`${base}`, markers);
+  } catch (error) {
+    console.warn("[homepage-simulation] guru lookup failed:", error);
+    return base;
+  }
 }
