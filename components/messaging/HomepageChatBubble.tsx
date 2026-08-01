@@ -428,6 +428,29 @@ export default function HomepageChatBubble() {
     return () => window.clearTimeout(t);
   }, [open]);
 
+  /** Keep the composer focused so visitors can type the next message without re-clicking. */
+  function focusComposer(delayMs = 0) {
+    if (!open) return;
+    window.setTimeout(() => {
+      const el = inputRef.current;
+      if (!el || el.disabled) return;
+      el.focus({ preventScroll: true });
+    }, delayMs);
+  }
+
+  // After Rogue finishes streaming (or any load ends), restore caret to the input.
+  const wasLoadingRef = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      wasLoadingRef.current = false;
+      return;
+    }
+    if (wasLoadingRef.current && !isLoading) {
+      focusComposer(30);
+    }
+    wasLoadingRef.current = isLoading;
+  }, [isLoading, open]);
+
   const showIntentChips = useMemo(
     () => Boolean(clientFirstName) && !awaitingName && !isLoading,
     [clientFirstName, awaitingName, isLoading],
@@ -483,6 +506,7 @@ export default function HomepageChatBubble() {
       },
     ]);
     setInput("");
+    focusComposer(40);
     return true;
   }
 
@@ -501,6 +525,7 @@ export default function HomepageChatBubble() {
       },
     ]);
     setInput("");
+    focusComposer(40);
   }
 
   async function sendChip(content: string) {
@@ -508,6 +533,7 @@ export default function HomepageChatBubble() {
     const inferred = inferRogueUserTypeFromIntent(content);
     if (inferred) setRogueUserType(inferred);
     await append({ role: "user", content }, chatRequestOptions());
+    focusComposer(40);
   }
 
   function onComposerSubmit(e: FormEvent<HTMLFormElement>) {
@@ -546,12 +572,15 @@ export default function HomepageChatBubble() {
         },
       ]);
       setInput("");
+      focusComposer(40);
       return;
     }
 
     const inferred = inferRogueUserTypeFromIntent(text);
     if (inferred) setRogueUserType(inferred);
     handleSubmit(e, chatRequestOptions());
+    // Input is disabled while streaming; refocus as soon as Rogue finishes (effect below).
+    focusComposer(40);
   }
 
   if (!mounted) return null;
@@ -683,7 +712,6 @@ export default function HomepageChatBubble() {
               ref={inputRef}
               rows={1}
               value={input}
-              disabled={streaming}
               placeholder={
                 awaitingName
                   ? "Type the name you go by…"
@@ -693,6 +721,7 @@ export default function HomepageChatBubble() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
+                  if (streaming) return;
                   const form = e.currentTarget.form;
                   if (form) form.requestSubmit();
                 }
