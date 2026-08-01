@@ -23,10 +23,10 @@ const BRAND_GREEN = "#0D5C3A";
 const STORAGE_KEY = "sitguru-homepage-lead-chat";
 const NAME_STORAGE_KEY = "sitguru_client_first_name";
 const LEGACY_HISTORY_KEY = "sitguru_chat_history";
-const SITGURU_AVATAR_SRC = "/images/sitguru-message-avatar.jpg";
+const ROGUE_AVATAR_SRC = "/images/rogue-avatar.png";
 
-const NAME_PROMPT =
-  "hey! welcome to the pack 🐾 i'm rogue, your chief treat officer — what should i call you? first name, nickname, whatever you go by works.";
+  const NAME_PROMPT =
+  "hey! welcome to the pack 🐾 i'm Rogue, your chief treat officer — what should i call you? first name, nickname, whatever you go by works.";
 
 /** Clean Title Case chip labels for the compact horizontal rail. */
 const CARE_INTENT_CHIPS = [
@@ -153,11 +153,11 @@ function SitGuruAvatar({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={SITGURU_AVATAR_SRC}
-      alt=""
+      src={ROGUE_AVATAR_SRC}
+      alt="Rogue"
       width={32}
       height={32}
-      className={`rounded-full overflow-hidden flex-shrink-0 object-cover ${className}`}
+      className={`rounded-full overflow-hidden flex-shrink-0 object-cover object-top ${className}`}
       aria-hidden="true"
     />
   );
