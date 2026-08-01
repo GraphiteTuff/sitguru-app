@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { buildBookingPetWriteCache } from "@/lib/bookings/load-booking-pets";
+import type { LivePetProfile } from "@/lib/bookings/booking-pet";
 
 export const dynamic = "force-dynamic";
 
@@ -706,8 +708,8 @@ export async function POST(req: NextRequest) {
       return jsonError("Missing Guru information for this booking.", 400);
     }
 
-    if (!petName) {
-      return jsonError("Missing pet name for this booking.", 400);
+    if (!petName && !incomingPetId) {
+      return jsonError("Select a pet passport for this booking.", 400);
     }
 
     if (!requestedStartDate) {
@@ -748,18 +750,28 @@ export async function POST(req: NextRequest) {
       petName,
     });
 
-    const resolvedPetId =
-      incomingPetId ||
-      (matchedPet?.id ? String(matchedPet.id) : "") ||
-      null;
-
-    const resolvedPetPhotoUrl =
-      getFirstText(body, [
+    const livePet = (matchedPet as LivePetProfile | null) || null;
+    const petWriteCache = buildBookingPetWriteCache(livePet, {
+      petId: incomingPetId,
+      petName,
+      petPhotoUrl: getFirstText(body, [
         "petPhotoUrl",
         "pet_photo_url",
         "petAvatarUrl",
         "pet_avatar_url",
-      ]) || getPetPhotoUrl(matchedPet);
+      ]),
+    });
+
+    const resolvedPetId = petWriteCache.pet_id;
+    const resolvedPetName = petWriteCache.pet_name;
+    const resolvedPetPhotoUrl = petWriteCache.pet_photo_url;
+
+    if (!resolvedPetId) {
+      return jsonError(
+        "Select a saved pet passport so this booking can link to the live pet profile.",
+        400,
+      );
+    }
 
     const servicePrice = getFirstNumber(
       body,
@@ -840,7 +852,7 @@ export async function POST(req: NextRequest) {
       guru_photo_url: resolvedGuruAvatarUrl || null,
 
       pet_id: resolvedPetId,
-      pet_name: petName,
+      pet_name: resolvedPetName,
       pet_photo_url: resolvedPetPhotoUrl || null,
 
       customer_name: customerName,
@@ -1014,7 +1026,7 @@ export async function POST(req: NextRequest) {
         guru_name: resolvedGuruName,
         guru_avatar_url: resolvedGuruAvatarUrl || "",
         pet_id: resolvedPetId || "",
-        pet_name: petName,
+        pet_name: resolvedPetName,
         pet_photo_url: resolvedPetPhotoUrl || "",
         requested_start_date: requestedStartDate,
         requested_end_date: requestedEndDate,

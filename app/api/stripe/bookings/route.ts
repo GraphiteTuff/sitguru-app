@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { calculateDistanceMiles } from "@/lib/distance/calculateDistanceMiles";
+import { buildBookingPetWriteCache } from "@/lib/bookings/load-booking-pets";
+import type { LivePetProfile } from "@/lib/bookings/booking-pet";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -983,18 +985,23 @@ export async function POST(req: NextRequest) {
       petName,
     });
 
-    const resolvedPetId =
-      selectedPetId || (matchedPet?.id ? String(matchedPet.id) : "") || null;
-
-    const selectedPetPhotoUrl =
-      getBodyString(body, [
+    const livePet = (matchedPet as LivePetProfile | null) || null;
+    const petWriteCache = buildBookingPetWriteCache(livePet, {
+      petId: selectedPetId,
+      petName,
+      petPhotoUrl: getBodyString(body, [
         "pet_photo_url",
         "petPhotoUrl",
         "pet_avatar_url",
         "petAvatarUrl",
         "pet_image_url",
         "petImageUrl",
-      ]) || getPetPhotoUrl(matchedPet);
+      ]),
+    });
+
+    const resolvedPetId = petWriteCache.pet_id;
+    const resolvedPetName = petWriteCache.pet_name;
+    const selectedPetPhotoUrl = petWriteCache.pet_photo_url;
 
     if (!guruId && !guruSlug) {
       return jsonError("Guru ID or Guru slug is required.", 400, {
@@ -1002,10 +1009,18 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (!petName) {
-      return jsonError("Pet name is required.", 400, {
+    if (!petName && !selectedPetId) {
+      return jsonError("Select a pet passport for this booking.", 400, {
         receivedBodyKeys: Object.keys(body),
       });
+    }
+
+    if (!resolvedPetId) {
+      return jsonError(
+        "Select a saved pet passport so this booking can link to the live pet profile.",
+        400,
+        { receivedBodyKeys: Object.keys(body) },
+      );
     }
 
     if (!date) {
@@ -1285,7 +1300,7 @@ export async function POST(req: NextRequest) {
       customer_total_amount: customerTotalAmount,
       total_customer_paid: customerTotalAmount,
 
-      pet_name: petName,
+      pet_name: resolvedPetName,
       service_type: serviceType,
       service_key: serviceKey || null,
       time_window: timeWindow,
@@ -1346,7 +1361,7 @@ export async function POST(req: NextRequest) {
       amount_total: customerTotalAmount,
       total: customerTotalAmount,
 
-      pet_name: petName,
+      pet_name: resolvedPetName,
       service_type: serviceType,
       time_window: timeWindow,
       visit_length: visitLength,
@@ -1529,7 +1544,7 @@ export async function POST(req: NextRequest) {
         gift_card_code: giftCardCode,
         credit_preference_requested: creditPreferenceRequested,
         pet_id: resolvedPetId || "",
-        pet_name: petName,
+        pet_name: resolvedPetName,
         pet_photo_url: selectedPetPhotoUrl || "",
         requested_start_date: requestedStartDate,
         requested_end_date: requestedEndDate,

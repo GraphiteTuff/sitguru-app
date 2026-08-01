@@ -111,12 +111,31 @@ async function resolveDisplayNames(params: {
   let petName = "Your pet";
   let guruName = "Your Guru";
 
-  const petFromBooking =
-    params.booking.pet_name ||
-    params.booking.petName ||
-    params.booking.animal_name;
-  if (typeof petFromBooking === "string" && petFromBooking.trim()) {
-    petName = petFromBooking.trim();
+  const petId = String(
+    params.booking.pet_id ||
+      params.booking.customer_pet_id ||
+      params.booking.primary_pet_id ||
+      "",
+  ).trim();
+
+  if (petId) {
+    const { data: pet } = await supabaseAdmin
+      .from("pets")
+      .select("name")
+      .eq("id", petId)
+      .maybeSingle();
+    const liveName = (pet as { name?: string } | null)?.name;
+    if (liveName?.trim()) petName = liveName.trim();
+  }
+
+  if (petName === "Your pet") {
+    const petFromBooking =
+      params.booking.pet_name ||
+      params.booking.petName ||
+      params.booking.animal_name;
+    if (typeof petFromBooking === "string" && petFromBooking.trim()) {
+      petName = petFromBooking.trim();
+    }
   }
 
   if (params.guruId) {

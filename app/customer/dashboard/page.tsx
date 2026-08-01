@@ -31,6 +31,10 @@ import Header from "@/components/Header";
 import { PawIcon } from "@/components/ui/PawIcon";
 import MultiPetProfileCenter from "@/components/customer/MultiPetProfileCenter";
 import { normalizeCanonicalPet } from "@/lib/pets/canonical";
+import {
+  findPetForBooking as findLinkedPetForBooking,
+  resolveBookingPet,
+} from "@/lib/bookings/booking-pet";
 
 type CustomerProfile = {
   first_name: string | null;
@@ -1186,21 +1190,17 @@ function getBookingLocation(booking: Booking) {
 }
 
 function findPetForBooking(booking: Booking, pets: Pet[]) {
-  const bookingPetId = booking.pet_id?.trim();
-  const bookingPetName = booking.pet_name?.trim().toLowerCase();
-
-  return (
-    pets.find((pet) => (bookingPetId ? pet.id === bookingPetId : false)) ||
-    pets.find((pet) =>
-      bookingPetName ? pet.name.trim().toLowerCase() === bookingPetName : false,
-    ) ||
-    (pets.length === 1 ? pets[0] : null)
-  );
+  return findLinkedPetForBooking(booking, pets);
 }
 
-function getBookingCareSummary(booking: Booking) {
+function getBookingDisplayPet(booking: Booking, pets: Pet[]) {
+  const live = findPetForBooking(booking, pets);
+  return resolveBookingPet(booking, live);
+}
+
+function getBookingCareSummary(booking: Booking, pets: Pet[] = []) {
   const service = booking.service_type || "Pet care";
-  const petName = booking.pet_name || "your pet";
+  const petName = getBookingDisplayPet(booking, pets).name || "your pet";
   const guruName = booking.guru_name?.trim();
 
   if (guruName) {
@@ -2347,16 +2347,19 @@ function BookingCard({
   booking,
   featured = false,
   petPhotoUrl = null,
+  petDisplayName = null,
   pawReportSummary = null,
 }: {
   booking: Booking;
   featured?: boolean;
   petPhotoUrl?: string | null;
+  petDisplayName?: string | null;
   pawReportSummary?: PawReportSummary | null;
 }) {
   const displayDate = getBookingDisplayDate(booking);
   const location = getBookingLocation(booking);
   const totalAmount = booking.total_customer_paid || booking.subtotal_amount;
+  const displayName = petDisplayName || booking.pet_name || "Your pet";
   const hasPawReportActivity = Boolean(
     pawReportSummary &&
     (pawReportSummary.status === "in_progress" ||
@@ -2409,7 +2412,7 @@ function BookingCard({
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={petPhotoUrl}
-                      alt={booking.pet_name || "Pet"}
+                      alt={displayName}
                       className="h-full w-full object-cover object-center"
                     />
                   ) : (
@@ -2436,7 +2439,7 @@ function BookingCard({
 
               <div className="min-w-0 flex-1">
                 <h3 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
-                  {booking.pet_name || "Your pet"}
+                  {displayName}
                 </h3>
                 <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
                   {getBookingCareSummary(booking)}
@@ -3191,7 +3194,7 @@ export default function CustomerDashboardPage() {
     if (activeBooking && activeSummary) {
       updates.push({
         label: getLatestPawReportLabel(activeSummary),
-        detail: `${activeBooking.pet_name || "Your pet"} • ${formatLiveUpdateTime(
+        detail: `${getBookingDisplayPet(activeBooking, pets).name} • ${formatLiveUpdateTime(
           activeSummary.latest_update_at,
         )}`,
         href: getBookingPawReportHref(activeBooking.id),
@@ -3202,7 +3205,7 @@ export default function CustomerDashboardPage() {
     if (stats.nextBooking) {
       updates.push({
         label: "Next care",
-        detail: `${stats.nextBooking.pet_name || "Pet care"} • ${formatShortDate(
+        detail: `${getBookingDisplayPet(stats.nextBooking, pets).name} • ${formatShortDate(
           getBookingDisplayDate(stats.nextBooking),
         )}`,
         href: getBookingDetailHref(stats.nextBooking.id),
@@ -3254,6 +3257,7 @@ export default function CustomerDashboardPage() {
     liveCareBookings,
     pawReportMap,
     stats.nextBooking,
+    pets,
     referralProfile?.pending_rewards,
     profileCompletion,
     universityProgress.completedSteps,
@@ -3489,7 +3493,7 @@ export default function CustomerDashboardPage() {
                   {featuredCareBooking ? (
                     <>
                       <p className="mt-3 text-base font-bold leading-7 text-slate-700">
-                        {getBookingCareSummary(featuredCareBooking)}
+                        {getBookingCareSummary(featuredCareBooking, pets)}
                       </p>
                       <div className="mt-4 flex flex-wrap gap-2 text-xs font-black">
                         <span className="rounded-full bg-white px-3 py-2 text-slate-700 ring-1 ring-slate-200">
@@ -3608,7 +3612,9 @@ export default function CustomerDashboardPage() {
                     </div>
                     <div>
                       <p className="text-sm font-black text-slate-950">
-                        {featuredCareBooking?.pet_name || "Your pet care hub"}
+                        {featuredCareBooking
+                          ? getBookingDisplayPet(featuredCareBooking, pets).name
+                          : "Your pet care hub"}
                       </p>
                       <p className="mt-1 text-xs font-semibold text-slate-500">
                         {featuredCareBooking?.guru_name
@@ -3902,13 +3908,14 @@ export default function CustomerDashboardPage() {
             ) : (
               <div className="mt-5 grid gap-4">
                 {upcomingBookings.slice(0, 3).map((booking, index) => {
-                  const matchedPet = findPetForBooking(booking, pets);
+                  const resolved = getBookingDisplayPet(booking, pets);
                   return (
                     <BookingCard
                       key={booking.id}
                       booking={booking}
                       featured={index === 0}
-                      petPhotoUrl={matchedPet?.photo_url || null}
+                      petPhotoUrl={resolved.photoUrl}
+                      petDisplayName={resolved.name}
                       pawReportSummary={pawReportMap.get(booking.id) || null}
                     />
                   );
@@ -4200,7 +4207,7 @@ export default function CustomerDashboardPage() {
             ) : (
               <div className="mt-5 grid gap-3 md:grid-cols-2">
                 {recentBookings.slice(0, 6).map((booking) => {
-                  const matchedPet = findPetForBooking(booking, pets);
+                  const resolved = getBookingDisplayPet(booking, pets);
                   return (
                     <Link
                       key={booking.id}
@@ -4209,11 +4216,11 @@ export default function CustomerDashboardPage() {
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
-                          {matchedPet?.photo_url ? (
+                          {resolved.photoUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={matchedPet.photo_url}
-                              alt={matchedPet.name}
+                              src={resolved.photoUrl}
+                              alt={resolved.name}
                               className="h-full w-full object-cover"
                             />
                           ) : (
@@ -4223,7 +4230,7 @@ export default function CustomerDashboardPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="truncate text-sm font-black text-slate-950">
-                              {booking.pet_name || "Pet Care"} • {booking.service_type || "Booking"}
+                              {resolved.name} • {booking.service_type || "Booking"}
                             </p>
                             <span className={`rounded-full px-2.5 py-1 text-[9px] font-black ${getStatusClasses(booking.status)}`}>
                               {formatStatus(booking.status)}

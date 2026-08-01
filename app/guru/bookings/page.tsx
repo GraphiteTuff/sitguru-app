@@ -50,6 +50,7 @@ type PetRow = {
   breed?: string | null;
   species?: string | null;
   size?: string | null;
+  photo_url?: string | null;
   owner_id?: string | null;
   owner_profile_id?: string | null;
 };
@@ -397,12 +398,14 @@ async function enrichBookingsWithPetMedia(
     }
 
     const petImageUrl =
+      pet?.photo_url ||
       booking.pet_photo_url ||
       (pet?.id ? petMediaByPetId.get(String(pet.id))?.file_url : null) ||
       null;
 
     return {
       ...booking,
+      pet_name: pet?.name || booking.pet_name,
       pet_avatar_url: petImageUrl,
       resolved_pet_type: pet?.species || booking.pet_type || null,
       resolved_breed: pet?.breed || booking.breed || null,

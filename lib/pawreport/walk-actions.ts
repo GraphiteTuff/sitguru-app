@@ -59,6 +59,20 @@ function pointFromBody(input: ActionInput): WalkGeoPoint | null {
 }
 
 async function resolvePetName(booking: Record<string, unknown>) {
+  const petId = String(
+    booking.pet_id || booking.customer_pet_id || booking.primary_pet_id || "",
+  ).trim();
+
+  if (petId) {
+    const { data: pet } = await supabaseAdmin
+      .from("pets")
+      .select("name")
+      .eq("id", petId)
+      .maybeSingle();
+    const liveName = (pet as { name?: string } | null)?.name;
+    if (liveName?.trim()) return liveName.trim();
+  }
+
   const raw =
     booking.pet_name || booking.petName || booking.animal_name || "Scout";
   return typeof raw === "string" && raw.trim() ? raw.trim() : "Scout";

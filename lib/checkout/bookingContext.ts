@@ -1,6 +1,12 @@
 /**
  * Booking context shown in the checkout drawer header / timeline.
+ * Live pet profile (via pet_id) wins over denormalized booking snapshots.
  */
+
+import {
+  resolveBookingPet,
+  type LivePetProfile,
+} from "@/lib/bookings/booking-pet";
 
 export type CheckoutBookingContext = {
   petName: string;
@@ -36,11 +42,14 @@ export function buildDurationLabel(daysCount: number): string {
 }
 
 /**
- * Normalize booking row fields (and optional client overrides) into drawer context.
+ * Normalize booking row fields (and optional live pet) into drawer context.
  */
 export function extractCheckoutBookingContext(
   booking: Record<string, unknown> | null | undefined,
-  overrides?: Partial<CheckoutBookingContext> & { daysCount?: number },
+  overrides?: Partial<CheckoutBookingContext> & {
+    daysCount?: number;
+    livePet?: LivePetProfile | null;
+  },
 ): CheckoutBookingContext {
   const daysCount = Math.max(
     1,
@@ -65,11 +74,12 @@ export function extractCheckoutBookingContext(
     asText(booking?.end_date) ||
     null;
 
-  const petName =
-    overrides?.petName ||
-    asText(booking?.pet_name) ||
-    asText(booking?.petName) ||
-    "your pet";
+  const resolved = resolveBookingPet(
+    booking || undefined,
+    overrides?.livePet || null,
+  );
+
+  const petName = overrides?.petName || resolved.name || "your pet";
 
   const guruName =
     overrides?.guruName ||
@@ -80,6 +90,7 @@ export function extractCheckoutBookingContext(
 
   const petPhotoUrl =
     overrides?.petPhotoUrl ||
+    resolved.photoUrl ||
     asText(booking?.pet_photo_url) ||
     asText(booking?.petPhotoUrl) ||
     null;
@@ -88,6 +99,7 @@ export function extractCheckoutBookingContext(
     overrides?.guruAvatarUrl ||
     asText(booking?.guru_avatar_url) ||
     asText(booking?.guruAvatarUrl) ||
+    asText(booking?.guru_photo_url) ||
     null;
 
   return {
