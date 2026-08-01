@@ -93,11 +93,8 @@ const ALL_INTENT_CHIPS: ReadonlyArray<{
   })),
 ];
 
-const INTENT_CHIP_TONE_CLASS: Record<IntentChipTone, string> = {
-  care: "border-green-600 text-green-700 hover:bg-green-50",
-  provider: "border-blue-600 text-blue-700 hover:bg-blue-50",
-  ambassador: "border-amber-600 text-amber-800 hover:bg-amber-50",
-};
+const INTENT_CHIP_CLASS =
+  "px-4 py-1.5 bg-[#0D5C3A] text-white text-xs font-medium rounded-full shadow-sm hover:bg-opacity-95 active:scale-95 transition-all whitespace-nowrap flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
 
 function sanitizeFirstName(raw: string): string {
   return String(raw || "")
@@ -484,8 +481,8 @@ export default function HomepageChatBubble() {
                   Rogue, Your Chief Treat Officer 🦴
                 </p>
                 <p className="homepage-chat-panel__sub">
-                  Your personalized Assistant to help you with your journey to
-                  become part of our SitGuru Pet Community.
+                  Your personalized instant AI Assistant for your SitGuru Pet
+                  Community journey.
                 </p>
               </div>
             </div>
@@ -554,7 +551,7 @@ export default function HomepageChatBubble() {
                   type="button"
                   disabled={streaming}
                   onClick={() => void sendChip(chip.content)}
-                  className={`shrink-0 rounded-full border bg-white px-2.5 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${INTENT_CHIP_TONE_CLASS[chip.tone]}`}
+                  className={INTENT_CHIP_CLASS}
                 >
                   {chip.label}
                 </button>
