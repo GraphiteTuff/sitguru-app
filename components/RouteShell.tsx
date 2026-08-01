@@ -138,7 +138,8 @@ export default function RouteShell({ children }: { children: ReactNode }) {
   const floatingControls = (
     <FloatingActionStack>
       <ScrollToTopButton nested />
-      {isHomePage ? <HomepageChatBubble /> : null}
+      {/* Rogue chat + intro tip on public marketing surfaces (all viewports). */}
+      {isHomePage || isPublicPage ? <HomepageChatBubble /> : null}
     </FloatingActionStack>
   );
 

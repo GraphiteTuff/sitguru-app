@@ -19,8 +19,8 @@ export default function FloatingActionStack({
     <div
       className={[
         "pointer-events-none fixed bottom-4 right-4 z-50",
-        "flex flex-row items-end gap-3",
-        "md:bottom-6 md:right-6 md:flex-col md:items-center md:gap-4",
+        "flex flex-row items-end gap-3 overflow-visible",
+        "md:bottom-6 md:right-6 md:flex-col md:items-end md:gap-4",
         className,
       ]
         .filter(Boolean)

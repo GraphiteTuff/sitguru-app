@@ -234,7 +234,6 @@ export default function HomepageChatBubble() {
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
-  const [showTip, setShowTip] = useState(true);
   const [clientFirstName, setClientFirstName] = useState("");
   const [awaitingName, setAwaitingName] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -327,7 +326,6 @@ export default function HomepageChatBubble() {
       if (Array.isArray(parsed.messages) && parsed.messages.length > 0) {
         setMessages(parsed.messages);
         setHasUnread(false);
-        setShowTip(false);
       } else {
         setMessages([buildWelcome(restoredName)]);
       }
@@ -372,7 +370,6 @@ export default function HomepageChatBubble() {
   function openPanel() {
     setOpen(true);
     setHasUnread(false);
-    setShowTip(false);
     if (messages.length === 0) {
       const name = clientFirstName || readStoredFirstName();
       setMessages([buildWelcome(name)]);
@@ -449,16 +446,17 @@ export default function HomepageChatBubble() {
       className="homepage-chat-bubble-root"
       style={{ ["--hcb-green" as string]: BRAND_GREEN }}
     >
-      {!open && showTip ? (
+      {!open ? (
         <button
           type="button"
           className="homepage-chat-tip"
           onClick={openPanel}
-          aria-label="Open SitGuru AI Pack Leader chat"
+          aria-label="Open chat with Rogue, Your Chief Treat Officer"
         >
           <span className="homepage-chat-tip__pulse" aria-hidden />
           <span className="homepage-chat-tip__text">
-            Need help? Chat with Rogue, Chief Treat Officer
+            Hi! I&apos;m Rogue 🦴 Tap to chat — I&apos;m your adorable assistant
+            for the SitGuru journey!
           </span>
         </button>
       ) : null}
