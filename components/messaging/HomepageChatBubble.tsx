@@ -158,7 +158,7 @@ function SitGuruAvatar({
       width={64}
       height={64}
       className={`rounded-full overflow-hidden flex-shrink-0 object-cover ${className}`}
-      style={{ objectPosition: "50% 18%" }}
+      style={{ objectPosition: "50% 28%" }}
       aria-hidden="true"
     />
   );
