@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
+  getTrustSafetyBypassStatusPayload,
+  isGuruTrustSafetyAlreadyBypassed,
   isTrustSafetyScreeningBypassed,
   TRUST_SAFETY_SCREENING_BYPASS,
 } from "@/lib/config/trust-safety";
@@ -317,6 +319,37 @@ function HeroPawDecor() {
 
 async function applyTrustSafetyLaunchWaiver(profile: GuruProfile | null) {
   if (!profile?.id) return profile;
+
+  if (isTrustSafetyScreeningBypassed()) {
+    const bypassPayload = getTrustSafetyBypassStatusPayload();
+
+    if (isGuruTrustSafetyAlreadyBypassed(profile)) {
+      return {
+        ...profile,
+        ...bypassPayload,
+      };
+    }
+
+    const { data, error } = await supabase
+      .from("gurus")
+      .update(bypassPayload)
+      .eq("id", profile.id)
+      .select("*")
+      .single();
+
+    if (error) {
+      console.warn("Could not persist Trust & Safety bypass status:", error);
+      return {
+        ...profile,
+        ...bypassPayload,
+      };
+    }
+
+    return (data as GuruProfile) || {
+      ...profile,
+      ...bypassPayload,
+    };
+  }
 
   const currentFeeStatus = String(profile.background_check_fee_status || "")
     .trim()

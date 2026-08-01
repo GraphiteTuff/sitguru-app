@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendSitGuruEmail } from "@/lib/email/resend";
+import {
+  getTrustSafetyBypassStatusPayload,
+  isTrustSafetyScreeningBypassed,
+  TRUST_SAFETY_SCREENING_BYPASS,
+} from "@/lib/config/trust-safety";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -771,6 +776,20 @@ export async function POST(request: Request) {
         { error: "You can only start screening for your own Guru profile." },
         { status: 403 },
       );
+    }
+
+    if (isTrustSafetyScreeningBypassed()) {
+      const bypassPayload = getTrustSafetyBypassStatusPayload();
+
+      await supabaseAdmin.from("gurus").update(bypassPayload).eq("id", guru.id);
+
+      return NextResponse.json({
+        ok: true,
+        bypassed: true,
+        message: TRUST_SAFETY_SCREENING_BYPASS.description,
+        background_check_status: TRUST_SAFETY_SCREENING_BYPASS.status,
+        checkr_status: TRUST_SAFETY_SCREENING_BYPASS.status,
+      });
     }
 
     const trustSafetyPurchase = await getLatestTrustSafetyPurchase(guru.id);
