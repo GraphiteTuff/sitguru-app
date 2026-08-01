@@ -210,7 +210,7 @@ function SitGuruAvatar({
 
 function CtaActionButton({ cta }: { cta: HomepageCtaDef }) {
   if (cta.socialPack) {
-    return <SocialFollowPack />;
+    return <SocialFollowPack source="rogue_homepage_chat" />;
   }
   const external = /^https?:\/\//i.test(cta.href);
   if (external) {
