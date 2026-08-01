@@ -219,7 +219,23 @@ function CtaActionButton({ cta }: { cta: HomepageCtaDef }) {
 }
 
 function AssistantBubbleBody({ content }: { content: string }) {
-  const { text, ctas, guruCards } = parseHomepageChatContent(content);
+  let text = "";
+  let ctas: HomepageCtaDef[] = [];
+  let guruCards: ReturnType<typeof parseHomepageChatContent>["guruCards"] = [];
+
+  try {
+    const parsed = parseHomepageChatContent(content);
+    text = parsed.text;
+    ctas = parsed.ctas;
+    guruCards = parsed.guruCards;
+  } catch {
+    // Last-resort strip so a parser failure never paints raw tokens.
+    text = String(content || "")
+      .replace(/\[\[\s*guru_card\s*:[\s\S]*?\]\]/gi, " ")
+      .replace(/\[\[\s*guru_card\s*:[^\[]*/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
 
   return (
     <div className="space-y-1">

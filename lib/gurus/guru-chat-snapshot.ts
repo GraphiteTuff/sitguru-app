@@ -36,13 +36,22 @@ export type LookupGurusResult = {
   note?: string;
 };
 
-/** Matches complete + slightly messy model-emitted guru card markers. */
+/** Matches complete + slightly messy model-emitted guru card markers.
+ *  Allow any chars (incl. newlines) until closing ]] — long base64 often wraps. */
 export const GURU_CARD_MARKER_PATTERN =
-  /(?:`{1,3})?\[\[\s*guru_card\s*:\s*([A-Za-z0-9_+\/=-]+)\s*\]\](?:`{1,3})?/gi;
+  /(?:`{1,3})?\[\[\s*guru_card\s*:\s*([\s\S]*?)\]\](?:`{1,3})?/gi;
 
 /** Incomplete / truncated markers (no closing brackets) — strip from UI. */
 const GURU_CARD_ORPHAN_PATTERN =
-  /(?:`{1,3})?\[\[\s*guru_card\s*:\s*[A-Za-z0-9_+\/=-]{8,}(?:`{1,3})?/gi;
+  /(?:`{1,3})?\[\[\s*guru_card\s*:[^\[]{8,}?(?=$|\n\n|\[\[)/gi;
+
+/** Catch leftover base64 crumbs after a broken orphan strip. */
+const GURU_CARD_CRUMB_PATTERN =
+  /(?:^|\s)(?:eyJ|ewog)[A-Za-z0-9_+\/= \t\r\n-]{20,}(?:\]\])?/g;
+
+function sanitizeCardPayload(payload: string) {
+  return String(payload || "").replace(/[^A-Za-z0-9_+\/=-]/g, "");
+}
 
 function toBase64Url(text: string) {
   const bytes = new TextEncoder().encode(text);
@@ -179,7 +188,7 @@ export function extractGuruCardsFromText(raw: string): {
   const seen = new Set<string>();
 
   text = text.replace(GURU_CARD_MARKER_PATTERN, (_full, payload: string) => {
-    const card = decodeGuruCardMarker(payload);
+    const card = decodeGuruCardMarker(sanitizeCardPayload(payload));
     if (card && !seen.has(card.slug)) {
       seen.add(card.slug);
       cards.push(card);
@@ -191,6 +200,8 @@ export function extractGuruCardsFromText(raw: string): {
   // Never leave raw token fragments in the bubble.
   text = text.replace(GURU_CARD_ORPHAN_PATTERN, " ");
   GURU_CARD_ORPHAN_PATTERN.lastIndex = 0;
+  text = text.replace(GURU_CARD_CRUMB_PATTERN, " ");
+  GURU_CARD_CRUMB_PATTERN.lastIndex = 0;
   text = text.replace(/\bmarker\s*:\s*/gi, " ");
 
   text = text
