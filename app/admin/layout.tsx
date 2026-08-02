@@ -132,7 +132,7 @@ const navSections = [
       { label: "Partners", href: adminRoutes.partners, icon: HandCoins },
       { label: "Analytics", href: adminRoutes.analytics, icon: Gauge },
       {
-        label: "Chat Insights",
+        label: "Insights",
         href: adminRoutes.insights,
         icon: MessageCircle,
       },
