@@ -1939,7 +1939,7 @@ const MODULE_KEYWORDS: Record<AdminReportModuleId, string[]> = {
   sitguru_university: ["university", "training", "certification", "quiz", "academy"],
   trust_safety: ["trust", "safety", "background check", "fraud", "compliance"],
   messages: ["message", "inbox", "sla", "unread", "support lag"],
-  sales_marketing: ["sales", "marketing", "campaign", "promo", "cac", "acquisition"],
+  sales_marketing: ["sales", "marketing", "campaign", "promo", "cac", "acquisition", "social", "followers", "instagram", "tiktok"],
   growth_referrals: ["referral", "invite", "bonus", "growth & referrals", "pawperks"],
   programs: ["program", "veteran", "military", "student hire", "community hire", "skillbridge"],
   partners: ["partner", "clinic", "b2b", "corporate"],

@@ -72,6 +72,13 @@ const QUICK_CHIPS = [
       "Produce Growth Analytics: campaigns/CAC signals, referrals, programs (including Veterans & Military Families), partners, analytics MoM KPIs, and chat insight friction.",
   },
   {
+    id: "social_followers",
+    label: "Social Followers",
+    period: "daily" as const,
+    prompt:
+      "Fetch live @SitGuruOfficial social follower counts and new followers today across Instagram, Facebook, TikTok, and X. Use fetchLiveSocialFollowers with scope admin and summarize the pack deltas.",
+  },
+  {
     id: "system_audit",
     label: "System Audit",
     period: "weekly" as const,

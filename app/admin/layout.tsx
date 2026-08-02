@@ -36,6 +36,7 @@ import {
 import NotificationBell from "@/components/NotificationBell";
 import AdminAccountMenu from "@/components/AdminAccountMenu";
 import RogueFloatingAssistant from "@/components/admin/RogueFloatingAssistant";
+import DelilahFloatingAssistant from "@/components/admin/DelilahFloatingAssistant";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 
 const adminRoutes = {
@@ -881,6 +882,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       {/* Outside overflow-x-hidden so the tip bubble isn't clipped */}
       <SafeAssistantBubble>
         <RogueFloatingAssistant />
+      </SafeAssistantBubble>
+      <SafeAssistantBubble>
+        <DelilahFloatingAssistant />
       </SafeAssistantBubble>
     </>
   );
