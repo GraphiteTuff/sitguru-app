@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
+import {
+  isHardcodedSuperUserEmail,
+  normalizeAdminEmail,
+} from "@/lib/admin/super-users";
+import { isAdminRole, isSuperUserRole } from "@/lib/admin/access";
 
 type SafeFormData = {
   get(name: string): unknown;
@@ -43,7 +46,7 @@ export async function POST(request: NextRequest) {
   const rawPassword = formData.get("password");
 
   const email =
-    typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
+    typeof rawEmail === "string" ? normalizeAdminEmail(rawEmail) : "";
   const password = typeof rawPassword === "string" ? rawPassword : "";
 
   if (!email || !password) {
@@ -54,7 +57,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!SUPER_USER_EMAILS.has(email)) {
+  if (!isHardcodedSuperUserEmail(email)) {
     return redirectWithMessage(
       request,
       "error",
@@ -92,11 +95,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const verifiedEmail = String(user.email || "")
-    .trim()
-    .toLowerCase();
+  const verifiedEmail = normalizeAdminEmail(user.email);
 
-  if (!SUPER_USER_EMAILS.has(verifiedEmail)) {
+  if (!isHardcodedSuperUserEmail(verifiedEmail)) {
     await supabase.auth.signOut();
 
     return redirectWithMessage(
@@ -122,7 +123,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (profile?.role && profile.role !== "admin") {
+  // Hardcoded HQ emails are allowed even without a profile role.
+  // If a role is set, it must still be an admin/super role.
+  const profileRole = String(profile?.role || "")
+    .trim()
+    .toLowerCase();
+  if (
+    profileRole &&
+    !isAdminRole(profileRole) &&
+    !isSuperUserRole(profileRole)
+  ) {
     await supabase.auth.signOut();
 
     return redirectWithMessage(

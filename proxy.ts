@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-
-const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
+import {
+  isHardcodedSuperUserEmail,
+  normalizeAdminEmail,
+} from "@/lib/admin/super-users";
 
 const ADMIN_PROFILE_ROLES = new Set([
   "founder",
@@ -39,7 +41,7 @@ function normalizeValue(value: string | null | undefined) {
 }
 
 function normalizeEmail(value: string | null | undefined) {
-  return normalizeValue(value);
+  return normalizeAdminEmail(value);
 }
 
 function getEnvAdminEmails() {
@@ -52,7 +54,7 @@ function getEnvAdminEmails() {
 }
 
 function isSuperUserEmail(email: string | null | undefined) {
-  return SUPER_USER_EMAILS.has(normalizeEmail(email));
+  return isHardcodedSuperUserEmail(email);
 }
 
 function isEnvAdminEmail(email: string | null | undefined) {

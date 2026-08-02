@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
 
 export const FINANCE_ROLES = [
   "owner",
@@ -50,8 +51,8 @@ export async function getFinanceAdminIdentity(): Promise<FinanceAdminIdentity | 
   const email = String(user.email || "").toLowerCase();
   const envEmails = getEnvAdminEmails();
 
-  if (envEmails.includes(email)) {
-    return { id: user.id, email, role: "admin" };
+  if (isHardcodedSuperUserEmail(email) || envEmails.includes(email)) {
+    return { id: user.id, email, role: "super_admin" };
   }
 
   const [adminUser, profile, users] = await Promise.all([
