@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 export type UniversityAcademyType = "pet_parent" | "guru" | "ambassador" | "all";
 
@@ -118,7 +119,7 @@ async function safeSelect(
     }
 
     return {
-      data: Array.isArray(data) ? (data as AnyRow[]) : [],
+      data: asAnyRows(data),
       ok: true,
       message: `${table} connected`,
     };

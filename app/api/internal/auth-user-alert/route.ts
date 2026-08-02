@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -164,7 +165,7 @@ async function safeRows(
       return [] as AnyRow[];
     }
 
-    return Array.isArray(data) ? (data as AnyRow[]) : [];
+    return asAnyRows(data);
   } catch (error) {
     console.warn(`Signup alert skipped ${label}:`, error);
     return [] as AnyRow[];

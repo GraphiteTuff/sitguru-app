@@ -20,6 +20,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { calculateSitGuruProfileCompletion } from "@/lib/profileCompletion";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -262,7 +263,7 @@ async function safeRows(
       return [] as AnyRow[];
     }
 
-    return Array.isArray(result.data) ? (result.data as AnyRow[]) : [];
+    return asAnyRows(result.data);
   } catch (error) {
     console.warn(`Account lifecycle query skipped for ${label}:`, error);
     return [] as AnyRow[];

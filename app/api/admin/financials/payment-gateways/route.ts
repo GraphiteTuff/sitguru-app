@@ -9,6 +9,7 @@ import {
   type PaymentGatewayId,
   type PaymentGatewayRange,
 } from "@/lib/admin/financials/payment-gateways";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -226,7 +227,7 @@ async function safeSelect(
 
     return {
       ok: true,
-      rows: Array.isArray(data) ? (data as any[]) : [],
+      rows: asAnyRows(data),
       message: `${table} connected`,
     };
   } catch (error) {
