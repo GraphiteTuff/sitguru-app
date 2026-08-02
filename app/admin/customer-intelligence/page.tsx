@@ -1922,7 +1922,7 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
             {recentCustomers.map((customer) => (
               <div
                 key={customer.id}
-                className="grid gap-4 bg-white px-4 py-4 transition hover:bg-green-50/60 xl:grid-cols-[1.3fr_0.95fr_0.72fr_0.62fr_0.55fr_0.55fr_1.45fr] xl:items-center"
+                className="grid gap-4 bg-white px-4 py-4 transition hover:bg-emerald-50/60 sm:px-5 xl:grid-cols-[1.3fr_0.95fr_0.72fr_0.62fr_0.55fr_0.55fr_1.45fr] xl:items-center"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
@@ -1930,11 +1930,11 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
                       name={customer.name}
                       email={customer.email}
                       src={customer.avatarUrl}
-                      size="md"
+                      size="lg"
                     />
 
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-slate-950">
+                      <p className="truncate text-base font-black text-slate-950">
                         {customer.name}
                       </p>
                       <p className="truncate text-xs font-bold text-slate-500">
