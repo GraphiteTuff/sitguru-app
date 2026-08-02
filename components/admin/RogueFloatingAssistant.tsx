@@ -22,9 +22,9 @@ const ROGUE_AVATAR_SRC = "/images/rogue-avatar.png";
 const REPORTING_STATEMENT =
   "**Rogue reporting for duty.** I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap a chip or ask me anything admin-shaped.";
 
-/** Homepage-style tip copy, admin reporting flavor. */
+/** Admin tip bubble — reporting-for-duty statement. */
 const TIP_STATEMENT =
-  "Hi! I'm Rogue 🦴 Tap for reports — I'll sniff Operations, Growth, Financials & Audits for you!";
+  "Rogue reporting for duty. I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap a chip or ask me anything admin-shaped!";
 
 const QUICK_CHIPS = [
   {
