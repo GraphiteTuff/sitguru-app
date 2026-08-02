@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies, headers } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,6 +12,8 @@ type PayoutRow = Record<string, unknown>;
 type DisputeRow = Record<string, unknown>;
 type StripeBalanceRow = Record<string, unknown>;
 type BankTransactionRow = Record<string, unknown>;
+type BookingPaymentRow = Record<string, unknown>;
+type PlaidTransactionRow = Record<string, unknown>;
 
 type SafeQueryResponse = {
   data: unknown;
@@ -61,16 +63,6 @@ type ExportPayload = {
     reconciliationReady: boolean;
   };
 };
-
-const FINANCE_ROLES = new Set([
-  "owner",
-  "super_admin",
-  "admin",
-  "finance_admin",
-  "finance",
-  "accounting",
-  "bookkeeper",
-]);
 
 const EXPORT_COLUMNS: Array<keyof ExportRow> = [
   "section",
@@ -168,103 +160,19 @@ function isActiveFinancialRow(row: Record<string, unknown>) {
   return true;
 }
 
-async function createSupabaseUserClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            );
-          } catch {
-            // Route handlers can run in contexts where setting cookies is not available.
-          }
-        },
-      },
-    },
-  );
-}
-
-function envEmailAllowed(email?: string | null) {
-  if (!email) return false;
-
-  const configured = [
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS,
-    process.env.ADMIN_EMAILS,
-  ]
-    .filter(Boolean)
-    .join(",")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-
-  return configured.includes(email.toLowerCase());
-}
-
 async function requireFinanceAccess(): Promise<UserAccess> {
-  try {
-    const supabase = await createSupabaseUserClient();
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
+  const financeCheck = await requireFinanceAdminApi();
 
-    if (error || !user) {
-      return { ok: false, reason: "Not authenticated" };
-    }
-
-    const email = user.email || "";
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, account_type")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const profileRole = asTrimmedString(profile?.role).toLowerCase();
-    const profileAccountType = asTrimmedString(profile?.account_type).toLowerCase();
-
-    if (FINANCE_ROLES.has(profileRole) || FINANCE_ROLES.has(profileAccountType)) {
-      return {
-        ok: true,
-        userId: user.id,
-        email,
-        role: profileRole || profileAccountType,
-      };
-    }
-
-    const { data: roleRows } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
-
-    const role = (roleRows || [])
-      .map((row) => asTrimmedString(row.role).toLowerCase())
-      .find((item) => FINANCE_ROLES.has(item));
-
-    if (role) {
-      return { ok: true, userId: user.id, email, role };
-    }
-
-    if (envEmailAllowed(email)) {
-      return { ok: true, userId: user.id, email, role: "finance_env_allowlist" };
-    }
-
-    return { ok: false, userId: user.id, email, reason: "Finance access required" };
-  } catch (error) {
-    return {
-      ok: false,
-      reason: error instanceof Error ? error.message : "Unable to verify finance access",
-    };
+  if (!financeCheck.identity) {
+    return { ok: false, reason: "Finance access required" };
   }
+
+  return {
+    ok: true,
+    userId: financeCheck.identity.id,
+    email: financeCheck.identity.email,
+    role: financeCheck.identity.role,
+  };
 }
 
 async function safeRows<T>(
@@ -486,10 +394,23 @@ async function getProfitLossExportPayload({
   startDate: string | null;
   endDate: string | null;
 }): Promise<ExportPayload> {
-  const [bookingRows, expenseRows, payoutRows, disputeRows, stripeRows, bankRows] = await Promise.all([
+  const [
+    bookingRows,
+    bookingPaymentRows,
+    expenseRows,
+    payoutRows,
+    disputeRows,
+    stripeRows,
+    bankRows,
+    plaidRows,
+  ] = await Promise.all([
     safeRows<BookingRow>(
       supabaseAdmin.from("bookings").select("*").order("created_at", { ascending: false }).limit(10000),
       "bookings",
+    ),
+    safeRows<BookingPaymentRow>(
+      supabaseAdmin.from("booking_payments").select("*").order("created_at", { ascending: false }).limit(10000),
+      "booking_payments",
     ),
     safeRows<ExpenseRow>(
       supabaseAdmin.from("expense_ledger").select("*").order("created_at", { ascending: false }).limit(10000),
@@ -511,30 +432,80 @@ async function getProfitLossExportPayload({
       supabaseAdmin.from("bank_transactions").select("*").order("created_at", { ascending: false }).limit(10000),
       "bank_transactions",
     ),
+    safeRows<PlaidTransactionRow>(
+      supabaseAdmin
+        .from("admin_plaid_transactions")
+        .select("*")
+        .is("removed_at", null)
+        .order("date", { ascending: false })
+        .limit(10000),
+      "admin_plaid_transactions",
+    ),
   ]);
 
   const bookings = bookingRows.filter(isActiveFinancialRow).filter((row) => rowInDateRange(row, startDate, endDate));
+  const bookingPayments = bookingPaymentRows
+    .filter(isActiveFinancialRow)
+    .filter((row) => {
+      const provider = asTrimmedString(row.provider).toLowerCase();
+      return !provider || provider === "stripe";
+    })
+    .filter((row) => rowInDateRange(row, startDate, endDate));
   const expenses = expenseRows.filter(isActiveFinancialRow).filter((row) => rowInDateRange(row, startDate, endDate));
   const payouts = payoutRows.filter(isActiveFinancialRow).filter((row) => rowInDateRange(row, startDate, endDate));
   const disputes = disputeRows.filter(isActiveFinancialRow).filter((row) => rowInDateRange(row, startDate, endDate));
   const stripe = stripeRows.filter(isActiveFinancialRow).filter((row) => rowInDateRange(row, startDate, endDate));
   const bank = bankRows.filter(isActiveFinancialRow).filter((row) => rowInDateRange(row, startDate, endDate));
+  const plaid = plaidRows.filter((row) => rowInDateRange(row, startDate, endDate));
 
   const paidBookings = bookings.filter(isPaidBooking);
+  const paidBookingPayments = bookingPayments.filter((row) => {
+    const status = asTrimmedString(row.status).toLowerCase();
+    return status.includes("paid") || status.includes("succeeded") || status.includes("complete");
+  });
+
+  const bookingPaymentPlatformFees = paidBookingPayments.reduce(
+    (sum, row) => sum + Math.abs(toNumber(row.marketplace_support_cents) / 100),
+    0,
+  );
+  const bookingPaymentRefunds = bookingPayments.reduce(
+    (sum, row) => sum + Math.abs(toNumber(row.refund_amount_cents) / 100),
+    0,
+  );
+  const bookingPaymentDisputes = bookingPayments.reduce(
+    (sum, row) => sum + Math.abs(toNumber(row.dispute_amount_cents) / 100),
+    0,
+  );
 
   const grossBookingVolume = bookings.reduce((sum, booking) => sum + getBookingGrossAmount(booking), 0);
   const paidBookingVolume = paidBookings.reduce((sum, booking) => sum + getBookingGrossAmount(booking), 0);
   const taxCollected = bookings.reduce((sum, booking) => sum + getBookingTaxAmount(booking), 0);
-  const platformFeeRevenue = bookings.reduce((sum, booking) => sum + getPlatformFee(booking), 0);
+  const platformFeeFromBookings = bookings.reduce((sum, booking) => sum + getPlatformFee(booking), 0);
+  const platformFeeRevenue =
+    bookingPaymentPlatformFees > 0 ? bookingPaymentPlatformFees : platformFeeFromBookings;
   const guruPayoutsFromBookings = bookings.reduce((sum, booking) => sum + getGuruPayoutAmount(booking), 0);
   const paidPayoutsFromTable = payouts.filter(isPayoutPaid).reduce((sum, payout) => sum + getPayoutAmount(payout), 0);
   const guruPayouts = paidPayoutsFromTable > 0 ? paidPayoutsFromTable : guruPayoutsFromBookings;
-  const refunds = bookings.reduce((sum, booking) => sum + getRefundAmount(booking), 0);
-  const disputeLosses = disputes.reduce((sum, dispute) => sum + getDisputeAmount(dispute), 0);
+  const refunds =
+    bookingPaymentRefunds > 0
+      ? bookingPaymentRefunds
+      : bookings.reduce((sum, booking) => sum + getRefundAmount(booking), 0);
+  const disputeLosses =
+    bookingPaymentDisputes > 0
+      ? bookingPaymentDisputes
+      : disputes.reduce((sum, dispute) => sum + getDisputeAmount(dispute), 0);
   const stripeProcessingFees = stripe.reduce((sum, row) => sum + getStripeFee(row), 0);
 
   const bankDeposits = bank.filter((row) => getBankAmount(row) > 0).reduce((sum, row) => sum + getBankAmount(row), 0);
   const bankWithdrawals = bank.filter((row) => getBankAmount(row) < 0).reduce((sum, row) => sum + Math.abs(getBankAmount(row)), 0);
+
+  const plaidExpenseTotal = plaid
+    .filter((row) => {
+      const type = asTrimmedString(row.sitguru_category_type).toLowerCase();
+      const excluded = row.is_excluded_from_reports === true;
+      return !excluded && type === "expense";
+    })
+    .reduce((sum, row) => sum + Math.abs(toNumber(row.amount)), 0);
 
   const marketingExpenses = expenses.filter((expense) => getExpenseCategory(expense) === "Marketing").reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
   const softwareExpenses = expenses.filter((expense) => getExpenseCategory(expense) === "Software").reduce((sum, expense) => sum + getExpenseAmount(expense), 0);
@@ -546,9 +517,19 @@ async function getProfitLossExportPayload({
   const totalRevenue = platformFeeRevenue;
   const totalCostOfRevenue = guruPayouts + refunds + disputeLosses;
   const grossProfit = totalRevenue - totalCostOfRevenue;
-  const totalOperatingExpenses = marketingExpenses + softwareExpenses + adminExpenses + insuranceExpenses + travelExpenses + otherExpenses + stripeProcessingFees;
+  const totalOperatingExpenses =
+    marketingExpenses +
+    softwareExpenses +
+    adminExpenses +
+    insuranceExpenses +
+    travelExpenses +
+    otherExpenses +
+    stripeProcessingFees +
+    plaidExpenseTotal;
   const netIncome = grossProfit - totalOperatingExpenses;
-  const reconciliationReady = stripe.length > 0 && bank.length > 0;
+  const reconciliationReady =
+    (stripe.length > 0 || bookingPayments.length > 0) &&
+    (bank.length > 0 || plaid.length > 0);
 
   const rows: ExportRow[] = [
     buildExportRow({
@@ -582,13 +563,21 @@ async function getProfitLossExportPayload({
       line_item: "SitGuru Platform Fee Revenue",
       accounting_account: "Service Revenue",
       quickbooks_account: "Sales of Product Income: Service Revenue",
-      source: "bookings",
-      source_count: bookings.length,
+      source:
+        bookingPaymentPlatformFees > 0 ? "booking_payments" : "bookings",
+      source_count:
+        bookingPaymentPlatformFees > 0
+          ? paidBookingPayments.length
+          : bookings.length,
       amount: platformFeeRevenue,
       statement_impact: "profit_loss",
       tax_treatment: "Revenue; review gross vs net reporting with CPA.",
-      reconciliation_status: bookings.length > 0 ? "ready" : "missing_source",
-      notes: "Default platform-fee revenue calculation uses stored fee fields or 8% fallback.",
+      reconciliation_status:
+        platformFeeRevenue > 0 ? "ready" : "missing_source",
+      notes:
+        bookingPaymentPlatformFees > 0
+          ? "Uses marketplace_support_cents from booking_payments (Stripe ledger)."
+          : "Fallback platform-fee calculation uses booking fee fields or 8% estimate.",
     }),
     buildExportRow({
       section: "Balance Sheet Liability",
@@ -634,26 +623,29 @@ async function getProfitLossExportPayload({
       line_item: "Refunds / Credits",
       accounting_account: "Refunds and Allowances",
       quickbooks_account: "Income: Refunds and Allowances",
-      source: "bookings",
-      source_count: bookings.length,
+      source: bookingPaymentRefunds > 0 ? "booking_payments" : "bookings",
+      source_count:
+        bookingPaymentRefunds > 0 ? bookingPayments.length : bookings.length,
       amount: -refunds,
       statement_impact: "profit_loss",
       tax_treatment: "Contra-revenue or expense based on CPA classification.",
       reconciliation_status: refunds > 0 ? "needs_review" : "memo",
-      notes: "Should reconcile to Stripe refund balance transactions.",
+      notes: "Prefers booking_payments.refund_amount_cents; reconcile to Stripe refunds.",
     }),
     buildExportRow({
       section: "Cost of Revenue",
       line_item: "Dispute Losses / Adjustments",
       accounting_account: "Chargebacks / Dispute Losses",
       quickbooks_account: "Expenses: Chargebacks and Disputes",
-      source: "dispute_cases",
-      source_count: disputes.length,
+      source:
+        bookingPaymentDisputes > 0 ? "booking_payments" : "dispute_cases",
+      source_count:
+        bookingPaymentDisputes > 0 ? bookingPayments.length : disputes.length,
       amount: -disputeLosses,
       statement_impact: "profit_loss",
       tax_treatment: "Expense or contra-revenue; review with CPA.",
       reconciliation_status: disputeLosses > 0 ? "needs_review" : "memo",
-      notes: "Should reconcile to Stripe dispute records and bank activity.",
+      notes: "Prefers booking_payments.dispute_amount_cents when present.",
     }),
     buildExportRow({
       section: "Gross Profit",
@@ -680,6 +672,19 @@ async function getProfitLossExportPayload({
       tax_treatment: "Deductible operating expense; confirm with CPA.",
       reconciliation_status: stripe.length > 0 ? "ready" : "needs_review",
       notes: "Use Stripe balance transactions as the preferred source for fees.",
+    }),
+    buildExportRow({
+      section: "Operating Expenses",
+      line_item: "NFCU / Plaid Categorized Expenses",
+      accounting_account: "Bank Operating Expenses",
+      quickbooks_account: "Expenses: Bank Feed Operating Costs",
+      source: "admin_plaid_transactions",
+      source_count: plaid.length,
+      amount: -plaidExpenseTotal,
+      statement_impact: "profit_loss",
+      tax_treatment: "Deductible operating expense; confirm categorization with CPA.",
+      reconciliation_status: plaidExpenseTotal > 0 ? "ready" : "memo",
+      notes: "Includes categorized NFCU Business Checking/Savings expense rows.",
     }),
     buildExportRow({
       section: "Operating Expenses",
@@ -824,8 +829,8 @@ async function getProfitLossExportPayload({
       grossProfit,
       totalOperatingExpenses,
       netIncome,
-      stripeRows: stripe.length,
-      bankRows: bank.length,
+      stripeRows: stripe.length + bookingPayments.length,
+      bankRows: bank.length + plaid.length,
       reconciliationReady,
     },
   };
