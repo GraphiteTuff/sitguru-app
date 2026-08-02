@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 export const dynamic = "force-dynamic";
 
@@ -368,7 +369,7 @@ async function safeAdminQuery(
       return [] as AnyRow[];
     }
 
-    return Array.isArray(result.data) ? (result.data as AnyRow[]) : [];
+    return asAnyRows(result.data);
   } catch (error) {
     console.warn(`Admin archive query skipped for ${label}:`, error);
     return [] as AnyRow[];
@@ -386,7 +387,7 @@ async function safeSelect(
 
     if (result.error) return [];
 
-    return Array.isArray(result.data) ? (result.data as AnyRow[]) : [];
+    return asAnyRows(result.data);
   } catch {
     return [];
   }

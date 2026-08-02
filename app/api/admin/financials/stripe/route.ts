@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 import { getStripeServer } from "@/lib/stripe/server";
 import type Stripe from "stripe";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -274,7 +275,7 @@ async function safeQueryTable(table: string, limit = 1000): Promise<SafeTableRes
 
     return {
       table,
-      rows: ((data || []) as AnyRow[]).filter(Boolean),
+      rows: asAnyRows(data).filter(Boolean),
       ok: true,
       message: "Connected.",
     };

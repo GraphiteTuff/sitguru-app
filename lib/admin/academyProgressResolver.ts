@@ -4,6 +4,7 @@ import {
   getAdminPeopleDirectory,
   type AdminPerson,
 } from "@/lib/admin/peopleResolver";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 export type AcademyProgressRecord = {
   key: string;
@@ -323,7 +324,7 @@ function getSource(row: AnyRow) {
   return getText(row, ["__source_table"], "unknown");
 }
 
-function withSourceTable(row: AnyRow, source: string) {
+function withSourceTable(row: AnyRow, source: string): AnyRow {
   return {
     ...row,
     __source_table: source,
@@ -721,14 +722,14 @@ export async function getAcademyProgressDashboardData(): Promise<AcademyProgress
     ),
   ]);
 
-  const academyAssignments = ((academyAssignmentsResult.data || []) as AnyRow[]).map((row) => withSourceTable(row, "academy_assignments"));
-  const universityAssignments = ((universityAssignmentsResult.data || []) as AnyRow[]).map((row) => withSourceTable(row, "university_assignments"));
-  const academyStepProgress = ((academyStepProgressResult.data || []) as AnyRow[]).map((row) => withSourceTable(row, "academy_step_progress"));
-  const academyMaterialProgress = ((academyMaterialProgressResult.data || []) as AnyRow[]).map((row) => withSourceTable(row, "academy_material_progress"));
-  const academyStepMaterials = ((academyStepMaterialsResult.data || []) as AnyRow[]).map((row) => withSourceTable(row, "academy_step_materials"));
-  const ambassadorTrainingSteps = ((ambassadorTrainingStepsResult.data || []) as AnyRow[]).map((row) => withSourceTable(row, "ambassador_training_steps"));
-  const academyCertifications = ((academyCertificationsResult.data || []) as AnyRow[]).map((row) => withSourceTable(row, "academy_certifications"));
-  const ambassadors = ((ambassadorsResult.data || []) as AnyRow[]).map((row) =>
+  const academyAssignments = asAnyRows(academyAssignmentsResult.data).map((row) => withSourceTable(row, "academy_assignments"));
+  const universityAssignments = asAnyRows(universityAssignmentsResult.data).map((row) => withSourceTable(row, "university_assignments"));
+  const academyStepProgress = asAnyRows(academyStepProgressResult.data).map((row) => withSourceTable(row, "academy_step_progress"));
+  const academyMaterialProgress = asAnyRows(academyMaterialProgressResult.data).map((row) => withSourceTable(row, "academy_material_progress"));
+  const academyStepMaterials = asAnyRows(academyStepMaterialsResult.data).map((row) => withSourceTable(row, "academy_step_materials"));
+  const ambassadorTrainingSteps = asAnyRows(ambassadorTrainingStepsResult.data).map((row) => withSourceTable(row, "ambassador_training_steps"));
+  const academyCertifications = asAnyRows(academyCertificationsResult.data).map((row) => withSourceTable(row, "academy_certifications"));
+  const ambassadors = asAnyRows(ambassadorsResult.data).map((row) =>
     withSourceTable(row, "ambassadors"),
   );
   const ambassadorIdToUserKey = new Map<string, string>();
@@ -743,9 +744,7 @@ export async function getAcademyProgressDashboardData(): Promise<AcademyProgress
       ambassadorIdToUserKey.set(ambassadorId, userKey);
     }
   }
-  const ambassadorTrainingProgress = (
-    (ambassadorProgressResult.data || []) as AnyRow[]
-  ).map((row) => {
+  const ambassadorTrainingProgress = asAnyRows(ambassadorProgressResult.data).map((row) => {
     const ambassadorId = asString(row.ambassador_id) || asString(row.id);
     const mappedUserKey =
       ambassadorIdToUserKey.get(ambassadorId) ||

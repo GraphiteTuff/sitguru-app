@@ -3,6 +3,7 @@ import {
   VETERANS_MILITARY_FAMILIES_PROGRAM,
   isVeteransMilitaryFamiliesProgram,
 } from "@/lib/programs/veterans-military-families";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 export type ProgramsSourceHealth = {
   id: string;
@@ -210,7 +211,7 @@ async function safeSelect(
       };
     }
 
-    const rows = Array.isArray(data) ? (data as AnyRow[]) : [];
+    const rows = asAnyRows(data);
     return {
       data: rows,
       ok: true,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 export const dynamic = "force-dynamic";
 
@@ -470,7 +471,7 @@ async function readSourceTable(table: string, startDate: string, endDate: string
       };
     }
 
-    const rows = (data as AnyRow[]).filter((row) =>
+    const rows = asAnyRows(data).filter((row) =>
       withinPeriod(row, startDate, endDate),
     );
 

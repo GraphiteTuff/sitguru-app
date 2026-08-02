@@ -6,6 +6,7 @@
  */
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 export type ReportPeriod = "daily" | "weekly" | "monthly" | "yearly";
 
@@ -161,7 +162,7 @@ async function safeSelect(
       };
     }
 
-    const rows = Array.isArray(data) ? (data as AnyRow[]) : [];
+    const rows = asAnyRows(data);
     return {
       ok: true,
       rows,
