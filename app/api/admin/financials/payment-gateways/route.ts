@@ -226,7 +226,7 @@ async function safeSelect(
 
     return {
       ok: true,
-      rows: Array.isArray(data) ? (data as AnyRow[]) : [],
+      rows: Array.isArray(data) ? (data as any[]) : [],
       message: `${table} connected`,
     };
   } catch (error) {

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "simulate-walk": "tsx --env-file=.env.local scripts/simulateWalk.ts",
-    "test-full-journey": "tsx --env-file=.env.local scripts/testFullJourney.ts"
+    "test-full-journey": "tsx --env-file=.env.local scripts/testFullJourney.ts",
+    "cleanup-test-ambassadors": "tsx --env-file=.env.local scripts/cleanup-test-ambassadors.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.12",
