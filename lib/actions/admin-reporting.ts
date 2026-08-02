@@ -1,6 +1,11 @@
 /**
- * Rogue admin reporting — read-only structural snapshots for the 33 SitGuru
- * admin subcategories. Defensive: empty / missing tables never throw.
+ * Rogue admin reporting — read-only structural snapshots + granular paginated
+ * query helpers for the 33 SitGuru admin subcategories.
+ * Defensive: empty / missing tables never throw.
+ *
+ * Tool-calling registration (AI SDK JSON tools) lives in
+ * `./admin-rogue-tools.ts` via `buildAdminRogueTools`, which calls the
+ * paginated helpers exported from this module.
  *
  * SERVER ONLY — do not import from client components.
  */
