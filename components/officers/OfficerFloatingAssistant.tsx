@@ -51,12 +51,14 @@ export type OfficerFloatingAssistantProps = {
   accessToken?: string | null;
   /** Optional Guru provider id (Scout only). */
   providerId?: string | null;
+  /** Match Rogue's face-forward circular crop. */
+  avatarObjectPosition?: string;
 };
 
 function OfficerAvatar({
   src,
   className = "h-8 w-8",
-  objectPosition = "center 20%",
+  objectPosition = "center 18%",
 }: {
   src: string;
   className?: string;
@@ -256,6 +258,7 @@ export default function OfficerFloatingAssistant({
   chips,
   accessToken = null,
   providerId = null,
+  avatarObjectPosition = "center 18%",
 }: OfficerFloatingAssistantProps) {
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -428,6 +431,7 @@ export default function OfficerFloatingAssistant({
               <OfficerAvatar
                 src={avatarSrc}
                 className="h-full w-full overflow-hidden rounded-full flex-shrink-0"
+                objectPosition={avatarObjectPosition}
               />
             </span>
           )}

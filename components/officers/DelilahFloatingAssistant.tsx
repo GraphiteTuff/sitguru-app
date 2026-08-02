@@ -60,7 +60,7 @@ export default function DelilahFloatingAssistant({
       officerId="delilah"
       displayName={profile.displayName}
       title={profile.title}
-      avatarSrc={profile.avatarSrc}
+      avatarSrc={`${profile.avatarSrc}?v=2`}
       greetingMarkdown={profile.greetingMarkdown}
       tipStatement={profile.tipStatement}
       composerPlaceholder={profile.composerPlaceholder}
@@ -69,6 +69,7 @@ export default function DelilahFloatingAssistant({
       theme={DELILAH_THEME}
       chips={DELILAH_CHIPS}
       accessToken={accessToken}
+      avatarObjectPosition="center 18%"
     />
   );
 }
