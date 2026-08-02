@@ -23,9 +23,11 @@ import {
 } from "@/lib/actions/officer-tools";
 import {
   buildMarketingFaqSnapshot,
+  isAmbassadorRoleExplainQuery,
   matchMarketingFaq,
   SCOUT_PUBLIC_MARKETING_FAQS,
   TACO_PUBLIC_MARKETING_FAQS,
+  TACO_WHAT_AMBASSADORS_DO_ANSWER,
 } from "@/lib/ai/officer-marketing-faqs";
 import {
   getSitGuruAiModel,
@@ -346,6 +348,12 @@ export async function POST(req: Request) {
 
     const lastUserText = messageContent(messages[messages.length - 1]);
     const preset = asString(body?.preset);
+
+    // Taco: always embed the Ambassador promo video + role description for
+    // "what do Ambassadors do?" style asks (public marketing or dashboard).
+    if (officer === "taco" && isAmbassadorRoleExplainQuery(lastUserText)) {
+      return simulationDataStreamResponse(TACO_WHAT_AMBASSADORS_DO_ANSWER);
+    }
 
     // Public surface: exact marketing FAQ database. Dashboard: session snapshots.
     let snapshotMarkdown: string;

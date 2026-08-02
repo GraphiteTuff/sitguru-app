@@ -25,6 +25,11 @@ const TACO_THEME = {
 
 const TACO_DASHBOARD_CHIPS = [
   {
+    id: "what_ambassadors_do",
+    label: "What we do",
+    prompt: "What do Ambassadors do?",
+  },
+  {
     id: "pack_pulse",
     label: "Pack Pulse",
     prompt:
@@ -42,16 +47,15 @@ const TACO_DASHBOARD_CHIPS = [
     prompt:
       "Break down my pending and approved treat commissions, and tell me what's still waiting on audit.",
   },
-  {
-    id: "milestones",
-    label: "Milestones",
-    prompt:
-      "Where am I on social milestones for growing the pack, and how many verified signups until the next reward?",
-  },
 ] as const;
 
 /** Exact marketing FAQ question strings for public Ambassador help. */
 const TACO_PUBLIC_CHIPS = [
+  {
+    id: "what_ambassadors_do",
+    label: "What they do",
+    prompt: "What do Ambassadors do?",
+  },
   {
     id: "who_can_join",
     label: "Who can join?",
@@ -66,11 +70,6 @@ const TACO_PUBLIC_CHIPS = [
     id: "vs_guru",
     label: "Vs Guru?",
     prompt: "Is this the same as becoming a Guru?",
-  },
-  {
-    id: "earnings",
-    label: "Earnings",
-    prompt: "Are earnings or rewards guaranteed?",
   },
 ] as const;
 

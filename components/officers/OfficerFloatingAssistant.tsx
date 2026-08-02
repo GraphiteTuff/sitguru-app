@@ -18,6 +18,8 @@ import { createPortal } from "react-dom";
 import { useChat } from "ai/react";
 import { Maximize2, Minimize2, Sparkles, X } from "lucide-react";
 import type { GuestOfficerId } from "@/lib/ai/officer-prompts";
+import { AMBASSADOR_VIDEO_CARD_MARKER } from "@/lib/ai/officer-marketing-faqs";
+import AmbassadorVideoCard from "@/components/officers/AmbassadorVideoCard";
 
 export type OfficerTheme = {
   brand: string;
@@ -224,6 +226,33 @@ function OfficerMarkdown({
           </p>
         );
       })}
+    </div>
+  );
+}
+
+function OfficerAssistantBody({
+  text,
+  theme,
+}: {
+  text: string;
+  theme: OfficerTheme;
+}) {
+  const raw = String(text || "");
+  const hasVideoCard =
+    raw.includes(AMBASSADOR_VIDEO_CARD_MARKER) ||
+    /\[\[\s*ambassador_video_card\s*\]\]/i.test(raw);
+  const cleaned = raw
+    .replaceAll(AMBASSADOR_VIDEO_CARD_MARKER, " ")
+    .replace(/\[\[\s*ambassador_video_card\s*\]\]/gi, " ")
+    .replace(/\[\[\s*cta:[^\]]+\]\]/gi, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return (
+    <div className="space-y-1">
+      {cleaned ? <OfficerMarkdown text={cleaned} theme={theme} /> : null}
+      {hasVideoCard ? <AmbassadorVideoCard /> : null}
     </div>
   );
 }
@@ -610,7 +639,7 @@ export default function OfficerFloatingAssistant({
                     className="homepage-chat-bubble homepage-chat-bubble--ai min-w-0 flex-1"
                     style={{ color: "#0f172a", WebkitTextFillColor: "#0f172a" }}
                   >
-                    <OfficerMarkdown text={message.content} theme={theme} />
+                    <OfficerAssistantBody text={message.content} theme={theme} />
                   </div>
                 </div>
               );

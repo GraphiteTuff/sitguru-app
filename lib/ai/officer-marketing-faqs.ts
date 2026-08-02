@@ -4,13 +4,36 @@
  *
  * Sources:
  * - Scout → `app/become-a-guru/page.tsx` faqs (+ success-center payment phrasing)
- * - Taco  → `app/ambassadors/page.tsx` faqs
+ * - Taco  → `app/ambassadors/page.tsx` faqs + what-you-do / video section
  */
 
 export type MarketingFaqEntry = {
   question: string;
   answer: string;
 };
+
+/** Marker rendered by Officer chat as an embedded Ambassador promo video card. */
+export const AMBASSADOR_VIDEO_CARD_MARKER = "[[ambassador_video_card]]";
+
+/**
+ * Canonical "What do Ambassadors do?" reply grounded in /ambassadors page copy.
+ * Always appends the video card marker so Taco embeds the promo in-chat.
+ */
+export const TACO_WHAT_AMBASSADORS_DO_ANSWER = [
+  "Ambassadors help people discover SitGuru — they share SitGuru on campus, online, at events, or with people they already know.",
+  "",
+  "That means helping Pet Parents find care, helping great people become Gurus, and building real community experience along the way.",
+  "",
+  "**What you actually do:**",
+  "- **Share the vibe** — Post, text, talk, or use your QR code to introduce people to SitGuru.",
+  "- **Refer great people** — Connect Pet Parents, future Gurus, and local partners with the right SitGuru path.",
+  "- **Show up locally** — Represent SitGuru at campus activities, community events, pet spaces, and local meetups.",
+  "- **Grow your lane** — Build real outreach, leadership, referral, and community experience as SitGuru grows.",
+  "",
+  "Hit play below to see what Ambassadors actually do.",
+  "",
+  AMBASSADOR_VIDEO_CARD_MARKER,
+].join("\n");
 
 /** Guru onboarding FAQs — exact copy from become-a-guru marketing page. */
 export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
@@ -63,6 +86,10 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
 /** Ambassador growth FAQs — exact copy from ambassadors marketing page. */
 export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
+    question: "What do Ambassadors do?",
+    answer: TACO_WHAT_AMBASSADORS_DO_ANSWER,
+  },
+  {
     question: "Who can become a SitGuru Ambassador?",
     answer:
       "Students, Gurus, pet professionals, rescue advocates, veterans, military spouses, community leaders, creators, and other trusted local voices can apply.",
@@ -90,6 +117,25 @@ function normalizeFaqQuery(value: string) {
     .toLowerCase()
     .replace(/[?!.,'"]+/g, "")
     .replace(/\s+/g, " ");
+}
+
+/**
+ * Soft intent match for role-explain / promo-video asks so Taco can embed
+ * the Ambassador video card even when wording varies.
+ */
+export function isAmbassadorRoleExplainQuery(question: string): boolean {
+  const needle = normalizeFaqQuery(question);
+  if (!needle) return false;
+
+  return (
+    /what (do|does) (an? )?ambassadors? do/.test(needle) ||
+    /what (is|are) (an? )?ambassadors?/.test(needle) ||
+    /what ambassadors? (actually )?do/.test(needle) ||
+    /see what ambassadors/.test(needle) ||
+    /ambassador (promo |onboarding )?video/.test(needle) ||
+    /watch (the )?ambassador/.test(needle) ||
+    needle === "what do ambassadors do"
+  );
 }
 
 /** Match a visitor question to an exact FAQ answer when the text aligns. */
@@ -121,6 +167,9 @@ export function buildMarketingFaqSnapshot(opts: {
     `# ${opts.officerLabel} Public Marketing FAQ Database`,
     `_Exact page copy — use these answer strings verbatim when the visitor asks the matching question._`,
     `Signup / apply path: ${opts.signupPath}`,
+    "",
+    "AMBASSADOR VIDEO RULE:",
+    `- When visitors ask what Ambassadors do / what the role is / to watch the Ambassador video, answer with the exact "What do Ambassadors do?" copy and ALWAYS append ${AMBASSADOR_VIDEO_CARD_MARKER} so the in-chat promo video renders.`,
     "",
   ];
 
