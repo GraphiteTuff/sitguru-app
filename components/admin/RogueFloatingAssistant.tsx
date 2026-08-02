@@ -6,13 +6,16 @@
  */
 
 import {
+  Component,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type ErrorInfo,
   type FormEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useChat } from "ai/react";
 import {
@@ -216,12 +219,13 @@ function renderInline(text: string): ReactNode {
   return nodes.length ? nodes : text;
 }
 
-export default function RogueFloatingAssistant() {
+export function RogueFloatingAssistant() {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [panelReady, setPanelReady] = useState(false);
   const [preset, setPreset] = useState<string>("");
   const [period, setPeriod] = useState<ReportPeriod>("daily");
+  const [mounted, setMounted] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -280,6 +284,10 @@ export default function RogueFloatingAssistant() {
     }
   }, [open]);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   async function runChip(chip: (typeof QUICK_CHIPS)[number]) {
     setPreset(chip.id);
     setPeriod(chip.period);
@@ -324,8 +332,11 @@ export default function RogueFloatingAssistant() {
     setInput("");
   }
 
-  return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[80] flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
+  const ui = (
+    <div
+      className="pointer-events-none fixed bottom-4 right-4 z-[9999] flex flex-col items-end gap-3 sm:bottom-6 sm:right-6"
+      data-sitguru-rogue-admin="true"
+    >
       {open ? (
         <section
           className={`pointer-events-auto flex ${panelClass} origin-bottom-right flex-col overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-[0_24px_60px_rgba(13,92,58,0.18)] transition-all duration-300 ease-out ${
@@ -537,4 +548,82 @@ export default function RogueFloatingAssistant() {
       </button>
     </div>
   );
+
+  // Portal to document.body so admin layout overflow-x-hidden cannot clip
+  // or retarget position:fixed (common cause of a "missing" FAB).
+  if (!mounted || typeof document === "undefined") return null;
+  return createPortal(ui, document.body);
 }
+
+class RogueAdminErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.warn("[rogue-admin] floating assistant crashed:", error.message, {
+      componentStack: info.componentStack?.slice(0, 240),
+    });
+  }
+
+  private handleReset = () => {
+    this.setState({ hasError: false });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <RogueRecoveryFab onReset={this.handleReset} />
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function RogueRecoveryFab({ onReset }: { onReset: () => void }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const ui = (
+    <button
+      type="button"
+      onClick={onReset}
+      className="fixed bottom-4 right-4 z-[9999] inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-3 text-xs font-black text-emerald-900 shadow-[0_18px_40px_rgba(13,92,58,0.28)] sm:bottom-6 sm:right-6"
+      aria-label="Reload Rogue assistant"
+    >
+      <span className="relative h-8 w-8 overflow-hidden rounded-full bg-white">
+        <Image
+          src={ROGUE_AVATAR_SRC}
+          alt=""
+          fill
+          className="object-cover object-[center_18%] mix-blend-multiply"
+          sizes="32px"
+        />
+      </span>
+      Rogue glitched — tap to reload
+    </button>
+  );
+
+  if (!mounted || typeof document === "undefined") return null;
+  return createPortal(ui, document.body);
+}
+
+/**
+ * Layout entrypoint — keeps Rogue visible even if the chat panel crashes.
+ */
+export function RogueAdminAssistantHost() {
+  return (
+    <RogueAdminErrorBoundary>
+      <RogueFloatingAssistant />
+    </RogueAdminErrorBoundary>
+  );
+}
+
+export default RogueFloatingAssistant;
