@@ -1839,14 +1839,30 @@ p {
   }
 }
 
-.homepage-chat-panel__header {
+.homepage-chat-panel__header,
+.homepage-chat-panel > .homepage-chat-panel__header,
+div.homepage-chat-panel__header,
+[data-rogue-admin-header="true"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.85rem 3rem 0.85rem 0.85rem;
-  background: linear-gradient(135deg, var(--hcb-green) 0%, var(--hcb-green-deep) 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #0d5c3a 0%, #09462c 100%) !important;
+  color: #ffffff !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Beat `.admin-theme header { background: white !important }` if nested. */
+.admin-theme .homepage-chat-panel__header,
+.admin-theme header.homepage-chat-panel__header,
+.admin-theme div.homepage-chat-panel__header,
+.admin-theme [data-rogue-admin-header="true"] {
+  background: linear-gradient(135deg, #0d5c3a 0%, #09462c 100%) !important;
+  color: #ffffff !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
 }
 
 .homepage-chat-panel__brand {
@@ -1904,20 +1920,31 @@ p {
   color: #fff;
 }
 
-.homepage-chat-panel__title {
+.homepage-chat-panel__title,
+.admin-theme .homepage-chat-panel__title,
+[data-rogue-admin-header="true"] .homepage-chat-panel__title {
   margin: 0;
   font-size: 0.92rem;
   font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
-.homepage-chat-panel__sub {
+.homepage-chat-panel__sub,
+.admin-theme .homepage-chat-panel__sub,
+[data-rogue-admin-header="true"] .homepage-chat-panel__sub {
   margin: 0.25rem 0 0;
   font-size: 0.72rem;
-  opacity: 0.95;
   line-height: 1.35;
   overflow-wrap: anywhere;
+  color: rgba(255, 255, 255, 0.95) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.95) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .homepage-chat-panel__close {
