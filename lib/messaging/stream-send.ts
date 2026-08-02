@@ -9,6 +9,7 @@ import { streamText, type CoreMessage } from "ai";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
+import { fetchLiveSocialFollowersTool } from "@/lib/chat/rogue-social-tool";
 import {
   isReservedPreferredName,
   sanitizePreferredName,
@@ -275,6 +276,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
         maxTokens: 500,
         tools: {
           lookupGurus: lookupGurusTool,
+          fetchLiveSocialFollowers: fetchLiveSocialFollowersTool,
         },
         maxSteps: 3,
         onFinish: async ({ text }) => {

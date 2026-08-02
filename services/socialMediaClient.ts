@@ -172,6 +172,134 @@ export async function fetchAllTrackedSnapshots(): Promise<
   return Promise.all(jobs);
 }
 
+export type LiveSocialFollowerRow = {
+  entityId: string;
+  platform: string;
+  currentFollowers: number;
+  baselineFollowers: number;
+  delta: number;
+  updatedAt: string | null;
+};
+
+export type LiveSocialFollowersResult = {
+  ok: boolean;
+  source: "database" | "empty" | "error";
+  rows: LiveSocialFollowerRow[];
+  digest: string;
+  error?: string;
+};
+
+type SocialMetricsSelectBuilder = {
+  eq: (
+    column: string,
+    value: string,
+  ) => PromiseLike<{
+    data: Array<Record<string, unknown>> | null;
+    error: { message?: string } | null;
+  }>;
+  order: (
+    column: string,
+    options?: { ascending?: boolean },
+  ) => PromiseLike<{
+    data: Array<Record<string, unknown>> | null;
+    error: { message?: string } | null;
+  }>;
+};
+
+type SocialMetricsReader = {
+  from: (table: string) => {
+    select: (columns: string) => SocialMetricsSelectBuilder;
+  };
+};
+
+function asInt(value: unknown) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.trunc(n) : 0;
+}
+
+/**
+ * Read live follower rows from `social_platform_metrics` and compute
+ * `current_followers - baseline_followers` deltas for Rogue / Delilah tools.
+ */
+export async function fetchLiveSocialFollowers(
+  admin: SocialMetricsReader,
+  opts?: { entityId?: string },
+): Promise<LiveSocialFollowersResult> {
+  try {
+    const entityId = String(opts?.entityId || "").trim();
+    const columns =
+      "entity_id, platform, current_followers, baseline_followers, updated_at";
+    const selected = admin.from("social_platform_metrics").select(columns);
+    const { data, error } = entityId
+      ? await selected.eq("entity_id", entityId)
+      : await selected.order("entity_id", { ascending: true });
+
+    if (error) {
+      return {
+        ok: false,
+        source: "error",
+        rows: [],
+        digest:
+          "Social metrics unavailable right now — table query failed. Ask them to retry shortly.",
+        error: error.message || "query failed",
+      };
+    }
+
+    const rows: LiveSocialFollowerRow[] = (data || [])
+      .map((row) => {
+        const currentFollowers = asInt(row.current_followers);
+        const baselineFollowers = asInt(row.baseline_followers);
+        return {
+          entityId: String(row.entity_id || "").trim() || "brand",
+          platform: String(row.platform || "").trim() || "unknown",
+          currentFollowers,
+          baselineFollowers,
+          delta: computeFollowerDelta(currentFollowers, baselineFollowers),
+          updatedAt: row.updated_at ? String(row.updated_at) : null,
+        };
+      })
+      .sort((a, b) =>
+        `${a.entityId}:${a.platform}`.localeCompare(
+          `${b.entityId}:${b.platform}`,
+        ),
+      );
+
+    if (!rows.length) {
+      return {
+        ok: true,
+        source: "empty",
+        rows: [],
+        digest:
+          "No social_platform_metrics rows yet. Seed baselines with `npm run seed-social-baseline` or run the social-metrics-baseline cron.",
+      };
+    }
+
+    const digestLines = [
+      "LIVE SOCIAL FOLLOWERS (from social_platform_metrics):",
+      ...rows.map((row) => {
+        const sign = row.delta > 0 ? "+" : "";
+        return `- ${row.entityId} / ${row.platform}: current ${row.currentFollowers.toLocaleString()} · baseline ${row.baselineFollowers.toLocaleString()} · delta ${sign}${row.delta.toLocaleString()}`;
+      }),
+      "Authorized: report these exact numbers. Do not invent counts outside this digest.",
+    ];
+
+    return {
+      ok: true,
+      source: "database",
+      rows,
+      digest: digestLines.join("\n"),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      source: "error",
+      rows: [],
+      digest: "Social metrics lookup crashed safely — retry in a moment.",
+      error: error instanceof Error ? error.message : "lookup failed",
+    };
+  }
+}
+
 export type BaselineSyncRowResult = {
   entityId: string;
   platform: string;
