@@ -55,7 +55,7 @@ export default function ExportPackageActions({
     setMessage("Preparing CPA package links and updating export metadata...");
 
     try {
-      const response = await fetch("/api/admin/financials/export-packages", {
+      const response = await fetch("/api/admin/financials/export-package", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

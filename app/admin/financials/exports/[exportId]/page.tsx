@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
 import ExportStatusActions from "./ExportStatusActions";
 import ExportPackageActions from "./ExportPackageActions";
 
@@ -15,128 +15,14 @@ type AdminIdentity = {
   canAccessFinancials: boolean;
 };
 
-const FINANCE_ROLES = [
-  "owner",
-  "super_admin",
-  "admin",
-  "finance_admin",
-  "finance",
-  "accounting",
-  "bookkeeper",
-];
-
-function asTrimmedString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function getOptionalBoolean(value: unknown) {
-  if (typeof value === "boolean") return value;
-
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (["true", "yes", "1"].includes(normalized)) return true;
-    if (["false", "no", "0"].includes(normalized)) return false;
-  }
-
-  return false;
-}
-
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function hasFinancialRole(role: string) {
-  return FINANCE_ROLES.includes(role.trim().toLowerCase());
-}
-
-async function safeRows<T>(
-  query: PromiseLike<{ data: unknown; error: unknown }>,
-  label: string,
-): Promise<T[]> {
-  try {
-    const result = await query;
-
-    if (result.error) {
-      console.warn(`Export detail query skipped for ${label}:`, result.error);
-      return [];
-    }
-
-    return Array.isArray(result.data) ? (result.data as T[]) : [];
-  } catch (error) {
-    console.warn(`Export detail query skipped for ${label}:`, error);
-    return [];
-  }
-}
-
 async function requireFinancialAdmin() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_export_detail_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_export_detail_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_export_detail_access",
-    ),
-  ]);
-
-  const profile = profileChecks.flat().find(Boolean) || {};
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-  const envAllowed = envAdminEmails.includes(userEmail);
-
-  const canAccessFinancials =
-    active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed);
-
-  if (!canAccessFinancials) return null;
-
+  const identity = await getFinanceAdminIdentity();
+  if (!identity) return null;
   return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials,
+    id: identity.id,
+    email: identity.email,
+    role: identity.role,
+    canAccessFinancials: true,
   } satisfies AdminIdentity;
 }
 
@@ -219,11 +105,15 @@ const exportTables = [
 ];
 
 function formatCurrency(value: number | null | undefined) {
-  return new Intl.NumberFormat("en-US", {
+  const amount = Number(value) || 0;
+  const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(Math.round(Number(value) || 0));
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(amount));
+
+  return amount < 0 ? `(${formatted})` : formatted;
 }
 
 function formatNumber(value: number | null | undefined) {
@@ -343,7 +233,9 @@ function getMetadataList(record: ExportRecord, keys: string[]) {
 
 function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLink | null {
   const normalized = normalizeIncludedLabel(label);
-  const statementFormat = getStatementFormat(record);
+  const statementFormat = ["csv", "excel", "word", "pdf"].includes(String(record.export_format || "").toLowerCase())
+    ? String(record.export_format).toLowerCase()
+    : "excel";
 
   if (normalized.includes("daily") || normalized.includes("snapshot")) {
     return {
@@ -419,7 +311,7 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
     return {
       label: "General Ledger",
       description: "Open ledger detail, including campaign expenses and referral rewards.",
-      href: "/admin/financials/general-ledger",
+      href: `/api/admin/financials/general-ledger/export?format=${statementFormat}`,
       kind: "open",
       badge: "LEDGER",
     };
@@ -429,7 +321,7 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
     return {
       label: "Reconciliation",
       description: "Open reconciliation support for bank, Stripe, payouts, campaign costs, and rewards.",
-      href: "/admin/financials/reconciliation",
+      href: `/api/admin/financials/reconciliation/export?format=${statementFormat}`,
       kind: "open",
       badge: "RECON",
     };
@@ -439,7 +331,7 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
     return {
       label: "Payout Analytics",
       description: "Open Guru, platform, and referral payout support.",
-      href: "/admin/financials/payouts",
+      href: "/api/admin/financials/payouts/export?format=csv",
       kind: "open",
       badge: "PAYOUTS",
     };
@@ -449,7 +341,7 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
     return {
       label: "Commissions & Referral Rewards",
       description: "Open partner, ambassador, Guru referral, and PawPerks reward support.",
-      href: "/admin/financials/commissions",
+      href: "/api/admin/commissions/export?format=csv",
       kind: "open",
       badge: "REWARDS",
     };
@@ -459,7 +351,7 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
     return {
       label: "Tax Center",
       description: "Open annual, quarterly, federal, state, local, and deduction support.",
-      href: "/admin/financials/tax-reports",
+      href: `/api/admin/financials/tax-reports/export?format=${statementFormat}`,
       kind: "open",
       badge: "TAX",
     };
