@@ -218,7 +218,12 @@ async function safeHeadCount(
 }
 
 function statusOf(row: AnyRow) {
-  return asString(row.status || row.application_status || row.check_status)
+  return asString(
+    row.status ||
+      row.payout_status ||
+      row.application_status ||
+      row.check_status,
+  )
     .toLowerCase()
     .replace(/\s+/g, "_");
 }
@@ -226,11 +231,94 @@ function statusOf(row: AnyRow) {
 function sumField(rows: AnyRow[], keys: string[]) {
   return rows.reduce((sum, row) => {
     for (const key of keys) {
-      const value = asNumber(row[key]);
+      const raw = row[key];
+      // Prefer explicit dollar fields; convert *_cents when needed.
+      if (key.endsWith("_cents") || key === "amount_cents") {
+        const cents = asNumber(raw);
+        if (cents !== 0) return sum + cents / 100;
+        continue;
+      }
+      const value = asNumber(raw);
       if (value !== 0) return sum + value;
+    }
+    // Last-resort: if amount missing but amount_cents present.
+    if (keys.includes("amount") && row.amount_cents != null) {
+      const cents = asNumber(row.amount_cents);
+      if (cents !== 0) return sum + cents / 100;
     }
     return sum;
   }, 0);
+}
+
+/**
+ * Try primary table/columns, then fallbacks. Never throws.
+ */
+async function safeSelectCascade(
+  attempts: Array<{
+    table: string;
+    columns?: string;
+    limit?: number;
+    sinceIso?: string | null;
+    dateColumn?: string;
+  }>,
+): Promise<SafeResult & { tableUsed: string }> {
+  const errors: string[] = [];
+  for (const attempt of attempts) {
+    const result = await safeSelect(
+      attempt.table,
+      attempt.columns || "*",
+      attempt.limit ?? 200,
+      attempt.sinceIso,
+      attempt.dateColumn || "created_at",
+    );
+    if (result.ok) {
+      return { ...result, tableUsed: attempt.table };
+    }
+    errors.push(result.message);
+  }
+  return {
+    ok: false,
+    rows: [],
+    count: 0,
+    message: errors.filter(Boolean).join(" | ") || "No sources available",
+    tableUsed: attempts[0]?.table || "unknown",
+  };
+}
+
+function normalizePaymentRows(rows: AnyRow[]) {
+  return rows.map((row) => {
+    const amount =
+      asNumber(row.amount) ||
+      asNumber(row.total) ||
+      asNumber(row.amount_cents) / 100;
+    const fee =
+      asNumber(row.fee_amount) ||
+      asNumber(row.processing_fee) ||
+      asNumber(row.marketplace_support_cents) / 100;
+    return {
+      ...row,
+      amount,
+      fee_amount: fee,
+      processing_fee: fee,
+    };
+  });
+}
+
+function normalizePayoutRows(rows: AnyRow[]) {
+  return rows.map((row) => {
+    const amount =
+      asNumber(row.amount) ||
+      asNumber(row.payout_amount) ||
+      asNumber(row.net_amount) ||
+      asNumber(row.gross_amount) ||
+      asNumber(row.amount_cents) / 100;
+    return {
+      ...row,
+      amount,
+      payout_amount: amount,
+      status: row.status || row.payout_status,
+    };
+  });
 }
 
 function countWhere(rows: AnyRow[], predicate: (row: AnyRow) => boolean) {
@@ -317,18 +405,72 @@ async function moduleLiveWalks(since: string): Promise<ModuleSnapshot> {
     "live_walks",
     "walk_sessions",
     "gps_events",
+    "booking_walk_tracks",
+    "booking_visit_sessions",
   ]);
   const [liveWalks, walkSessions, gpsEvents] = await Promise.all([
-    safeSelect("live_walks", "id,status,created_at,updated_at,guru_id,booking_id", 100, since),
-    safeSelect("walk_sessions", "id,status,created_at,check_in_at,check_out_at", 100, since),
-    safeSelect("gps_events", "id,created_at,event_type", 50, since),
+    safeSelectCascade([
+      {
+        table: "live_walks",
+        columns: "id,status,created_at,updated_at,guru_id,booking_id",
+        limit: 100,
+        sinceIso: since,
+      },
+      {
+        table: "booking_walk_tracks",
+        columns: "id,status,created_at,updated_at,guru_id,booking_id",
+        limit: 100,
+        sinceIso: since,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "walk_sessions",
+        columns: "id,status,created_at,check_in_at,check_out_at",
+        limit: 100,
+        sinceIso: since,
+      },
+      {
+        table: "booking_visit_sessions",
+        columns: "id,status,created_at,started_at,ended_at",
+        limit: 100,
+        sinceIso: since,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "gps_events",
+        columns: "id,created_at,event_type",
+        limit: 50,
+        sinceIso: since,
+      },
+      {
+        table: "booking_walk_track_points",
+        columns: "id,recorded_at,created_at,lat,lng,walk_track_id,booking_id",
+        limit: 50,
+        sinceIso: since,
+        dateColumn: "recorded_at",
+      },
+      {
+        table: "booking_walk_track_points",
+        columns: "id,created_at,lat,lng",
+        limit: 50,
+        sinceIso: since,
+      },
+    ]),
   ]);
-  const rows = liveWalks.ok ? liveWalks.rows : walkSessions.rows;
+  const sessionRows = walkSessions.rows.map((row) => ({
+    ...row,
+    check_in_at: row.check_in_at ?? row.started_at ?? null,
+    check_out_at: row.check_out_at ?? row.ended_at ?? null,
+  }));
+  const rows = liveWalks.ok ? liveWalks.rows : sessionRows;
   const active = countWhere(
     rows,
     (row) =>
       ["active", "in_progress", "live", "started"].includes(statusOf(row)) ||
-      Boolean(row.check_in_at && !row.check_out_at),
+      Boolean(row.check_in_at && !row.check_out_at) ||
+      Boolean(row.started_at && !row.ended_at),
   );
   const ok = liveWalks.ok || walkSessions.ok || gpsEvents.ok;
   return finalize(
@@ -341,6 +483,9 @@ async function moduleLiveWalks(since: string): Promise<ModuleSnapshot> {
       activeWalks: active,
       walkRows: liveWalks.ok ? liveWalks.count : walkSessions.count,
       gpsEvents: gpsEvents.count,
+      liveWalksSource: liveWalks.tableUsed,
+      walkSessionsSource: walkSessions.tableUsed,
+      gpsSource: gpsEvents.tableUsed,
     },
     [`${number(active)} active walks`, `${number(gpsEvents.count)} GPS events`],
     [liveWalks, walkSessions, gpsEvents].filter((r) => !r.ok).map((r) => r.message),
@@ -349,12 +494,21 @@ async function moduleLiveWalks(since: string): Promise<ModuleSnapshot> {
 
 async function moduleBookings(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("bookings", "Bookings", "operations", ["bookings"]);
-  const result = await safeSelect(
-    "bookings",
-    "id,status,created_at,total_amount,amount,service_name,cancellation_reason",
-    500,
-    since,
-  );
+  const result = await safeSelectCascade([
+    {
+      table: "bookings",
+      columns:
+        "id,status,created_at,total_amount,amount,subtotal_amount,customer_total_amount,service_name,cancellation_reason",
+      limit: 500,
+      sinceIso: since,
+    },
+    {
+      table: "bookings",
+      columns: "id,status,created_at,total_amount,service_type",
+      limit: 500,
+      sinceIso: since,
+    },
+  ]);
   const completed = countWhere(result.rows, (r) =>
     ["completed", "complete", "paid", "confirmed"].includes(statusOf(r)),
   );
@@ -911,46 +1065,98 @@ async function moduleFinancialOverview(since: string): Promise<ModuleSnapshot> {
     "financial_overview",
     "Financial Overview",
     "financials",
-    ["bookings", "payments", "payouts"],
+    ["bookings", "payments", "booking_payments", "payouts", "guru_payouts"],
   );
-  const [bookings, payments, payouts] = await Promise.all([
-    safeSelect(
-      "bookings",
-      "id,status,total_amount,amount,subtotal_amount,created_at",
-      500,
-      since,
-    ),
-    safeSelect(
-      "payments",
-      "id,status,amount,fee_amount,created_at",
-      400,
-      since,
-    ),
-    safeSelect(
-      "payouts",
-      "id,status,amount,created_at",
-      300,
-      since,
-    ),
+  const [bookings, paymentsRaw, payoutsRaw] = await Promise.all([
+    safeSelectCascade([
+      {
+        table: "bookings",
+        columns:
+          "id,status,total_amount,amount,subtotal_amount,customer_total_amount,created_at",
+        limit: 500,
+        sinceIso: since,
+      },
+      {
+        table: "bookings",
+        columns: "id,status,total_amount,created_at",
+        limit: 500,
+        sinceIso: since,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "payments",
+        columns: "id,status,amount,fee_amount,processing_fee,created_at",
+        limit: 400,
+        sinceIso: since,
+      },
+      {
+        table: "booking_payments",
+        columns:
+          "id,status,amount,amount_cents,fee_amount,marketplace_support_cents,created_at",
+        limit: 400,
+        sinceIso: since,
+      },
+      {
+        table: "booking_payments",
+        columns: "id,status,amount_cents,provider,currency,created_at",
+        limit: 400,
+        sinceIso: since,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "payouts",
+        columns: "id,status,amount,payout_amount,amount_cents,created_at",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "guru_payouts",
+        columns: "id,status,amount,amount_cents,created_at",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "guru_payouts",
+        columns:
+          "id,payout_status,net_amount,gross_amount,created_at,guru_id,booking_id",
+        limit: 300,
+        sinceIso: since,
+      },
+    ]),
   ]);
+  const paymentRows = normalizePaymentRows(paymentsRaw.rows);
+  const payoutRows = normalizePayoutRows(payoutsRaw.rows);
   const gmv = sumField(bookings.rows, [
     "total_amount",
     "subtotal_amount",
+    "customer_total_amount",
     "amount",
   ]);
   const collected = sumField(
-    payments.rows.filter((r) =>
+    paymentRows.filter((r) =>
       ["paid", "succeeded", "captured", "complete"].includes(statusOf(r)),
     ),
-    ["amount", "total"],
+    ["amount", "total", "amount_cents"],
   );
-  const fees = sumField(payments.rows, ["fee_amount", "processing_fee"]);
-  const payoutTotal = sumField(payouts.rows, ["amount", "payout_amount"]);
+  const fees = sumField(paymentRows, [
+    "fee_amount",
+    "processing_fee",
+    "marketplace_support_cents",
+  ]);
+  const payoutTotal = sumField(payoutRows, [
+    "amount",
+    "payout_amount",
+    "net_amount",
+    "gross_amount",
+    "amount_cents",
+  ]);
   const platformRevenue = Math.max(0, collected - payoutTotal - fees);
   const takeRate = gmv > 0 ? (platformRevenue / gmv) * 100 : 0;
   return finalize(
     snap,
-    bookings.ok || payments.ok || payouts.ok,
+    bookings.ok || paymentsRaw.ok || payoutsRaw.ok,
     `GMV ${money(gmv)} · collected ${money(collected)} · payouts ${money(payoutTotal)} · est. take-rate ${takeRate.toFixed(1)}%.`,
     {
       gmv,
@@ -959,13 +1165,15 @@ async function moduleFinancialOverview(since: string): Promise<ModuleSnapshot> {
       payouts: payoutTotal,
       platformRevenue,
       takeRatePercent: Number(takeRate.toFixed(1)),
+      paymentsSource: paymentsRaw.tableUsed,
+      payoutsSource: payoutsRaw.tableUsed,
     },
     [
       `GMV ${money(gmv)}`,
       `Collected ${money(collected)}`,
       `Take-rate ${takeRate.toFixed(1)}%`,
     ],
-    [bookings, payments, payouts].filter((r) => !r.ok).map((r) => r.message),
+    [bookings, paymentsRaw, payoutsRaw].filter((r) => !r.ok).map((r) => r.message),
   );
 }
 
@@ -1010,7 +1218,7 @@ async function moduleStripe(since: string): Promise<ModuleSnapshot> {
     "stripe_transactions",
     "Stripe Transactions",
     "financials",
-    ["stripe_transactions", "stripe_balance_transactions", "payments"],
+    ["stripe_transactions", "stripe_balance_transactions", "payments", "booking_payments"],
   );
   const [stripeTx, balanceTx, payments] = await Promise.all([
     safeSelect(
@@ -1025,13 +1233,44 @@ async function moduleStripe(since: string): Promise<ModuleSnapshot> {
       300,
       since,
     ),
-    safeSelect("payments", "id,amount,fee_amount,status,created_at", 300, since),
+    safeSelectCascade([
+      {
+        table: "payments",
+        columns: "id,amount,fee_amount,amount_cents,status,created_at",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "booking_payments",
+        columns:
+          "id,amount,amount_cents,fee_amount,marketplace_support_cents,status,created_at",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "booking_payments",
+        columns: "id,amount_cents,status,provider,currency,created_at",
+        limit: 300,
+        sinceIso: since,
+      },
+    ]),
   ]);
-  const rows = stripeTx.ok ? stripeTx.rows : balanceTx.ok ? balanceTx.rows : payments.rows;
-  const volume = sumField(rows, ["amount", "total"]);
-  const fees = sumField(rows, ["fee", "fee_amount"]);
-  const disputes = countWhere(rows, (r) =>
-    statusOf(r).includes("dispute") || asString(r.type).includes("dispute"),
+  const paymentRows = normalizePaymentRows(payments.rows);
+  const rows = stripeTx.ok
+    ? stripeTx.rows
+    : balanceTx.ok
+      ? balanceTx.rows
+      : paymentRows;
+  const volume = sumField(rows, ["amount", "total", "amount_cents"]);
+  const fees = sumField(rows, [
+    "fee",
+    "fee_amount",
+    "marketplace_support_cents",
+  ]);
+  const disputes = countWhere(
+    rows,
+    (r) =>
+      statusOf(r).includes("dispute") || asString(r.type).includes("dispute"),
   );
   return finalize(
     snap,
@@ -1042,6 +1281,11 @@ async function moduleStripe(since: string): Promise<ModuleSnapshot> {
       fees,
       disputes,
       rows: rows.length,
+      source: stripeTx.ok
+        ? "stripe_transactions"
+        : balanceTx.ok
+          ? "stripe_balance_transactions"
+          : payments.tableUsed,
     },
     [`${money(volume)} volume`, `${money(fees)} fees`, `${number(disputes)} disputes`],
     [stripeTx, balanceTx, payments].filter((r) => !r.ok).map((r) => r.message),
@@ -1125,21 +1369,70 @@ async function moduleBalanceSheet(): Promise<ModuleSnapshot> {
 async function moduleCashFlow(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("cash_flow", "Cash Flow", "financials", [
     "payments",
+    "booking_payments",
     "payouts",
+    "guru_payouts",
     "bank_transactions",
   ]);
   const [payments, payouts, bank] = await Promise.all([
-    safeSelect("payments", "id,amount,status,created_at", 400, since),
-    safeSelect("payouts", "id,amount,status,created_at", 300, since),
+    safeSelectCascade([
+      {
+        table: "payments",
+        columns: "id,amount,amount_cents,status,created_at",
+        limit: 400,
+        sinceIso: since,
+      },
+      {
+        table: "booking_payments",
+        columns: "id,amount,amount_cents,status,created_at",
+        limit: 400,
+        sinceIso: since,
+      },
+      {
+        table: "booking_payments",
+        columns: "id,amount_cents,status,created_at",
+        limit: 400,
+        sinceIso: since,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "payouts",
+        columns: "id,amount,payout_amount,amount_cents,status,created_at",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "guru_payouts",
+        columns: "id,amount,amount_cents,status,created_at",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "guru_payouts",
+        columns:
+          "id,payout_status,net_amount,gross_amount,created_at,guru_id,booking_id",
+        limit: 300,
+        sinceIso: since,
+      },
+    ]),
     safeSelect("bank_transactions", "id,amount,status,created_at", 300, since),
   ]);
+  const paymentRows = normalizePaymentRows(payments.rows);
+  const payoutRows = normalizePayoutRows(payouts.rows);
   const inflow = sumField(
-    payments.rows.filter((r) =>
+    paymentRows.filter((r) =>
       ["paid", "succeeded", "captured"].includes(statusOf(r)),
     ),
-    ["amount"],
+    ["amount", "amount_cents"],
   );
-  const outflow = sumField(payouts.rows, ["amount"]);
+  const outflow = sumField(payoutRows, [
+    "amount",
+    "payout_amount",
+    "net_amount",
+    "gross_amount",
+    "amount_cents",
+  ]);
   const net = inflow - outflow;
   return finalize(
     snap,
@@ -1150,6 +1443,8 @@ async function moduleCashFlow(since: string): Promise<ModuleSnapshot> {
       outflow,
       net,
       bankTransactions: bank.count,
+      paymentsSource: payments.tableUsed,
+      payoutsSource: payouts.tableUsed,
     },
     [`In ${money(inflow)}`, `Out ${money(outflow)}`, `Net ${money(net)}`],
     [payments, payouts, bank].filter((r) => !r.ok).map((r) => r.message),
@@ -1309,32 +1604,58 @@ async function modulePayouts(since: string): Promise<ModuleSnapshot> {
     "payouts",
     "guru_payouts",
   ]);
-  const [payouts, guruPayouts] = await Promise.all([
-    safeSelect("payouts", "id,amount,status,created_at,scheduled_for", 400, since),
-    safeSelect("guru_payouts", "id,amount,status,created_at", 400, since),
+  const payouts = await safeSelectCascade([
+    {
+      table: "payouts",
+      columns:
+        "id,amount,payout_amount,amount_cents,status,created_at,scheduled_for",
+      limit: 400,
+      sinceIso: since,
+    },
+    {
+      table: "guru_payouts",
+      columns: "id,amount,amount_cents,status,created_at",
+      limit: 400,
+      sinceIso: since,
+    },
+    {
+      table: "guru_payouts",
+      columns:
+        "id,payout_status,net_amount,gross_amount,created_at,guru_id,booking_id",
+      limit: 400,
+      sinceIso: since,
+    },
   ]);
-  const rows = payouts.ok ? payouts.rows : guruPayouts.rows;
+  const rows = normalizePayoutRows(payouts.rows);
+  const amountKeys = [
+    "amount",
+    "payout_amount",
+    "net_amount",
+    "gross_amount",
+    "amount_cents",
+  ];
   const pending = rows.filter((r) =>
     ["pending", "processing", "scheduled", "queued"].includes(statusOf(r)),
   );
   const paid = rows.filter((r) =>
-    ["paid", "complete", "completed", "sent"].includes(statusOf(r)),
+    ["paid", "complete", "completed", "sent", "released"].includes(statusOf(r)),
   );
   return finalize(
     snap,
-    payouts.ok || guruPayouts.ok,
-    `${number(pending.length)} payouts pending (${money(sumField(pending, ["amount"]))}) · ${number(paid.length)} paid.`,
+    payouts.ok,
+    `${number(pending.length)} payouts pending (${money(sumField(pending, amountKeys))}) · ${number(paid.length)} paid.`,
     {
       pendingCount: pending.length,
-      pendingAmount: sumField(pending, ["amount"]),
+      pendingAmount: sumField(pending, amountKeys),
       paidCount: paid.length,
-      paidAmount: sumField(paid, ["amount"]),
+      paidAmount: sumField(paid, amountKeys),
+      source: payouts.tableUsed,
     },
     [
       `${number(pending.length)} pending`,
-      `${money(sumField(pending, ["amount"]))} queued`,
+      `${money(sumField(pending, amountKeys))} queued`,
     ],
-    [payouts, guruPayouts].filter((r) => !r.ok).map((r) => r.message),
+    payouts.ok ? [] : [payouts.message],
   );
 }
 
@@ -1374,18 +1695,34 @@ async function moduleAuditTrail(since: string): Promise<ModuleSnapshot> {
     "financial_audit_logs",
   ]);
   const [adminLogs, financeLogs] = await Promise.all([
-    safeSelect(
-      "admin_audit_logs",
-      "id,action,created_at,actor_email,entity_type",
-      300,
-      since,
-    ),
-    safeSelect(
-      "financial_audit_logs",
-      "id,action,created_at,actor_email",
-      200,
-      since,
-    ),
+    safeSelectCascade([
+      {
+        table: "admin_audit_logs",
+        columns: "id,action,created_at,actor_email,entity_type,target_type",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "admin_audit_logs",
+        columns: "id,action,created_at,actor_email,target_type",
+        limit: 300,
+        sinceIso: since,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "financial_audit_logs",
+        columns: "id,action,created_at,actor_email,entity_type,target_type",
+        limit: 200,
+        sinceIso: since,
+      },
+      {
+        table: "financial_audit_logs",
+        columns: "id,action,created_at,actor_email,target_type",
+        limit: 200,
+        sinceIso: since,
+      },
+    ]),
   ]);
   return finalize(
     snap,

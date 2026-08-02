@@ -18,7 +18,10 @@ import {
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
-import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
+import {
+  isHardcodedSuperUserEmail,
+  SUPER_USER_EMAILS,
+} from "@/lib/admin/super-users";
 
 type LoginMethod = "email" | "phone";
 
@@ -81,7 +84,7 @@ function isProbablyValidE164Phone(value: string) {
 }
 
 function isApprovedAdminEmail(value: string | null | undefined) {
-  return APPROVED_ADMIN_EMAILS.has(String(value || "").trim().toLowerCase());
+  return isHardcodedSuperUserEmail(value);
 }
 
 export default function AdminLoginPage() {
@@ -101,7 +104,7 @@ export default function AdminLoginPage() {
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
 
   const approvedAdminList = useMemo(
-    () => Array.from(APPROVED_ADMIN_EMAILS).join(" or "),
+    () => Array.from(SUPER_USER_EMAILS).join(" or "),
     [],
   );
 

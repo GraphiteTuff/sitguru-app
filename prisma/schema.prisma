@@ -1,0 +1,110 @@
+/**
+ * Live Supabase production schema reflection for Rogue (project mmtjhxnzuglbyumbsjhs).
+ *
+ * SitGuru does NOT run Prisma migrations against production — schema is owned by
+ * supabase/migrations. This file is the local binding surface for Rogue tooling.
+ *
+ * Regenerated 2026-08-02 via live PostgREST column probes (prisma db pull blocked:
+ * DATABASE_URL / Postgres password not available in this cloud agent environment).
+ * When DATABASE_URL is set, prefer: `npx prisma db pull --force`
+ *
+ * Compatibility tables that do NOT exist yet in production (payments, payouts,
+ * live_walks, etc.) are intentionally omitted here. Apply
+ * supabase/migrations/20260802_structural_schema_alignment_rogue.sql to add them.
+ */
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+/// Canonical payment ledger (cents). There is no public.payments table in prod.
+model BookingPayment {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId             String?   @map("booking_id")
+  status                String?
+  amountCents           BigInt?   @map("amount_cents")
+  provider              String?
+  currency              String?
+  stripePaymentIntentId String?   @map("stripe_payment_intent_id")
+  stripeChargeId        String?   @map("stripe_charge_id")
+  receiptUrl            String?   @map("receipt_url")
+  paidAt                DateTime? @map("paid_at") @db.Timestamptz(6)
+  failedAt              DateTime? @map("failed_at") @db.Timestamptz(6)
+  metadata              Json?
+  createdAt             DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime? @map("updated_at") @db.Timestamptz(6)
+
+  @@map("booking_payments")
+}
+
+/// Guru payouts — amounts live as net_amount / gross_amount (not amount / amount_cents).
+model GuruPayout {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guruId           String?  @map("guru_id") @db.Uuid
+  bookingId        String?  @map("booking_id")
+  payoutStatus     String?  @map("payout_status")
+  stripeTransferId String?  @map("stripe_transfer_id")
+  netAmount        Decimal? @map("net_amount") @db.Decimal
+  grossAmount      Decimal? @map("gross_amount") @db.Decimal
+  createdAt        DateTime? @map("created_at") @db.Timestamptz(6)
+
+  @@map("guru_payouts")
+}
+
+model AdminAuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorEmail String?  @map("actor_email")
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  metadata   Json?
+  createdAt  DateTime? @map("created_at") @db.Timestamptz(6)
+
+  @@map("admin_audit_logs")
+}
+
+model Booking {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status       String?
+  totalAmount  Decimal?  @map("total_amount") @db.Decimal
+  petParentId  String?   @map("pet_parent_id") @db.Uuid
+  guruId       String?   @map("guru_id") @db.Uuid
+  serviceType  String?   @map("service_type")
+  createdAt    DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime? @map("updated_at") @db.Timestamptz(6)
+
+  @@map("bookings")
+}
+
+/// Live walk tracks (no public.live_walks / walk_sessions in prod).
+model BookingWalkTrack {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId String?   @map("booking_id")
+  guruId    String?   @map("guru_id") @db.Uuid
+  status    String?
+  startedAt DateTime? @map("started_at") @db.Timestamptz(6)
+  endedAt   DateTime? @map("ended_at") @db.Timestamptz(6)
+  createdAt DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @map("updated_at") @db.Timestamptz(6)
+
+  @@map("booking_walk_tracks")
+}
+
+/// GPS points for walk tracks (no public.gps_events in prod).
+model BookingWalkTrackPoint {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  walkTrackId String?   @map("walk_track_id") @db.Uuid
+  bookingId   String?   @map("booking_id")
+  lat         Float?
+  lng         Float?
+  accuracy    Float?
+  recordedAt  DateTime? @map("recorded_at") @db.Timestamptz(6)
+  createdAt   DateTime? @map("created_at") @db.Timestamptz(6)
+
+  @@map("booking_walk_track_points")
+}
