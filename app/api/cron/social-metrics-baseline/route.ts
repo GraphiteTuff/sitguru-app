@@ -1,6 +1,12 @@
 /**
  * Daily social metrics baseline + optional live brand sync.
+ *
+ * App Router path (canonical):
+ *   app/api/cron/social-metrics-baseline/route.ts
+ *   → GET|POST /api/cron/social-metrics-baseline
+ *
  * Auth: Authorization: Bearer $CRON_SECRET (same pattern as profile-completion reminders).
+ * vercel.json cron: "5 0 * * *" → this path.
  */
 
 import { NextRequest, NextResponse } from "next/server";

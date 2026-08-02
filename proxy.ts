@@ -545,5 +545,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Skip static assets and cron API handlers (App Router: app/api/cron/**/route.ts).
+  // Cron routes authenticate via CRON_SECRET themselves and must not hit session redirects.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api/cron(?:/|$)).*)",
+  ],
 };
