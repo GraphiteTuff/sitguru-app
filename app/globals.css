@@ -2121,6 +2121,36 @@ div.homepage-chat-panel__header,
   box-shadow: 0 0 0 3px rgba(13, 92, 58, 0.15);
 }
 
+/* Pet Officer overlays: beat dark-theme / inherited white text washouts. */
+[data-officer-dock] .homepage-chat-panel {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+[data-officer-dock] .homepage-chat-bubble--user {
+  background: var(--hcb-green, #166534) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+[data-officer-dock] .homepage-chat-bubble--ai {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+[data-officer-dock] .homepage-chat-panel__composer textarea {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
+  background: #ffffff !important;
+}
+
+[data-officer-dock] .homepage-chat-panel__composer textarea::placeholder {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+  opacity: 1 !important;
+}
+
 .homepage-chat-panel__composer button {
   border: 0;
   border-radius: 0.85rem;
