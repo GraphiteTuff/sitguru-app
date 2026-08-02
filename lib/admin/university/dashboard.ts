@@ -118,7 +118,7 @@ async function safeSelect(
     }
 
     return {
-      data: Array.isArray(data) ? (data as AnyRow[]) : [],
+      data: Array.isArray(data) ? (data as unknown as AnyRow[]) : [],
       ok: true,
       message: `${table} connected`,
     };
