@@ -532,7 +532,7 @@ export default function RogueFloatingAssistant() {
 
           <p className="flex items-center gap-1.5 border-t border-gray-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
             <Sparkles size={12} />
-            Read-only admin snapshots · Markdown reports
+            Live admin tools · on-demand DB reads · Markdown reports
           </p>
         </div>
       ) : null}

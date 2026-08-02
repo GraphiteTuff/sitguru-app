@@ -1,12 +1,13 @@
 /**
  * Rogue Admin AI — authenticated streaming intelligence route.
- * Verifies SitGuru admin identity, compiles read-only reporting snapshots,
- * and streams Claude responses via the Vercel AI SDK data stream protocol.
+ * Verifies SitGuru admin identity, exposes read-only DB tools to Claude,
+ * and runs a multi-step tool-calling loop via the Vercel AI SDK.
  */
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { streamText, type CoreMessage } from "ai";
 import { getAdminIdentity } from "@/lib/admin/access";
+import { buildAdminRogueTools } from "@/lib/actions/admin-rogue-tools";
 import {
   compileAdminReportingSnapshot,
   inferPeriodFromText,
@@ -72,7 +73,7 @@ function buildAdminRogueSystemPrompt(opts: {
   periodLabel: string;
   actorEmail: string;
   actorRole: string;
-  snapshotMarkdown: string;
+  canAccessFinancials: boolean;
   preset?: string;
 }) {
   return `
@@ -80,43 +81,63 @@ You are Rogue, Chief Treat Officer 🦴 — SitGuru's floating semantic administ
 
 PERSONA:
 - Sharp, analytical, delightful, and pet-centric.
-- You are fiercely loyal to the pack and obsessed with clean ops, fair payouts, trusted care, and growth that doesn't smell like snake oil.
-- Occasional GSP flair is welcome (pointing, zoomies, naps) — but never at the expense of clarity.
+- Fiercely loyal to the pack: clean ops, fair payouts, trusted care, growth without snake oil.
+- Occasional GSP flair (pointing, zoomies, naps) is welcome — never at the expense of clarity.
 - Admin tone: mature, precise, trustworthy. Still warm. Not cutesy spam.
 
 MISSION:
-- Scan the injected ADMIN DATA SNAPSHOT and answer the admin's question.
-- Compile daily / weekly / monthly / yearly style reports when asked.
+- You are an autonomous admin agent with LIVE database tools. Do not wait for a preloaded snapshot.
+- When the admin asks for names, emails, lists, logs, queues, IDs, drill-downs, or "show me / list / find / filter", you MUST call the matching tool before answering.
+- For Daily Sync / Weekly Financials / Growth Analytics / System Audit (or similar chips), call compileAdminReport first with the matching preset/period, then optionally drill with list/fetch tools.
 - Prefer actionable findings: exceptions, queues, risks, opportunities, and next clicks.
-- Never invent financial numbers. If a module is unavailable or zero, say so plainly.
-- Never expose secrets, service-role keys, env values, or raw PII dumps beyond what the snapshot already summarizes.
+- Never invent financial numbers, people, or row counts. If a tool returns empty/unavailable, say so plainly.
+- Never expose secrets, service-role keys, env values, access tokens, or dump entire raw PII payloads. Summarize tool rows; show only the fields needed to answer.
+- Finance tools may deny access when the actor lacks financials capability — respect that and route them to an owner/finance admin.
+
+AVAILABLE TOOLS (read-only, paginated — keep pageSize ≤ 25):
+- compileAdminReport — aggregate module snapshot (presets + period + modules)
+- listGurus / getGuruDetails — Guru directory + drill-down
+- listPetParents / getPetParentDetails — Pet Parent directory + drill-down
+- listBookings — bookings queue / status filters
+- listAmbassadors — ambassador / referral partners
+- listPayouts — payout queue (finance-gated)
+- fetchFinancialLedger — payment ledger lines (finance-gated; prefers booking_payments)
+- listAuditLogs — admin / finance / analytics audit rows
+- listMessages — recent message activity
+- searchAdminDomain — generic domain search when unsure which table
+
+TOOL USE RULES:
+- Call tools proactively. Multiple tools in one turn are fine when useful.
+- Use pagination (page / pageSize) and filters instead of asking for "everything".
+- After tool results arrive, write the final Markdown answer. Do not narrate the tool call itself unless helpful ("sniffed the Guru kennel…").
+- If hasMore is true, say so and offer the next page / tighter filter.
 
 OUTPUT RULES:
-- Use clean Markdown: headings, short bullets, and tables when comparing metrics.
+- Use clean Markdown: headings, short bullets, and tables when listing people or comparing metrics.
 - Lead with a 1–2 sentence executive sniff-check, then structured sections.
-- When useful, include a "Next hops" list with admin routes (e.g. /admin/financials/payouts).
+- When listing people, include name + key status + city/state when present; email only when asked or clearly useful for ops.
+- When useful, include a "Next hops" list with admin routes (e.g. /admin/gurus, /admin/financials/payouts, /admin/audit-trail).
 - Keep reports scannable. No wall-of-text paragraphs.
 
 TEMPORAL CONTEXT:
 - Current UTC datetime: ${opts.nowIso}
-- Active report period: ${opts.period} (${opts.periodLabel})
+- Default report period: ${opts.period} (${opts.periodLabel})
 - Requesting admin: ${opts.actorEmail} (${opts.actorRole})
-${opts.preset ? `- Quick-tap preset: ${opts.preset}` : ""}
-
-ADMIN DATA SNAPSHOT (read-only, defensive aggregates):
-${opts.snapshotMarkdown}
+- Financials access: ${opts.canAccessFinancials ? "granted" : "restricted"}
+${opts.preset ? `- Quick-tap preset: ${opts.preset} — call compileAdminReport with this preset.` : ""}
 `.trim();
 }
 
-function fallbackReport(snapshotMarkdown: string, question: string) {
+function fallbackReport(question: string, snapshotMarkdown?: string) {
   return [
     `**Rogue here — Chief Treat Officer on duty.**`,
     ``,
-    `I couldn't reach the live model kennel just now, so here's a raw snapshot pack for: _${question || "admin sync"}_.`,
+    `I couldn't reach the live model kennel just now, so here's a best-effort pack note for: _${question || "admin sync"}_.`,
     ``,
-    snapshotMarkdown.slice(0, 6000) || "_No snapshot rows available._",
+    snapshotMarkdown?.slice(0, 6000) ||
+      "_Live tools unavailable in simulation mode. Re-check ANTHROPIC_API_KEY and retry._",
     ``,
-    `**Next hops:** /admin/financials/reports · /admin/analytics · /admin/audit-trail`,
+    `**Next hops:** /admin/gurus · /admin/financials/reports · /admin/audit-trail`,
   ].join("\n");
 }
 
@@ -156,30 +177,34 @@ export async function POST(req: Request) {
         ? periodHint
         : inferPeriodFromText(`${preset} ${lastUserText}`);
 
-    const snapshot = await compileAdminReportingSnapshot({
-      period,
-      query: lastUserText,
-      preset: preset || null,
-    }).catch(() => null);
-
-    const snapshotMarkdown =
-      snapshot?.markdownContext ||
-      "# SitGuru Admin Snapshot\n- No live module data available.";
-
     const nowIso = new Date().toISOString();
+    const canAccessFinancials = Boolean(actor.canAccessFinancials);
+
     const system = buildAdminRogueSystemPrompt({
       nowIso,
-      period: snapshot?.period || period,
-      periodLabel: snapshot?.periodLabel || period,
-      actorEmail: actor.email,
-      actorRole: actor.role,
-      snapshotMarkdown,
+      period,
+      periodLabel: period,
+      actorEmail: actor.email || "admin",
+      actorRole: actor.role || "admin",
+      canAccessFinancials,
       preset: preset || undefined,
     });
 
+    const tools = buildAdminRogueTools({
+      canAccessFinancials,
+      defaultPeriod: period,
+    });
+
     if (!isSitGuruAiConfigured()) {
+      // Simulation path: still compile a snapshot so chips aren't empty.
+      const snapshot = await compileAdminReportingSnapshot({
+        period,
+        query: lastUserText,
+        preset: preset || null,
+      }).catch(() => null);
+
       return simulationDataStreamResponse(
-        fallbackReport(snapshotMarkdown, lastUserText),
+        fallbackReport(lastUserText, snapshot?.markdownContext),
       );
     }
 
@@ -188,6 +213,8 @@ export async function POST(req: Request) {
         model: anthropic(getSitGuruAiModel()),
         system,
         messages: messages.slice(-16),
+        tools,
+        maxSteps: 5,
         temperature: 0.4,
         maxTokens: 2500,
       });
@@ -200,8 +227,13 @@ export async function POST(req: Request) {
       });
     } catch (error) {
       console.error("[rogue-ai] model failure:", error);
+      const snapshot = await compileAdminReportingSnapshot({
+        period,
+        query: lastUserText,
+        preset: preset || null,
+      }).catch(() => null);
       return simulationDataStreamResponse(
-        fallbackReport(snapshotMarkdown, lastUserText),
+        fallbackReport(lastUserText, snapshot?.markdownContext),
       );
     }
   } catch (error) {

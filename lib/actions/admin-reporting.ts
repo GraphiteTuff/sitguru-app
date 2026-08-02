@@ -73,6 +73,35 @@ type SafeResult = {
   rows: AnyRow[];
   count: number;
   message: string;
+  table?: string;
+};
+
+/** Preferred live tables for money / banking reads (legacy names as soft fallback). */
+const FINANCIAL_TABLE_CANDIDATES = {
+  payments: [
+    "booking_payments",
+    "payments",
+    "stripe_transactions",
+    "stripe_balance_transactions",
+  ],
+  payouts: ["guru_payouts", "payouts", "stripe_payouts"],
+  bankTransactions: [
+    "admin_plaid_transactions",
+    "bank_transactions",
+    "plaid_bank_transactions",
+  ],
+  bankAccounts: ["admin_plaid_accounts", "plaid_accounts"],
+} as const;
+
+export type PaginatedQueryResult = {
+  ok: boolean;
+  table?: string;
+  rows: AnyRow[];
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+  message: string;
 };
 
 function asString(value: unknown) {
@@ -158,6 +187,7 @@ async function safeSelect(
         rows: [],
         count: 0,
         message: error.message || `${table} unavailable`,
+        table,
       };
     }
 
@@ -167,6 +197,7 @@ async function safeSelect(
       rows,
       count: typeof count === "number" ? count : rows.length,
       message: `${table} connected`,
+      table,
     };
   } catch (error) {
     return {
@@ -174,8 +205,31 @@ async function safeSelect(
       rows: [],
       count: 0,
       message: error instanceof Error ? error.message : `${table} unavailable`,
+      table,
     };
   }
+}
+
+async function safeSelectFirst(
+  tables: readonly string[],
+  columns = "*",
+  limit = 200,
+  sinceIso?: string | null,
+  dateColumn = "created_at",
+): Promise<SafeResult> {
+  const errors: string[] = [];
+  for (const table of tables) {
+    const result = await safeSelect(table, columns, limit, sinceIso, dateColumn);
+    if (result.ok) return result;
+    errors.push(`${table}: ${result.message}`);
+  }
+  return {
+    ok: false,
+    rows: [],
+    count: 0,
+    message: errors[0] || "No candidate tables available",
+    table: tables[0],
+  };
 }
 
 async function safeHeadCount(
@@ -218,19 +272,37 @@ async function safeHeadCount(
 }
 
 function statusOf(row: AnyRow) {
-  return asString(row.status || row.application_status || row.check_status)
+  return asString(
+    row.status ||
+      row.application_status ||
+      row.check_status ||
+      row.review_status ||
+      row.payment_status ||
+      row.payout_status ||
+      row.dispute_status,
+  )
     .toLowerCase()
     .replace(/\s+/g, "_");
 }
 
-function sumField(rows: AnyRow[], keys: string[]) {
-  return rows.reduce((sum, row) => {
-    for (const key of keys) {
-      const value = asNumber(row[key]);
-      if (value !== 0) return sum + value;
+function moneyFromRow(row: AnyRow, keys: string[]) {
+  for (const key of keys) {
+    if (!(key in row)) continue;
+    const raw = row[key];
+    if (raw == null || raw === "") continue;
+    const value = asNumber(raw);
+    if (!value) continue;
+    const lower = key.toLowerCase();
+    if (lower.includes("cents") || lower.includes("_cent")) {
+      return value / 100;
     }
-    return sum;
-  }, 0);
+    return value;
+  }
+  return 0;
+}
+
+function sumField(rows: AnyRow[], keys: string[]) {
+  return rows.reduce((sum, row) => sum + moneyFromRow(row, keys), 0);
 }
 
 function countWhere(rows: AnyRow[], predicate: (row: AnyRow) => boolean) {
@@ -349,12 +421,7 @@ async function moduleLiveWalks(since: string): Promise<ModuleSnapshot> {
 
 async function moduleBookings(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("bookings", "Bookings", "operations", ["bookings"]);
-  const result = await safeSelect(
-    "bookings",
-    "id,status,created_at,total_amount,amount,service_name,cancellation_reason",
-    500,
-    since,
-  );
+  const result = await safeSelect("bookings", "*", 500, since);
   const completed = countWhere(result.rows, (r) =>
     ["completed", "complete", "paid", "confirmed"].includes(statusOf(r)),
   );
@@ -911,58 +978,66 @@ async function moduleFinancialOverview(since: string): Promise<ModuleSnapshot> {
     "financial_overview",
     "Financial Overview",
     "financials",
-    ["bookings", "payments", "payouts"],
+    ["bookings", "booking_payments", "guru_payouts"],
   );
   const [bookings, payments, payouts] = await Promise.all([
-    safeSelect(
-      "bookings",
-      "id,status,total_amount,amount,subtotal_amount,created_at",
-      500,
-      since,
-    ),
-    safeSelect(
-      "payments",
-      "id,status,amount,fee_amount,created_at",
-      400,
-      since,
-    ),
-    safeSelect(
-      "payouts",
-      "id,status,amount,created_at",
-      300,
-      since,
-    ),
+    safeSelect("bookings", "*", 500, since),
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.payments, "*", 400, since),
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.payouts, "*", 300, since),
   ]);
   const gmv = sumField(bookings.rows, [
     "total_amount",
+    "customer_total_amount",
     "subtotal_amount",
+    "amount_total",
     "amount",
   ]);
   const collected = sumField(
     payments.rows.filter((r) =>
-      ["paid", "succeeded", "captured", "complete"].includes(statusOf(r)),
+      ["paid", "succeeded", "captured", "complete", "completed"].includes(
+        statusOf(r),
+      ),
     ),
-    ["amount", "total"],
+    ["amount_cents", "amount", "total"],
   );
-  const fees = sumField(payments.rows, ["fee_amount", "processing_fee"]);
-  const payoutTotal = sumField(payouts.rows, ["amount", "payout_amount"]);
-  const platformRevenue = Math.max(0, collected - payoutTotal - fees);
-  const takeRate = gmv > 0 ? (platformRevenue / gmv) * 100 : 0;
+  const fees = sumField(payments.rows, [
+    "marketplace_support_cents",
+    "fee_amount",
+    "processing_fee",
+    "fee",
+  ]);
+  const payoutTotal = sumField(payouts.rows, [
+    "amount_cents",
+    "amount",
+    "payout_amount",
+    "guru_payout_amount",
+  ]);
+  const platformFromPayments = sumField(payments.rows, [
+    "marketplace_support_cents",
+    "sitguru_fee_amount",
+    "platform_revenue",
+  ]);
+  const platformRevenue =
+    platformFromPayments > 0
+      ? platformFromPayments
+      : Math.max(0, (collected || gmv) - payoutTotal);
+  const effectiveGmv = gmv || collected;
+  const takeRate = effectiveGmv > 0 ? (platformRevenue / effectiveGmv) * 100 : 0;
   return finalize(
     snap,
     bookings.ok || payments.ok || payouts.ok,
-    `GMV ${money(gmv)} · collected ${money(collected)} · payouts ${money(payoutTotal)} · est. take-rate ${takeRate.toFixed(1)}%.`,
+    `GMV ${money(effectiveGmv)} · collected ${money(collected || effectiveGmv)} · payouts ${money(payoutTotal)} · est. take-rate ${takeRate.toFixed(1)}%.`,
     {
-      gmv,
-      collected,
+      gmv: effectiveGmv,
+      collected: collected || effectiveGmv,
       fees,
       payouts: payoutTotal,
       platformRevenue,
       takeRatePercent: Number(takeRate.toFixed(1)),
     },
     [
-      `GMV ${money(gmv)}`,
-      `Collected ${money(collected)}`,
+      `GMV ${money(effectiveGmv)}`,
+      `Collected ${money(collected || effectiveGmv)}`,
       `Take-rate ${takeRate.toFixed(1)}%`,
     ],
     [bookings, payments, payouts].filter((r) => !r.ok).map((r) => r.message),
@@ -971,25 +1046,26 @@ async function moduleFinancialOverview(since: string): Promise<ModuleSnapshot> {
 
 async function moduleBanking(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("banking", "Banking", "financials", [
-    "bank_transactions",
-    "plaid_accounts",
+    "admin_plaid_transactions",
+    "admin_plaid_accounts",
   ]);
   const [txns, accounts] = await Promise.all([
-    safeSelect(
-      "bank_transactions",
-      "id,amount,status,created_at,posted_at,category",
-      300,
-    ),
-    safeSelect("plaid_accounts", "id,status,current_balance,available_balance", 50),
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.bankTransactions, "*", 300),
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.bankAccounts, "*", 50),
   ]);
   const balance = sumField(accounts.rows, [
     "current_balance",
     "available_balance",
     "balance",
   ]);
-  const needsReview = countWhere(txns.rows, (r) =>
-    ["needs_review", "review", "unmatched"].includes(statusOf(r)),
-  );
+  const needsReview = countWhere(txns.rows, (r) => {
+    const status = statusOf(r);
+    return (
+      ["needs_review", "review", "unmatched", "pending_review"].includes(
+        status,
+      ) || r.pending === true
+    );
+  });
   return finalize(
     snap,
     txns.ok || accounts.ok,
@@ -1010,32 +1086,31 @@ async function moduleStripe(since: string): Promise<ModuleSnapshot> {
     "stripe_transactions",
     "Stripe Transactions",
     "financials",
-    ["stripe_transactions", "stripe_balance_transactions", "payments"],
+    ["booking_payments", "stripe_transactions", "payments"],
   );
-  const [stripeTx, balanceTx, payments] = await Promise.all([
-    safeSelect(
-      "stripe_transactions",
-      "id,amount,fee,status,created_at,type",
-      300,
-      since,
-    ),
-    safeSelect(
-      "stripe_balance_transactions",
-      "id,amount,fee,status,created_at,type",
-      300,
-      since,
-    ),
-    safeSelect("payments", "id,amount,fee_amount,status,created_at", 300, since),
+  const payments = await safeSelectFirst(
+    FINANCIAL_TABLE_CANDIDATES.payments,
+    "*",
+    400,
+    since,
+  );
+  const rows = payments.rows;
+  const volume = sumField(rows, ["amount_cents", "amount", "total"]);
+  const fees = sumField(rows, [
+    "marketplace_support_cents",
+    "fee",
+    "fee_amount",
   ]);
-  const rows = stripeTx.ok ? stripeTx.rows : balanceTx.ok ? balanceTx.rows : payments.rows;
-  const volume = sumField(rows, ["amount", "total"]);
-  const fees = sumField(rows, ["fee", "fee_amount"]);
-  const disputes = countWhere(rows, (r) =>
-    statusOf(r).includes("dispute") || asString(r.type).includes("dispute"),
+  const disputes = countWhere(
+    rows,
+    (r) =>
+      statusOf(r).includes("dispute") ||
+      asString(r.type).toLowerCase().includes("dispute") ||
+      asNumber(r.dispute_amount_cents) > 0,
   );
   return finalize(
     snap,
-    stripeTx.ok || balanceTx.ok || payments.ok,
+    payments.ok,
     `Stripe/payment volume ${money(volume)} · fees ${money(fees)} · disputes ${number(disputes)}.`,
     {
       volume,
@@ -1044,7 +1119,7 @@ async function moduleStripe(since: string): Promise<ModuleSnapshot> {
       rows: rows.length,
     },
     [`${money(volume)} volume`, `${money(fees)} fees`, `${number(disputes)} disputes`],
-    [stripeTx, balanceTx, payments].filter((r) => !r.ok).map((r) => r.message),
+    payments.ok ? [] : [payments.message],
   );
 }
 
@@ -1081,14 +1156,14 @@ async function moduleProfitLoss(since: string): Promise<ModuleSnapshot> {
 
 async function moduleBalanceSheet(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("balance_sheet", "Balance Sheet", "financials", [
-    "plaid_accounts",
-    "payouts",
+    "admin_plaid_accounts",
+    "guru_payouts",
     "referral_rewards",
   ]);
   const [accounts, payouts, rewards] = await Promise.all([
-    safeSelect("plaid_accounts", "id,current_balance,available_balance", 50),
-    safeSelect("payouts", "id,amount,status", 300),
-    safeSelect("referral_rewards", "id,amount,status", 300),
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.bankAccounts, "*", 50),
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.payouts, "*", 300),
+    safeSelectFirst(["referral_rewards", "ambassador_rewards"], "*", 300),
   ]);
   const assets = sumField(accounts.rows, [
     "current_balance",
@@ -1097,15 +1172,15 @@ async function moduleBalanceSheet(): Promise<ModuleSnapshot> {
   const liabilities =
     sumField(
       payouts.rows.filter((r) =>
-        ["pending", "processing", "owed"].includes(statusOf(r)),
+        ["pending", "processing", "owed", "scheduled"].includes(statusOf(r)),
       ),
-      ["amount"],
+      ["amount_cents", "amount", "payout_amount"],
     ) +
     sumField(
       rewards.rows.filter((r) =>
-        ["pending", "owed", "review"].includes(statusOf(r)),
+        ["pending", "owed", "review", "accrued"].includes(statusOf(r)),
       ),
-      ["amount"],
+      ["amount_cents", "amount", "reward_amount"],
     );
   const equity = assets - liabilities;
   return finalize(
@@ -1124,22 +1199,28 @@ async function moduleBalanceSheet(): Promise<ModuleSnapshot> {
 
 async function moduleCashFlow(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("cash_flow", "Cash Flow", "financials", [
-    "payments",
-    "payouts",
-    "bank_transactions",
+    "booking_payments",
+    "guru_payouts",
+    "admin_plaid_transactions",
   ]);
   const [payments, payouts, bank] = await Promise.all([
-    safeSelect("payments", "id,amount,status,created_at", 400, since),
-    safeSelect("payouts", "id,amount,status,created_at", 300, since),
-    safeSelect("bank_transactions", "id,amount,status,created_at", 300, since),
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.payments, "*", 400, since),
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.payouts, "*", 300, since),
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.bankTransactions, "*", 300, since),
   ]);
   const inflow = sumField(
     payments.rows.filter((r) =>
-      ["paid", "succeeded", "captured"].includes(statusOf(r)),
+      ["paid", "succeeded", "captured", "complete", "completed"].includes(
+        statusOf(r),
+      ),
     ),
-    ["amount"],
+    ["amount_cents", "amount"],
   );
-  const outflow = sumField(payouts.rows, ["amount"]);
+  const outflow = sumField(payouts.rows, [
+    "amount_cents",
+    "amount",
+    "payout_amount",
+  ]);
   const net = inflow - outflow;
   return finalize(
     snap,
@@ -1159,18 +1240,18 @@ async function moduleCashFlow(since: string): Promise<ModuleSnapshot> {
 async function moduleGeneralLedger(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("general_ledger", "General Ledger", "financials", [
     "general_ledger_entries",
-    "commission_ledger",
-    "payments",
+    "booking_payments",
+    "ambassador_rewards",
   ]);
   const [ledger, commissions, payments] = await Promise.all([
-    safeSelect(
-      "general_ledger_entries",
-      "id,account_type,amount,created_at",
-      300,
+    safeSelect("general_ledger_entries", "*", 300, since),
+    safeSelectFirst(
+      ["ambassador_rewards", "commission_ledger", "partner_commissions"],
+      "*",
+      200,
       since,
     ),
-    safeSelect("commission_ledger", "id,amount,created_at", 200, since),
-    safeSelect("payments", "id,amount,created_at", 200, since),
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.payments, "*", 200, since),
   ]);
   return finalize(
     snap,
@@ -1191,30 +1272,33 @@ async function moduleGeneralLedger(since: string): Promise<ModuleSnapshot> {
 
 async function moduleReconciliation(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("reconciliation", "Reconciliation", "financials", [
-    "bank_transactions",
-    "payments",
-    "stripe_transactions",
+    "admin_plaid_transactions",
+    "booking_payments",
   ]);
-  const [bank, payments, stripe] = await Promise.all([
-    safeSelect("bank_transactions", "id,status,amount", 300),
-    safeSelect("payments", "id,status,amount", 300),
-    safeSelect("stripe_transactions", "id,status,amount", 300),
+  const [bank, payments] = await Promise.all([
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.bankTransactions, "*", 300),
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.payments, "*", 300),
   ]);
-  const unmatched = countWhere(bank.rows, (r) =>
-    ["unmatched", "needs_review", "review"].includes(statusOf(r)),
-  );
+  const unmatched = countWhere(bank.rows, (r) => {
+    const status = statusOf(r);
+    return (
+      ["unmatched", "needs_review", "review", "pending_review"].includes(
+        status,
+      ) || r.pending === true
+    );
+  });
   return finalize(
     snap,
-    bank.ok || payments.ok || stripe.ok,
+    bank.ok || payments.ok,
     `${number(unmatched)} bank rows need reconciliation review.`,
     {
       bankRows: bank.count,
       paymentRows: payments.count,
-      stripeRows: stripe.count,
+      stripeRows: payments.count,
       unmatched,
     },
     [`${number(unmatched)} unmatched/review`],
-    [bank, payments, stripe].filter((r) => !r.ok).map((r) => r.message),
+    [bank, payments].filter((r) => !r.ok).map((r) => r.message),
   );
 }
 
@@ -1249,92 +1333,103 @@ async function moduleProForma(since: string): Promise<ModuleSnapshot> {
 
 async function moduleTaxCenter(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("tax_center", "Tax Center", "financials", [
-    "tax_liabilities",
+    "booking_payments",
     "gurus",
     "bookings",
   ]);
-  const [tax, gurus, bookings] = await Promise.all([
-    safeSelect("tax_liabilities", "id,amount,status,created_at", 200),
+  const [payments, gurus, bookings] = await Promise.all([
+    safeSelectFirst(FINANCIAL_TABLE_CANDIDATES.payments, "*", 400),
     safeHeadCount("gurus"),
-    safeSelect("bookings", "id,tax_amount,total_amount", 300),
+    safeSelect("bookings", "*", 300),
   ]);
   const taxPool =
-    sumField(tax.rows, ["amount", "tax_amount"]) ||
-    sumField(bookings.rows, ["tax_amount"]);
+    sumField(payments.rows, ["tax_cents", "sales_tax_cents"]) ||
+    sumField(bookings.rows, ["sales_tax_amount", "tax_amount"]);
   return finalize(
     snap,
-    tax.ok || gurus.ok || bookings.ok,
+    payments.ok || gurus.ok || bookings.ok,
     `Tax pool signals ${money(taxPool)} · ${number(gurus.count)} providers potentially 1099-relevant.`,
     {
       taxPool,
       providers: gurus.count,
-      taxRows: tax.count,
+      taxRows: payments.count,
     },
     [`${money(taxPool)} tax pool`, `${number(gurus.count)} providers`],
-    [tax, gurus, bookings].filter((r) => !r.ok).map((r) => r.message),
+    [payments, gurus, bookings].filter((r) => !r.ok).map((r) => r.message),
   );
 }
 
 async function moduleCommissions(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("commissions", "Commissions", "financials", [
-    "commission_ledger",
+    "ambassador_rewards",
     "partner_commissions",
   ]);
-  const [ledger, partners] = await Promise.all([
-    safeSelect("commission_ledger", "id,amount,status,created_at", 400),
-    safeSelect("partner_commissions", "id,amount,status,created_at", 300),
-  ]);
+  const commissions = await safeSelectFirst(
+    ["ambassador_rewards", "commission_ledger", "partner_commissions"],
+    "*",
+    400,
+  );
   const outstanding = sumField(
-    [...ledger.rows, ...partners.rows].filter((r) =>
-      ["pending", "owed", "accrued", "open"].includes(statusOf(r)),
+    commissions.rows.filter((r) =>
+      ["pending", "owed", "accrued", "open", "earned"].includes(statusOf(r)),
     ),
-    ["amount", "commission_amount"],
+    ["amount_cents", "reward_amount_cents", "amount", "commission_amount"],
   );
   return finalize(
     snap,
-    ledger.ok || partners.ok,
+    commissions.ok,
     `Outstanding commissions ≈ ${money(outstanding)}.`,
     {
-      ledgerRows: ledger.count,
-      partnerCommissionRows: partners.count,
+      ledgerRows: commissions.count,
+      partnerCommissionRows: commissions.count,
       outstanding,
     },
     [`${money(outstanding)} outstanding`],
-    [ledger, partners].filter((r) => !r.ok).map((r) => r.message),
+    commissions.ok ? [] : [commissions.message],
   );
 }
 
 async function modulePayouts(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("payouts", "Payouts", "financials", [
-    "payouts",
     "guru_payouts",
+    "payouts",
   ]);
-  const [payouts, guruPayouts] = await Promise.all([
-    safeSelect("payouts", "id,amount,status,created_at,scheduled_for", 400, since),
-    safeSelect("guru_payouts", "id,amount,status,created_at", 400, since),
-  ]);
-  const rows = payouts.ok ? payouts.rows : guruPayouts.rows;
+  const payouts = await safeSelectFirst(
+    FINANCIAL_TABLE_CANDIDATES.payouts,
+    "*",
+    400,
+    since,
+  );
+  const rows = payouts.rows;
   const pending = rows.filter((r) =>
-    ["pending", "processing", "scheduled", "queued"].includes(statusOf(r)),
+    ["pending", "processing", "scheduled", "queued", "owed"].includes(
+      statusOf(r),
+    ),
   );
   const paid = rows.filter((r) =>
-    ["paid", "complete", "completed", "sent"].includes(statusOf(r)),
+    ["paid", "complete", "completed", "sent", "transferred"].includes(
+      statusOf(r),
+    ),
   );
   return finalize(
     snap,
-    payouts.ok || guruPayouts.ok,
-    `${number(pending.length)} payouts pending (${money(sumField(pending, ["amount"]))}) · ${number(paid.length)} paid.`,
+    payouts.ok,
+    `${number(pending.length)} payouts pending (${money(sumField(pending, ["amount_cents", "amount", "payout_amount"]))}) · ${number(paid.length)} paid.`,
     {
       pendingCount: pending.length,
-      pendingAmount: sumField(pending, ["amount"]),
+      pendingAmount: sumField(pending, [
+        "amount_cents",
+        "amount",
+        "payout_amount",
+      ]),
       paidCount: paid.length,
-      paidAmount: sumField(paid, ["amount"]),
+      paidAmount: sumField(paid, ["amount_cents", "amount", "payout_amount"]),
     },
     [
       `${number(pending.length)} pending`,
-      `${money(sumField(pending, ["amount"]))} queued`,
+      `${money(sumField(pending, ["amount_cents", "amount", "payout_amount"]))} queued`,
     ],
-    [payouts, guruPayouts].filter((r) => !r.ok).map((r) => r.message),
+    payouts.ok ? [] : [payouts.message],
   );
 }
 
@@ -1803,3 +1898,817 @@ export async function compileAdminReportingSnapshot(opts?: {
     markdownContext: modulesToMarkdown(modules, period, compiledAt),
   };
 }
+
+/* ------------------------------------------------------------------ */
+/*  Granular, paginated read APIs for Rogue tool-calling               */
+/* ------------------------------------------------------------------ */
+
+const SENSITIVE_ROW_KEYS = new Set([
+  "password",
+  "password_hash",
+  "access_token",
+  "refresh_token",
+  "secret",
+  "private_key",
+  "service_role",
+  "raw",
+  "raw_user_meta_data",
+  "encrypted_password",
+  "stripe_customer_secret",
+]);
+
+function clampPage(page?: number) {
+  const value = Number(page);
+  if (!Number.isFinite(value) || value < 1) return 1;
+  return Math.min(50, Math.floor(value));
+}
+
+function clampPageSize(pageSize?: number, fallback = 10) {
+  const value = Number(pageSize);
+  if (!Number.isFinite(value) || value < 1) return fallback;
+  return Math.min(25, Math.floor(value));
+}
+
+function truncateValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value.length > 240 ? `${value.slice(0, 237)}...` : value;
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, 12).map(truncateValue);
+  }
+  if (value && typeof value === "object") {
+    return "[object]";
+  }
+  return value;
+}
+
+function sanitizeRow(row: AnyRow, allowKeys?: string[]): AnyRow {
+  const out: AnyRow = {};
+  const entries = Object.entries(row || {});
+  for (const [key, value] of entries) {
+    const lower = key.toLowerCase();
+    if (SENSITIVE_ROW_KEYS.has(lower)) continue;
+    if (lower.includes("token") || lower.includes("secret")) continue;
+    if (allowKeys && !allowKeys.includes(key)) continue;
+    out[key] = truncateValue(value);
+  }
+  return out;
+}
+
+function rowMatchesSearch(row: AnyRow, search: string, keys: string[]) {
+  const needle = search.toLowerCase();
+  if (!needle) return true;
+  return keys.some((key) =>
+    asString(row[key]).toLowerCase().includes(needle),
+  );
+}
+
+function rowMatchesStatus(row: AnyRow, status?: string) {
+  const wanted = asString(status).toLowerCase();
+  if (!wanted) return true;
+  const actual = asString(
+    row.status ||
+      row.application_status ||
+      row.payment_status ||
+      row.payout_status ||
+      row.review_status,
+  ).toLowerCase();
+  if (wanted === "bookable") {
+    return (
+      row.is_bookable === true ||
+      actual === "bookable" ||
+      actual === "active" ||
+      actual === "approved"
+    );
+  }
+  return actual.includes(wanted) || actual === wanted;
+}
+
+function emptyPage(
+  message: string,
+  page = 1,
+  pageSize = 10,
+  table?: string,
+): PaginatedQueryResult {
+  return {
+    ok: false,
+    table,
+    rows: [],
+    page,
+    pageSize,
+    total: 0,
+    hasMore: false,
+    message,
+  };
+}
+
+function paginateRows(
+  rows: AnyRow[],
+  page: number,
+  pageSize: number,
+  table?: string,
+  message = "ok",
+): PaginatedQueryResult {
+  const total = rows.length;
+  const start = (page - 1) * pageSize;
+  const slice = rows.slice(start, start + pageSize);
+  return {
+    ok: true,
+    table,
+    rows: slice,
+    page,
+    pageSize,
+    total,
+    hasMore: start + pageSize < total,
+    message,
+  };
+}
+
+async function loadCandidateRows(
+  tables: readonly string[],
+  limit = 400,
+  sinceIso?: string | null,
+) {
+  return safeSelectFirst(tables, "*", limit, sinceIso);
+}
+
+/**
+ * List Guru records with optional filter / status / geo + pagination.
+ */
+export async function listGurus(opts?: {
+  filter?: string;
+  status?: string;
+  city?: string;
+  state?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginatedQueryResult> {
+  const page = clampPage(opts?.page);
+  const pageSize = clampPageSize(opts?.pageSize);
+  const filter = asString(opts?.filter);
+  const city = asString(opts?.city).toLowerCase();
+  const state = asString(opts?.state).toLowerCase();
+
+  const result = await safeSelectFirst(["gurus", "guru_profiles"], "*", 500);
+  if (!result.ok) {
+    return emptyPage(result.message, page, pageSize, result.table);
+  }
+
+  const filtered = result.rows
+    .filter((row) => rowMatchesStatus(row, opts?.status))
+    .filter((row) =>
+      rowMatchesSearch(row, filter, [
+        "id",
+        "user_id",
+        "profile_id",
+        "email",
+        "full_name",
+        "display_name",
+        "first_name",
+        "last_name",
+        "name",
+        "city",
+        "state",
+        "slug",
+      ]),
+    )
+    .filter((row) =>
+      city ? asString(row.city).toLowerCase().includes(city) : true,
+    )
+    .filter((row) =>
+      state ? asString(row.state).toLowerCase().includes(state) : true,
+    )
+    .map((row) =>
+      sanitizeRow(row, [
+        "id",
+        "user_id",
+        "profile_id",
+        "email",
+        "full_name",
+        "display_name",
+        "first_name",
+        "last_name",
+        "name",
+        "status",
+        "is_bookable",
+        "is_verified",
+        "city",
+        "state",
+        "rating",
+        "slug",
+        "created_at",
+        "updated_at",
+      ]),
+    );
+
+  return paginateRows(
+    filtered,
+    page,
+    pageSize,
+    result.table,
+    `${filtered.length} guru matches`,
+  );
+}
+
+/**
+ * Deep-fetch one Guru by id / email / name fragment.
+ */
+export async function getGuruDetails(id: string): Promise<{
+  ok: boolean;
+  row: AnyRow | null;
+  message: string;
+}> {
+  const needle = asString(id);
+  if (!needle) {
+    return { ok: false, row: null, message: "Guru id is required." };
+  }
+
+  const listed = await listGurus({ filter: needle, page: 1, pageSize: 5 });
+  const exact =
+    listed.rows.find(
+      (row) =>
+        asString(row.id) === needle ||
+        asString(row.user_id) === needle ||
+        asString(row.profile_id) === needle ||
+        asString(row.email).toLowerCase() === needle.toLowerCase(),
+    ) || listed.rows[0];
+
+  if (!exact) {
+    return {
+      ok: false,
+      row: null,
+      message: listed.message || "Guru not found.",
+    };
+  }
+  return { ok: true, row: exact, message: "Guru found." };
+}
+
+/**
+ * List Pet Parent / customer-shaped records.
+ */
+export async function listPetParents(opts?: {
+  filter?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginatedQueryResult> {
+  const page = clampPage(opts?.page);
+  const pageSize = clampPageSize(opts?.pageSize);
+  const filter = asString(opts?.filter);
+
+  const [petParents, profiles, customers] = await Promise.all([
+    safeSelect("pet_parents", "*", 400),
+    safeSelect("profiles", "*", 400),
+    safeSelect("customers", "*", 200),
+  ]);
+
+  const profileParents = profiles.ok
+    ? profiles.rows.filter((row) => {
+        const role = asString(row.role).toLowerCase();
+        return (
+          !role ||
+          role.includes("parent") ||
+          role.includes("customer") ||
+          role === "user"
+        );
+      })
+    : [];
+
+  const merged = [
+    ...(petParents.ok ? petParents.rows : []),
+    ...profileParents,
+    ...(customers.ok ? customers.rows : []),
+  ];
+
+  if (!petParents.ok && !profiles.ok && !customers.ok) {
+    return emptyPage(
+      petParents.message || profiles.message || customers.message,
+      page,
+      pageSize,
+    );
+  }
+
+  const seen = new Set<string>();
+  const filtered = merged
+    .filter((row) =>
+      rowMatchesSearch(row, filter, [
+        "id",
+        "user_id",
+        "profile_id",
+        "email",
+        "full_name",
+        "display_name",
+        "first_name",
+        "last_name",
+        "name",
+        "city",
+        "state",
+      ]),
+    )
+    .map((row) =>
+      sanitizeRow(row, [
+        "id",
+        "user_id",
+        "profile_id",
+        "email",
+        "full_name",
+        "display_name",
+        "first_name",
+        "last_name",
+        "name",
+        "role",
+        "status",
+        "account_status",
+        "city",
+        "state",
+        "created_at",
+        "updated_at",
+      ]),
+    )
+    .filter((row) => {
+      const key =
+        asString(row.id) ||
+        asString(row.user_id) ||
+        asString(row.email).toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  return paginateRows(
+    filtered,
+    page,
+    pageSize,
+    petParents.ok ? "pet_parents" : profiles.ok ? "profiles" : "customers",
+    `${filtered.length} pet parent matches`,
+  );
+}
+
+export async function getPetParentDetails(id: string): Promise<{
+  ok: boolean;
+  row: AnyRow | null;
+  message: string;
+}> {
+  const needle = asString(id);
+  if (!needle) {
+    return { ok: false, row: null, message: "Pet parent id is required." };
+  }
+  const listed = await listPetParents({ filter: needle, page: 1, pageSize: 5 });
+  const exact =
+    listed.rows.find(
+      (row) =>
+        asString(row.id) === needle ||
+        asString(row.user_id) === needle ||
+        asString(row.profile_id) === needle ||
+        asString(row.email).toLowerCase() === needle.toLowerCase(),
+    ) || listed.rows[0];
+
+  if (!exact) {
+    return {
+      ok: false,
+      row: null,
+      message: listed.message || "Pet parent not found.",
+    };
+  }
+  return { ok: true, row: exact, message: "Pet parent found." };
+}
+
+export async function listBookings(opts?: {
+  filter?: string;
+  status?: string;
+  period?: ReportPeriod;
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginatedQueryResult> {
+  const page = clampPage(opts?.page);
+  const pageSize = clampPageSize(opts?.pageSize);
+  const filter = asString(opts?.filter);
+  const period = opts?.period || "weekly";
+  const sinceIso = getPeriodStart(period).toISOString();
+
+  const result = await safeSelect("bookings", "*", 500, sinceIso);
+  if (!result.ok) {
+    return emptyPage(result.message, page, pageSize, "bookings");
+  }
+
+  const filtered = result.rows
+    .filter((row) => rowMatchesStatus(row, opts?.status))
+    .filter((row) =>
+      rowMatchesSearch(row, filter, [
+        "id",
+        "status",
+        "service_name",
+        "service_type",
+        "guru_id",
+        "customer_id",
+        "pet_parent_id",
+        "cancellation_reason",
+      ]),
+    )
+    .map((row) =>
+      sanitizeRow(row, [
+        "id",
+        "status",
+        "payment_status",
+        "payout_status",
+        "service_name",
+        "service_type",
+        "guru_id",
+        "customer_id",
+        "pet_parent_id",
+        "total_amount",
+        "subtotal_amount",
+        "customer_total_amount",
+        "sales_tax_amount",
+        "created_at",
+        "updated_at",
+        "cancellation_reason",
+      ]),
+    );
+
+  return paginateRows(
+    filtered,
+    page,
+    pageSize,
+    "bookings",
+    `${filtered.length} bookings in ${period}`,
+  );
+}
+
+export async function listAmbassadors(opts?: {
+  filter?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginatedQueryResult> {
+  const page = clampPage(opts?.page);
+  const pageSize = clampPageSize(opts?.pageSize);
+  const filter = asString(opts?.filter);
+
+  const result = await safeSelectFirst(
+    ["ambassadors", "sitguru_ambassadors"],
+    "*",
+    400,
+  );
+  if (!result.ok) {
+    return emptyPage(result.message, page, pageSize, result.table);
+  }
+
+  const filtered = result.rows
+    .filter((row) => rowMatchesStatus(row, opts?.status))
+    .filter((row) =>
+      rowMatchesSearch(row, filter, [
+        "id",
+        "user_id",
+        "email",
+        "full_name",
+        "display_name",
+        "first_name",
+        "last_name",
+        "name",
+        "referral_code",
+        "status",
+      ]),
+    )
+    .map((row) =>
+      sanitizeRow(row, [
+        "id",
+        "user_id",
+        "email",
+        "full_name",
+        "display_name",
+        "first_name",
+        "last_name",
+        "name",
+        "status",
+        "referral_code",
+        "created_at",
+        "updated_at",
+      ]),
+    );
+
+  return paginateRows(
+    filtered,
+    page,
+    pageSize,
+    result.table,
+    `${filtered.length} ambassador matches`,
+  );
+}
+
+export async function listPayouts(opts?: {
+  status?: string;
+  period?: ReportPeriod;
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginatedQueryResult> {
+  const page = clampPage(opts?.page);
+  const pageSize = clampPageSize(opts?.pageSize);
+  const period = opts?.period || "weekly";
+  const sinceIso = getPeriodStart(period).toISOString();
+
+  const result = await loadCandidateRows(
+    FINANCIAL_TABLE_CANDIDATES.payouts,
+    400,
+    sinceIso,
+  );
+  if (!result.ok) {
+    return emptyPage(result.message, page, pageSize, result.table);
+  }
+
+  const filtered = result.rows
+    .filter((row) => rowMatchesStatus(row, opts?.status))
+    .map((row) =>
+      sanitizeRow(row, [
+        "id",
+        "status",
+        "amount",
+        "amount_cents",
+        "payout_amount",
+        "guru_id",
+        "user_id",
+        "stripe_transfer_id",
+        "created_at",
+        "updated_at",
+        "paid_at",
+        "scheduled_for",
+      ]),
+    );
+
+  return paginateRows(
+    filtered,
+    page,
+    pageSize,
+    result.table,
+    `${filtered.length} payout rows`,
+  );
+}
+
+export async function fetchFinancialLedger(opts?: {
+  timeframe?: ReportPeriod;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginatedQueryResult> {
+  const page = clampPage(opts?.page);
+  const pageSize = clampPageSize(opts?.pageSize);
+  const timeframe = opts?.timeframe || "weekly";
+  const sinceIso = getPeriodStart(timeframe).toISOString();
+
+  const result = await loadCandidateRows(
+    FINANCIAL_TABLE_CANDIDATES.payments,
+    400,
+    sinceIso,
+  );
+  if (!result.ok) {
+    return emptyPage(result.message, page, pageSize, result.table);
+  }
+
+  const filtered = result.rows
+    .filter((row) => rowMatchesStatus(row, opts?.status))
+    .map((row) =>
+      sanitizeRow(row, [
+        "id",
+        "booking_id",
+        "status",
+        "provider",
+        "amount_cents",
+        "subtotal_cents",
+        "tax_cents",
+        "marketplace_support_cents",
+        "tip_cents",
+        "refund_amount_cents",
+        "dispute_amount_cents",
+        "dispute_status",
+        "amount",
+        "fee_amount",
+        "stripe_payment_intent_id",
+        "stripe_charge_id",
+        "paid_at",
+        "created_at",
+        "updated_at",
+      ]),
+    );
+
+  return paginateRows(
+    filtered,
+    page,
+    pageSize,
+    result.table,
+    `${filtered.length} ledger rows (${timeframe})`,
+  );
+}
+
+export async function listAuditLogs(opts?: {
+  filter?: string;
+  source?: "admin" | "financial" | "analytics" | "all";
+  canAccessFinancials?: boolean;
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginatedQueryResult> {
+  const page = clampPage(opts?.page);
+  const pageSize = clampPageSize(opts?.pageSize);
+  const filter = asString(opts?.filter);
+  const source = opts?.source || "all";
+  const canAccessFinancials = opts?.canAccessFinancials !== false;
+
+  const tables: string[] = [];
+  if (source === "admin" || source === "all") tables.push("admin_audit_logs");
+  if ((source === "financial" || source === "all") && canAccessFinancials) {
+    tables.push("financial_audit_logs");
+  }
+  if (source === "analytics" || source === "all") {
+    tables.push("analytics_events");
+  }
+
+  const results = await Promise.all(
+    tables.map((table) => safeSelect(table, "*", 200)),
+  );
+  const connected = results.filter((r) => r.ok);
+  if (!connected.length) {
+    return emptyPage(
+      results[0]?.message || "Audit tables unavailable",
+      page,
+      pageSize,
+    );
+  }
+
+  const merged = connected.flatMap((result) =>
+    result.rows.map((row) => ({
+      ...sanitizeRow(row, [
+        "id",
+        "action",
+        "event_type",
+        "event_name",
+        "actor_email",
+        "actor_id",
+        "user_id",
+        "entity_type",
+        "entity_id",
+        "status",
+        "created_at",
+        "message",
+        "summary",
+      ]),
+      __source_table: result.table,
+    })),
+  );
+
+  const filtered = merged.filter((row) =>
+    rowMatchesSearch(row, filter, [
+      "action",
+      "event_type",
+      "event_name",
+      "actor_email",
+      "entity_type",
+      "entity_id",
+      "message",
+      "summary",
+      "status",
+    ]),
+  );
+
+  return paginateRows(
+    filtered,
+    page,
+    pageSize,
+    connected[0]?.table,
+    `${filtered.length} audit rows`,
+  );
+}
+
+export async function listMessages(opts?: {
+  filter?: string;
+  period?: ReportPeriod;
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginatedQueryResult> {
+  const page = clampPage(opts?.page);
+  const pageSize = clampPageSize(opts?.pageSize, 8);
+  const filter = asString(opts?.filter);
+  const period = opts?.period || "daily";
+  const sinceIso = getPeriodStart(period).toISOString();
+
+  const result = await safeSelectFirst(
+    ["messages", "conversations"],
+    "*",
+    200,
+    sinceIso,
+  );
+  if (!result.ok) {
+    return emptyPage(result.message, page, pageSize, result.table);
+  }
+
+  const filtered = result.rows
+    .filter((row) =>
+      rowMatchesSearch(row, filter, [
+        "id",
+        "conversation_id",
+        "sender_id",
+        "body",
+        "content",
+        "subject",
+        "status",
+      ]),
+    )
+    .map((row) =>
+      sanitizeRow(row, [
+        "id",
+        "conversation_id",
+        "sender_id",
+        "receiver_id",
+        "status",
+        "created_at",
+        "subject",
+        "body",
+        "content",
+      ]),
+    );
+
+  return paginateRows(
+    filtered,
+    page,
+    pageSize,
+    result.table,
+    `${filtered.length} message rows`,
+  );
+}
+
+export async function searchAdminDomain(opts: {
+  domain:
+    | "gurus"
+    | "pet_parents"
+    | "bookings"
+    | "ambassadors"
+    | "payouts"
+    | "payments"
+    | "messages"
+    | "audit";
+  filter?: string;
+  period?: ReportPeriod;
+  canAccessFinancials?: boolean;
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginatedQueryResult> {
+  const domain = opts?.domain || "gurus";
+  switch (domain) {
+    case "gurus":
+      return listGurus({
+        filter: opts.filter,
+        page: opts.page,
+        pageSize: opts.pageSize,
+      });
+    case "pet_parents":
+      return listPetParents({
+        filter: opts.filter,
+        page: opts.page,
+        pageSize: opts.pageSize,
+      });
+    case "bookings":
+      return listBookings({
+        filter: opts.filter,
+        period: opts.period,
+        page: opts.page,
+        pageSize: opts.pageSize,
+      });
+    case "ambassadors":
+      return listAmbassadors({
+        filter: opts.filter,
+        page: opts.page,
+        pageSize: opts.pageSize,
+      });
+    case "payouts":
+      return listPayouts({
+        period: opts.period,
+        page: opts.page,
+        pageSize: opts.pageSize,
+      });
+    case "payments":
+      return fetchFinancialLedger({
+        timeframe: opts.period,
+        page: opts.page,
+        pageSize: opts.pageSize,
+      });
+    case "messages":
+      return listMessages({
+        filter: opts.filter,
+        period: opts.period,
+        page: opts.page,
+        pageSize: opts.pageSize,
+      });
+    case "audit":
+      return listAuditLogs({
+        filter: opts.filter,
+        canAccessFinancials: opts.canAccessFinancials,
+        page: opts.page,
+        pageSize: opts.pageSize,
+      });
+    default:
+      return emptyPage(`Unknown domain: ${String(domain)}`);
+  }
+}
+
+/**
+ * AI SDK tool registration for Rogue lives in:
+ * `@/lib/actions/admin-rogue-tools` (`buildAdminRogueTools`).
+ * Those tools call the paginated helpers above — keep this module server-only.
+ */
