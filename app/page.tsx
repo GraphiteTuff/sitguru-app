@@ -55,6 +55,34 @@ const popularServices = [
   },
 ];
 
+/** Homepage AI Pet Companions — avatar + statement only (no CTA buttons). */
+const aiPetCompanions = [
+  {
+    name: "Rogue",
+    role: "Chief Treat Officer",
+    avatarSrc: "/images/rogue-avatar.png",
+    objectPosition: "50% 28%",
+    statement:
+      "Just like zoomies, I'm quick to find you the local pet care you deserve. I've got your pack's back 24/7!",
+  },
+  {
+    name: "Taco",
+    role: "Ambassador Advocate",
+    avatarSrc: "/images/taco-avatar.png",
+    objectPosition: "center 22%",
+    statement:
+      "I'm here to cheer on our Ambassadors. I'll fetch your links and track your work!",
+  },
+  {
+    name: "Scout",
+    role: "Guru Matching Officer",
+    avatarSrc: "/images/scout-avatar.png",
+    objectPosition: "center 22%",
+    statement:
+      "Scout reporting for duty. I'm here to help seamlessly match our local Pet Gurus to the perfect Pet Parents.",
+  },
+] as const;
+
 type FeaturedHomepageGuruTarget = {
   label: string;
   fullName?: string;
@@ -2148,6 +2176,52 @@ export default function HomePage() {
                 </h3>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                   {description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section
+        aria-label="AI Pet Companions"
+        className="bg-gradient-to-b from-white via-[#f4faf7] to-white py-12 sm:py-16"
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D5C3A]">
+              Meet the pack
+            </p>
+            <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-4xl">
+              AI Pet Companions
+            </h2>
+          </div>
+
+          <div className="mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
+            {aiPetCompanions.map((companion) => (
+              <div
+                key={companion.name}
+                className="flex flex-col items-center text-center"
+              >
+                <div className="relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 sm:h-32 sm:w-32">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={companion.avatarSrc}
+                    alt={companion.name}
+                    width={128}
+                    height={128}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    style={{ objectPosition: companion.objectPosition }}
+                  />
+                </div>
+                <h3 className="mt-5 text-xl font-black tracking-tight text-slate-950">
+                  {companion.name}
+                </h3>
+                <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#0D5C3A]">
+                  {companion.role}
+                </p>
+                <p className="mt-4 max-w-sm text-sm font-semibold leading-6 tracking-wide text-slate-600 sm:text-[15px] sm:leading-7">
+                  &ldquo;{companion.statement}&rdquo;
                 </p>
               </div>
             ))}
