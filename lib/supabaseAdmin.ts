@@ -1,11 +1,15 @@
-import { createClient } from "@supabase/supabase-js";
+/**
+ * Legacy path for service-role Supabase — SERVER ONLY.
+ * Re-exports the lazy admin client so module evaluation does not crash
+ * during builds when env vars are not present at import time.
+ *
+ * Prefer `@/lib/supabase/admin` for new code.
+ */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
+export {
+  createSupabaseAdminClient,
+  getBearerToken,
+  requireAdminUser,
+  requireAuthenticatedUser,
+  supabaseAdmin,
+} from "@/lib/supabase/admin";
