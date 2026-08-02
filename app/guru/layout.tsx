@@ -1,6 +1,13 @@
 import "@/app/platform-dark.css";
 import type { ReactNode } from "react";
+import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
+import ScoutFloatingAssistant from "@/components/officers/ScoutFloatingAssistant";
 
+/**
+ * Guru root layout — mounts Scout (Guru Logistics Captain) across provider
+ * surfaces. Scout's chat accents use the mint/emerald provider palette;
+ * Rogue admin AI remains untouched.
+ */
 export default function GuruLayout({
   children,
 }: {
@@ -13,6 +20,9 @@ export default function GuruLayout({
           {children}
         </div>
       </div>
+      <SafeAssistantBubble>
+        <ScoutFloatingAssistant />
+      </SafeAssistantBubble>
     </div>
   );
 }
