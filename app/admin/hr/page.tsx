@@ -5,76 +5,66 @@ import {
   ArrowLeft,
   BadgeCheck,
   BriefcaseBusiness,
-  CalendarDays,
   ClipboardCheck,
   ClipboardList,
   ExternalLink,
-  FileText,
   GraduationCap,
   HeartHandshake,
   MapPin,
   MessageCircle,
   PawPrint,
   Plus,
+  Settings2,
   ShieldCheck,
   Sparkles,
   UserPlus,
   Users,
+  WalletCards,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAdminIdentity } from "@/lib/admin/access";
+import {
+  getHrDashboardData,
+  type HrLeadRecord,
+} from "@/lib/admin/hr/dashboard";
 import {
   VETERANS_MILITARY_FAMILIES_PROGRAM,
-  isVeteransMilitaryFamiliesProgram,
 } from "@/lib/programs/veterans-military-families";
 
 export const dynamic = "force-dynamic";
 
-type AnyRow = Record<string, unknown>;
-
-type SafeAdminQueryResponse = {
-  data: unknown;
-  error: unknown;
-};
-
-const adminRoutes = {
+const routes = {
   dashboard: "/admin",
   hr: "/admin/hr",
   ambassadors: "/admin/ambassadors",
   ambassadorLeads: "/admin/ambassador-leads",
+  ambassadorLeadsArchived: "/admin/ambassador-leads?status=archived",
   ambassadorTraining: "/admin/ambassador-training",
   universityAssignments: "/admin/university-assignments",
   universityProgress: "/admin/university-progress",
   programs: "/admin/programs",
   gurus: "/admin/gurus",
   newGuru: "/admin/gurus/new",
+  guruApprovals: "/admin/guru-approvals",
   backgroundChecks: "/admin/background-checks",
-  partners: "/admin/partners",
-  partnerApplications: "/admin/partners/applications",
-  referrals: "/admin/referrals",
+  settings: "/admin/settings",
+  users: "/admin/users",
   messages: "/admin/messages",
   exports: "/admin/exports",
+  payroll: "/admin/financials/payroll",
+  payouts: "/admin/payouts",
 };
 
 const VETERANS_PROGRAM_LABEL = VETERANS_MILITARY_FAMILIES_PROGRAM.shortName;
-const programOrder = ["Student Hire", "Community Hire", VETERANS_PROGRAM_LABEL];
 
-function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function asBoolean(value: unknown) {
-  if (typeof value === "boolean") return value;
-
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    return normalized === "true" || normalized === "1" || normalized === "yes";
-  }
-
-  if (typeof value === "number") return value === 1;
-
-  return false;
-}
+type ModuleCard = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  href: string;
+  wiring: "live" | "next";
+  value?: string;
+  icon: ReactNode;
+};
 
 function number(value: number) {
   return new Intl.NumberFormat("en-US").format(
@@ -84,10 +74,8 @@ function number(value: number) {
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
-
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "—";
-
   return parsed.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -95,1696 +83,797 @@ function formatDate(value?: string | null) {
   });
 }
 
-function getText(row: AnyRow, keys: string[], fallback = "") {
-  for (const key of keys) {
-    const value = asString(row[key]);
-    if (value) return value;
-  }
-
-  return fallback;
-}
-
-function getDate(row: AnyRow) {
-  return (
-    asString(row.created_at) ||
-    asString(row.updated_at) ||
-    asString(row.applied_at) ||
-    asString(row.submitted_at) ||
-    asString(row.last_contacted_at) ||
-    asString(row.date) ||
-    null
-  );
-}
-
-function getStatus(row: AnyRow) {
-  return getText(
-    row,
-    [
-      "status",
-      "lead_status",
-      "application_status",
-      "approval_status",
-      "background_check_status",
-    ],
-    "new",
-  ).toLowerCase();
-}
-
-function isArchivedStatus(row: AnyRow) {
-  const status = getStatus(row);
-
-  return (
-    status === "archived" ||
-    status === "archive" ||
-    status === "retained" ||
-    Boolean(asString(row.archived_at))
-  );
-}
-
-function isPendingStatus(row: AnyRow) {
-  if (isArchivedStatus(row)) return false;
-
-  const status = getStatus(row);
-
-  return (
-    status === "new" ||
-    status === "pending" ||
-    status === "submitted" ||
-    status === "review" ||
-    status === "in_review" ||
-    status === "contacted" ||
-    status === "interested" ||
-    status === "applied" ||
-    status === "conditional_offer_sent" ||
-    status === "onboarding_sent"
-  );
-}
-
-function isApprovedStatus(row: AnyRow) {
-  if (isArchivedStatus(row)) return false;
-
-  const status = getStatus(row);
-
-  return (
-    status === "approved" ||
-    status === "active" ||
-    status === "enabled" ||
-    status === "live" ||
-    status === "complete" ||
-    status === "completed"
-  );
-}
-
-function isDashboardEnabled(row: AnyRow) {
-  return asBoolean(row.dashboard_enabled);
-}
-
-function getRole(row: AnyRow) {
-  return getText(
-    row,
-    ["role", "user_role", "account_type", "type", "segment"],
-    "",
-  ).toLowerCase();
-}
-
-function getParticipantType(row: AnyRow) {
-  return getText(
-    row,
-    ["participant_type", "partner_type", "program_type", "type", "role"],
-    "",
-  ).toLowerCase();
-}
-
-function getDisplayName(row: AnyRow, fallback = "Applicant") {
-  const firstName = getText(row, ["first_name", "firstName"]);
-  const lastName = getText(row, ["last_name", "lastName"]);
-
-  if (firstName || lastName) return `${firstName} ${lastName}`.trim();
-
-  return getText(
-    row,
-    [
-      "full_name",
-      "display_name",
-      "name",
-      "lead_name",
-      "applicant_name",
-      "candidate_name",
-      "contact_name",
-      "guru_name",
-      "email",
-    ],
-    fallback,
-  );
-}
-
-function getEmail(row: AnyRow) {
-  return getText(
-    row,
-    [
-      "email",
-      "lead_email",
-      "applicant_email",
-      "candidate_email",
-      "contact_email",
-    ],
-    "—",
-  );
-}
-
-function getLocation(row: AnyRow) {
-  const city = getText(row, ["city", "service_city", "location_city"]);
-  const state = getText(row, ["state", "service_state", "location_state"]);
-  const location = getText(row, ["location", "market", "area"]);
-
-  if (city || state) return [city, state].filter(Boolean).join(", ");
-  return location || "—";
-}
-
-function getCombinedText(row: AnyRow) {
-  return [
-    getText(row, ["program", "program_name", "program_type", "lead_program"]),
-    getText(row, ["participant_type", "partner_type", "type", "role"]),
-    getText(row, ["source", "lead_source", "signup_source", "utm_source"]),
-    getText(row, ["campaign", "campaign_name", "utm_campaign"]),
-    getText(row, ["title", "name", "interest", "notes", "message"]),
-    getText(row, ["position", "job_title", "posting_title"]),
-  ]
+function Avatar({ name }: { name: string }) {
+  const initials = name
+    .split(" ")
     .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
-function getProgramLabel(row: AnyRow) {
-  const text = getCombinedText(row);
-  const explicitProgram = getText(
-    row,
-    ["program", "program_name", "program_type", "lead_program"],
-    "",
-  );
-
-  if (programOrder.includes(explicitProgram)) return explicitProgram;
-  if (isVeteransMilitaryFamiliesProgram(explicitProgram)) return VETERANS_PROGRAM_LABEL;
-
-  if (text.includes("student")) return "Student Hire";
-  if (text.includes("community")) return "Community Hire";
-
-  if (
-    text.includes("military") ||
-    text.includes("veteran") ||
-    text.includes("active-duty") ||
-    text.includes("active duty") ||
-    text.includes("guard") ||
-    text.includes("reserve")
-  ) {
-    return VETERANS_PROGRAM_LABEL;
-  }
-
-  return "Community Hire";
-}
-
-function getSourceLabel(row: AnyRow) {
-  const source = getText(
-    row,
-    ["source", "lead_source", "signup_source", "utm_source", "referral_source"],
-    "",
-  );
-  const text = `${source} ${getCombinedText(row)}`.toLowerCase();
-
-  if (text.includes("careerlink") || text.includes("career link")) {
-    return "PA CareerLink";
-  }
-  if (text.includes("indeed")) return "Indeed";
-  if (text.includes("handshake")) return "Handshake";
-  if (text.includes("linkedin") || text.includes("linked in")) return "LinkedIn";
-  if (
-    text.includes("college") ||
-    text.includes("university") ||
-    text.includes("campus")
-  ) {
-    return "College / University";
-  }
-  if (
-    text.includes("student organization") ||
-    text.includes("student org") ||
-    text.includes("club") ||
-    text.includes("fraternity") ||
-    text.includes("sorority")
-  ) {
-    return "Student Organization";
-  }
-  if (
-    text.includes("military") ||
-    text.includes("veteran") ||
-    text.includes("active-duty") ||
-    text.includes("active duty") ||
-    text.includes("guard") ||
-    text.includes("reserve")
-  ) {
-    return "Military / Veteran Organization";
-  }
-  if (text.includes("referral")) return "Referral";
-  if (text.includes("website") || text.includes("site")) return "Website";
-
-  return source || "Other";
-}
-
-function isGuruApplicant(row: AnyRow) {
-  const text = getCombinedText(row);
-  const role = getRole(row);
-  const participantType = getParticipantType(row);
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
 
   return (
-    text.includes("guru") ||
-    text.includes("pet care") ||
-    text.includes("sitter") ||
-    text.includes("walker") ||
-    role.includes("guru") ||
-    participantType.includes("guru")
-  );
-}
-
-function isWithinLastDays(value: string | null, days: number) {
-  if (!value) return false;
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return false;
-
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-
-  return parsed >= cutoff;
-}
-
-async function safeAdminQuery(
-  query: PromiseLike<SafeAdminQueryResponse>,
-  label: string,
-): Promise<SafeAdminQueryResponse> {
-  try {
-    const result = await query;
-
-    if (result.error) {
-      console.warn(`HR query skipped for ${label}:`, result.error);
-      return { data: [], error: null };
-    }
-
-    return result;
-  } catch (error) {
-    console.warn(`HR query skipped for ${label}:`, error);
-    return { data: [], error: null };
-  }
-}
-
-function mergeRows(...groups: AnyRow[][]) {
-  const merged: AnyRow[] = [];
-  const seen = new Set<string>();
-
-  for (const group of groups) {
-    for (const row of group) {
-      const sourceTable = getText(row, ["__source_table"], "unknown");
-      const id = getText(row, ["id"]);
-      const email = getEmail(row).toLowerCase();
-      const name = getDisplayName(row).toLowerCase();
-      const date = getDate(row);
-      const fallbackKey = `${sourceTable}:${email}:${name}:${date}:${merged.length}`;
-      const key = id ? `${sourceTable}:${id}` : fallbackKey;
-
-      if (seen.has(key)) continue;
-
-      seen.add(key);
-      merged.push(row);
-    }
-  }
-
-  return merged;
-}
-
-function withSourceTable(row: AnyRow, sourceTable: string) {
-  return {
-    ...row,
-    __source_table: sourceTable,
-  };
-}
-
-function normalizeLead(row: AnyRow) {
-  return {
-    raw: row,
-    name: getDisplayName(row),
-    email: getEmail(row),
-    program: getProgramLabel(row),
-    source: getSourceLabel(row),
-    status: getReadableStatus(row),
-    location: getLocation(row),
-    date: getDate(row),
-    archived: isArchivedStatus(row),
-  };
-}
-
-function getReadableStatus(row: AnyRow) {
-  const status = getStatus(row);
-
-  if (status === "new") return "New";
-  if (status === "pending") return "New";
-  if (status === "submitted") return "New";
-  if (status === "review") return "New";
-  if (status === "in_review") return "New";
-  if (status === "applied") return "New";
-  if (status === "conditional_offer_sent") return "Contacted";
-  if (status === "onboarding_sent") return "Contacted";
-  if (status === "contacted") return "Contacted";
-  if (status === "interested") return "Interested";
-  if (status === "signed_up") return "Signed Up";
-  if (status === "signup") return "Signed Up";
-  if (status === "converted") return "Signed Up";
-  if (status === "approved") return "Approved";
-  if (status === "active") return "Approved";
-  if (status === "enabled") return "Approved";
-  if (status === "live") return "Approved";
-  if (status === "complete") return "Approved";
-  if (status === "completed") return "Approved";
-  if (status === "not_moving_forward") return "Not Moving Forward";
-  if (status === "not_a_fit") return "Not Moving Forward";
-  if (status === "not_moving") return "Not Moving Forward";
-  if (status === "declined") return "Not Moving Forward";
-  if (status === "rejected") return "Not Moving Forward";
-  if (status === "inactive") return "Not Moving Forward";
-  if (status === "archived") return "Archived";
-
-  return (
-    status
-      .split("_")
-      .filter(Boolean)
-      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-      .join(" ") || "New"
-  );
-}
-
-async function getHrData() {
-  const [
-    ambassadorLeadsResult,
-    ambassadorsResult,
-    guruApplicationsResult,
-    gurusResult,
-    partnerApplicationsResult,
-    networkPartnerLeadsResult,
-    networkParticipantsResult,
-    launchSignupsResult,
-    launchWaitlistResult,
-    programApplicationsResult,
-    backgroundChecksResult,
-  ] = await Promise.all([
-    safeAdminQuery(
-      supabaseAdmin
-        .from("ambassador_leads")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "ambassador_leads",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("ambassadors")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "ambassadors",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("guru_applications")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "guru_applications",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("gurus")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "gurus",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("partner_applications")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "partner_applications",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("network_partner_leads")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "network_partner_leads",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("network_program_participants")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "network_program_participants",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("launch_signups")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "launch_signups",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("launch_waitlist")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "launch_waitlist",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("program_applications")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "program_applications",
-    ),
-    safeAdminQuery(
-      supabaseAdmin
-        .from("background_checks")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1000),
-      "background_checks",
-    ),
-  ]);
-
-  const ambassadorLeads = ((ambassadorLeadsResult.data || []) as AnyRow[]).map(
-    (row) => withSourceTable(row, "ambassador_leads"),
-  );
-  const ambassadors = ((ambassadorsResult.data || []) as AnyRow[]).map((row) =>
-    withSourceTable(row, "ambassadors"),
-  );
-  const guruApplications = ((guruApplicationsResult.data || []) as AnyRow[]).map(
-    (row) => withSourceTable(row, "guru_applications"),
-  );
-  const gurus = ((gurusResult.data || []) as AnyRow[]).map((row) =>
-    withSourceTable(row, "gurus"),
-  );
-  const partnerApplications = (
-    (partnerApplicationsResult.data || []) as AnyRow[]
-  ).map((row) => withSourceTable(row, "partner_applications"));
-  const launchSignups = ((launchSignupsResult.data || []) as AnyRow[]).map(
-    (row) => withSourceTable(row, "launch_signups"),
-  );
-  const launchWaitlist = ((launchWaitlistResult.data || []) as AnyRow[]).map(
-    (row) => withSourceTable(row, "launch_waitlist"),
-  );
-  const programApplications = (
-    (programApplicationsResult.data || []) as AnyRow[]
-  ).map((row) => withSourceTable(row, "program_applications"));
-  const backgroundChecks = (
-    (backgroundChecksResult.data || []) as AnyRow[]
-  ).map((row) => withSourceTable(row, "background_checks"));
-
-  const allAmbassadorRows = mergeRows(ambassadorLeads).sort((a, b) => {
-    const dateA = new Date(getDate(a) || 0).getTime();
-    const dateB = new Date(getDate(b) || 0).getTime();
-    return dateB - dateA;
-  });
-
-  const allAmbassadorDashboardRows = mergeRows(ambassadors).sort((a, b) => {
-    const dateA = new Date(getDate(a) || 0).getTime();
-    const dateB = new Date(getDate(b) || 0).getTime();
-    return dateB - dateA;
-  });
-
-  const allGuruRows = mergeRows(
-    guruApplications,
-    gurus,
-    partnerApplications.filter(isGuruApplicant),
-    launchSignups.filter(isGuruApplicant),
-    launchWaitlist.filter(isGuruApplicant),
-    programApplications.filter(isGuruApplicant),
-  ).sort((a, b) => {
-    const dateA = new Date(getDate(a) || 0).getTime();
-    const dateB = new Date(getDate(b) || 0).getTime();
-    return dateB - dateA;
-  });
-
-  const ambassadorRecords = allAmbassadorRows.map(normalizeLead);
-  const ambassadorDashboardRecords = allAmbassadorDashboardRows.map(normalizeLead);
-  const guruRecords = allGuruRows.map(normalizeLead);
-  const backgroundCheckRecords = backgroundChecks.map(normalizeLead);
-
-  const activeAmbassadorRecords = ambassadorRecords.filter(
-    (record) => !record.archived,
-  );
-  const archivedAmbassadorRecords = ambassadorRecords.filter(
-    (record) => record.archived,
-  );
-  const activeAmbassadorDashboardRecords = ambassadorDashboardRecords.filter(
-    (record) => !record.archived && isDashboardEnabled(record.raw),
-  );
-  const pendingGuruRecords = guruRecords.filter((record) =>
-    isPendingStatus(record.raw),
-  );
-  const approvedGuruRecords = guruRecords.filter((record) =>
-    isApprovedStatus(record.raw),
-  );
-  const pendingBackgroundCheckRecords = backgroundCheckRecords.filter((record) =>
-    isPendingStatus(record.raw),
-  );
-  const approvedBackgroundCheckRecords = backgroundCheckRecords.filter((record) =>
-    isApprovedStatus(record.raw),
-  );
-
-  const metrics = {
-    ambassadorLeads: ambassadorRecords.length,
-    activeAmbassadorLeads: activeAmbassadorRecords.length,
-    archivedAmbassadorLeads: archivedAmbassadorRecords.length,
-    activeAmbassadorDashboards: activeAmbassadorDashboardRecords.length,
-    studentHire: ambassadorRecords.filter(
-      (record) => record.program === "Student Hire",
-    ).length,
-    communityHire: ambassadorRecords.filter(
-      (record) => record.program === "Community Hire",
-    ).length,
-    militaryHire: ambassadorRecords.filter((record) =>
-      isVeteransMilitaryFamiliesProgram(record.program),
-    ).length,
-    activeStudentHire: activeAmbassadorRecords.filter(
-      (record) => record.program === "Student Hire",
-    ).length,
-    activeCommunityHire: activeAmbassadorRecords.filter(
-      (record) => record.program === "Community Hire",
-    ).length,
-    activeMilitaryHire: activeAmbassadorRecords.filter((record) =>
-      isVeteransMilitaryFamiliesProgram(record.program),
-    ).length,
-    activeGuruApplicants: guruRecords.filter((record) => !record.archived).length,
-    pendingGuruApplicants: pendingGuruRecords.length,
-    approvedGuruApplicants: approvedGuruRecords.length,
-    pendingBackgroundChecks: pendingBackgroundCheckRecords.length,
-    approvedBackgroundChecks: approvedBackgroundCheckRecords.length,
-    recentApplicants: [...ambassadorRecords, ...guruRecords].filter((record) =>
-      isWithinLastDays(record.date, 14),
-    ).length,
-  };
-
-  return {
-    metrics,
-    recentAmbassadorLeads: activeAmbassadorRecords.slice(0, 8),
-    recentGuruApplicants: guruRecords.filter((record) => !record.archived).slice(0, 8),
-    pendingBackgroundChecks: pendingBackgroundCheckRecords.slice(0, 8),
-  };
-}
-
-export default async function AdminHrPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return null;
-  }
-
-  const data = await getHrData();
-
-  return (
-    <main className="w-full min-w-0 space-y-5">
-      <section className="rounded-[28px] border border-green-100 bg-gradient-to-br from-white via-[#f7fbf4] to-white p-4 shadow-sm sm:p-6">
-        <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
-          <div className="min-w-0">
-            <Link
-              href={adminRoutes.dashboard}
-              className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-2 text-xs font-black text-green-800 shadow-sm ring-1 ring-green-100 transition hover:bg-green-50 hover:text-green-950 sm:text-sm"
-            >
-              <ArrowLeft size={16} />
-              Back to Admin
-            </Link>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl xl:text-5xl">
-                Human Resources
-              </h1>
-              <span className="rounded-full bg-green-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-green-800 sm:text-xs">
-                Hiring Dashboard
-              </span>
-            </div>
-
-            <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-              Manage SitGuru hiring, ambassador recruiting, Indeed and PA
-              CareerLink leads, Guru applicants, onboarding, trust and safety
-              checks, archived applicant records, and future contractor
-              documentation in one mobile-friendly workspace.
-            </p>
-          </div>
-
-          <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
-            <Link
-              href={adminRoutes.ambassadorLeads}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-            >
-              <Plus size={17} />
-              Add Lead
-            </Link>
-
-            <Link
-              href={adminRoutes.ambassadors}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-            >
-              <HeartHandshake size={17} />
-              Dashboards
-            </Link>
-
-            <Link
-              href={adminRoutes.ambassadorTraining}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
-            >
-              <GraduationCap size={17} />
-              SitGuru University
-            </Link>
-
-            <Link
-              href={adminRoutes.newGuru}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-green-800 to-emerald-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:brightness-105"
-            >
-              <PawPrint size={17} />
-              Add Guru
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-white p-3 shadow-sm sm:grid-cols-2 sm:p-4 lg:grid-cols-3 2xl:grid-cols-8">
-        <DataHealthTile
-          label="Ambassador Leads"
-          value={number(data.metrics.ambassadorLeads)}
-        />
-        <DataHealthTile
-          label="Active Leads"
-          value={number(data.metrics.activeAmbassadorLeads)}
-        />
-        <DataHealthTile
-          label="Dashboards"
-          value={number(data.metrics.activeAmbassadorDashboards)}
-        />
-        <DataHealthTile
-          label="Archived"
-          value={number(data.metrics.archivedAmbassadorLeads)}
-        />
-        <DataHealthTile
-          label="Guru Applicants"
-          value={number(data.metrics.activeGuruApplicants)}
-        />
-        <DataHealthTile
-          label="Pending Review"
-          value={number(
-            data.metrics.pendingGuruApplicants +
-              data.metrics.pendingBackgroundChecks,
-          )}
-        />
-        <DataHealthTile
-          label="Approved"
-          value={number(
-            data.metrics.approvedGuruApplicants +
-              data.metrics.approvedBackgroundChecks,
-          )}
-        />
-        <DataHealthTile
-          label="Recent 14 Days"
-          value={number(data.metrics.recentApplicants)}
-        />
-      </section>
-
-      <section className="grid w-full min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-6">
-        <HrFeatureCard
-          href={adminRoutes.ambassadorLeads}
-          icon={<HeartHandshake size={22} />}
-          title="Ambassador Leads"
-          value={number(data.metrics.activeAmbassadorLeads)}
-          detail="Track active Indeed, PA CareerLink, social, referral, event, and website ambassador applicants."
-          action="Open Ambassador Leads"
-          tone="green"
-        />
-
-        <HrFeatureCard
-          href={adminRoutes.ambassadors}
-          icon={<ClipboardCheck size={22} />}
-          title="Ambassador Dashboards"
-          value={number(data.metrics.activeAmbassadorDashboards)}
-          detail="Open Student Ambassador dashboard records, referral codes, referral links, and early referral tracking."
-          action="Open Dashboards"
-          tone="emerald"
-        />
-
-        <HrFeatureCard
-          href={adminRoutes.ambassadorTraining}
-          icon={<GraduationCap size={22} />}
-          title="Training Manager"
-          value="Mass"
-          detail="Mass update Ambassador onboarding modules, documents, videos, acknowledgments, signatures, certification steps, and Stripe/banking setup steps."
-          action="Open Training Manager"
-          tone="green"
-        />
-
-        <HrFeatureCard
-          href={adminRoutes.gurus}
-          icon={<PawPrint size={22} />}
-          title="Guru Applicants"
-          value={number(data.metrics.activeGuruApplicants)}
-          detail="Review Pet Guru applicants, onboarding progress, and approval readiness."
-          action="Open Gurus"
-          tone="emerald"
-        />
-
-        <HrFeatureCard
-          href={adminRoutes.backgroundChecks}
-          icon={<ShieldCheck size={22} />}
-          title="Trust & Safety Checks"
-          value={number(data.metrics.pendingBackgroundChecks)}
-          detail="Monitor pending trust and safety checks before Guru activation."
-          action="Open Checks"
-          tone="blue"
-        />
-
-        <HrFeatureCard
-          href={adminRoutes.ambassadorLeads}
-          icon={<Archive size={22} />}
-          title="Archived Records"
-          value={number(data.metrics.archivedAmbassadorLeads)}
-          detail="Retain declined or closed applicant records without keeping them in the active pipeline."
-          action="Review Archived"
-          tone="amber"
-        />
-      </section>
-
-      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-7">
-          <DashboardCard>
-            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-              <div className="min-w-0">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-green-800 to-emerald-600 text-white">
-                  <GraduationCap size={23} />
-                </div>
-                <h2 className="text-xl font-black text-slate-950">
-                  SitGuru University
-                </h2>
-                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-                  Manage onboarding, academy training, assignments,
-                  certifications, badges, and progress for Pet Parents, Gurus,
-                  Ambassadors, and future SitGuru team members.
-                </p>
-              </div>
-
-              <Link
-                href={adminRoutes.ambassadorTraining}
-                className="inline-flex shrink-0 items-center justify-center rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white transition hover:bg-green-900"
-              >
-                Open University
-              </Link>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <QuickAction
-                href={adminRoutes.ambassadorTraining}
-                icon={<GraduationCap size={18} />}
-                title="SitGuru University Training Manager"
-                detail="Update academy modules, training steps, documents, videos, acknowledgments, certifications, and payout setup requirements."
-              />
-              <QuickAction
-                href={adminRoutes.universityAssignments}
-                icon={<ClipboardList size={18} />}
-                title="Academy Assignment Manager"
-                detail="Assign academies individually to Pet Parents, Gurus, Ambassadors, and internal onboarding users."
-              />
-              <QuickAction
-                href={adminRoutes.ambassadorTraining}
-                icon={<BadgeCheck size={18} />}
-                title="Certifications & Badges"
-                detail="Prepare and track completion-based certificates, badges, and readiness markers."
-              />
-              <QuickAction
-                href={adminRoutes.universityProgress}
-                icon={<ClipboardCheck size={18} />}
-                title="Progress Tracking"
-                detail="Review who completed academies, who is still in progress, and who has not started."
-              />
-            </div>
-          </DashboardCard>
-        </div>
-
-        <div className="min-w-0 xl:col-span-5">
-          <DashboardCard>
-            <div className="mb-5">
-              <h2 className="text-lg font-black text-slate-950">
-                University Quick Map
-              </h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                SitGuru University is now connected directly from HR so training
-                and academy assignments are easier to find.
-              </p>
-            </div>
-
-            <div className="grid gap-3">
-              <InfoTile
-                icon={<GraduationCap size={18} />}
-                title="Training Manager"
-                detail="Main academy content, module, document, video, and onboarding step manager."
-              />
-              <InfoTile
-                icon={<ClipboardList size={18} />}
-                title="Academy Assignments"
-                detail="Assign Pet Parent, Guru, and Ambassador academies by person or role."
-              />
-              <InfoTile
-                icon={<ClipboardCheck size={18} />}
-                title="Progress Tracking"
-                detail="Review who completed academies and how far each assigned user has progressed."
-              />
-              <InfoTile
-                icon={<BadgeCheck size={18} />}
-                title="Certifications"
-                detail="Use completed training to support badges, certificates, and profile readiness."
-              />
-            </div>
-          </DashboardCard>
-        </div>
-      </section>
-
-      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-5">
-          <DashboardCard>
-            <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-              <div>
-                <h2 className="text-lg font-black text-slate-950">
-                  Ambassador Program Pipeline
-                </h2>
-                <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                  Active order: Student Hire, Community Hire, {VETERANS_PROGRAM_LABEL}.
-                  Archived applicants stay retained but are not treated as
-                  active.
-                </p>
-              </div>
-
-              <Link
-                href={adminRoutes.ambassadorLeads}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-4 py-2.5 text-sm font-black text-green-900 transition hover:bg-green-50 sm:shrink-0"
-              >
-                View All
-                <ExternalLink size={14} />
-              </Link>
-            </div>
-
-            <div className="grid gap-3">
-              <ProgramRow
-                icon={<GraduationCap size={19} />}
-                title="Student Hire"
-                detail="Campus, student, school, and peer-network ambassador recruiting."
-                value={number(data.metrics.activeStudentHire)}
-                subvalue={`${number(data.metrics.studentHire)} total`}
-              />
-              <ProgramRow
-                icon={<Users size={19} />}
-                title="Community Hire"
-                detail="Neighborhood, local events, community groups, and pet-friendly outreach."
-                value={number(data.metrics.activeCommunityHire)}
-                subvalue={`${number(data.metrics.communityHire)} total`}
-              />
-              <ProgramRow
-                icon={<ShieldCheck size={19} />}
-                title={VETERANS_PROGRAM_LABEL}
-                detail="Veterans, military spouses, service families, Guard, Reserve, and supporters."
-                value={number(data.metrics.activeMilitaryHire)}
-                subvalue={`${number(data.metrics.militaryHire)} total`}
-              />
-              <ProgramRow
-                icon={<Archive size={19} />}
-                title="Archived Applicants"
-                detail="Declined, closed, or retained applicant files that should not continue onboarding."
-                value={number(data.metrics.archivedAmbassadorLeads)}
-                subvalue="retained"
-              />
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-green-100 bg-green-50 p-4">
-              <div className="flex items-start gap-3">
-                <Sparkles className="mt-0.5 shrink-0 text-green-800" size={20} />
-                <div>
-                  <p className="text-sm font-black text-green-950">
-                    Status buttons are now wired
-                  </p>
-                  <p className="mt-1 text-sm font-semibold leading-6 text-green-900/75">
-                    Use the Ambassador Leads page to move applicants to
-                    Contacted, Interested, Not Moving, Archived, or Restored
-                    without running SQL each time.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </DashboardCard>
-        </div>
-
-        <div className="min-w-0 xl:col-span-7">
-          <DashboardCard>
-            <TableHeader
-              title="Recent Active Ambassador Leads"
-              subtitle="Latest non-archived ambassador leads from Indeed, PA CareerLink, and other recruiting sources."
-              href={adminRoutes.ambassadorLeads}
-            />
-
-            <MobileLeadList
-              leads={data.recentAmbassadorLeads}
-              emptyTitle="No active ambassador leads yet"
-              emptyDetail="Active ambassador applicants will show here once added or restored."
-              type="ambassador"
-            />
-
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#edf3ee] text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    <th className="pb-3">Lead</th>
-                    <th className="pb-3">Program</th>
-                    <th className="pb-3">Source</th>
-                    <th className="pb-3">Status</th>
-                    <th className="pb-3">Location</th>
-                    <th className="pb-3">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentAmbassadorLeads.length ? (
-                    data.recentAmbassadorLeads.map((lead, index) => (
-                      <tr
-                        key={`${lead.name}-${lead.email}-${lead.date}-${index}`}
-                        className="border-b border-[#f1f5f2] last:border-0"
-                      >
-                        <td className="py-4">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <Avatar name={lead.name} />
-                            <div className="min-w-0">
-                              <p className="truncate font-black text-slate-950">
-                                {lead.name}
-                              </p>
-                              <p className="truncate text-xs font-bold text-slate-500">
-                                {lead.email}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4">
-                          <ProgramBadge program={lead.program} />
-                        </td>
-                        <td className="py-4">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
-                            {lead.source}
-                          </span>
-                        </td>
-                        <td className="py-4">
-                          <StatusBadge status={lead.status} />
-                        </td>
-                        <td className="py-4 font-bold text-slate-600">
-                          <span className="inline-flex items-center gap-1.5">
-                            <MapPin size={13} />
-                            {lead.location}
-                          </span>
-                        </td>
-                        <td className="py-4 font-bold text-slate-600">
-                          {formatDate(lead.date)}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <EmptyTableRow
-                      colSpan={6}
-                      title="No active ambassador leads yet"
-                      detail="Active ambassador applicants will show here once added or restored."
-                    />
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </DashboardCard>
-        </div>
-      </section>
-
-      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-7">
-          <DashboardCard>
-            <TableHeader
-              title="Recent Guru Applicants"
-              subtitle="Pet Guru applicant and onboarding activity."
-              href={adminRoutes.gurus}
-            />
-
-            <MobileLeadList
-              leads={data.recentGuruApplicants}
-              emptyTitle="No Guru applicants yet"
-              emptyDetail="Guru applications and onboarding activity will appear here."
-              type="guru"
-            />
-
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[680px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#edf3ee] text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    <th className="pb-3">Applicant</th>
-                    <th className="pb-3">Status</th>
-                    <th className="pb-3">Location</th>
-                    <th className="pb-3">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentGuruApplicants.length ? (
-                    data.recentGuruApplicants.map((applicant, index) => (
-                      <tr
-                        key={`${applicant.name}-${applicant.email}-${applicant.date}-${index}`}
-                        className="border-b border-[#f1f5f2] last:border-0"
-                      >
-                        <td className="py-4">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <Avatar name={applicant.name} />
-                            <div className="min-w-0">
-                              <p className="truncate font-black text-slate-950">
-                                {applicant.name}
-                              </p>
-                              <p className="truncate text-xs font-bold text-slate-500">
-                                {applicant.email}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4">
-                          <StatusBadge status={applicant.status} />
-                        </td>
-                        <td className="py-4 font-bold text-slate-600">
-                          <span className="inline-flex items-center gap-1.5">
-                            <MapPin size={13} />
-                            {applicant.location}
-                          </span>
-                        </td>
-                        <td className="py-4 font-bold text-slate-600">
-                          {formatDate(applicant.date)}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <EmptyTableRow
-                      colSpan={4}
-                      title="No Guru applicants yet"
-                      detail="Guru applications and onboarding activity will appear here."
-                    />
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </DashboardCard>
-        </div>
-
-        <div className="min-w-0 xl:col-span-5">
-          <DashboardCard>
-            <TableHeader
-              title="Trust & Safety Watchlist"
-              subtitle="Pending checks and onboarding review items."
-              href={adminRoutes.backgroundChecks}
-            />
-
-            <div className="grid gap-3">
-              {data.pendingBackgroundChecks.length ? (
-                data.pendingBackgroundChecks.map((check, index) => (
-                  <div
-                    key={`${check.name}-${check.email}-${check.date}-${index}`}
-                    className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-800">
-                        <ShieldCheck size={18} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-black text-slate-950">
-                          {check.name}
-                        </p>
-                        <p className="truncate text-xs font-bold text-slate-500">
-                          {check.email}
-                        </p>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <StatusBadge status={check.status} />
-                          <span className="text-xs font-bold text-slate-500">
-                            {formatDate(check.date)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <EmptyState
-                  title="No pending checks"
-                  detail="Pending Guru trust and safety checks will show here."
-                />
-              )}
-            </div>
-          </DashboardCard>
-        </div>
-      </section>
-
-      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-12">
-          <DashboardCard>
-            <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <h2 className="text-lg font-black text-slate-950">
-                  SitGuru University & HR Onboarding Tools
-                </h2>
-                <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
-                  Direct HR access for SitGuru University training, academy
-                  assignments, onboarding steps, referral setup, payout
-                  readiness, documents, videos, acknowledgments, and
-                  certification requirements.
-                </p>
-              </div>
-
-              <Link
-                href={adminRoutes.ambassadorTraining}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900 lg:shrink-0"
-              >
-                <GraduationCap size={17} />
-                Open SitGuru University
-              </Link>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <QuickAction
-                href={adminRoutes.ambassadorTraining}
-                icon={<GraduationCap size={18} />}
-                title="SitGuru University Training Manager"
-                detail="Manage Pet Parent, Guru, and Ambassador onboarding steps, materials, documents, videos, required acknowledgments, signatures, certifications, and Stripe/banking setup."
-              />
-              <QuickAction
-                href={adminRoutes.universityAssignments}
-                icon={<ClipboardList size={18} />}
-                title="Academy Assignment Manager"
-                detail="Assign academies one by one to Pet Parents, Gurus, Ambassadors, and internal onboarding users."
-              />
-              <QuickAction
-                href={adminRoutes.universityProgress}
-                icon={<ClipboardCheck size={18} />}
-                title="Academy Progress Tracker"
-                detail="See academy completion by Pet Parent, Guru, and Ambassador, including completion percentage, status, and last activity."
-              />
-              <QuickAction
-                href={adminRoutes.ambassadors}
-                icon={<ClipboardCheck size={18} />}
-                title="View Ambassador progress"
-                detail="Open Ambassador dashboard records to see training progress, referral codes, onboarding status, and message follow-up."
-              />
-              <QuickAction
-                href={adminRoutes.ambassadorLeads}
-                icon={<UserPlus size={18} />}
-                title="Move leads into onboarding"
-                detail="Review ZipRecruiter, Indeed, PA CareerLink, referral, and website leads before converting them into active Ambassador dashboard records."
-              />
-              <QuickAction
-                href={adminRoutes.gurus}
-                icon={<PawPrint size={18} />}
-                title="Review Guru onboarding"
-                detail="Check Guru applicants, trust readiness, service setup, and approval status from the same HR dashboard."
-              />
-            </div>
-          </DashboardCard>
-        </div>
-      </section>
-
-      <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-7">
-          <DashboardCard>
-            <div className="mb-5">
-              <h2 className="text-lg font-black text-slate-950">
-                Hiring Command Notes
-              </h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                Use HR as the main dashboard for applicant intake,
-                ambassador recruiting, contractor readiness, Guru onboarding,
-                and retained records.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <InfoTile
-                icon={<ClipboardList size={18} />}
-                title="Ambassador intake"
-                detail="Use Ambassador Leads for applications, Ambassador Dashboards for referral codes, and the Training Manager for mass onboarding module updates."
-              />
-              <InfoTile
-                icon={<BriefcaseBusiness size={18} />}
-                title="Contractor records"
-                detail="Keep early referral candidates separate from fully approved active Ambassadors until terms and training are complete."
-              />
-              <InfoTile
-                icon={<ShieldCheck size={18} />}
-                title="Trust & Safety"
-                detail="Screening and compliance records should stay visible here before any Guru activation."
-              />
-              <InfoTile
-                icon={<Archive size={18} />}
-                title="Retention"
-                detail="Use archive for declined or closed applicants so records are retained without cluttering active recruiting."
-              />
-            </div>
-          </DashboardCard>
-        </div>
-
-        <div className="min-w-0 xl:col-span-5">
-          <DashboardCard>
-            <div className="mb-5">
-              <h2 className="text-lg font-black text-slate-950">
-                Quick Actions
-              </h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-                Jump to the most common HR and onboarding workflows directly
-                from this Human Resources area.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <QuickAction
-                href={adminRoutes.ambassadorLeads}
-                icon={<UserPlus size={18} />}
-                title="Add or review ambassador leads"
-                detail="Indeed, PA CareerLink, Student Hire, Community Hire, and Veterans & Military Families."
-              />
-              <QuickAction
-                href={adminRoutes.ambassadors}
-                icon={<ClipboardCheck size={18} />}
-                title="Open Student Ambassador dashboards"
-                detail="View referral codes, dashboard records, signup links, and early referral tracking."
-              />
-              <QuickAction
-                href={adminRoutes.ambassadorTraining}
-                icon={<GraduationCap size={18} />}
-                title="SitGuru University Training Manager"
-                detail="Update academy videos, PowerPoints, PDFs, documents, acknowledgments, certification steps, and payout setup modules."
-              />
-              <QuickAction
-                href={adminRoutes.universityAssignments}
-                icon={<ClipboardList size={18} />}
-                title="Academy Assignment Manager"
-                detail="Assign Pet Parent, Guru, and Ambassador academies individually so training access is no longer buried."
-              />
-              <QuickAction
-                href={adminRoutes.universityProgress}
-                icon={<ClipboardCheck size={18} />}
-                title="Academy Progress Tracker"
-                detail="See who completed academies, who is in progress, and who has not started."
-              />
-              <QuickAction
-                href={adminRoutes.ambassadorLeads}
-                icon={<Archive size={18} />}
-                title="Archive or restore applicants"
-                detail="Use wired buttons instead of SQL for declined or reopened candidates."
-              />
-              <QuickAction
-                href={adminRoutes.gurus}
-                icon={<PawPrint size={18} />}
-                title="Review Guru applicants"
-                detail="Applicant records, onboarding, and approval readiness."
-              />
-              <QuickAction
-                href={adminRoutes.backgroundChecks}
-                icon={<BadgeCheck size={18} />}
-                title="Trust and safety checks"
-                detail="Track checks before Gurus are fully activated."
-              />
-              <QuickAction
-                href={adminRoutes.messages}
-                icon={<MessageCircle size={18} />}
-                title="Message applicants"
-                detail="Follow up with candidates and onboarding contacts."
-              />
-              <QuickAction
-                href={adminRoutes.exports}
-                icon={<FileText size={18} />}
-                title="Export records"
-                detail="Prepare applicant, lead, and contractor tracking exports."
-              />
-            </div>
-          </DashboardCard>
-        </div>
-      </section>
-    </main>
-  );
-}
-
-function DashboardCard({ children }: { children: ReactNode }) {
-  return (
-    <div className="w-full min-w-0 rounded-[24px] border border-[#e3ece5] bg-white p-4 shadow-sm sm:rounded-[28px] sm:p-5">
-      {children}
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-100 bg-white text-xs font-black text-[#0D5C3A] shadow-sm">
+      {initials || "SG"}
     </div>
-  );
-}
-
-function DataHealthTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-green-100 bg-[#fbfcf9] px-4 py-3 shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 sm:text-xs">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-black text-green-950 sm:text-xl">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function HrFeatureCard({
-  href,
-  icon,
-  title,
-  value,
-  detail,
-  action,
-  tone,
-}: {
-  href: string;
-  icon: ReactNode;
-  title: string;
-  value: string;
-  detail: string;
-  action: string;
-  tone: "green" | "emerald" | "blue" | "amber";
-}) {
-  const toneClasses = {
-    green: "bg-green-50 text-green-800 border-green-100",
-    emerald: "bg-emerald-50 text-emerald-800 border-emerald-100",
-    blue: "bg-blue-50 text-blue-800 border-blue-100",
-    amber: "bg-amber-50 text-amber-800 border-amber-100",
-  };
-
-  return (
-    <Link
-      href={href}
-      className="group rounded-[24px] border border-[#e3ece5] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-lg sm:rounded-[28px] sm:p-5"
-    >
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${toneClasses[tone]}`}
-        >
-          {icon}
-        </div>
-
-        <span className="text-3xl font-black text-green-950">{value}</span>
-      </div>
-
-      <h2 className="text-2xl font-black tracking-tight text-slate-950">
-        {title}
-      </h2>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-        {detail}
-      </p>
-      <p className="mt-3 text-sm font-black text-green-900 group-hover:text-green-700">
-        {action} →
-      </p>
-    </Link>
-  );
-}
-
-function ProgramRow({
-  icon,
-  title,
-  detail,
-  value,
-  subvalue,
-}: {
-  icon: ReactNode;
-  title: string;
-  detail: string;
-  value: string;
-  subvalue: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white">
-            {icon}
-          </div>
-          <div className="min-w-0">
-            <p className="font-black text-slate-950">{title}</p>
-            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-              {detail}
-            </p>
-          </div>
-        </div>
-
-        <div className="text-right">
-          <p className="text-2xl font-black text-green-950">{value}</p>
-          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
-            {subvalue}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TableHeader({
-  title,
-  subtitle,
-  href,
-}: {
-  title: string;
-  subtitle: string;
-  href: string;
-}) {
-  return (
-    <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-      <div>
-        <h2 className="text-lg font-black text-slate-950">{title}</h2>
-        <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-          {subtitle}
-        </p>
-      </div>
-
-      <Link
-        href={href}
-        className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-green-200 bg-white px-4 py-2 text-sm font-black text-green-800 transition hover:bg-green-50 sm:shrink-0"
-      >
-        View all →
-      </Link>
-    </div>
-  );
-}
-
-function MobileLeadList({
-  leads,
-  emptyTitle,
-  emptyDetail,
-  type,
-}: {
-  leads: {
-    name: string;
-    email: string;
-    status: string;
-    location: string;
-    date: string | null;
-    program?: string;
-    source?: string;
-  }[];
-  emptyTitle: string;
-  emptyDetail: string;
-  type: "ambassador" | "guru";
-}) {
-  if (!leads.length) {
-    return (
-      <div className="md:hidden">
-        <EmptyState title={emptyTitle} detail={emptyDetail} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-3 md:hidden">
-      {leads.map((lead, index) => (
-        <article
-          key={`${lead.name}-${lead.email}-${lead.date}-${index}`}
-          className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4"
-        >
-          <div className="flex min-w-0 items-start gap-3">
-            <Avatar name={lead.name} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black text-slate-950">
-                {lead.name}
-              </p>
-              <p className="truncate text-xs font-bold text-slate-500">
-                {lead.email}
-              </p>
-            </div>
-            <StatusBadge status={lead.status} />
-          </div>
-
-          <div className="mt-4 grid gap-2">
-            {type === "ambassador" && lead.program ? (
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
-                  Program
-                </span>
-                <ProgramBadge program={lead.program} />
-              </div>
-            ) : null}
-
-            {type === "ambassador" && lead.source ? (
-              <MobileMetaRow label="Source" value={lead.source} />
-            ) : null}
-
-            <MobileMetaRow label="Location" value={lead.location} />
-            <MobileMetaRow label="Date" value={formatDate(lead.date)} />
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function MobileMetaRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2">
-      <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-400">
-        {label}
-      </span>
-      <span className="truncate text-right text-xs font-black text-slate-700">
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function ProgramBadge({ program }: { program: string }) {
-  const styles =
-    program === "Student Hire"
-      ? "border-blue-100 bg-blue-50 text-blue-800"
-      : isVeteransMilitaryFamiliesProgram(program)
-        ? "border-emerald-100 bg-emerald-50 text-emerald-800"
-        : "border-green-100 bg-green-50 text-green-800";
-
-  return (
-    <span
-      className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${styles}`}
-    >
-      {isVeteransMilitaryFamiliesProgram(program)
-        ? VETERANS_PROGRAM_LABEL
-        : program}
-    </span>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const styles =
-    status === "Approved"
-      ? "bg-green-100 text-green-800"
-      : status === "Signed Up"
-        ? "bg-emerald-100 text-emerald-800"
-        : status === "Contacted"
-          ? "bg-blue-100 text-blue-800"
-          : status === "Interested"
-            ? "bg-amber-100 text-amber-800"
-            : status === "Not Moving Forward"
-              ? "bg-slate-100 text-slate-600"
-              : status === "Archived"
-                ? "bg-red-100 text-red-700"
-                : "bg-orange-100 text-orange-800";
+  const normalized = status.toLowerCase();
+  const tone =
+    normalized.includes("approved") ||
+    normalized.includes("clear") ||
+    normalized.includes("signed")
+      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+      : normalized.includes("review") ||
+          normalized.includes("blocked") ||
+          normalized.includes("not moving")
+        ? "border-rose-200 bg-rose-50 text-rose-800"
+        : normalized.includes("contact") || normalized.includes("interest")
+          ? "border-sky-200 bg-sky-50 text-sky-800"
+          : "border-amber-200 bg-amber-50 text-amber-800";
 
   return (
     <span
-      className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${styles}`}
+      className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${tone}`}
     >
       {status}
     </span>
   );
 }
 
-function Avatar({ name }: { name: string }) {
-  const initials = name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-
-  return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-black text-green-800">
-      {initials || "SG"}
-    </div>
-  );
-}
-
-function EmptyTableRow({
-  colSpan,
-  title,
-  detail,
+function MetricTile({
+  label,
+  value,
+  helper,
 }: {
-  colSpan: number;
-  title: string;
-  detail: string;
+  label: string;
+  value: string;
+  helper: string;
 }) {
   return (
-    <tr>
-      <td colSpan={colSpan} className="py-8">
-        <EmptyState title={title} detail={detail} />
-      </td>
-    </tr>
-  );
-}
-
-function EmptyState({ title, detail }: { title: string; detail: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-green-200 bg-green-50/60 p-6 text-center">
-      <p className="font-black text-green-950">{title}</p>
-      <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-green-900/70">
-        {detail}
+    <div className="rounded-[1.35rem] border border-emerald-100 bg-white p-4 shadow-sm">
+      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
+        {label}
       </p>
+      <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
+      <p className="mt-1 text-xs font-semibold text-slate-500">{helper}</p>
     </div>
   );
 }
 
-function InfoTile({
-  icon,
-  title,
-  detail,
-}: {
-  icon: ReactNode;
-  title: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-        {icon}
-      </div>
-      <p className="font-black text-slate-950">{title}</p>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-        {detail}
-      </p>
-    </div>
-  );
-}
-
-function QuickAction({
-  href,
-  icon,
-  title,
-  detail,
-}: {
-  href: string;
-  icon: ReactNode;
-  title: string;
-  detail: string;
-}) {
+function ModuleLinkCard({ card }: { card: ModuleCard }) {
   return (
     <Link
-      href={href}
-      className="group rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4 transition hover:border-green-200 hover:bg-green-50"
+      href={card.href}
+      className="group flex h-full flex-col rounded-[1.6rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
     >
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-green-800 shadow-sm">
-          {icon}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-[#0D5C3A]">
+          {card.icon}
         </div>
-        <div className="min-w-0">
-          <p className="font-black text-slate-950 group-hover:text-green-950">
-            {title}
+        <span
+          className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+            card.wiring === "live"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-amber-200 bg-amber-50 text-amber-800"
+          }`}
+        >
+          {card.wiring === "live" ? "Live" : "Next"}
+        </span>
+      </div>
+      <p className="mt-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+        {card.eyebrow}
+      </p>
+      <h3 className="mt-1 text-lg font-black text-slate-950">{card.title}</h3>
+      {card.value ? (
+        <p className="mt-2 text-2xl font-black text-[#0D5C3A]">{card.value}</p>
+      ) : null}
+      <p className="mt-2 flex-1 text-sm font-semibold leading-6 text-slate-600">
+        {card.description}
+      </p>
+      <span className="mt-4 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
+        Open
+        <ExternalLink size={14} className="transition group-hover:translate-x-0.5" />
+      </span>
+    </Link>
+  );
+}
+
+function LeadTable({
+  title,
+  subtitle,
+  href,
+  leads,
+  emptyTitle,
+  emptyDetail,
+  showProgram = false,
+}: {
+  title: string;
+  subtitle: string;
+  href: string;
+  leads: HrLeadRecord[];
+  emptyTitle: string;
+  emptyDetail: string;
+  showProgram?: boolean;
+}) {
+  return (
+    <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black text-slate-950">{title}</h2>
+          <p className="mt-1 text-sm font-semibold text-slate-500">{subtitle}</p>
+        </div>
+        <Link
+          href={href}
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+        >
+          View all
+        </Link>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:hidden">
+        {leads.length ? (
+          leads.map((lead) => (
+            <Link
+              key={`${lead.id}-${lead.email}`}
+              href={lead.href}
+              className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/40"
+            >
+              <div className="flex items-start gap-3">
+                <Avatar name={lead.name} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-black text-slate-950">{lead.name}</p>
+                  <p className="truncate text-xs font-semibold text-slate-500">
+                    {lead.email}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <StatusBadge status={lead.status} />
+                    {showProgram ? (
+                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">
+                        {lead.program}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5">
+            <p className="font-black text-slate-950">{emptyTitle}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              {emptyDetail}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[680px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-slate-100 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+              <th className="pb-3 pr-3">Person</th>
+              {showProgram ? <th className="pb-3 pr-3">Program</th> : null}
+              <th className="pb-3 pr-3">Status</th>
+              <th className="pb-3 pr-3">Location</th>
+              <th className="pb-3">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leads.length ? (
+              leads.map((lead) => (
+                <tr
+                  key={`${lead.id}-${lead.email}`}
+                  className="border-b border-slate-50 last:border-0"
+                >
+                  <td className="py-3 pr-3">
+                    <Link
+                      href={lead.href}
+                      className="flex min-w-0 items-center gap-3 transition hover:opacity-90"
+                    >
+                      <Avatar name={lead.name} />
+                      <div className="min-w-0">
+                        <p className="truncate font-black text-slate-950">
+                          {lead.name}
+                        </p>
+                        <p className="truncate text-xs font-semibold text-slate-500">
+                          {lead.email}
+                        </p>
+                      </div>
+                    </Link>
+                  </td>
+                  {showProgram ? (
+                    <td className="py-3 pr-3 font-semibold text-slate-600">
+                      {lead.program}
+                    </td>
+                  ) : null}
+                  <td className="py-3 pr-3">
+                    <StatusBadge status={lead.status} />
+                  </td>
+                  <td className="py-3 pr-3 font-semibold text-slate-600">
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin size={13} />
+                      {lead.location}
+                    </span>
+                  </td>
+                  <td className="py-3 font-semibold text-slate-600">
+                    {formatDate(lead.date)}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={showProgram ? 5 : 4}
+                  className="py-8 text-center"
+                >
+                  <p className="font-black text-slate-950">{emptyTitle}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    {emptyDetail}
+                  </p>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+export default async function AdminHrPage() {
+  const actor = await getAdminIdentity();
+
+  if (!actor?.canAccessAdmin) {
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
           </p>
-          <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-            {detail}
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Admin access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with an authorized SitGuru admin or HR account to open Hiring
+            &amp; People Ops.
           </p>
         </div>
       </div>
-    </Link>
+    );
+  }
+
+  const data = await getHrDashboardData();
+
+  const liveModules: ModuleCard[] = [
+    {
+      eyebrow: "Recruiting",
+      title: "Ambassador Leads",
+      description:
+        "Indeed, PA CareerLink, campus, referral, and website ambassador applicants.",
+      href: routes.ambassadorLeads,
+      wiring: "live",
+      value: number(data.metrics.activeAmbassadorLeads),
+      icon: <HeartHandshake size={20} />,
+    },
+    {
+      eyebrow: "Dashboards",
+      title: "Ambassador Dashboards",
+      description:
+        "Active ambassador records, referral codes, and early referral tracking.",
+      href: routes.ambassadors,
+      wiring: "live",
+      value: number(data.metrics.activeAmbassadorDashboards),
+      icon: <ClipboardCheck size={20} />,
+    },
+    {
+      eyebrow: "Guru Hiring",
+      title: "Guru Applicants",
+      description:
+        "Pet Guru applications, onboarding progress, and approval readiness.",
+      href: routes.gurus,
+      wiring: "live",
+      value: number(data.metrics.activeGuruApplicants),
+      icon: <PawPrint size={20} />,
+    },
+    {
+      eyebrow: "Approvals",
+      title: "Guru Approvals",
+      description:
+        "Final bookable review queue before Gurus go live on SitGuru.",
+      href: routes.guruApprovals,
+      wiring: "live",
+      value: number(data.metrics.pendingGuruApplicants),
+      icon: <BadgeCheck size={20} />,
+    },
+    {
+      eyebrow: "Trust & Safety",
+      title: "Background Checks",
+      description:
+        "Checkr / Trust & Safety watchlist for pending and needs-review Gurus.",
+      href: routes.backgroundChecks,
+      wiring: "live",
+      value: number(
+        data.metrics.pendingBackgroundChecks +
+          data.metrics.needsReviewBackgroundChecks,
+      ),
+      icon: <ShieldCheck size={20} />,
+    },
+    {
+      eyebrow: "Training",
+      title: "SitGuru University",
+      description:
+        "Mass update onboarding modules, documents, videos, and certifications.",
+      href: routes.ambassadorTraining,
+      wiring: "live",
+      icon: <GraduationCap size={20} />,
+    },
+    {
+      eyebrow: "Programs",
+      title: "Hire Programs",
+      description: `Student Hire, Community Hire, and ${VETERANS_PROGRAM_LABEL} pathways.`,
+      href: routes.programs,
+      wiring: "live",
+      value: number(
+        data.metrics.activeStudentHire +
+          data.metrics.activeCommunityHire +
+          data.metrics.activeMilitaryHire,
+      ),
+      icon: <BriefcaseBusiness size={20} />,
+    },
+    {
+      eyebrow: "HQ People",
+      title: "Admin Access Control",
+      description:
+        "HR / People roles, password support, MFA visibility, and HQ department access.",
+      href: routes.settings,
+      wiring: "live",
+      icon: <Settings2 size={20} />,
+    },
+    {
+      eyebrow: "Directory",
+      title: "User Directory",
+      description:
+        "Look up Pet Parents, Gurus, Ambassadors, and internal accounts.",
+      href: routes.users,
+      wiring: "live",
+      icon: <Users size={20} />,
+    },
+    {
+      eyebrow: "Archives",
+      title: "Archived Leads",
+      description:
+        "Declined or closed ambassador applicant records retained for history.",
+      href: routes.ambassadorLeadsArchived,
+      wiring: "live",
+      value: number(data.metrics.archivedAmbassadorLeads),
+      icon: <Archive size={20} />,
+    },
+    {
+      eyebrow: "Messaging",
+      title: "Applicant Messages",
+      description: "Follow up with leads, Gurus, and Ambassadors in Admin Messages.",
+      href: routes.messages,
+      wiring: "live",
+      icon: <MessageCircle size={20} />,
+    },
+    {
+      eyebrow: "Payroll",
+      title: "Employee Payroll",
+      description:
+        "W-2 / employee payroll stays in Financials. Contractor payouts stay under Payouts.",
+      href: routes.payroll,
+      wiring: "next",
+      icon: <WalletCards size={20} />,
+    },
+  ];
+
+  return (
+    <main className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1640px] space-y-6">
+        <section className="rounded-[2rem] border border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(13,92,58,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_55%,#f8fafc_100%)] p-5 shadow-sm sm:p-7">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div className="min-w-0">
+              <Link
+                href={routes.dashboard}
+                className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+              >
+                <ArrowLeft size={16} />
+                Back to Admin
+              </Link>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl xl:text-5xl">
+                  Human Resources
+                </h1>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                  Hiring & People Ops
+                </span>
+                <span
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+                    data.isLive
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-amber-200 bg-amber-50 text-amber-800"
+                  }`}
+                >
+                  {data.isLive ? "Live Sources" : "Preview Sources"}
+                </span>
+              </div>
+
+              <p className="mt-3 max-w-4xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
+                Manage SitGuru hiring as a hub over live ops modules — ambassador
+                recruiting, Guru applicants/approvals, Trust &amp; Safety,
+                SitGuru University, programs, and HQ people access. Employee
+                payroll stays Next in Financials.
+              </p>
+
+              <p className="mt-3 text-xs font-bold text-slate-500">
+                Signed in as {actor.email} · Role {actor.role}
+                {actor.canManageUsers ? " · Can manage people access" : ""}
+              </p>
+            </div>
+
+            <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
+              <Link
+                href={routes.ambassadorLeads}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+              >
+                <Plus size={17} />
+                Add Lead
+              </Link>
+              <Link
+                href={routes.guruApprovals}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+              >
+                <BadgeCheck size={17} />
+                Guru Approvals
+              </Link>
+              <Link
+                href={routes.ambassadorTraining}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
+              >
+                <GraduationCap size={17} />
+                University
+              </Link>
+              <Link
+                href={routes.newGuru}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-900"
+              >
+                <PawPrint size={17} />
+                Add Guru
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+          <MetricTile
+            label="Active Leads"
+            value={number(data.metrics.activeAmbassadorLeads)}
+            helper="Ambassador pipeline"
+          />
+          <MetricTile
+            label="Dashboards"
+            value={number(data.metrics.activeAmbassadorDashboards)}
+            helper="Enabled ambassadors"
+          />
+          <MetricTile
+            label="Guru Applicants"
+            value={number(data.metrics.activeGuruApplicants)}
+            helper="Active applicant records"
+          />
+          <MetricTile
+            label="Pending Review"
+            value={number(
+              data.metrics.pendingGuruApplicants +
+                data.metrics.pendingBackgroundChecks +
+                data.metrics.needsReviewBackgroundChecks,
+            )}
+            helper="Approvals + Trust & Safety"
+          />
+          <MetricTile
+            label="Approved / Clear"
+            value={number(
+              data.metrics.approvedGuruApplicants +
+                data.metrics.approvedBackgroundChecks,
+            )}
+            helper="Ready for next step"
+          />
+          <MetricTile
+            label="Student Hire"
+            value={number(data.metrics.activeStudentHire)}
+            helper="Active student pathway"
+          />
+          <MetricTile
+            label="Community / Vets"
+            value={number(
+              data.metrics.activeCommunityHire + data.metrics.activeMilitaryHire,
+            )}
+            helper={`${VETERANS_PROGRAM_LABEL} included`}
+          />
+          <MetricTile
+            label="Recent 14 Days"
+            value={number(data.metrics.recentApplicants)}
+            helper="New leads + applicants"
+          />
+        </section>
+
+        <section>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                Manage HR from live modules
+              </p>
+              <h2 className="mt-1 text-2xl font-black text-slate-950">
+                Hiring command center
+              </h2>
+            </div>
+            <p className="text-sm font-semibold text-slate-500">
+              Live = wired ops pages · Next = planned employee payroll
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {liveModules.map((card) => (
+              <ModuleLinkCard key={card.title} card={card} />
+            ))}
+          </div>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-12">
+          <div className="xl:col-span-7">
+            <LeadTable
+              title="Recent Ambassador Leads"
+              subtitle="Active recruiting pipeline across Student, Community, and Veterans pathways."
+              href={routes.ambassadorLeads}
+              leads={data.recentAmbassadorLeads}
+              emptyTitle="No active ambassador leads yet"
+              emptyDetail="Add Indeed, PA CareerLink, campus, or referral leads to start the pipeline."
+              showProgram
+            />
+          </div>
+
+          <div className="space-y-4 xl:col-span-5">
+            <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-black text-slate-950">
+                    Program mix
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    Active ambassador leads by pathway.
+                  </p>
+                </div>
+                <Link
+                  href={routes.programs}
+                  className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+                >
+                  Programs
+                </Link>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {[
+                  ["Student Hire", data.metrics.activeStudentHire],
+                  ["Community Hire", data.metrics.activeCommunityHire],
+                  [VETERANS_PROGRAM_LABEL, data.metrics.activeMilitaryHire],
+                ].map(([label, value]) => (
+                  <div
+                    key={String(label)}
+                    className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+                  >
+                    <p className="font-black text-slate-900">{label}</p>
+                    <p className="text-lg font-black text-[#0D5C3A]">
+                      {number(Number(value))}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-black text-slate-950">
+                    University tools
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    Training, assignments, and progress.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {[
+                  [
+                    "Training Manager",
+                    routes.ambassadorTraining,
+                    <GraduationCap key="t" size={16} />,
+                  ],
+                  [
+                    "Academy Assignments",
+                    routes.universityAssignments,
+                    <ClipboardList key="a" size={16} />,
+                  ],
+                  [
+                    "Progress Tracker",
+                    routes.universityProgress,
+                    <ClipboardCheck key="p" size={16} />,
+                  ],
+                  [
+                    "Move leads into onboarding",
+                    routes.ambassadorLeads,
+                    <UserPlus key="l" size={16} />,
+                  ],
+                ].map(([label, href, icon]) => (
+                  <Link
+                    key={String(href)}
+                    href={String(href)}
+                    className="inline-flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm font-black text-slate-900 transition hover:border-emerald-200 hover:bg-emerald-50"
+                  >
+                    <span className="text-emerald-800">{icon as ReactNode}</span>
+                    {label as string}
+                  </Link>
+                ))}
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-12">
+          <div className="xl:col-span-7">
+            <LeadTable
+              title="Recent Guru Applicants"
+              subtitle="Applications and onboarding activity feeding Guru Approvals."
+              href={routes.gurus}
+              leads={data.recentGuruApplicants}
+              emptyTitle="No Guru applicants yet"
+              emptyDetail="Guru applications and onboarding activity will appear here."
+            />
+          </div>
+
+          <div className="xl:col-span-5">
+            <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-black text-slate-950">
+                    Trust &amp; Safety watchlist
+                  </h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    Pending and needs-review background checks.
+                  </p>
+                </div>
+                <Link
+                  href={routes.backgroundChecks}
+                  className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-black text-sky-900 transition hover:bg-sky-100"
+                >
+                  Open Checks
+                </Link>
+              </div>
+
+              <div className="mt-4 grid gap-3">
+                {data.pendingBackgroundChecks.length ? (
+                  data.pendingBackgroundChecks.map((check) => (
+                    <Link
+                      key={`${check.id}-${check.email}`}
+                      href={check.href}
+                      className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 transition hover:border-sky-200 hover:bg-sky-50"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-800">
+                          <ShieldCheck size={18} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-black text-slate-950">{check.name}</p>
+                          <p className="truncate text-xs font-semibold text-slate-500">
+                            {check.email}
+                          </p>
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <StatusBadge status={check.status} />
+                            <span className="text-xs font-bold text-slate-500">
+                              {formatDate(check.date)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5">
+                    <p className="font-black text-slate-950">No pending checks</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-500">
+                      Pending Guru trust and safety checks will show here once
+                      `guru_background_checks` has live rows.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-2">
+          <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="text-xl font-black text-slate-950">Source health</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              HR hub reads live ops tables — it does not invent a separate employee
+              database.
+            </p>
+            <div className="mt-4 grid gap-3">
+              {data.sourceHealth.map((source) => (
+                <div
+                  key={source.id}
+                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-black text-slate-900">{source.label}</p>
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+                        source.ok
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : "border-amber-200 bg-amber-50 text-amber-800"
+                      }`}
+                    >
+                      {source.ok ? "Connected" : "Pending"}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-slate-600">
+                    {source.message}
+                  </p>
+                  <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                    {number(source.rowCount)} rows
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-[#0D5C3A]">
+              <Sparkles size={20} />
+            </div>
+            <h2 className="text-xl font-black text-slate-950">
+              How to manage HR here
+            </h2>
+            <ul className="mt-3 space-y-3 text-sm font-semibold leading-6 text-slate-600">
+              <li>
+                Use this page as the hub. Keep CRUD on Ambassador Leads, Gurus,
+                Approvals, Trust &amp; Safety, University, Programs, and Settings.
+              </li>
+              <li>
+                HQ people access (roles, passwords, MFA) lives in Admin Settings —
+                not a second HR access UI.
+              </li>
+              <li>
+                Contractor payouts stay in Payouts / Financials. Employee payroll
+                is marked Next until W-2 tooling is real.
+              </li>
+              <li>
+                Export applicant or roster CSVs from Exports when you need CPA /
+                ops handoff packages.
+              </li>
+            </ul>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link
+                href={routes.settings}
+                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+              >
+                HQ People Access
+              </Link>
+              <Link
+                href={routes.payouts}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-800 transition hover:bg-slate-50"
+              >
+                Contractor Payouts
+              </Link>
+              <Link
+                href={routes.exports}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-800 transition hover:bg-slate-50"
+              >
+                Exports
+              </Link>
+            </div>
+          </section>
+        </section>
+      </div>
+    </main>
   );
 }
