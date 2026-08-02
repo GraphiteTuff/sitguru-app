@@ -157,3 +157,21 @@ model BookingWalkTrackPoint {
 
   @@map("booking_walk_track_points")
 }
+
+/// Live + midnight-baseline social follower counts (Rogue / Delilah tools).
+model SocialPlatformMetrics {
+  id                            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityId                      String   @map("entity_id")
+  platform                      String
+  handle                        String   @default("SitGuruOfficial")
+  currentFollowers              Int      @default(0) @map("current_followers")
+  baselineFollowersStartOfDay   Int      @default(0) @map("baseline_followers_start_of_day")
+  baselineDate                  DateTime @map("baseline_date") @db.Date
+  updatedAt                     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  createdAt                     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([entityId, platform, handle])
+  @@index([entityId])
+  @@index([platform, handle])
+  @@map("social_platform_metrics")
+}

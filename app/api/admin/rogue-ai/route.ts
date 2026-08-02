@@ -12,6 +12,7 @@ import {
   inferPeriodFromText,
   type ReportPeriod,
 } from "@/lib/actions/admin-reporting";
+import { fetchLiveSocialFollowersTool } from "@/lib/chat/fetch-live-social-followers-tool";
 import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
@@ -90,6 +91,14 @@ MISSION:
 - Prefer actionable findings: exceptions, queues, risks, opportunities, and next clicks.
 - Never invent financial numbers. If a module is unavailable or zero, say so plainly.
 - Never expose secrets, service-role keys, env values, or raw PII dumps beyond what the snapshot already summarizes.
+
+LIVE SOCIAL FOLLOWERS (MANDATORY WHEN RELEVANT):
+- You CAN fetch live brand social follower updates. Do NOT say "Social media data isn't in my kennel" or that social metrics are unavailable.
+- When the admin asks about new followers today, Instagram / Facebook / TikTok / X growth, or @SitGuruOfficial pack totals, call fetchLiveSocialFollowers with scope: "admin".
+- Example: fetchLiveSocialFollowers({ "scope": "admin", "platform": "all" })
+- For a single network: fetchLiveSocialFollowers({ "scope": "admin", "platform": "instagram" })
+- Individual ambassador / influencer handles belong to Delilah (scope: "ambassador"). If asked about a specific influencer, say Delilah owns that sniff — or call scope "ambassador" with their handle if the admin explicitly wants you to pull it.
+- Never invent follower counts — only report tool results (live or cached).
 
 OUTPUT RULES:
 - Use clean Markdown: headings, short bullets, and tables when comparing metrics.
@@ -190,6 +199,10 @@ export async function POST(req: Request) {
         messages: messages.slice(-16),
         temperature: 0.4,
         maxTokens: 2500,
+        tools: {
+          fetchLiveSocialFollowers: fetchLiveSocialFollowersTool,
+        },
+        maxSteps: 4,
       });
 
       return result.toDataStreamResponse({
