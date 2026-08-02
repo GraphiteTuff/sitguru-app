@@ -1839,14 +1839,28 @@ p {
   }
 }
 
-.homepage-chat-panel__header {
+.homepage-chat-panel__header,
+.homepage-chat-panel > .homepage-chat-panel__header,
+div.homepage-chat-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.85rem 3rem 0.85rem 0.85rem;
-  background: linear-gradient(135deg, var(--hcb-green) 0%, var(--hcb-green-deep) 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #0d5c3a 0%, #09462c 100%) !important;
+  color: #ffffff !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Beat `.admin-theme header { background: white !important }` if panel is nested. */
+.admin-theme .homepage-chat-panel__header,
+.admin-theme header.homepage-chat-panel__header,
+.admin-theme div.homepage-chat-panel__header {
+  background: linear-gradient(135deg, #0d5c3a 0%, #09462c 100%) !important;
+  color: #ffffff !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
 }
 
 .homepage-chat-panel__brand {
@@ -1910,6 +1924,7 @@ p {
   font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
+  color: #ffffff !important;
 }
 
 .homepage-chat-panel__sub {
@@ -1918,6 +1933,7 @@ p {
   opacity: 0.95;
   line-height: 1.35;
   overflow-wrap: anywhere;
+  color: rgba(255, 255, 255, 0.92) !important;
 }
 
 .homepage-chat-panel__close {

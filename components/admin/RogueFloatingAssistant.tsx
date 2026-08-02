@@ -9,6 +9,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -334,7 +335,13 @@ export default function RogueFloatingAssistant() {
     <div
       className="pointer-events-none fixed bottom-4 right-4 z-[90] flex flex-row items-center justify-end gap-3 overflow-visible md:bottom-6 md:right-6"
       data-rogue-admin-dock
-      style={{ ["--hcb-green" as string]: BRAND_GREEN }}
+      style={
+        {
+          ["--hcb-green"]: BRAND_GREEN,
+          ["--hcb-green-deep"]: "#09462c",
+          ["--hcb-cream"]: "#f4faf6",
+        } as CSSProperties
+      }
     >
       <div className="homepage-chat-bubble-root !relative !inset-auto !z-auto !max-w-none">
         {!open ? (
@@ -377,7 +384,15 @@ export default function RogueFloatingAssistant() {
           role="dialog"
           aria-label="Rogue, Chief Treat Officer admin assistant"
         >
-          <header className="homepage-chat-panel__header relative shrink-0">
+          <div
+            className="homepage-chat-panel__header relative shrink-0"
+            role="banner"
+            style={{
+              background:
+                "linear-gradient(135deg, #0D5C3A 0%, #09462C 100%)",
+              color: "#ffffff",
+            }}
+          >
             <div className="homepage-chat-panel__brand">
               <span
                 className="homepage-chat-panel__avatar homepage-chat-panel__avatar--dog"
@@ -386,10 +401,16 @@ export default function RogueFloatingAssistant() {
                 <RogueAvatar className="!h-full !w-full max-h-full max-w-full rounded-full" />
               </span>
               <div className="min-w-0 flex-1 pr-14">
-                <p className="homepage-chat-panel__title">
+                <p
+                  className="homepage-chat-panel__title"
+                  style={{ color: "#ffffff" }}
+                >
                   Rogue, Chief Treat Officer 🦴
                 </p>
-                <p className="homepage-chat-panel__sub">
+                <p
+                  className="homepage-chat-panel__sub"
+                  style={{ color: "rgba(255, 255, 255, 0.92)" }}
+                >
                   Semantic admin · live report compiler
                 </p>
               </div>
@@ -414,10 +435,10 @@ export default function RogueFloatingAssistant() {
                 <X className="h-5 w-5 text-white" aria-hidden="true" />
               </button>
             </div>
-          </header>
+          </div>
 
           <div
-            className="flex shrink-0 flex-row items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-gray-50 p-2 scrollbar-none"
+            className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50 p-2"
             role="toolbar"
             aria-label="Quick admin reports"
           >
@@ -435,7 +456,7 @@ export default function RogueFloatingAssistant() {
             <button
               type="button"
               onClick={clearChat}
-              className="flex-shrink-0 cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
+              className="cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
             >
               Clear
             </button>
