@@ -224,9 +224,10 @@ async function safeSelect(
       return { ok: false, rows: [], message: error.message };
     }
 
+    const formattedRows: any[] = Array.isArray(data) ? data : [];
     return {
       ok: true,
-      rows: Array.isArray(data) ? (data as unknown as AnyRow[]) : [],
+      rows: formattedRows,
       message: `${table} connected`,
     };
   } catch (error) {
