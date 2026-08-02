@@ -2114,6 +2114,10 @@ div.homepage-chat-panel__header,
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
+  color: #0f172a;
+  -webkit-text-fill-color: #0f172a;
+  caret-color: #0f172a;
+  background: #ffffff;
 }
 
 .homepage-chat-panel__composer textarea:focus {
