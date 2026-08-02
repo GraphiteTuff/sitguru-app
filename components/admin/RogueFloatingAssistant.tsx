@@ -304,10 +304,36 @@ export default function RogueFloatingAssistant() {
   }, [messages, isLoading, open]);
 
   useEffect(() => {
-    if (open) {
-      window.setTimeout(() => inputRef.current?.focus(), 80);
-    }
+    if (!open) return;
+    const t = window.setTimeout(
+      () => inputRef.current?.focus({ preventScroll: true }),
+      180,
+    );
+    return () => window.clearTimeout(t);
   }, [open]);
+
+  /** Keep the composer focused so admins can type the next message without re-clicking. */
+  function focusComposer(delayMs = 0) {
+    if (!open) return;
+    window.setTimeout(() => {
+      const el = inputRef.current;
+      if (!el || el.disabled) return;
+      el.focus({ preventScroll: true });
+    }, delayMs);
+  }
+
+  // After Rogue finishes streaming (or any load ends), restore caret to the input.
+  const wasLoadingRef = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      wasLoadingRef.current = false;
+      return;
+    }
+    if (wasLoadingRef.current && !isLoading) {
+      focusComposer(30);
+    }
+    wasLoadingRef.current = isLoading;
+  }, [isLoading, open]);
 
   function openPanel() {
     setOpen(true);
@@ -334,7 +360,7 @@ export default function RogueFloatingAssistant() {
         },
       },
     );
-    window.setTimeout(() => inputRef.current?.focus(), 40);
+    focusComposer(40);
   }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -346,7 +372,7 @@ export default function RogueFloatingAssistant() {
         period,
       },
     });
-    window.setTimeout(() => inputRef.current?.focus(), 40);
+    focusComposer(40);
   }
 
   function clearChat() {
@@ -359,7 +385,7 @@ export default function RogueFloatingAssistant() {
       },
     ]);
     setPreset("");
-    window.setTimeout(() => inputRef.current?.focus(), 40);
+    focusComposer(40);
   }
 
   if (!mounted) return null;
@@ -569,7 +595,6 @@ export default function RogueFloatingAssistant() {
               value={input}
               onChange={handleInputChange}
               placeholder="Ask Rogue about payouts, growth, audits…"
-              disabled={isLoading}
               aria-label="Message Rogue"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
