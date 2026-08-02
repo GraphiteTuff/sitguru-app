@@ -1170,7 +1170,7 @@ export default async function AdminReferralCodesPage({
 
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl xl:text-5xl">
-                Referral Dashboard
+                Referral Code Registry
               </h1>
               <span className="rounded-full bg-green-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-green-800 sm:text-xs">
                 Code Ops
