@@ -9,6 +9,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -334,7 +335,13 @@ export default function RogueFloatingAssistant() {
     <div
       className="pointer-events-none fixed bottom-4 right-4 z-[90] flex flex-row items-center justify-end gap-3 overflow-visible md:bottom-6 md:right-6"
       data-rogue-admin-dock
-      style={{ ["--hcb-green" as string]: BRAND_GREEN }}
+      style={
+        {
+          ["--hcb-green"]: BRAND_GREEN,
+          ["--hcb-green-deep"]: "#09462c",
+          ["--hcb-cream"]: "#f4faf6",
+        } as CSSProperties
+      }
     >
       <div className="homepage-chat-bubble-root !relative !inset-auto !z-auto !max-w-none">
         {!open ? (
