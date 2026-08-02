@@ -24,6 +24,9 @@ column probes against the public API.
 | `guru_payouts.amount` / `amount_cents` / `status` | `net_amount`, `gross_amount`, `payout_status` |
 | `admin_audit_logs.entity_type` | `target_type` only |
 | `live_walks` / `gps_events` | `booking_walk_tracks` / `booking_walk_track_points` |
+| `moderation_flags` | `support_intake_cases` (admin moderation queue) |
+| `fraud_flags` | `dispute_cases` (admin fraud / dispute queue) |
+| `financial_audit_logs` | may be missing — fall back to `admin_audit_logs` |
 
 To add Rogue compatibility tables/columns on top of production, apply:
 

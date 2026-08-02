@@ -782,12 +782,63 @@ async function moduleTrustSafety(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("trust_safety", "Trust & Safety", "operations", [
     "guru_background_checks",
     "moderation_flags",
+    "support_intake_cases",
     "fraud_flags",
+    "dispute_cases",
   ]);
   const [checks, moderation, fraud] = await Promise.all([
     safeSelect("guru_background_checks", "id,status,created_at", 300),
-    safeSelect("moderation_flags", "id,status,created_at", 200),
-    safeSelect("fraud_flags", "id,status,created_at", 200),
+    // Rogue name: moderation_flags. Live prod queue: support_intake_cases.
+    safeSelectCascade([
+      {
+        table: "moderation_flags",
+        columns: "id,status,created_at,severity,reason,subject_type",
+        limit: 200,
+      },
+      {
+        table: "moderation_flags",
+        columns: "id,status,created_at",
+        limit: 200,
+      },
+      {
+        table: "support_intake_cases",
+        columns: "id,status,priority,created_at,subject,category",
+        limit: 200,
+      },
+      {
+        table: "support_intake_cases",
+        columns: "id,status,priority,created_at",
+        limit: 200,
+      },
+    ]),
+    // Rogue name: fraud_flags. Live prod queue: dispute_cases (+ support intake).
+    safeSelectCascade([
+      {
+        table: "fraud_flags",
+        columns: "id,status,created_at,severity,reason,subject_type",
+        limit: 200,
+      },
+      {
+        table: "fraud_flags",
+        columns: "id,status,created_at",
+        limit: 200,
+      },
+      {
+        table: "dispute_cases",
+        columns: "id,status,priority,created_at,reason,category",
+        limit: 200,
+      },
+      {
+        table: "dispute_cases",
+        columns: "id,status,created_at",
+        limit: 200,
+      },
+      {
+        table: "support_intake_cases",
+        columns: "id,status,priority,created_at",
+        limit: 200,
+      },
+    ]),
   ]);
   const escalations = countWhere(checks.rows, (r) =>
     ["review", "escalated", "failed", "consider", "pending"].includes(statusOf(r)),
@@ -801,6 +852,8 @@ async function moduleTrustSafety(): Promise<ModuleSnapshot> {
       escalations,
       moderationFlags: moderation.count,
       fraudFlags: fraud.count,
+      moderationSource: moderation.tableUsed,
+      fraudSource: fraud.tableUsed,
     },
     [
       `${number(escalations)} escalations`,
@@ -1708,7 +1761,15 @@ async function moduleAuditTrail(since: string): Promise<ModuleSnapshot> {
         limit: 300,
         sinceIso: since,
       },
+      {
+        table: "admin_audit_logs",
+        columns: "id,action,created_at,actor_email",
+        limit: 300,
+        sinceIso: since,
+      },
     ]),
+    // Rogue name: financial_audit_logs. Falls back to admin_audit_logs when
+    // the finance-specific table is missing from the PostgREST schema cache.
     safeSelectCascade([
       {
         table: "financial_audit_logs",
@@ -1722,6 +1783,30 @@ async function moduleAuditTrail(since: string): Promise<ModuleSnapshot> {
         limit: 200,
         sinceIso: since,
       },
+      {
+        table: "financial_audit_logs",
+        columns: "id,action,created_at,actor_email",
+        limit: 200,
+        sinceIso: since,
+      },
+      {
+        table: "admin_audit_logs",
+        columns: "id,action,created_at,actor_email,entity_type,target_type,area",
+        limit: 200,
+        sinceIso: since,
+      },
+      {
+        table: "admin_audit_logs",
+        columns: "id,action,created_at,actor_email,target_type,area",
+        limit: 200,
+        sinceIso: since,
+      },
+      {
+        table: "admin_audit_logs",
+        columns: "id,action,created_at,actor_email",
+        limit: 200,
+        sinceIso: since,
+      },
     ]),
   ]);
   return finalize(
@@ -1731,6 +1816,8 @@ async function moduleAuditTrail(since: string): Promise<ModuleSnapshot> {
     {
       adminAuditEvents: adminLogs.count,
       financialAuditEvents: financeLogs.count,
+      adminAuditSource: adminLogs.tableUsed,
+      financialAuditSource: financeLogs.tableUsed,
     },
     [
       `${number(adminLogs.count)} admin actions`,

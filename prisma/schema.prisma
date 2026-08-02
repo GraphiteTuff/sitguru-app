@@ -8,9 +8,10 @@
  * DATABASE_URL / Postgres password not available in this cloud agent environment).
  * When DATABASE_URL is set, prefer: `npx prisma db pull --force`
  *
- * Compatibility tables that do NOT exist yet in production (payments, payouts,
- * live_walks, etc.) are intentionally omitted here. Apply
- * supabase/migrations/20260802_structural_schema_alignment_rogue.sql to add them.
+ * Compatibility / accessory tables (payments, payouts, live_walks, moderation_flags,
+ * fraud_flags, financial_audit_logs) may be missing from live PostgREST until
+ * supabase/migrations/20260802_structural_schema_alignment_rogue.sql is applied.
+ * Rogue admin-reporting falls back to production aliases in those cases.
  */
 
 datasource db {
@@ -66,6 +67,54 @@ model AdminAuditLog {
   createdAt  DateTime? @map("created_at") @db.Timestamptz(6)
 
   @@map("admin_audit_logs")
+}
+
+/// Finance/CPA audit trail. Falls back to admin_audit_logs when unmapped in PostgREST.
+model FinancialAuditLog {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String?   @map("actor_id") @db.Uuid
+  actorEmail String?   @map("actor_email")
+  actorRole  String?   @map("actor_role")
+  action     String
+  area       String?
+  targetType String?   @map("target_type")
+  targetId   String?   @map("target_id")
+  entityType String?   @map("entity_type")
+  severity   String?
+  metadata   Json?
+  createdAt  DateTime? @map("created_at") @db.Timestamptz(6)
+
+  @@map("financial_audit_logs")
+}
+
+/// Trust & safety moderation queue. Live alias: support_intake_cases.
+model ModerationFlag {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status      String?   @default("open")
+  subjectType String?   @map("subject_type")
+  subjectId   String?   @map("subject_id")
+  reason      String?
+  severity    String?
+  metadata    Json?
+  createdAt   DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamptz(6)
+
+  @@map("moderation_flags")
+}
+
+/// Trust & safety fraud queue. Live alias: dispute_cases.
+model FraudFlag {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status      String?   @default("open")
+  subjectType String?   @map("subject_type")
+  subjectId   String?   @map("subject_id")
+  reason      String?
+  severity    String?
+  metadata    Json?
+  createdAt   DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamptz(6)
+
+  @@map("fraud_flags")
 }
 
 model Booking {
