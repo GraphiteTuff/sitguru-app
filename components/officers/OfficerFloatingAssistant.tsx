@@ -458,6 +458,7 @@ export default function OfficerFloatingAssistant({
                 <OfficerAvatar
                   src={avatarSrc}
                   className="!h-full !w-full max-h-full max-w-full rounded-full"
+                  objectPosition={avatarObjectPosition}
                 />
               </span>
               <div className="min-w-0 flex-1 pr-14">
@@ -546,7 +547,11 @@ export default function OfficerFloatingAssistant({
                     className={`mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ${theme.ringClass}`}
                     aria-hidden
                   >
-                    <OfficerAvatar src={avatarSrc} className="h-full w-full" />
+                    <OfficerAvatar
+                      src={avatarSrc}
+                      className="h-full w-full"
+                      objectPosition={avatarObjectPosition}
+                    />
                   </span>
                   <div
                     className="homepage-chat-bubble homepage-chat-bubble--ai min-w-0 flex-1"
@@ -564,7 +569,11 @@ export default function OfficerFloatingAssistant({
                   className={`mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ${theme.ringClass}`}
                   aria-hidden
                 >
-                  <OfficerAvatar src={avatarSrc} className="h-full w-full" />
+                  <OfficerAvatar
+                    src={avatarSrc}
+                    className="h-full w-full"
+                    objectPosition={avatarObjectPosition}
+                  />
                 </span>
                 <div
                   className="homepage-chat-bubble homepage-chat-bubble--ai homepage-chat-typing"
