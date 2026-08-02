@@ -220,6 +220,8 @@ async function safeHeadCount(
 function statusOf(row: AnyRow) {
   return asString(
     row.status ||
+      row.lead_status ||
+      row.signup_invite_status ||
       row.payout_status ||
       row.application_status ||
       row.check_status,
@@ -788,18 +790,8 @@ async function moduleTrustSafety(): Promise<ModuleSnapshot> {
   ]);
   const [checks, moderation, fraud] = await Promise.all([
     safeSelect("guru_background_checks", "id,status,created_at", 300),
-    // Rogue name: moderation_flags. Live prod queue: support_intake_cases.
+    // Rogue alias moderation_flags → native live queue support_intake_cases.
     safeSelectCascade([
-      {
-        table: "moderation_flags",
-        columns: "id,status,created_at,severity,reason,subject_type",
-        limit: 200,
-      },
-      {
-        table: "moderation_flags",
-        columns: "id,status,created_at",
-        limit: 200,
-      },
       {
         table: "support_intake_cases",
         columns: "id,status,priority,created_at,subject,category",
@@ -810,19 +802,19 @@ async function moduleTrustSafety(): Promise<ModuleSnapshot> {
         columns: "id,status,priority,created_at",
         limit: 200,
       },
-    ]),
-    // Rogue name: fraud_flags. Live prod queue: dispute_cases (+ support intake).
-    safeSelectCascade([
       {
-        table: "fraud_flags",
+        table: "moderation_flags",
         columns: "id,status,created_at,severity,reason,subject_type",
         limit: 200,
       },
       {
-        table: "fraud_flags",
+        table: "moderation_flags",
         columns: "id,status,created_at",
         limit: 200,
       },
+    ]),
+    // Rogue alias fraud_flags → native live queue dispute_cases.
+    safeSelectCascade([
       {
         table: "dispute_cases",
         columns: "id,status,priority,created_at,reason,category",
@@ -834,8 +826,13 @@ async function moduleTrustSafety(): Promise<ModuleSnapshot> {
         limit: 200,
       },
       {
-        table: "support_intake_cases",
-        columns: "id,status,priority,created_at",
+        table: "fraud_flags",
+        columns: "id,status,created_at,severity,reason,subject_type",
+        limit: 200,
+      },
+      {
+        table: "fraud_flags",
+        columns: "id,status,created_at",
         limit: 200,
       },
     ]),
@@ -900,15 +897,68 @@ async function moduleSalesMarketing(since: string): Promise<ModuleSnapshot> {
     "admin_marketing_tasks",
   ]);
   const [campaigns, leads, tasks] = await Promise.all([
-    safeSelect("admin_marketing_campaigns", "id,status,created_at,name,title", 200),
-    safeSelect(
-      "admin_marketing_signup_leads",
-      "id,status,created_at,priority_level",
-      300,
-      since,
-    ),
-    safeSelect("admin_marketing_tasks", "id,status,created_at,needs_help", 200, since),
+    // Live campaigns expose `name`; Rogue also asks for `title` when present.
+    safeSelectCascade([
+      {
+        table: "admin_marketing_campaigns",
+        columns: "id,status,created_at,name,title",
+        limit: 200,
+      },
+      {
+        table: "admin_marketing_campaigns",
+        columns: "id,status,created_at,name",
+        limit: 200,
+      },
+      {
+        table: "admin_marketing_campaigns",
+        columns: "id,status,created_at",
+        limit: 200,
+      },
+    ]),
+    // Live signup leads use `lead_status`; Rogue prefers unified `status`.
+    safeSelectCascade([
+      {
+        table: "admin_marketing_signup_leads",
+        columns: "id,status,created_at,priority_level",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "admin_marketing_signup_leads",
+        columns: "id,lead_status,created_at,priority_level",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "admin_marketing_signup_leads",
+        columns: "id,created_at,priority_level",
+        limit: 300,
+        sinceIso: since,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "admin_marketing_tasks",
+        columns: "id,status,created_at,needs_help",
+        limit: 200,
+        sinceIso: since,
+      },
+      {
+        table: "admin_marketing_tasks",
+        columns: "id,status,created_at",
+        limit: 200,
+        sinceIso: since,
+      },
+    ]),
   ]);
+  const campaignRows = campaigns.rows.map((row) => ({
+    ...row,
+    title: asString(row.title) || asString(row.name) || null,
+  }));
+  const leadRows = leads.rows.map((row) => ({
+    ...row,
+    status: asString(row.status) || asString(row.lead_status) || null,
+  }));
   return finalize(
     snap,
     campaigns.ok || leads.ok || tasks.ok,
@@ -917,6 +967,11 @@ async function moduleSalesMarketing(since: string): Promise<ModuleSnapshot> {
       campaigns: campaigns.count,
       signupLeads: leads.count,
       tasks: tasks.count,
+      campaignsSource: campaigns.tableUsed,
+      signupLeadsSource: leads.tableUsed,
+      tasksSource: tasks.tableUsed,
+      campaignTitlesSampled: countWhere(campaignRows, (r) => Boolean(asString(r.title))),
+      leadsWithStatus: countWhere(leadRows, (r) => Boolean(asString(r.status))),
     },
     [
       `${number(campaigns.count)} campaigns`,
@@ -934,10 +989,66 @@ async function moduleGrowthReferrals(since: string): Promise<ModuleSnapshot> {
     "referral_rewards",
   ]);
   const [codes, events, rewards] = await Promise.all([
-    safeSelect("referral_codes", "id,status,created_at,program", 300),
-    safeSelect("referral_events", "id,created_at,event_type,status", 300, since),
-    safeSelect("referral_rewards", "id,status,amount,created_at", 300, since),
+    // Live referral_codes often expose program_type / program_context, not program.
+    safeSelectCascade([
+      {
+        table: "referral_codes",
+        columns: "id,status,created_at,program",
+        limit: 300,
+      },
+      {
+        table: "referral_codes",
+        columns: "id,status,created_at,program_type,program_context",
+        limit: 300,
+      },
+      {
+        table: "referral_codes",
+        columns: "id,status,created_at",
+        limit: 300,
+      },
+      {
+        table: "pawperks_account_referral_codes",
+        columns: "id,status,created_at,program_type",
+        limit: 300,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "referral_events",
+        columns: "id,created_at,event_type,status",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "referral_events",
+        columns: "id,created_at,event_type",
+        limit: 300,
+        sinceIso: since,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "referral_rewards",
+        columns: "id,status,amount,created_at",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "referral_rewards",
+        columns: "id,status,created_at",
+        limit: 300,
+        sinceIso: since,
+      },
+    ]),
   ]);
+  const codeRows = codes.rows.map((row) => ({
+    ...row,
+    program:
+      asString(row.program) ||
+      asString(row.program_type) ||
+      asString(row.program_context) ||
+      null,
+  }));
   const pendingRewards = sumField(
     rewards.rows.filter((r) =>
       ["pending", "owed", "review"].includes(statusOf(r)),
@@ -953,6 +1064,10 @@ async function moduleGrowthReferrals(since: string): Promise<ModuleSnapshot> {
       events: events.count,
       rewards: rewards.count,
       pendingRewardAmount: pendingRewards,
+      codesSource: codes.tableUsed,
+      eventsSource: events.tableUsed,
+      rewardsSource: rewards.tableUsed,
+      codesWithProgram: countWhere(codeRows, (r) => Boolean(asString(r.program))),
     },
     [
       `${number(codes.count)} codes`,
