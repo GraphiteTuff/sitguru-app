@@ -42,41 +42,41 @@ const PAYMENT_PARTNERS: PaymentPartner[] = [
     label: "Stripe",
     logoSrc: "/images/payments/stripe.svg",
     logoClassName:
-      "h-7 w-auto max-w-[88px] sm:h-8 sm:max-w-[96px] lg:h-9 lg:max-w-[104px]",
+      "h-10 w-[92%] max-w-[8.5rem] sm:h-11 sm:max-w-[9.5rem] lg:h-12 lg:max-w-[10.5rem]",
   },
   {
     name: "paypal",
     label: "PayPal",
     logoSrc: "/images/payments/paypal.svg",
     logoClassName:
-      "h-9 w-auto max-w-[40px] sm:h-10 sm:max-w-[44px] lg:h-11 lg:max-w-[48px]",
+      "h-10 w-auto max-w-[44px] sm:h-11 sm:max-w-[48px] lg:h-12 lg:max-w-[52px]",
   },
   {
     name: "applepay",
     label: "Apple Pay",
     logoSrc: "/images/payments/apple-pay.svg",
     logoClassName:
-      "h-7 w-auto max-w-[78px] sm:h-8 sm:max-w-[86px] lg:h-9 lg:max-w-[94px]",
+      "h-10 w-[92%] max-w-[8.25rem] sm:h-11 sm:max-w-[9rem] lg:h-12 lg:max-w-[10rem]",
   },
   {
     name: "googlepay",
     label: "Google Pay",
     logoSrc: "/images/payments/google-pay.svg",
     logoClassName:
-      "h-5 w-auto max-w-[92px] sm:h-6 sm:max-w-[104px] lg:h-7 lg:max-w-[112px]",
+      "h-9 w-[94%] max-w-[9rem] sm:h-10 sm:max-w-[10rem] lg:h-11 lg:max-w-[11rem]",
   },
   {
     name: "venmo",
     label: "Venmo",
     logoSrc: "/images/payments/venmo.svg",
     logoClassName:
-      "h-9 w-auto max-w-[40px] sm:h-10 sm:max-w-[44px] lg:h-11 lg:max-w-[48px]",
+      "h-10 w-auto max-w-[44px] sm:h-11 sm:max-w-[48px] lg:h-12 lg:max-w-[52px]",
   },
   {
     name: "plaid",
     label: "Plaid",
     logoClassName:
-      "h-6 text-[1.05rem] leading-none sm:h-7 sm:text-[1.15rem] lg:h-8 lg:text-[1.25rem]",
+      "h-7 text-[1.15rem] leading-none sm:h-8 sm:text-[1.3rem] lg:h-9 lg:text-[1.4rem]",
     useInlinePlaid: true,
   },
 ];
@@ -148,7 +148,7 @@ export default function PaymentIntegrationsGrid({
           <div
             key={partner.name}
             title={partner.label}
-            className={`flex min-h-[4.75rem] cursor-pointer items-center justify-center rounded-2xl border border-slate-200/80 bg-transparent px-3 py-4 transition-all duration-300 ease-out sm:min-h-[5.25rem] sm:rounded-[1.25rem] sm:px-4 ${
+            className={`flex min-h-[4.75rem] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-slate-200/80 bg-white px-2 py-2.5 transition-all duration-300 ease-out sm:min-h-[5.5rem] sm:rounded-[1.25rem] sm:px-2.5 sm:py-3 ${
               hoveredIndex === index
                 ? "-translate-y-1 scale-[1.03] border-emerald-300/90"
                 : ""
