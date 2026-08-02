@@ -92,7 +92,7 @@ const fallbackStripeFinancials: StripeFinancialsResponse = {
   isLive: false,
   generatedAt: new Date().toISOString(),
   message:
-    "Stripe financial data is ready for wiring. Showing safe preview values until the Stripe financial API is connected.",
+    "Stripe financial data is loading from ledger tables and the live Stripe API when configured.",
   range: "month",
   summary: {
     grossPayments: 0,
@@ -147,8 +147,9 @@ function formatCurrency(value: unknown) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(Math.round(safeValue));
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(safeValue);
 }
 
 function formatDateTime(value: string | null) {
@@ -638,23 +639,37 @@ export default function AdminStripeFinancialsPage() {
               <div className="mb-3 flex flex-wrap gap-2">
                 <Link
                   href="/admin/financials/reconciliation"
-                  className="rounded-full bg-emerald-700 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
+                  className="rounded-2xl bg-emerald-700 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800"
                 >
                   Open Reconciliation
                 </Link>
 
                 <Link
                   href="/admin/financials/plaid"
-                  className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+                  className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
                 >
                   NFCU / Plaid Banking
                 </Link>
+
+                <a
+                  href={`/api/admin/financials/stripe/export?range=${range}&startDate=${rangeDates.startDate}&endDate=${rangeDates.endDate}&section=transactions`}
+                  className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+                >
+                  Export Transactions CSV
+                </a>
+
+                <a
+                  href={`/api/admin/financials/stripe/export?range=${range}&startDate=${rangeDates.startDate}&endDate=${rangeDates.endDate}&section=payouts`}
+                  className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+                >
+                  Export Payouts CSV
+                </a>
 
                 <button
                   type="button"
                   onClick={loadStripeFinancials}
                   disabled={loading}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? "Refreshing..." : "Refresh"}
                 </button>
@@ -666,7 +681,7 @@ export default function AdminStripeFinancialsPage() {
                     key={filter.value}
                     type="button"
                     onClick={() => setRange(filter.value)}
-                    className={`rounded-full border px-4 py-2 text-xs font-black shadow-sm transition ${
+                    className={`rounded-2xl border px-4 py-2 text-xs font-black shadow-sm transition ${
                       range === filter.value
                         ? "border-emerald-700 bg-emerald-700 text-white"
                         : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
@@ -678,6 +693,35 @@ export default function AdminStripeFinancialsPage() {
               </div>
             </div>
           </div>
+
+          <section className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+              Statement Wiring
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[
+                ["Cash Flow", "/admin/financials/cash-flow"],
+                ["Profit & Loss", "/admin/financials/profit-loss"],
+                ["Balance Sheet", "/admin/financials/balance-sheet"],
+                ["General Ledger", "/admin/financials/general-ledger"],
+                ["Reconciliation", "/admin/financials/reconciliation"],
+                ["Payouts", "/admin/financials/payouts"],
+                ["Plaid Banking", "/admin/financials/plaid"],
+              ].map(([label, href]) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+                >
+                  {label}
+                </Link>
+              ))}
+            </div>
+            <p className="mt-3 text-xs font-semibold leading-5 text-slate-500">
+              Gross payments feed revenue. Fees/refunds/disputes hit expense.
+              Payout batches should match NFCU deposits before month-end close.
+            </p>
+          </section>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
             <SummaryCard
@@ -895,7 +939,7 @@ export default function AdminStripeFinancialsPage() {
               </p>
             </div>
 
-            <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-blue-800">
+            <span className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-blue-800">
               {displayedFinancials.summary.transactionCount.toLocaleString()}{" "}
               Transactions
             </span>
@@ -993,8 +1037,8 @@ export default function AdminStripeFinancialsPage() {
             </div>
           ) : (
             <EmptyState
-              title="No Stripe transactions loaded yet"
-              description="Once /api/admin/financials/stripe is connected, this table will show live customer charges, refunds, disputes, fees, transfers, and reconciliation status."
+              title="No Stripe transactions in this range"
+              description="Try another date range, confirm booking payments are recording Stripe payment intents, or verify STRIPE_SECRET_KEY so live balance transactions can load."
             />
           )}
         </section>
@@ -1014,9 +1058,18 @@ export default function AdminStripeFinancialsPage() {
               </p>
             </div>
 
-            <span className="rounded-full border border-purple-100 bg-purple-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-purple-800">
-              {displayedFinancials.summary.payoutCount.toLocaleString()} Payouts
-            </span>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={`/api/admin/financials/stripe/export?range=${range}&startDate=${rangeDates.startDate}&endDate=${rangeDates.endDate}&section=payouts`}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
+              >
+                Export Payouts CSV
+              </a>
+              <span className="rounded-2xl border border-purple-100 bg-purple-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-purple-800">
+                {displayedFinancials.summary.payoutCount.toLocaleString()}{" "}
+                Payouts
+              </span>
+            </div>
           </div>
 
           {displayedFinancials.payouts.length > 0 ? (
@@ -1088,8 +1141,8 @@ export default function AdminStripeFinancialsPage() {
             </div>
           ) : (
             <EmptyState
-              title="No Stripe payouts loaded yet"
-              description="Live payout batches will appear here after the Stripe financial API returns payout and Plaid/NFCU matching details."
+              title="No Stripe payouts in this range"
+              description="Live payout batches appear after Stripe sends funds to NFCU. Connect Plaid banking so deposits can auto-match by amount and arrival date."
             />
           )}
         </section>
