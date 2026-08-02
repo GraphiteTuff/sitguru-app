@@ -62,7 +62,7 @@ export default function ScoutFloatingAssistant({
       officerId="scout"
       displayName={profile.displayName}
       title={profile.title}
-      avatarSrc={`${profile.avatarSrc}?v=3`}
+      avatarSrc={`${profile.avatarSrc}?v=4`}
       greetingMarkdown={profile.greetingMarkdown}
       tipStatement={profile.tipStatement}
       composerPlaceholder={profile.composerPlaceholder}
@@ -72,7 +72,7 @@ export default function ScoutFloatingAssistant({
       chips={SCOUT_CHIPS}
       accessToken={accessToken}
       providerId={providerId}
-      avatarObjectPosition="center 18%"
+      avatarObjectPosition="center 22%"
     />
   );
 }
