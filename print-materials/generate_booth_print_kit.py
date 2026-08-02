@@ -438,35 +438,35 @@ def create_sitguru_kit(output_path: Path | None = None):
         Paragraph("<b>Our Core Offerings:</b>", flyer_heading),
         Spacer(1, 8),
         Paragraph(
-            "• <b>Overnight Pet Sitting:</b> Dedicated, "
+            "&bull; <b>Overnight Pet Sitting:</b> Dedicated, "
             "insured providers remain in your primary residence to ensure "
             "routines are completely uninterrupted.",
             style_bullet,
         ),
         Spacer(1, 8),
         Paragraph(
-            "• <b>Dog Walking:</b> Scheduled neighborhood "
+            "&bull; <b>Dog Walking:</b> Scheduled neighborhood "
             "walks with GPS tracking so you always know when your pup is out "
             "and moving.",
             style_bullet,
         ),
         Spacer(1, 8),
         Paragraph(
-            "• <b>Drop-In Visits:</b> Midday feeding, "
+            "&bull; <b>Drop-In Visits:</b> Midday feeding, "
             "playtime, litter checks, and medication support without a full "
             "overnight stay.",
             style_bullet,
         ),
         Spacer(1, 8),
         Paragraph(
-            "• <b>Boarding &amp; Day Care:</b> Trusted "
+            "&bull; <b>Boarding &amp; Day Care:</b> Trusted "
             "local Guru homes and facilities when travel or long days away "
             "require extra coverage.",
             style_bullet,
         ),
         Spacer(1, 8),
         Paragraph(
-            "• <b>Training &amp; Grooming Support:</b> "
+            "&bull; <b>Training &amp; Grooming Support:</b> "
             "Connect with experienced providers for everyday care add-ons "
             "alongside sitting and walks.",
             style_bullet,
