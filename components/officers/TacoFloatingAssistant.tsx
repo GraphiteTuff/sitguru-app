@@ -60,7 +60,7 @@ export default function TacoFloatingAssistant({
       officerId="taco"
       displayName={profile.displayName}
       title={profile.title}
-      avatarSrc={`${profile.avatarSrc}?v=1`}
+      avatarSrc={`${profile.avatarSrc}?v=2`}
       greetingMarkdown={profile.greetingMarkdown}
       tipStatement={profile.tipStatement}
       composerPlaceholder={profile.composerPlaceholder}
@@ -69,7 +69,7 @@ export default function TacoFloatingAssistant({
       theme={TACO_THEME}
       chips={TACO_CHIPS}
       accessToken={accessToken}
-      avatarObjectPosition="center 18%"
+      avatarObjectPosition="center 22%"
     />
   );
 }
