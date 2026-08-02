@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * Delilah — Ambassador Advocate floating assistant.
+ * Taco — Ambassador Advocate floating assistant.
  * Mounted on Ambassador dashboard layouts. Streams to /api/ai/officer-stream.
  */
 
 import OfficerFloatingAssistant from "@/components/officers/OfficerFloatingAssistant";
-import { DELILAH_OFFICER_PROMPT } from "@/lib/ai/officer-prompts";
+import { TACO_OFFICER_PROMPT } from "@/lib/ai/officer-prompts";
 
-const DELILAH_THEME = {
+const TACO_THEME = {
   /** Ambassador green palette accents */
   brand: "#166534",
   brandDeep: "#0D5C3A",
@@ -21,7 +21,7 @@ const DELILAH_THEME = {
   tableBorderClass: "border-green-100",
 } as const;
 
-const DELILAH_CHIPS = [
+const TACO_CHIPS = [
   {
     id: "pack_pulse",
     label: "Pack Pulse",
@@ -29,10 +29,10 @@ const DELILAH_CHIPS = [
       "Give me a quick Pack Pulse: how are we doing growing the pack — referrals, link clicks, and treat commissions right now?",
   },
   {
-    id: "sniff_leads",
-    label: "Sniff Leads",
+    id: "pounce_leads",
+    label: "Pounce Leads",
     prompt:
-      "Help me sniffing out new leads — what should I focus on next to boost referrals and link clicks?",
+      "Help me pouncing on new leads — what should I focus on next to boost referrals and link clicks?",
   },
   {
     id: "treat_commissions",
@@ -48,26 +48,26 @@ const DELILAH_CHIPS = [
   },
 ] as const;
 
-export default function DelilahFloatingAssistant({
+export default function TacoFloatingAssistant({
   accessToken = null,
 }: {
   accessToken?: string | null;
 }) {
-  const profile = DELILAH_OFFICER_PROMPT;
+  const profile = TACO_OFFICER_PROMPT;
 
   return (
     <OfficerFloatingAssistant
-      officerId="delilah"
+      officerId="taco"
       displayName={profile.displayName}
       title={profile.title}
-      avatarSrc={`${profile.avatarSrc}?v=3`}
+      avatarSrc={`${profile.avatarSrc}?v=1`}
       greetingMarkdown={profile.greetingMarkdown}
       tipStatement={profile.tipStatement}
       composerPlaceholder={profile.composerPlaceholder}
       footerLabel={profile.footerLabel}
       subtitle="Ambassador advocate · your pack only"
-      theme={DELILAH_THEME}
-      chips={DELILAH_CHIPS}
+      theme={TACO_THEME}
+      chips={TACO_CHIPS}
       accessToken={accessToken}
       avatarObjectPosition="center 18%"
     />

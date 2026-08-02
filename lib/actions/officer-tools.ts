@@ -1,10 +1,10 @@
 /**
- * Security-isolated Pet Officer query helpers (Delilah + Scout).
+ * Security-isolated Pet Officer query helpers (Taco + Scout).
  *
  * SERVER ONLY — do not import from client components.
  *
  * Guarantees:
- * - Delilah tools filter exclusively by the calling Ambassador's session /
+ * - Taco tools filter exclusively by the calling Ambassador's session /
  *   ledger profile id. Global platform financial ledgers are blocked.
  * - Scout tools filter exclusively by the logged-in Guru's provider /
  *   user id. Parent user matrices are blocked.
@@ -107,7 +107,7 @@ export type AmbassadorSessionInput = z.infer<typeof AmbassadorSessionSchema>;
 export type GuruProviderSessionInput = z.infer<typeof GuruProviderSessionSchema>;
 
 /* -------------------------------------------------------------------------- */
-/* Delilah — Ambassador Advocate tools                                        */
+/* Taco — Ambassador Advocate tools                                           */
 /* -------------------------------------------------------------------------- */
 
 export const AMBASSADOR_SOCIAL_MILESTONES = [
@@ -987,7 +987,7 @@ export async function getProviderPayoutCache(
 /* Snapshot compilers for the generic stream endpoint                         */
 /* -------------------------------------------------------------------------- */
 
-export async function compileDelilahSnapshot(sessionUserId: string) {
+export async function compileTacoSnapshot(sessionUserId: string) {
   const scope = { sessionUserId, limit: 15 as const };
   const [referrals, commissions, milestones] = await Promise.all([
     getAmbassadorReferrals(scope),
@@ -996,7 +996,7 @@ export async function compileDelilahSnapshot(sessionUserId: string) {
   ]);
 
   const lines: string[] = [
-    "# Delilah · Ambassador Advocate Snapshot",
+    "# Taco · Ambassador Advocate Snapshot",
     `- Session user: ${sessionUserId}`,
     `- Profile id: ${referrals?.profileId ?? commissions?.summary?.profileId ?? "unconfigured"}`,
     "",

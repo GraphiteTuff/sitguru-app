@@ -1,5 +1,5 @@
 /**
- * Generic Pet Officer stream endpoint — Delilah (Ambassador) + Scout (Guru).
+ * Generic Pet Officer stream endpoint — Taco (Ambassador) + Scout (Guru).
  *
  * Rogue's admin route (`/api/admin/rogue-ai`) is intentionally untouched.
  * This handler only serves guest officers with session-scoped snapshots.
@@ -16,7 +16,7 @@ import {
   type GuestOfficerId,
 } from "@/lib/ai/officer-prompts";
 import {
-  compileDelilahSnapshot,
+  compileTacoSnapshot,
   compileScoutSnapshot,
 } from "@/lib/actions/officer-tools";
 import {
@@ -109,7 +109,7 @@ async function assertOfficerAccess(
   officer: GuestOfficerId,
   userId: string,
 ): Promise<{ ok: true; actorLabel: string; providerId?: string | null } | { ok: false; status: number; error: string }> {
-  if (officer === "delilah") {
+  if (officer === "taco") {
     const [{ data: profile }, { data: ambassador }, { data: ledger }] =
       await Promise.all([
         supabaseAdmin
@@ -150,7 +150,7 @@ async function assertOfficerAccess(
       return {
         ok: false,
         status: 403,
-        error: "Ambassador access required for Delilah.",
+        error: "Ambassador access required for Taco.",
       };
     }
 
@@ -247,7 +247,7 @@ export async function POST(req: Request) {
       return Response.json(
         {
           error:
-            "officer must be 'delilah' or 'scout'. Rogue remains on /api/admin/rogue-ai.",
+            "officer must be 'taco' or 'scout'. Rogue remains on /api/admin/rogue-ai.",
         },
         { status: 400 },
       );
@@ -292,8 +292,8 @@ export async function POST(req: Request) {
     const preset = asString(body.preset);
 
     const snapshot =
-      officer === "delilah"
-        ? await compileDelilahSnapshot(session.id).catch(() => null)
+      officer === "taco"
+        ? await compileTacoSnapshot(session.id).catch(() => null)
         : await compileScoutSnapshot(
             session.id,
             asString(body.providerId) || access.providerId || null,

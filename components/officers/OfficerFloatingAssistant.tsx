@@ -2,7 +2,7 @@
 
 /**
  * Shared floating Pet Officer overlay — cloned from the Rogue admin template
- * and themed per guest officer (Delilah / Scout). Streams via
+ * and themed per guest officer (Taco / Scout). Streams via
  * /api/ai/officer-stream (Rogue admin route remains untouched).
  */
 

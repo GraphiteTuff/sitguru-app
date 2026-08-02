@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
-import DelilahFloatingAssistant from "@/components/officers/DelilahFloatingAssistant";
+import TacoFloatingAssistant from "@/components/officers/TacoFloatingAssistant";
 
 /**
- * Ambassador root layout — mounts Delilah (Ambassador Advocate) across
+ * Ambassador root layout — mounts Taco (Ambassador Advocate) across
  * Ambassador dashboard and related views without touching Rogue admin AI.
  */
 export default function AmbassadorLayout({
@@ -15,7 +15,7 @@ export default function AmbassadorLayout({
     <>
       {children}
       <SafeAssistantBubble>
-        <DelilahFloatingAssistant />
+        <TacoFloatingAssistant />
       </SafeAssistantBubble>
     </>
   );
