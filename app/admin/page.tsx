@@ -400,7 +400,7 @@ export default async function AdminOperationsDashboard() {
     },
     {
       title: "Programs & growth",
-      description: "Student, community, veterans pathways, and ambassador leads.",
+      description: "Student, community, veterans pathways, SkillBridge, and ambassadors.",
       href: "/admin/programs",
       priority: "Monitor",
     },
