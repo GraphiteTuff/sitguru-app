@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
+import { getPlaidEnvironment } from "@/lib/plaid";
 
 export const dynamic = "force-dynamic";
 
@@ -122,16 +123,6 @@ const DEFAULT_ASSUMPTIONS: Assumptions = {
   forecastMonths: 12,
 };
 
-const FINANCE_ROLES = [
-  "owner",
-  "super_admin",
-  "admin",
-  "finance_admin",
-  "finance",
-  "accounting",
-  "bookkeeper",
-];
-
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -214,79 +205,16 @@ async function safeRows<T>(
   }
 }
 
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function hasFinancialRole(role: string) {
-  return FINANCE_ROLES.includes(role.trim().toLowerCase());
-}
-
 async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
+  const financeCheck = await requireFinanceAdminApi();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_finance_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_finance_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_finance_access",
-    ),
-  ]);
-
-  const profile = profileChecks.flat().find(Boolean) || {};
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-  const envAllowed = envAdminEmails.includes(userEmail);
+  if (!financeCheck.identity) return null;
 
   return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials:
-      active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed),
+    id: financeCheck.identity.id,
+    email: financeCheck.identity.email,
+    role: financeCheck.identity.role,
+    canAccessFinancials: true,
   };
 }
 
@@ -625,17 +553,51 @@ function buildRows(forecast: ProFormaMonth[], assumptions: Assumptions) {
 }
 
 async function getProFormaPackage(): Promise<ProFormaPackage> {
-  const assumptionRows = await safeRows<AnyRow>(
-    supabaseAdmin
-      .from("proforma_assumptions")
-      .select("*")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(1),
-    "proforma_assumptions",
-  );
+  const plaidEnvironment = getPlaidEnvironment();
 
-  const assumptions = rowToAssumptions(assumptionRows[0]);
+  const [assumptionRows, plaidAccounts] = await Promise.all([
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("proforma_assumptions")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1),
+      "proforma_assumptions",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_plaid_accounts")
+        .select(
+          "account_id, name, official_name, subtype, current_balance, available_balance, plaid_environment",
+        )
+        .eq("plaid_environment", plaidEnvironment)
+        .limit(500),
+      "admin_plaid_accounts",
+    ),
+  ]);
+
+  const savedAssumptions = rowToAssumptions(assumptionRows[0]);
+  const liveCash = plaidAccounts
+    .filter((account) => {
+      const name =
+        `${asTrimmedString(account.name)} ${asTrimmedString(account.official_name)}`.toLowerCase();
+      const subtype = asTrimmedString(account.subtype).toLowerCase();
+      return (
+        (subtype === "checking" || subtype === "savings") &&
+        name.includes("business")
+      );
+    })
+    .reduce((sum, account) => sum + toNumber(account.current_balance), 0);
+
+  const assumptions: Assumptions = {
+    ...savedAssumptions,
+    beginningCash:
+      savedAssumptions.beginningCash <= 0 && liveCash > 0
+        ? liveCash
+        : savedAssumptions.beginningCash,
+  };
+
   const forecast = buildForecast(assumptions);
   const rows = buildRows(forecast, assumptions);
 
