@@ -109,16 +109,32 @@ function addDays(date: Date, days: number) {
 
 function getAmount(record: MoneyRecord, possibleKeys: string[]) {
   for (const key of possibleKeys) {
+    if (!(key in record)) continue;
     const raw = record[key];
 
+    let value = 0;
     if (typeof raw === "number") {
-      return raw;
+      value = raw;
+    } else if (typeof raw === "string") {
+      const parsed = Number(raw.replace(/[$,]/g, ""));
+      if (!Number.isFinite(parsed)) continue;
+      value = parsed;
+    } else {
+      continue;
     }
 
-    if (typeof raw === "string") {
-      const parsed = Number(raw.replace(/[$,]/g, ""));
-      if (Number.isFinite(parsed)) return parsed;
+    if (!value && raw !== 0 && raw !== "0") continue;
+
+    const lower = key.toLowerCase();
+    if (
+      lower.includes("cents") ||
+      lower.includes("_cent") ||
+      lower === "application_fee_amount"
+    ) {
+      return value / 100;
     }
+
+    return value;
   }
 
   return 0;
@@ -128,35 +144,6 @@ function sumRecords(records: MoneyRecord[], possibleKeys: string[]) {
   return records.reduce((total, record) => {
     return total + getAmount(record, possibleKeys);
   }, 0);
-}
-
-function isCompletedBooking(record: MoneyRecord) {
-  const status = String(
-    record.status || record.booking_status || record.payment_status || "",
-  ).toLowerCase();
-
-  if (!status) return true;
-
-  return [
-    "completed",
-    "confirmed",
-    "paid",
-    "succeeded",
-    "finished",
-    "approved",
-  ].includes(status);
-}
-
-function isRefundOrChargeback(record: MoneyRecord) {
-  const status = String(
-    record.status || record.payment_status || record.type || "",
-  ).toLowerCase();
-
-  return (
-    status.includes("refund") ||
-    status.includes("chargeback") ||
-    status.includes("dispute")
-  );
 }
 
 async function readTable(tableName: string, startIso: string, endIso: string) {
@@ -178,6 +165,72 @@ async function readTable(tableName: string, startIso: string, endIso: string) {
   }
 }
 
+async function readFirstTable(
+  tableNames: string[],
+  startIso: string,
+  endIso: string,
+) {
+  for (const tableName of tableNames) {
+    const rows = await readTable(tableName, startIso, endIso);
+    // Empty array can mean missing table OR truly empty — try next only when
+    // the table failed (readTable returns [] on error). Prefer first non-error
+    // by probing with a head count when all are empty.
+    if (rows.length > 0) return rows;
+  }
+
+  // All empty: probe which tables exist and return the first reachable empty set.
+  for (const tableName of tableNames) {
+    try {
+      const supabase = await createClient();
+      const { error } = await supabase
+        .from(tableName)
+        .select("*", { head: true, count: "exact" })
+        .limit(1);
+      if (!error) return [];
+    } catch {
+      // try next
+    }
+  }
+
+  return [];
+}
+
+function isCompletedBooking(record: MoneyRecord) {
+  const status = String(
+    record.status || record.booking_status || record.payment_status || "",
+  ).toLowerCase();
+
+  if (!status) return true;
+
+  return [
+    "completed",
+    "confirmed",
+    "paid",
+    "succeeded",
+    "finished",
+    "approved",
+  ].includes(status);
+}
+
+function isRefundOrChargeback(record: MoneyRecord) {
+  const status = String(
+    record.status ||
+      record.payment_status ||
+      record.dispute_status ||
+      record.refund_status ||
+      record.type ||
+      "",
+  ).toLowerCase();
+
+  return (
+    status.includes("refund") ||
+    status.includes("chargeback") ||
+    status.includes("dispute") ||
+    Number(record.refund_amount_cents || 0) > 0 ||
+    Number(record.dispute_amount_cents || 0) > 0
+  );
+}
+
 async function getPeriodData(startIso: string, endIso: string) {
   const [
     bookings,
@@ -188,11 +241,27 @@ async function getPeriodData(startIso: string, endIso: string) {
     vendorExpenses,
   ] = await Promise.all([
     readTable("bookings", startIso, endIso),
-    readTable("payments", startIso, endIso),
-    readTable("guru_payouts", startIso, endIso),
-    readTable("partner_commissions", startIso, endIso),
-    readTable("stripe_transactions", startIso, endIso),
-    readTable("vendor_expenses", startIso, endIso),
+    readFirstTable(
+      ["booking_payments", "payments", "stripe_transactions"],
+      startIso,
+      endIso,
+    ),
+    readFirstTable(["guru_payouts", "payouts"], startIso, endIso),
+    readFirstTable(
+      ["ambassador_rewards", "partner_commissions", "commission_ledger"],
+      startIso,
+      endIso,
+    ),
+    readFirstTable(
+      ["booking_payments", "stripe_transactions", "payments"],
+      startIso,
+      endIso,
+    ),
+    readFirstTable(
+      ["vendor_expenses", "admin_growth_marketing_expenses"],
+      startIso,
+      endIso,
+    ),
   ]);
 
   const completedBookings = bookings.filter(isCompletedBooking);
@@ -203,16 +272,33 @@ async function getPeriodData(startIso: string, endIso: string) {
 
   const grossBookings = sumRecords(completedBookings, [
     "total_amount",
+    "customer_total_amount",
+    "subtotal_amount",
     "gross_amount",
     "booking_total",
+    "amount_cents",
     "amount",
     "price",
   ]);
 
+  const paymentGross = sumRecords(payments, [
+    "amount_cents",
+    "total_cents",
+    "amount",
+    "total_amount",
+    "gross_amount",
+  ]);
+
+  const effectiveGross =
+    grossBookings > 0 ? grossBookings : paymentGross;
+
   const directPlatformRevenue = sumRecords(payments, [
+    "marketplace_support_cents",
+    "platform_fee_cents",
     "platform_revenue",
     "application_fee_amount",
     "sitguru_fee",
+    "sitguru_fee_amount",
     "service_fee",
     "platform_fee",
   ]);
@@ -220,18 +306,23 @@ async function getPeriodData(startIso: string, endIso: string) {
   const platformRevenue =
     directPlatformRevenue > 0
       ? directPlatformRevenue
-      : Math.round(grossBookings * 0.15);
+      : Math.round(effectiveGross * 0.15);
 
   const guruPayoutTotal = sumRecords(guruPayouts, [
+    "amount_cents",
     "amount",
     "payout_amount",
+    "guru_payout_amount",
     "guru_earnings",
     "net_payout",
   ]);
 
   const partnerCommissionTotal = sumRecords(partnerCommissions, [
+    "amount_cents",
+    "reward_amount_cents",
     "amount",
     "commission_amount",
+    "reward_amount",
     "partner_commission",
     "payout_amount",
   ]);
@@ -245,6 +336,8 @@ async function getPeriodData(startIso: string, endIso: string) {
 
   const refundsChargebacks = Math.abs(
     sumRecords(refundTransactions, [
+      "refund_amount_cents",
+      "dispute_amount_cents",
       "amount",
       "refund_amount",
       "chargeback_amount",
@@ -256,6 +349,8 @@ async function getPeriodData(startIso: string, endIso: string) {
     "amount",
     "expense_amount",
     "total_amount",
+    "total_cost",
+    "cost",
   ]);
 
   const netIncome =
@@ -266,12 +361,12 @@ async function getPeriodData(startIso: string, endIso: string) {
     refundsChargebacks -
     operatingExpenses;
 
-  const netMargin = grossBookings > 0 ? (netIncome / grossBookings) * 100 : 0;
+  const netMargin = effectiveGross > 0 ? (netIncome / effectiveGross) * 100 : 0;
 
   const cashBalance = netIncome;
 
   return {
-    grossBookings,
+    grossBookings: effectiveGross,
     platformRevenue,
     guruPayoutTotal,
     partnerCommissionTotal,

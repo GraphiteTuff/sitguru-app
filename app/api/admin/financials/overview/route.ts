@@ -177,6 +177,7 @@ const TABLE_NAMES = [
   "admin_plaid_items",
   "bookings",
   "customer_bookings",
+  "booking_payments",
   "payments",
   "stripe_transactions",
   "stripe_balance_transactions",
@@ -188,6 +189,7 @@ const TABLE_NAMES = [
   "financial_statement_lines",
   "guru_payouts",
   "payouts",
+  "ambassador_rewards",
   "commissions",
   "partner_commissions",
   "financial_export_history",
@@ -546,9 +548,14 @@ function getManualExpenseAmount(row: AnyRow) {
 
 function getGrossAmount(row: AnyRow) {
   return (
+    toNumber(row.amount_cents) / 100 ||
+    toNumber(row.total_cents) / 100 ||
+    toNumber(row.gross_amount_cents) / 100 ||
     toCentsAwareAmount(row.gross_amount) ||
-    toCentsAwareAmount(row.amount) ||
     toCentsAwareAmount(row.total_amount) ||
+    toCentsAwareAmount(row.customer_total_amount) ||
+    toCentsAwareAmount(row.subtotal_amount) ||
+    toCentsAwareAmount(row.amount) ||
     toCentsAwareAmount(row.booking_total) ||
     toCentsAwareAmount(row.price) ||
     toCentsAwareAmount(row.subtotal) ||
@@ -558,18 +565,26 @@ function getGrossAmount(row: AnyRow) {
 
 function getNetAmount(row: AnyRow) {
   return (
+    toNumber(row.marketplace_support_cents) / 100 ||
+    toNumber(row.platform_fee_cents) / 100 ||
     toCentsAwareAmount(row.net_amount) ||
     toCentsAwareAmount(row.net) ||
     toCentsAwareAmount(row.platform_revenue) ||
     toCentsAwareAmount(row.platform_fee) ||
     toCentsAwareAmount(row.sitguru_fee) ||
+    toCentsAwareAmount(row.sitguru_fee_amount) ||
+    toCentsAwareAmount(row.marketplace_fee_amount) ||
     0
   );
 }
 
 function getPayoutAmount(row: AnyRow) {
   return (
+    toNumber(row.amount_cents) / 100 ||
+    toNumber(row.payout_amount_cents) / 100 ||
     toCentsAwareAmount(row.payout_amount) ||
+    toCentsAwareAmount(row.guru_payout_amount) ||
+    toCentsAwareAmount(row.guru_net_amount) ||
     toCentsAwareAmount(row.amount) ||
     toCentsAwareAmount(row.total_amount) ||
     0
@@ -578,7 +593,10 @@ function getPayoutAmount(row: AnyRow) {
 
 function getCommissionAmount(row: AnyRow) {
   return (
+    toNumber(row.amount_cents) / 100 ||
+    toNumber(row.reward_amount_cents) / 100 ||
     toCentsAwareAmount(row.commission_amount) ||
+    toCentsAwareAmount(row.reward_amount) ||
     toCentsAwareAmount(row.amount) ||
     toCentsAwareAmount(row.total_amount) ||
     0
@@ -1228,6 +1246,7 @@ export async function GET(request: Request) {
     plaidItems,
     bookingRowsA,
     bookingRowsB,
+    bookingPaymentRows,
     paymentRows,
     stripeRows,
     stripeBalanceRows,
@@ -1239,6 +1258,7 @@ export async function GET(request: Request) {
     payoutRowsB,
     commissionRowsA,
     commissionRowsB,
+    commissionRowsC,
     proformaRows,
   ] = await Promise.all([
     Promise.all(TABLE_NAMES.map(checkSource)),
@@ -1289,6 +1309,15 @@ export async function GET(request: Request) {
         .order("created_at", { ascending: false })
         .limit(5000),
       "customer_bookings",
+    ),
+
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("booking_payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "booking_payments",
     ),
 
     safeRows<AnyRow>(
@@ -1392,6 +1421,15 @@ export async function GET(request: Request) {
 
     safeRows<AnyRow>(
       supabaseAdmin
+        .from("ambassador_rewards")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "ambassador_rewards",
+    ),
+
+    safeRows<AnyRow>(
+      supabaseAdmin
         .from("proforma_assumptions")
         .select("*")
         .order("created_at", { ascending: false })
@@ -1404,11 +1442,21 @@ export async function GET(request: Request) {
     (row) => !isArchivedRow(row) && isInsideDateWindow(row, startDate, endDate),
   );
 
-  const filteredPaymentRows = paymentRows.filter(
+  // Prefer canonical booking_payments ledger; fall back to legacy payments.
+  const mergedPaymentRows =
+    bookingPaymentRows.length > 0
+      ? bookingPaymentRows
+      : paymentRows;
+
+  const filteredPaymentRows = mergedPaymentRows.filter(
     (row) => !isArchivedRow(row) && isInsideDateWindow(row, startDate, endDate),
   );
 
-  const filteredStripeRows = [...stripeRows, ...stripeBalanceRows].filter(
+  const filteredStripeRows = [
+    ...(bookingPaymentRows.length > 0 ? bookingPaymentRows : []),
+    ...stripeRows,
+    ...stripeBalanceRows,
+  ].filter(
     (row) => !isArchivedRow(row) && isInsideDateWindow(row, startDate, endDate),
   );
 
@@ -1420,7 +1468,11 @@ export async function GET(request: Request) {
     (row) => !isArchivedRow(row) && isInsideDateWindow(row, startDate, endDate),
   );
 
-  const commissionRows = [...commissionRowsA, ...commissionRowsB].filter(
+  const commissionRows = [
+    ...commissionRowsA,
+    ...commissionRowsB,
+    ...commissionRowsC,
+  ].filter(
     (row) => !isArchivedRow(row) && isInsideDateWindow(row, startDate, endDate),
   );
 
@@ -1467,7 +1519,8 @@ export async function GET(request: Request) {
       Math.abs(
         toCentsAwareAmount(row.fee) ||
           toCentsAwareAmount(row.stripe_fee) ||
-          toCentsAwareAmount(row.fee_amount),
+          toCentsAwareAmount(row.fee_amount) ||
+          0,
       ),
     0,
   );

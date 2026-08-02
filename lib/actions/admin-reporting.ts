@@ -73,7 +73,37 @@ type SafeResult = {
   rows: AnyRow[];
   count: number;
   message: string;
+  table?: string;
 };
+
+/** Canonical financial sources — prefer these over legacy/aspirational names. */
+const FINANCIAL_TABLES = {
+  payments: [
+    "booking_payments",
+    "payments",
+    "stripe_transactions",
+    "stripe_balance_transactions",
+  ],
+  bankTransactions: [
+    "admin_plaid_transactions",
+    "bank_transactions",
+    "plaid_bank_transactions",
+  ],
+  bankAccounts: ["admin_plaid_accounts", "plaid_accounts"],
+  payouts: [
+    "guru_payouts",
+    "payouts",
+    "stripe_payouts",
+    "user_payout_destinations",
+  ],
+  commissions: [
+    "ambassador_rewards",
+    "commission_ledger",
+    "partner_commissions",
+    "referral_rewards",
+  ],
+  tax: ["booking_payments", "bookings", "tax_liabilities"],
+} as const;
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -158,6 +188,7 @@ async function safeSelect(
         rows: [],
         count: 0,
         message: error.message || `${table} unavailable`,
+        table,
       };
     }
 
@@ -167,6 +198,7 @@ async function safeSelect(
       rows,
       count: typeof count === "number" ? count : rows.length,
       message: `${table} connected`,
+      table,
     };
   } catch (error) {
     return {
@@ -174,8 +206,35 @@ async function safeSelect(
       rows: [],
       count: 0,
       message: error instanceof Error ? error.message : `${table} unavailable`,
+      table,
     };
   }
+}
+
+/**
+ * Try candidate tables in order; return the first that resolves.
+ * Avoids hard failures when legacy names were renamed (e.g. payments → booking_payments).
+ */
+async function safeSelectFirst(
+  tables: readonly string[],
+  columns = "*",
+  limit = 200,
+  sinceIso?: string | null,
+  dateColumn = "created_at",
+): Promise<SafeResult> {
+  const errors: string[] = [];
+  for (const table of tables) {
+    const result = await safeSelect(table, columns, limit, sinceIso, dateColumn);
+    if (result.ok) return result;
+    errors.push(`${table}: ${result.message}`);
+  }
+  return {
+    ok: false,
+    rows: [],
+    count: 0,
+    message: errors[0] || "No candidate tables available",
+    table: tables[0],
+  };
 }
 
 async function safeHeadCount(
@@ -218,20 +277,107 @@ async function safeHeadCount(
 }
 
 function statusOf(row: AnyRow) {
-  return asString(row.status || row.application_status || row.check_status)
+  return asString(
+    row.status ||
+      row.application_status ||
+      row.check_status ||
+      row.review_status ||
+      row.payment_status ||
+      row.payout_status ||
+      row.dispute_status ||
+      row.refund_status,
+  )
     .toLowerCase()
     .replace(/\s+/g, "_");
 }
 
-function sumField(rows: AnyRow[], keys: string[]) {
-  return rows.reduce((sum, row) => {
-    for (const key of keys) {
-      const value = asNumber(row[key]);
-      if (value !== 0) return sum + value;
+function moneyFromRow(row: AnyRow, keys: string[]) {
+  for (const key of keys) {
+    if (!(key in row)) continue;
+    const raw = row[key];
+    if (raw == null || raw === "") continue;
+    const value = asNumber(raw);
+    if (!value) continue;
+
+    const lower = key.toLowerCase();
+    if (
+      lower.includes("cents") ||
+      lower.includes("_cent") ||
+      lower === "amount_received" ||
+      lower === "amount_captured" ||
+      lower === "amount_refunded" ||
+      lower === "application_fee_amount"
+    ) {
+      return value / 100;
     }
-    return sum;
-  }, 0);
+    return value;
+  }
+  return 0;
 }
+
+function sumField(rows: AnyRow[], keys: string[]) {
+  return rows.reduce((sum, row) => sum + moneyFromRow(row, keys), 0);
+}
+
+const BOOKING_AMOUNT_KEYS = [
+  "total_amount",
+  "customer_total_amount",
+  "subtotal_amount",
+  "amount_total",
+  "gross_amount",
+  "booking_total",
+  "amount",
+  "price",
+];
+
+const PAYMENT_AMOUNT_KEYS = [
+  "amount_cents",
+  "total_cents",
+  "gross_amount_cents",
+  "amount",
+  "total",
+  "total_amount",
+  "gross_amount",
+];
+
+const FEE_AMOUNT_KEYS = [
+  "marketplace_support_cents",
+  "platform_fee_cents",
+  "fee",
+  "fee_amount",
+  "processing_fee",
+  "stripe_fee",
+  "application_fee_amount",
+];
+
+const TAX_AMOUNT_KEYS = [
+  "tax_cents",
+  "sales_tax_cents",
+  "sales_tax_amount",
+  "tax_amount",
+  "tax",
+];
+
+const PAYOUT_AMOUNT_KEYS = [
+  "amount_cents",
+  "payout_amount_cents",
+  "amount",
+  "payout_amount",
+  "guru_payout_amount",
+  "guru_net_amount",
+  "net_payout",
+  "guru_earnings",
+];
+
+const COMMISSION_AMOUNT_KEYS = [
+  "amount_cents",
+  "reward_amount_cents",
+  "amount",
+  "commission_amount",
+  "reward_amount",
+  "partner_commission",
+  "payout_amount",
+];
 
 function countWhere(rows: AnyRow[], predicate: (row: AnyRow) => boolean) {
   return rows.filter(predicate).length;
@@ -349,12 +495,8 @@ async function moduleLiveWalks(since: string): Promise<ModuleSnapshot> {
 
 async function moduleBookings(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("bookings", "Bookings", "operations", ["bookings"]);
-  const result = await safeSelect(
-    "bookings",
-    "id,status,created_at,total_amount,amount,service_name,cancellation_reason",
-    500,
-    since,
-  );
+  // Use * so missing legacy columns (e.g. bare `amount`) never fail the select.
+  const result = await safeSelect("bookings", "*", 500, since);
   const completed = countWhere(result.rows, (r) =>
     ["completed", "complete", "paid", "confirmed"].includes(statusOf(r)),
   );
@@ -364,12 +506,7 @@ async function moduleBookings(since: string): Promise<ModuleSnapshot> {
   const pending = countWhere(result.rows, (r) =>
     ["pending", "requested", "new", "open"].includes(statusOf(r)),
   );
-  const gmv = sumField(result.rows, [
-    "total_amount",
-    "amount",
-    "customer_total_amount",
-    "subtotal_amount",
-  ]);
+  const gmv = sumField(result.rows, BOOKING_AMOUNT_KEYS);
   const cancelRate =
     result.rows.length > 0 ? (cancelled / result.rows.length) * 100 : 0;
   return finalize(
@@ -515,26 +652,39 @@ async function moduleAmbassadorLedger(): Promise<ModuleSnapshot> {
     "ambassador_ledger",
     "Ambassador Ledger",
     "operations",
-    ["ambassador_rewards", "commission_ledger", "partner_payouts"],
+    ["ambassador_rewards", "partner_commissions", "partner_payouts"],
   );
   const [rewards, commissions, payouts] = await Promise.all([
-    safeSelect("ambassador_rewards", "id,status,amount,reward_amount,created_at", 300),
-    safeSelect("commission_ledger", "id,status,amount,commission_amount,created_at", 300),
-    safeSelect("partner_payouts", "id,status,amount,created_at", 200),
+    safeSelect("ambassador_rewards", "*", 300),
+    safeSelectFirst(FINANCIAL_TABLES.commissions, "*", 300),
+    safeSelectFirst(
+      ["partner_payouts", "guru_payouts", "payouts"],
+      "*",
+      200,
+    ),
   ]);
   const pendingRewards = rewards.rows.filter((r) =>
-    ["pending", "owed", "accrued", "review"].includes(statusOf(r)),
+    ["pending", "owed", "accrued", "review", "earned"].includes(statusOf(r)),
   );
   const pendingAmount =
-    sumField(pendingRewards, ["amount", "reward_amount"]) +
+    sumField(pendingRewards, COMMISSION_AMOUNT_KEYS) +
     sumField(
       commissions.rows.filter((r) =>
-        ["pending", "owed", "accrued"].includes(statusOf(r)),
+        ["pending", "owed", "accrued", "open"].includes(statusOf(r)),
       ),
-      ["amount", "commission_amount"],
+      COMMISSION_AMOUNT_KEYS,
     );
   return finalize(
-    snap,
+    {
+      ...snap,
+      sources: [
+        "ambassador_rewards",
+        commissions.ok
+          ? commissions.table || "partner_commissions"
+          : "partner_commissions",
+        payouts.ok ? payouts.table || "partner_payouts" : "partner_payouts",
+      ],
+    },
     rewards.ok || commissions.ok || payouts.ok,
     `Outstanding affiliate/commission exposure ≈ ${money(pendingAmount)}.`,
     {
@@ -911,45 +1061,47 @@ async function moduleFinancialOverview(since: string): Promise<ModuleSnapshot> {
     "financial_overview",
     "Financial Overview",
     "financials",
-    ["bookings", "payments", "payouts"],
+    ["bookings", "booking_payments", "guru_payouts"],
   );
   const [bookings, payments, payouts] = await Promise.all([
-    safeSelect(
-      "bookings",
-      "id,status,total_amount,amount,subtotal_amount,created_at",
-      500,
-      since,
-    ),
-    safeSelect(
-      "payments",
-      "id,status,amount,fee_amount,created_at",
-      400,
-      since,
-    ),
-    safeSelect(
-      "payouts",
-      "id,status,amount,created_at",
-      300,
-      since,
-    ),
+    safeSelect("bookings", "*", 500, since),
+    safeSelectFirst(FINANCIAL_TABLES.payments, "*", 400, since),
+    safeSelectFirst(FINANCIAL_TABLES.payouts, "*", 300, since),
   ]);
-  const gmv = sumField(bookings.rows, [
-    "total_amount",
-    "subtotal_amount",
-    "amount",
-  ]);
-  const collected = sumField(
-    payments.rows.filter((r) =>
-      ["paid", "succeeded", "captured", "complete"].includes(statusOf(r)),
+  const gmv = sumField(bookings.rows, BOOKING_AMOUNT_KEYS);
+  const paidPayments = payments.rows.filter((r) =>
+    ["paid", "succeeded", "captured", "complete", "completed"].includes(
+      statusOf(r),
     ),
-    ["amount", "total"],
   );
-  const fees = sumField(payments.rows, ["fee_amount", "processing_fee"]);
-  const payoutTotal = sumField(payouts.rows, ["amount", "payout_amount"]);
-  const platformRevenue = Math.max(0, collected - payoutTotal - fees);
+  const collected =
+    sumField(paidPayments.length ? paidPayments : payments.rows, PAYMENT_AMOUNT_KEYS) ||
+    gmv;
+  const fees = sumField(payments.rows, FEE_AMOUNT_KEYS);
+  const payoutTotal = sumField(payouts.rows, PAYOUT_AMOUNT_KEYS);
+  const platformFromPayments = sumField(payments.rows, [
+    "marketplace_support_cents",
+    "platform_fee_cents",
+    "platform_revenue",
+    "sitguru_fee_amount",
+    "marketplace_fee_amount",
+    "application_fee_amount",
+  ]);
+  const platformRevenue =
+    platformFromPayments > 0
+      ? platformFromPayments
+      : Math.max(0, collected - payoutTotal - fees);
   const takeRate = gmv > 0 ? (platformRevenue / gmv) * 100 : 0;
+  const sources = [
+    bookings.ok ? "bookings" : null,
+    payments.ok ? payments.table || "booking_payments" : null,
+    payouts.ok ? payouts.table || "guru_payouts" : null,
+  ].filter(Boolean) as string[];
   return finalize(
-    snap,
+    {
+      ...snap,
+      sources: sources.length ? sources : snap.sources,
+    },
     bookings.ok || payments.ok || payouts.ok,
     `GMV ${money(gmv)} · collected ${money(collected)} · payouts ${money(payoutTotal)} · est. take-rate ${takeRate.toFixed(1)}%.`,
     {
@@ -971,27 +1123,36 @@ async function moduleFinancialOverview(since: string): Promise<ModuleSnapshot> {
 
 async function moduleBanking(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("banking", "Banking", "financials", [
-    "bank_transactions",
-    "plaid_accounts",
+    "admin_plaid_transactions",
+    "admin_plaid_accounts",
   ]);
   const [txns, accounts] = await Promise.all([
-    safeSelect(
-      "bank_transactions",
-      "id,amount,status,created_at,posted_at,category",
-      300,
-    ),
-    safeSelect("plaid_accounts", "id,status,current_balance,available_balance", 50),
+    safeSelectFirst(FINANCIAL_TABLES.bankTransactions, "*", 300),
+    safeSelectFirst(FINANCIAL_TABLES.bankAccounts, "*", 50),
   ]);
   const balance = sumField(accounts.rows, [
     "current_balance",
     "available_balance",
     "balance",
   ]);
-  const needsReview = countWhere(txns.rows, (r) =>
-    ["needs_review", "review", "unmatched"].includes(statusOf(r)),
-  );
+  const needsReview = countWhere(txns.rows, (r) => {
+    const status = statusOf(r);
+    return (
+      ["needs_review", "review", "unmatched", "pending_review"].includes(
+        status,
+      ) || r.pending === true
+    );
+  });
   return finalize(
-    snap,
+    {
+      ...snap,
+      sources: [
+        txns.ok ? txns.table || "admin_plaid_transactions" : "admin_plaid_transactions",
+        accounts.ok
+          ? accounts.table || "admin_plaid_accounts"
+          : "admin_plaid_accounts",
+      ],
+    },
     txns.ok || accounts.ok,
     `Banking: ${money(balance)} account balance signals · ${number(needsReview)} txns need review.`,
     {
@@ -1010,32 +1171,32 @@ async function moduleStripe(since: string): Promise<ModuleSnapshot> {
     "stripe_transactions",
     "Stripe Transactions",
     "financials",
-    ["stripe_transactions", "stripe_balance_transactions", "payments"],
+    ["booking_payments", "stripe_transactions", "payments"],
   );
-  const [stripeTx, balanceTx, payments] = await Promise.all([
-    safeSelect(
-      "stripe_transactions",
-      "id,amount,fee,status,created_at,type",
-      300,
-      since,
-    ),
-    safeSelect(
-      "stripe_balance_transactions",
-      "id,amount,fee,status,created_at,type",
-      300,
-      since,
-    ),
-    safeSelect("payments", "id,amount,fee_amount,status,created_at", 300, since),
-  ]);
-  const rows = stripeTx.ok ? stripeTx.rows : balanceTx.ok ? balanceTx.rows : payments.rows;
-  const volume = sumField(rows, ["amount", "total"]);
-  const fees = sumField(rows, ["fee", "fee_amount"]);
-  const disputes = countWhere(rows, (r) =>
-    statusOf(r).includes("dispute") || asString(r.type).includes("dispute"),
+  const payments = await safeSelectFirst(
+    FINANCIAL_TABLES.payments,
+    "*",
+    400,
+    since,
+  );
+  const rows = payments.rows;
+  const volume = sumField(rows, PAYMENT_AMOUNT_KEYS);
+  const fees = sumField(rows, FEE_AMOUNT_KEYS);
+  const disputes = countWhere(
+    rows,
+    (r) =>
+      statusOf(r).includes("dispute") ||
+      statusOf(r).includes("chargeback") ||
+      asString(r.type).toLowerCase().includes("dispute") ||
+      asNumber(r.dispute_amount_cents) > 0 ||
+      Boolean(r.dispute_status),
   );
   return finalize(
-    snap,
-    stripeTx.ok || balanceTx.ok || payments.ok,
+    {
+      ...snap,
+      sources: [payments.ok ? payments.table || "booking_payments" : "booking_payments"],
+    },
+    payments.ok,
     `Stripe/payment volume ${money(volume)} · fees ${money(fees)} · disputes ${number(disputes)}.`,
     {
       volume,
@@ -1044,21 +1205,20 @@ async function moduleStripe(since: string): Promise<ModuleSnapshot> {
       rows: rows.length,
     },
     [`${money(volume)} volume`, `${money(fees)} fees`, `${number(disputes)} disputes`],
-    [stripeTx, balanceTx, payments].filter((r) => !r.ok).map((r) => r.message),
+    payments.ok ? [] : [payments.message],
   );
 }
 
 async function moduleProfitLoss(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("profit_loss", "Profit & Loss", "financials", [
     "bookings",
-    "payments",
-    "payouts",
+    "booking_payments",
     "admin_growth_marketing_expenses",
   ]);
   const overview = await moduleFinancialOverview(since);
   const expenses = await safeSelect(
     "admin_growth_marketing_expenses",
-    "id,amount,created_at",
+    "*",
     200,
     since,
   );
@@ -1081,14 +1241,18 @@ async function moduleProfitLoss(since: string): Promise<ModuleSnapshot> {
 
 async function moduleBalanceSheet(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("balance_sheet", "Balance Sheet", "financials", [
-    "plaid_accounts",
-    "payouts",
+    "admin_plaid_accounts",
+    "guru_payouts",
     "referral_rewards",
   ]);
   const [accounts, payouts, rewards] = await Promise.all([
-    safeSelect("plaid_accounts", "id,current_balance,available_balance", 50),
-    safeSelect("payouts", "id,amount,status", 300),
-    safeSelect("referral_rewards", "id,amount,status", 300),
+    safeSelectFirst(FINANCIAL_TABLES.bankAccounts, "*", 50),
+    safeSelectFirst(FINANCIAL_TABLES.payouts, "*", 300),
+    safeSelectFirst(
+      ["referral_rewards", "ambassador_rewards"],
+      "*",
+      300,
+    ),
   ]);
   const assets = sumField(accounts.rows, [
     "current_balance",
@@ -1097,19 +1261,30 @@ async function moduleBalanceSheet(): Promise<ModuleSnapshot> {
   const liabilities =
     sumField(
       payouts.rows.filter((r) =>
-        ["pending", "processing", "owed"].includes(statusOf(r)),
+        ["pending", "processing", "owed", "scheduled", "queued"].includes(
+          statusOf(r),
+        ),
       ),
-      ["amount"],
+      PAYOUT_AMOUNT_KEYS,
     ) +
     sumField(
       rewards.rows.filter((r) =>
-        ["pending", "owed", "review"].includes(statusOf(r)),
+        ["pending", "owed", "review", "accrued"].includes(statusOf(r)),
       ),
-      ["amount"],
+      COMMISSION_AMOUNT_KEYS,
     );
   const equity = assets - liabilities;
   return finalize(
-    snap,
+    {
+      ...snap,
+      sources: [
+        accounts.ok
+          ? accounts.table || "admin_plaid_accounts"
+          : "admin_plaid_accounts",
+        payouts.ok ? payouts.table || "guru_payouts" : "guru_payouts",
+        rewards.ok ? rewards.table || "referral_rewards" : "referral_rewards",
+      ],
+    },
     accounts.ok || payouts.ok || rewards.ok,
     `Assets ${money(assets)} · liabilities ${money(liabilities)} · equity signal ${money(equity)}.`,
     { assets, liabilities, equity },
@@ -1124,25 +1299,36 @@ async function moduleBalanceSheet(): Promise<ModuleSnapshot> {
 
 async function moduleCashFlow(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("cash_flow", "Cash Flow", "financials", [
-    "payments",
-    "payouts",
-    "bank_transactions",
+    "booking_payments",
+    "guru_payouts",
+    "admin_plaid_transactions",
   ]);
   const [payments, payouts, bank] = await Promise.all([
-    safeSelect("payments", "id,amount,status,created_at", 400, since),
-    safeSelect("payouts", "id,amount,status,created_at", 300, since),
-    safeSelect("bank_transactions", "id,amount,status,created_at", 300, since),
+    safeSelectFirst(FINANCIAL_TABLES.payments, "*", 400, since),
+    safeSelectFirst(FINANCIAL_TABLES.payouts, "*", 300, since),
+    safeSelectFirst(FINANCIAL_TABLES.bankTransactions, "*", 300, since),
   ]);
   const inflow = sumField(
     payments.rows.filter((r) =>
-      ["paid", "succeeded", "captured"].includes(statusOf(r)),
+      ["paid", "succeeded", "captured", "complete", "completed"].includes(
+        statusOf(r),
+      ),
     ),
-    ["amount"],
+    PAYMENT_AMOUNT_KEYS,
   );
-  const outflow = sumField(payouts.rows, ["amount"]);
+  const outflow = sumField(payouts.rows, PAYOUT_AMOUNT_KEYS);
   const net = inflow - outflow;
   return finalize(
-    snap,
+    {
+      ...snap,
+      sources: [
+        payments.ok ? payments.table || "booking_payments" : "booking_payments",
+        payouts.ok ? payouts.table || "guru_payouts" : "guru_payouts",
+        bank.ok
+          ? bank.table || "admin_plaid_transactions"
+          : "admin_plaid_transactions",
+      ],
+    },
     payments.ok || payouts.ok || bank.ok,
     `Cash velocity: in ${money(inflow)} · out ${money(outflow)} · net ${money(net)}.`,
     {
@@ -1159,21 +1345,25 @@ async function moduleCashFlow(since: string): Promise<ModuleSnapshot> {
 async function moduleGeneralLedger(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("general_ledger", "General Ledger", "financials", [
     "general_ledger_entries",
-    "commission_ledger",
-    "payments",
+    "booking_payments",
+    "ambassador_rewards",
   ]);
   const [ledger, commissions, payments] = await Promise.all([
-    safeSelect(
-      "general_ledger_entries",
-      "id,account_type,amount,created_at",
-      300,
-      since,
-    ),
-    safeSelect("commission_ledger", "id,amount,created_at", 200, since),
-    safeSelect("payments", "id,amount,created_at", 200, since),
+    safeSelect("general_ledger_entries", "*", 300, since),
+    safeSelectFirst(FINANCIAL_TABLES.commissions, "*", 200, since),
+    safeSelectFirst(FINANCIAL_TABLES.payments, "*", 200, since),
   ]);
   return finalize(
-    snap,
+    {
+      ...snap,
+      sources: [
+        "general_ledger_entries",
+        commissions.ok
+          ? commissions.table || "ambassador_rewards"
+          : "ambassador_rewards",
+        payments.ok ? payments.table || "booking_payments" : "booking_payments",
+      ],
+    },
     ledger.ok || commissions.ok || payments.ok,
     `Ledger signals: ${number(ledger.count)} GL entries · ${number(commissions.count)} commission rows · ${number(payments.count)} payments.`,
     {
@@ -1191,37 +1381,48 @@ async function moduleGeneralLedger(since: string): Promise<ModuleSnapshot> {
 
 async function moduleReconciliation(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("reconciliation", "Reconciliation", "financials", [
-    "bank_transactions",
-    "payments",
-    "stripe_transactions",
+    "admin_plaid_transactions",
+    "booking_payments",
   ]);
-  const [bank, payments, stripe] = await Promise.all([
-    safeSelect("bank_transactions", "id,status,amount", 300),
-    safeSelect("payments", "id,status,amount", 300),
-    safeSelect("stripe_transactions", "id,status,amount", 300),
+  const [bank, payments] = await Promise.all([
+    safeSelectFirst(FINANCIAL_TABLES.bankTransactions, "*", 300),
+    safeSelectFirst(FINANCIAL_TABLES.payments, "*", 300),
   ]);
-  const unmatched = countWhere(bank.rows, (r) =>
-    ["unmatched", "needs_review", "review"].includes(statusOf(r)),
-  );
+  const unmatched = countWhere(bank.rows, (r) => {
+    const status = statusOf(r);
+    return (
+      ["unmatched", "needs_review", "review", "pending_review"].includes(
+        status,
+      ) || r.pending === true
+    );
+  });
   return finalize(
-    snap,
-    bank.ok || payments.ok || stripe.ok,
+    {
+      ...snap,
+      sources: [
+        bank.ok
+          ? bank.table || "admin_plaid_transactions"
+          : "admin_plaid_transactions",
+        payments.ok ? payments.table || "booking_payments" : "booking_payments",
+      ],
+    },
+    bank.ok || payments.ok,
     `${number(unmatched)} bank rows need reconciliation review.`,
     {
       bankRows: bank.count,
       paymentRows: payments.count,
-      stripeRows: stripe.count,
+      stripeRows: payments.count,
       unmatched,
     },
     [`${number(unmatched)} unmatched/review`],
-    [bank, payments, stripe].filter((r) => !r.ok).map((r) => r.message),
+    [bank, payments].filter((r) => !r.ok).map((r) => r.message),
   );
 }
 
 async function moduleProForma(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("pro_forma", "Pro Forma", "financials", [
     "bookings",
-    "payments",
+    "booking_payments",
   ]);
   const overview = await moduleFinancialOverview(since);
   const gmv = asNumber(overview.metrics.gmv);
@@ -1249,92 +1450,124 @@ async function moduleProForma(since: string): Promise<ModuleSnapshot> {
 
 async function moduleTaxCenter(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("tax_center", "Tax Center", "financials", [
-    "tax_liabilities",
-    "gurus",
+    "booking_payments",
     "bookings",
+    "gurus",
   ]);
-  const [tax, gurus, bookings] = await Promise.all([
-    safeSelect("tax_liabilities", "id,amount,status,created_at", 200),
+  const [payments, gurus, bookings, taxLiabilities] = await Promise.all([
+    safeSelectFirst(["booking_payments", "payments"], "*", 400),
     safeHeadCount("gurus"),
-    safeSelect("bookings", "id,tax_amount,total_amount", 300),
+    safeSelect("bookings", "*", 300),
+    safeSelect("tax_liabilities", "*", 200),
   ]);
   const taxPool =
-    sumField(tax.rows, ["amount", "tax_amount"]) ||
-    sumField(bookings.rows, ["tax_amount"]);
+    sumField(payments.rows, TAX_AMOUNT_KEYS) ||
+    sumField(bookings.rows, TAX_AMOUNT_KEYS) ||
+    sumField(taxLiabilities.rows, ["amount", "tax_amount", "amount_cents"]);
   return finalize(
-    snap,
-    tax.ok || gurus.ok || bookings.ok,
+    {
+      ...snap,
+      sources: [
+        payments.ok ? payments.table || "booking_payments" : "booking_payments",
+        "gurus",
+        "bookings",
+      ],
+    },
+    payments.ok || gurus.ok || bookings.ok || taxLiabilities.ok,
     `Tax pool signals ${money(taxPool)} · ${number(gurus.count)} providers potentially 1099-relevant.`,
     {
       taxPool,
       providers: gurus.count,
-      taxRows: tax.count,
+      taxRows: taxLiabilities.count || payments.count,
     },
     [`${money(taxPool)} tax pool`, `${number(gurus.count)} providers`],
-    [tax, gurus, bookings].filter((r) => !r.ok).map((r) => r.message),
+    [payments, gurus, bookings]
+      .filter((r) => !r.ok)
+      .map((r) => r.message),
   );
 }
 
 async function moduleCommissions(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("commissions", "Commissions", "financials", [
-    "commission_ledger",
+    "ambassador_rewards",
     "partner_commissions",
+    "commission_ledger",
   ]);
-  const [ledger, partners] = await Promise.all([
-    safeSelect("commission_ledger", "id,amount,status,created_at", 400),
-    safeSelect("partner_commissions", "id,amount,status,created_at", 300),
-  ]);
-  const outstanding = sumField(
-    [...ledger.rows, ...partners.rows].filter((r) =>
-      ["pending", "owed", "accrued", "open"].includes(statusOf(r)),
-    ),
-    ["amount", "commission_amount"],
+  const commissions = await safeSelectFirst(
+    FINANCIAL_TABLES.commissions,
+    "*",
+    400,
   );
+  const outstanding = sumField(
+    commissions.rows.filter((r) =>
+      ["pending", "owed", "accrued", "open", "approved", "earned"].includes(
+        statusOf(r),
+      ),
+    ),
+    COMMISSION_AMOUNT_KEYS,
+  );
+  const total = sumField(commissions.rows, COMMISSION_AMOUNT_KEYS);
   return finalize(
-    snap,
-    ledger.ok || partners.ok,
-    `Outstanding commissions ≈ ${money(outstanding)}.`,
     {
-      ledgerRows: ledger.count,
-      partnerCommissionRows: partners.count,
-      outstanding,
+      ...snap,
+      sources: [
+        commissions.ok
+          ? commissions.table || "ambassador_rewards"
+          : "ambassador_rewards",
+      ],
     },
-    [`${money(outstanding)} outstanding`],
-    [ledger, partners].filter((r) => !r.ok).map((r) => r.message),
+    commissions.ok,
+    `Outstanding commissions ≈ ${money(outstanding || total)}.`,
+    {
+      ledgerRows: commissions.count,
+      partnerCommissionRows: commissions.count,
+      outstanding: outstanding || total,
+    },
+    [`${money(outstanding || total)} outstanding`],
+    commissions.ok ? [] : [commissions.message],
   );
 }
 
 async function modulePayouts(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("payouts", "Payouts", "financials", [
-    "payouts",
     "guru_payouts",
+    "payouts",
   ]);
-  const [payouts, guruPayouts] = await Promise.all([
-    safeSelect("payouts", "id,amount,status,created_at,scheduled_for", 400, since),
-    safeSelect("guru_payouts", "id,amount,status,created_at", 400, since),
-  ]);
-  const rows = payouts.ok ? payouts.rows : guruPayouts.rows;
+  const payouts = await safeSelectFirst(
+    FINANCIAL_TABLES.payouts,
+    "*",
+    400,
+    since,
+  );
+  const rows = payouts.rows;
   const pending = rows.filter((r) =>
-    ["pending", "processing", "scheduled", "queued"].includes(statusOf(r)),
+    ["pending", "processing", "scheduled", "queued", "owed"].includes(
+      statusOf(r),
+    ),
   );
   const paid = rows.filter((r) =>
-    ["paid", "complete", "completed", "sent"].includes(statusOf(r)),
+    ["paid", "complete", "completed", "sent", "transferred"].includes(
+      statusOf(r),
+    ),
   );
   return finalize(
-    snap,
-    payouts.ok || guruPayouts.ok,
-    `${number(pending.length)} payouts pending (${money(sumField(pending, ["amount"]))}) · ${number(paid.length)} paid.`,
+    {
+      ...snap,
+      sources: [payouts.ok ? payouts.table || "guru_payouts" : "guru_payouts"],
+    },
+    payouts.ok,
+    `${number(pending.length)} payouts pending (${money(sumField(pending, PAYOUT_AMOUNT_KEYS))}) · ${number(paid.length)} paid.`,
     {
       pendingCount: pending.length,
-      pendingAmount: sumField(pending, ["amount"]),
+      pendingAmount: sumField(pending, PAYOUT_AMOUNT_KEYS),
       paidCount: paid.length,
-      paidAmount: sumField(paid, ["amount"]),
+      paidAmount: sumField(paid, PAYOUT_AMOUNT_KEYS),
     },
     [
       `${number(pending.length)} pending`,
-      `${money(sumField(pending, ["amount"]))} queued`,
+      `${money(sumField(pending, PAYOUT_AMOUNT_KEYS))} queued`,
     ],
-    [payouts, guruPayouts].filter((r) => !r.ok).map((r) => r.message),
+    payouts.ok ? [] : [payouts.message],
   );
 }
 
