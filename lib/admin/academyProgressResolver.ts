@@ -323,7 +323,7 @@ function getSource(row: AnyRow) {
   return getText(row, ["__source_table"], "unknown");
 }
 
-function withSourceTable(row: AnyRow, source: string) {
+function withSourceTable(row: AnyRow, source: string): AnyRow {
   return {
     ...row,
     __source_table: source,

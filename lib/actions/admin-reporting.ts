@@ -161,7 +161,7 @@ async function safeSelect(
       };
     }
 
-    const rows = Array.isArray(data) ? (data as AnyRow[]) : [];
+    const rows = Array.isArray(data) ? (data as unknown as AnyRow[]) : [];
     return {
       ok: true,
       rows,
