@@ -27,6 +27,12 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import {
+  hardDeleteAmbassadorIfTestFixture,
+  isTestAmbassadorEmail,
+  purgeTestAmbassadors,
+  purgeTestAmbassadorsAction,
+} from "@/lib/admin/ambassadors/purge-test-ambassadors";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -1877,6 +1883,26 @@ async function updateAmbassadorPipelineStatus(formData: FormData) {
     redirect("/admin/ambassadors?updated=missing");
   }
 
+  // Test fixtures (sitguru.local / journey.amb.*) must be hard-deleted —
+  // soft archive leaves the cards cluttering Ambassadors HQ.
+  if (nextStatus === "archived") {
+    const hardPurge = await hardDeleteAmbassadorIfTestFixture({
+      ambassadorId,
+    });
+
+    if (hardPurge.handled) {
+      revalidatePath("/admin/ambassadors");
+      revalidatePath("/admin/ambassador-leads");
+      revalidatePath("/admin/hr");
+      revalidatePath("/admin/users");
+      redirect(
+        hardPurge.result?.ok
+          ? "/admin/ambassadors?purged=success&count=1"
+          : "/admin/ambassadors?purged=error&count=1",
+      );
+    }
+  }
+
   const now = new Date().toISOString();
 
   const statusPatch =
@@ -1886,6 +1912,8 @@ async function updateAmbassadorPipelineStatus(formData: FormData) {
           archived_at: now,
           archived_reason:
             "Archived from Ambassador Dashboard quick action. Retained for applicant and contractor recordkeeping.",
+          dashboard_enabled: false,
+          login_enabled: false,
           updated_at: now,
         }
       : {
@@ -2026,24 +2054,35 @@ function AmbassadorQuickActions({
 
   return (
     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-      {ambassadorQuickActions.map((action) => (
-        <form key={action.value} action={updateAmbassadorPipelineStatus}>
-          <input
-            type="hidden"
-            name="ambassador_id"
-            value={ambassador.ambassador_id}
-          />
-          <input type="hidden" name="ambassador_name" value={ambassadorName} />
-          <input type="hidden" name="next_status" value={action.value} />
-          <button
-            type="submit"
-            className={`inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-2xl px-3 py-2 text-xs font-extrabold ring-1 transition ${action.className}`}
-          >
-            {action.icon}
-            {action.label}
-          </button>
-        </form>
-      ))}
+      {ambassadorQuickActions.map((action) => {
+        const isTestFixture =
+          action.value === "archived" &&
+          isTestAmbassadorEmail(ambassador.email);
+        const label = isTestFixture ? "Purge test" : action.label;
+
+        return (
+          <form key={action.value} action={updateAmbassadorPipelineStatus}>
+            <input
+              type="hidden"
+              name="ambassador_id"
+              value={ambassador.ambassador_id}
+            />
+            <input type="hidden" name="ambassador_name" value={ambassadorName} />
+            <input type="hidden" name="next_status" value={action.value} />
+            <button
+              type="submit"
+              className={`inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-2xl px-3 py-2 text-xs font-extrabold ring-1 transition ${
+                isTestFixture
+                  ? "bg-rose-50 text-rose-800 ring-rose-100 hover:bg-rose-100"
+                  : action.className
+              }`}
+            >
+              {action.icon}
+              {label}
+            </button>
+          </form>
+        );
+      })}
     </div>
   );
 }
@@ -2269,6 +2308,27 @@ function getNotice(
   searchParams?: Record<string, string | string[] | undefined>,
 ) {
   const updated = searchParams?.updated;
+  const purged = getSingleSearchParam(searchParams, "purged");
+  const purgedCount = getSingleSearchParam(searchParams, "count");
+
+  if (purged === "success") {
+    return {
+      title: "Test ambassadors purged",
+      message: purgedCount
+        ? `Hard-deleted ${purgedCount} sitguru.local / journey.amb. fixture(s) and related profile rows.`
+        : "Hard-deleted sitguru.local / journey.amb. fixtures and related profile rows.",
+      tone: "success" as const,
+    };
+  }
+
+  if (purged === "error") {
+    return {
+      title: "Test ambassador purge incomplete",
+      message:
+        "Some fixture rows were targeted, but one or more dependency deletes failed. Refresh and retry if cards remain.",
+      tone: "warning" as const,
+    };
+  }
 
   if (updated === "success") {
     return {
@@ -3281,8 +3341,39 @@ export default async function AdminAmbassadorsPage({
     redirect("/admin/login");
   }
 
+  const isSuperUser = isSuperUserEmail(email);
+
+  // If fixture ambassadors are still in the live table, hard-purge them before
+  // rendering so Archive soft-deletes cannot leave junk cards in the grid.
+  let autoPurgeMessage: string | null = null;
+  const { data: fixtureProbe } = await supabaseAdmin
+    .from("ambassadors")
+    .select("id,email")
+    .or("email.ilike.%sitguru.local%,email.ilike.%journey.amb.%")
+    .limit(25);
+
+  const fixtureRows = ((fixtureProbe || []) as Array<{ email?: string | null }>).filter(
+    (row) => isTestAmbassadorEmail(row.email),
+  );
+
+  if (fixtureRows.length > 0) {
+    const autoPurge = await purgeTestAmbassadors();
+    autoPurgeMessage = autoPurge.message;
+    revalidatePath("/admin/ambassadors");
+    revalidatePath("/admin/ambassador-leads");
+    revalidatePath("/admin/users");
+  }
+
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const notice = getNotice(resolvedSearchParams);
+  const notice =
+    getNotice(resolvedSearchParams) ||
+    (autoPurgeMessage
+      ? {
+          title: "Test ambassadors purged",
+          message: autoPurgeMessage,
+          tone: "success" as const,
+        }
+      : null);
 
   const { data, error } = await supabaseAdmin
     .from("admin_ambassador_dashboard_summary")
@@ -3528,6 +3619,16 @@ export default async function AdminAmbassadorsPage({
             >
               Performance Ledger
             </Link>
+            {isSuperUser ? (
+              <form action={purgeTestAmbassadorsAction}>
+                <button
+                  type="submit"
+                  className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-black text-rose-800 shadow-sm transition hover:bg-rose-100"
+                >
+                  Purge sitguru.local test Ambassadors
+                </button>
+              </form>
+            ) : null}
           </div>
         </section>
 
