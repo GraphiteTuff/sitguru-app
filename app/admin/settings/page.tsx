@@ -1790,7 +1790,7 @@ export default async function AdminSettingsPage({
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-4">
+        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
           <SettingsCard
             href="/admin/users"
             title="User Directory"
