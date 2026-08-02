@@ -3,6 +3,7 @@ import {
   VETERANS_MILITARY_FAMILIES_PROGRAM,
   isVeteransMilitaryFamiliesProgram,
 } from "@/lib/programs/veterans-military-families";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 export type AnyRow = Record<string, unknown>;
 
@@ -353,7 +354,7 @@ async function safeAdminQuery(
       };
     }
     return {
-      data: Array.isArray(result.data) ? (result.data as AnyRow[]) : [],
+      data: asAnyRows(result.data),
       ok: true,
       message: `${label} connected`,
     };

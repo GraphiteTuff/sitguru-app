@@ -14,6 +14,7 @@ import type {
   DirectoryTotals,
   DirectoryUser,
 } from "@/lib/admin/users/types";
+import { asAnyRows } from "@/lib/supabase/as-rows";
 
 type AnyRow = Record<string, unknown>;
 
@@ -155,7 +156,7 @@ async function loadProfilePage(filters: DirectoryFilters): Promise<{
   query = query.range(from, to);
 
   const result = await safeQuery(query, "profiles_page");
-  const rows = Array.isArray(result.data) ? (result.data as AnyRow[]) : [];
+  const rows = asAnyRows(result.data);
 
   let users = rows
     .map((row) => toDirectoryUserFromProfile(row))
