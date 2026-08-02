@@ -66,6 +66,91 @@ export type AdminReportingSnapshot = {
   markdownContext: string;
 };
 
+/** Sequential conversion funnel stages for signup→booking leak diagnostics. */
+export type FunnelStageId =
+  | "traffic_pageview"
+  | "account_signup"
+  | "booking_initiated"
+  | "booking_completed";
+
+export type FunnelStageMetric = {
+  id: FunnelStageId;
+  label: string;
+  count: number;
+  uniqueActors: number;
+  dropOffCount: number | null;
+  dropOffPct: number | null;
+  conversionFromPreviousPct: number | null;
+  conversionFromTopPct: number;
+  eventNamesMatched: string[];
+};
+
+export type ConversionFunnelReport = {
+  compiledAt: string;
+  periodStart: string | null;
+  totalEventsSampled: number;
+  groundTruthSignups: number;
+  groundTruthBookings: number;
+  stages: FunnelStageMetric[];
+  leakSummary: string;
+  largestDropOff: {
+    from: FunnelStageId;
+    to: FunnelStageId;
+    count: number;
+    pct: number;
+  } | null;
+  sources: string[];
+  errors: string[];
+};
+
+/** Isolated chat friction flag for Help Center article briefs. */
+export type ChatFrictionFlag = {
+  insightId: string;
+  sessionId: string | null;
+  userId: string | null;
+  frictionSnippet: string;
+  category: string;
+  channel: string;
+  frequency: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+  isConverted: boolean;
+};
+
+export type HelpCenterArticleBrief = {
+  insightId: string;
+  title: string;
+  summary: string;
+  solution: string;
+  category:
+    | "Pet Parent Support"
+    | "Guru Success & Training Hub"
+    | "Billing & Refunds"
+    | "Account & Profiles"
+    | "Booking & Cancellations"
+    | "Trust & Safety";
+  audience: "parent" | "guru" | "ambassador" | "all";
+  tags: string[];
+  frictionSnippet: string;
+  sessionId: string | null;
+  userId: string | null;
+  createdAt: string | null;
+  /** Prefill path for the Help Center article creator. */
+  createPath: string;
+};
+
+export type ConversionLeakDiagnostics = {
+  compiledAt: string;
+  period: ReportPeriod;
+  periodStart: string;
+  funnel: ConversionFunnelReport;
+  frictionFlags: ChatFrictionFlag[];
+  insightRowsLogged: number;
+  communicationsSampled: number;
+  helpCenterBriefs: HelpCenterArticleBrief[];
+  markdownContext: string;
+};
+
 type AnyRow = Record<string, unknown>;
 
 type SafeResult = {
@@ -1154,32 +1239,587 @@ async function modulePartners(): Promise<ModuleSnapshot> {
   );
 }
 
+/* --------- CONVERSION FUNNEL + CHAT FRICTION DIAGNOSTICS --------- */
+
+const FUNNEL_STAGE_ORDER: FunnelStageId[] = [
+  "traffic_pageview",
+  "account_signup",
+  "booking_initiated",
+  "booking_completed",
+];
+
+const FUNNEL_STAGE_LABELS: Record<FunnelStageId, string> = {
+  traffic_pageview: "Traffic / Pageview",
+  account_signup: "Account Signup",
+  booking_initiated: "Booking Initiated",
+  booking_completed: "Booking Completed",
+};
+
+const FUNNEL_EVENT_MATCHERS: Record<FunnelStageId, RegExp[]> = {
+  traffic_pageview: [
+    /^homepage_visit$/i,
+    /^page_view$/i,
+    /^launch_page_visit$/i,
+    /^traffic$/i,
+    /^page$/i,
+  ],
+  account_signup: [
+    /^launch_signup_completed$/i,
+    /^launch_signup_started$/i,
+    /^account_signup$/i,
+    /^signup$/i,
+    /^account_created$/i,
+    /^registration$/i,
+    /^customer_signup$/i,
+  ],
+  booking_initiated: [
+    /^booking_started$/i,
+    /^booking_initiated$/i,
+    /^booking_cta_clicked$/i,
+    /^checkout_started$/i,
+    /^booking_request_created$/i,
+    /^booking$/i,
+  ],
+  booking_completed: [
+    /^booking_completed$/i,
+    /^completed_booking$/i,
+    /^booking_paid$/i,
+    /^first_booking$/i,
+  ],
+};
+
+function pct(part: number, whole: number) {
+  if (!Number.isFinite(part) || !Number.isFinite(whole) || whole <= 0) return 0;
+  return Math.round((part / whole) * 1000) / 10;
+}
+
+function eventNameOf(row: AnyRow) {
+  return asString(row.event_name || row.eventName || row.name || row.action);
+}
+
+function eventTypeOf(row: AnyRow) {
+  return asString(row.event_type || row.eventType || row.type);
+}
+
+function actorKeyOf(row: AnyRow) {
+  return (
+    asString(row.user_id) ||
+    asString(row.userId) ||
+    asString(row.session_id) ||
+    asString(row.sessionId) ||
+    asString(row.id) ||
+    ""
+  );
+}
+
+function matchesFunnelStage(row: AnyRow, stage: FunnelStageId) {
+  const name = eventNameOf(row);
+  const type = eventTypeOf(row);
+  const haystacks = [name, type].filter(Boolean);
+  return FUNNEL_EVENT_MATCHERS[stage].some((rx) =>
+    haystacks.some((value) => rx.test(value)),
+  );
+}
+
+/**
+ * Pure aggregator: map raw analytics_events rows into sequential funnel stages
+ * with absolute + percentage drop-offs between each step.
+ */
+export function aggregateConversionFunnel(
+  events: AnyRow[],
+  opts?: {
+    groundTruthSignups?: number;
+    groundTruthBookings?: number;
+    periodStart?: string | null;
+    sources?: string[];
+    errors?: string[];
+  },
+): ConversionFunnelReport {
+  const compiledAt = new Date().toISOString();
+  const rows = Array.isArray(events) ? events : [];
+  const stageRows: Record<FunnelStageId, AnyRow[]> = {
+    traffic_pageview: [],
+    account_signup: [],
+    booking_initiated: [],
+    booking_completed: [],
+  };
+  const matchedNames: Record<FunnelStageId, Set<string>> = {
+    traffic_pageview: new Set(),
+    account_signup: new Set(),
+    booking_initiated: new Set(),
+    booking_completed: new Set(),
+  };
+
+  for (const row of rows) {
+    for (const stage of FUNNEL_STAGE_ORDER) {
+      if (!matchesFunnelStage(row, stage)) continue;
+      stageRows[stage].push(row);
+      const label = eventNameOf(row) || eventTypeOf(row);
+      if (label) matchedNames[stage].add(label);
+    }
+  }
+
+  const eventSignupActors = new Set(
+    stageRows.account_signup.map(actorKeyOf).filter(Boolean),
+  ).size;
+  const eventBookingActors = new Set(
+    stageRows.booking_completed.map(actorKeyOf).filter(Boolean),
+  ).size;
+
+  const groundTruthSignups =
+    typeof opts?.groundTruthSignups === "number"
+      ? opts.groundTruthSignups
+      : eventSignupActors;
+  const groundTruthBookings =
+    typeof opts?.groundTruthBookings === "number"
+      ? opts.groundTruthBookings
+      : eventBookingActors;
+
+  const counts: Record<FunnelStageId, number> = {
+    traffic_pageview: new Set(
+      stageRows.traffic_pageview.map(actorKeyOf).filter(Boolean),
+    ).size || stageRows.traffic_pageview.length,
+    account_signup: Math.max(groundTruthSignups, eventSignupActors),
+    booking_initiated: new Set(
+      stageRows.booking_initiated.map(actorKeyOf).filter(Boolean),
+    ).size || stageRows.booking_initiated.length,
+    booking_completed: Math.max(groundTruthBookings, eventBookingActors),
+  };
+
+  // Enforce funnel monotonicity for drop-off readability when ground truth
+  // signups exceed tracked booking_initiated events.
+  if (counts.booking_initiated > counts.account_signup) {
+    counts.booking_initiated = counts.account_signup;
+  }
+  if (counts.booking_completed > counts.booking_initiated) {
+    counts.booking_completed = counts.booking_initiated;
+  }
+
+  const top = counts.traffic_pageview || counts.account_signup || 0;
+  const stages: FunnelStageMetric[] = FUNNEL_STAGE_ORDER.map((id, index) => {
+    const previousId = index > 0 ? FUNNEL_STAGE_ORDER[index - 1] : null;
+    const previousCount = previousId ? counts[previousId] : null;
+    const count = counts[id];
+    const dropOffCount =
+      previousCount == null ? null : Math.max(previousCount - count, 0);
+    const dropOffPct =
+      previousCount == null ? null : pct(dropOffCount || 0, previousCount);
+    const conversionFromPreviousPct =
+      previousCount == null ? null : pct(count, previousCount);
+    return {
+      id,
+      label: FUNNEL_STAGE_LABELS[id],
+      count,
+      uniqueActors: count,
+      dropOffCount,
+      dropOffPct,
+      conversionFromPreviousPct,
+      conversionFromTopPct: pct(count, top || 1),
+      eventNamesMatched: [...matchedNames[id]].slice(0, 12),
+    };
+  });
+
+  let largestDropOff: ConversionFunnelReport["largestDropOff"] = null;
+  for (let i = 1; i < stages.length; i += 1) {
+    const prev = stages[i - 1];
+    const curr = stages[i];
+    const drop = curr.dropOffCount ?? 0;
+    const dropPct = curr.dropOffPct ?? 0;
+    if (
+      !largestDropOff ||
+      drop > largestDropOff.count ||
+      (drop === largestDropOff.count && dropPct > largestDropOff.pct)
+    ) {
+      largestDropOff = {
+        from: prev.id,
+        to: curr.id,
+        count: drop,
+        pct: dropPct,
+      };
+    }
+  }
+
+  const signupStage = stages.find((s) => s.id === "account_signup");
+  const completedStage = stages.find((s) => s.id === "booking_completed");
+  const leakSummary = `${number(signupStage?.count || 0)} signups → ${number(completedStage?.count || 0)} completed bookings (${pct(completedStage?.count || 0, signupStage?.count || 0)}% signup→book). Largest drop-off: ${largestDropOff ? `${FUNNEL_STAGE_LABELS[largestDropOff.from]} → ${FUNNEL_STAGE_LABELS[largestDropOff.to]} (−${number(largestDropOff.count)} / ${largestDropOff.pct}%)` : "n/a"}.`;
+
+  return {
+    compiledAt,
+    periodStart: opts?.periodStart || null,
+    totalEventsSampled: rows.length,
+    groundTruthSignups,
+    groundTruthBookings,
+    stages,
+    leakSummary,
+    largestDropOff,
+    sources: opts?.sources || ["analytics_events"],
+    errors: (opts?.errors || []).filter(Boolean),
+  };
+}
+
+/**
+ * Load analytics + ground-truth signup/booking tables and compile funnel stages.
+ */
+export async function loadConversionFunnelDiagnostics(
+  sinceIso?: string | null,
+): Promise<ConversionFunnelReport> {
+  const [events, signups, bookings] = await Promise.all([
+    safeSelectCascade([
+      {
+        table: "analytics_events",
+        columns:
+          "id,user_id,session_id,event_name,event_type,role,source,page_path,booking_id,created_at",
+        limit: 500,
+        sinceIso: sinceIso || null,
+      },
+      {
+        table: "analytics_events",
+        columns: "id,user_id,session_id,event_name,event_type,created_at",
+        limit: 500,
+        sinceIso: sinceIso || null,
+      },
+      {
+        table: "analytics_events",
+        columns: "id,event_name,event_type,created_at",
+        limit: 500,
+        sinceIso: sinceIso || null,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "launch_signups",
+        columns: "id,user_id,email,created_at,role,status",
+        limit: 500,
+        sinceIso: sinceIso || null,
+      },
+      {
+        table: "launch_signups",
+        columns: "id,created_at",
+        limit: 500,
+        sinceIso: sinceIso || null,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "bookings",
+        columns: "id,status,created_at,pet_parent_id,guru_id,total_amount",
+        limit: 500,
+        sinceIso: sinceIso || null,
+      },
+      {
+        table: "bookings",
+        columns: "id,status,created_at",
+        limit: 500,
+        sinceIso: sinceIso || null,
+      },
+    ]),
+  ]);
+
+  const completedBookings = countWhere(bookings.rows, (row) =>
+    ["completed", "complete", "paid", "succeeded", "confirmed", "fulfilled"].includes(
+      statusOf(row),
+    ),
+  );
+
+  return aggregateConversionFunnel(events.rows, {
+    groundTruthSignups: signups.ok ? signups.count : undefined,
+    // Completed bookings only — do not fall back to total rows (leak target is 0).
+    groundTruthBookings: bookings.ok ? completedBookings : undefined,
+    periodStart: sinceIso || null,
+    sources: [events.tableUsed, signups.tableUsed, bookings.tableUsed].filter(
+      Boolean,
+    ),
+    errors: [events, signups, bookings]
+      .filter((result) => !result.ok)
+      .map((result) => result.message),
+  });
+}
+
+function mapInsightCategoryToHelpCategory(
+  category: string,
+): HelpCenterArticleBrief["category"] {
+  const lower = category.toLowerCase();
+  if (lower.includes("stripe") || lower.includes("billing") || lower.includes("payout")) {
+    return "Billing & Refunds";
+  }
+  if (lower.includes("booking") || lower.includes("cancel") || lower.includes("schedule")) {
+    return "Booking & Cancellations";
+  }
+  if (lower.includes("trust") || lower.includes("safety") || lower.includes("leash") || lower.includes("dispute")) {
+    return "Trust & Safety";
+  }
+  if (lower.includes("account") || lower.includes("login") || lower.includes("profile")) {
+    return "Account & Profiles";
+  }
+  if (lower.includes("guru") || lower.includes("training") || lower.includes("university")) {
+    return "Guru Success & Training Hub";
+  }
+  return "Pet Parent Support";
+}
+
+/**
+ * Extract friction-flagged chat insight rows into a structured payload
+ * (session/user/snippet/timestamps) for Help Center article creation.
+ */
+export function mapChatFrictionFlags(rows: AnyRow[]): ChatFrictionFlag[] {
+  return rows
+    .filter((row) => Boolean(row.is_friction_flag))
+    .map((row) => {
+      const insightId = asString(row.insight_id || row.id);
+      const snippet = asString(
+        row.core_question_summary ||
+          row.raw_question_text ||
+          row.friction_snippet ||
+          row.summary,
+      );
+      const hash = asString(row.text_string_hash);
+      return {
+        insightId,
+        sessionId:
+          asString(row.session_id) ||
+          asString(row.sessionId) ||
+          (hash ? `insight-hash:${hash.slice(0, 16)}` : null) ||
+          (insightId ? `insight:${insightId}` : null),
+        userId: asString(row.user_id) || asString(row.userId) || null,
+        frictionSnippet: snippet,
+        category: asString(row.ai_assigned_category) || "General Inquiry",
+        channel: asString(row.channel_source_enum) || "UNKNOWN",
+        frequency: asNumber(row.frequency_tally_count) || 1,
+        createdAt: asString(row.created_at) || null,
+        updatedAt: asString(row.updated_at) || asString(row.last_asked_at) || null,
+        isConverted: Boolean(
+          row.is_converted_to_article || row.is_converted_to_help_article,
+        ),
+      };
+    })
+    .filter((row) => Boolean(row.insightId) && Boolean(row.frictionSnippet))
+    .sort((a, b) => b.frequency - a.frequency || (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+}
+
+/**
+ * Format friction flags as pre-populated Help Center article briefs for
+ * `/admin/help/articles/new` (posts through `/api/admin/insights/convert`).
+ */
+export function buildHelpCenterArticleBriefs(
+  flags: ChatFrictionFlag[],
+  limit = 6,
+): HelpCenterArticleBrief[] {
+  return flags.slice(0, Math.max(limit, 0)).map((flag) => {
+    const title = flag.frictionSnippet.slice(0, 120);
+    const summary = `Friction signal (${flag.channel}): ${flag.frictionSnippet}`.slice(
+      0,
+      400,
+    );
+    const solution = [
+      `Customers repeatedly hit this friction point:`,
+      ``,
+      `"${flag.frictionSnippet}"`,
+      ``,
+      `Category: ${flag.category}`,
+      `Channel: ${flag.channel}`,
+      `Frequency tally: ${flag.frequency}`,
+      ``,
+      `Draft the clear SitGuru answer that unblocks signup→booking conversion.`,
+    ].join("\n");
+    const params = new URLSearchParams({
+      insightId: flag.insightId,
+      title,
+      category: mapInsightCategoryToHelpCategory(flag.category),
+    });
+    return {
+      insightId: flag.insightId,
+      title,
+      summary,
+      solution,
+      category: mapInsightCategoryToHelpCategory(flag.category),
+      audience: "all",
+      tags: [
+        "friction",
+        "conversion-leak",
+        "omnichannel",
+        flag.channel.toLowerCase(),
+        flag.category.toLowerCase().replace(/\s+/g, "-"),
+      ].slice(0, 12),
+      frictionSnippet: flag.frictionSnippet,
+      sessionId: flag.sessionId,
+      userId: flag.userId,
+      createdAt: flag.createdAt || flag.updatedAt,
+      createPath: `/admin/help/articles/new?${params.toString()}`,
+    };
+  });
+}
+
+/**
+ * Operational query: pull friction-flagged chat insights and export Help briefs.
+ */
+export async function extractChatFrictionFlags(opts?: {
+  limit?: number;
+  briefLimit?: number;
+}): Promise<{
+  ok: boolean;
+  insightRowsLogged: number;
+  communicationsSampled: number;
+  frictionFlags: ChatFrictionFlag[];
+  helpCenterBriefs: HelpCenterArticleBrief[];
+  sources: string[];
+  errors: string[];
+}> {
+  const limit = opts?.limit ?? 250;
+  const briefLimit = opts?.briefLimit ?? 6;
+  const insights = await safeSelectCascade([
+    {
+      table: "global_chat_insights",
+      columns:
+        "insight_id,text_string_hash,core_question_summary,ai_assigned_category,channel_source_enum,frequency_tally_count,is_friction_flag,is_converted_to_article,created_at,updated_at",
+      limit,
+    },
+    {
+      table: "global_chat_insights",
+      columns:
+        "insight_id,core_question_summary,ai_assigned_category,channel_source_enum,frequency_tally_count,is_friction_flag,is_converted_to_article,updated_at",
+      limit,
+    },
+    {
+      table: "homepage_chat_insights",
+      columns:
+        "insight_id,raw_question_text,clean_ai_topic_category,frequency_tally_count,is_converted_to_help_article,last_asked_at,created_at",
+      limit,
+    },
+  ]);
+
+  const normalizedRows: AnyRow[] =
+    insights.tableUsed === "homepage_chat_insights"
+      ? insights.rows.map((row) => ({
+          ...row,
+          core_question_summary: row.raw_question_text,
+          ai_assigned_category: row.clean_ai_topic_category,
+          channel_source_enum: "HOMEPAGE_LEAD",
+          is_friction_flag: true,
+          is_converted_to_article: row.is_converted_to_help_article,
+          updated_at: row.last_asked_at || row.created_at,
+          frequency_tally_count: row.frequency_tally_count,
+        }))
+      : insights.rows;
+
+  const frictionFlags = mapChatFrictionFlags(normalizedRows);
+  const communicationsSampled = normalizedRows.reduce(
+    (sum, row) => sum + (asNumber(row.frequency_tally_count) || 0),
+    0,
+  );
+
+  return {
+    ok: insights.ok,
+    insightRowsLogged: insights.count,
+    communicationsSampled,
+    frictionFlags,
+    helpCenterBriefs: buildHelpCenterArticleBriefs(frictionFlags, briefLimit),
+    sources: [insights.tableUsed],
+    errors: insights.ok ? [] : [insights.message],
+  };
+}
+
+function funnelDiagnosticsMarkdown(
+  funnel: ConversionFunnelReport,
+  friction: Awaited<ReturnType<typeof extractChatFrictionFlags>>,
+) {
+  const lines = [
+    `# Conversion Leak Diagnostics`,
+    `- Compiled: ${funnel.compiledAt}`,
+    `- Events sampled: ${number(funnel.totalEventsSampled)}`,
+    `- Ground truth: ${number(funnel.groundTruthSignups)} signups · ${number(funnel.groundTruthBookings)} bookings`,
+    `- Leak: ${funnel.leakSummary}`,
+    ``,
+    `## Funnel stages`,
+    `| Stage | Count | Drop-off | Drop-% | Conv from prev |`,
+    `| --- | --- | --- | --- | --- |`,
+  ];
+  for (const stage of funnel.stages) {
+    lines.push(
+      `| ${stage.label} | ${stage.count} | ${stage.dropOffCount ?? "—"} | ${stage.dropOffPct == null ? "—" : `${stage.dropOffPct}%`} | ${stage.conversionFromPreviousPct == null ? "—" : `${stage.conversionFromPreviousPct}%`} |`,
+    );
+  }
+  lines.push(``);
+  lines.push(`## Chat friction flags`);
+  lines.push(
+    `- Insight rows logged: ${number(friction.insightRowsLogged)} · Communications: ${number(friction.communicationsSampled)} · Friction flags: ${number(friction.frictionFlags.length)}`,
+  );
+  for (const brief of friction.helpCenterBriefs.slice(0, 6)) {
+    lines.push(
+      `- [${brief.category}] ${brief.title} → ${brief.createPath}`,
+    );
+  }
+  return lines.join("\n").slice(0, 20000);
+}
+
+/**
+ * Combined conversion-leak packet for Rogue + admin diagnostic endpoints.
+ */
+export async function compileConversionLeakDiagnostics(opts?: {
+  period?: ReportPeriod;
+}): Promise<ConversionLeakDiagnostics> {
+  const now = new Date();
+  const period = opts?.period || "yearly";
+  const periodStart = getPeriodStart(period, now).toISOString();
+  const [funnel, friction] = await Promise.all([
+    loadConversionFunnelDiagnostics(periodStart),
+    extractChatFrictionFlags({ limit: 250, briefLimit: 6 }),
+  ]);
+
+  return {
+    compiledAt: now.toISOString(),
+    period,
+    periodStart,
+    funnel,
+    frictionFlags: friction.frictionFlags,
+    insightRowsLogged: friction.insightRowsLogged,
+    communicationsSampled: friction.communicationsSampled,
+    helpCenterBriefs: friction.helpCenterBriefs,
+    markdownContext: funnelDiagnosticsMarkdown(funnel, friction),
+  };
+}
+
 async function moduleAnalytics(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("analytics", "Analytics", "growth", [
     "analytics_events",
     "launch_signups",
     "bookings",
   ]);
-  const [events, launches, bookings] = await Promise.all([
-    safeHeadCount("analytics_events", since),
-    safeHeadCount("launch_signups", since),
-    safeHeadCount("bookings", since),
-  ]);
+  const funnel = await loadConversionFunnelDiagnostics(since);
+  const traffic = funnel.stages.find((s) => s.id === "traffic_pageview");
+  const signups = funnel.stages.find((s) => s.id === "account_signup");
+  const initiated = funnel.stages.find((s) => s.id === "booking_initiated");
+  const completed = funnel.stages.find((s) => s.id === "booking_completed");
+  const ok =
+    funnel.totalEventsSampled > 0 ||
+    funnel.groundTruthSignups > 0 ||
+    funnel.groundTruthBookings > 0 ||
+    funnel.errors.length === 0;
   return finalize(
     snap,
-    events.ok || launches.ok || bookings.ok,
-    `Growth KPIs in period: ${number(events.count)} tracked events · ${number(launches.count)} launch signups · ${number(bookings.count)} bookings.`,
+    ok,
+    funnel.leakSummary,
     {
-      events: events.count,
-      launchSignups: launches.count,
-      bookings: bookings.count,
+      events: funnel.totalEventsSampled,
+      launchSignups: funnel.groundTruthSignups,
+      bookings: funnel.groundTruthBookings,
+      funnelTraffic: traffic?.count ?? 0,
+      funnelSignups: signups?.count ?? 0,
+      funnelBookingInitiated: initiated?.count ?? 0,
+      funnelBookingCompleted: completed?.count ?? 0,
+      largestDropOffFrom: funnel.largestDropOff?.from || null,
+      largestDropOffTo: funnel.largestDropOff?.to || null,
+      largestDropOffCount: funnel.largestDropOff?.count ?? 0,
+      largestDropOffPct: funnel.largestDropOff?.pct ?? 0,
+      signupToBookPct: pct(completed?.count || 0, signups?.count || 0),
     },
     [
-      `${number(events.count)} events`,
-      `${number(launches.count)} launch signups`,
-      `${number(bookings.count)} bookings`,
+      `${number(funnel.totalEventsSampled)} events sampled`,
+      `${number(signups?.count || 0)} signups → ${number(completed?.count || 0)} bookings`,
+      funnel.largestDropOff
+        ? `Drop-off ${FUNNEL_STAGE_LABELS[funnel.largestDropOff.from]}→${FUNNEL_STAGE_LABELS[funnel.largestDropOff.to]} (−${number(funnel.largestDropOff.count)})`
+        : "No drop-off computed",
     ],
-    [events, launches, bookings].filter((r) => !r.ok).map((r) => r.message),
+    funnel.errors,
   );
 }
 
@@ -1187,42 +1827,34 @@ async function moduleChatInsights(): Promise<ModuleSnapshot> {
   const snap = snapshotBase("chat_insights", "Chat Insights", "growth", [
     "global_chat_insights",
   ]);
-  const insights = await safeSelect(
-    "global_chat_insights",
-    "insight_id,frequency_tally_count,is_friction_flag,is_converted_to_article,ai_assigned_category,core_question_summary",
-    400,
-  );
-  const communications = insights.rows.reduce(
-    (sum, row) => sum + asNumber(row.frequency_tally_count),
-    0,
-  );
-  const friction = insights.rows.reduce(
-    (sum, row) =>
-      sum +
-      (row.is_friction_flag ? asNumber(row.frequency_tally_count) : 0),
-    0,
-  );
-  const converted = countWhere(insights.rows, (r) =>
-    Boolean(r.is_converted_to_article),
-  );
+  const extracted = await extractChatFrictionFlags({ limit: 250, briefLimit: 6 });
+  const topFriction = extracted.frictionFlags.slice(0, 6);
   return finalize(
     snap,
-    insights.ok,
-    insights.ok
-      ? `${number(communications)} communications · ${number(friction)} friction · ${number(converted)} converted to Help.`
+    extracted.ok,
+    extracted.ok
+      ? `${number(extracted.communicationsSampled)} communications · ${number(extracted.frictionFlags.length)} friction flags · ${number(extracted.helpCenterBriefs.length)} Help briefs ready.`
       : "Chat insights unavailable.",
     {
-      insightRows: insights.count,
-      communications,
-      frictionFlags: friction,
-      convertedArticles: converted,
+      insightRowsLogged: extracted.insightRowsLogged,
+      insightRows: extracted.insightRowsLogged,
+      communications: extracted.communicationsSampled,
+      frictionFlags: extracted.frictionFlags.length,
+      frictionCommunications: topFriction.reduce((sum, row) => sum + row.frequency, 0),
+      convertedArticles: extracted.frictionFlags.filter((flag) => flag.isConverted)
+        .length,
+      helpBriefsReady: extracted.helpCenterBriefs.length,
+      frictionSource: extracted.sources[0] || null,
     },
     [
-      `${number(communications)} communications`,
-      `${number(friction)} friction`,
-      `${number(converted)} converted`,
+      `${number(extracted.communicationsSampled)} communications`,
+      `${number(extracted.frictionFlags.length)} friction flags`,
+      `${number(extracted.helpCenterBriefs.length)} Help briefs`,
+      ...topFriction.slice(0, 3).map(
+        (flag) => `Friction: ${flag.frictionSnippet.slice(0, 80)}`,
+      ),
     ],
-    insights.ok ? [] : [insights.message],
+    extracted.errors,
   );
 }
 
@@ -2058,8 +2690,8 @@ const MODULE_KEYWORDS: Record<AdminReportModuleId, string[]> = {
   growth_referrals: ["referral", "invite", "bonus", "growth & referrals", "pawperks"],
   programs: ["program", "veteran", "military", "student hire", "community hire", "skillbridge"],
   partners: ["partner", "clinic", "b2b", "corporate"],
-  analytics: ["analytics", "mom", "month-over-month", "cohort", "trend"],
-  chat_insights: ["chat insight", "friction", "intent", "ticket classification"],
+  analytics: ["analytics", "mom", "month-over-month", "cohort", "trend", "funnel", "conversion", "drop-off", "dropoff", "pageview", "signup leak"],
+  chat_insights: ["chat insight", "friction", "intent", "ticket classification", "help brief", "help center", "insight_rows_logged"],
   financial_overview: ["financial overview", "gmv", "take-rate", "margin", "net profit"],
   banking: ["banking", "plaid", "liquidity", "operating account"],
   stripe_transactions: ["stripe", "charge", "processing fee", "dispute"],
@@ -2135,6 +2767,14 @@ export function resolveModulesForQuery(
       "ambassadors",
       "pet_parents",
     ];
+  }
+  if (
+    presetKey === "conversion_leak" ||
+    presetKey === "conversion-leak" ||
+    presetKey === "funnel_diagnostics" ||
+    presetKey === "funnel-diagnostics"
+  ) {
+    return ["analytics", "chat_insights", "pet_parents", "bookings", "sales_marketing"];
   }
   if (presetKey === "system_audit" || presetKey === "system-audit") {
     return [

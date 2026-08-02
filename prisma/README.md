@@ -41,6 +41,8 @@ column probes against the public API.
 | `AdminMarketingCampaign` | `admin_marketing_campaigns` | Includes string `title` (+ live `name`) |
 | `AdminMarketingSignupLead` | `admin_marketing_signup_leads` | Includes string `status` (+ live `lead_status`) |
 | `ReferralCode` | `referral_codes` | Includes string `program` (+ live `program_type`) |
+| `AnalyticsEvent` | `analytics_events` | Funnel diagnostics: session/user + event_name/type |
+| `GlobalChatInsight` | `global_chat_insights` | Friction flags (`is_friction_flag`) for Help briefs |
 
 To add Rogue compatibility tables/columns on top of production, apply:
 

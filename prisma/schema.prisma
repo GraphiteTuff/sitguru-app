@@ -221,3 +221,39 @@ model ReferralCode {
 
   @@map("referral_codes")
 }
+
+/// Product analytics stream used by conversion-funnel diagnostics.
+model AnalyticsEvent {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String?   @map("user_id") @db.Uuid
+  sessionId String?   @map("session_id")
+  eventName String?   @map("event_name")
+  eventType String?   @map("event_type")
+  role      String?
+  source    String?
+  pagePath  String?   @map("page_path")
+  guruId    String?   @map("guru_id")
+  bookingId String?   @map("booking_id")
+  metadata  Json?
+  createdAt DateTime? @map("created_at") @db.Timestamptz(6)
+
+  @@map("analytics_events")
+}
+
+/// Omnichannel chat insight ledger (friction flags + help conversion).
+model GlobalChatInsight {
+  insightId            String    @id @default(dbgenerated("gen_random_uuid()")) @map("insight_id") @db.Uuid
+  textStringHash       String?   @map("text_string_hash")
+  coreQuestionSummary  String    @map("core_question_summary")
+  aiAssignedCategory   String?   @map("ai_assigned_category")
+  channelSourceEnum    String?   @map("channel_source_enum")
+  frequencyTallyCount  Int?      @map("frequency_tally_count") @default(1)
+  isConvertedToArticle Boolean?  @map("is_converted_to_article") @default(false)
+  isFrictionFlag       Boolean?  @map("is_friction_flag") @default(false)
+  convertedArticleSlug String?   @map("converted_article_slug")
+  convertedAt          DateTime? @map("converted_at") @db.Timestamptz(6)
+  createdAt            DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime? @map("updated_at") @db.Timestamptz(6)
+
+  @@map("global_chat_insights")
+}
