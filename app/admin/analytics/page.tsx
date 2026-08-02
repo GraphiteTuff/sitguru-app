@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ExternalLink,
   FileText,
+  Filter,
   Handshake,
   HeartHandshake,
   LineChart,
@@ -29,6 +30,7 @@ const routes = {
   dashboard: "/admin",
   hub: "/admin/analytics",
   overview: "/admin/analytics/overview",
+  funnel: "/admin/analytics/funnel",
   petAnalytics: "/admin/pet-analytics",
   insights: "/admin/insights",
   reports: "/admin/reports",
@@ -237,6 +239,16 @@ export default async function AdminAnalyticsHubPage() {
       wiring: "live",
       value: number(data.metrics.events),
       icon: <Activity size={20} />,
+    },
+    {
+      eyebrow: "Conversion",
+      title: "Conversion Funnel",
+      description:
+        "Traffic → signup → booking leak diagnostics from unmasked PostgREST pipelines.",
+      href: routes.funnel,
+      wiring: "live",
+      value: number(data.metrics.completedBookings),
+      icon: <Filter size={20} />,
     },
     {
       eyebrow: "Pets",
