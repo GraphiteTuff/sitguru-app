@@ -1,0 +1,133 @@
+/**
+ * SitGuru does not use Prisma — schema is managed via supabase/migrations.
+ * This stub documents the Rogue structural alignment entities for tooling
+ * that expects a prisma/schema.prisma path. Do not run `prisma migrate`
+ * against production; apply:
+ *   supabase/migrations/20260802_structural_schema_alignment_rogue.sql
+ */
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+/// Compatibility surface for Rogue reporting (dollars).
+model Payment {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId      String?  @map("booking_id")
+  status         String   @default("pending")
+  amount         Decimal  @default(0) @db.Decimal
+  feeAmount      Decimal  @default(0) @map("fee_amount") @db.Decimal
+  processingFee  Decimal  @default(0) @map("processing_fee") @db.Decimal
+  amountCents    BigInt   @default(0) @map("amount_cents")
+  provider       String   @default("stripe")
+  currency       String   @default("usd")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("payments")
+}
+
+model GuruPayout {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guruId               String?   @map("guru_id") @db.Uuid
+  bookingId            String?   @map("booking_id")
+  amountCents          BigInt    @default(0) @map("amount_cents")
+  amount               Decimal   @default(0) @db.Decimal
+  currency             String    @default("usd")
+  status               String    @default("pending")
+  payoutStatus         String?   @map("payout_status")
+  stripeTransferId     String?   @map("stripe_transfer_id")
+  transactionReference String?   @map("transaction_reference")
+  scheduledFor         DateTime? @map("scheduled_for") @db.Timestamptz(6)
+  releasedAt           DateTime? @map("released_at") @db.Timestamptz(6)
+  paidAt               DateTime? @map("paid_at") @db.Timestamptz(6)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("guru_payouts")
+}
+
+model Payout {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  amountCents   BigInt    @default(0) @map("amount_cents")
+  amount        Decimal   @default(0) @db.Decimal
+  payoutAmount  Decimal?  @map("payout_amount") @db.Decimal
+  status        String    @default("pending")
+  scheduledFor  DateTime? @map("scheduled_for") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("payouts")
+}
+
+model AdminAuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorEmail String?  @map("actor_email")
+  action     String
+  entityType String?  @map("entity_type")
+  targetType String?  @map("target_type")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("admin_audit_logs")
+}
+
+model FinancialAuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorEmail String?  @map("actor_email")
+  action     String
+  entityType String?  @map("entity_type")
+  targetType String?  @map("target_type")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("financial_audit_logs")
+}
+
+model LiveWalk {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId String?  @map("booking_id")
+  guruId    String?  @map("guru_id") @db.Uuid
+  status    String   @default("active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("live_walks")
+}
+
+model WalkSession {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status     String    @default("in_progress")
+  checkInAt  DateTime? @map("check_in_at") @db.Timestamptz(6)
+  checkOutAt DateTime? @map("check_out_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("walk_sessions")
+}
+
+model GpsEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventType String   @default("point") @map("event_type")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("gps_events")
+}
+
+model ModerationFlag {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status    String   @default("open")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("moderation_flags")
+}
+
+model FraudFlag {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status    String   @default("open")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("fraud_flags")
+}
