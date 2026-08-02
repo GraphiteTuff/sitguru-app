@@ -187,7 +187,7 @@ export function ProfitLossExportActions({
 
         <div className="flex flex-wrap gap-2 sm:justify-end">
           <NavPill href="/admin/financials" label="Financials" />
-          <NavPill href="/admin/financials/stripe" label="Stripe" />
+          <NavPill href="/admin/financials/payment-gateway" label="Payment Gateway" />
           <NavPill href="/admin/financials/plaid" label="Plaid" />
           <NavPill href="/admin/financials/cash-flow" label="Cash Flow" />
           <NavPill href="/admin/financials/reconciliation" label="Recon" />

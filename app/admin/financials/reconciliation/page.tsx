@@ -1893,7 +1893,7 @@ export default async function AdminReconciliationPage() {
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <ActionLink href="/admin/financials" label="Overview" />
                 <ActionLink href="/admin/financials/plaid" label="Banking" />
-                <ActionLink href="/admin/financials/stripe" label="Stripe" />
+                <ActionLink href="/admin/financials/payment-gateway" label="Payment Gateway" />
                 <ActionLink href="/admin/financials/profit-loss" label="P&L" />
                 <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
                 <ActionLink href="/admin/financials/general-ledger" label="Ledger" />

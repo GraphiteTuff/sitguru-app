@@ -1145,7 +1145,7 @@ export default async function AdminFinancialsTaxReportsPage({
                   href="/admin/financials/balance-sheet"
                   label="Balance Sheet"
                 />
-                <ActionLink href="/admin/financials/stripe" label="Stripe" />
+                <ActionLink href="/admin/financials/payment-gateway" label="Payment Gateway" />
                 <ActionLink href="/admin/financials/plaid" label="Banking" />
                 <ActionLink
                   href="/admin/financials/general-ledger"

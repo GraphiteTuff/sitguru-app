@@ -1468,7 +1468,7 @@ function BalanceExportPanel() {
         <ActionLink href="/admin/financials" label="Financials" />
         <ActionLink href="/admin/financials/profit-loss" label="P&L" />
         <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
-        <ActionLink href="/admin/financials/stripe" label="Stripe" />
+        <ActionLink href="/admin/financials/payment-gateway" label="Payment Gateway" />
         <ActionLink href="/admin/financials/plaid" label="Plaid" />
         <ActionLink href="/admin/financials/reconciliation" label="Recon" />
       </div>
@@ -2113,7 +2113,7 @@ export default async function AdminBalanceSheetPage() {
                     ["Cash Flow", "/admin/financials/cash-flow"],
                     ["General Ledger", "/admin/financials/general-ledger"],
                     ["Reconciliation", "/admin/financials/reconciliation"],
-                    ["Stripe", "/admin/financials/stripe"],
+                    ["Payment Gateway", "/admin/financials/payment-gateway"],
                     ["Plaid Banking", "/admin/financials/plaid"],
                     ["Payouts", "/admin/financials/payouts"],
                   ].map(([label, href]) => (

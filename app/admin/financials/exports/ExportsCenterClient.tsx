@@ -265,9 +265,10 @@ const REPORTS: ReportCard[] = [
     wordHref: datedExport("/api/admin/financials/tax-reports/export", "word", yearPeriod.start, yearPeriod.end),
   },
   {
-    title: "Stripe",
-    description: "Stripe balances, booking_payments marketplace fees, payouts, and clearing support.",
-    openHref: "/admin/financials/stripe",
+    title: "Payment Gateway",
+    description:
+      "Stripe, PayPal, Apple Pay, Google Pay, Venmo, and Plaid banking volume by provider, plus Stripe export support.",
+    openHref: "/admin/financials/payment-gateway",
     csvHref: datedExport("/api/admin/financials/stripe/export", "csv"),
   },
   {
@@ -1279,7 +1280,7 @@ export default function FinancialExportCenterPage() {
               <ActionLink href="/admin/financials/reconciliation" label="Open Reconciliation" />
               <ActionLink href="/admin/payouts" label="Open Payouts" />
               <ActionLink href="/admin/financials/general-ledger" label="Open Ledger" />
-              <ActionLink href="/admin/financials/stripe" label="Open Stripe" />
+              <ActionLink href="/admin/financials/payment-gateway" label="Open Payment Gateway" />
               <ActionLink href="/admin/financials/plaid" label="Open Banking" />
               <ActionLink href="/admin/audit-trail" label="Open Audit Trail" />
             </div>

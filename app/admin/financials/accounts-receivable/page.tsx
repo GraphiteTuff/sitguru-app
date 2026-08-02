@@ -8,7 +8,7 @@ export default function AccountsReceivableComingSoonPage() {
       title="Accounts Receivable Aging"
       description="This module will age open customer balances, failed payments, and chargebacks. Until it is wired, review Payments and Stripe transactions for collection signals."
       relatedLinks={[
-        { label: "Stripe Transactions", href: "/admin/financials/stripe" },
+        { label: "Payment Gateway", href: "/admin/financials/payment-gateway" },
         { label: "Payments", href: "/admin/payments" },
         { label: "Financials Hub", href: "/admin/financials" },
       ]}

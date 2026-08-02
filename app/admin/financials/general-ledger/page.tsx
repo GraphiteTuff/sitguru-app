@@ -2351,7 +2351,7 @@ export default async function AdminGeneralLedgerPage({
                   Balance Sheet
                 </Link>
                 <Link
-                  href="/admin/financials/stripe"
+                  href="/admin/financials/payment-gateway"
                   className="rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-center text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
                 >
                   Stripe

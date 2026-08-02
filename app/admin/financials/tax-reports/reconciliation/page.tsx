@@ -12,7 +12,7 @@ export default function TaxReconciliationComingSoonPage() {
         { label: "Tax Center", href: "/admin/financials/tax-reports" },
         { label: "Reconciliation", href: "/admin/financials/reconciliation" },
         { label: "Banking (Plaid)", href: "/admin/financials/plaid" },
-        { label: "Stripe", href: "/admin/financials/stripe" },
+        { label: "Payment Gateway", href: "/admin/financials/payment-gateway" },
         {
           label: "Export Reconciliation",
           href: "/api/admin/financials/reconciliation/export?format=csv",

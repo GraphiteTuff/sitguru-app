@@ -600,7 +600,7 @@ function buildDailyActivityCards(
       description:
         "Review customer charges, failed payments, refunds, disputes, and payment exceptions.",
       value: formatCompactCurrency(collectedCash),
-      href: "/admin/financials/stripe",
+      href: "/admin/financials/payment-gateway",
       tone: "blue",
     },
     {
@@ -633,7 +633,7 @@ function buildDailyActivityCards(
       description:
         "Review daily payments, fees, refunds, transfers, payout timing, and dispute activity.",
       value: stripeLabel,
-      href: "/admin/financials/stripe",
+      href: "/admin/financials/payment-gateway",
       tone: "slate",
     },
     {

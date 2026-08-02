@@ -712,10 +712,10 @@ const operatingFinance: ReportCard[] = [
   },
   {
     eyebrow: "Payments",
-    title: "Stripe Transactions",
+    title: "Payment Gateway",
     description:
-      "Track gross payments, fees, refunds, disputes, chargebacks, transfers, payout reconciliation, and customer payment status.",
-    href: "/admin/financials/stripe",
+      "Track Stripe, PayPal, Apple Pay, Google Pay, Venmo, and Plaid banking volume, fees, refunds, merchant readiness, and deposit matching by provider.",
+    href: "/admin/financials/payment-gateway",
     wiring: "live",
     tone: "purple",
   },

@@ -10,7 +10,7 @@ export default function MarketplaceTaxComingSoonPage() {
       description="This marketplace and local tax exposure schedule is next. Until it ships, use Stripe booking_payments tax support in Tax Center, Stripe balances, and CPA Handoff local-tax notes."
       relatedLinks={[
         { label: "Tax Center", href: "/admin/financials/tax-reports" },
-        { label: "Stripe", href: "/admin/financials/stripe" },
+        { label: "Payment Gateway", href: "/admin/financials/payment-gateway" },
         {
           label: "CPA Local Tax",
           href: "/admin/financials/cpa-handoff?section=local-tax",

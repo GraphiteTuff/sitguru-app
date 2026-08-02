@@ -661,7 +661,7 @@ export default async function AdminPayoutsPage() {
                 <Link href="/admin/financials/tax-reports/1099" className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-50">
                   1099 tax support <ArrowRight className="h-4 w-4" />
                 </Link>
-                <Link href="/admin/financials/stripe" className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-50">
+                <Link href="/admin/financials/payment-gateway" className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-50">
                   Stripe balances <CreditCard className="h-4 w-4" />
                 </Link>
               </div>

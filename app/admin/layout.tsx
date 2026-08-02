@@ -51,7 +51,8 @@ const adminRoutes = {
   universityAssignments: "/admin/university-assignments",
   financials: "/admin/financials",
   banking: "/admin/financials/plaid",
-  stripe: "/admin/financials/stripe",
+  stripe: "/admin/financials/payment-gateway",
+  paymentGateway: "/admin/financials/payment-gateway",
   profitLoss: "/admin/financials/profit-loss",
   balanceSheet: "/admin/financials/balance-sheet",
   cashFlow: "/admin/financials/cash-flow",
@@ -139,8 +140,8 @@ const navSections = [
       },
       { label: "Banking", href: adminRoutes.banking, icon: Landmark },
       {
-        label: "Stripe Transactions",
-        href: adminRoutes.stripe,
+        label: "Payment Gateway",
+        href: adminRoutes.paymentGateway,
         icon: CreditCard,
       },
       {
@@ -555,7 +556,7 @@ function AdminFooter() {
       title: "Financial Operations",
       links: [
         { label: "Banking", href: adminRoutes.banking },
-        { label: "Stripe Transactions", href: adminRoutes.stripe },
+        { label: "Payment Gateway", href: adminRoutes.paymentGateway },
         { label: "Commissions", href: adminRoutes.commissions },
         { label: "Payouts", href: adminRoutes.payouts },
         {

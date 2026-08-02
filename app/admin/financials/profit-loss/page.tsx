@@ -3194,7 +3194,7 @@ export default async function AdminProfitLossPage({
                     ["Balance Sheet", "/admin/financials/balance-sheet"],
                     ["General Ledger", "/admin/financials/general-ledger"],
                     ["Reconciliation", "/admin/financials/reconciliation"],
-                    ["Stripe", "/admin/financials/stripe"],
+                    ["Payment Gateway", "/admin/financials/payment-gateway"],
                     ["Plaid Banking", "/admin/financials/plaid"],
                     ["Payouts", "/admin/financials/payouts"],
                   ].map(([label, href]) => (
