@@ -35,8 +35,7 @@ import {
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import AdminAccountMenu from "@/components/AdminAccountMenu";
-import RogueFloatingAssistant from "@/components/admin/RogueFloatingAssistant";
-import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
+import { RogueAdminAssistantHost } from "@/components/admin/RogueFloatingAssistant";
 
 const adminRoutes = {
   dashboard: "/admin",
@@ -875,9 +874,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <SafeAssistantBubble>
-        <RogueFloatingAssistant />
-      </SafeAssistantBubble>
+      <RogueAdminAssistantHost />
     </div>
   );
 }
