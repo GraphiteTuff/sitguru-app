@@ -9,6 +9,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -17,7 +18,29 @@ import { useChat } from "ai/react";
 import { Maximize2, Minimize2, Sparkles, X } from "lucide-react";
 
 const BRAND_GREEN = "#0D5C3A";
+const BRAND_GREEN_DEEP = "#09462C";
 const ROGUE_AVATAR_SRC = "/images/rogue-avatar.png";
+
+const HEADER_BANNER_STYLE: CSSProperties = {
+  backgroundImage: `linear-gradient(135deg, ${BRAND_GREEN} 0%, ${BRAND_GREEN_DEEP} 100%)`,
+  backgroundColor: BRAND_GREEN,
+  color: "#ffffff",
+  borderBottom: "0",
+};
+
+const HEADER_TITLE_STYLE: CSSProperties = {
+  color: "#ffffff",
+  WebkitTextFillColor: "#ffffff",
+  opacity: 1,
+  visibility: "visible",
+};
+
+const HEADER_SUB_STYLE: CSSProperties = {
+  color: "rgba(255, 255, 255, 0.95)",
+  WebkitTextFillColor: "rgba(255, 255, 255, 0.95)",
+  opacity: 1,
+  visibility: "visible",
+};
 
 const REPORTING_STATEMENT =
   "**Rogue reporting for duty.** I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap a chip or ask me anything admin-shaped.";
@@ -79,7 +102,10 @@ function AdminRogueMarkdown({ text }: { text: string }) {
   const blocks = normalized.split(/\n{2,}/);
 
   return (
-    <div className="space-y-3 text-sm leading-6 text-slate-700">
+    <div
+      className="rogue-admin-md space-y-3 text-sm leading-6"
+      style={{ color: "#0f172a", WebkitTextFillColor: "#0f172a" }}
+    >
       {blocks.map((block, blockIndex) => {
         const lines = block.split("\n");
         const isTable =
@@ -142,7 +168,8 @@ function AdminRogueMarkdown({ text }: { text: string }) {
           return (
             <h4
               key={`h3-${blockIndex}`}
-              className="text-sm font-black text-slate-950"
+              className="text-sm font-black"
+              style={{ color: "#020617", WebkitTextFillColor: "#020617" }}
             >
               {renderInline(first.replace(/^###\s+/, ""))}
             </h4>
@@ -152,7 +179,8 @@ function AdminRogueMarkdown({ text }: { text: string }) {
           return (
             <h3
               key={`h2-${blockIndex}`}
-              className="text-base font-black text-slate-950"
+              className="text-base font-black"
+              style={{ color: "#020617", WebkitTextFillColor: "#020617" }}
             >
               {renderInline(first.replace(/^##\s+/, ""))}
             </h3>
@@ -162,7 +190,8 @@ function AdminRogueMarkdown({ text }: { text: string }) {
           return (
             <h2
               key={`h1-${blockIndex}`}
-              className="text-lg font-black text-slate-950"
+              className="text-lg font-black"
+              style={{ color: "#020617", WebkitTextFillColor: "#020617" }}
             >
               {renderInline(first.replace(/^#\s+/, ""))}
             </h2>
@@ -175,7 +204,11 @@ function AdminRogueMarkdown({ text }: { text: string }) {
               {lines
                 .filter((line) => line.trim())
                 .map((line, idx) => (
-                  <li key={idx} className="font-semibold">
+                  <li
+                    key={idx}
+                    className="font-semibold"
+                    style={{ color: "#0f172a", WebkitTextFillColor: "#0f172a" }}
+                  >
                     {renderInline(line.replace(/^\s*[-*]\s+/, ""))}
                   </li>
                 ))}
@@ -187,6 +220,7 @@ function AdminRogueMarkdown({ text }: { text: string }) {
           <p
             key={`p-${blockIndex}`}
             className="font-semibold whitespace-pre-wrap"
+            style={{ color: "#0f172a", WebkitTextFillColor: "#0f172a" }}
           >
             {lines.map((line, idx) => (
               <span key={idx}>
@@ -210,7 +244,11 @@ function renderInline(text: string): ReactNode {
   while ((match = pattern.exec(text)) !== null) {
     if (match.index > last) nodes.push(text.slice(last, match.index));
     nodes.push(
-      <strong key={`b-${part++}`} className="font-black text-slate-950">
+      <strong
+        key={`b-${part++}`}
+        className="font-black"
+        style={{ color: "#020617", WebkitTextFillColor: "#020617" }}
+      >
         {match[1]}
       </strong>,
     );
@@ -334,7 +372,13 @@ export default function RogueFloatingAssistant() {
     <div
       className="pointer-events-none fixed bottom-4 right-4 z-[90] flex flex-row items-center justify-end gap-3 overflow-visible md:bottom-6 md:right-6"
       data-rogue-admin-dock
-      style={{ ["--hcb-green" as string]: BRAND_GREEN }}
+      style={
+        {
+          ["--hcb-green"]: BRAND_GREEN,
+          ["--hcb-green-deep"]: BRAND_GREEN_DEEP,
+          ["--hcb-cream"]: "#f4faf6",
+        } as CSSProperties
+      }
     >
       <div className="homepage-chat-bubble-root !relative !inset-auto !z-auto !max-w-none">
         {!open ? (
@@ -377,7 +421,13 @@ export default function RogueFloatingAssistant() {
           role="dialog"
           aria-label="Rogue, Chief Treat Officer admin assistant"
         >
-          <header className="homepage-chat-panel__header relative shrink-0">
+          {/* Use div (not header) so `.admin-theme header { background: white }` cannot hide title. */}
+          <div
+            className="homepage-chat-panel__header relative shrink-0"
+            role="banner"
+            data-rogue-admin-header="true"
+            style={HEADER_BANNER_STYLE}
+          >
             <div className="homepage-chat-panel__brand">
               <span
                 className="homepage-chat-panel__avatar homepage-chat-panel__avatar--dog"
@@ -386,10 +436,16 @@ export default function RogueFloatingAssistant() {
                 <RogueAvatar className="!h-full !w-full max-h-full max-w-full rounded-full" />
               </span>
               <div className="min-w-0 flex-1 pr-14">
-                <p className="homepage-chat-panel__title">
+                <p
+                  className="homepage-chat-panel__title"
+                  style={HEADER_TITLE_STYLE}
+                >
                   Rogue, Chief Treat Officer 🦴
                 </p>
-                <p className="homepage-chat-panel__sub">
+                <p
+                  className="homepage-chat-panel__sub"
+                  style={HEADER_SUB_STYLE}
+                >
                   Semantic admin · live report compiler
                 </p>
               </div>
@@ -414,10 +470,10 @@ export default function RogueFloatingAssistant() {
                 <X className="h-5 w-5 text-white" aria-hidden="true" />
               </button>
             </div>
-          </header>
+          </div>
 
           <div
-            className="flex shrink-0 flex-row items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-gray-50 p-2 scrollbar-none"
+            className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50 p-2"
             role="toolbar"
             aria-label="Quick admin reports"
           >
@@ -435,7 +491,7 @@ export default function RogueFloatingAssistant() {
             <button
               type="button"
               onClick={clearChat}
-              className="flex-shrink-0 cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
+              className="cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
             >
               Clear
             </button>
@@ -467,7 +523,10 @@ export default function RogueFloatingAssistant() {
                   >
                     <RogueAvatar className="h-full w-full" />
                   </span>
-                  <div className="homepage-chat-bubble homepage-chat-bubble--ai min-w-0 flex-1">
+                  <div
+                    className="homepage-chat-bubble homepage-chat-bubble--ai rogue-admin-bubble min-w-0 flex-1"
+                    style={{ color: "#0f172a", WebkitTextFillColor: "#0f172a" }}
+                  >
                     <AdminRogueMarkdown text={message.content} />
                   </div>
                 </div>
