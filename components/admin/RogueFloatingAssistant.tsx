@@ -417,7 +417,7 @@ export default function RogueFloatingAssistant() {
           </header>
 
           <div
-            className="flex shrink-0 flex-row items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-gray-50 p-2 scrollbar-none"
+            className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50 p-2"
             role="toolbar"
             aria-label="Quick admin reports"
           >
@@ -435,7 +435,7 @@ export default function RogueFloatingAssistant() {
             <button
               type="button"
               onClick={clearChat}
-              className="flex-shrink-0 cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
+              className="cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
             >
               Clear
             </button>
