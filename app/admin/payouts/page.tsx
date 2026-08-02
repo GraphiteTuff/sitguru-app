@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
+import PayoutReleaseButton from "@/app/admin/payouts/PayoutReleaseButton";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +32,7 @@ type PayoutSource = "Guru" | "Ambassador" | "Partner" | "Referral" | "PawPerks" 
 type PayoutQueueRow = {
   id: string;
   source: PayoutSource;
+  ledgerSource: string;
   recipientName: string;
   recipientEmail: string;
   amount: number;
@@ -42,6 +45,7 @@ type PayoutQueueRow = {
   notes: string;
   createdAt: string | null;
   href: string;
+  canRelease: boolean;
 };
 
 type PayoutSummary = {
@@ -84,6 +88,21 @@ function getNumber(row: SafeRow, keys: string[], fallback = 0) {
   return fallback;
 }
 
+function getAmountDollars(
+  row: SafeRow,
+  dollarKeys: string[],
+  centKeys: string[] = [],
+  amountInCents = false,
+) {
+  const fromCents = getNumber(row, centKeys);
+  if (fromCents > 0) return fromCents / 100;
+
+  const raw = getNumber(row, dollarKeys);
+  if (raw <= 0) return 0;
+  if (amountInCents) return raw / 100;
+  return raw;
+}
+
 function normalizeStatus(value: unknown): PayoutStatus {
   const status = String(value || "").toLowerCase();
 
@@ -121,12 +140,14 @@ function normalizeSource(value: unknown, fallback: PayoutSource = "Guru"): Payou
 }
 
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
+  const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value || 0);
+  }).format(Math.abs(value || 0));
+
+  return value < 0 ? `(${formatted})` : formatted;
 }
 
 function formatDateTime(value: string | null) {
@@ -144,9 +165,9 @@ function formatDateTime(value: string | null) {
   }).format(date);
 }
 
-async function safeSelect(table: string, query = "*"): Promise<SafeRow[]> {
+async function safeSelect(table: string, query = "*", limit = 1500): Promise<SafeRow[]> {
   try {
-    const { data, error } = await supabaseAdmin.from(table).select(query).limit(500);
+    const { data, error } = await supabaseAdmin.from(table).select(query).limit(limit);
 
     if (error || !data) return [];
 
@@ -156,27 +177,58 @@ async function safeSelect(table: string, query = "*"): Promise<SafeRow[]> {
   }
 }
 
-function mapBookingRows(rows: SafeRow[]): PayoutQueueRow[] {
+function mapBookingRows(
+  rows: SafeRow[],
+  bookingPaymentsByBooking: Map<string, SafeRow>,
+): PayoutQueueRow[] {
   return rows
     .map((row, index) => {
-      const amount = getNumber(row, [
-        "guru_estimated_total_payout",
-        "guru_estimated_base_payout",
-        "guru_payout_amount",
-        "guru_net_amount",
-        "provider_amount",
-        "payout_amount",
-        "guru_amount",
-      ]);
+      const id = getFirst(row, ["id", "booking_id", "uid"], `booking-${index}`);
+      const bookingPayment = bookingPaymentsByBooking.get(id);
+      const amount =
+        getAmountDollars(
+          bookingPayment || {},
+          ["guru_net_amount", "provider_amount", "amount"],
+          [
+            "guru_net_amount_cents",
+            "provider_amount_cents",
+            "amount_cents",
+            "marketplace_support_cents",
+          ],
+        ) ||
+        getAmountDollars(
+          row,
+          [
+            "guru_estimated_total_payout",
+            "guru_estimated_base_payout",
+            "guru_payout_amount",
+            "guru_net_amount",
+            "provider_amount",
+            "payout_amount",
+            "guru_amount",
+          ],
+          [
+            "guru_estimated_total_payout_cents",
+            "guru_payout_amount_cents",
+            "guru_net_amount_cents",
+            "payout_amount_cents",
+          ],
+        );
 
       if (amount <= 0) return null;
 
-      const status = normalizeStatus(getFirst(row, ["payout_status", "guru_payout_status", "payment_status", "status"], "pending"));
-      const id = getFirst(row, ["id", "booking_id", "uid"], `booking-${index}`);
+      const status = normalizeStatus(
+        getFirst(
+          bookingPayment || {},
+          ["payout_status", "status"],
+          getFirst(row, ["payout_status", "guru_payout_status", "payment_status", "status"], "pending"),
+        ),
+      );
 
       return {
         id,
         source: "Guru" as PayoutSource,
+        ledgerSource: bookingPayment ? "booking_payments" : "bookings",
         recipientName: getFirst(row, ["guru_name", "sitter_name", "provider_name"], "Guru payout"),
         recipientEmail: getFirst(row, ["guru_email", "sitter_email", "provider_email"], "No email on file"),
         amount,
@@ -184,29 +236,57 @@ function mapBookingRows(rows: SafeRow[]): PayoutQueueRow[] {
         reference: getFirst(row, ["stripe_transfer_id", "transfer_id", "stripe_payout_id", "payment_intent_id", "stripe_session_id", "stripe_checkout_session_id", "uid", "id"], "No reference"),
         batch: getFirst(row, ["payout_batch", "batch_name", "batch"], "Bookings / Guru payouts"),
         bookingId: id,
-        paymentStatus: getFirst(row, ["payment_status", "stripe_status", "checkout_status"], "Not listed"),
+        paymentStatus: getFirst(
+          bookingPayment || {},
+          ["status", "payment_status"],
+          getFirst(row, ["payment_status", "stripe_status", "checkout_status"], "Not listed"),
+        ),
         payoutStatus: getFirst(row, ["payout_status", "guru_payout_status"], status),
-        notes: getFirst(row, ["payout_notes", "notes", "memo"], "Booking payout generated from completed or payable care."),
+        notes: bookingPayment
+          ? "Booking payout calibrated with booking_payments Stripe truth."
+          : getFirst(row, ["payout_notes", "notes", "memo"], "Booking payout generated from completed or payable care."),
         createdAt: getFirst(row, ["completed_at", "scheduled_payout_at", "booking_date", "created_at", "updated_at"], "") || null,
         href: `/admin/bookings?booking=${encodeURIComponent(id)}`,
+        canRelease: false,
       };
     })
     .filter(Boolean) as PayoutQueueRow[];
 }
 
-function mapGenericRows(rows: SafeRow[], fallbackSource: PayoutSource, defaultBatch: string): PayoutQueueRow[] {
+function mapGenericRows(
+  rows: SafeRow[],
+  fallbackSource: PayoutSource,
+  defaultBatch: string,
+  ledgerSource: string,
+  options?: { amountInCents?: boolean; canRelease?: boolean },
+): PayoutQueueRow[] {
+  const amountInCents = options?.amountInCents === true;
+  const canRelease = options?.canRelease === true;
+
   return rows
     .map((row, index) => {
-      const amount = getNumber(row, [
-        "amount",
-        "payout_amount",
-        "commission_amount",
-        "reward_amount",
-        "credit_amount",
-        "total_amount",
-        "net_amount",
-        "normalized_amount",
-      ]);
+      const amount = getAmountDollars(
+        row,
+        [
+          "amount",
+          "payout_amount",
+          "commission_amount",
+          "reward_amount",
+          "credit_amount",
+          "total_amount",
+          "net_amount",
+          "normalized_amount",
+        ],
+        [
+          "amount_cents",
+          "payout_amount_cents",
+          "commission_amount_cents",
+          "reward_amount_cents",
+          "net_amount_cents",
+          "guru_net_amount_cents",
+        ],
+        amountInCents,
+      );
 
       if (amount <= 0) return null;
 
@@ -216,22 +296,36 @@ function mapGenericRows(rows: SafeRow[], fallbackSource: PayoutSource, defaultBa
       );
       const status = normalizeStatus(getFirst(row, ["status", "payout_status", "reward_status", "normalized_status", "financial_treatment"], "pending"));
       const id = getFirst(row, ["id", "payout_id", "referral_reward_id", "referral_code_id"], `${defaultBatch}-${index}`);
+      const bookingId = getFirst(row, ["booking_id", "bookingId"], "");
+
+      const href =
+        source === "Referral" || source === "PawPerks"
+          ? "/admin/referrals"
+          : source === "Partner" || source === "Ambassador"
+            ? "/admin/financials/commissions"
+            : bookingId
+              ? `/admin/bookings?booking=${encodeURIComponent(bookingId)}`
+              : "/admin/financials/commissions";
 
       return {
         id,
         source,
+        ledgerSource,
         recipientName: getFirst(row, ["recipient_name", "guru_name", "ambassador_name", "partner_name", "customer_name", "referrer_name", "name", "full_name"], `${source} payout`),
         recipientEmail: getFirst(row, ["recipient_email", "guru_email", "ambassador_email", "partner_email", "customer_email", "referrer_email", "email"], "No email on file"),
         amount,
         status,
         reference: getFirst(row, ["transaction_reference", "stripe_transfer_id", "stripe_payout_id", "reference", "referral_code", "id"], "No reference"),
         batch: getFirst(row, ["batch_name", "batch", "payout_batch"], defaultBatch),
-        bookingId: getFirst(row, ["booking_id", "bookingId"], ""),
+        bookingId,
         paymentStatus: getFirst(row, ["payment_status", "stripe_status"], "Not listed"),
         payoutStatus: getFirst(row, ["payout_status", "status", "reward_status", "normalized_status"], status),
-        notes: getFirst(row, ["notes", "memo", "description", "financial_treatment"], `${source} payout row.`),
+        notes: getFirst(row, ["notes", "memo", "description", "financial_treatment"], `${source} payout row from ${ledgerSource}.`),
         createdAt: getFirst(row, ["payout_date", "scheduled_for", "paid_at", "credited_at", "created_at", "updated_at"], "") || null,
-        href: source === "Referral" || source === "PawPerks" ? "/admin/referrals" : "/admin/payouts",
+        href,
+        canRelease:
+          canRelease &&
+          ["ready", "pending", "scheduled", "processing"].includes(status),
       };
     })
     .filter(Boolean) as PayoutQueueRow[];
@@ -251,9 +345,12 @@ function dedupeRows(rows: PayoutQueueRow[]) {
 async function getPayoutRows() {
   const [
     bookingRows,
+    bookingPaymentRows,
     guruPayoutRows,
     partnerPayoutRows,
     payoutRows,
+    commissionRows,
+    partnerCommissionRows,
     financialPayoutRows,
     adminPayoutRows,
     referralRewardRows,
@@ -261,9 +358,12 @@ async function getPayoutRows() {
     stripePayoutRows,
   ] = await Promise.all([
     safeSelect("bookings"),
+    safeSelect("booking_payments", "*", 5000),
     safeSelect("guru_payouts"),
     safeSelect("partner_payouts"),
     safeSelect("payouts"),
+    safeSelect("commissions"),
+    safeSelect("partner_commissions"),
     safeSelect("financial_payouts"),
     safeSelect("admin_payouts"),
     safeSelect("admin_referral_reward_liability"),
@@ -271,21 +371,60 @@ async function getPayoutRows() {
     safeSelect("stripe_payouts"),
   ]);
 
-  return dedupeRows([
-    ...mapBookingRows(bookingRows),
-    ...mapGenericRows(guruPayoutRows, "Guru", "Guru payouts"),
-    ...mapGenericRows(partnerPayoutRows, "Partner", "Partner commissions"),
-    ...mapGenericRows(payoutRows, "Platform", "Payout records"),
-    ...mapGenericRows(financialPayoutRows, "Platform", "Financial payouts"),
-    ...mapGenericRows(adminPayoutRows, "Platform", "Admin payouts"),
-    ...mapGenericRows(referralRewardRows, "Referral", "Referral Rewards / PawPerks"),
-    ...mapGenericRows(stripeTransferRows, "Platform", "Stripe transfers"),
-    ...mapGenericRows(stripePayoutRows, "Platform", "Stripe payouts"),
-  ]).sort((a, b) => {
-    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return bTime - aTime;
-  });
+  const bookingPaymentsByBooking = new Map<string, SafeRow>();
+  for (const row of bookingPaymentRows) {
+    const bookingId = getFirst(row, ["booking_id", "bookingId"]);
+    if (bookingId && !bookingPaymentsByBooking.has(bookingId)) {
+      bookingPaymentsByBooking.set(bookingId, row);
+    }
+  }
+
+  return {
+    rows: dedupeRows([
+      ...mapBookingRows(bookingRows, bookingPaymentsByBooking),
+      ...mapGenericRows(guruPayoutRows, "Guru", "Guru payouts", "guru_payouts", {
+        canRelease: true,
+      }),
+      ...mapGenericRows(partnerPayoutRows, "Partner", "Partner commissions", "partner_payouts"),
+      ...mapGenericRows(payoutRows, "Platform", "Payout records", "payouts"),
+      ...mapGenericRows(commissionRows, "Partner", "Commission ledger", "commissions"),
+      ...mapGenericRows(
+        partnerCommissionRows,
+        "Partner",
+        "Partner commission ledger",
+        "partner_commissions",
+      ),
+      ...mapGenericRows(financialPayoutRows, "Platform", "Financial payouts", "financial_payouts"),
+      ...mapGenericRows(adminPayoutRows, "Platform", "Admin payouts", "admin_payouts"),
+      ...mapGenericRows(
+        referralRewardRows,
+        "Referral",
+        "Referral Rewards / PawPerks",
+        "admin_referral_reward_liability",
+      ),
+      ...mapGenericRows(stripeTransferRows, "Platform", "Stripe transfers", "stripe_transfers", {
+        amountInCents: true,
+      }),
+      ...mapGenericRows(stripePayoutRows, "Platform", "Stripe payouts", "stripe_payouts", {
+        amountInCents: true,
+      }),
+    ]).sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    }),
+    sourceCounts: {
+      bookings: bookingRows.length,
+      bookingPayments: bookingPaymentRows.length,
+      guruPayouts: guruPayoutRows.length,
+      partnerPayouts: partnerPayoutRows.length,
+      payouts: payoutRows.length,
+      commissions: commissionRows.length,
+      partnerCommissions: partnerCommissionRows.length,
+      referralRewards: referralRewardRows.length,
+      stripePayouts: stripePayoutRows.length,
+    },
+  };
 }
 
 function buildSummary(rows: PayoutQueueRow[]): PayoutSummary {
@@ -403,12 +542,34 @@ function StatCard({
 }
 
 export default async function AdminPayoutsPage() {
-  const rows = await getPayoutRows();
+  const actor = await getFinanceAdminIdentity();
+
+  if (!actor) {
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Financial access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with a finance-enabled admin account to manage SitGuru
+            payouts.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const { rows, sourceCounts } = await getPayoutRows();
   const summary = buildSummary(rows);
   const pendingRows = rows.filter((row) => ["ready", "pending", "processing", "scheduled"].includes(row.status));
   const reviewRows = rows.filter((row) => row.status === "review" || row.status === "failed");
   const referralRows = rows.filter((row) => row.source === "Referral" || row.source === "PawPerks");
-  const recentRows = rows.slice(0, 10);
+  const releasableRows = pendingRows.filter((row) => row.canRelease);
+  const recentRows = rows.slice(0, 12);
 
   return (
     <main className="min-h-screen bg-[#f7fbf8] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
@@ -418,21 +579,23 @@ export default async function AdminPayoutsPage() {
             <div className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-600">
               <Link href="/admin" className="text-emerald-800 hover:text-emerald-900">Admin</Link>
               <span>/</span>
+              <Link href="/admin/financials" className="text-emerald-800 hover:text-emerald-900">Financials</Link>
+              <span>/</span>
               <span className="text-slate-950">Payout Dashboard</span>
             </div>
 
             <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-emerald-800">
-                  Live Supabase Payouts
+                  Live Stripe + Ledger Payouts
                 </span>
                 <h1 className="mt-4 max-w-5xl text-5xl font-black tracking-[-0.05em] text-slate-950 lg:text-7xl">
                   Payout Dashboard
                 </h1>
                 <p className="mt-4 max-w-4xl text-base font-semibold leading-8 text-slate-700">
-                  Manage real Guru payouts, partner commissions, Ambassador rewards, PawPerks rewards,
-                  referral liabilities, payout batches, payment exceptions, refunds, and reconciliation work.
-                  This page does not use fake demo payout people or static date examples.
+                  Manage Guru payouts, partner commissions, Ambassador rewards, PawPerks,
+                  referral liabilities, Stripe transfers, and release-ready guru_payouts rows.
+                  Amounts prefer cents fields and booking_payments Stripe truth when present.
                 </p>
               </div>
 
@@ -440,11 +603,14 @@ export default async function AdminPayoutsPage() {
                 <Link href="/admin/payments" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800">
                   Open Payments <CreditCard className="h-4 w-4" />
                 </Link>
-                <Link href="/admin/financials/payouts" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50">
-                  Payout Analytics <TrendingUp className="h-4 w-4" />
+                <Link href="/admin/financials/commissions" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50">
+                  Commissions Analytics <TrendingUp className="h-4 w-4" />
                 </Link>
-                <Link href="/api/admin/financials/payouts/export" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-white">
+                <Link href="/api/admin/financials/payouts/export?format=csv" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-white">
                   Export CSV <Download className="h-4 w-4" />
+                </Link>
+                <Link href="/api/admin/financials/payouts/export?format=json" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-white">
+                  Export JSON <Download className="h-4 w-4" />
                 </Link>
               </div>
             </div>
@@ -453,7 +619,7 @@ export default async function AdminPayoutsPage() {
               <div className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50 p-5">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-800">Ready / Pending</p>
                 <p className="mt-2 text-3xl font-black text-slate-950">{formatCurrency(summary.readyToPay)}</p>
-                <p className="mt-1 text-sm font-bold text-slate-700">{summary.pendingCount} payout row(s)</p>
+                <p className="mt-1 text-sm font-bold text-slate-700">{summary.pendingCount} payout row(s) · {releasableRows.length} release-ready</p>
               </div>
               <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50 p-5">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Manual Review</p>
@@ -477,14 +643,14 @@ export default async function AdminPayoutsPage() {
                 <div>
                   <h2 className="text-3xl font-black tracking-tight text-slate-950">Payout workflow</h2>
                   <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
-                    Use this as the main payout landing page. It reads from live Supabase payout, booking, referral, Stripe, and financial payout tables when those tables exist.
+                    Review pending rows, dry-run then release Guru payouts through Stripe Connect, and reconcile deposits in NFCU.
                   </p>
                 </div>
               </div>
 
               <div className="mt-5 grid gap-3">
-                <Link href="/admin/financials/payouts" className="inline-flex items-center justify-between rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800">
-                  Open payout analytics <ArrowRight className="h-4 w-4" />
+                <Link href="/admin/financials/commissions" className="inline-flex items-center justify-between rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800">
+                  Open commissions analytics <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link href="/admin/referrals" className="inline-flex items-center justify-between rounded-2xl border border-purple-200 bg-purple-50 px-5 py-3 text-sm font-black text-purple-800 transition hover:bg-purple-100">
                   Review referral rewards <Gift className="h-4 w-4" />
@@ -492,13 +658,19 @@ export default async function AdminPayoutsPage() {
                 <Link href="/admin/financials/reconciliation" className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-50">
                   Reconcile deposits <RefreshCw className="h-4 w-4" />
                 </Link>
+                <Link href="/admin/financials/tax-reports/1099" className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-50">
+                  1099 tax support <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link href="/admin/financials/stripe" className="inline-flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-50">
+                  Stripe balances <CreditCard className="h-4 w-4" />
+                </Link>
               </div>
             </div>
 
             <div className="rounded-[2rem] border border-amber-100 bg-amber-50 p-6 shadow-sm">
               <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-800">Live-data note</p>
               <p className="mt-2 text-sm font-bold leading-6 text-slate-700">
-                If a section shows zero, it means no matching live rows were found in Supabase for that source. This page does not fill the dashboard with fake payout recipients.
+                Release actions only apply to `guru_payouts` rows. If a section shows zero, no matching live rows were found for that source.
               </p>
             </div>
           </aside>
@@ -540,15 +712,16 @@ export default async function AdminPayoutsPage() {
                         <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Status</th>
                         <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Reference</th>
                         <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Updated</th>
-                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Open</th>
+                        <th className="px-5 py-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {pendingRows.slice(0, 12).map((row) => (
-                        <tr key={`${row.source}-${row.id}`} className="border-t border-slate-100">
+                      {pendingRows.slice(0, 20).map((row) => (
+                        <tr key={`${row.ledgerSource}-${row.source}-${row.id}`} className="border-t border-slate-100">
                           <td className="px-5 py-4">
                             <p className="font-black text-slate-950">{row.recipientName}</p>
                             <p className="text-xs font-bold text-slate-500">{row.recipientEmail}</p>
+                            <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">{row.ledgerSource}</p>
                           </td>
                           <td className="px-5 py-4">
                             <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${sourceBadgeClass(row.source)}`}>{row.source}</span>
@@ -560,7 +733,15 @@ export default async function AdminPayoutsPage() {
                           <td className="max-w-[240px] truncate px-5 py-4 font-bold text-slate-600">{row.reference}</td>
                           <td className="px-5 py-4 font-bold text-slate-600">{formatDateTime(row.createdAt)}</td>
                           <td className="px-5 py-4">
-                            <Link href={row.href} className="inline-flex rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 hover:bg-emerald-50">Open</Link>
+                            <div className="flex flex-col gap-2">
+                              <Link href={row.href} className="inline-flex w-fit rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 hover:bg-emerald-50">Open</Link>
+                              {row.canRelease ? (
+                                <PayoutReleaseButton
+                                  payoutId={row.id}
+                                  amountLabel={formatCurrency(row.amount)}
+                                />
+                              ) : null}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -641,12 +822,13 @@ export default async function AdminPayoutsPage() {
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
             {recentRows.length > 0 ? (
               recentRows.map((row) => (
-                <Link key={`${row.source}-${row.id}-recent`} href={row.href} className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
+                <Link key={`${row.ledgerSource}-${row.source}-${row.id}-recent`} href={row.href} className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="flex flex-wrap gap-2">
                         <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${sourceBadgeClass(row.source)}`}>{row.source}</span>
                         <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black capitalize ${statusBadgeClass(row.status)}`}>{row.status}</span>
+                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.08em] text-slate-500">{row.ledgerSource}</span>
                       </div>
                       <h3 className="mt-3 text-lg font-black text-slate-950">{row.recipientName}</h3>
                       <p className="mt-1 text-sm font-bold text-slate-600">{row.batch}</p>
@@ -665,6 +847,76 @@ export default async function AdminPayoutsPage() {
                 <p className="mt-2 text-sm font-semibold text-slate-600">When real payout rows exist in Supabase, they will appear here. No fake demo names are shown.</p>
               </div>
             )}
+          </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm lg:p-8">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Referral / PawPerks</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">Reward payout support</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                Pending and issued reward rows from admin_referral_reward_liability for CPA and growth review.
+              </p>
+            </div>
+            <Link href="/admin/referrals" className="inline-flex w-fit items-center gap-2 rounded-full border border-purple-200 bg-purple-50 px-4 py-2 text-xs font-black text-purple-800 hover:bg-purple-100">
+              Open Growth & Referrals <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {referralRows.slice(0, 9).map((row) => (
+              <Link
+                key={`${row.ledgerSource}-${row.id}-referral`}
+                href={row.href}
+                className="rounded-[1.25rem] border border-slate-100 bg-slate-50 p-4 transition hover:border-emerald-200 hover:bg-white"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-black text-slate-950">{row.recipientName}</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">{row.source} · {row.status}</p>
+                  </div>
+                  <p className="font-black text-slate-950">{formatCurrency(row.amount)}</p>
+                </div>
+              </Link>
+            ))}
+            {referralRows.length === 0 ? (
+              <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 p-5 text-center md:col-span-2 xl:col-span-3">
+                <p className="text-sm font-bold text-slate-600">No referral reward payout rows found yet.</p>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm lg:p-8">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-slate-950">Supabase source coverage</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-600">
+                Live row counts powering this payout queue.
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+            {[
+              ["Bookings", sourceCounts.bookings],
+              ["Booking Payments", sourceCounts.bookingPayments],
+              ["Guru Payouts", sourceCounts.guruPayouts],
+              ["Partner Payouts", sourceCounts.partnerPayouts],
+              ["Payouts", sourceCounts.payouts],
+              ["Commissions", sourceCounts.commissions],
+              ["Partner Commissions", sourceCounts.partnerCommissions],
+              ["Referral Rewards", sourceCounts.referralRewards],
+              ["Stripe Payouts", sourceCounts.stripePayouts],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="rounded-2xl border border-emerald-100 bg-[#fbfefc] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.08em] text-slate-500">{label}</p>
+                <p className="mt-2 text-2xl font-black text-slate-950">{Number(value)}</p>
+              </div>
+            ))}
           </div>
         </section>
       </div>

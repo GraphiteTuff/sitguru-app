@@ -1,145 +1,228 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type AnyRow = Record<string, unknown>;
 
-const FINANCE_ROLES = new Set([
-  "owner",
-  "super_admin",
-  "admin",
-  "finance_admin",
-  "finance",
-  "accounting",
-  "bookkeeper",
-]);
+type SafeQueryResponse = {
+  data: unknown;
+  error: unknown;
+};
+
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function toNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const cleaned = value.replace(/[$,()]/g, "").trim();
+    const parsed = Number(cleaned);
+    if (Number.isFinite(parsed)) {
+      return value.includes("(") && value.includes(")") ? -parsed : parsed;
+    }
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function centsToDollars(value: unknown) {
+  return toNumber(value) / 100;
+}
+
+function firstNumber(row: AnyRow, keys: string[]) {
+  for (const key of keys) {
+    const value = toNumber(row[key]);
+    if (value > 0) return value;
+  }
+  return 0;
+}
+
+function amountDollars(row: AnyRow, amountInCents = false) {
+  const fromCents = firstNumber(row, [
+    "amount_cents",
+    "payout_amount_cents",
+    "guru_net_amount_cents",
+    "net_amount_cents",
+    "commission_amount_cents",
+  ]);
+  if (fromCents > 0) return fromCents / 100;
+
+  const raw = firstNumber(row, [
+    "amount",
+    "payout_amount",
+    "commission_amount",
+    "reward_amount",
+    "credit_amount",
+    "total_amount",
+    "net_amount",
+    "normalized_amount",
+  ]);
+
+  if (amountInCents && raw > 0) return raw / 100;
+  return raw;
+}
 
 function csvEscape(value: unknown) {
   const text = String(value ?? "");
-  if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
   return text;
 }
 
-async function requireFinanceAccess() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const email = String(user.email || "").toLowerCase();
-  const envEmails = String(process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-
-  if (envEmails.includes(email)) {
-    return { id: user.id, email };
+async function safeRows<T>(
+  query: PromiseLike<SafeQueryResponse>,
+  label: string,
+): Promise<T[]> {
+  try {
+    const result = await query;
+    if (result.error) {
+      console.warn(`Payouts export query skipped for ${label}:`, result.error);
+      return [];
+    }
+    return Array.isArray(result.data) ? (result.data as T[]) : [];
+  } catch (error) {
+    console.warn(`Payouts export query skipped for ${label}:`, error);
+    return [];
   }
-
-  const [adminUser, profile] = await Promise.all([
-    supabaseAdmin
-      .from("admin_users")
-      .select("role,can_access_financials,is_active")
-      .eq("user_id", user.id)
-      .limit(1),
-    supabaseAdmin
-      .from("profiles")
-      .select("role,can_access_financials,is_active")
-      .eq("id", user.id)
-      .limit(1),
-  ]);
-
-  const row = adminUser.data?.[0] || profile.data?.[0];
-  const role = String(row?.role || "").toLowerCase();
-  const active = row?.is_active !== false;
-  const canAccess =
-    Boolean(row?.can_access_financials) || FINANCE_ROLES.has(role);
-
-  if (!active || !canAccess) return null;
-  return { id: user.id, email };
 }
 
-async function safeRows(table: string, columns: string) {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from(table)
-      .select(columns)
-      .limit(5000);
-    if (error) return [] as AnyRow[];
-    return (Array.isArray(data) ? data : []) as unknown as AnyRow[];
-  } catch {
-    return [] as AnyRow[];
-  }
+function mapRows(
+  rows: AnyRow[],
+  source: string,
+  amountInCents = false,
+) {
+  return rows.map((row) => ({
+    source,
+    id: asTrimmedString(row.id) || asTrimmedString(row.payout_id),
+    party_id:
+      asTrimmedString(row.guru_id) ||
+      asTrimmedString(row.partner_id) ||
+      asTrimmedString(row.user_id) ||
+      asTrimmedString(row.recipient_id) ||
+      "",
+    amount: amountDollars(row, amountInCents),
+    status:
+      asTrimmedString(row.status) ||
+      asTrimmedString(row.payout_status) ||
+      asTrimmedString(row.reward_status) ||
+      "pending",
+    currency: asTrimmedString(row.currency) || "USD",
+    created_at:
+      asTrimmedString(row.created_at) ||
+      asTrimmedString(row.paid_at) ||
+      asTrimmedString(row.issued_at) ||
+      "",
+    paid_at: asTrimmedString(row.paid_at) || "",
+    booking_id:
+      asTrimmedString(row.booking_id) || asTrimmedString(row.bookingId) || "",
+    provider:
+      asTrimmedString(row.provider) ||
+      (source.includes("stripe") ? "stripe" : source),
+    notes:
+      asTrimmedString(row.notes) ||
+      asTrimmedString(row.financial_treatment) ||
+      "",
+  }));
 }
 
 export async function GET(request: NextRequest) {
-  const actor = await requireFinanceAccess();
-  if (!actor) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const financeCheck = await requireFinanceAdminApi();
+  if (!financeCheck.identity) return financeCheck.response;
 
   const format = String(
     request.nextUrl.searchParams.get("format") || "csv",
   ).toLowerCase();
 
-  const [guruPayouts, partnerPayouts, genericPayouts] = await Promise.all([
-    safeRows(
+  const [
+    guruPayouts,
+    partnerPayouts,
+    genericPayouts,
+    commissions,
+    partnerCommissions,
+    referralRewards,
+    bookingPayments,
+    stripePayouts,
+  ] = await Promise.all([
+    safeRows<AnyRow>(
+      supabaseAdmin.from("guru_payouts").select("*").limit(5000),
       "guru_payouts",
-      "id,guru_id,amount,status,created_at,paid_at,currency,booking_id",
     ),
-    safeRows(
+    safeRows<AnyRow>(
+      supabaseAdmin.from("partner_payouts").select("*").limit(5000),
       "partner_payouts",
-      "id,partner_id,amount,status,created_at,paid_at,currency",
     ),
-    safeRows(
+    safeRows<AnyRow>(
+      supabaseAdmin.from("payouts").select("*").limit(5000),
       "payouts",
-      "id,user_id,amount,status,created_at,paid_at,currency,provider",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("commissions").select("*").limit(2500),
+      "commissions",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("partner_commissions").select("*").limit(2500),
+      "partner_commissions",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_referral_reward_liability")
+        .select("*")
+        .limit(2500),
+      "admin_referral_reward_liability",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("booking_payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "booking_payments",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("stripe_payouts").select("*").limit(2500),
+      "stripe_payouts",
     ),
   ]);
 
   const rows = [
-    ...guruPayouts.map((row) => ({
-      source: "guru_payouts",
-      id: row.id,
-      party_id: row.guru_id,
-      amount: row.amount,
-      status: row.status,
-      currency: row.currency || "USD",
-      created_at: row.created_at,
-      paid_at: row.paid_at,
-      booking_id: row.booking_id || "",
-      provider: "stripe",
-    })),
-    ...partnerPayouts.map((row) => ({
-      source: "partner_payouts",
-      id: row.id,
-      party_id: row.partner_id,
-      amount: row.amount,
-      status: row.status,
-      currency: row.currency || "USD",
-      created_at: row.created_at,
-      paid_at: row.paid_at,
-      booking_id: "",
-      provider: "partner",
-    })),
-    ...genericPayouts.map((row) => ({
-      source: "payouts",
-      id: row.id,
-      party_id: row.user_id,
-      amount: row.amount,
-      status: row.status,
-      currency: row.currency || "USD",
-      created_at: row.created_at,
-      paid_at: row.paid_at,
-      booking_id: "",
-      provider: row.provider || "",
-    })),
-  ];
+    ...mapRows(guruPayouts, "guru_payouts"),
+    ...mapRows(partnerPayouts, "partner_payouts"),
+    ...mapRows(genericPayouts, "payouts"),
+    ...mapRows(commissions, "commissions"),
+    ...mapRows(partnerCommissions, "partner_commissions"),
+    ...mapRows(referralRewards, "admin_referral_reward_liability"),
+    ...mapRows(
+      bookingPayments.map((row) => ({
+        ...row,
+        amount:
+          centsToDollars(row.marketplace_support_cents) ||
+          centsToDollars(row.amount_cents) ||
+          toNumber(row.amount),
+        status: row.status,
+        provider: "stripe",
+      })),
+      "booking_payments",
+    ),
+    ...mapRows(stripePayouts, "stripe_payouts", true),
+  ].filter((row) => row.amount > 0 || row.id);
+
+  try {
+    await supabaseAdmin.from("financial_audit_logs").insert({
+      actor_id: financeCheck.identity.id,
+      actor_email: financeCheck.identity.email,
+      actor_role: financeCheck.identity.role,
+      action: "export_payouts",
+      area: "financials.payouts.export",
+      target_type: "payouts",
+      metadata: { format, rowCount: rows.length },
+      created_at: new Date().toISOString(),
+    });
+  } catch {
+    // Audit tables may not exist in every environment.
+  }
 
   if (format === "json") {
     return NextResponse.json({
@@ -160,12 +243,21 @@ export async function GET(request: NextRequest) {
     "paid_at",
     "booking_id",
     "provider",
+    "notes",
   ];
 
   const csv = [
     header.join(","),
     ...rows.map((row) =>
-      header.map((key) => csvEscape((row as AnyRow)[key])).join(","),
+      header
+        .map((key) =>
+          csvEscape(
+            key === "amount"
+              ? Number((row as AnyRow)[key] || 0).toFixed(2)
+              : (row as AnyRow)[key],
+          ),
+        )
+        .join(","),
     ),
   ].join("\n");
 

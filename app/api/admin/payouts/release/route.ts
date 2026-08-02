@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 
 export const dynamic = "force-dynamic";
 
@@ -62,11 +62,28 @@ function normalizeStatus(value: unknown) {
   return String(value || "").trim().toLowerCase();
 }
 
-function getAllowedAdminEmails() {
-  return String(process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
+
+async function getAuthenticatedAdmin() {
+  const financeCheck = await requireFinanceAdminApi();
+
+  if (!financeCheck.identity) {
+    return {
+      ok: false as const,
+      user: null,
+      message: "Finance admin access required to release payouts.",
+      response: financeCheck.response,
+    };
+  }
+
+  return {
+    ok: true as const,
+    user: {
+      id: financeCheck.identity.id,
+      email: financeCheck.identity.email,
+    },
+    message: "Authorized by shared finance admin access.",
+    response: null,
+  };
 }
 
 function getPayoutId(row: DbRow) {
@@ -169,64 +186,6 @@ function isReleaseableStatus(status: string) {
     "scheduled",
     "pending",
   ].includes(status);
-}
-
-async function getAuthenticatedAdmin() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return {
-      ok: false,
-      user: null,
-      message: "You must be signed in to release payouts.",
-    };
-  }
-
-  const email = String(user.email || "").toLowerCase();
-  const allowedEmails = getAllowedAdminEmails();
-
-  if (allowedEmails.includes(email)) {
-    return {
-      ok: true,
-      user,
-      message: "Authorized by ADMIN_EMAILS.",
-    };
-  }
-
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const role = normalizeStatus(
-    firstString(profile || {}, ["role", "admin_role", "account_role", "user_role"]),
-  );
-
-  const isAdmin =
-    profile?.is_admin === true ||
-    profile?.admin === true ||
-    ["admin", "super_admin", "owner", "finance", "finance_admin"].includes(role);
-
-  if (isAdmin) {
-    return {
-      ok: true,
-      user,
-      message: "Authorized by profile role.",
-    };
-  }
-
-  return {
-    ok: false,
-    user,
-    message:
-      "Your account is not authorized to release payouts. Add an admin role in profiles or add your email to ADMIN_EMAILS.",
-  };
 }
 
 async function safeUpdateGuruPayout(payoutId: string, patches: DbRow[]) {
@@ -627,13 +586,16 @@ async function releaseOnePayout({
 export async function POST(request: Request) {
   const admin = await getAuthenticatedAdmin();
 
-  if (!admin.ok || !admin.user) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: admin.message,
-      },
-      { status: admin.user ? 403 : 401 },
+  if (!admin.ok) {
+    return (
+      admin.response ||
+      NextResponse.json(
+        {
+          ok: false,
+          error: "Finance admin access required to release payouts.",
+        },
+        { status: 403 },
+      )
     );
   }
 
