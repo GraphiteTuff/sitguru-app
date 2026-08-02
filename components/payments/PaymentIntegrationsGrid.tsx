@@ -63,7 +63,7 @@ const PAYMENT_PARTNERS: PaymentPartner[] = [
     label: "Google Pay",
     logoSrc: "/images/payments/google-pay.svg",
     logoClassName:
-      "h-9 w-[94%] max-w-[9rem] sm:h-10 sm:max-w-[10rem] lg:h-11 lg:max-w-[11rem]",
+      "h-8 w-auto max-w-[7.5rem] sm:h-9 sm:max-w-[8.25rem] lg:h-10 lg:max-w-[9rem]",
   },
   {
     name: "venmo",
