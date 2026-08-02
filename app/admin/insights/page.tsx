@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import {
   AlertTriangle,
   MessageCircleQuestion,
   Sparkles,
   TrendingUp,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { getAdminIdentity } from "@/lib/admin/access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import ChatInsightsPanel, {
   type GlobalInsightRow,
@@ -14,36 +13,27 @@ import ChatInsightsPanel, {
 
 export const dynamic = "force-dynamic";
 
-async function requireAdminOrRedirect() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/admin/login");
-
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("id, role, account_status")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const role = String(
-    (profile as { role?: string } | null)?.role || "",
-  ).toLowerCase();
-  const status = String(
-    (profile as { account_status?: string } | null)?.account_status || "active",
-  ).toLowerCase();
-
-  if (role !== "admin" || (status && status !== "active")) {
-    redirect("/admin/login");
-  }
-
-  return user;
-}
-
 export default async function AdminChatInsightsPage() {
-  await requireAdminOrRedirect();
+  const actor = await getAdminIdentity();
+
+  if (!actor?.canAccessAdmin) {
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Admin access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with an authorized SitGuru admin account to open Chat
+            Insights.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const { data, error } = await supabaseAdmin
     .from("global_chat_insights")
@@ -104,12 +94,20 @@ export default async function AdminChatInsightsPage() {
             before it leaks conversions.
           </p>
         </div>
-        <Link
-          href="/help"
-          className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50"
-        >
-          Open Help Center
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/analytics"
+            className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-900 hover:bg-emerald-100"
+          >
+            Analytics Hub
+          </Link>
+          <Link
+            href="/help"
+            className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50"
+          >
+            Open Help Center
+          </Link>
+        </div>
       </div>
 
       {error ? (
