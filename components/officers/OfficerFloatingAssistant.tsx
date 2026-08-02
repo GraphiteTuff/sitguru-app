@@ -400,6 +400,10 @@ export default function OfficerFloatingAssistant({
           ["--officer-brand"]: theme.brand,
           ["--officer-brand-deep"]: theme.brandDeep,
           ["--officer-cream"]: theme.cream,
+          /* Homepage chat CSS reads --hcb-green for user bubbles / tips. */
+          ["--hcb-green"]: theme.brand,
+          ["--hcb-green-deep"]: theme.brandDeep,
+          ["--hcb-cream"]: theme.cream,
         } as CSSProperties
       }
     >
@@ -533,6 +537,11 @@ export default function OfficerFloatingAssistant({
                   <div
                     key={message.id}
                     className="homepage-chat-bubble homepage-chat-bubble--user"
+                    style={{
+                      backgroundColor: theme.brand,
+                      color: "#ffffff",
+                      WebkitTextFillColor: "#ffffff",
+                    }}
                   >
                     {message.content}
                   </div>
