@@ -331,6 +331,7 @@ export default function RogueFloatingAssistant() {
         <button
           type="button"
           className="homepage-chat-tip"
+          style={{ maxWidth: "min(300px, calc(100vw - 6.5rem))" }}
           onClick={openPanel}
           aria-label="Open Rogue reporting terminal"
         >
