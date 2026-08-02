@@ -10,6 +10,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type FormEvent,
   type ReactNode,
@@ -175,7 +176,11 @@ function renderInline(text: string): ReactNode {
 
 export default function DelilahFloatingAssistant() {
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -200,10 +205,6 @@ export default function DelilahFloatingAssistant() {
       },
     ],
   });
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!open) return;
