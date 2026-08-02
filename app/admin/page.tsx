@@ -265,7 +265,7 @@ export default async function AdminOperationsDashboard() {
     {
       label: "PawPerks Conflicts",
       value: pawPerksConflicts,
-      href: "/admin/referrals",
+      href: "/admin/referrals/inventory",
     },
   ].filter((item) => numericCount(item.value) > 0 || !item.value.available);
 
