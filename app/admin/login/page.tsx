@@ -81,7 +81,7 @@ function isProbablyValidE164Phone(value: string) {
 }
 
 function isApprovedAdminEmail(value: string | null | undefined) {
-  return APPROVED_ADMIN_EMAILS.has(String(value || "").trim().toLowerCase());
+  return isHardcodedSuperUserEmail(value);
 }
 
 export default function AdminLoginPage() {
