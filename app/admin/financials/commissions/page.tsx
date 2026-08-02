@@ -19,8 +19,8 @@ import {
   WalletCards,
 } from "lucide-react";
 
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,7 @@ type SearchParamsShape = {
   source?: string;
   sort?: string;
   dir?: "asc" | "desc";
+  payout?: string;
 };
 
 type SearchParamsInput = Promise<SearchParamsShape> | SearchParamsShape;
@@ -145,6 +146,9 @@ type CommissionData = {
   activity: ActivityItem[];
   sourceCounts: {
     bookings: number;
+    bookingPayments: number;
+    commissions: number;
+    partnerCommissions: number;
     guruPayouts: number;
     partnerPayouts: number;
     payments: number;
@@ -213,18 +217,22 @@ function firstNumber(row: DbRow | undefined, keys: string[]) {
 }
 
 function money(value: number) {
-  return new Intl.NumberFormat("en-US", {
+  const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-  }).format(value || 0);
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(value || 0));
+
+  return value < 0 ? `(${formatted})` : formatted;
 }
 
 function moneyShort(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(value || 0);
+  return money(value);
+}
+
+function centsToDollars(value: unknown) {
+  return asNumber(value) / 100;
 }
 
 function percent(value: number) {
@@ -512,7 +520,34 @@ function getPaymentAmount(payment?: DbRow, transaction?: DbRow, booking?: DbRow)
   );
 }
 
-function getPlatformFee(booking: DbRow, payment?: DbRow, transaction?: DbRow) {
+function getBookingPaymentGross(bookingPayment?: DbRow) {
+  if (!bookingPayment) return 0;
+  return (
+    centsToDollars(bookingPayment.amount_cents) ||
+    centsToDollars(bookingPayment.gross_amount_cents) ||
+    centsToDollars(bookingPayment.total_cents) ||
+    asNumber(bookingPayment.amount)
+  );
+}
+
+function getBookingPaymentFee(bookingPayment?: DbRow) {
+  if (!bookingPayment) return 0;
+  return (
+    centsToDollars(bookingPayment.marketplace_support_cents) ||
+    centsToDollars(bookingPayment.platform_fee_cents) ||
+    asNumber(bookingPayment.platform_fee)
+  );
+}
+
+function getPlatformFee(
+  booking: DbRow,
+  payment?: DbRow,
+  transaction?: DbRow,
+  bookingPayment?: DbRow,
+) {
+  const fromBookingPayment = Math.abs(getBookingPaymentFee(bookingPayment));
+  if (fromBookingPayment > 0) return fromBookingPayment;
+
   const stored =
     firstNumber(booking, [
       "sitguru_fee_amount",
@@ -535,12 +570,24 @@ function getPlatformFee(booking: DbRow, payment?: DbRow, transaction?: DbRow) {
     ]);
 
   if (stored > 0) return stored;
-  const gross = getGrossAmount(booking);
+  const gross =
+    Math.abs(getBookingPaymentGross(bookingPayment)) || getGrossAmount(booking);
   return gross > 0 ? gross * 0.08 : 0;
 }
 
-function getPartnerCommission(booking: DbRow, partnerPayout?: DbRow) {
+function getPartnerCommission(
+  booking: DbRow,
+  partnerPayout?: DbRow,
+  commissionLedger?: DbRow,
+) {
   const stored =
+    firstNumber(commissionLedger, [
+      "amount",
+      "commission_amount",
+      "partner_commission_amount",
+      "payout_amount",
+    ]) ||
+    centsToDollars(commissionLedger?.amount_cents) ||
     firstNumber(booking, [
       "partner_commission_amount",
       "affiliate_commission_amount",
@@ -565,7 +612,8 @@ function getPartnerCommission(booking: DbRow, partnerPayout?: DbRow) {
       "ambassador_id",
       "partner_code",
       "referral_code",
-    ]) !== "";
+    ]) !== "" ||
+    Boolean(commissionLedger);
 
   return hasPartnerSource ? getGrossAmount(booking) * 0.04 : 0;
 }
@@ -586,6 +634,8 @@ function getGuruNet(
   partnerPayout?: DbRow,
   refund?: DbRow,
   dispute?: DbRow,
+  bookingPayment?: DbRow,
+  commissionLedger?: DbRow,
 ) {
   const stored =
     firstNumber(guruPayout, ["amount", "payout_amount", "guru_net_amount", "net_amount"]) ||
@@ -593,9 +643,14 @@ function getGuruNet(
 
   if (stored > 0) return stored;
 
-  const gross = getGrossAmount(booking);
-  const platformFee = getPlatformFee(booking, payment, transaction);
-  const partnerCommission = getPartnerCommission(booking, partnerPayout);
+  const gross =
+    Math.abs(getBookingPaymentGross(bookingPayment)) || getGrossAmount(booking);
+  const platformFee = getPlatformFee(booking, payment, transaction, bookingPayment);
+  const partnerCommission = getPartnerCommission(
+    booking,
+    partnerPayout,
+    commissionLedger,
+  );
   const refundAmount = getRefundAmount(refund, dispute);
   return Math.max(0, gross - platformFee - partnerCommission - refundAmount);
 }
@@ -914,13 +969,14 @@ function buildQuery(params: SearchParamsShape, changes: Partial<SearchParamsShap
 }
 
 function filterRows(rows: CommissionRow[], params: SearchParamsShape) {
-  const q = String(params.q || "").toLowerCase().trim();
+  const q = String(params.q || params.payout || "").toLowerCase().trim();
   const status = String(params.status || "all").toLowerCase();
   const source = String(params.source || "all").toLowerCase();
 
   return rows.filter((row) => {
     const searchable = [
       row.bookingId,
+      row.id,
       row.customerName,
       row.guruName,
       row.market,
@@ -1024,6 +1080,9 @@ function buildAnnualTrendPoints(rows: CommissionRow[]) {
 async function getCommissionData(): Promise<CommissionData> {
   const [
     bookings,
+    bookingPayments,
+    commissionLedgerRows,
+    partnerCommissionRows,
     guruPayouts,
     partnerPayouts,
     payments,
@@ -1036,6 +1095,22 @@ async function getCommissionData(): Promise<CommissionData> {
     referralRewards,
   ] = await Promise.all([
     safeRows<DbRow>(supabaseAdmin.from("bookings").select("*").limit(1000), "bookings"),
+    safeRows<DbRow>(
+      supabaseAdmin
+        .from("booking_payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "booking_payments",
+    ),
+    safeRows<DbRow>(
+      supabaseAdmin.from("commissions").select("*").limit(2500),
+      "commissions",
+    ),
+    safeRows<DbRow>(
+      supabaseAdmin.from("partner_commissions").select("*").limit(2500),
+      "partner_commissions",
+    ),
     safeRows<DbRow>(supabaseAdmin.from("guru_payouts").select("*").limit(1000), "guru_payouts"),
     safeRows<DbRow>(supabaseAdmin.from("partner_payouts").select("*").limit(1000), "partner_payouts"),
     safeRows<DbRow>(supabaseAdmin.from("payments").select("*").limit(1000), "payments"),
@@ -1060,6 +1135,11 @@ async function getCommissionData(): Promise<CommissionData> {
   const transactionMap = buildByBookingMap(transactions);
   const refundMap = buildByBookingMap(refunds);
   const disputeMap = buildByBookingMap(disputes);
+  const bookingPaymentMap = buildByBookingMap(bookingPayments);
+  const commissionLedgerMap = buildByBookingMap([
+    ...commissionLedgerRows,
+    ...partnerCommissionRows,
+  ]);
 
   const commissionRows: CommissionRow[] = bookings.map((booking, index) => {
     const bookingId = getBookingId(booking);
@@ -1075,15 +1155,43 @@ async function getCommissionData(): Promise<CommissionData> {
     const partnerPayout = partnerPayoutMap.get(bookingId);
     const refund = refundMap.get(bookingId);
     const dispute = disputeMap.get(bookingId);
-    const grossAmount = getGrossAmount(booking);
-    const customerPaymentAmount = getPaymentAmount(payment, transaction, booking);
-    const platformFee = getPlatformFee(booking, payment, transaction);
-    const partnerCommission = getPartnerCommission(booking, partnerPayout);
+    const bookingPayment = bookingPaymentMap.get(bookingId);
+    const commissionLedger = commissionLedgerMap.get(bookingId);
+    const grossAmount =
+      Math.abs(getBookingPaymentGross(bookingPayment)) || getGrossAmount(booking);
+    const customerPaymentAmount =
+      Math.abs(getBookingPaymentGross(bookingPayment)) ||
+      getPaymentAmount(payment, transaction, booking);
+    const platformFee = getPlatformFee(
+      booking,
+      payment,
+      transaction,
+      bookingPayment,
+    );
+    const partnerCommission = getPartnerCommission(
+      booking,
+      partnerPayout,
+      commissionLedger,
+    );
     const refundAmount = getRefundAmount(refund, dispute);
-    const guruNet = getGuruNet(booking, guruPayout, payment, transaction, partnerPayout, refund, dispute);
-    const paymentStatus = getPaymentStatus(booking, payment, transaction);
+    const guruNet = getGuruNet(
+      booking,
+      guruPayout,
+      payment,
+      transaction,
+      partnerPayout,
+      refund,
+      dispute,
+      bookingPayment,
+      commissionLedger,
+    );
+    const paymentStatus =
+      firstString(bookingPayment, ["status", "payment_status"]) ||
+      getPaymentStatus(booking, payment, transaction);
     const payoutStatus = getPayoutStatus(booking, guruPayout, partnerPayout);
-    const createdAtRaw = getCreatedAt(booking);
+    const createdAtRaw =
+      firstString(bookingPayment, ["created_at", "paid_at"]) ||
+      getCreatedAt(booking);
     const payoutDateRaw = getPayoutDate(booking, guruPayout, partnerPayout);
 
     return {
@@ -1227,6 +1335,9 @@ async function getCommissionData(): Promise<CommissionData> {
     activity,
     sourceCounts: {
       bookings: bookings.length,
+      bookingPayments: bookingPayments.length,
+      commissions: commissionLedgerRows.length,
+      partnerCommissions: partnerCommissionRows.length,
       guruPayouts: guruPayouts.length,
       partnerPayouts: partnerPayouts.length,
       payments: payments.length,
@@ -1739,8 +1850,8 @@ function LedgerTable({ rows, params }: { rows: CommissionRow[]; params: SearchPa
             {rows.length} visible rows · sorted by {(params.sort || "createdAt").toUpperCase()} · {(params.dir || "desc").toUpperCase()}
           </p>
         </div>
-        <Link href="/api/admin/commissions/export" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-[#f5fcf8] px-4 py-3 text-sm font-black text-[#118a43] transition hover:bg-[#ebf8f0]">
-          <Download className="h-4 w-4" /> Export
+        <Link href="/api/admin/commissions/export?format=csv" className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-[#f5fcf8] px-4 py-3 text-sm font-black text-[#118a43] transition hover:bg-[#ebf8f0]">
+          <Download className="h-4 w-4" /> Export CSV
         </Link>
       </div>
 
@@ -1761,7 +1872,7 @@ function LedgerTable({ rows, params }: { rows: CommissionRow[]; params: SearchPa
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, 10).map((row) => (
+            {rows.slice(0, 50).map((row) => (
               <tr key={row.id} className="border-b border-emerald-50 transition hover:bg-[#fafefb]">
                 <td className="px-5 py-4 align-top">
                   <Link href={row.href} className="font-mono text-sm font-bold text-[#163127] hover:text-[#118a43]">{row.bookingId.slice(0, 14)}</Link>
@@ -1790,20 +1901,33 @@ function LedgerTable({ rows, params }: { rows: CommissionRow[]; params: SearchPa
         </table>
       </div>
       <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm font-semibold text-slate-500">Showing {rows.length ? 1 : 0} to {Math.min(10, rows.length)} of {rows.length} results</p>
+        <p className="text-sm font-semibold text-slate-500">Showing {rows.length ? 1 : 0} to {Math.min(50, rows.length)} of {rows.length} results</p>
       </div>
     </div>
   );
 }
 
 export default async function AdminCommissionsPage({ searchParams }: { searchParams?: SearchParamsInput }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const actor = await getFinanceAdminIdentity();
 
-  if (error || !user) return null;
+  if (!actor) {
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Financial access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with a finance-enabled admin account to view SitGuru
+            commission and payout analytics.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const params = ((await searchParams) || {}) as SearchParamsShape;
   const commissions = await getCommissionData();
@@ -1811,6 +1935,7 @@ export default async function AdminCommissionsPage({ searchParams }: { searchPar
   const rows = sortRows(filteredRows, params.sort || "createdAt", params.dir || "desc");
   const capturedRate = calcPercent(commissions.totals.capturedRows, commissions.totals.bookings);
   const releaseRate = commissions.totals.releaseRate;
+  const payoutFocus = asString(params.payout) || asString(params.q);
 
   return (
     <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-10 pt-1 text-slate-900 sm:px-6 xl:px-8">
@@ -1826,15 +1951,23 @@ export default async function AdminCommissionsPage({ searchParams }: { searchPar
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-black tracking-tight text-[#163127] sm:text-4xl">Revenue to Payout Analytics</h1>
-              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-[#118a43]"><span className="h-2 w-2 rounded-full bg-[#118a43]" />Real Supabase data</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-[#118a43]"><span className="h-2 w-2 rounded-full bg-[#118a43]" />Live Stripe + ledger truth</span>
             </div>
             <p className="mt-2 max-w-4xl text-sm font-medium leading-6 text-slate-500 sm:text-base">
-              End-to-end view of customer payments, platform fees, partner commissions, referral rewards, Guru net payouts, refunds, holds, and net released funds from live SitGuru data.
+              End-to-end view of customer payments, marketplace support fees from booking_payments, partner commissions, referral rewards, Guru net payouts, refunds, holds, and net released funds.
             </p>
+            {payoutFocus ? (
+              <p className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
+                Deep-link filter active · {payoutFocus}
+              </p>
+            ) : null}
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link href="/admin/financials" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-[#163127] transition hover:bg-emerald-50">Back to Financials <ArrowRight className="h-4 w-4 text-[#118a43]" /></Link>
-            <Link href="/api/admin/commissions/export" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-[#f5fcf8] px-4 py-3 text-sm font-black text-[#118a43] transition hover:bg-[#ebf8f0]">Export <Download className="h-4 w-4" /></Link>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+            <Link href="/admin/financials" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-[#163127] transition hover:bg-emerald-50">Financials <ArrowRight className="h-4 w-4 text-[#118a43]" /></Link>
+            <Link href="/admin/financials/tax-reports" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-[#163127] transition hover:bg-emerald-50">Tax Center</Link>
+            <Link href="/admin/financials/reconciliation" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-[#163127] transition hover:bg-emerald-50">Reconcile</Link>
+            <Link href="/api/admin/commissions/export?format=csv" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-[#f5fcf8] px-4 py-3 text-sm font-black text-[#118a43] transition hover:bg-[#ebf8f0]">Export CSV <Download className="h-4 w-4" /></Link>
+            <Link href="/api/admin/commissions/export?format=excel" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-[#f5fcf8] px-4 py-3 text-sm font-black text-[#118a43] transition hover:bg-[#ebf8f0]">Excel</Link>
             <Link href="/admin/financials/payouts" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#118a43] px-4 py-3 text-sm font-black text-white transition hover:bg-[#0c7338]">Release Payouts <WalletCards className="h-4 w-4" /></Link>
           </div>
         </div>
@@ -1971,6 +2104,10 @@ export default async function AdminCommissionsPage({ searchParams }: { searchPar
         <Link href="/admin/financials/payouts" className="rounded-[1.4rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><WalletCards className="h-5 w-5 text-[#118a43]" /><p className="mt-3 text-base font-black text-[#163127]">Payout Dashboard</p><p className="mt-1 text-sm text-slate-500">Review release queues, payout records, and operational payout activity.</p></Link>
         <Link href="/admin/referrals" className="rounded-[1.4rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><Users className="h-5 w-5 text-[#118a43]" /><p className="mt-3 text-base font-black text-[#163127]">Growth & Referrals</p><p className="mt-1 text-sm text-slate-500">Review PawPerks, Guru referrals, Ambassador referrals, and Partner rewards.</p></Link>
         <Link href="/admin/financials/stripe" className="rounded-[1.4rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><CreditCard className="h-5 w-5 text-[#118a43]" /><p className="mt-3 text-base font-black text-[#163127]">Stripe Transactions</p><p className="mt-1 text-sm text-slate-500">Track customer payment capture, Stripe fees, refunds, disputes, and payout matching.</p></Link>
+        <Link href="/admin/financials/tax-reports/1099" className="rounded-[1.4rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><HandCoins className="h-5 w-5 text-[#118a43]" /><p className="mt-3 text-base font-black text-[#163127]">1099 Tax Support</p><p className="mt-1 text-sm text-slate-500">Open contractor and partner payment schedules for CPA review.</p></Link>
+        <Link href="/admin/financials/general-ledger" className="rounded-[1.4rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><BarChart3 className="h-5 w-5 text-[#118a43]" /><p className="mt-3 text-base font-black text-[#163127]">General Ledger</p><p className="mt-1 text-sm text-slate-500">Trace commission and payout entries into the SitGuru ledger.</p></Link>
+        <Link href="/admin/financials/reconciliation" className="rounded-[1.4rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><RefreshCw className="h-5 w-5 text-[#118a43]" /><p className="mt-3 text-base font-black text-[#163127]">Reconciliation</p><p className="mt-1 text-sm text-slate-500">Match Stripe payouts to NFCU deposits and booking_payments truth.</p></Link>
+        <Link href="/admin/financials/profit-loss" className="rounded-[1.4rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><LineChart className="h-5 w-5 text-[#118a43]" /><p className="mt-3 text-base font-black text-[#163127]">Profit & Loss</p><p className="mt-1 text-sm text-slate-500">See marketplace fees and commission expense impact on P&L.</p></Link>
         <Link href="/admin/financials" className="rounded-[1.4rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><LineChart className="h-5 w-5 text-[#118a43]" /><p className="mt-3 text-base font-black text-[#163127]">Financial Overview</p><p className="mt-1 text-sm text-slate-500">Return to the full SitGuru financial overview and reporting dashboard.</p></Link>
       </section>
 
@@ -1978,13 +2115,16 @@ export default async function AdminCommissionsPage({ searchParams }: { searchPar
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-[#118a43]"><ShieldCheck className="h-5 w-5" /></div>
-            <div><h2 className="text-lg font-black text-[#163127]">Supabase Source Coverage</h2><p className="mt-1 text-sm text-slate-500">Real row counts from connected SitGuru tables and views powering this page.</p></div>
+            <div><h2 className="text-lg font-black text-[#163127]">Supabase Source Coverage</h2><p className="mt-1 text-sm text-slate-500">Live row counts from booking_payments, commissions ledgers, payouts, and referral liability views.</p></div>
           </div>
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#118a43]">No fake fallback values</span>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-[#118a43]">Stripe fee truth preferred</span>
         </div>
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
           {[
             ["Bookings", commissions.sourceCounts.bookings],
+            ["Booking Payments", commissions.sourceCounts.bookingPayments],
+            ["Commissions", commissions.sourceCounts.commissions],
+            ["Partner Commissions", commissions.sourceCounts.partnerCommissions],
             ["Payments", commissions.sourceCounts.payments],
             ["Transactions", commissions.sourceCounts.transactions],
             ["Guru Payouts", commissions.sourceCounts.guruPayouts],
