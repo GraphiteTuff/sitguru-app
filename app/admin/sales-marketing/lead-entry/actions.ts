@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { getAdminIdentity } from "@/lib/admin/access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { notifyHighPriorityPetLeadSignup } from "@/lib/marketing/notify-high-priority-lead";
 
@@ -127,6 +128,11 @@ function getThankYouMessage({
 }
 
 export async function createLeadEntry(formData: FormData) {
+  const actor = await getAdminIdentity();
+  if (!actor?.canAccessAdmin) {
+    redirect("/admin/login");
+  }
+
   const entryKind = getString(formData, "entry_kind") as EntryKind;
 
   const firstName = getString(formData, "first_name");
