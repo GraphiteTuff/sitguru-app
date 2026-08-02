@@ -902,6 +902,28 @@ p {
   color: #23352d !important;
 }
 
+/* Dark hero / gradient surfaces need light headings despite the admin default. */
+.admin-theme .on-dark-surface h1,
+.admin-theme .on-dark-surface h2,
+.admin-theme .on-dark-surface h3,
+.admin-theme .on-dark-surface h4,
+.admin-theme .on-dark-surface h5,
+.admin-theme .on-dark-surface h6,
+.admin-theme h1.text-white,
+.admin-theme h2.text-white,
+.admin-theme h3.text-white,
+.admin-theme h4.text-white,
+.admin-theme h5.text-white,
+.admin-theme h6.text-white,
+.admin-theme h1.\!text-white,
+.admin-theme h2.\!text-white,
+.admin-theme h3.\!text-white,
+.admin-theme h4.\!text-white,
+.admin-theme h5.\!text-white,
+.admin-theme h6.\!text-white {
+  color: #ffffff !important;
+}
+
 .admin-theme p {
   color: inherit;
 }
