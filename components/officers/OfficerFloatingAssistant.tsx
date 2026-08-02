@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Floating Rogue admin assistant — homepage tip bubble + panel (no AI badge).
- * Streams via Vercel AI SDK useChat → /api/admin/rogue-ai.
+ * Shared floating Pet Officer overlay — cloned from the Rogue admin template
+ * and themed per guest officer (Taco / Scout). Streams via
+ * /api/ai/officer-stream (Rogue admin route remains untouched).
  */
 
 import {
@@ -16,86 +17,80 @@ import {
 import { createPortal } from "react-dom";
 import { useChat } from "ai/react";
 import { Maximize2, Minimize2, Sparkles, X } from "lucide-react";
+import type { GuestOfficerId } from "@/lib/ai/officer-prompts";
+import { AMBASSADOR_VIDEO_CARD_MARKER } from "@/lib/ai/officer-marketing-faqs";
+import AmbassadorVideoCard from "@/components/officers/AmbassadorVideoCard";
 
-const BRAND_GREEN = "#0D5C3A";
-const BRAND_GREEN_DEEP = "#09462C";
-const ROGUE_AVATAR_SRC = "/images/rogue-avatar.png";
-
-const HEADER_BANNER_STYLE: CSSProperties = {
-  backgroundImage: `linear-gradient(135deg, ${BRAND_GREEN} 0%, ${BRAND_GREEN_DEEP} 100%)`,
-  backgroundColor: BRAND_GREEN,
-  color: "#ffffff",
-  borderBottom: "0",
+export type OfficerTheme = {
+  brand: string;
+  brandDeep: string;
+  cream: string;
+  chipClass: string;
+  ringClass: string;
+  tableHeadClass: string;
+  tableBorderClass: string;
 };
 
-const HEADER_TITLE_STYLE: CSSProperties = {
-  color: "#ffffff",
-  WebkitTextFillColor: "#ffffff",
-  opacity: 1,
-  visibility: "visible",
+export type OfficerQuickChip = {
+  id: string;
+  label: string;
+  prompt: string;
 };
 
-const HEADER_SUB_STYLE: CSSProperties = {
-  color: "rgba(255, 255, 255, 0.95)",
-  WebkitTextFillColor: "rgba(255, 255, 255, 0.95)",
-  opacity: 1,
-  visibility: "visible",
+export type OfficerSurface = "dashboard" | "public";
+
+export type OfficerFloatingAssistantProps = {
+  officerId: GuestOfficerId;
+  displayName: string;
+  title: string;
+  avatarSrc: string;
+  greetingMarkdown: string;
+  tipStatement: string;
+  composerPlaceholder: string;
+  footerLabel: string;
+  subtitle: string;
+  theme: OfficerTheme;
+  chips: readonly OfficerQuickChip[];
+  /**
+   * Optional access token forwarded to the stream endpoint.
+   * Public marketing guests may omit this — never require it client-side.
+   */
+  accessToken?: string | null;
+  /** Optional Guru provider id (Scout only). */
+  providerId?: string | null;
+  /** Match Rogue's face-forward circular crop. */
+  avatarObjectPosition?: string;
+  /** `public` = marketing FAQ mode for unauthenticated guests. */
+  surface?: OfficerSurface;
 };
 
-const REPORTING_STATEMENT =
-  "**Rogue reporting for duty.** I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap a chip or ask me anything admin-shaped.";
-
-/** Admin tip bubble — reporting-for-duty statement. */
-const TIP_STATEMENT =
-  "Rogue reporting for duty. I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap a chip or ask me anything admin-shaped!";
-
-const QUICK_CHIPS = [
-  {
-    id: "daily_sync",
-    label: "Daily Sync",
-    period: "daily" as const,
-    prompt:
-      "Run a Daily Sync across operations, financials, messages, payouts, trust & safety, and audit alerts. Give me an executive pack report with exceptions and next hops.",
-  },
-  {
-    id: "weekly_financials",
-    label: "Weekly Financials",
-    period: "weekly" as const,
-    prompt:
-      "Compile Weekly Financials: GMV, take-rate, banking/liquidity, Stripe fees/disputes, P&L, cash flow, commissions, payouts, reconciliation mismatches, and tax signals.",
-  },
-  {
-    id: "growth_analytics",
-    label: "Growth Analytics",
-    period: "monthly" as const,
-    prompt:
-      "Produce Growth Analytics: campaigns/CAC signals, referrals, programs (including Veterans & Military Families), partners, analytics MoM KPIs, and chat insight friction.",
-  },
-  {
-    id: "system_audit",
-    label: "System Audit",
-    period: "weekly" as const,
-    prompt:
-      "Run a System Audit: admin audit trail, trust & safety escalations, settings/config, webhook/integration health, export queues, and support load.",
-  },
-] as const;
-
-const CHIP_CLASS =
-  "px-4 py-1.5 bg-[#0D5C3A] text-white text-xs font-medium rounded-full shadow-sm hover:bg-opacity-95 active:scale-95 transition-all whitespace-nowrap flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
-
-function RogueAvatar({ className = "h-8 w-8" }: { className?: string }) {
+function OfficerAvatar({
+  src,
+  className = "h-8 w-8",
+  objectPosition = "center 18%",
+}: {
+  src: string;
+  className?: string;
+  objectPosition?: string;
+}) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={ROGUE_AVATAR_SRC}
+      src={src}
       alt=""
-      className={`${className} rounded-full object-cover object-[center_18%]`}
-      style={{ backgroundColor: "#fff" }}
+      className={`${className} rounded-full object-cover`}
+      style={{ backgroundColor: "#fff", objectPosition }}
     />
   );
 }
 
-function AdminRogueMarkdown({ text }: { text: string }) {
+function OfficerMarkdown({
+  text,
+  theme,
+}: {
+  text: string;
+  theme: OfficerTheme;
+}) {
   const normalized = String(text || "").replace(/\r\n/g, "\n").trim();
   if (!normalized) return null;
 
@@ -103,7 +98,7 @@ function AdminRogueMarkdown({ text }: { text: string }) {
 
   return (
     <div
-      className="rogue-admin-md space-y-3 text-sm leading-6"
+      className="officer-md space-y-3 text-sm leading-6"
       style={{ color: "#0f172a", WebkitTextFillColor: "#0f172a" }}
     >
       {blocks.map((block, blockIndex) => {
@@ -129,10 +124,10 @@ function AdminRogueMarkdown({ text }: { text: string }) {
           return (
             <div
               key={`t-${blockIndex}`}
-              className="overflow-x-auto rounded-2xl border border-emerald-100"
+              className={`overflow-x-auto rounded-2xl border ${theme.tableBorderClass}`}
             >
               <table className="min-w-full text-left text-xs">
-                <thead className="bg-emerald-50 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
+                <thead className={theme.tableHeadClass}>
                   <tr>
                     {header.map((cell) => (
                       <th key={cell} className="px-3 py-2">
@@ -145,7 +140,7 @@ function AdminRogueMarkdown({ text }: { text: string }) {
                   {body.map((row, rowIndex) => (
                     <tr
                       key={`r-${rowIndex}`}
-                      className="border-t border-emerald-50 bg-white"
+                      className={`border-t ${theme.tableBorderClass} bg-white`}
                     >
                       {row.map((cell, cellIndex) => (
                         <td
@@ -235,6 +230,33 @@ function AdminRogueMarkdown({ text }: { text: string }) {
   );
 }
 
+function OfficerAssistantBody({
+  text,
+  theme,
+}: {
+  text: string;
+  theme: OfficerTheme;
+}) {
+  const raw = String(text || "");
+  const hasVideoCard =
+    raw.includes(AMBASSADOR_VIDEO_CARD_MARKER) ||
+    /\[\[\s*ambassador_video_card\s*\]\]/i.test(raw);
+  const cleaned = raw
+    .replaceAll(AMBASSADOR_VIDEO_CARD_MARKER, " ")
+    .replace(/\[\[\s*ambassador_video_card\s*\]\]/gi, " ")
+    .replace(/\[\[\s*cta:[^\]]+\]\]/gi, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return (
+    <div className="space-y-1">
+      {cleaned ? <OfficerMarkdown text={cleaned} theme={theme} /> : null}
+      {hasVideoCard ? <AmbassadorVideoCard /> : null}
+    </div>
+  );
+}
+
 function renderInline(text: string): ReactNode {
   const nodes: ReactNode[] = [];
   const pattern = /\*\*(.+?)\*\*/g;
@@ -258,16 +280,70 @@ function renderInline(text: string): ReactNode {
   return nodes.length ? nodes : text;
 }
 
-export default function RogueFloatingAssistant() {
+export default function OfficerFloatingAssistant({
+  officerId,
+  displayName,
+  title,
+  avatarSrc,
+  greetingMarkdown,
+  tipStatement,
+  composerPlaceholder,
+  footerLabel,
+  subtitle,
+  theme,
+  chips,
+  accessToken = null,
+  providerId = null,
+  avatarObjectPosition = "center 18%",
+  surface = "dashboard",
+}: OfficerFloatingAssistantProps) {
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [preset, setPreset] = useState<string>("");
-  const [period, setPeriod] = useState<"daily" | "weekly" | "monthly" | "yearly">(
-    "daily",
-  );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const headerBannerStyle: CSSProperties = {
+    backgroundImage: `linear-gradient(135deg, ${theme.brand} 0%, ${theme.brandDeep} 100%)`,
+    backgroundColor: theme.brand,
+    color: "#ffffff",
+    borderBottom: "0",
+  };
+
+  const headerTitleStyle: CSSProperties = {
+    color: "#ffffff",
+    WebkitTextFillColor: "#ffffff",
+    opacity: 1,
+    visibility: "visible",
+  };
+
+  const headerSubStyle: CSSProperties = {
+    color: "rgba(255, 255, 255, 0.95)",
+    WebkitTextFillColor: "rgba(255, 255, 255, 0.95)",
+    opacity: 1,
+    visibility: "visible",
+  };
+
+  // Defensive: optional chaining so missing guest session tokens never crash SSR/CSR.
+  const safeAccessToken =
+    typeof accessToken === "string" && accessToken.trim()
+      ? accessToken.trim()
+      : undefined;
+  const safeProviderId =
+    typeof providerId === "string" && providerId.trim()
+      ? providerId.trim()
+      : undefined;
+  const safeSurface = surface === "public" ? "public" : "dashboard";
+
+  const requestBody = {
+    officer: officerId,
+    surface: safeSurface,
+    preset: preset || undefined,
+    // Only forward when present — never send null/"undefined" string tokens.
+    ...(safeAccessToken ? { accessToken: safeAccessToken } : {}),
+    ...(safeProviderId ? { providerId: safeProviderId } : {}),
+  };
 
   const {
     messages,
@@ -279,18 +355,15 @@ export default function RogueFloatingAssistant() {
     error,
     setMessages,
   } = useChat({
-    api: "/api/admin/rogue-ai",
+    api: "/api/ai/officer-stream",
     initialMessages: [
       {
-        id: "rogue-admin-hello",
+        id: `${officerId}-hello`,
         role: "assistant",
-        content: REPORTING_STATEMENT,
+        content: greetingMarkdown,
       },
     ],
-    body: {
-      preset: preset || undefined,
-      period,
-    },
+    body: requestBody,
   });
 
   useEffect(() => {
@@ -305,14 +378,11 @@ export default function RogueFloatingAssistant() {
 
   useEffect(() => {
     if (!open) return;
-    const t = window.setTimeout(
-      () => inputRef.current?.focus({ preventScroll: true }),
-      180,
-    );
+    const t = window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 180);
     return () => window.clearTimeout(t);
   }, [open]);
 
-  /** Keep the composer focused so admins can type the next message without re-clicking. */
+  /** Keep the composer focused so visitors can type the next message without re-clicking. */
   function focusComposer(delayMs = 0) {
     if (!open) return;
     window.setTimeout(() => {
@@ -322,7 +392,7 @@ export default function RogueFloatingAssistant() {
     }, delayMs);
   }
 
-  // After Rogue finishes streaming (or any load ends), restore caret to the input.
+  // After the officer finishes streaming (or any load ends), restore caret to the input.
   const wasLoadingRef = useRef(false);
   useEffect(() => {
     if (!open) {
@@ -344,9 +414,8 @@ export default function RogueFloatingAssistant() {
     setExpanded(false);
   }
 
-  async function runChip(chip: (typeof QUICK_CHIPS)[number]) {
+  async function runChip(chip: OfficerQuickChip) {
     setPreset(chip.id);
-    setPeriod(chip.period);
     setOpen(true);
     await append(
       {
@@ -355,8 +424,8 @@ export default function RogueFloatingAssistant() {
       },
       {
         body: {
+          ...requestBody,
           preset: chip.id,
-          period: chip.period,
         },
       },
     );
@@ -368,8 +437,8 @@ export default function RogueFloatingAssistant() {
     if (!input.trim() || isLoading) return;
     handleSubmit(event, {
       body: {
+        ...requestBody,
         preset: preset || undefined,
-        period,
       },
     });
     focusComposer(40);
@@ -378,10 +447,9 @@ export default function RogueFloatingAssistant() {
   function clearChat() {
     setMessages([
       {
-        id: "rogue-admin-hello",
+        id: `${officerId}-hello`,
         role: "assistant",
-        content:
-          "**Fresh bowl.** Ask me for a Daily Sync, Weekly Financials, Growth Analytics, or System Audit — or type a precise question.",
+        content: `**Fresh bowl.** ${greetingMarkdown.replace(/^\*\*[^*]+\*\*\s*/, "")}`,
       },
     ]);
     setPreset("");
@@ -394,15 +462,21 @@ export default function RogueFloatingAssistant() {
     ? "sm:h-[min(820px,92dvh)] sm:w-[min(560px,96vw)]"
     : "sm:h-[600px] sm:w-[400px]";
 
+  const fullTitle = `${displayName}, ${title}`;
+
   const ui = (
     <div
       className="pointer-events-none fixed bottom-4 right-4 z-[90] flex flex-row items-center justify-end gap-3 overflow-visible md:bottom-6 md:right-6"
-      data-rogue-admin-dock
+      data-officer-dock={officerId}
       style={
         {
-          ["--hcb-green"]: BRAND_GREEN,
-          ["--hcb-green-deep"]: BRAND_GREEN_DEEP,
-          ["--hcb-cream"]: "#f4faf6",
+          ["--officer-brand"]: theme.brand,
+          ["--officer-brand-deep"]: theme.brandDeep,
+          ["--officer-cream"]: theme.cream,
+          /* Homepage chat CSS reads --hcb-green for user bubbles / tips. */
+          ["--hcb-green"]: theme.brand,
+          ["--hcb-green-deep"]: theme.brandDeep,
+          ["--hcb-cream"]: theme.cream,
         } as CSSProperties
       }
     >
@@ -413,10 +487,10 @@ export default function RogueFloatingAssistant() {
             className="homepage-chat-tip"
             style={{ maxWidth: "min(280px, calc(100vw - 6.5rem))" }}
             onClick={openPanel}
-            aria-label="Open Rogue reporting terminal"
+            aria-label={`Open ${displayName} assistant`}
           >
             <span className="homepage-chat-tip__pulse" aria-hidden />
-            <span className="homepage-chat-tip__text">{TIP_STATEMENT}</span>
+            <span className="homepage-chat-tip__text">{tipStatement}</span>
           </button>
         ) : null}
 
@@ -424,18 +498,18 @@ export default function RogueFloatingAssistant() {
           type="button"
           className="homepage-chat-launcher"
           onClick={() => (open ? closePanel() : openPanel())}
-          aria-label={
-            open
-              ? "Close Rogue, Chief Treat Officer"
-              : "Open Rogue, Chief Treat Officer"
-          }
+          aria-label={open ? `Close ${fullTitle}` : `Open ${fullTitle}`}
           aria-expanded={open}
         >
           {open ? (
             <span className="homepage-chat-launcher__icon">×</span>
           ) : (
             <span className="homepage-chat-launcher__icon" aria-hidden>
-              <RogueAvatar className="h-full w-full overflow-hidden rounded-full flex-shrink-0" />
+              <OfficerAvatar
+                src={avatarSrc}
+                className="h-full w-full overflow-hidden rounded-full flex-shrink-0"
+                objectPosition={avatarObjectPosition}
+              />
             </span>
           )}
         </button>
@@ -445,34 +519,37 @@ export default function RogueFloatingAssistant() {
         <div
           className={`homepage-chat-panel pointer-events-auto fixed inset-0 z-[91] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:rounded-2xl sm:shadow-2xl ${panelSize}`}
           role="dialog"
-          aria-label="Rogue, Chief Treat Officer admin assistant"
+          aria-label={`${fullTitle} assistant`}
         >
-          {/* Use div (not header) so `.admin-theme header { background: white }` cannot hide title. */}
           <div
             className="homepage-chat-panel__header relative shrink-0"
             role="banner"
-            data-rogue-admin-header="true"
-            style={HEADER_BANNER_STYLE}
+            data-officer-header={officerId}
+            style={headerBannerStyle}
           >
             <div className="homepage-chat-panel__brand">
               <span
                 className="homepage-chat-panel__avatar homepage-chat-panel__avatar--dog"
                 aria-hidden
               >
-                <RogueAvatar className="!h-full !w-full max-h-full max-w-full rounded-full" />
+                <OfficerAvatar
+                  src={avatarSrc}
+                  className="!h-full !w-full max-h-full max-w-full rounded-full"
+                  objectPosition={avatarObjectPosition}
+                />
               </span>
               <div className="min-w-0 flex-1 pr-14">
                 <p
                   className="homepage-chat-panel__title"
-                  style={HEADER_TITLE_STYLE}
+                  style={headerTitleStyle}
                 >
-                  Rogue, Chief Treat Officer 🦴
+                  {fullTitle}
                 </p>
                 <p
                   className="homepage-chat-panel__sub"
-                  style={HEADER_SUB_STYLE}
+                  style={headerSubStyle}
                 >
-                  Semantic admin · live report compiler
+                  {subtitle}
                 </p>
               </div>
             </div>
@@ -490,7 +567,7 @@ export default function RogueFloatingAssistant() {
                 type="button"
                 onClick={closePanel}
                 className="homepage-chat-panel__close"
-                aria-label="Close Rogue assistant"
+                aria-label={`Close ${displayName} assistant`}
                 title="Close"
               >
                 <X className="h-5 w-5 text-white" aria-hidden="true" />
@@ -501,15 +578,15 @@ export default function RogueFloatingAssistant() {
           <div
             className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50 p-2"
             role="toolbar"
-            aria-label="Quick admin reports"
+            aria-label={`${displayName} quick prompts`}
           >
-            {QUICK_CHIPS.map((chip) => (
+            {chips.map((chip) => (
               <button
                 key={chip.id}
                 type="button"
                 disabled={isLoading}
                 onClick={() => void runChip(chip)}
-                className={CHIP_CLASS}
+                className={theme.chipClass}
               >
                 {chip.label}
               </button>
@@ -533,6 +610,11 @@ export default function RogueFloatingAssistant() {
                   <div
                     key={message.id}
                     className="homepage-chat-bubble homepage-chat-bubble--user"
+                    style={{
+                      backgroundColor: theme.brand,
+                      color: "#ffffff",
+                      WebkitTextFillColor: "#ffffff",
+                    }}
                   >
                     {message.content}
                   </div>
@@ -544,16 +626,20 @@ export default function RogueFloatingAssistant() {
               return (
                 <div key={message.id} className="flex items-start gap-2">
                   <span
-                    className="mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-emerald-100"
+                    className={`mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ${theme.ringClass}`}
                     aria-hidden
                   >
-                    <RogueAvatar className="h-full w-full" />
+                    <OfficerAvatar
+                      src={avatarSrc}
+                      className="h-full w-full"
+                      objectPosition={avatarObjectPosition}
+                    />
                   </span>
                   <div
-                    className="homepage-chat-bubble homepage-chat-bubble--ai rogue-admin-bubble min-w-0 flex-1"
+                    className="homepage-chat-bubble homepage-chat-bubble--ai min-w-0 flex-1"
                     style={{ color: "#0f172a", WebkitTextFillColor: "#0f172a" }}
                   >
-                    <AdminRogueMarkdown text={message.content} />
+                    <OfficerAssistantBody text={message.content} theme={theme} />
                   </div>
                 </div>
               );
@@ -562,10 +648,14 @@ export default function RogueFloatingAssistant() {
             {isLoading ? (
               <div className="flex items-start gap-2">
                 <span
-                  className="mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-emerald-100"
+                  className={`mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ${theme.ringClass}`}
                   aria-hidden
                 >
-                  <RogueAvatar className="h-full w-full" />
+                  <OfficerAvatar
+                    src={avatarSrc}
+                    className="h-full w-full"
+                    objectPosition={avatarObjectPosition}
+                  />
                 </span>
                 <div
                   className="homepage-chat-bubble homepage-chat-bubble--ai homepage-chat-typing"
@@ -594,8 +684,14 @@ export default function RogueFloatingAssistant() {
               rows={1}
               value={input}
               onChange={handleInputChange}
-              placeholder="Ask Rogue about payouts, growth, audits…"
-              aria-label="Message Rogue"
+              placeholder={composerPlaceholder}
+              aria-label={`Message ${displayName}`}
+              style={{
+                color: "#0f172a",
+                WebkitTextFillColor: "#0f172a",
+                caretColor: "#0f172a",
+                backgroundColor: "#ffffff",
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -608,7 +704,7 @@ export default function RogueFloatingAssistant() {
             <button
               type="submit"
               disabled={isLoading || !input.trim()}
-              aria-label="Send to Rogue"
+              aria-label={`Send to ${displayName}`}
             >
               {isLoading ? "…" : "Send"}
             </button>
@@ -616,7 +712,7 @@ export default function RogueFloatingAssistant() {
 
           <p className="flex items-center gap-1.5 border-t border-gray-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
             <Sparkles size={12} />
-            Read-only admin snapshots · Markdown reports
+            {footerLabel}
           </p>
         </div>
       ) : null}
