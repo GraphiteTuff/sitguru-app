@@ -22,6 +22,7 @@ export type AdminReportModuleId =
   | "trust_safety"
   | "messages"
   | "sales_marketing"
+  | "social_platform_metrics"
   | "growth_referrals"
   | "programs"
   | "partners"
@@ -892,6 +893,67 @@ async function moduleMessages(since: string): Promise<ModuleSnapshot> {
 }
 
 /* -------------------------- GROWTH & MARKETING ------------------------- */
+
+async function moduleSocialPlatformMetrics(): Promise<ModuleSnapshot> {
+  const snap = snapshotBase(
+    "social_platform_metrics",
+    "Social Platform Metrics",
+    "growth",
+    ["social_platform_metrics"],
+  );
+  const result = await safeSelect(
+    "social_platform_metrics",
+    "id,entity_id,platform,current_followers,baseline_followers,updated_at",
+    200,
+  );
+
+  if (!result.ok) {
+    return finalize(
+      snap,
+      false,
+      "Social platform metrics unavailable.",
+      {},
+      [],
+      [result.message],
+    );
+  }
+
+  const highlights: string[] = [];
+  let totalCurrent = 0;
+  let totalBaseline = 0;
+  for (const row of result.rows) {
+    const entity = asString(row.entity_id) || "brand";
+    const platform = asString(row.platform) || "unknown";
+    const current = asNumber(row.current_followers);
+    const baseline = asNumber(row.baseline_followers);
+    const delta = current - baseline;
+    totalCurrent += current;
+    totalBaseline += baseline;
+    const sign = delta > 0 ? "+" : "";
+    highlights.push(
+      `${entity}/${platform}: ${number(current)} current · ${number(baseline)} baseline · ${sign}${number(delta)} delta`,
+    );
+  }
+
+  const totalDelta = totalCurrent - totalBaseline;
+  const totalSign = totalDelta > 0 ? "+" : "";
+
+  return finalize(
+    snap,
+    true,
+    result.rows.length
+      ? `${number(result.rows.length)} social rows · ${number(totalCurrent)} current followers · ${totalSign}${number(totalDelta)} vs baseline.`
+      : "No social_platform_metrics rows seeded yet.",
+    {
+      rows: result.rows.length,
+      totalCurrentFollowers: totalCurrent,
+      totalBaselineFollowers: totalBaseline,
+      totalDelta,
+    },
+    highlights.slice(0, 12),
+    [],
+  );
+}
 
 async function moduleSalesMarketing(since: string): Promise<ModuleSnapshot> {
   const snap = snapshotBase("sales_marketing", "Sales & Marketing", "growth", [
@@ -1904,6 +1966,7 @@ export const ALL_ADMIN_REPORT_MODULES: AdminReportModuleId[] = [
   "trust_safety",
   "messages",
   "sales_marketing",
+  "social_platform_metrics",
   "growth_referrals",
   "programs",
   "partners",
@@ -1940,6 +2003,19 @@ const MODULE_KEYWORDS: Record<AdminReportModuleId, string[]> = {
   trust_safety: ["trust", "safety", "background check", "fraud", "compliance"],
   messages: ["message", "inbox", "sla", "unread", "support lag"],
   sales_marketing: ["sales", "marketing", "campaign", "promo", "cac", "acquisition"],
+  social_platform_metrics: [
+    "social",
+    "follower",
+    "instagram",
+    "tiktok",
+    "youtube",
+    "facebook",
+    "twitter",
+    "social media",
+    "rogue followers",
+    "delilah",
+    "sitguruofficial",
+  ],
   growth_referrals: ["referral", "invite", "bonus", "growth & referrals", "pawperks"],
   programs: ["program", "veteran", "military", "student hire", "community hire", "skillbridge"],
   partners: ["partner", "clinic", "b2b", "corporate"],
@@ -2012,6 +2088,7 @@ export function resolveModulesForQuery(
   if (presetKey === "growth_analytics" || presetKey === "growth-analytics") {
     return [
       "sales_marketing",
+      "social_platform_metrics",
       "growth_referrals",
       "programs",
       "partners",
@@ -2090,6 +2167,8 @@ async function runModule(
         return await moduleMessages(sinceIso);
       case "sales_marketing":
         return await moduleSalesMarketing(sinceIso);
+      case "social_platform_metrics":
+        return await moduleSocialPlatformMetrics();
       case "growth_referrals":
         return await moduleGrowthReferrals(sinceIso);
       case "programs":
