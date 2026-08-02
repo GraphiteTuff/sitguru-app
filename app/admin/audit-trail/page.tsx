@@ -1,48 +1,20 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAdminIdentity } from "@/lib/admin/access";
+import {
+  asTrimmedString,
+  classifyCategory,
+  filterEntries,
+  formatMetadataValue,
+  getAuditTrail,
+  sourceLabel,
+  type AuditEntry,
+  type AuditSearchParams,
+  type AuditSeverity,
+  type AuditSource,
+  type AuditSourceHealth,
+} from "@/lib/admin/audit";
 
 export const dynamic = "force-dynamic";
-
-type AuditSource = "admin_audit_logs" | "financial_audit_logs" | "analytics_events";
-
-type AuditSeverity = "info" | "success" | "warning" | "critical";
-
-type AuditEntry = {
-  id: string;
-  source: AuditSource;
-  action: string;
-  area: string;
-  actorId: string;
-  actorEmail: string;
-  actorRole: string;
-  targetType: string;
-  targetId: string;
-  severity: AuditSeverity;
-  pagePath: string;
-  createdAt: string;
-  metadata: Record<string, unknown>;
-};
-
-type AdminIdentity = {
-  id: string;
-  email: string;
-  role: string;
-  canAccessAdmin: boolean;
-  canAccessFinancials: boolean;
-};
-
-type SafeQueryResponse = {
-  data: unknown;
-  error: unknown;
-};
-
-type SearchParams = {
-  q?: string;
-  category?: string;
-  severity?: string;
-  source?: string;
-};
 
 const CATEGORY_FILTERS = [
   { label: "All Activity", value: "all" },
@@ -69,172 +41,6 @@ const SOURCE_FILTERS = [
   { label: "Financial Audit", value: "financial_audit_logs" },
   { label: "Analytics Events", value: "analytics_events" },
 ];
-
-const FINANCE_ROLES = [
-  "owner",
-  "super_admin",
-  "admin",
-  "finance_admin",
-  "finance",
-  "accounting",
-  "bookkeeper",
-];
-
-const ADMIN_ROLES = [
-  ...FINANCE_ROLES,
-  "support_admin",
-  "operations",
-  "moderator",
-];
-
-function asTrimmedString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function getOptionalBoolean(value: unknown) {
-  if (typeof value === "boolean") return value;
-
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (["true", "yes", "1"].includes(normalized)) return true;
-    if (["false", "no", "0"].includes(normalized)) return false;
-  }
-
-  return false;
-}
-
-function safeMetadata(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function getMetadataString(metadata: Record<string, unknown>, key: string) {
-  return asTrimmedString(metadata[key]);
-}
-
-function getSeverity(value: unknown, metadata: Record<string, unknown>): AuditSeverity {
-  const normalized = (
-    asTrimmedString(value) ||
-    getMetadataString(metadata, "severity") ||
-    getMetadataString(metadata, "level")
-  ).toLowerCase();
-
-  if (normalized === "success") return "success";
-  if (normalized === "warning" || normalized === "warn") return "warning";
-  if (
-    normalized === "critical" ||
-    normalized === "error" ||
-    normalized === "danger" ||
-    normalized === "failed"
-  ) {
-    return "critical";
-  }
-
-  return "info";
-}
-
-function hasAdminRole(role: string) {
-  return ADMIN_ROLES.includes(role.trim().toLowerCase());
-}
-
-function hasFinancialRole(role: string) {
-  return FINANCE_ROLES.includes(role.trim().toLowerCase());
-}
-
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-async function safeRows<T>(
-  query: PromiseLike<SafeQueryResponse>,
-  label: string,
-): Promise<T[]> {
-  try {
-    const result = await query;
-
-    if (result.error) {
-      console.warn(`Audit trail query skipped for ${label}:`, result.error);
-      return [];
-    }
-
-    return Array.isArray(result.data) ? (result.data as T[]) : [];
-  } catch (error) {
-    console.warn(`Audit trail query skipped for ${label}:`, error);
-    return [];
-  }
-}
-
-async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<Record<string, unknown>>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_audit_access",
-    ),
-    safeRows<Record<string, unknown>>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_audit_access",
-    ),
-    safeRows<Record<string, unknown>>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_audit_access",
-    ),
-  ]);
-
-  const profile = profileChecks.flat().find(Boolean) || {};
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const envAllowed = envAdminEmails.includes(userEmail);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-
-  return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessAdmin: active && (hasAdminRole(role) || envAllowed),
-    canAccessFinancials:
-      active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed),
-  };
-}
 
 function formatDateTime(value: string) {
   const parsed = new Date(value);
@@ -270,16 +76,6 @@ function getRelativeTime(value: string) {
   return formatDateTime(value);
 }
 
-function sourceLabel(source: AuditSource) {
-  const labels: Record<AuditSource, string> = {
-    admin_audit_logs: "Admin Audit",
-    financial_audit_logs: "Financial Audit",
-    analytics_events: "Analytics",
-  };
-
-  return labels[source];
-}
-
 function severityClasses(severity: AuditSeverity) {
   const classes: Record<AuditSeverity, string> = {
     info: "border-blue-100 bg-blue-50 text-blue-800",
@@ -301,172 +97,15 @@ function sourceClasses(source: AuditSource) {
   return classes[source];
 }
 
-function normalizeAdminAuditRow(row: Record<string, unknown>, source: AuditSource): AuditEntry {
-  const metadata = safeMetadata(row.metadata);
-
-  return {
-    id:
-      asTrimmedString(row.id) ||
-      `${source}-${asTrimmedString(row.created_at)}-${asTrimmedString(row.action)}`,
-    source,
-    action: asTrimmedString(row.action) || "admin_action",
-    area: asTrimmedString(row.area) || "admin",
-    actorId: asTrimmedString(row.actor_id),
-    actorEmail: asTrimmedString(row.actor_email),
-    actorRole: asTrimmedString(row.actor_role),
-    targetType: asTrimmedString(row.target_type),
-    targetId: asTrimmedString(row.target_id),
-    severity: getSeverity(row.severity, metadata),
-    pagePath: getMetadataString(metadata, "pagePath"),
-    createdAt: asTrimmedString(row.created_at) || new Date().toISOString(),
-    metadata,
-  };
-}
-
-function normalizeAnalyticsRow(row: Record<string, unknown>): AuditEntry {
-  const metadata = safeMetadata(row.metadata);
-  const eventName = asTrimmedString(row.event_name) || "analytics_event";
-  const eventType = asTrimmedString(row.event_type) || "interaction";
-
-  return {
-    id:
-      asTrimmedString(row.id) ||
-      `analytics-${asTrimmedString(row.created_at)}-${eventName}`,
-    source: "analytics_events",
-    action: getMetadataString(metadata, "auditAction") || eventName,
-    area:
-      getMetadataString(metadata, "auditArea") ||
-      asTrimmedString(row.source) ||
-      eventType ||
-      "analytics",
-    actorId: asTrimmedString(row.user_id),
-    actorEmail: getMetadataString(metadata, "actorEmail"),
-    actorRole: asTrimmedString(row.role),
-    targetType: getMetadataString(metadata, "targetType"),
-    targetId:
-      getMetadataString(metadata, "targetId") ||
-      asTrimmedString(row.booking_id) ||
-      asTrimmedString(row.guru_id),
-    severity: getSeverity(row.severity, metadata),
-    pagePath: asTrimmedString(row.page_path),
-    createdAt: asTrimmedString(row.created_at) || new Date().toISOString(),
-    metadata,
-  };
-}
-
-function classifyCategory(entry: AuditEntry) {
-  const text = [
-    entry.action,
-    entry.area,
-    entry.targetType,
-    entry.pagePath,
-    JSON.stringify(entry.metadata),
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  if (
-    text.includes("financial") ||
-    text.includes("profit") ||
-    text.includes("balance") ||
-    text.includes("cash_flow") ||
-    text.includes("stripe") ||
-    text.includes("plaid") ||
-    text.includes("bank") ||
-    text.includes("navy")
-  ) {
-    return "financials";
-  }
-
-  if (
-    text.includes("export") ||
-    text.includes("email") ||
-    text.includes("csv") ||
-    text.includes("excel") ||
-    text.includes("pdf") ||
-    text.includes("word")
-  ) {
-    return "exports";
-  }
-
-  if (
-    text.includes("login") ||
-    text.includes("security") ||
-    text.includes("permission") ||
-    text.includes("role") ||
-    text.includes("access")
-  ) {
-    return "security";
-  }
-
-  if (
-    text.includes("user") ||
-    text.includes("customer") ||
-    text.includes("profile") ||
-    text.includes("guru")
-  ) {
-    return "users";
-  }
-
-  if (text.includes("booking") || text.includes("reservation")) {
-    return "bookings";
-  }
-
-  if (
-    text.includes("payout") ||
-    text.includes("commission") ||
-    text.includes("payable")
-  ) {
-    return "payouts";
-  }
-
-  if (text.includes("setting") || text.includes("config")) {
-    return "settings";
-  }
-
-  return "all";
-}
-
-function matchesSearch(entry: AuditEntry, query: string) {
-  if (!query) return true;
-
-  const normalized = query.toLowerCase();
-
-  return [
-    entry.action,
-    entry.area,
-    entry.actorEmail,
-    entry.actorRole,
-    entry.targetType,
-    entry.targetId,
-    entry.pagePath,
-    sourceLabel(entry.source),
-    JSON.stringify(entry.metadata),
-  ]
-    .join(" ")
-    .toLowerCase()
-    .includes(normalized);
-}
-
-function filterEntries(entries: AuditEntry[], searchParams: SearchParams) {
-  const query = asTrimmedString(searchParams.q).toLowerCase();
-  const category = asTrimmedString(searchParams.category) || "all";
-  const severity = asTrimmedString(searchParams.severity) || "all";
-  const source = asTrimmedString(searchParams.source) || "all";
-
-  return entries.filter((entry) => {
-    if (source !== "all" && entry.source !== source) return false;
-    if (severity !== "all" && entry.severity !== severity) return false;
-    if (category !== "all" && classifyCategory(entry) !== category) return false;
-    if (!matchesSearch(entry, query)) return false;
-
-    return true;
-  });
+function readinessClasses(available: boolean) {
+  return available
+    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+    : "border-amber-200 bg-amber-50 text-amber-800";
 }
 
 function buildFilterHref(
-  searchParams: SearchParams,
-  updates: Partial<SearchParams>,
+  searchParams: AuditSearchParams,
+  updates: Partial<AuditSearchParams>,
 ) {
   const params = new URLSearchParams();
 
@@ -480,8 +119,18 @@ function buildFilterHref(
   });
 
   const query = params.toString();
-
   return query ? `/admin/audit-trail?${query}` : "/admin/audit-trail";
+}
+
+function buildExportHref(searchParams: AuditSearchParams, format: "csv" | "json") {
+  const params = new URLSearchParams();
+  params.set("format", format);
+
+  Object.entries(searchParams).forEach(([key, value]) => {
+    if (value && value !== "all") params.set(key, value);
+  });
+
+  return `/api/admin/audit-trail/export?${params.toString()}`;
 }
 
 function metadataPreview(metadata: Record<string, unknown>) {
@@ -492,63 +141,8 @@ function metadataPreview(metadata: Record<string, unknown>) {
   if (!entries.length) return "No extra metadata";
 
   return entries
-    .map(([key, value]) => {
-      if (value === null || value === undefined || value === "") {
-        return `${key}: —`;
-      }
-
-      if (typeof value === "object") {
-        return `${key}: ${JSON.stringify(value).slice(0, 80)}`;
-      }
-
-      return `${key}: ${String(value).slice(0, 80)}`;
-    })
+    .map(([key, value]) => `${key}: ${formatMetadataValue(key, value)}`)
     .join(" • ");
-}
-
-async function getAuditEntries(canAccessFinancials: boolean) {
-  const [adminRows, financialRows, analyticsRows] = await Promise.all([
-    safeRows<Record<string, unknown>>(
-      supabaseAdmin
-        .from("admin_audit_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(250),
-      "admin_audit_logs",
-    ),
-    canAccessFinancials
-      ? safeRows<Record<string, unknown>>(
-          supabaseAdmin
-            .from("financial_audit_logs")
-            .select("*")
-            .order("created_at", { ascending: false })
-            .limit(250),
-          "financial_audit_logs",
-        )
-      : Promise.resolve([]),
-    safeRows<Record<string, unknown>>(
-      supabaseAdmin
-        .from("analytics_events")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(250),
-      "analytics_events",
-    ),
-  ]);
-
-  return [
-    ...adminRows.map((row) => normalizeAdminAuditRow(row, "admin_audit_logs")),
-    ...financialRows.map((row) =>
-      normalizeAdminAuditRow(row, "financial_audit_logs"),
-    ),
-    ...analyticsRows.map(normalizeAnalyticsRow),
-  ]
-    .sort((a, b) => {
-      const aTime = new Date(a.createdAt).getTime() || 0;
-      const bTime = new Date(b.createdAt).getTime() || 0;
-      return bTime - aTime;
-    })
-    .slice(0, 500);
 }
 
 function FilterPill({
@@ -601,6 +195,29 @@ function AuditStatCard({
         {value}
       </p>
       <p className="mt-3 text-sm leading-6 text-slate-600">{detail}</p>
+    </div>
+  );
+}
+
+function SourceHealthCard({ item }: { item: AuditSourceHealth }) {
+  return (
+    <div className="rounded-[1.35rem] border border-slate-100 bg-[#fbfefd] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-black text-slate-950">{item.label}</p>
+        <span
+          className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${readinessClasses(
+            item.available,
+          )}`}
+        >
+          {item.available ? "Live" : "Setup"}
+        </span>
+      </div>
+      <p className="mt-2 text-2xl font-black text-slate-950">
+        {item.count.toLocaleString()}
+      </p>
+      <p className="mt-2 text-xs font-bold leading-5 text-slate-600">
+        {item.message}
+      </p>
     </div>
   );
 }
@@ -705,27 +322,58 @@ function AuditEntryCard({ entry }: { entry: AuditEntry }) {
 export default async function AdminAuditTrailPage({
   searchParams,
 }: {
-  searchParams?: Promise<SearchParams>;
+  searchParams?: Promise<AuditSearchParams>;
 }) {
   const params = (await searchParams) || {};
   const actor = await getAdminIdentity();
 
   if (!actor?.canAccessAdmin) {
-    return null;
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Admin access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with an admin account to open the SitGuru Audit Trail.
+            Financial audit events also require finance-enabled access.
+          </p>
+        </div>
+      </div>
+    );
   }
 
-  const entries = await getAuditEntries(actor.canAccessFinancials);
-  const filteredEntries = filterEntries(entries, params);
+  const trail = await getAuditTrail({
+    canAccessFinancials: actor.canAccessFinancials,
+  });
+  const filteredEntries = filterEntries(trail.entries, params);
 
   const category = asTrimmedString(params.category) || "all";
   const severity = asTrimmedString(params.severity) || "all";
   const source = asTrimmedString(params.source) || "all";
   const query = asTrimmedString(params.q);
+  const from = asTrimmedString(params.from);
+  const to = asTrimmedString(params.to);
 
-  const criticalCount = entries.filter((entry) => entry.severity === "critical").length;
-  const warningCount = entries.filter((entry) => entry.severity === "warning").length;
-  const financialCount = entries.filter((entry) => classifyCategory(entry) === "financials").length;
-  const exportCount = entries.filter((entry) => classifyCategory(entry) === "exports").length;
+  const criticalCount = trail.entries.filter(
+    (entry) => entry.severity === "critical",
+  ).length;
+  const warningCount = trail.entries.filter(
+    (entry) => entry.severity === "warning",
+  ).length;
+  const financialCount = trail.entries.filter(
+    (entry) => classifyCategory(entry) === "financials",
+  ).length;
+  const exportCount = trail.entries.filter(
+    (entry) => classifyCategory(entry) === "exports",
+  ).length;
+  const liveSources = trail.health.filter((item) => item.available).length;
+
+  const csvHref = buildExportHref(params, "csv");
+  const jsonHref = buildExportHref(params, "json");
 
   return (
     <main className="min-h-screen bg-[#f7fbf8] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
@@ -737,9 +385,27 @@ export default async function AdminAuditTrailPage({
                 Admin / Analytics / Audit Trail
               </p>
 
-              <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-                SitGuru Audit Trail.
-              </h1>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <h1 className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
+                  SitGuru Audit Trail.
+                </h1>
+                <span
+                  className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.18em] ${
+                    liveSources > 0
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-amber-200 bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {liveSources > 0
+                    ? `${liveSources}/3 Sources Live`
+                    : "Sources Setup Needed"}
+                </span>
+                {!actor.canAccessFinancials ? (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+                    Finance Events Hidden
+                  </span>
+                ) : null}
+              </div>
 
               <p className="mt-4 max-w-4xl text-sm leading-7 text-slate-600 sm:text-base">
                 Review admin actions, financial exports, emailed reports,
@@ -763,10 +429,22 @@ export default async function AdminAuditTrailPage({
                 Reports & Exports
               </Link>
               <Link
-                href="/admin/financials"
+                href="/admin/financials/exports"
+                className="rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+              >
+                Export Center
+              </Link>
+              <Link
+                href={csvHref}
+                className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-900 shadow-sm transition hover:bg-emerald-100"
+              >
+                Export CSV
+              </Link>
+              <Link
+                href={jsonHref}
                 className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
               >
-                Financial Overview
+                Export JSON
               </Link>
             </div>
           </div>
@@ -774,8 +452,8 @@ export default async function AdminAuditTrailPage({
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <AuditStatCard
               label="Total Events"
-              value={entries.length.toLocaleString()}
-              detail="Latest combined audit and analytics records."
+              value={trail.entries.length.toLocaleString()}
+              detail="Deduped combined audit and analytics records."
               tone="emerald"
             />
             <AuditStatCard
@@ -800,37 +478,88 @@ export default async function AdminAuditTrailPage({
         </section>
 
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="mb-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+              Wiring & Readiness
+            </p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+              Live audit source checks
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Service-role reads from admin audit, financial audit, and analytics
+              event tables. Apply the audit-log migration if a source shows Setup.
+            </p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            {trail.health.map((item) => (
+              <SourceHealthCard key={item.source} item={item} />
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
                 Filters
               </p>
               <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-                Find activity by category, severity, source, or keyword.
+                Find activity by category, severity, source, date, or keyword.
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 Search actor emails, actions, areas, targets, page paths, or
-                metadata. Financial audit records are visible to finance-enabled
-                admins.
+                metadata. Financial audit records stay hidden without finance
+                access. Exports honor the active filters.
               </p>
             </div>
 
-            <form action="/admin/audit-trail" className="w-full max-w-xl">
+            <form action="/admin/audit-trail" className="w-full max-w-xl space-y-3">
               <input
                 name="q"
                 defaultValue={query}
                 placeholder="Search audit trail..."
                 className="w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
               />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                    From
+                  </span>
+                  <input
+                    type="date"
+                    name="from"
+                    defaultValue={from}
+                    className="w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                    To
+                  </span>
+                  <input
+                    type="date"
+                    name="to"
+                    defaultValue={to}
+                    className="w-full rounded-xl border border-slate-100 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  />
+                </label>
+              </div>
               <input type="hidden" name="category" value={category} />
               <input type="hidden" name="severity" value={severity} />
               <input type="hidden" name="source" value={source} />
-              <div className="mt-3 flex justify-end">
+              <div className="flex justify-end gap-2">
+                <Link
+                  href="/admin/audit-trail"
+                  className="rounded-xl border border-slate-100 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+                >
+                  Clear
+                </Link>
                 <button
                   type="submit"
                   className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
                 >
-                  Search
+                  Apply
                 </button>
               </div>
             </form>
@@ -847,7 +576,10 @@ export default async function AdminAuditTrailPage({
                     key={filter.value}
                     href={buildFilterHref(params, { category: filter.value })}
                     label={filter.label}
-                    active={category === filter.value || (!params.category && filter.value === "all")}
+                    active={
+                      category === filter.value ||
+                      (!params.category && filter.value === "all")
+                    }
                   />
                 ))}
               </div>
@@ -863,7 +595,10 @@ export default async function AdminAuditTrailPage({
                     key={filter.value}
                     href={buildFilterHref(params, { severity: filter.value })}
                     label={filter.label}
-                    active={severity === filter.value || (!params.severity && filter.value === "all")}
+                    active={
+                      severity === filter.value ||
+                      (!params.severity && filter.value === "all")
+                    }
                   />
                 ))}
               </div>
@@ -879,7 +614,10 @@ export default async function AdminAuditTrailPage({
                     key={filter.value}
                     href={buildFilterHref(params, { source: filter.value })}
                     label={filter.label}
-                    active={source === filter.value || (!params.source && filter.value === "all")}
+                    active={
+                      source === filter.value ||
+                      (!params.source && filter.value === "all")
+                    }
                   />
                 ))}
               </div>
@@ -897,23 +635,34 @@ export default async function AdminAuditTrailPage({
                 {filteredEntries.length.toLocaleString()} matching audit events
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Showing the newest events first from admin audit, financial
-                audit, and analytics tracking sources.
+                Newest first from admin audit, financial audit, and analytics
+                tracking sources. Dual-written finance events are deduped.
               </p>
             </div>
 
-            <Link
-              href="/admin/audit-trail"
-              className="inline-flex w-fit rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
-            >
-              Clear Filters
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={csvHref}
+                className="inline-flex rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-900 shadow-sm transition hover:bg-emerald-100"
+              >
+                Download Filtered CSV
+              </Link>
+              <Link
+                href="/admin/audit-trail"
+                className="inline-flex rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+              >
+                Clear Filters
+              </Link>
+            </div>
           </div>
 
           <div className="mt-6 space-y-4">
             {filteredEntries.length ? (
               filteredEntries.map((entry) => (
-                <AuditEntryCard key={`${entry.source}-${entry.id}`} entry={entry} />
+                <AuditEntryCard
+                  key={`${entry.source}-${entry.id}`}
+                  entry={entry}
+                />
               ))
             ) : (
               <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
@@ -921,9 +670,9 @@ export default async function AdminAuditTrailPage({
                   No audit events found.
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Adjust filters or generate admin activity such as exports,
-                  financial edits, approvals, settings changes, or analytics
-                  events.
+                  {liveSources === 0
+                    ? "Audit tables look unavailable. Apply supabase/migrations/20260802_create_admin_financial_audit_logs.sql, then generate exports or admin actions."
+                    : "Adjust filters or generate admin activity such as exports, financial edits, approvals, settings changes, or analytics events."}
                 </p>
               </div>
             )}

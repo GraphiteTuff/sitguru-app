@@ -1281,6 +1281,7 @@ export default function FinancialExportCenterPage() {
               <ActionLink href="/admin/financials/general-ledger" label="Open Ledger" />
               <ActionLink href="/admin/financials/stripe" label="Open Stripe" />
               <ActionLink href="/admin/financials/plaid" label="Open Banking" />
+              <ActionLink href="/admin/audit-trail" label="Open Audit Trail" />
             </div>
           </div>
         </section>
