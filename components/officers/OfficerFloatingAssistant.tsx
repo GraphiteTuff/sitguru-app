@@ -614,6 +614,12 @@ export default function OfficerFloatingAssistant({
               placeholder={composerPlaceholder}
               disabled={isLoading}
               aria-label={`Message ${displayName}`}
+              style={{
+                color: "#0f172a",
+                WebkitTextFillColor: "#0f172a",
+                caretColor: "#0f172a",
+                backgroundColor: "#ffffff",
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
