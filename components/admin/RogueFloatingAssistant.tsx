@@ -59,7 +59,7 @@ const QUICK_CHIPS = [
 ] as const;
 
 const CHIP_CLASS =
-  "px-4 py-1.5 bg-[#0D5C3A] text-white text-xs font-medium rounded-full shadow-sm hover:bg-opacity-95 active:scale-95 transition-all whitespace-nowrap flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full justify-center px-3 py-2 bg-[#0D5C3A] text-white text-xs font-semibold rounded-full shadow-sm hover:bg-opacity-95 active:scale-95 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 text-center leading-tight";
 
 function RogueAvatar({ className = "h-8 w-8" }: { className?: string }) {
   return (
@@ -451,7 +451,7 @@ export default function RogueFloatingAssistant() {
           </div>
 
           <div
-            className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50 p-2"
+            className="grid shrink-0 grid-cols-2 gap-2 border-b border-gray-100 bg-gray-50 p-2"
             role="toolbar"
             aria-label="Quick admin reports"
           >
@@ -469,7 +469,7 @@ export default function RogueFloatingAssistant() {
             <button
               type="button"
               onClick={clearChat}
-              className="cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
+              className="col-span-2 w-full cursor-pointer rounded-full border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
             >
               Clear
             </button>
