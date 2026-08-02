@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Floating Rogue admin assistant — homepage-style tip bubble + panel.
+ * Floating Rogue admin assistant — homepage tip bubble + panel (no AI badge).
  * Streams via Vercel AI SDK useChat → /api/admin/rogue-ai.
  */
 
@@ -12,6 +12,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { useChat } from "ai/react";
 import { Maximize2, Minimize2, Sparkles, X } from "lucide-react";
 
@@ -21,8 +22,9 @@ const ROGUE_AVATAR_SRC = "/images/rogue-avatar.png";
 const REPORTING_STATEMENT =
   "**Rogue reporting for duty.** I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap a chip or ask me anything admin-shaped.";
 
+/** Homepage-style tip copy, admin reporting flavor. */
 const TIP_STATEMENT =
-  "Rogue reporting for duty. I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap to open!";
+  "Hi! I'm Rogue 🦴 Tap for reports — I'll sniff Operations, Growth, Financials & Audits for you!";
 
 const QUICK_CHIPS = [
   {
@@ -219,6 +221,7 @@ function renderInline(text: string): ReactNode {
 }
 
 export default function RogueFloatingAssistant() {
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [preset, setPreset] = useState<string>("");
@@ -251,6 +254,10 @@ export default function RogueFloatingAssistant() {
       period,
     },
   });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -317,32 +324,56 @@ export default function RogueFloatingAssistant() {
     window.setTimeout(() => inputRef.current?.focus(), 40);
   }
 
+  if (!mounted) return null;
+
   const panelSize = expanded
     ? "sm:h-[min(820px,92dvh)] sm:w-[min(560px,96vw)]"
     : "sm:h-[600px] sm:w-[400px]";
 
-  return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[80] flex justify-end sm:bottom-6 sm:right-6">
-      <div
-        className="homepage-chat-bubble-root"
-        style={{ ["--hcb-green" as string]: BRAND_GREEN }}
-      >
-      {!open ? (
+  const ui = (
+    <div
+      className="pointer-events-none fixed bottom-4 right-4 z-[90] flex flex-row items-center justify-end gap-3 overflow-visible md:bottom-6 md:right-6"
+      data-rogue-admin-dock
+      style={{ ["--hcb-green" as string]: BRAND_GREEN }}
+    >
+      <div className="homepage-chat-bubble-root !relative !inset-auto !z-auto !max-w-none">
+        {!open ? (
+          <button
+            type="button"
+            className="homepage-chat-tip"
+            style={{ maxWidth: "min(280px, calc(100vw - 6.5rem))" }}
+            onClick={openPanel}
+            aria-label="Open Rogue reporting terminal"
+          >
+            <span className="homepage-chat-tip__pulse" aria-hidden />
+            <span className="homepage-chat-tip__text">{TIP_STATEMENT}</span>
+          </button>
+        ) : null}
+
         <button
           type="button"
-          className="homepage-chat-tip"
-          style={{ maxWidth: "min(300px, calc(100vw - 6.5rem))" }}
-          onClick={openPanel}
-          aria-label="Open Rogue reporting terminal"
+          className="homepage-chat-launcher"
+          onClick={() => (open ? closePanel() : openPanel())}
+          aria-label={
+            open
+              ? "Close Rogue, Chief Treat Officer"
+              : "Open Rogue, Chief Treat Officer"
+          }
+          aria-expanded={open}
         >
-          <span className="homepage-chat-tip__pulse" aria-hidden />
-          <span className="homepage-chat-tip__text">{TIP_STATEMENT}</span>
+          {open ? (
+            <span className="homepage-chat-launcher__icon">×</span>
+          ) : (
+            <span className="homepage-chat-launcher__icon" aria-hidden>
+              <RogueAvatar className="h-full w-full overflow-hidden rounded-full flex-shrink-0" />
+            </span>
+          )}
         </button>
-      ) : null}
+      </div>
 
       {open ? (
         <div
-          className={`homepage-chat-panel pointer-events-auto fixed inset-0 z-50 flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:rounded-2xl sm:shadow-2xl ${panelSize}`}
+          className={`homepage-chat-panel pointer-events-auto fixed inset-0 z-[91] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:rounded-2xl sm:shadow-2xl ${panelSize}`}
           role="dialog"
           aria-label="Rogue, Chief Treat Officer admin assistant"
         >
@@ -354,7 +385,7 @@ export default function RogueFloatingAssistant() {
               >
                 <RogueAvatar className="!h-full !w-full max-h-full max-w-full rounded-full" />
               </span>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 pr-14">
                 <p className="homepage-chat-panel__title">
                   Rogue, Chief Treat Officer 🦴
                 </p>
@@ -505,27 +536,8 @@ export default function RogueFloatingAssistant() {
           </p>
         </div>
       ) : null}
-
-      <button
-        type="button"
-        className="homepage-chat-launcher"
-        onClick={() => (open ? closePanel() : openPanel())}
-        aria-label={
-          open
-            ? "Close Rogue, Chief Treat Officer"
-            : "Open Rogue, Chief Treat Officer"
-        }
-        aria-expanded={open}
-      >
-        {open ? (
-          <span className="homepage-chat-launcher__icon">×</span>
-        ) : (
-          <span className="homepage-chat-launcher__icon" aria-hidden>
-            <RogueAvatar className="h-full w-full rounded-full overflow-hidden flex-shrink-0" />
-          </span>
-        )}
-      </button>
-      </div>
     </div>
   );
+
+  return createPortal(ui, document.body);
 }
