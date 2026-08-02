@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
+import { getPlaidEnvironment } from "@/lib/plaid";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,9 @@ type ReconciliationData = {
     duplicateRows: number;
     uncategorizedRows: number;
     stripeRows: number;
+    bookingPaymentRows: number;
+    matchedStripePayouts: number;
+    unmatchedStripePayouts: number;
     trustSafetyRows: number;
     growthMarketingRows: number;
     referralRewardRows: number;
@@ -130,6 +134,8 @@ function money(value: number) {
   const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(Math.abs(value || 0));
 
   return value < 0 ? `(${formatted})` : formatted;
@@ -171,88 +177,16 @@ function getOptionalBoolean(value: unknown) {
   return false;
 }
 
-function hasFinancialRole(role: string) {
-  return [
-    "owner",
-    "super_admin",
-    "admin",
-    "finance_admin",
-    "finance",
-    "accounting",
-    "bookkeeper",
-  ].includes(role.trim().toLowerCase());
-}
-
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
 async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
+  const identity = await getFinanceAdminIdentity();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<GenericRow>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_reconciliation_access",
-    ),
-    safeRows<GenericRow>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_reconciliation_access",
-    ),
-    safeRows<GenericRow>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_reconciliation_access",
-    ),
-  ]);
-
-  const profile = (profileChecks.flat().find(Boolean) || {}) as GenericRow;
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-  const envAllowed = envAdminEmails.includes(userEmail);
-  const canAccessFinancials =
-    active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed);
+  if (!identity) return null;
 
   return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials,
+    id: identity.id,
+    email: identity.email,
+    role: identity.role,
+    canAccessFinancials: true,
   };
 }
 
@@ -411,8 +345,40 @@ function getBookingStripeFee(row: GenericRow) {
     centsToDollars(row.sitguru_fee_amount_cents) ||
     centsToDollars(row.platform_fee_cents) ||
     centsToDollars(row.marketplace_fee_amount_cents) ||
+    centsToDollars(row.marketplace_support_cents) ||
     centsToDollars(row.stripe_fee_cents)
   );
+}
+
+function getBookingPaymentAmount(row: GenericRow) {
+  return (
+    centsToDollars(row.amount_cents) ||
+    centsToDollars(row.gross_amount_cents) ||
+    centsToDollars(row.total_cents) ||
+    centsAwareAmount(row.amount) ||
+    centsToDollars(row.marketplace_support_cents)
+  );
+}
+
+function getBookingPaymentFee(row: GenericRow) {
+  return (
+    centsToDollars(row.marketplace_support_cents) ||
+    centsToDollars(row.platform_fee_cents) ||
+    centsToDollars(row.fee_amount_cents) ||
+    getBookingStripeFee(row)
+  );
+}
+
+function amountsClose(left: number, right: number, tolerance = 0.51) {
+  return Math.abs(Math.abs(left) - Math.abs(right)) <= tolerance;
+}
+
+function datesClose(left?: string | null, right?: string | null, days = 3) {
+  if (!left || !right) return false;
+  const a = new Date(left).getTime();
+  const b = new Date(right).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b)) return false;
+  return Math.abs(a - b) <= days * 24 * 60 * 60 * 1000;
 }
 
 function getPayoutAmount(row: GenericRow) {
@@ -815,13 +781,95 @@ function bookingToStripeItem(row: GenericRow, index: number): ReconciliationItem
       : "Booking match support",
     issueType: "Booking payment match support",
     recommendation:
-      "Use this booking only as matching support. Revenue should come from Stripe/payment tables, while Plaid/NFCU rows confirm deposits and payouts.",
+      "Use this booking only as matching support. Prefer booking_payments for Stripe ledger truth; Plaid/NFCU rows confirm deposits and payouts.",
   };
 }
 
-function stripePayoutToItem(row: GenericRow, index: number): ReconciliationItem {
+function bookingPaymentToItem(row: GenericRow, index: number): ReconciliationItem {
+  const amount = getBookingPaymentAmount(row);
+  const fee = getBookingPaymentFee(row);
+  const refund = centsToDollars(row.refund_amount_cents);
+  const dispute = centsToDollars(row.dispute_amount_cents);
+  const status = asTrimmedString(row.status) || "Recorded";
+  const reference =
+    asTrimmedString(row.payment_intent_id) ||
+    asTrimmedString(row.stripe_payment_intent_id) ||
+    asTrimmedString(row.charge_id) ||
+    getRowReference(row, String(index));
+
+  return {
+    id: `booking-payment-${reference}`,
+    source: "Booking Payments (Stripe Ledger)",
+    label:
+      asTrimmedString(row.description) ||
+      asTrimmedString(row.customer_email) ||
+      "Stripe booking payment",
+    amount: refund > 0 || dispute > 0 ? -(refund || dispute || amount) : amount,
+    status,
+    bankStatus: "Stripe Clearing",
+    reviewStatus:
+      status.toLowerCase().includes("paid") ||
+      status.toLowerCase().includes("succeeded")
+        ? "recorded"
+        : "needs_review",
+    date: formatDate(getRowDate(row)),
+    reference,
+    category: fee
+      ? `Platform fee ${moneyExact(fee)}`
+      : "Stripe booking payment",
+    issueType:
+      refund > 0 || dispute > 0
+        ? "Booking payment refund/dispute support"
+        : "Booking payment ledger truth",
+    recommendation:
+      "Primary Stripe payment ledger row. Match platform fees to P&L and payout deposits to NFCU bank cash-in.",
+  };
+}
+
+function matchStripePayoutToBank(
+  payout: GenericRow,
+  bankCandidates: GenericRow[],
+  usedBankIds: Set<string>,
+) {
+  const explicit =
+    asTrimmedString(payout.plaid_transaction_id) ||
+    asTrimmedString(payout.bank_transaction_id) ||
+    asTrimmedString(payout.matched_bank_transaction_id);
+
+  if (explicit) {
+    return { matched: true, bankId: explicit, method: "stored_reference" as const };
+  }
+
+  const payoutAmount = getPayoutAmount(payout);
+  const payoutDate =
+    asTrimmedString(payout.arrival_date) ||
+    asTrimmedString(payout.available_on) ||
+    getRowDate(payout);
+
+  for (const bank of bankCandidates) {
+    const bankId = getRowReference(bank, "");
+    if (!bankId || usedBankIds.has(bankId)) continue;
+    if (!amountsClose(payoutAmount, getBankAmount(bank))) continue;
+    if (!datesClose(payoutDate, getRowDate(bank), 4)) continue;
+
+    return {
+      matched: true,
+      bankId,
+      method: "amount_date" as const,
+    };
+  }
+
+  return { matched: false, bankId: "", method: "none" as const };
+}
+
+function stripePayoutToItem(
+  row: GenericRow,
+  index: number,
+  match?: { matched: boolean; bankId: string; method: string },
+): ReconciliationItem {
   const amount = getPayoutAmount(row);
   const plaidReference =
+    match?.bankId ||
     asTrimmedString(row.plaid_transaction_id) ||
     asTrimmedString(row.bank_transaction_id) ||
     asTrimmedString(row.matched_bank_transaction_id);
@@ -830,6 +878,7 @@ function stripePayoutToItem(row: GenericRow, index: number): ReconciliationItem 
     asTrimmedString(row.payout_id) ||
     asTrimmedString(row.transfer_id) ||
     getRowReference(row, String(index));
+  const matched = Boolean(match?.matched || plaidReference);
 
   return {
     id: `stripe-payout-${reference}`,
@@ -843,22 +892,29 @@ function stripePayoutToItem(row: GenericRow, index: number): ReconciliationItem 
       asTrimmedString(row.status) ||
       asTrimmedString(row.payout_status) ||
       "Recorded",
-    bankStatus: plaidReference ? "Bank Matched" : "Needs Bank Match",
-    reviewStatus: plaidReference ? "matched" : "needs_review",
+    bankStatus: matched ? "Bank Matched" : "Needs Bank Match",
+    reviewStatus: matched ? "matched" : "needs_review",
     date: formatDate(getRowDate(row)),
     reference,
-    category: plaidReference ? "Matched payout deposit" : "Unmatched payout deposit",
-    issueType: plaidReference
+    category: matched
+      ? match?.method === "amount_date"
+        ? "Matched by amount/date"
+        : "Matched payout deposit"
+      : "Unmatched payout deposit",
+    issueType: matched
       ? "Matched Stripe payout"
       : "Stripe payout needs Plaid/NFCU match",
-    recommendation: plaidReference
+    recommendation: matched
       ? "Confirm the matched Plaid/NFCU deposit agrees to the Stripe payout batch."
       : "Match this Stripe payout to the corresponding Plaid/NFCU business bank deposit before month-end close.",
   };
 }
 
 async function getReconciliationData(): Promise<ReconciliationData> {
+  const plaidEnvironment = getPlaidEnvironment();
+
   const [
+    adminPlaidAccounts,
     adminPlaidRows,
     plaidTransactionRows,
     bankTransactionRows,
@@ -869,6 +925,7 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     stripeRows,
     stripeBalanceRows,
     stripePayoutRows,
+    bookingPaymentRows,
     bookingRows,
     trustSafetyEvents,
     trustSafetyPurchases,
@@ -876,6 +933,16 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     growthMarketingRows,
     referralRewardRows,
   ] = await Promise.all([
+    safeRows<GenericRow>(
+      supabaseAdmin
+        .from("admin_plaid_accounts")
+        .select(
+          "account_id, name, official_name, subtype, plaid_environment",
+        )
+        .eq("plaid_environment", plaidEnvironment)
+        .limit(500),
+      "admin_plaid_accounts",
+    ),
     safeRows<GenericRow>(
       supabaseAdmin
         .from("admin_plaid_transactions")
@@ -962,6 +1029,14 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     ),
     safeRows<GenericRow>(
       supabaseAdmin
+        .from("booking_payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "booking_payments",
+    ),
+    safeRows<GenericRow>(
+      supabaseAdmin
         .from("bookings")
         .select("*")
         .order("created_at", { ascending: false })
@@ -1010,11 +1085,32 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     ),
   ]);
 
-  const bankRows = getUniqueSourceRows([
-    ...adminPlaidRows,
-    ...plaidTransactionRows,
-    ...bankTransactionRows,
-  ]);
+  const businessAccountIds = new Set(
+    adminPlaidAccounts
+      .filter((account) => {
+        const name =
+          `${asTrimmedString(account.name)} ${asTrimmedString(account.official_name)}`.toLowerCase();
+        const subtype = asTrimmedString(account.subtype).toLowerCase();
+        return (
+          (subtype === "checking" || subtype === "savings") &&
+          name.includes("business")
+        );
+      })
+      .map((account) => asTrimmedString(account.account_id))
+      .filter(Boolean),
+  );
+
+  const envFilteredAdminPlaid = adminPlaidRows.filter((row) => {
+    if (row.removed_at || row.is_excluded_from_reports) return false;
+    if (!businessAccountIds.size) return true;
+    return businessAccountIds.has(asTrimmedString(row.account_id));
+  });
+
+  const bankRows = getUniqueSourceRows(
+    businessAccountIds.size
+      ? envFilteredAdminPlaid
+      : [...envFilteredAdminPlaid, ...plaidTransactionRows, ...bankTransactionRows],
+  );
   const activeBankRows = bankRows.filter((row) => !isArchivedRow(row));
   const activeManualExpenseRows = manualExpenseRows.filter((row) => !isArchivedRow(row));
   const activeCashFlowLines = cashFlowLines.filter((row) => !isArchivedRow(row));
@@ -1060,30 +1156,68 @@ async function getReconciliationData(): Promise<ReconciliationData> {
   const stripeBookingRows = bookingRows
     .filter((row) => !isArchivedRow(row))
     .filter(isStripeRelatedBooking);
+  const activeBookingPayments = bookingPaymentRows
+    .filter((row) => !isArchivedRow(row))
+    .filter((row) => {
+      const provider = asTrimmedString(row.provider).toLowerCase();
+      return !provider || provider === "stripe";
+    });
+  const bookingPaymentItems = activeBookingPayments.map(bookingPaymentToItem);
+
+  const stripeBankDepositCandidates = activeBankRows.filter(
+    bankLooksLikeStripeDeposit,
+  );
+  const usedBankMatchIds = new Set<string>();
   const stripePayoutItems = stripePayoutRows
     .filter((row) => !isArchivedRow(row))
-    .map(stripePayoutToItem);
-  const stripeBankDepositItems = activeBankRows
-    .filter(bankLooksLikeStripeDeposit)
     .map((row, index) => {
+      const match = matchStripePayoutToBank(
+        row,
+        stripeBankDepositCandidates,
+        usedBankMatchIds,
+      );
+      if (match.matched && match.bankId) usedBankMatchIds.add(match.bankId);
+      return stripePayoutToItem(row, index, match);
+    });
+
+  const matchedStripePayouts = stripePayoutItems.filter(
+    (item) => item.reviewStatus === "matched",
+  ).length;
+  const unmatchedStripePayouts = stripePayoutItems.length - matchedStripePayouts;
+
+  const stripeBankDepositItems = stripeBankDepositCandidates.map(
+    (row, index) => {
       const item = bankRowToItem(row, index);
+      const bankId = getRowReference(row, String(index));
+      const matched = usedBankMatchIds.has(bankId);
 
       return {
         ...item,
         id: `${item.id}-stripe-bank-deposit-${index}`,
         source: "Plaid/NFCU Stripe Deposit",
-        issueType: "Stripe deposit bank match candidate",
-        recommendation:
-          "Confirm this Plaid/NFCU bank row matches a Stripe payout batch and should clear the unmatched deposit queue.",
+        bankStatus: matched ? "Payout Matched" : item.bankStatus,
+        reviewStatus: matched ? "matched" : item.reviewStatus,
+        issueType: matched
+          ? "Matched Stripe deposit bank row"
+          : "Stripe deposit bank match candidate",
+        recommendation: matched
+          ? "This NFCU bank credit matched a Stripe payout by stored reference or amount/date."
+          : "Confirm this Plaid/NFCU bank row matches a Stripe payout batch and should clear the unmatched deposit queue.",
       };
-    });
+    },
+  );
 
   const stripeItems = [
-    ...stripeRows.map((row, index) => stripeToItem(row, index, "Stripe Transaction")),
+    ...bookingPaymentItems,
+    ...stripeRows.map((row, index) =>
+      stripeToItem(row, index, "Stripe Transaction"),
+    ),
     ...stripeBalanceRows.map((row, index) =>
       stripeToItem(row, index, "Stripe Balance Transaction"),
     ),
-    ...stripeBookingRows.map(bookingToStripeItem),
+    ...(bookingPaymentItems.length
+      ? []
+      : stripeBookingRows.map(bookingToStripeItem)),
     ...stripePayoutItems,
     ...stripeBankDepositItems,
   ];
@@ -1166,10 +1300,11 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     ...duplicateItems,
     ...pendingItems,
     ...growthItems.filter((item) => item.reviewStatus === "needs_review"),
+    ...stripePayoutItems.filter((item) => item.reviewStatus === "needs_review"),
   ]).length;
 
   const reconciliationScore = getScore({
-    needsReviewRows: needsReviewItems.length,
+    needsReviewRows: needsReviewItems.length + unmatchedStripePayouts,
     pendingRows: pendingItems.length,
     duplicateRows: duplicateItems.length,
     uncategorizedRows: uncategorizedItems.length,
@@ -1182,7 +1317,11 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     {
       label: "Plaid/NFCU Bank Feed",
       status: bankItems.length > 0 ? "ready" : "missing",
-      detail: `${bankItems.length.toLocaleString()} bank-fed rows are available for reconciliation.`,
+      detail: `${bankItems.length.toLocaleString()} bank-fed rows are available for ${plaidEnvironment}${
+        businessAccountIds.size
+          ? ` across ${businessAccountIds.size} NFCU business accounts`
+          : ""
+      }.`,
     },
     {
       label: "Posted vs Pending",
@@ -1223,9 +1362,26 @@ async function getReconciliationData(): Promise<ReconciliationData> {
       ).toLocaleString()} saved statement or reporting lines are active.`,
     },
     {
-      label: "Stripe / Payment Activity",
-      status: stripeItems.length > 0 ? "ready" : "needs_review",
-      detail: `${stripeItems.length.toLocaleString()} Stripe rows and booking match candidates are available. Stripe/payment tables remain the source of payment truth; bookings and Plaid/NFCU deposits are matching support.`,
+      label: "Stripe / Booking Payments",
+      status:
+        bookingPaymentItems.length > 0 || stripeItems.length > 0
+          ? "ready"
+          : "needs_review",
+      detail: bookingPaymentItems.length
+        ? `${bookingPaymentItems.length.toLocaleString()} booking_payments rows drive Stripe ledger truth; ${stripeItems.length.toLocaleString()} total Stripe match rows are available.`
+        : `${stripeItems.length.toLocaleString()} Stripe rows and booking match candidates are available. Prefer booking_payments when present.`,
+    },
+    {
+      label: "Stripe Payout ↔ NFCU Match",
+      status:
+        stripePayoutItems.length === 0
+          ? "needs_review"
+          : unmatchedStripePayouts === 0
+            ? "ready"
+            : "needs_review",
+      detail: stripePayoutItems.length
+        ? `${matchedStripePayouts.toLocaleString()} matched and ${unmatchedStripePayouts.toLocaleString()} unmatched Stripe payout deposits.`
+        : "No Stripe payout rows found yet for bank matching.",
     },
     {
       label: "Trust & Safety Activity",
@@ -1259,7 +1415,16 @@ async function getReconciliationData(): Promise<ReconciliationData> {
     growthItems,
     reportChecks,
     sourceCounts: [
-      { label: "Admin Plaid", count: adminPlaidRows.length, source: "admin_plaid_transactions" },
+      {
+        label: "Admin Plaid Accounts",
+        count: adminPlaidAccounts.length,
+        source: "admin_plaid_accounts",
+      },
+      {
+        label: "Admin Plaid Txns",
+        count: envFilteredAdminPlaid.length,
+        source: "admin_plaid_transactions",
+      },
       { label: "Plaid", count: plaidTransactionRows.length, source: "plaid_transactions" },
       { label: "Bank", count: bankTransactionRows.length, source: "bank_transactions" },
       { label: "Manual Expenses", count: manualExpenseRows.length, source: "expense_ledger" },
@@ -1269,6 +1434,11 @@ async function getReconciliationData(): Promise<ReconciliationData> {
       { label: "Stripe", count: stripeRows.length, source: "stripe_transactions" },
       { label: "Stripe Balance", count: stripeBalanceRows.length, source: "stripe_balance_transactions" },
       { label: "Stripe Payouts", count: stripePayoutRows.length, source: "stripe_payouts" },
+      {
+        label: "Booking Payments",
+        count: bookingPaymentRows.length,
+        source: "booking_payments",
+      },
       { label: "Bookings", count: bookingRows.length, source: "bookings" },
       { label: "Trust & Safety Events", count: trustSafetyEvents.length, source: "trust_safety_financial_events" },
       { label: "Trust & Safety Plans", count: trustSafetyPurchases.length, source: "guru_trust_safety_plan_purchases" },
@@ -1286,6 +1456,9 @@ async function getReconciliationData(): Promise<ReconciliationData> {
       duplicateRows: duplicateItems.length,
       uncategorizedRows: uncategorizedItems.length,
       stripeRows: stripeItems.length,
+      bookingPaymentRows: bookingPaymentItems.length,
+      matchedStripePayouts,
+      unmatchedStripePayouts,
       trustSafetyRows: trustSafetyItems.length,
       growthMarketingRows: growthMarketingItems.length,
       referralRewardRows: referralRewardItems.length,
@@ -1583,7 +1756,8 @@ function ItemsTable({
 
       {displayRows.length > 80 ? (
         <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold text-amber-800">
-          Showing the latest 80 rows in this section.
+          Showing the latest 80 rows in this section. Export CSV/Excel/Word/PDF
+          for the full reconciliation package.
         </p>
       ) : null}
     </section>
@@ -1594,7 +1768,7 @@ function ReconciliationFlowPanel() {
   const steps = [
     "Plaid/NFCU bank rows are checked for pending, posted, needs review, excluded, and uncategorized states.",
     "Manual expenses and manual statement lines are checked so they do not accidentally duplicate bank activity.",
-    "Stripe/payment tables are reviewed as the source of payment truth, while bookings and Plaid/NFCU bank deposits are used as matching support only.",
+    "Stripe booking_payments drive payment ledger truth; payout batches auto-match to NFCU deposits by stored reference or amount/date.",
     "Trust & Safety and Growth & Referrals are checked against receivables, liabilities, reward payouts, campaign costs, and vendor costs.",
     "Exception queues show what needs cleanup before P&L, Cash Flow, General Ledger, Balance Sheet, and payout review are final.",
   ];
@@ -1719,7 +1893,7 @@ export default async function AdminReconciliationPage() {
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <ActionLink href="/admin/financials" label="Overview" />
                 <ActionLink href="/admin/financials/plaid" label="Banking" />
-                <ActionLink href="/admin/financials/stripe" label="Stripe" />
+                <ActionLink href="/admin/financials/payment-gateway" label="Payment Gateway" />
                 <ActionLink href="/admin/financials/profit-loss" label="P&L" />
                 <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
                 <ActionLink href="/admin/financials/general-ledger" label="Ledger" />
@@ -1731,6 +1905,30 @@ export default async function AdminReconciliationPage() {
                 />
               </div>
 
+              <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Export Reconciliation
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {(
+                    [
+                      ["CSV", "csv"],
+                      ["Excel", "excel"],
+                      ["Word", "word"],
+                      ["PDF", "pdf"],
+                    ] as const
+                  ).map(([label, format]) => (
+                    <Link
+                      key={format}
+                      href={`/api/admin/financials/reconciliation/export?format=${format}`}
+                      className="rounded-xl border border-emerald-100 bg-white px-3 py-2 text-center text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
               <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4">
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">
                   Reconciliation Score
@@ -1740,7 +1938,8 @@ export default async function AdminReconciliationPage() {
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                   Based on needs review, pending, duplicate, uncategorized,
-                  excluded bank activity, and growth/reward matching gaps.
+                  excluded bank activity, growth/reward gaps, and unmatched
+                  Stripe payout deposits.
                 </p>
               </div>
             </div>
@@ -1771,14 +1970,14 @@ export default async function AdminReconciliationPage() {
             <StatCard
               label="Manual Entries"
               value={data.totals.manualRows.toLocaleString()}
-              detail={`${money(data.totals.manualExpenseTotal)} in manual expenses plus reporting lines.`}
+              detail={`${moneyExact(data.totals.manualExpenseTotal)} in manual expenses plus reporting lines.`}
               tone="sky"
             />
 
             <StatCard
               label="Net Cash Movement"
-              value={money(data.totals.netCashMovement)}
-              detail={`${money(data.totals.totalCashIn)} cash in and ${money(data.totals.totalCashOut)} cash out.`}
+              value={moneyExact(data.totals.netCashMovement)}
+              detail={`${moneyExact(data.totals.totalCashIn)} cash in and ${moneyExact(data.totals.totalCashOut)} cash out.`}
               tone={data.totals.netCashMovement >= 0 ? "violet" : "rose"}
             />
           </div>
@@ -1801,7 +2000,7 @@ export default async function AdminReconciliationPage() {
             <StatCard
               label="Stripe Rows"
               value={data.totals.stripeRows.toLocaleString()}
-              detail="Stripe/payment rows, payout rows, booking match candidates, and Plaid/NFCU deposit candidates available for reconciliation support."
+              detail={`${data.totals.bookingPaymentRows.toLocaleString()} booking_payments · ${data.totals.matchedStripePayouts.toLocaleString()} matched / ${data.totals.unmatchedStripePayouts.toLocaleString()} unmatched payouts.`}
               tone="sky"
             />
 
@@ -1815,30 +2014,30 @@ export default async function AdminReconciliationPage() {
 
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard
-              label="Growth Rows"
-              value={data.totals.growthRows.toLocaleString()}
-              detail="Campaign costs plus PawPerks, Guru, Ambassador, and Partner reward rows."
-              tone="emerald"
+              label="Matched Payouts"
+              value={data.totals.matchedStripePayouts.toLocaleString()}
+              detail="Stripe payout batches matched to NFCU deposits by stored reference or amount/date."
+              tone={data.totals.matchedStripePayouts ? "emerald" : "slate"}
+            />
+
+            <StatCard
+              label="Unmatched Payouts"
+              value={data.totals.unmatchedStripePayouts.toLocaleString()}
+              detail="Stripe payouts still needing a Plaid/NFCU business checking deposit match."
+              tone={data.totals.unmatchedStripePayouts ? "amber" : "emerald"}
             />
 
             <StatCard
               label="Growth Marketing"
-              value={money(data.totals.growthMarketingTotal)}
+              value={moneyExact(data.totals.growthMarketingTotal)}
               detail={`${data.totals.growthMarketingRows.toLocaleString()} campaign cost rows needing bank, Stripe, card, or manual expense support.`}
               tone="sky"
             />
 
             <StatCard
-              label="Issued Rewards"
-              value={money(data.totals.issuedReferralRewardTotal)}
-              detail="Paid, credited, issued, or completed rewards that should match payout records."
-              tone="violet"
-            />
-
-            <StatCard
               label="Pending Reward Liability"
-              value={money(data.totals.pendingReferralRewardLiabilityTotal)}
-              detail="Rewards still owed and carried as current liabilities until cleared."
+              value={moneyExact(data.totals.pendingReferralRewardLiabilityTotal)}
+              detail={`${moneyExact(data.totals.issuedReferralRewardTotal)} issued rewards should match payout records.`}
               tone={data.totals.pendingReferralRewardLiabilityTotal ? "amber" : "emerald"}
             />
           </div>
@@ -1857,6 +2056,11 @@ export default async function AdminReconciliationPage() {
             ...data.uncategorizedItems,
             ...data.duplicateItems,
             ...data.pendingItems,
+            ...data.stripeItems.filter(
+              (item) =>
+                item.issueType === "Stripe payout needs Plaid/NFCU match" ||
+                item.reviewStatus === "needs_review",
+            ),
             ...data.growthItems.filter((item) => item.reviewStatus === "needs_review"),
           ]}
           emptyMessage="No exception rows found. Reconciliation looks clean for this pass."
@@ -1890,7 +2094,7 @@ export default async function AdminReconciliationPage() {
           <ItemsTable
             eyebrow="Stripe Matching"
             title="Stripe activity"
-            description="Stripe/payment rows are the source of payment truth. Booking rows and Plaid/NFCU deposit rows are included here only as match candidates for deposits, payouts, fees, refunds, and chargebacks."
+            description="booking_payments are the preferred Stripe ledger source. Payout batches are auto-matched to NFCU deposits by stored reference or amount/date. Booking rows remain fallback match candidates only."
             rows={data.stripeItems}
             emptyMessage="No Stripe/payment rows or booking match candidates found yet."
           />

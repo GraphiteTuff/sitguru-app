@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
+import { getStripeServer } from "@/lib/stripe/server";
+import type Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type AnyRow = Record<string, unknown>;
 
@@ -41,10 +45,41 @@ type SourceHealth = {
   rowCount: number;
 };
 
+type NormalizedTransaction = {
+  id: string;
+  createdAt: string;
+  customerName: string;
+  customerEmail: string;
+  description: string;
+  amount: number;
+  fee: number;
+  net: number;
+  status: StripeTransactionStatus;
+  type: StripeTransactionType;
+  stripeReference: string;
+  bookingReference: string | null;
+  matchedBankDeposit: boolean;
+  reconciliationStatus: ReconciliationStatus;
+  sourceTable?: string;
+};
+
+type NormalizedPayout = {
+  id: string;
+  arrivalDate: string;
+  amount: number;
+  feeTotal: number;
+  netAmount: number;
+  status: StripePayoutStatus;
+  stripePayoutId: string;
+  bankDescription: string;
+  bankMatched: boolean;
+  plaidTransactionId: string | null;
+};
+
 const candidateTables = {
   stripeTransactions: [
-    "payments",
     "booking_payments",
+    "payments",
     "stripe_transactions",
     "stripe_balance_transactions",
     "stripe_payment_intents",
@@ -138,6 +173,7 @@ function getText(row: AnyRow, keys: string[], fallback = "") {
 function getDate(row: AnyRow) {
   return (
     getText(row, [
+      "paid_at",
       "occurred_at",
       "created_at",
       "updated_at",
@@ -149,8 +185,29 @@ function getDate(row: AnyRow) {
       "transaction_date",
       "start_time",
       "booking_date",
+      "refunded_at",
     ]) || null
   );
+}
+
+function parseRangeBoundary(
+  value: string | null,
+  edge: "start" | "end",
+): string | null {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return edge === "start"
+      ? `${trimmed}T00:00:00.000Z`
+      : `${trimmed}T23:59:59.999Z`;
+  }
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
 }
 
 function getRangeDates(range: StripeRange) {
@@ -398,7 +455,9 @@ function rowLooksLikeRealStripePayment(row: AnyRow) {
   const source = getText(row, ["__source_table"]).toLowerCase();
   const status = getStripeStatus(row);
   const type = getStripeType(row);
+  const provider = getText(row, ["provider"]).toLowerCase();
 
+  if (provider && provider !== "stripe") return false;
   if (!rowHasStripeReference(row)) return false;
   if (status === "failed") return false;
   if (type !== "payment" && type !== "adjustment") return false;
@@ -708,11 +767,21 @@ function buildSourceHealth(params: {
   transactionCount: number;
   payoutCount: number;
   plaidStripeDeposits: number;
+  liveStripeOk: boolean;
+  liveStripeMessage: string;
+  liveStripeRowCount: number;
 }): SourceHealth[] {
   return [
     {
+      id: "stripe-live-api",
+      label: "Stripe Live API",
+      ok: params.liveStripeOk,
+      message: params.liveStripeMessage,
+      rowCount: params.liveStripeRowCount,
+    },
+    {
       id: "stripe-financial-api",
-      label: "Stripe Financial API",
+      label: "Stripe Ledger Tables",
       ok: params.transactionConnected.length > 0,
       message: connectedTableMessage(params.transactionConnected),
       rowCount: params.transactionCount,
@@ -720,8 +789,12 @@ function buildSourceHealth(params: {
     {
       id: "stripe-payouts",
       label: "Stripe Payouts",
-      ok: params.payoutConnected.length > 0,
-      message: connectedTableMessage(params.payoutConnected),
+      ok: params.payoutConnected.length > 0 || params.liveStripeOk,
+      message: params.payoutConnected.length
+        ? connectedTableMessage(params.payoutConnected)
+        : params.liveStripeOk
+          ? "Live Stripe payouts loaded from the Stripe API."
+          : "No payout source table or live Stripe payouts found yet.",
       rowCount: params.payoutCount,
     },
     {
@@ -731,14 +804,16 @@ function buildSourceHealth(params: {
       message: params.plaidConnected.length
         ? `${connectedTableMessage(
             params.plaidConnected,
-          )} Stripe payout deposits will match here when customer payment payouts exist.`
+          )} Stripe payout deposits match by amount/date when customer payouts exist.`
         : "No Plaid/NFCU banking source table was found yet.",
       rowCount: params.plaidStripeDeposits,
     },
   ];
 }
 
-function uniqueByReference<T extends { id: string; stripeReference?: string }>(rows: T[]) {
+function uniqueByReference<T extends { id: string; stripeReference?: string }>(
+  rows: T[],
+) {
   const seen = new Set<string>();
   const unique: T[] = [];
 
@@ -757,20 +832,303 @@ function getLiveConnectedStatus(sourceHealth: SourceHealth[]) {
   return sourceHealth.some((source) => source.ok);
 }
 
+function tryGetStripeClient() {
+  try {
+    if (!process.env.STRIPE_SECRET_KEY?.trim()) return null;
+    return getStripeServer();
+  } catch {
+    return null;
+  }
+}
+
+function stripeAmountToDollars(amount: number | null | undefined) {
+  if (typeof amount !== "number" || !Number.isFinite(amount)) return 0;
+  return amount / 100;
+}
+
+function sumStripeBalance(
+  buckets: Stripe.Balance.Available[] | Stripe.Balance.Pending[] | undefined,
+) {
+  return (buckets || [])
+    .filter((bucket) => String(bucket.currency || "").toLowerCase() === "usd")
+    .reduce((sum, bucket) => sum + stripeAmountToDollars(bucket.amount), 0);
+}
+
+function mapLiveBalanceTransaction(
+  txn: Stripe.BalanceTransaction,
+): NormalizedTransaction {
+  const typeRaw = String(txn.type || "").toLowerCase();
+  let type: StripeTransactionType = "payment";
+  let status: StripeTransactionStatus = "paid";
+
+  if (typeRaw.includes("refund")) {
+    type = "refund";
+    status = "refunded";
+  } else if (typeRaw.includes("dispute") || typeRaw.includes("chargeback")) {
+    type = "dispute";
+    status = "disputed";
+  } else if (typeRaw.includes("fee") || typeRaw === "stripe_fee") {
+    type = "fee";
+  } else if (typeRaw.includes("payout") || typeRaw.includes("transfer")) {
+    type = "transfer";
+  } else if (typeRaw.includes("adjustment")) {
+    type = "adjustment";
+  }
+
+  const amount = Math.abs(stripeAmountToDollars(txn.amount));
+  const fee = Math.abs(stripeAmountToDollars(txn.fee));
+  const net = stripeAmountToDollars(txn.net);
+
+  return {
+    id: txn.id,
+    createdAt: new Date((txn.created || 0) * 1000).toISOString(),
+    customerName: "Stripe",
+    customerEmail: "",
+    description: txn.description || `Stripe ${txn.type}`,
+    amount,
+    fee,
+    net,
+    status,
+    type,
+    stripeReference: txn.id,
+    bookingReference: null,
+    matchedBankDeposit: false,
+    reconciliationStatus: "pending",
+    sourceTable: "stripe_live_balance_transactions",
+  };
+}
+
+function mapLivePayout(payout: Stripe.Payout): NormalizedPayout {
+  const statusRaw = String(payout.status || "").toLowerCase();
+  let status: StripePayoutStatus = "pending";
+  if (statusRaw === "paid") status = "paid";
+  else if (statusRaw === "in_transit") status = "in_transit";
+  else if (statusRaw === "failed" || statusRaw === "canceled") status = "failed";
+
+  const amount = Math.abs(stripeAmountToDollars(payout.amount));
+
+  return {
+    id: payout.id,
+    arrivalDate: payout.arrival_date
+      ? new Date(payout.arrival_date * 1000).toISOString()
+      : new Date((payout.created || 0) * 1000).toISOString(),
+    amount,
+    feeTotal: 0,
+    netAmount: amount,
+    status,
+    stripePayoutId: payout.id,
+    bankDescription:
+      payout.description ||
+      payout.statement_descriptor ||
+      "Stripe payout to bank",
+    bankMatched: false,
+    plaidTransactionId: null,
+  };
+}
+
+async function loadLiveStripeData(startDate: string, endDate: string) {
+  const stripe = tryGetStripeClient();
+
+  if (!stripe) {
+    return {
+      ok: false,
+      message: "STRIPE_SECRET_KEY is not configured in this environment.",
+      availableBalance: 0,
+      pendingBalance: 0,
+      transactions: [] as NormalizedTransaction[],
+      payouts: [] as NormalizedPayout[],
+      rowCount: 0,
+    };
+  }
+
+  try {
+    const createdGte = Math.floor(new Date(startDate).getTime() / 1000);
+    const createdLte = Math.floor(new Date(endDate).getTime() / 1000);
+    const createdFilter: { gte?: number; lte?: number } = {};
+    if (Number.isFinite(createdGte)) createdFilter.gte = createdGte;
+    if (Number.isFinite(createdLte)) createdFilter.lte = createdLte;
+
+    const [balance, balanceTransactions, payouts] = await Promise.all([
+      stripe.balance.retrieve(),
+      stripe.balanceTransactions.list({
+        limit: 100,
+        ...(Object.keys(createdFilter).length
+          ? { created: createdFilter }
+          : {}),
+      }),
+      stripe.payouts.list({
+        limit: 50,
+        ...(Object.keys(createdFilter).length
+          ? { created: createdFilter }
+          : {}),
+      }),
+    ]);
+
+    const transactions = (balanceTransactions.data || []).map(
+      mapLiveBalanceTransaction,
+    );
+    const livePayouts = (payouts.data || []).map(mapLivePayout);
+
+    return {
+      ok: true,
+      message: `Live Stripe connected. ${transactions.length} balance transactions, ${livePayouts.length} payouts.`,
+      availableBalance: sumStripeBalance(balance.available),
+      pendingBalance: sumStripeBalance(balance.pending),
+      transactions,
+      payouts: livePayouts,
+      rowCount: transactions.length + livePayouts.length,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? `Stripe API error: ${error.message}`
+          : "Unable to load live Stripe data.",
+      availableBalance: 0,
+      pendingBalance: 0,
+      transactions: [] as NormalizedTransaction[],
+      payouts: [] as NormalizedPayout[],
+      rowCount: 0,
+    };
+  }
+}
+
+function daysBetween(a: string, b: string) {
+  const left = new Date(a).getTime();
+  const right = new Date(b).getTime();
+  if (Number.isNaN(left) || Number.isNaN(right)) return Number.POSITIVE_INFINITY;
+  return Math.abs(left - right) / (1000 * 60 * 60 * 24);
+}
+
+function matchPayoutsToPlaidDeposits(
+  payouts: NormalizedPayout[],
+  plaidDepositRows: AnyRow[],
+): NormalizedPayout[] {
+  const deposits = plaidDepositRows.map((row) => {
+    const amount = Math.abs(
+      normalizeMoney(row, [
+        "amount",
+        "amount_cents",
+        "transaction_amount",
+        "transaction_amount_cents",
+      ]),
+    );
+    return {
+      id:
+        getText(row, ["transaction_id", "id", "plaid_transaction_id"]) ||
+        `${getDate(row)}-${amount}`,
+      transactionId:
+        getText(row, ["transaction_id", "plaid_transaction_id", "id"]) || null,
+      amount,
+      date: getDate(row) || "",
+      name:
+        getText(row, ["name", "merchant_name", "description", "memo"]) ||
+        "NFCU deposit",
+    };
+  });
+
+  const used = new Set<string>();
+
+  return payouts.map((payout) => {
+    if (payout.bankMatched && payout.plaidTransactionId) return payout;
+
+    const match = deposits.find((deposit) => {
+      if (used.has(deposit.id)) return false;
+      if (!deposit.amount || !payout.netAmount) return false;
+
+      const amountClose =
+        Math.abs(deposit.amount - Math.abs(payout.netAmount)) <= 1.05;
+      const dateClose = daysBetween(deposit.date, payout.arrivalDate) <= 5;
+      return amountClose && dateClose;
+    });
+
+    if (!match) return payout;
+
+    used.add(match.id);
+
+    return {
+      ...payout,
+      bankMatched: true,
+      plaidTransactionId: match.transactionId,
+      bankDescription: match.name,
+    };
+  });
+}
+
+function expandBookingPaymentRows(rows: AnyRow[]) {
+  const expanded: AnyRow[] = [];
+
+  for (const row of rows) {
+    const source = getText(row, ["__source_table"]).toLowerCase();
+    if (source !== "booking_payments") {
+      expanded.push(row);
+      continue;
+    }
+
+    expanded.push(row);
+
+    const refundAmount = normalizeMoney(row, [
+      "refund_amount_cents",
+      "amount_refunded_cents",
+      "refund_amount",
+    ]);
+    if (refundAmount > 0) {
+      expanded.push({
+        ...row,
+        __source_table: "booking_payments_refunds",
+        event_type: "refund",
+        type: "refund",
+        amount_cents: Math.round(refundAmount * 100),
+        amount: refundAmount,
+        status: "refunded",
+        created_at: getText(row, ["refunded_at", "updated_at", "created_at"]),
+        description: `Refund for booking ${getText(row, ["booking_id"]) || ""}`.trim(),
+      });
+    }
+
+    const disputeAmount = normalizeMoney(row, [
+      "dispute_amount_cents",
+      "dispute_amount",
+    ]);
+    if (disputeAmount > 0 || getText(row, ["dispute_status"])) {
+      expanded.push({
+        ...row,
+        __source_table: "booking_payments_disputes",
+        event_type: "dispute",
+        type: "dispute",
+        amount_cents: Math.round(
+          (disputeAmount ||
+            normalizeMoney(row, ["amount_cents", "amount"])) *
+            100,
+        ),
+        amount: disputeAmount || normalizeMoney(row, ["amount_cents", "amount"]),
+        status: "disputed",
+        description: getText(row, ["dispute_reason"], "Stripe dispute"),
+      });
+    }
+  }
+
+  return expanded;
+}
+
 export async function GET(request: Request) {
+  const financeCheck = await requireFinanceAdminApi();
+  if (!financeCheck.identity) {
+    return financeCheck.response;
+  }
+
   const url = new URL(request.url);
   const range = (url.searchParams.get("range") || "month") as StripeRange;
-  const startDateParam = url.searchParams.get("startDate");
-  const endDateParam = url.searchParams.get("endDate");
   const generatedAt = new Date().toISOString();
 
   const fallbackDates = getRangeDates(range);
-  const startDate = startDateParam
-    ? new Date(startDateParam).toISOString()
-    : fallbackDates.startDate;
-  const endDate = endDateParam
-    ? new Date(endDateParam).toISOString()
-    : fallbackDates.endDate;
+  const startDate =
+    parseRangeBoundary(url.searchParams.get("startDate"), "start") ||
+    fallbackDates.startDate;
+  const endDate =
+    parseRangeBoundary(url.searchParams.get("endDate"), "end") ||
+    fallbackDates.endDate;
 
   const [
     stripeTransactionResult,
@@ -778,15 +1136,21 @@ export async function GET(request: Request) {
     stripeRefundResult,
     stripeDisputeResult,
     plaidResult,
+    liveStripe,
   ] = await Promise.all([
     queryCandidateTables(candidateTables.stripeTransactions),
     queryCandidateTables(candidateTables.stripePayouts),
     queryCandidateTables(candidateTables.stripeRefunds),
     queryCandidateTables(candidateTables.stripeDisputes),
     queryCandidateTables(candidateTables.plaidTransactions),
+    loadLiveStripeData(startDate, endDate),
   ]);
 
-  const stripePaymentRows = stripeTransactionResult.rows
+  const expandedPaymentRows = expandBookingPaymentRows(
+    stripeTransactionResult.rows,
+  );
+
+  const stripePaymentRows = expandedPaymentRows
     .filter(rowLooksLikeRealStripePayment)
     .filter((row) => isWithinRange(row, startDate, endDate));
 
@@ -794,38 +1158,61 @@ export async function GET(request: Request) {
     .filter((row) => rowHasStripeReference(row) || rowLooksLikePayout(row))
     .filter((row) => isWithinRange(row, startDate, endDate));
 
-  const refundRows = stripeRefundResult.rows
-    .filter(rowHasStripeReference)
-    .filter((row) => isWithinRange(row, startDate, endDate));
+  const refundRows = [
+    ...stripeRefundResult.rows.filter(rowHasStripeReference),
+    ...expandedPaymentRows.filter(
+      (row) => getStripeType(row) === "refund" && rowHasStripeReference(row),
+    ),
+  ].filter((row) => isWithinRange(row, startDate, endDate));
 
-  const disputeRows = stripeDisputeResult.rows
-    .filter(rowHasStripeReference)
-    .filter((row) => isWithinRange(row, startDate, endDate));
+  const disputeRows = [
+    ...stripeDisputeResult.rows.filter(rowHasStripeReference),
+    ...expandedPaymentRows.filter(
+      (row) => getStripeType(row) === "dispute" && rowHasStripeReference(row),
+    ),
+  ].filter((row) => isWithinRange(row, startDate, endDate));
 
   const plaidRows = plaidResult.rows.filter((row) =>
     isWithinRange(row, startDate, endDate),
   );
 
-  const transactions = uniqueByReference([
+  const dbTransactions = uniqueByReference([
     ...stripePaymentRows.map(normalizeStripeTransaction),
     ...refundRows.map(normalizeRefund),
     ...disputeRows.map(normalizeDispute),
+  ]) as NormalizedTransaction[];
+
+  const transactions = uniqueByReference([
+    ...liveStripe.transactions,
+    ...dbTransactions,
   ])
     .sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
-    .slice(0, 100);
+    .slice(0, 150) as NormalizedTransaction[];
 
-  const payouts = payoutRows
-    .map(normalizePayout)
-    .sort(
-      (a, b) =>
-        new Date(b.arrivalDate).getTime() - new Date(a.arrivalDate).getTime(),
-    )
-    .slice(0, 100);
-
+  const dbPayouts = payoutRows.map(normalizePayout) as NormalizedPayout[];
   const plaidStripeDeposits = plaidRows.filter(isStripeBankDeposit);
+
+  const payoutSeen = new Set<string>();
+  const mergedPayouts: NormalizedPayout[] = [];
+  for (const payout of [...liveStripe.payouts, ...dbPayouts]) {
+    const key = payout.stripePayoutId || payout.id;
+    if (payoutSeen.has(key)) continue;
+    payoutSeen.add(key);
+    mergedPayouts.push(payout);
+  }
+
+  const payouts = matchPayoutsToPlaidDeposits(
+    mergedPayouts
+      .sort(
+        (a, b) =>
+          new Date(b.arrivalDate).getTime() - new Date(a.arrivalDate).getTime(),
+      )
+      .slice(0, 100),
+    plaidStripeDeposits,
+  );
 
   const grossPayments = transactions
     .filter((transaction) => transaction.type === "payment")
@@ -876,6 +1263,9 @@ export async function GET(request: Request) {
     transactionCount: transactions.length,
     payoutCount: payouts.length,
     plaidStripeDeposits: plaidStripeDeposits.length,
+    liveStripeOk: liveStripe.ok,
+    liveStripeMessage: liveStripe.message,
+    liveStripeRowCount: liveStripe.rowCount,
   });
 
   const isLive = getLiveConnectedStatus(sourceHealth);
@@ -886,8 +1276,12 @@ export async function GET(request: Request) {
     isLive,
     generatedAt,
     message: hasStripeRows
-      ? "Live Stripe and Plaid/NFCU financial data connected."
-      : "Stripe financial route is connected. No live Stripe customer payments or payouts have been recorded yet.",
+      ? liveStripe.ok
+        ? "Live Stripe API + ledger/Plaid sources connected."
+        : "Stripe ledger and/or Plaid sources connected."
+      : liveStripe.ok
+        ? "Live Stripe API connected. No customer payments or payouts in this range yet."
+        : "Stripe financial route is ready. No live Stripe customer payments or payouts have been recorded yet.",
     range,
     summary: {
       grossPayments,
@@ -900,8 +1294,10 @@ export async function GET(request: Request) {
       payoutDeposits,
       unmatchedDeposits,
       matchedDeposits,
-      pendingBalance: 0,
-      availableBalance: Math.max(netPayments - transfers, 0),
+      pendingBalance: liveStripe.pendingBalance,
+      availableBalance: liveStripe.ok
+        ? liveStripe.availableBalance
+        : Math.max(netPayments - transfers, 0),
       transactionCount: transactions.length,
       payoutCount: payouts.length,
       refundCount: transactions.filter((transaction) => transaction.type === "refund")

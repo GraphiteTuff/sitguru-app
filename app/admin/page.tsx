@@ -260,12 +260,12 @@ export default async function AdminOperationsDashboard() {
     {
       label: "Stripe Gaps",
       value: stripeIssues,
-      href: "/admin/financials/stripe",
+      href: "/admin/financials/payment-gateway",
     },
     {
       label: "PawPerks Conflicts",
       value: pawPerksConflicts,
-      href: "/admin/referrals",
+      href: "/admin/referrals/inventory",
     },
   ].filter((item) => numericCount(item.value) > 0 || !item.value.available);
 
@@ -350,7 +350,7 @@ export default async function AdminOperationsDashboard() {
       label: "Stripe Readiness",
       value: formatCount(stripeIssues, "Review"),
       helper: "Gurus with payout readiness gaps",
-      href: "/admin/financials/stripe",
+      href: "/admin/financials/payment-gateway",
       tone: "rose",
     },
   ];
@@ -400,7 +400,7 @@ export default async function AdminOperationsDashboard() {
     },
     {
       title: "Programs & growth",
-      description: "Student, community, veterans pathways, and ambassador leads.",
+      description: "Student, community, veterans pathways, SkillBridge, and ambassadors.",
       href: "/admin/programs",
       priority: "Monitor",
     },
@@ -433,7 +433,7 @@ export default async function AdminOperationsDashboard() {
       links: [
         ["Financials", "/admin/financials"],
         ["Payouts", "/admin/payouts"],
-        ["Stripe", "/admin/financials/stripe"],
+        ["Payment Gateway", "/admin/financials/payment-gateway"],
         ["Commissions", "/admin/commissions"],
         ["Partner Payouts", "/admin/partners/payouts"],
       ],
@@ -446,7 +446,8 @@ export default async function AdminOperationsDashboard() {
         ["Sales & Marketing", "/admin/sales-marketing"],
         ["Partners", "/admin/partners"],
         ["Analytics", "/admin/analytics"],
-        ["SitGuru University", "/admin/university-progress"],
+        ["Insights", "/admin/insights"],
+        ["SitGuru University", "/admin/ambassador-training"],
       ],
     },
   ];
@@ -454,13 +455,13 @@ export default async function AdminOperationsDashboard() {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <div className="overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 p-6 text-white shadow-xl sm:p-8">
+        <div className="on-dark-surface overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 p-6 text-white shadow-xl sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-100">
                 SitGuru Admin Portal · {todayLabel}
               </p>
-              <h1 className="mt-3 text-3xl font-black tracking-[-0.05em] text-white sm:text-5xl">
+              <h1 className="mt-3 text-3xl font-black tracking-[-0.05em] !text-white sm:text-5xl">
                 Operations Dashboard
               </h1>
               <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-emerald-50 sm:text-base">
@@ -605,7 +606,7 @@ export default async function AdminOperationsDashboard() {
             {[
               ["Guru verification", "/admin/guru-approvals"],
               ["Background checks", "/admin/background-checks"],
-              ["Stripe Connect readiness", "/admin/financials/stripe"],
+              ["Payment Gateway readiness", "/admin/financials/payment-gateway"],
               ["Payout method readiness", "/admin/payouts"],
               ["Profile completeness", "/admin/gurus?queue=profile-updates"],
               ["Review moderation", "/admin/reviews?status=moderation"],

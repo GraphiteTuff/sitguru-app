@@ -1,4 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import {
+  getMonthPeriod,
+  getQuarterPeriod,
+  getYearPeriod,
+} from "@/lib/admin/financials/periods";
 
 export type FinancialExportStatus =
   | "ready"
@@ -62,96 +67,100 @@ export type ExportHistoryViewModel = {
   raw: FinancialExportHistoryRecord;
 };
 
+const monthPeriod = getMonthPeriod();
+const quarterPeriod = getQuarterPeriod();
+const yearPeriod = getYearPeriod();
+
 const fallbackExportHistory: ExportHistoryViewModel[] = [
   {
-    id: "preview-june-2026-monthly-cpa",
-    title: "June 2026 Monthly CPA Package",
-    period: "Jun 1–Jun 30, 2026",
-    format: "PDF / Excel / CSV / ZIP",
+    id: "template-monthly-cpa",
+    title: "Monthly CPA Package template",
+    period: monthPeriod.label,
+    format: "Linked exports",
     status: "Needs Review",
-    createdBy: "Admin User",
-    createdAt: "Pending first close",
-    href: "/admin/financials/cpa-handoff?period=2026-06",
+    createdBy: "SitGuru Admin",
+    createdAt: "Save a record to start history",
+    href: `/admin/financials/cpa-handoff?period=${monthPeriod.start.slice(0, 7)}`,
     raw: {
-      id: "preview-june-2026-monthly-cpa",
-      title: "June 2026 Monthly CPA Package",
+      id: "template-monthly-cpa",
+      title: "Monthly CPA Package template",
       package_type: "monthly-cpa",
       report_type: "cpa",
-      period_label: "Jun 1–Jun 30, 2026",
-      period_start: "2026-06-01",
-      period_end: "2026-06-30",
+      period_label: monthPeriod.label,
+      period_start: monthPeriod.start,
+      period_end: monthPeriod.end,
       export_format: "zip",
       export_status: "needs_review",
-      created_by: "Admin User",
+      created_by: "SitGuru Admin",
       created_by_user_id: null,
       sent_to_email: null,
       sent_to_phone: null,
       file_url: null,
       storage_path: null,
       notes: null,
-      metadata: {},
+      metadata: { template: true },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
   },
   {
-    id: "preview-q2-2026-partial-quarter",
-    title: "Q2 2026 Partial Quarter Package",
-    period: "Jun 1–Jun 30, 2026",
-    format: "PDF / Excel / CSV / ZIP",
+    id: "template-quarterly-cpa",
+    title: "Quarterly CPA Package template",
+    period: quarterPeriod.label,
+    format: "Linked exports",
     status: "Processing",
-    createdBy: "Admin User",
-    createdAt: "Pending launch",
-    href: "/admin/financials/cpa-handoff?period=2026-q2",
+    createdBy: "SitGuru Admin",
+    createdAt: "Open CPA handoff or save a record",
+    href: "/admin/financials/cpa-handoff?section=quarterly",
     raw: {
-      id: "preview-q2-2026-partial-quarter",
-      title: "Q2 2026 Partial Quarter Package",
+      id: "template-quarterly-cpa",
+      title: "Quarterly CPA Package template",
       package_type: "quarterly-cpa",
       report_type: "cpa",
-      period_label: "Jun 1–Jun 30, 2026",
-      period_start: "2026-06-01",
-      period_end: "2026-06-30",
+      period_label: quarterPeriod.label,
+      period_start: quarterPeriod.start,
+      period_end: quarterPeriod.end,
       export_format: "zip",
       export_status: "processing",
-      created_by: "Admin User",
+      created_by: "SitGuru Admin",
       created_by_user_id: null,
       sent_to_email: null,
       sent_to_phone: null,
       file_url: null,
       storage_path: null,
       notes: null,
-      metadata: {},
+      metadata: { template: true },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
   },
   {
-    id: "preview-2026-annual-tax",
-    title: "2026 Annual Tax Package",
-    period: "Jun 1–Dec 31, 2026",
-    format: "PDF / Excel / CSV / ZIP",
+    id: "template-annual-tax",
+    title: "Annual Tax Package template",
+    period: yearPeriod.label,
+    format: "Linked exports",
     status: "Processing",
-    createdBy: "Admin User",
-    createdAt: "Pending year-end",
-    href: "/admin/financials/tax-reports?period=2026",
+    createdBy: "SitGuru Admin",
+    createdAt: "Open Tax Center or save a record",
+    href: `/admin/financials/tax-reports?period=${yearPeriod.start.slice(0, 4)}`,
     raw: {
-      id: "preview-2026-annual-tax",
-      title: "2026 Annual Tax Package",
+      id: "template-annual-tax",
+      title: "Annual Tax Package template",
       package_type: "annual-tax",
       report_type: "tax",
-      period_label: "Jun 1–Dec 31, 2026",
-      period_start: "2026-06-01",
-      period_end: "2026-12-31",
+      period_label: yearPeriod.label,
+      period_start: yearPeriod.start,
+      period_end: yearPeriod.end,
       export_format: "zip",
       export_status: "processing",
-      created_by: "Admin User",
+      created_by: "SitGuru Admin",
       created_by_user_id: null,
       sent_to_email: null,
       sent_to_phone: null,
       file_url: null,
       storage_path: null,
       notes: null,
-      metadata: {},
+      metadata: { template: true },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
@@ -174,7 +183,7 @@ function normalizeFormat(format: string | null | undefined) {
 
   if (value === "xlsx") return "Excel";
   if (value === "csv") return "CSV";
-  if (value === "zip") return "ZIP";
+  if (value === "zip") return "Linked exports";
   if (value === "word") return "Word";
 
   return "PDF";
@@ -197,18 +206,7 @@ function formatCreatedAt(value: string | null | undefined) {
 }
 
 function buildExportHref(record: FinancialExportHistoryRecord) {
-  const packageType = encodeURIComponent(record.package_type || "custom");
-  const exportId = encodeURIComponent(record.id);
-
-  if (record.report_type === "tax") {
-    return `/admin/financials/tax-reports?export=${exportId}`;
-  }
-
-  if (record.report_type === "cpa") {
-    return `/admin/financials/cpa-handoff?export=${exportId}`;
-  }
-
-  return `/admin/financials/exports?package=${packageType}&export=${exportId}`;
+  return `/admin/financials/exports/${encodeURIComponent(record.id)}`;
 }
 
 export function mapExportHistoryRecord(

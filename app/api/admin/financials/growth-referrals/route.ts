@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -50,6 +51,9 @@ async function safeRows(table: string, limit = 5000): Promise<SafeRowsResult> {
 }
 
 export async function GET() {
+  const financeCheck = await requireFinanceAdminApi();
+  if (!financeCheck.identity) return financeCheck.response;
+
   const generatedAt = new Date().toISOString();
 
   const [summaryResult, roiResult] = await Promise.all([

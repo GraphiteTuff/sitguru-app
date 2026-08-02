@@ -1,8 +1,8 @@
 import Link from "next/link";
 import ProfitLossExportActions from "@/components/admin/financials/ProfitLossExportActions";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
 
 export const dynamic = "force-dynamic";
 
@@ -394,7 +394,8 @@ function money(value: number) {
   const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(Math.abs(value));
 
   return value < 0 ? `(${formatted})` : formatted;
@@ -632,74 +633,16 @@ function hasFinancialRole(role: string) {
   ].includes(role.trim().toLowerCase());
 }
 
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
 async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
+  const identity = await getFinanceAdminIdentity();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.allSettled([
-    supabaseAdmin
-      .from("admin_users")
-      .select("role,email,is_active,can_access_financials")
-      .eq("user_id", user.id)
-      .limit(1),
-    supabaseAdmin
-      .from("profiles")
-      .select("role,email,is_active,can_access_financials")
-      .eq("id", user.id)
-      .limit(1),
-    supabaseAdmin
-      .from("users")
-      .select("role,email,is_active,can_access_financials")
-      .eq("id", user.id)
-      .limit(1),
-  ]);
-
-  const profile = (profileChecks
-    .filter((result) => result.status === "fulfilled")
-    .flatMap((result) => {
-      if (result.status !== "fulfilled") return [];
-      return Array.isArray(result.value.data) ? result.value.data : [];
-    })
-    .find(Boolean) || {}) as Record<string, unknown>;
-
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-  const envAllowed = envAdminEmails.includes(userEmail);
-  const canAccessFinancials =
-    active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed);
+  if (!identity) return null;
 
   return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials,
+    id: identity.id,
+    email: identity.email,
+    role: identity.role,
+    canAccessFinancials: true,
   };
 }
 
@@ -1480,7 +1423,9 @@ function isSuccessfulStripeRow(row: StripeFinancialRow) {
 function isStripeRevenueRow(row: StripeFinancialRow) {
   const source = getStripeSourceTable(row).toLowerCase();
   const text = getStripeActivityText(row);
+  const provider = getStripeText(row, ["provider"]).toLowerCase();
 
+  if (provider && provider !== "stripe") return false;
   if (!rowHasStripePaymentReference(row)) return false;
   if (!isSuccessfulStripeRow(row)) return false;
 
@@ -1497,6 +1442,7 @@ function isStripeRevenueRow(row: StripeFinancialRow) {
 
   return (
     source === "payments" ||
+    source === "booking_payments" ||
     source === "stripe_transactions" ||
     source === "stripe_balance_transactions"
   );
@@ -1532,6 +1478,21 @@ function isStripeExpenseRow(row: StripeFinancialRow) {
 }
 
 function getStripeRevenueAmount(row: StripeFinancialRow) {
+  const source = getStripeSourceTable(row).toLowerCase();
+
+  if (source === "booking_payments") {
+    return Math.abs(
+      getStripeMoney(row, [
+        "marketplace_support_cents",
+        "platform_fee_cents",
+        "platform_fee",
+        "application_fee_amount",
+        "sitguru_fee_cents",
+        "sitguru_fee",
+      ]),
+    );
+  }
+
   return Math.abs(
     getStripeMoney(row, [
       "platform_revenue",
@@ -1544,6 +1505,7 @@ function getStripeRevenueAmount(row: StripeFinancialRow) {
       "sitguru_fee_amount_cents",
       "application_fee_amount",
       "application_fee_amount_cents",
+      "marketplace_support_cents",
       "net_amount",
       "net_amount_cents",
       "net",
@@ -1594,6 +1556,7 @@ function getStripeExpenseAmount(row: StripeFinancialRow) {
 function getStripeRevenueCategory(row: StripeFinancialRow) {
   const source = getStripeSourceTable(row);
 
+  if (source === "booking_payments") return "Platform Fee Revenue";
   if (source === "payments") return "Platform Revenue";
 
   return "Stripe Customer Revenue";
@@ -1769,6 +1732,7 @@ function calculatePeriodMetrics({
 
 async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> {
   const period = getPeriodWindow(periodKey);
+  const plaidEnvironment = process.env.PLAID_ENV || "production";
 
   const [
     accountsResult,
@@ -1778,14 +1742,16 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     growthMarketingExpensesResult,
     referralRewardLiabilityResult,
     paymentsResult,
+    bookingPaymentsResult,
     stripeTransactionsResult,
     stripeBalanceTransactionsResult,
   ] = await Promise.all([
       supabaseAdmin
         .from("admin_plaid_accounts")
         .select(
-          "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, created_at, updated_at",
+          "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, plaid_environment, created_at, updated_at",
         )
+        .eq("plaid_environment", plaidEnvironment)
         .order("created_at", { ascending: false }),
       supabaseAdmin
         .from("admin_plaid_transactions")
@@ -1819,6 +1785,11 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
         .limit(2500),
       supabaseAdmin
         .from("payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      supabaseAdmin
+        .from("booking_payments")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(5000),
@@ -1874,6 +1845,13 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     console.warn("Profit & Loss payments query skipped:", paymentsResult.error);
   }
 
+  if (bookingPaymentsResult.error) {
+    console.warn(
+      "Profit & Loss booking_payments query skipped:",
+      bookingPaymentsResult.error,
+    );
+  }
+
   if (stripeTransactionsResult.error) {
     console.warn(
       "Profit & Loss Stripe transactions query skipped:",
@@ -1910,11 +1888,55 @@ async function getProfitLossData(periodKey: PeriodKey): Promise<ProfitLossData> 
     (referralRewardLiabilityResult.data || []) as ReferralRewardLiabilityRow[]
   ).filter(isIssuedReferralReward);
 
+  const expandedBookingPayments = (
+    (bookingPaymentsResult.data || []) as StripeFinancialRow[]
+  ).flatMap((row) => {
+    const provider = asTrimmedString(row.provider).toLowerCase();
+    if (provider && provider !== "stripe") return [] as StripeFinancialRow[];
+
+    const base: StripeFinancialRow = {
+      ...row,
+      __source_table: "booking_payments",
+    };
+    const rows: StripeFinancialRow[] = [base];
+
+    const refundCents = toNumber(row.refund_amount_cents);
+    if (refundCents > 0) {
+      rows.push({
+        ...row,
+        __source_table: "booking_payments",
+        type: "refund",
+        event_type: "refund",
+        status: "refunded",
+        amount_cents: refundCents,
+        created_at: row.refunded_at || row.updated_at || row.created_at,
+        description: `Refund for booking ${asTrimmedString(row.booking_id)}`,
+      });
+    }
+
+    const disputeCents = toNumber(row.dispute_amount_cents);
+    if (disputeCents > 0 || asTrimmedString(row.dispute_status)) {
+      rows.push({
+        ...row,
+        __source_table: "booking_payments",
+        type: "dispute",
+        event_type: "dispute",
+        status: "disputed",
+        amount_cents: disputeCents || toNumber(row.amount_cents),
+        description:
+          asTrimmedString(row.dispute_reason) || "Stripe dispute / chargeback",
+      });
+    }
+
+    return rows;
+  });
+
   const allStripeRows: StripeFinancialRow[] = [
     ...((paymentsResult.data || []) as StripeFinancialRow[]).map((row) => ({
       ...row,
       __source_table: "payments",
     })),
+    ...expandedBookingPayments,
     ...((stripeTransactionsResult.data || []) as StripeFinancialRow[]).map((row) => ({
       ...row,
       __source_table: "stripe_transactions",
@@ -2554,6 +2576,13 @@ function AccountingReadinessPanel({ pnl }: { pnl: ProfitLossData }) {
           : "Connect both NFCU Business Checking and Business Savings for complete cash visibility.",
     },
     {
+      label: "Stripe / Booking Payments",
+      status: pnl.totals.stripeRevenueCount ? "ready" : "needs_review",
+      detail: pnl.totals.stripeRevenueCount
+        ? `${pnl.totals.stripeRevenueCount.toLocaleString()} platform-fee revenue rows (${money(pnl.totals.stripePaymentRevenueTotal)}) feed this period.`
+        : "No Stripe booking-payment platform fees found in this period yet.",
+    },
+    {
       label: "Selected Period Activity",
       status: pnl.totals.reportableTransactions ? "ready" : "needs_review",
       detail: `${pnl.totals.reportableTransactions} reportable transactions are included for ${pnl.period.label}.`,
@@ -2603,15 +2632,15 @@ function AccountingReadinessPanel({ pnl }: { pnl: ProfitLossData }) {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
-            Plaid / Manual P&L Readiness
+            Stripe + Plaid / Manual P&L Readiness
           </p>
           <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
             Report wiring checks
           </h2>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-            These checks confirm whether categorized NFCU activity, manual
-            operating expenses, and custom P&L categories are ready for the
-            selected period.
+            These checks confirm whether Stripe booking fees, categorized NFCU
+            activity, manual operating expenses, and custom P&L categories are
+            ready for the selected period.
           </p>
         </div>
 
@@ -2644,6 +2673,7 @@ function AccountingReadinessPanel({ pnl }: { pnl: ProfitLossData }) {
 
 function IntegrationFlowPanel() {
   const steps = [
+    "Stripe booking payments record platform-fee revenue (marketplace support), refunds, and disputes.",
     "Plaid sync pulls NFCU Business Checking and Savings transactions.",
     "SitGuru auto-categorizes common bank transactions into report categories.",
     "Admin reviews and manually categorizes anything in Needs Review.",
@@ -2655,7 +2685,7 @@ function IntegrationFlowPanel() {
   return (
     <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
-        Bank Feed + Manual Controls
+        Stripe + Bank Feed + Manual Controls
       </p>
       <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
         How SitGuru turns activity into P&L reports
@@ -3145,12 +3175,38 @@ export default async function AdminProfitLossPage({
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
                 View daily, weekly, monthly, quarterly, yearly, annual, or
-                all-time Profit & Loss using categorized NFCU transactions plus
-                manual operating expenses.
+                all-time Profit &amp; Loss using Stripe booking fees, categorized
+                NFCU transactions, growth/referral costs, and manual operating
+                expenses.
               </p>
 
               <div className="mt-5">
                 <PeriodSelector currentPeriod={pnl.period.key} />
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  Statement Wiring
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[
+                    ["Cash Flow", "/admin/financials/cash-flow"],
+                    ["Balance Sheet", "/admin/financials/balance-sheet"],
+                    ["General Ledger", "/admin/financials/general-ledger"],
+                    ["Reconciliation", "/admin/financials/reconciliation"],
+                    ["Payment Gateway", "/admin/financials/payment-gateway"],
+                    ["Plaid Banking", "/admin/financials/plaid"],
+                    ["Payouts", "/admin/financials/payouts"],
+                  ].map(([label, href]) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </div>
               </div>
 
               <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
@@ -3170,8 +3226,8 @@ export default async function AdminProfitLossPage({
                     before they affect this period’s reports.
                   </p>
                   <Link
-                    href="/admin/financials/plaid"
-                    className="mt-3 inline-flex rounded-full bg-amber-600 px-4 py-2 text-xs font-black text-white transition hover:bg-amber-700"
+                    href="/admin/financials/plaid?filter=needs_review"
+                    className="mt-3 inline-flex rounded-2xl bg-amber-600 px-4 py-2 text-xs font-black text-white transition hover:bg-amber-700"
                   >
                     Review Banking Categories
                   </Link>
@@ -3179,7 +3235,18 @@ export default async function AdminProfitLossPage({
               ) : null}
             </div>
 
-            <ProfitLossExportActions />
+            <ProfitLossExportActions
+              initialStartDate={
+                pnl.period.start
+                  ? pnl.period.start.toISOString().slice(0, 10)
+                  : undefined
+              }
+              initialEndDate={
+                pnl.period.end
+                  ? pnl.period.end.toISOString().slice(0, 10)
+                  : undefined
+              }
+            />
           </div>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">

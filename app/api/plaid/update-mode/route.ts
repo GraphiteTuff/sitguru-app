@@ -1,12 +1,12 @@
 import { Products } from "plaid";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   assertPlaidConfigured,
   getPlaidCountryCodes,
   plaidClient,
 } from "@/lib/plaid";
+import { requireFinanceAdminRedirect } from "@/lib/admin/financials/access";
 
 type PlaidItemRow = {
   item_id: string;
@@ -69,41 +69,26 @@ function getErrorMessage(error: unknown) {
   return "Unable to create Plaid update mode token.";
 }
 
-async function requireAdminUser() {
-  const supabase = await createClient();
+async function requireAdminUser(): Promise<
+  | { user: { id: string }; response: null }
+  | { user: null; response: NextResponse }
+> {
+  const financeCheck = await requireFinanceAdminRedirect("/admin/login");
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  if (!financeCheck.identity) {
     return {
       user: null,
-      response: NextResponse.redirect("/admin/login"),
-    };
-  }
-
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || profile?.role !== "admin") {
-    return {
-      user: null,
-      response: NextResponse.redirect("/admin/login"),
+      response: financeCheck.response,
     };
   }
 
   return {
-    user,
+    user: { id: financeCheck.identity.id },
     response: null,
   };
 }
 
-async function getNewestPlaidItem(userId: string) {
+async function getNewestPlaidItem() {
   const plaidEnvironment = getPlaidEnvironment();
 
   const { data, error } = await supabaseAdmin
@@ -111,7 +96,6 @@ async function getNewestPlaidItem(userId: string) {
     .select(
       "item_id, access_token, institution_name, plaid_environment, created_at",
     )
-    .eq("user_id", userId)
     .eq("plaid_environment", plaidEnvironment)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -323,14 +307,14 @@ function buildUpdateModeHtml({
 export async function GET(request: NextRequest) {
   const adminCheck = await requireAdminUser();
 
-  if (adminCheck.response || !adminCheck.user) {
+  if (!adminCheck.user) {
     return adminCheck.response;
   }
 
   try {
     assertPlaidConfigured();
 
-    const item = await getNewestPlaidItem(adminCheck.user.id);
+    const item = await getNewestPlaidItem();
 
     if (!item?.access_token) {
       const url = new URL("/admin/financials/plaid", getBaseUrl(request));

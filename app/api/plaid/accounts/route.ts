@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
+import { getPlaidEnvironment } from "@/lib/plaid";
 
 function getErrorMessage(error: unknown) {
   if (!error) return "Unable to load Plaid accounts.";
@@ -20,46 +21,18 @@ function getErrorMessage(error: unknown) {
 }
 
 export async function GET() {
-  const supabase = await createClient();
+  const financeCheck = await requireFinanceAdminApi();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json(
-      { error: "Unauthorized. Please sign in as admin again." },
-      { status: 401 },
-    );
+  if (!financeCheck.identity) {
+    return financeCheck.response;
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError) {
-    console.error("Plaid accounts profile lookup error:", profileError);
-
-    return NextResponse.json(
-      { error: "Unable to verify admin profile." },
-      { status: 500 },
-    );
-  }
-
-  if (profile?.role !== "admin") {
-    return NextResponse.json(
-      { error: "Admin access required." },
-      { status: 403 },
-    );
-  }
+  const plaidEnvironment = getPlaidEnvironment();
 
   const { data: accounts, error } = await supabaseAdmin
     .from("admin_plaid_accounts")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("plaid_environment", plaidEnvironment)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -73,5 +46,7 @@ export async function GET() {
 
   return NextResponse.json({
     accounts: accounts || [],
+    plaid_environment: plaidEnvironment,
+    org_wide: true,
   });
 }

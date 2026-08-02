@@ -3,6 +3,37 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
 
+const ADMIN_PROFILE_ROLES = new Set([
+  "founder",
+  "owner",
+  "super_admin",
+  "admin",
+  "finance_admin",
+  "finance",
+  "accounting",
+  "bookkeeper",
+  "billing_admin",
+  "support_admin",
+  "operations",
+  "operations_admin",
+  "moderator",
+  "hr_admin",
+  "sales_admin",
+  "marketing_admin",
+  "partner_admin",
+  "customer_service",
+  "guru_approvals_admin",
+  "developer_admin",
+  "executive_viewer",
+  "finance_viewer",
+  "support_viewer",
+  "marketing_viewer",
+  "tech_support_admin",
+  "technical_support",
+  "systems_admin",
+  "trust_safety_admin",
+]);
+
 function normalizeValue(value: string | null | undefined) {
   return String(value || "").trim().toLowerCase();
 }
@@ -11,8 +42,25 @@ function normalizeEmail(value: string | null | undefined) {
   return normalizeValue(value);
 }
 
+function getEnvAdminEmails() {
+  return String(
+    process.env.SITGURU_FINANCE_ADMIN_EMAILS || process.env.ADMIN_EMAILS || "",
+  )
+    .split(",")
+    .map((email) => normalizeEmail(email))
+    .filter(Boolean);
+}
+
 function isSuperUserEmail(email: string | null | undefined) {
   return SUPER_USER_EMAILS.has(normalizeEmail(email));
+}
+
+function isEnvAdminEmail(email: string | null | undefined) {
+  return getEnvAdminEmails().includes(normalizeEmail(email));
+}
+
+function isAdminProfileRole(role: string | null | undefined) {
+  return ADMIN_PROFILE_ROLES.has(normalizeValue(role));
 }
 
 function isAdminLoginPath(pathname: string) {
@@ -353,13 +401,39 @@ export async function middleware(request: NextRequest) {
   }
 
   const userEmail = normalizeEmail(user.email);
-  const isSuperUser = isSuperUserEmail(userEmail);
+  const isSuperUser = isSuperUserEmail(userEmail) || isEnvAdminEmail(userEmail);
 
   if (requiresAdminAccess && isSuperUser) {
     return responseRef.current;
   }
 
   if (requiresAdminAccess && !isSuperUser) {
+    const [{ data: adminProfile }, { data: adminRoleRows }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, email, role, account_type, is_active")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id),
+    ]);
+
+    const profileRole = normalizeValue(adminProfile?.role);
+    const roleList = (adminRoleRows || [])
+      .map((row) => normalizeValue(row.role))
+      .filter(Boolean);
+    const profileActive = adminProfile?.is_active !== false;
+    const hasAdminRole =
+      profileActive &&
+      (isAdminProfileRole(profileRole) ||
+        roleList.some((role) => isAdminProfileRole(role)));
+
+    if (hasAdminRole) {
+      return responseRef.current;
+    }
+
     await supabase.auth.signOut();
 
     const redirectResponse = NextResponse.redirect(

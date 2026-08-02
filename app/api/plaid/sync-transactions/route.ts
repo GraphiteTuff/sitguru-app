@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { getPlaidEnvironment, plaidClient } from "@/lib/plaid";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 
 type PlaidItemRow = {
   id: string;
@@ -264,54 +264,21 @@ async function applyAutoCategory({
   }
 }
 
-async function requireAdminUser() {
-  const supabase = await createClient();
+async function requireAdminUser(): Promise<
+  | { user: { id: string }; response: null }
+  | { user: null; response: NextResponse }
+> {
+  const financeCheck = await requireFinanceAdminApi();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  if (!financeCheck.identity) {
     return {
       user: null,
-      response: NextResponse.json(
-        { error: "Unauthorized. Please sign in as admin again." },
-        { status: 401 },
-      ),
-    };
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError) {
-    console.error("Plaid transactions profile lookup error:", profileError);
-
-    return {
-      user: null,
-      response: NextResponse.json(
-        { error: "Unable to verify admin profile." },
-        { status: 500 },
-      ),
-    };
-  }
-
-  if (profile?.role !== "admin") {
-    return {
-      user: null,
-      response: NextResponse.json(
-        { error: "Admin access required." },
-        { status: 403 },
-      ),
+      response: financeCheck.response,
     };
   }
 
   return {
-    user,
+    user: { id: financeCheck.identity.id },
     response: null,
   };
 }
@@ -566,7 +533,7 @@ async function syncSinglePlaidItem({
 export async function POST(request: NextRequest) {
   const adminCheck = await requireAdminUser();
 
-  if (adminCheck.response || !adminCheck.user) {
+  if (!adminCheck.user) {
     return adminCheck.response;
   }
 
@@ -583,7 +550,6 @@ export async function POST(request: NextRequest) {
       .select(
         "id, user_id, item_id, access_token, institution_name, plaid_environment, transactions_cursor, created_at",
       )
-      .eq("user_id", adminCheck.user.id)
       .eq("plaid_environment", currentPlaidEnvironment)
       .order("created_at", { ascending: false });
 
@@ -628,7 +594,6 @@ export async function POST(request: NextRequest) {
     const { data: accountRows, error: accountError } = await supabaseAdmin
       .from("admin_plaid_accounts")
       .select("account_id, item_id, name, official_name, subtype")
-      .eq("user_id", adminCheck.user.id)
       .in("item_id", itemIds);
 
     if (accountError) {
@@ -764,6 +729,57 @@ export async function POST(request: NextRequest) {
   }
 }
 
+function getRequestOrigin(request: NextRequest) {
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const origin = request.headers.get("origin");
+
+  if (forwardedProto && forwardedHost) {
+    return `${forwardedProto}://${forwardedHost}`;
+  }
+
+  if (origin) return origin;
+
+  return request.nextUrl.origin;
+}
+
 export async function GET(request: NextRequest) {
-  return POST(request);
+  const result = await POST(request);
+  const payload = (await result.json().catch(() => ({}))) as {
+    error?: string;
+    first_error?: string;
+    message?: string;
+    added?: number;
+    modified?: number;
+    auto_categorized?: number;
+  };
+
+  const redirectUrl = new URL(
+    "/admin/financials/plaid",
+    getRequestOrigin(request),
+  );
+
+  if (!result.ok) {
+    redirectUrl.searchParams.set(
+      "error",
+      payload.error ||
+        payload.first_error ||
+        "Unable to sync Plaid transactions.",
+    );
+  } else {
+    const summaryParts = [
+      payload.message || "Plaid sync completed.",
+      typeof payload.added === "number" ? `Added ${payload.added}.` : null,
+      typeof payload.modified === "number"
+        ? `Modified ${payload.modified}.`
+        : null,
+      typeof payload.auto_categorized === "number"
+        ? `Auto-categorized ${payload.auto_categorized}.`
+        : null,
+    ].filter(Boolean);
+
+    redirectUrl.searchParams.set("status", summaryParts.join(" "));
+  }
+
+  return NextResponse.redirect(redirectUrl);
 }

@@ -23,6 +23,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAdminIdentity } from "@/lib/admin/access";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 export const dynamic = "force-dynamic";
@@ -1238,6 +1239,11 @@ async function getProgramApplications() {
 async function updateProgramApplicationAction(formData: FormData) {
   "use server";
 
+  const actor = await getAdminIdentity();
+  if (!actor?.canAccessAdmin) {
+    throw new Error("Admin access required.");
+  }
+
   const id = String(formData.get("id") || "").trim();
   const sourceTable = String(formData.get("source_table") || "program_applications").trim();
   const status = normalizeStatus(String(formData.get("status") || "new"));
@@ -2006,6 +2012,27 @@ export default async function AdminProgramApplicationsPage({
 }: {
   searchParams?: Promise<SearchParams> | SearchParams;
 }) {
+  const actor = await getAdminIdentity();
+
+  if (!actor?.canAccessAdmin) {
+    return (
+      <div className="min-h-screen bg-[#f9faf5] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Admin access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with an authorized SitGuru admin account to review program
+            applications.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const resolvedSearchParams = await Promise.resolve(searchParams || {});
   const selectedProgram = getParam(resolvedSearchParams, "program", "all");
   const selectedStatus = getParam(resolvedSearchParams, "status", "all");

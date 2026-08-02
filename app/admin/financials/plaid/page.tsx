@@ -1,7 +1,7 @@
 import Link from "next/link";
 import PlaidTransactionCategoryControls from "@/components/admin/PlaidTransactionCategoryControls";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { getFinanceAdminIdentity as getSharedFinanceAdminIdentity } from "@/lib/admin/financials/access";
 
 type TransactionFilter =
   | "all"
@@ -311,37 +311,32 @@ function categoryBadgeClasses(transaction: PlaidTransaction) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-async function getCurrentAdminUserId() {
-  const supabase = await createClient();
+type FinanceAdminIdentity = {
+  id: string;
+  email: string;
+  role: string;
+  canAccessFinancials: boolean;
+};
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+async function getFinanceAdminIdentity(): Promise<FinanceAdminIdentity | null> {
+  const identity = await getSharedFinanceAdminIdentity();
 
-  if (userError || !user) {
-    return null;
-  }
+  if (!identity) return null;
 
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || profile?.role !== "admin") {
-    return null;
-  }
-
-  return user.id;
+  return {
+    id: identity.id,
+    email: identity.email,
+    role: identity.role,
+    canAccessFinancials: true,
+  };
 }
 
 async function getBankingData(
   selectedFilter: TransactionFilter,
 ): Promise<BankingData> {
-  const userId = await getCurrentAdminUserId();
+  const actor = await getFinanceAdminIdentity();
 
-  if (!userId) {
+  if (!actor) {
     return {
       accounts: [],
       items: [],
@@ -367,7 +362,6 @@ async function getBankingData(
     .select(
       "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, plaid_environment, created_at, updated_at",
     )
-    .eq("user_id", userId)
     .eq("plaid_environment", currentEnvironment)
     .order("created_at", { ascending: false });
 
@@ -391,7 +385,6 @@ async function getBankingData(
       .select(
         "item_id, institution_name, plaid_environment, transactions_last_synced_at, created_at, updated_at",
       )
-      .eq("user_id", userId)
       .eq("plaid_environment", currentEnvironment)
       .in("item_id", itemIds)
       .order("created_at", { ascending: false });
@@ -414,7 +407,6 @@ async function getBankingData(
         .select(
           "id, transaction_id, item_id, account_id, name, merchant_name, amount, iso_currency_code, date, pending, payment_channel, created_at, sitguru_category, sitguru_category_type, sitguru_report_section, sitguru_notes, review_status, is_excluded_from_reports, manually_categorized",
         )
-        .eq("user_id", userId)
         .in("account_id", accountIds)
         .is("removed_at", null)
         .order("date", { ascending: false })
@@ -600,20 +592,54 @@ export default async function AdminPlaidFinancialsPage({
 
           <div className="flex flex-wrap gap-3">
             <Link
+              href="/api/plaid/start"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+            >
+              Connect / Reconnect Bank
+            </Link>
+
+            <Link
               href="/api/plaid/sync-transactions"
-              className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-emerald-800"
             >
               Sync Transactions
             </Link>
 
             <Link
               href="/api/plaid/update-mode"
-              className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
             >
               Authorize Transactions
             </Link>
           </div>
         </div>
+
+        <section className="mb-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+            Statement Wiring
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[
+              ["Cash Flow", "/admin/financials/cash-flow"],
+              ["Profit & Loss", "/admin/financials/profit-loss"],
+              ["Balance Sheet", "/admin/financials/balance-sheet"],
+              ["Reconciliation", "/admin/financials/reconciliation"],
+              ["Financials Hub", "/admin/financials"],
+            ].map(([label, href]) => (
+              <Link
+                key={href}
+                href={href}
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+          <p className="mt-3 text-xs font-semibold leading-5 text-slate-500">
+            Categories you set here feed Cash Flow, P&amp;L, Balance Sheet, and
+            month-end reconciliation. Sync is org-wide for finance admins.
+          </p>
+        </section>
 
         <section className="mb-6 rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -664,20 +690,49 @@ export default async function AdminPlaidFinancialsPage({
 
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
-              href="/api/plaid/link-token"
-              className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
+              href="/admin/financials/plaid?filter=needs_review"
+              className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
             >
-              Test Link Token JSON
+              Review Uncategorized
+            </Link>
+
+            <Link
+              href={`/api/admin/financials/plaid/export?filter=${selectedFilter}`}
+              className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
+            >
+              Export CSV
             </Link>
 
             <Link
               href="/admin/financials/plaid"
-              className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
+              className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
             >
               Refresh Page
             </Link>
           </div>
         </section>
+
+        {accounts.length === 0 ? (
+          <section className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-800">
+              No Business Accounts Linked
+            </p>
+            <h2 className="mt-2 text-2xl font-black text-amber-950">
+              Connect NFCU Business Checking / Savings
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-amber-900">
+              Once connected, Sync Transactions pulls bank activity for Cash
+              Flow, P&amp;L, and Reconciliation. Finance admins share the same
+              org-wide feed.
+            </p>
+            <Link
+              href="/api/plaid/start"
+              className="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
+            >
+              Start Plaid Link
+            </Link>
+          </section>
+        ) : null}
 
         {errorMessage ? (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold text-red-700">
@@ -829,12 +884,21 @@ export default async function AdminPlaidFinancialsPage({
               </p>
             </div>
 
-            <Link
-              href="/api/plaid/sync-transactions"
-              className="inline-flex w-fit items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
-            >
-              Sync Now
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href={`/api/admin/financials/plaid/export?filter=${selectedFilter}`}
+                className="inline-flex w-fit items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
+              >
+                Export CSV
+              </Link>
+
+              <Link
+                href="/api/plaid/sync-transactions"
+                className="inline-flex w-fit items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
+              >
+                Sync Now
+              </Link>
+            </div>
           </div>
 
           <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-3">

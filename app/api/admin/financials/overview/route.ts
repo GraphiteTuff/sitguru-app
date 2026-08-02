@@ -1247,7 +1247,6 @@ export async function GET(request: Request) {
       supabaseAdmin
         .from("admin_plaid_accounts")
         .select("*")
-        .eq("user_id", actor.id)
         .eq("plaid_environment", plaidEnvironment)
         .order("created_at", { ascending: false })
         .limit(1000),
@@ -1258,7 +1257,6 @@ export async function GET(request: Request) {
       supabaseAdmin
         .from("admin_plaid_transactions")
         .select("*")
-        .eq("user_id", actor.id)
         .is("removed_at", null)
         .order("date", { ascending: false })
         .limit(10000),
@@ -1269,7 +1267,6 @@ export async function GET(request: Request) {
       supabaseAdmin
         .from("admin_plaid_items")
         .select("*")
-        .eq("user_id", actor.id)
         .eq("plaid_environment", plaidEnvironment)
         .order("created_at", { ascending: false })
         .limit(1000),

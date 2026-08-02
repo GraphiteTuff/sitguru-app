@@ -28,7 +28,10 @@ function getSecret() {
 
 function authorize(request: NextRequest) {
   const secret = getSecret();
-  if (!secret) return true; // allow in soft-config; prefer setting a secret in prod
+  if (!secret) {
+    // Soft-config for local/dev only. Production must set a webhook secret.
+    return process.env.NODE_ENV !== "production";
+  }
 
   const header = request.headers.get("authorization") || "";
   const bearer = header.toLowerCase().startsWith("bearer ")

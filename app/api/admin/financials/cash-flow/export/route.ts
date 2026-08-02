@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 
 export const dynamic = "force-dynamic";
 
@@ -57,32 +57,6 @@ type CashFlowPackage = {
   };
 };
 
-const FINANCE_ROLES = [
-  "owner",
-  "super_admin",
-  "admin",
-  "finance_admin",
-  "finance",
-  "accounting",
-  "bookkeeper",
-];
-
-const CASH_IN_ACCOUNTS = [
-  "Stripe Clearing",
-  "Customer Payments",
-  "Service Revenue",
-  "Booking Revenue",
-  "Navy Federal Business Checking",
-];
-
-const CASH_OUT_ACCOUNTS = [
-  "Guru Payouts Payable",
-  "Merchant Processing Fees",
-  "Refunds and Allowances",
-  "Chargeback Expense",
-  "Operating Expenses",
-];
-
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -137,33 +111,6 @@ function htmlEscape(value: unknown) {
     .replace(/"/g, "&quot;");
 }
 
-function getOptionalBoolean(value: unknown) {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (["true", "yes", "1"].includes(normalized)) return true;
-    if (["false", "no", "0"].includes(normalized)) return false;
-  }
-
-  return false;
-}
-
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function hasFinancialRole(role: string) {
-  return FINANCE_ROLES.includes(role.trim().toLowerCase());
-}
-
 async function safeRows<T>(
   query: PromiseLike<SafeQueryResponse>,
   label: string,
@@ -184,62 +131,15 @@ async function safeRows<T>(
 }
 
 async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
+  const financeCheck = await requireFinanceAdminApi();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_finance_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_finance_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_finance_access",
-    ),
-  ]);
-
-  const profile = profileChecks.flat().find(Boolean) || {};
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-  const envAllowed = envAdminEmails.includes(userEmail);
+  if (!financeCheck.identity) return null;
 
   return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials:
-      active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed),
+    id: financeCheck.identity.id,
+    email: financeCheck.identity.email,
+    role: financeCheck.identity.role,
+    canAccessFinancials: true,
   };
 }
 
@@ -342,6 +242,7 @@ function getText(row: AnyRow) {
     row.type,
     row.category,
     row.name,
+    row.merchant_name,
     row.description,
     row.memo,
     row.account_name,
@@ -349,10 +250,13 @@ function getText(row: AnyRow) {
     row.external_account_name,
     row.reporting_category,
     row.transaction_type,
+    row.sitguru_category,
+    row.sitguru_category_type,
+    row.sitguru_notes,
   ]
-    .map(asTrimmedString)
-    .join(" ")
-    .toLowerCase();
+    .map((value) => asTrimmedString(value).toLowerCase())
+    .filter(Boolean)
+    .join(" ");
 }
 
 function getRowId(row: AnyRow) {
@@ -496,6 +400,10 @@ function isLikelyStripePayoutDeposit(row: AnyRow) {
   );
 }
 
+function beginningCashFallback(netCashChange: number) {
+  return Math.max(0, netCashChange);
+}
+
 function getReconciliationStatus(rows: AnyRow[]) {
   const matched = rows.some((row) =>
     Boolean(
@@ -578,8 +486,11 @@ async function getCashFlowPackage({
   startDate: string | null;
   endDate: string | null;
 }): Promise<CashFlowPackage> {
+  const plaidEnvironment = process.env.PLAID_ENV || "production";
+
   const [
     rawBookings,
+    rawBookingPayments,
     rawExpenses,
     rawPayouts,
     rawDisputes,
@@ -587,6 +498,8 @@ async function getCashFlowPackage({
     rawBankTransactions,
     rawStripeBalanceTransactions,
     rawManualLines,
+    rawPlaidAccounts,
+    rawPlaidTransactions,
   ] = await Promise.all([
     safeRows<AnyRow>(
       supabaseAdmin
@@ -595,6 +508,14 @@ async function getCashFlowPackage({
         .order("created_at", { ascending: false })
         .limit(5000),
       "bookings",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("booking_payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "booking_payments",
     ),
     safeRows<AnyRow>(
       supabaseAdmin
@@ -653,10 +574,37 @@ async function getCashFlowPackage({
         .limit(1000),
       "cash_flow_lines",
     ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_plaid_accounts")
+        .select(
+          "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, plaid_environment, created_at, updated_at",
+        )
+        .eq("plaid_environment", plaidEnvironment)
+        .order("created_at", { ascending: false })
+        .limit(500),
+      "admin_plaid_accounts",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_plaid_transactions")
+        .select("*")
+        .is("removed_at", null)
+        .order("date", { ascending: false })
+        .limit(5000),
+      "admin_plaid_transactions",
+    ),
   ]);
 
   const bookings = rawBookings
     .filter((row) => !isArchivedRow(row))
+    .filter((row) => isWithinDateRange(row, startDate, endDate));
+  const bookingPayments = rawBookingPayments
+    .filter((row) => !isArchivedRow(row))
+    .filter((row) => {
+      const provider = asTrimmedString(row.provider).toLowerCase();
+      return !provider || provider === "stripe";
+    })
     .filter((row) => isWithinDateRange(row, startDate, endDate));
   const expenses = rawExpenses
     .filter((row) => !isArchivedRow(row))
@@ -680,30 +628,122 @@ async function getCashFlowPackage({
     .filter((row) => !isArchivedRow(row))
     .filter((row) => isWithinDateRange(row, startDate, endDate));
 
+  const businessPlaidAccounts = rawPlaidAccounts.filter((account) => {
+    const name =
+      `${asTrimmedString(account.name)} ${asTrimmedString(account.official_name)}`.toLowerCase();
+    const subtype = asTrimmedString(account.subtype).toLowerCase();
+    return (
+      (subtype === "checking" || subtype === "savings") &&
+      name.includes("business")
+    );
+  });
+  const allowedPlaidAccountIds = new Set(
+    businessPlaidAccounts
+      .map((account) => asTrimmedString(account.account_id))
+      .filter(Boolean),
+  );
+  const plaidTransactions = rawPlaidTransactions
+    .filter((row) => !row.removed_at)
+    .filter((row) =>
+      allowedPlaidAccountIds.has(asTrimmedString(row.account_id)),
+    )
+    .filter((row) => isWithinDateRange(row, startDate, endDate));
+
   const rows: CashFlowExportRow[] = [];
 
   const paidBookings = bookings.filter(isPaidBooking);
+  const paidBookingPayments = bookingPayments.filter((row) => {
+    const status = asTrimmedString(row.status).toLowerCase();
+    return (
+      status.includes("paid") ||
+      status.includes("succeeded") ||
+      status.includes("complete")
+    );
+  });
+  const bookingPaymentCashReceipts = paidBookingPayments.reduce((sum, row) => {
+    const cents =
+      toNumber(row.amount_cents) ||
+      toNumber(row.gross_amount_cents) ||
+      toNumber(row.total_cents) ||
+      toNumber(row.transaction_amount_cents);
+    if (cents) return sum + Math.abs(cents) / 100;
+    return sum + Math.abs(toCentsAwareAmount(row.amount));
+  }, 0);
   const bookingCashReceipts = paidBookings.reduce(
     (sum, booking) => sum + getBookingGrossAmount(booking),
     0,
   );
+  const customerCashReceipts =
+    bookingPaymentCashReceipts > 0
+      ? bookingPaymentCashReceipts
+      : bookingCashReceipts;
 
-  addRow(rows, {
-    section: "Operating Activities - Cash Inflows",
-    lineItem: "Customer Booking Cash Receipts",
-    accountingAccount: "Customer Payments / Stripe Clearing",
-    quickBooksAccount: "Undeposited Funds",
-    source: "bookings",
-    sourceId: "bookings:paid",
-    sourceCount: paidBookings.length,
-    amount: bookingCashReceipts,
-    statementImpact: "Cash inflow from customer bookings",
-    taxTreatment:
-      "Gross customer receipts; sales tax and trust balances should be reviewed separately.",
-    reconciliationStatus: getReconciliationStatus(paidBookings),
-    notes:
-      "Gross paid booking cash receipts. Stripe payout deposits should be matched, not counted again as new revenue.",
+  const reviewedPlaidIncome = plaidTransactions.filter((row) => {
+    const type = asTrimmedString(row.sitguru_category_type).toLowerCase();
+    const review = asTrimmedString(row.review_status).toLowerCase();
+    return (
+      type === "income" &&
+      !row.is_excluded_from_reports &&
+      (review === "reviewed" || review === "auto_categorized")
+    );
   });
+  const plaidBankCashIn = reviewedPlaidIncome.reduce(
+    (sum, row) => sum + Math.abs(toNumber(row.amount)),
+    0,
+  );
+  const usePlaidAsPrimaryCashIn = reviewedPlaidIncome.length > 0;
+
+  if (usePlaidAsPrimaryCashIn) {
+    addRow(rows, {
+      section: "Operating Activities - Cash Inflows",
+      lineItem: "Reviewed NFCU Bank Cash In",
+      accountingAccount: "Navy Federal Business Checking",
+      quickBooksAccount: "Checking",
+      source: "admin_plaid_transactions",
+      sourceId: "plaid:bank_cash_in",
+      sourceCount: reviewedPlaidIncome.length,
+      amount: plaidBankCashIn,
+      statementImpact: "Actual bank cash movement into NFCU",
+      taxTreatment:
+        "Cash movement only; not automatically P&L revenue. Match Stripe payouts separately.",
+      reconciliationStatus: getReconciliationStatus(reviewedPlaidIncome),
+      notes:
+        "Primary cash-flow inflow from reviewed Plaid/NFCU bank credits. Includes Stripe payout deposits and other cash-in.",
+    });
+  }
+
+  if (customerCashReceipts > 0 || paidBookings.length || paidBookingPayments.length) {
+    addRow(rows, {
+      section: usePlaidAsPrimaryCashIn
+        ? "Operating Activities - Reconciliation Memo"
+        : "Operating Activities - Cash Inflows",
+      lineItem: "Customer Booking Cash Receipts",
+      accountingAccount: "Customer Payments / Stripe Clearing",
+      quickBooksAccount: "Undeposited Funds",
+      source:
+        bookingPaymentCashReceipts > 0 ? "booking_payments" : "bookings",
+      sourceId:
+        bookingPaymentCashReceipts > 0
+          ? "booking_payments:paid"
+          : "bookings:paid",
+      sourceCount:
+        bookingPaymentCashReceipts > 0
+          ? paidBookingPayments.length
+          : paidBookings.length,
+      amount: customerCashReceipts,
+      statementImpact: usePlaidAsPrimaryCashIn
+        ? "Stripe/booking receipt support schedule"
+        : "Cash inflow from customer bookings",
+      taxTreatment:
+        "Gross customer receipts; sales tax and trust balances should be reviewed separately.",
+      reconciliationStatus: getReconciliationStatus(
+        bookingPaymentCashReceipts > 0 ? paidBookingPayments : paidBookings,
+      ),
+      notes: usePlaidAsPrimaryCashIn
+        ? "Support schedule from Stripe booking ledger. Do not add again when NFCU bank cash-in is the primary cash-flow inflow."
+        : "Prefers booking_payments Stripe ledger amounts when Plaid bank cash-in is unavailable.",
+    });
+  }
 
   const stripeCharges = stripeBalanceTransactions.filter((row) => {
     const text = getText(row);
@@ -722,7 +762,7 @@ async function getCashFlowPackage({
 
   if (stripeCharges.length) {
     addRow(rows, {
-      section: "Operating Activities - Cash Inflows",
+      section: "Operating Activities - Reconciliation Memo",
       lineItem: "Stripe Customer Payment Activity",
       accountingAccount: "Stripe Clearing",
       quickBooksAccount: "Undeposited Funds",
@@ -732,16 +772,30 @@ async function getCashFlowPackage({
       amount: stripeChargeAmount,
       statementImpact: "Cash inflow support schedule",
       taxTreatment:
-        "Support schedule for receipts; reconcile against bookings to avoid duplication.",
+        "Support schedule for receipts; reconcile against bookings/bank cash to avoid duplication.",
       reconciliationStatus: getReconciliationStatus(stripeCharges),
       notes:
-        "Included as a support row for Stripe activity. If bookings already drive receipts, use this for reconciliation instead of duplicate revenue recognition.",
+        "Included as a support row for Stripe activity. Prefer NFCU bank cash-in and booking_payments for statement totals.",
     });
   }
 
-  const stripePayoutDeposits = bankTransactions.filter(isLikelyStripePayoutDeposit);
+  const plaidStripePayoutDeposits = reviewedPlaidIncome.filter(
+    isLikelyStripePayoutDeposit,
+  );
+  const legacyStripePayoutDeposits = bankTransactions.filter(
+    isLikelyStripePayoutDeposit,
+  );
+  const stripePayoutDeposits =
+    plaidStripePayoutDeposits.length > 0
+      ? plaidStripePayoutDeposits
+      : legacyStripePayoutDeposits;
   const stripePayoutDepositAmount = stripePayoutDeposits.reduce(
-    (sum, row) => sum + Math.max(0, getBankAmount(row)),
+    (sum, row) =>
+      sum +
+      Math.max(
+        0,
+        Math.abs(toNumber(row.amount)) || Math.max(0, getBankAmount(row)),
+      ),
     0,
   );
 
@@ -751,16 +805,41 @@ async function getCashFlowPackage({
       lineItem: "Stripe Payouts Deposited to Navy Federal",
       accountingAccount: "Navy Federal Business Checking",
       quickBooksAccount: "Checking",
-      source: "bank_transactions",
+      source:
+        plaidStripePayoutDeposits.length > 0
+          ? "admin_plaid_transactions"
+          : "bank_transactions",
       sourceId: "bank:stripe_payout_deposits",
       sourceCount: stripePayoutDeposits.length,
       amount: stripePayoutDepositAmount,
       statementImpact: "Cash deposit reconciliation memo",
       taxTreatment:
-        "Not new income; match to Stripe payouts so revenue is not double-counted.",
+        "Not new income; match to Stripe payouts so revenue is not double-counted. Already included in Reviewed NFCU Bank Cash In when present.",
       reconciliationStatus: getReconciliationStatus(stripePayoutDeposits),
       notes:
-        "This row confirms cash landed in Navy Federal checking/savings. It should reconcile to Stripe payout records.",
+        "Subset of bank cash-in confirming Stripe payouts landed in NFCU. Do not add again to net cash.",
+    });
+  }
+
+  const currentCashBalance = businessPlaidAccounts.reduce(
+    (sum, account) => sum + toNumber(account.current_balance),
+    0,
+  );
+
+  if (businessPlaidAccounts.length) {
+    addRow(rows, {
+      section: "Cash Position",
+      lineItem: "Current NFCU Cash Balance",
+      accountingAccount: "Navy Federal Business Checking / Savings",
+      quickBooksAccount: "Cash and Cash Equivalents",
+      source: "admin_plaid_accounts",
+      sourceId: "plaid:current_cash",
+      sourceCount: businessPlaidAccounts.length,
+      amount: currentCashBalance,
+      statementImpact: "Ending cash position support",
+      taxTreatment: "Balance sheet cash position; not period P&L.",
+      reconciliationStatus: "Live Plaid balance",
+      notes: `Current balance across ${businessPlaidAccounts.length} NFCU business accounts (${plaidEnvironment}).`,
     });
   }
 
@@ -834,31 +913,49 @@ async function getCashFlowPackage({
     (sum, booking) => sum + getRefundAmount(booking),
     0,
   );
+  const bookingPaymentRefunds = bookingPayments.reduce(
+    (sum, row) => sum + Math.abs(toNumber(row.refund_amount_cents) / 100),
+    0,
+  );
   const stripeRefunds = stripeBalanceTransactions
     .filter((row) => getText(row).includes("refund"))
     .reduce((sum, row) => sum + Math.abs(getStripeAmount(row)), 0);
-  const refundCashOut = Math.max(bookingRefunds, stripeRefunds);
+  const refundCashOut = Math.max(
+    bookingPaymentRefunds,
+    bookingRefunds,
+    stripeRefunds,
+  );
 
   addRow(rows, {
     section: "Operating Activities - Cash Outflows",
     lineItem: "Refunds / Customer Credits",
     accountingAccount: "Refunds and Allowances",
     quickBooksAccount: "Refunds and Allowances",
-    source: "bookings + stripe_balance_transactions",
+    source:
+      bookingPaymentRefunds > 0
+        ? "booking_payments"
+        : "bookings + stripe_balance_transactions",
     sourceId: "refunds:combined",
     sourceCount:
+      bookingPayments.filter((row) => toNumber(row.refund_amount_cents) > 0)
+        .length +
       bookings.filter((booking) => getRefundAmount(booking) > 0).length +
-      stripeBalanceTransactions.filter((row) => getText(row).includes("refund")).length,
+      stripeBalanceTransactions.filter((row) =>
+        getText(row).includes("refund"),
+      ).length,
     amount: -refundCashOut,
     statementImpact: "Cash outflow or revenue reversal support",
     taxTreatment:
       "Contra-revenue or customer credit treatment should be reviewed by CPA.",
     reconciliationStatus: getReconciliationStatus([
+      ...bookingPayments.filter((row) => toNumber(row.refund_amount_cents) > 0),
       ...bookings.filter((booking) => getRefundAmount(booking) > 0),
-      ...stripeBalanceTransactions.filter((row) => getText(row).includes("refund")),
+      ...stripeBalanceTransactions.filter((row) =>
+        getText(row).includes("refund"),
+      ),
     ]),
     notes:
-      "Uses the higher of booking refund records or Stripe refund rows to avoid understating refunds when one source is incomplete.",
+      "Prefers booking_payments.refund_amount_cents, then booking/Stripe refund rows, using the highest available support total.",
   });
 
   const disputeCashOut = disputes.reduce(
@@ -890,15 +987,40 @@ async function getCashFlowPackage({
       "Includes dispute financial impact from available dispute case records.",
   });
 
-  const bankTransfers = bankTransactions.filter(isLikelyTransfer);
-  const netTransfers = bankTransfers.reduce((sum, row) => sum + getBankAmount(row), 0);
+  const plaidTransfers = plaidTransactions.filter((row) => {
+    const type = asTrimmedString(row.sitguru_category_type).toLowerCase();
+    return type === "transfer" || type === "owner_equity" || type === "owner_draw";
+  });
+  const bankTransfers =
+    plaidTransfers.length > 0
+      ? plaidTransfers
+      : bankTransactions.filter(isLikelyTransfer);
+  const netTransfers = bankTransfers.reduce((sum, row) => {
+    const type = asTrimmedString(row.sitguru_category_type).toLowerCase();
+    const amount = Math.abs(toNumber(row.amount) || getBankAmount(row));
+    if (type === "owner_draw" || type === "transfer") {
+      const text = getText(row);
+      if (
+        type === "owner_draw" ||
+        text.includes("to savings") ||
+        text.includes("from checking")
+      ) {
+        return sum - amount;
+      }
+    }
+    if (type === "owner_equity") return sum + amount;
+    return sum + (toNumber(row.amount) || getBankAmount(row));
+  }, 0);
 
   addRow(rows, {
     section: "Financing Activities",
     lineItem: "Owner / Internal Checking-Savings Transfers",
     accountingAccount: "Owner Equity / Internal Transfers",
     quickBooksAccount: "Owner Investment / Owner Draws",
-    source: "bank_transactions",
+    source:
+      plaidTransfers.length > 0
+        ? "admin_plaid_transactions"
+        : "bank_transactions",
     sourceId: "bank:transfers",
     sourceCount: bankTransfers.length,
     amount: netTransfers,
@@ -908,7 +1030,7 @@ async function getCashFlowPackage({
       "Generally not operating income or expense; CPA should classify equity/transfer items.",
     reconciliationStatus: getReconciliationStatus(bankTransfers),
     notes:
-      "Includes likely checking/savings transfers, owner draws, owner contributions, and internal cash movement.",
+      "Prefers reviewed Plaid transfer/owner equity categories; falls back to likely checking/savings transfer text matches.",
   });
 
   const investingRows = financialLedger.filter((row) => {
@@ -948,10 +1070,20 @@ async function getCashFlowPackage({
   }
 
   const operatingInflows = rows
-    .filter((row) => row.section.includes("Operating") && row.amount > 0)
+    .filter(
+      (row) =>
+        row.section.includes("Operating") &&
+        !row.section.includes("Reconciliation Memo") &&
+        row.amount > 0,
+    )
     .reduce((sum, row) => sum + row.amount, 0);
   const operatingOutflows = rows
-    .filter((row) => row.section.includes("Operating") && row.amount < 0)
+    .filter(
+      (row) =>
+        row.section.includes("Operating") &&
+        !row.section.includes("Reconciliation Memo") &&
+        row.amount < 0,
+    )
     .reduce((sum, row) => sum + Math.abs(row.amount), 0);
   const netOperatingCashFlow = operatingInflows - operatingOutflows;
 
@@ -965,8 +1097,29 @@ async function getCashFlowPackage({
   const netCashChange =
     netOperatingCashFlow + finalInvestingCashFlow + financingCashFlow;
 
-  const beginningCash = 0;
-  const endingCash = beginningCash + netCashChange;
+  const endingCash =
+    currentCashBalance || beginningCashFallback(netCashChange);
+  const beginningCash = endingCash - netCashChange;
+
+  addRow(rows, {
+    section: "Cash Flow Summary",
+    lineItem: "Beginning Cash",
+    accountingAccount: "Cash",
+    quickBooksAccount: "Cash and Cash Equivalents",
+    source: businessPlaidAccounts.length
+      ? "admin_plaid_accounts"
+      : "calculated",
+    sourceId: "summary:beginning_cash",
+    sourceCount: businessPlaidAccounts.length || 1,
+    amount: beginningCash,
+    statementImpact: "Opening cash support",
+    taxTreatment: "Statement summary; no direct tax category.",
+    reconciliationStatus: businessPlaidAccounts.length
+      ? "Derived from live Plaid balance"
+      : "Calculated",
+    notes:
+      "Ending NFCU cash less net cash change for the selected period when live balances are available.",
+  });
 
   addRow(rows, {
     section: "Cash Flow Summary",
@@ -998,6 +1151,26 @@ async function getCashFlowPackage({
     reconciliationStatus: "Calculated",
     notes:
       "Net operating, investing, and financing cash flow from available records.",
+  });
+
+  addRow(rows, {
+    section: "Cash Flow Summary",
+    lineItem: "Ending Cash",
+    accountingAccount: "Cash",
+    quickBooksAccount: "Cash and Cash Equivalents",
+    source: businessPlaidAccounts.length
+      ? "admin_plaid_accounts"
+      : "calculated",
+    sourceId: "summary:ending_cash",
+    sourceCount: businessPlaidAccounts.length || 1,
+    amount: endingCash,
+    statementImpact: "Closing cash support",
+    taxTreatment: "Statement summary; no direct tax category.",
+    reconciliationStatus: businessPlaidAccounts.length
+      ? "Live Plaid balance"
+      : "Calculated",
+    notes:
+      "Prefers live NFCU Business Checking/Savings balances from admin_plaid_accounts.",
   });
 
   return {

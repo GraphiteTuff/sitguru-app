@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
+import { getPlaidEnvironment } from "@/lib/plaid";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,22 @@ type GrowthForecastActuals = {
   pendingReferralRewardLiability: number;
   bestGrowthSignal: string;
   bestRecommendation: string;
+};
+
+type BookingPaymentActuals = {
+  paymentCount: number;
+  paidCount: number;
+  averageBookingValue: number;
+  averagePlatformFeeRate: number;
+  totalPlatformFees: number;
+  totalGrossVolume: number;
+};
+
+type LiveCashActuals = {
+  connectedAccounts: number;
+  currentBalance: number;
+  availableBalance: number;
+  seededBeginningCash: boolean;
 };
 
 type ForecastMonth = {
@@ -214,8 +231,9 @@ function money(value: number) {
   const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(Math.abs(value));
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(value || 0));
 
   return value < 0 ? `(${formatted})` : formatted;
 }
@@ -224,7 +242,9 @@ function moneyExact(value: number) {
   const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-  }).format(Math.abs(value));
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(value || 0));
 
   return value < 0 ? `(${formatted})` : formatted;
 }
@@ -263,87 +283,16 @@ async function safeRows<T>(
   }
 }
 
-function hasFinancialRole(role: string) {
-  return [
-    "owner",
-    "super_admin",
-    "admin",
-    "finance_admin",
-    "finance",
-    "accounting",
-    "bookkeeper",
-  ].includes(role.trim().toLowerCase());
-}
-
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
 async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
+  const identity = await getFinanceAdminIdentity();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<Record<string, unknown>>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_finance_access",
-    ),
-    safeRows<Record<string, unknown>>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_finance_access",
-    ),
-    safeRows<Record<string, unknown>>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_finance_access",
-    ),
-  ]);
-
-  const profile = profileChecks.flat().find(Boolean) || {};
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-  const envAllowed = envAdminEmails.includes(userEmail);
+  if (!identity) return null;
 
   return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials:
-      active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed),
+    id: identity.id,
+    email: identity.email,
+    role: identity.role,
+    canAccessFinancials: true,
   };
 }
 
@@ -824,6 +773,73 @@ function getTrustSafetyEventAmountCents(row: TrustSafetyFinancialEventRow) {
   );
 }
 
+function getBookingPaymentActuals(rows: AnyRow[]): BookingPaymentActuals {
+  const payments = rows.filter((row) => {
+    const provider = asTrimmedString(row.provider).toLowerCase();
+    return !provider || provider === "stripe";
+  });
+
+  const paid = payments.filter((row) => {
+    const status = asTrimmedString(row.status).toLowerCase();
+    return (
+      status.includes("paid") ||
+      status.includes("succeeded") ||
+      status.includes("complete")
+    );
+  });
+
+  let totalGross = 0;
+  let totalFees = 0;
+
+  for (const row of paid) {
+    const gross =
+      centsToDollars(toNumber(row.amount_cents)) ||
+      centsToDollars(toNumber(row.gross_amount_cents)) ||
+      centsToDollars(toNumber(row.total_cents)) ||
+      toNumber(row.amount);
+    const fee = centsToDollars(toNumber(row.marketplace_support_cents));
+    totalGross += Math.abs(gross);
+    totalFees += Math.abs(fee);
+  }
+
+  return {
+    paymentCount: payments.length,
+    paidCount: paid.length,
+    averageBookingValue: paid.length ? totalGross / paid.length : 0,
+    averagePlatformFeeRate: totalGross > 0 ? (totalFees / totalGross) * 100 : 0,
+    totalPlatformFees: totalFees,
+    totalGrossVolume: totalGross,
+  };
+}
+
+function getLiveCashActuals(accounts: AnyRow[]): LiveCashActuals {
+  const businessAccounts = accounts.filter((account) => {
+    const name =
+      `${asTrimmedString(account.name)} ${asTrimmedString(account.official_name)}`.toLowerCase();
+    const subtype = asTrimmedString(account.subtype).toLowerCase();
+    return (
+      (subtype === "checking" || subtype === "savings") &&
+      name.includes("business")
+    );
+  });
+
+  const currentBalance = businessAccounts.reduce(
+    (sum, account) => sum + toNumber(account.current_balance),
+    0,
+  );
+  const availableBalance = businessAccounts.reduce(
+    (sum, account) => sum + toNumber(account.available_balance),
+    0,
+  );
+
+  return {
+    connectedAccounts: businessAccounts.length,
+    currentBalance,
+    availableBalance,
+    seededBeginningCash: false,
+  };
+}
+
 function getTrustSafetyActuals({
   purchases,
   events,
@@ -1184,10 +1200,10 @@ function ForecastReadinessPanel({
 
 function IntegrationFlowPanel() {
   const steps = [
-    "Actual P&L, Balance Sheet, Cash Flow, General Ledger, and Trust & Safety records provide the baseline operating model.",
+    "Actual P&L, Balance Sheet, Cash Flow, General Ledger, Stripe booking_payments, and Trust & Safety records provide the baseline operating model.",
     "Pro forma assumptions project bookings, platform fees, refunds, payouts, expenses, Trust & Safety plans, and growth.",
     "Trust & Safety projections split Paw in Full, Pawstep, and Book & Bark into cash collected, receivables, vendor costs, Stripe fees, and recoveries.",
-    "Cash planning layers in beginning cash, owner contributions, loan proceeds, repayments, and projected screening cash flow.",
+    "Cash planning layers in live NFCU beginning cash (when blank), owner contributions, loan proceeds, repayments, and projected screening cash flow.",
     "Exports give CPA/bookkeeper/investor-ready planning schedules alongside actual statements.",
   ];
 
@@ -1224,12 +1240,16 @@ function getForecastReadinessItems({
   savedScenarioCount,
   trustSafetyActuals,
   growthActuals,
+  bookingPaymentActuals,
+  liveCashActuals,
 }: {
   assumptions: Assumptions;
   forecast: ForecastMonth[];
   savedScenarioCount: number;
   trustSafetyActuals: TrustSafetyActuals;
   growthActuals: GrowthForecastActuals;
+  bookingPaymentActuals: BookingPaymentActuals;
+  liveCashActuals: LiveCashActuals;
 }): ForecastReadinessItem[] {
   const totalOperatingExpenses =
     assumptions.monthlyMarketingSpend +
@@ -1274,6 +1294,13 @@ function getForecastReadinessItems({
       )} platform fee.`,
     },
     {
+      label: "Stripe booking_payments actuals",
+      status: bookingPaymentActuals.paidCount > 0 ? "ready" : "needs_review",
+      detail: bookingPaymentActuals.paidCount
+        ? `${bookingPaymentActuals.paidCount.toLocaleString()} paid booking payments · ABV ${moneyExact(bookingPaymentActuals.averageBookingValue)} · observed fee ${percent(bookingPaymentActuals.averagePlatformFeeRate)}.`
+        : "No paid booking_payments rows yet to calibrate ABV / platform fee assumptions.",
+    },
+    {
       label: "Trust & Safety assumptions",
       status: trustSafetyCash > 0 ? "ready" : "needs_review",
       detail: trustSafetyActuals.purchaseCount
@@ -1293,6 +1320,17 @@ function getForecastReadinessItems({
       detail: growthActuals.campaignCount
         ? `${growthActuals.campaignCount.toLocaleString()} tracked campaign${growthActuals.campaignCount === 1 ? "" : "s"}; ${moneyExact(growthActuals.costPerBooking)} cost per booking and ${percent(growthActuals.averageRoiPercent)} average ROI.`
         : "No campaign ROI rows found yet, so Pro Forma uses manual marketing assumptions.",
+    },
+    {
+      label: "Live NFCU cash",
+      status: liveCashActuals.connectedAccounts >= 1 ? "ready" : "needs_review",
+      detail: liveCashActuals.connectedAccounts
+        ? `${liveCashActuals.connectedAccounts} NFCU business account${liveCashActuals.connectedAccounts === 1 ? "" : "s"} · ${moneyExact(liveCashActuals.currentBalance)} current${
+            liveCashActuals.seededBeginningCash
+              ? " (seeded into beginning cash for this forecast)"
+              : ""
+          }.`
+        : "No NFCU business accounts found for the active Plaid environment.",
     },
     {
       label: "Cash runway assumptions",
@@ -1550,6 +1588,8 @@ function ScenarioRepository({
 }
 
 async function getProFormaData() {
+  const plaidEnvironment = getPlaidEnvironment();
+
   const [
     rows,
     trustSafetyPurchases,
@@ -1557,6 +1597,8 @@ async function getProFormaData() {
     growthCampaignRows,
     growthFinancialSummaryRows,
     growthMarketingExpenseRows,
+    bookingPaymentRows,
+    plaidAccounts,
   ] = await Promise.all([
     safeRows<ProFormaRow>(
       supabaseAdmin
@@ -1607,6 +1649,24 @@ async function getProFormaData() {
         .limit(1000),
       "admin_growth_marketing_expenses",
     ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("booking_payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "booking_payments",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_plaid_accounts")
+        .select(
+          "account_id, name, official_name, subtype, current_balance, available_balance, plaid_environment",
+        )
+        .eq("plaid_environment", plaidEnvironment)
+        .limit(500),
+      "admin_plaid_accounts",
+    ),
   ]);
 
   const scenarioRows = rows;
@@ -1614,7 +1674,20 @@ async function getProFormaData() {
     scenarioRows.find((row) => getOptionalBoolean(row.is_active)) ||
     scenarioRows[0];
   const scenarios = scenarioRows.map(rowToScenarioRepositoryItem);
-  const assumptions = rowToAssumptions(activeScenario);
+  const savedAssumptions = rowToAssumptions(activeScenario);
+  const bookingPaymentActuals = getBookingPaymentActuals(bookingPaymentRows);
+  const liveCashActuals = getLiveCashActuals(plaidAccounts);
+
+  const seededBeginningCash =
+    savedAssumptions.beginningCash <= 0 && liveCashActuals.currentBalance > 0;
+  const assumptions: Assumptions = {
+    ...savedAssumptions,
+    beginningCash: seededBeginningCash
+      ? liveCashActuals.currentBalance
+      : savedAssumptions.beginningCash,
+  };
+  liveCashActuals.seededBeginningCash = seededBeginningCash;
+
   const trustSafetyActuals = getTrustSafetyActuals({
     purchases: trustSafetyPurchases,
     events: trustSafetyEvents,
@@ -1713,7 +1786,11 @@ async function getProFormaData() {
       savedScenarioCount: scenarioRows.length,
       trustSafetyActuals,
       growthActuals,
+      bookingPaymentActuals,
+      liveCashActuals,
     }),
+    bookingPaymentActuals,
+    liveCashActuals,
     totals: {
       totalGrossBookingVolume,
       totalPlatformRevenue,
@@ -1741,7 +1818,22 @@ export default async function AdminProFormaPage() {
   const actor = await getAdminIdentity();
 
   if (!actor?.canAccessFinancials) {
-    return null;
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Financial access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with a finance-enabled admin account to view SitGuru Pro
+            Forma forecasts.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const proForma = await getProFormaData();
@@ -1778,7 +1870,7 @@ export default async function AdminProFormaPage() {
     <div className="min-h-screen bg-[#f7fbf8] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1600px] space-y-6">
         <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-          <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
+          <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] 2xl:items-start">
             <div className="max-w-4xl">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-700">
                 Admin / Financials / Pro Forma
@@ -1791,43 +1883,87 @@ export default async function AdminProFormaPage() {
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
                 Forecast future booking revenue, Guru payouts, refunds,
                 operating expenses, Trust & Safety screening plans, Checkr cost
-                exposure, cash flow, break-even timing, and ending cash based on
-                planning assumptions.
+                exposure, cash flow, break-even timing, and ending cash. Live
+                NFCU balances and Stripe booking_payments actuals help calibrate
+                beginning cash and fee assumptions.
               </p>
+
+              {proForma.liveCashActuals.seededBeginningCash ? (
+                <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <p className="text-sm font-black text-emerald-950">
+                    Beginning cash seeded from live NFCU balance
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-emerald-700">
+                    Scenario beginning cash was blank, so this forecast uses{" "}
+                    {moneyExact(proForma.liveCashActuals.currentBalance)} from
+                    connected business accounts. Save a beginning cash value to
+                    lock the assumption.
+                  </p>
+                </div>
+              ) : null}
             </div>
 
-            <div className="flex max-w-2xl flex-wrap gap-3">
-              <ActionLink href="/admin/financials" label="Financials" />
-              <ActionLink href="/admin/financials/profit-loss" label="P&L" />
-              <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
-              <ActionLink
-                href="/admin/financials/balance-sheet"
-                label="Balance Sheet"
-              />
-              <ActionLink
-                href="/admin/background-checks"
-                label="Trust & Safety"
-              />
-              <ActionLink
-                href="/api/admin/financials/pro-forma/export?format=csv"
-                label="CSV"
-              />
-              <ActionLink
-                href="/api/admin/financials/pro-forma/export?format=excel"
-                label="Excel"
-              />
-              <ActionLink
-                href="/api/admin/financials/pro-forma/export?format=pdf"
-                label="PDF / Print"
-                primary
-              />
+            <div className="rounded-[1.5rem] border border-emerald-100 bg-[#fbfefd] p-4 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                Forecast Actions
+              </p>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <ActionLink href="/admin/financials" label="Financials" />
+                <ActionLink href="/admin/financials/profit-loss" label="P&L" />
+                <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
+                <ActionLink
+                  href="/admin/financials/balance-sheet"
+                  label="Balance Sheet"
+                />
+                <ActionLink href="/admin/financials/payment-gateway" label="Payment Gateway" />
+                <ActionLink href="/admin/financials/plaid" label="Banking" />
+                <ActionLink
+                  href="/admin/financials/general-ledger"
+                  label="Ledger"
+                />
+                <ActionLink
+                  href="/admin/financials/reconciliation"
+                  label="Reconcile"
+                />
+                <ActionLink
+                  href="/admin/background-checks"
+                  label="Trust & Safety"
+                  primary
+                />
+              </div>
+
+              <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Export Forecast
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <ActionLink
+                    href="/api/admin/financials/pro-forma/export?format=csv"
+                    label="CSV"
+                  />
+                  <ActionLink
+                    href="/api/admin/financials/pro-forma/export?format=excel"
+                    label="Excel"
+                  />
+                  <ActionLink
+                    href="/api/admin/financials/pro-forma/export?format=word"
+                    label="Word"
+                  />
+                  <ActionLink
+                    href="/api/admin/financials/pro-forma/export?format=pdf"
+                    label="PDF"
+                    primary
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Projected Revenue"
-              value={money(
+              value={moneyExact(
                 proForma.totals.totalPlatformRevenue +
                   proForma.totals.totalTrustSafetyCashCollected,
               )}
@@ -1836,13 +1972,13 @@ export default async function AdminProFormaPage() {
             />
             <StatCard
               label="Projected Trust & Safety"
-              value={money(proForma.totals.totalTrustSafetyCashCollected)}
-              detail={`${money(proForma.totals.totalTrustSafetyNetCash)} projected net Trust & Safety cash after Checkr and Stripe costs.`}
+              value={moneyExact(proForma.totals.totalTrustSafetyCashCollected)}
+              detail={`${moneyExact(proForma.totals.totalTrustSafetyNetCash)} projected net Trust & Safety cash after Checkr and Stripe costs.`}
               tone="sky"
             />
             <StatCard
               label="Projected Net Income / Loss"
-              value={money(proForma.totals.totalNetIncome)}
+              value={moneyExact(proForma.totals.totalNetIncome)}
               detail={
                 proForma.totals.breakEvenMonth
                   ? `Breakeven begins around month ${proForma.totals.breakEvenMonth}.`
@@ -1852,9 +1988,34 @@ export default async function AdminProFormaPage() {
             />
             <StatCard
               label="Projected Ending Cash"
-              value={money(proForma.totals.endingCash)}
-              detail="Beginning cash plus projected net cash movement."
+              value={moneyExact(proForma.totals.endingCash)}
+              detail={
+                proForma.liveCashActuals.connectedAccounts
+                  ? `Live NFCU ${moneyExact(proForma.liveCashActuals.currentBalance)} · beginning ${moneyExact(assumptions.beginningCash)}.`
+                  : "Beginning cash plus projected net cash movement."
+              }
               tone={proForma.totals.endingCash >= 0 ? "amber" : "rose"}
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <StatCard
+              label="Observed ABV"
+              value={moneyExact(proForma.bookingPaymentActuals.averageBookingValue)}
+              detail={`${proForma.bookingPaymentActuals.paidCount.toLocaleString()} paid booking_payments · compare to assumed ${moneyExact(assumptions.averageBookingValue)}.`}
+              tone="sky"
+            />
+            <StatCard
+              label="Observed Platform Fee"
+              value={percent(proForma.bookingPaymentActuals.averagePlatformFeeRate)}
+              detail={`${moneyExact(proForma.bookingPaymentActuals.totalPlatformFees)} marketplace support fees · assumed ${percent(assumptions.platformFeeRate)}.`}
+              tone="violet"
+            />
+            <StatCard
+              label="Live NFCU Cash"
+              value={moneyExact(proForma.liveCashActuals.currentBalance)}
+              detail={`${proForma.liveCashActuals.connectedAccounts} business account${proForma.liveCashActuals.connectedAccounts === 1 ? "" : "s"} · ${moneyExact(proForma.liveCashActuals.availableBalance)} available.`}
+              tone="emerald"
             />
           </div>
         </section>

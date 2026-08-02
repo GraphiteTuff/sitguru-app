@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import {
   assertPlaidConfigured,
   getPlaidCountryCodes,
   getPlaidProducts,
   plaidClient,
 } from "@/lib/plaid";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 
 function getErrorMessage(error: unknown) {
   if (
@@ -40,58 +40,21 @@ function getPlaidRedirectUri() {
   return redirectUri;
 }
 
-async function requireAdminUser() {
-  const supabase = await createClient();
+async function requireAdminUser(): Promise<
+  | { user: { id: string }; response: null }
+  | { user: null; response: NextResponse }
+> {
+  const financeCheck = await requireFinanceAdminApi();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  if (!financeCheck.identity) {
     return {
-      supabase,
       user: null,
-      response: NextResponse.json(
-        { error: "Unauthorized. Please sign in as admin again." },
-        { status: 401 },
-      ),
-    };
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError) {
-    console.error("Plaid admin profile lookup error:", profileError);
-
-    return {
-      supabase,
-      user: null,
-      response: NextResponse.json(
-        { error: "Unable to verify admin profile." },
-        { status: 500 },
-      ),
-    };
-  }
-
-  if (profile?.role !== "admin") {
-    return {
-      supabase,
-      user: null,
-      response: NextResponse.json(
-        { error: "Admin access required." },
-        { status: 403 },
-      ),
+      response: financeCheck.response,
     };
   }
 
   return {
-    supabase,
-    user,
+    user: { id: financeCheck.identity.id },
     response: null,
   };
 }
@@ -127,7 +90,7 @@ async function createPlaidLinkToken(userId: string) {
 export async function GET() {
   const adminCheck = await requireAdminUser();
 
-  if (adminCheck.response || !adminCheck.user) {
+  if (!adminCheck.user) {
     return adminCheck.response;
   }
 
@@ -165,7 +128,7 @@ export async function GET() {
 export async function POST() {
   const adminCheck = await requireAdminUser();
 
-  if (adminCheck.response || !adminCheck.user) {
+  if (!adminCheck.user) {
     return adminCheck.response;
   }
 

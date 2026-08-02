@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
+import { getStripeServer } from "@/lib/stripe/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type Row = Record<string, unknown>;
 type SafeQueryResponse = { data: unknown; error: unknown };
@@ -51,16 +53,6 @@ type BalanceSheetExportPayload = {
     detail: string;
   }[];
 };
-
-const FINANCE_ROLES = new Set([
-  "owner",
-  "super_admin",
-  "admin",
-  "finance_admin",
-  "finance",
-  "accounting",
-  "bookkeeper",
-]);
 
 const BALANCE_SHEET_EXPORT_COLUMNS = [
   "Section",
@@ -152,18 +144,6 @@ function getClientIp(request: NextRequest) {
   );
 }
 
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
 async function safeRows<T>(
   query: PromiseLike<SafeQueryResponse>,
   label: string,
@@ -182,61 +162,15 @@ async function safeRows<T>(
 }
 
 async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const financeCheck = await requireFinanceAdminApi();
 
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<Row>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_finance_access",
-    ),
-    safeRows<Row>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_finance_access",
-    ),
-    safeRows<Row>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_finance_access",
-    ),
-  ]);
-
-  const profile = profileChecks.flat().find(Boolean) || {};
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined ? true : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(profile.can_access_financials);
-  const envAllowed = envAdminEmails.includes(userEmail);
-  const canAccessFinancials =
-    active &&
-    (FINANCE_ROLES.has(role.trim().toLowerCase()) ||
-      explicitFinanceAccess ||
-      envAllowed);
+  if (!financeCheck.identity) return null;
 
   return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials,
+    id: financeCheck.identity.id,
+    email: financeCheck.identity.email,
+    role: financeCheck.identity.role,
+    canAccessFinancials: true,
   };
 }
 
@@ -248,6 +182,24 @@ async function requireFinancialAdmin() {
   }
 
   return identity;
+}
+
+async function loadLiveStripeClearing() {
+  try {
+    if (!process.env.STRIPE_SECRET_KEY?.trim()) return 0;
+    const stripe = getStripeServer();
+    const balance = await stripe.balance.retrieve();
+    const sum = (
+      buckets: Array<{ amount: number; currency: string }> | undefined,
+    ) =>
+      (buckets || [])
+        .filter((bucket) => String(bucket.currency || "").toLowerCase() === "usd")
+        .reduce((total, bucket) => total + bucket.amount / 100, 0);
+    return sum(balance.available) + sum(balance.pending);
+  } catch (error) {
+    console.warn("Balance sheet export Stripe balance skipped:", error);
+    return 0;
+  }
 }
 
 async function writeFinancialAuditLog({
@@ -601,17 +553,24 @@ async function getBalanceSheetPayload({
 }): Promise<BalanceSheetExportPayload> {
   const [
     rawBookings,
+    rawBookingPayments,
     rawExpenses,
     rawPayouts,
     rawDisputes,
     rawFinancialLedger,
     rawBankTransactions,
+    rawPlaidAccounts,
     rawStripeTransactions,
     rawManualLines,
+    liveStripeClearing,
   ] = await Promise.all([
     safeRows<Row>(
       supabaseAdmin.from("bookings").select("*").order("created_at", { ascending: false }).limit(5000),
       "bookings",
+    ),
+    safeRows<Row>(
+      supabaseAdmin.from("booking_payments").select("*").order("created_at", { ascending: false }).limit(5000),
+      "booking_payments",
     ),
     safeRows<Row>(
       supabaseAdmin.from("expense_ledger").select("*").order("created_at", { ascending: false }).limit(5000),
@@ -643,6 +602,15 @@ async function getBalanceSheetPayload({
     ),
     safeRows<Row>(
       supabaseAdmin
+        .from("admin_plaid_accounts")
+        .select("*")
+        .eq("plaid_environment", process.env.PLAID_ENV || "production")
+        .order("created_at", { ascending: false })
+        .limit(500),
+      "admin_plaid_accounts",
+    ),
+    safeRows<Row>(
+      supabaseAdmin
         .from("stripe_balance_transactions")
         .select("*")
         .order("created_at", { ascending: false })
@@ -659,9 +627,16 @@ async function getBalanceSheetPayload({
         .limit(1000),
       "balance_sheet_lines",
     ),
+    loadLiveStripeClearing(),
   ]);
 
   const bookings = rawBookings.filter((row) => !isArchivedRow(row) && withinRange(row, startDate, endDate));
+  const bookingPayments = rawBookingPayments
+    .filter((row) => !isArchivedRow(row) && withinRange(row, startDate, endDate))
+    .filter((row) => {
+      const provider = asTrimmedString(row.provider).toLowerCase();
+      return !provider || provider === "stripe";
+    });
   const expenses = rawExpenses.filter((row) => !isArchivedRow(row) && withinRange(row, startDate, endDate));
   const payouts = rawPayouts.filter((row) => !isArchivedRow(row) && withinRange(row, startDate, endDate));
   const disputes = rawDisputes.filter((row) => !isArchivedRow(row) && withinRange(row, startDate, endDate));
@@ -672,8 +647,30 @@ async function getBalanceSheetPayload({
 
   const lines: BalanceSheetLine[] = [];
 
+  for (const account of rawPlaidAccounts) {
+    const name = `${asTrimmedString(account.name) || asTrimmedString(account.official_name) || "NFCU Account"}${
+      account.mask ? ` •••• ${account.mask}` : ""
+    }`;
+    addLine(lines, {
+      section: "assets",
+      lineItem: name,
+      accountingAccount: "Cash and Cash Equivalents",
+      quickBooksAccount: name,
+      source: "admin_plaid_accounts",
+      sourceId: asTrimmedString(account.account_id) || null,
+      sourceCount: 1,
+      amount: toNumber(account.current_balance),
+      statementImpact: "Balance Sheet",
+      taxTreatment: "Cash asset; Stripe payout deposits should match, not create revenue.",
+      reconciliationStatus: "Plaid-connected business account",
+      notes: "Current balance from connected NFCU/Plaid business banking.",
+    });
+  }
+
   const bankGroups = groupBy(bankTransactions, getBankAccountBucket);
   for (const [accountName, rows] of bankGroups.entries()) {
+    if (rawPlaidAccounts.length > 0) continue;
+
     const balanceRows = rows.filter(
       (row) => row.current_balance !== undefined || row.available_balance !== undefined || row.balance !== undefined,
     );
@@ -699,25 +696,25 @@ async function getBalanceSheetPayload({
     });
   }
 
-  const stripeClearingAmount = stripeTransactions.reduce(
-    (sum, row) => sum + getStripeAmount(row),
-    0,
-  );
+  const stripeClearingAmount =
+    liveStripeClearing > 0
+      ? liveStripeClearing
+      : stripeTransactions.reduce((sum, row) => sum + getStripeAmount(row), 0);
   addLine(lines, {
     section: "assets",
     lineItem: "Stripe Processor Clearing",
     accountingAccount: "Payment Processor Clearing",
     quickBooksAccount: "Stripe Clearing",
-    source: "stripe_balance_transactions",
+    source: liveStripeClearing > 0 ? "stripe_live_balance" : "stripe_balance_transactions",
     sourceId: null,
-    sourceCount: stripeTransactions.length,
+    sourceCount: liveStripeClearing > 0 ? 1 : stripeTransactions.length,
     amount: stripeClearingAmount,
     statementImpact: "Balance Sheet",
     taxTreatment: "Processor clearing asset; fees and revenue should be separated in the P&L.",
-    reconciliationStatus: stripeTransactions.some((row) => row.payout_id || row.reconciliation_id || row.matched_transaction_id)
+    reconciliationStatus: liveStripeClearing > 0 || stripeTransactions.some((row) => row.payout_id || row.reconciliation_id || row.matched_transaction_id)
       ? "Payout metadata available"
       : "Needs payout-to-bank match",
-    notes: "Represents Stripe net activity available for payout or clearing review.",
+    notes: "Live Stripe available + pending balance when configured; otherwise ledger estimate.",
   });
 
   const accountsReceivable = bookings
@@ -774,41 +771,84 @@ async function getBalanceSheetPayload({
     notes: "Estimated from unpaid, pending, due, or payable expense ledger rows.",
   });
 
+  const refundFromPayments = bookingPayments.reduce(
+    (sum, row) =>
+      sum +
+      Math.abs(toNumber(row.refund_amount_cents) / 100) +
+      Math.abs(toNumber(row.dispute_amount_cents) / 100),
+    0,
+  );
   const refundAndDisputeLiability =
-    bookings.reduce((sum, booking) => sum + getRefundAmount(booking), 0) +
-    disputes.reduce(
-      (sum, dispute) => sum + (toNumber(dispute.refund_amount) || toNumber(dispute.amount) || toNumber(dispute.financial_impact)),
-      0,
-    );
+    refundFromPayments > 0
+      ? refundFromPayments
+      : bookings.reduce((sum, booking) => sum + getRefundAmount(booking), 0) +
+        disputes.reduce(
+          (sum, dispute) =>
+            sum +
+            (toNumber(dispute.refund_amount) ||
+              toNumber(dispute.amount) ||
+              toNumber(dispute.financial_impact)),
+          0,
+        );
   addLine(lines, {
     section: "liabilities",
     lineItem: "Refunds and Disputes Liability",
     accountingAccount: "Refunds and Disputes Payable",
     quickBooksAccount: "Refunds and Disputes Payable",
-    source: "bookings/dispute_cases",
+    source: refundFromPayments > 0 ? "booking_payments" : "bookings/dispute_cases",
     sourceId: null,
-    sourceCount: bookings.filter((booking) => getRefundAmount(booking) > 0).length + disputes.length,
+    sourceCount:
+      refundFromPayments > 0
+        ? bookingPayments.length
+        : bookings.filter((booking) => getRefundAmount(booking) > 0).length +
+          disputes.length,
     amount: refundAndDisputeLiability,
     statementImpact: "Balance Sheet",
     taxTreatment: "Refund/dispute liability; confirm chargeback resolution and tax treatment with CPA.",
     reconciliationStatus: refundAndDisputeLiability > 0 ? "Needs review" : "No refund liability detected",
-    notes: "Estimated from refund-marked booking rows and dispute case financial impact.",
+    notes:
+      refundFromPayments > 0
+        ? "Uses booking_payments refund/dispute cents."
+        : "Estimated from refund-marked booking rows and dispute case financial impact.",
   });
 
-  const taxCollected = bookings.reduce((sum, booking) => sum + toNumber(booking.sales_tax_amount), 0);
+  const taxFromBookingPayments = bookingPayments
+    .filter((row) => {
+      const status = asTrimmedString(row.status).toLowerCase();
+      return (
+        status.includes("paid") ||
+        status.includes("succeeded") ||
+        status.includes("complete")
+      );
+    })
+    .reduce((sum, row) => sum + Math.max(0, toNumber(row.tax_cents) / 100), 0);
+  const taxCollected =
+    taxFromBookingPayments > 0
+      ? taxFromBookingPayments
+      : bookings.reduce((sum, booking) => sum + toNumber(booking.sales_tax_amount), 0);
   addLine(lines, {
     section: "liabilities",
     lineItem: "Sales Tax Payable",
     accountingAccount: "Sales Tax Payable",
     quickBooksAccount: "Sales Tax Payable",
-    source: "bookings",
+    source: taxFromBookingPayments > 0 ? "booking_payments" : "bookings",
     sourceId: null,
-    sourceCount: bookings.filter((booking) => toNumber(booking.sales_tax_amount) > 0).length,
+    sourceCount:
+      taxFromBookingPayments > 0
+        ? bookingPayments.filter((row) => toNumber(row.tax_cents) > 0).length
+        : bookings.filter((booking) => toNumber(booking.sales_tax_amount) > 0)
+            .length,
     amount: taxCollected,
     statementImpact: "Balance Sheet",
     taxTreatment: "Collected tax liability; not revenue.",
-    reconciliationStatus: taxCollected > 0 ? "Needs tax remittance review" : "No collected sales tax detected",
-    notes: "Uses sales_tax_amount on booking rows when available.",
+    reconciliationStatus:
+      taxCollected > 0
+        ? "Needs tax remittance review"
+        : "No collected sales tax detected",
+    notes:
+      taxFromBookingPayments > 0
+        ? "Uses booking_payments.tax_cents from Stripe booking ledger."
+        : "Uses sales_tax_amount on booking rows when available.",
   });
 
   const totalBookingRevenue = bookings.filter(isPaidBooking).reduce((sum, booking) => sum + getBookingGrossAmount(booking), 0);

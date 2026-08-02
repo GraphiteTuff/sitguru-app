@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +44,7 @@ type PlaidAccountRow = {
   current_balance?: number | null;
   available_balance?: number | null;
   iso_currency_code?: string | null;
+  plaid_environment?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -124,6 +125,9 @@ type CashFlowMetrics = {
   cashOut: number;
   operatingCashIn: number;
   operatingCashOut: number;
+  stripePayoutDeposits: number;
+  stripePayoutDepositCount: number;
+  otherBankCashIn: number;
   netOperatingCash: number;
   netInvestingCash: number;
   netFinancingCash: number;
@@ -226,8 +230,21 @@ const DEFAULT_CASH_FLOW_LINES: CashFlowLine[] = [
     section: "operating",
     label: "Reviewed Bank Cash In",
     amount: 0,
-    notes: "Reviewed bank-credit transactions from NFCU Business Checking/Savings. Cash movement only; Stripe/payments drive P&L revenue.",
+    notes:
+      "Reviewed bank-credit transactions from NFCU Business Checking/Savings. Cash movement only; Stripe/payments drive P&L revenue.",
     displayOrder: 10,
+    source: "admin_plaid_transactions",
+  },
+  {
+    id: "core-stripe-payout-deposits",
+    dbId: "",
+    isSaved: false,
+    section: "operating",
+    label: "Stripe Payout Deposits (subset)",
+    amount: 0,
+    notes:
+      "Bank credits matching Stripe payouts into NFCU. Already included in Reviewed Bank Cash In — shown for reconciliation only, not added again.",
+    displayOrder: 15,
     source: "admin_plaid_transactions",
   },
   {
@@ -374,8 +391,9 @@ function money(value: number) {
   const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(Math.abs(value));
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(value || 0));
 
   return value < 0 ? `(${formatted})` : formatted;
 }
@@ -628,92 +646,16 @@ async function safeRows<T>(
   }
 }
 
-function hasFinancialRole(role: string) {
-  return [
-    "owner",
-    "super_admin",
-    "admin",
-    "finance_admin",
-    "finance",
-    "accounting",
-    "bookkeeper",
-  ].includes(role.trim().toLowerCase());
-}
-
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
 async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
+  const identity = await getFinanceAdminIdentity();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<Record<string, unknown>>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_finance_access",
-    ),
-    safeRows<Record<string, unknown>>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_finance_access",
-    ),
-    safeRows<Record<string, unknown>>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_finance_access",
-    ),
-  ]);
-
-  const profile = (profileChecks.flat().find(Boolean) || {}) as Record<
-    string,
-    unknown
-  >;
-
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-  const envAllowed = envAdminEmails.includes(userEmail);
-  const canAccessFinancials =
-    active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed);
+  if (!identity) return null;
 
   return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials,
+    id: identity.id,
+    email: identity.email,
+    role: identity.role,
+    canAccessFinancials: true,
   };
 }
 
@@ -911,6 +853,19 @@ function getBankStatus(transaction: PlaidTransactionRow) {
 
 function getTransactionAmount(transaction: PlaidTransactionRow) {
   return Math.abs(toNumber(transaction.amount));
+}
+
+function isLikelyStripePayoutDeposit(transaction: PlaidTransactionRow) {
+  const text =
+    `${transaction.name || ""} ${transaction.merchant_name || ""} ${transaction.sitguru_category || ""} ${transaction.sitguru_notes || ""}`.toLowerCase();
+
+  return (
+    text.includes("stripe") &&
+    (text.includes("payout") ||
+      text.includes("deposit") ||
+      text.includes("settlement") ||
+      text.includes("transfer"))
+  );
 }
 
 function getSignedCashAmount(transaction: PlaidTransactionRow) {
@@ -1246,6 +1201,15 @@ function calculateCashFlowMetrics({
     0,
   );
 
+  const stripePayoutDepositTransactions = incomeTransactions.filter(
+    isLikelyStripePayoutDeposit,
+  );
+  const stripePayoutDeposits = stripePayoutDepositTransactions.reduce(
+    (sum, transaction) => sum + getTransactionAmount(transaction),
+    0,
+  );
+  const otherBankCashIn = Math.max(0, operatingCashIn - stripePayoutDeposits);
+
   const operatingCashOut = expenseTransactions.reduce(
     (sum, transaction) => sum + getTransactionAmount(transaction),
     0,
@@ -1322,6 +1286,9 @@ function calculateCashFlowMetrics({
     cashOut,
     operatingCashIn,
     operatingCashOut,
+    stripePayoutDeposits,
+    stripePayoutDepositCount: stripePayoutDepositTransactions.length,
+    otherBankCashIn,
     netOperatingCash,
     netInvestingCash,
     netFinancingCash,
@@ -1357,6 +1324,10 @@ function buildCoreLines({
   return DEFAULT_CASH_FLOW_LINES.map((line) => {
     if (line.id === "core-operating-cash-in") {
       return { ...line, amount: metrics.operatingCashIn };
+    }
+
+    if (line.id === "core-stripe-payout-deposits") {
+      return { ...line, amount: metrics.stripePayoutDeposits };
     }
 
     if (line.id === "core-operating-cash-out") {
@@ -1408,6 +1379,7 @@ function buildCoreLines({
 
 async function getCashFlowData(periodKey: PeriodKey): Promise<CashFlowData> {
   const period = getPeriodWindow(periodKey);
+  const plaidEnvironment = process.env.PLAID_ENV || "production";
 
   const [
     accounts,
@@ -1421,9 +1393,11 @@ async function getCashFlowData(periodKey: PeriodKey): Promise<CashFlowData> {
       supabaseAdmin
         .from("admin_plaid_accounts")
         .select(
-          "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, created_at, updated_at",
+          "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, plaid_environment, created_at, updated_at",
         )
-        .order("created_at", { ascending: false }),
+        .eq("plaid_environment", plaidEnvironment)
+        .order("created_at", { ascending: false })
+        .limit(500),
       "admin_plaid_accounts",
     ),
     safeRows<PlaidTransactionRow>(
@@ -1857,7 +1831,7 @@ function CashFlowSection({
                   line.amount < 0 ? "text-rose-700" : "text-slate-950"
                 }`}
               >
-                {money(line.amount)}
+                {moneyExact(line.amount)}
               </p>
 
               <div className="flex justify-end">
@@ -1888,7 +1862,7 @@ function CashFlowSection({
         <div className="grid grid-cols-[1fr_auto] gap-4 bg-slate-50 px-4 py-3 font-black text-slate-950">
           <p>{totalLabel}</p>
           <p className={totalValue < 0 ? "text-rose-700" : "text-slate-950"}>
-            {money(totalValue)}
+            {moneyExact(totalValue)}
           </p>
         </div>
       </div>
@@ -2021,13 +1995,20 @@ function ReadinessPanel({ cashFlow }: { cashFlow: CashFlowData }) {
       ready: cashFlow.totals.connectedAccounts >= 2,
       detail:
         cashFlow.totals.connectedAccounts >= 2
-          ? `${cashFlow.totals.connectedAccounts} business accounts are connected.`
+          ? `${cashFlow.totals.connectedAccounts} business accounts are connected for ${process.env.PLAID_ENV || "production"}.`
           : "Connect NFCU Business Checking and Business Savings.",
     },
     {
       label: "Cash Flow Transactions",
       ready: cashFlow.totals.reportableTransactions > 0,
       detail: `${cashFlow.totals.reportableTransactions} cash-flow-ready rows are included for ${cashFlow.period.label}.`,
+    },
+    {
+      label: "Stripe Payout Deposits",
+      ready: cashFlow.totals.stripePayoutDepositCount > 0,
+      detail: cashFlow.totals.stripePayoutDepositCount
+        ? `${cashFlow.totals.stripePayoutDepositCount} Stripe payout deposit${cashFlow.totals.stripePayoutDepositCount === 1 ? "" : "s"} (${moneyExact(cashFlow.totals.stripePayoutDeposits)}) matched inside bank cash-in.`
+        : "No Stripe payout deposits matched in NFCU bank cash-in for this period yet.",
     },
     {
       label: "Needs Review Queue",
@@ -2070,12 +2051,13 @@ function ReadinessPanel({ cashFlow }: { cashFlow: CashFlowData }) {
             Cash Flow Readiness
           </p>
           <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-            Bank feed and reporting checks
+            Bank feed, Stripe deposits, and reporting checks
           </h2>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-            This checks whether NFCU business accounts, categorized cash
-            activity, manual expenses, transfers, and cash balances are ready
-            for the selected period. Bank cash-in is cash movement only; Stripe/payments drive P&L revenue.
+            This checks whether NFCU business accounts, Stripe payout deposits,
+            categorized cash activity, manual expenses, transfers, and cash
+            balances are ready for the selected period. Bank cash-in is cash
+            movement only; Stripe/payments drive P&L revenue.
           </p>
         </div>
 
@@ -2252,6 +2234,17 @@ export default async function AdminCashFlowPage({
 
   const cashFlow = await getCashFlowData(selectedPeriod);
 
+  const exportStartDate = cashFlow.period.start
+    ? cashFlow.period.start.toISOString().slice(0, 10)
+    : "";
+  const exportEndDate = cashFlow.period.end
+    ? cashFlow.period.end.toISOString().slice(0, 10)
+    : "";
+  const exportDateQuery =
+    exportStartDate || exportEndDate
+      ? `&startDate=${exportStartDate}&endDate=${exportEndDate}`
+      : "";
+
   const visualRows = [
     {
       label: "Cash In",
@@ -2302,10 +2295,10 @@ export default async function AdminCashFlowPage({
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
                 Tracks real cash movement from NFCU Business Checking and
-                Business Savings, including reviewed bank credits, expenses, owner
-                contributions, owner draws, transfers, manual expenses, growth
-                marketing cash out, issued referral rewards, pending activity,
-                and current cash position.
+                Business Savings, including reviewed bank credits, Stripe payout
+                deposits, expenses, owner contributions, owner draws, transfers,
+                manual expenses, growth marketing cash out, issued referral
+                rewards, pending activity, and current cash position.
               </p>
 
               <div className="mt-5">
@@ -2346,6 +2339,11 @@ export default async function AdminCashFlowPage({
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <ActionLink href="/admin/financials" label="Financials" />
                 <ActionLink href="/admin/financials/profit-loss" label="P&L" />
+                <ActionLink
+                  href="/admin/financials/balance-sheet"
+                  label="Balance Sheet"
+                />
+                <ActionLink href="/admin/financials/payment-gateway" label="Payment Gateway" />
                 <ActionLink href="/admin/financials/plaid" label="Banking" />
                 <ActionLink
                   href="/admin/financials/reconciliation"
@@ -2360,19 +2358,19 @@ export default async function AdminCashFlowPage({
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <ExportLink
-                    href="/api/admin/financials/cash-flow/export?format=csv"
+                    href={`/api/admin/financials/cash-flow/export?format=csv${exportDateQuery}`}
                     label="CSV"
                   />
                   <ExportLink
-                    href="/api/admin/financials/cash-flow/export?format=excel"
+                    href={`/api/admin/financials/cash-flow/export?format=excel${exportDateQuery}`}
                     label="Excel"
                   />
                   <ExportLink
-                    href="/api/admin/financials/cash-flow/export?format=word"
+                    href={`/api/admin/financials/cash-flow/export?format=word${exportDateQuery}`}
                     label="Word"
                   />
                   <ExportLink
-                    href="/api/admin/financials/cash-flow/export?format=pdf"
+                    href={`/api/admin/financials/cash-flow/export?format=pdf${exportDateQuery}`}
                     label="PDF"
                   />
                 </div>
@@ -2383,19 +2381,19 @@ export default async function AdminCashFlowPage({
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <StatCard
               label="Cash In"
-              value={money(cashFlow.totals.cashIn)}
+              value={moneyExact(cashFlow.totals.cashIn)}
               change={getMetricChange(
                 cashFlow.totals.cashIn,
                 cashFlow.previousMetrics.cashIn,
               )}
               comparisonLabel={cashFlow.period.comparisonLabel}
-              detail="Reviewed bank cash-in, owner contributions, and positive cash movement. Stripe/payments drive revenue."
+              detail={`Reviewed bank cash-in includes ${moneyExact(cashFlow.totals.stripePayoutDeposits)} Stripe payout deposits. Stripe/payments drive P&L revenue.`}
               tone="emerald"
             />
 
             <StatCard
               label="Cash Out"
-              value={money(cashFlow.totals.cashOut)}
+              value={moneyExact(cashFlow.totals.cashOut)}
               change={getMetricChange(
                 cashFlow.totals.cashOut,
                 cashFlow.previousMetrics.cashOut,
@@ -2407,7 +2405,7 @@ export default async function AdminCashFlowPage({
 
             <StatCard
               label="Net Cash Flow"
-              value={money(cashFlow.totals.netChangeInCash)}
+              value={moneyExact(cashFlow.totals.netChangeInCash)}
               change={getMetricChange(
                 cashFlow.totals.netChangeInCash,
                 cashFlow.previousMetrics.netChangeInCash,
@@ -2570,7 +2568,7 @@ export default async function AdminCashFlowPage({
                         : "text-slate-950"
                     }
                   >
-                    {money(cashFlow.totals.netChangeInCash)}
+                    {moneyExact(cashFlow.totals.netChangeInCash)}
                   </p>
                 </div>
 
@@ -2610,7 +2608,7 @@ export default async function AdminCashFlowPage({
                         : "text-rose-700"
                     }`}
                   >
-                    {money(cashFlow.totals.netOperatingCash)}
+                    {moneyExact(cashFlow.totals.netOperatingCash)}
                   </p>
                 </div>
 
@@ -2631,10 +2629,14 @@ export default async function AdminCashFlowPage({
 
                 <div className="rounded-xl border border-slate-100 bg-[#fbfefd] p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Bank Rows
+                    Stripe Payout Deposits
                   </p>
                   <p className="mt-2 text-2xl font-black text-slate-950">
-                    {cashFlow.totals.totalBankTransactions.toLocaleString()}
+                    {moneyExact(cashFlow.totals.stripePayoutDeposits)}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    {cashFlow.totals.stripePayoutDepositCount} matched · subset
+                    of bank cash-in
                   </p>
                 </div>
 
@@ -2643,7 +2645,7 @@ export default async function AdminCashFlowPage({
                     Growth / Referral Cash Out
                   </p>
                   <p className="mt-2 text-2xl font-black text-slate-950">
-                    {money(cashFlow.totals.growthReferralCashOut)}
+                    {moneyExact(cashFlow.totals.growthReferralCashOut)}
                   </p>
                 </div>
               </div>
@@ -2656,7 +2658,9 @@ export default async function AdminCashFlowPage({
                   Transfers between NFCU Business Checking and Business Savings
                   are shown separately so the bank movement is visible without
                   incorrectly treating transfers as revenue or operating
-                  expense. Reviewed bank cash-in is also kept separate from
+                  expense. Stripe payout deposits are broken out as a subset of
+                  reviewed bank cash-in for reconciliation — they are not added
+                  again to net cash. Reviewed bank cash-in stays separate from
                   P&L revenue unless supported by Stripe/payment records.
                 </p>
               </div>
@@ -2668,10 +2672,11 @@ export default async function AdminCashFlowPage({
               </p>
               <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
                 P&L shows profit. Cash Flow shows actual money movement. This
-                page includes reviewed bank credits, expenses, manual operating expenses, owner
-                equity, owner draws, transfers, growth marketing cash out,
-                issued referral reward cash out, pending activity, posted bank
-                activity, and available cash from NFCU business banking.
+                page includes reviewed bank credits, Stripe payout deposits into
+                NFCU, expenses, manual operating expenses, owner equity, owner
+                draws, transfers, growth marketing cash out, issued referral
+                reward cash out, pending activity, posted bank activity, and
+                available cash from NFCU business banking.
               </p>
             </div>
           </div>

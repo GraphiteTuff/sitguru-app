@@ -82,11 +82,24 @@ function FieldLabel({ children }: { children: ReactNode }) {
   );
 }
 
-export function ProfitLossExportActions() {
-  const [range, setRange] = useState<PresetRange>("month");
+export function ProfitLossExportActions({
+  initialStartDate,
+  initialEndDate,
+}: {
+  initialStartDate?: string;
+  initialEndDate?: string;
+} = {}) {
+  const hasInitialRange = Boolean(initialStartDate && initialEndDate);
+  const [range, setRange] = useState<PresetRange>(
+    hasInitialRange ? "custom" : "month",
+  );
   const presetDates = useMemo(() => getPresetDates(range), [range]);
-  const [customStartDate, setCustomStartDate] = useState(presetDates.startDate);
-  const [customEndDate, setCustomEndDate] = useState(presetDates.endDate);
+  const [customStartDate, setCustomStartDate] = useState(
+    initialStartDate || presetDates.startDate,
+  );
+  const [customEndDate, setCustomEndDate] = useState(
+    initialEndDate || presetDates.endDate,
+  );
   const [emailOpen, setEmailOpen] = useState(false);
   const [recipient, setRecipient] = useState("");
   const [subject, setSubject] = useState("SitGuru Profit & Loss Statement");
@@ -174,7 +187,10 @@ export function ProfitLossExportActions() {
 
         <div className="flex flex-wrap gap-2 sm:justify-end">
           <NavPill href="/admin/financials" label="Financials" />
-          <NavPill href="/admin/financials/commissions" label="Commissions" />
+          <NavPill href="/admin/financials/payment-gateway" label="Payment Gateway" />
+          <NavPill href="/admin/financials/plaid" label="Plaid" />
+          <NavPill href="/admin/financials/cash-flow" label="Cash Flow" />
+          <NavPill href="/admin/financials/reconciliation" label="Recon" />
           <NavPill href="/admin/financials/payouts" label="Payouts" />
         </div>
       </div>

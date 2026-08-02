@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
+import { getStripeServer } from "@/lib/stripe/server";
 
 export const dynamic = "force-dynamic";
 
@@ -229,6 +230,17 @@ const CORE_BALANCE_LINES: BalanceLine[] = [
     source: "plaid",
   },
   {
+    id: "core-stripe-clearing",
+    dbId: "",
+    isSaved: false,
+    section: "current_assets",
+    label: "Stripe Balance / Pending Receipts",
+    amount: 0,
+    notes: "Live Stripe available + pending balance waiting for payout to NFCU.",
+    displayOrder: 15,
+    source: "calculated",
+  },
+  {
     id: "core-trust-safety-receivables",
     dbId: "",
     isSaved: false,
@@ -268,8 +280,19 @@ const CORE_BALANCE_LINES: BalanceLine[] = [
     section: "current_liabilities",
     label: "Guru Payouts Payable",
     amount: 0,
-    notes: "Estimated payable placeholder for unreleased Guru payouts.",
+    notes: "Pending, scheduled, or approved Guru payouts not yet paid.",
     displayOrder: 10,
+    source: "calculated",
+  },
+  {
+    id: "core-sales-tax-payable",
+    dbId: "",
+    isSaved: false,
+    section: "current_liabilities",
+    label: "Sales Tax Payable",
+    amount: 0,
+    notes: "Sales tax collected on Stripe booking payments; not revenue.",
+    displayOrder: 15,
     source: "calculated",
   },
   {
@@ -381,7 +404,8 @@ function money(value: number) {
   const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(Math.abs(value || 0));
 
   return value < 0 ? `(${formatted})` : formatted;
@@ -434,88 +458,16 @@ async function safeRows<T>(
   }
 }
 
-function hasFinancialRole(role: string) {
-  return [
-    "owner",
-    "super_admin",
-    "admin",
-    "finance_admin",
-    "finance",
-    "accounting",
-    "bookkeeper",
-  ].includes(role.trim().toLowerCase());
-}
-
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
 async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
+  const identity = await getFinanceAdminIdentity();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_balance_sheet_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_balance_sheet_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_balance_sheet_access",
-    ),
-  ]);
-
-  const profile = (profileChecks.flat().find(Boolean) || {}) as AnyRow;
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-  const envAllowed = envAdminEmails.includes(userEmail);
-  const canAccessFinancials =
-    active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed);
+  if (!identity) return null;
 
   return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials,
+    id: identity.id,
+    email: identity.email,
+    role: identity.role,
+    canAccessFinancials: true,
   };
 }
 
@@ -855,9 +807,13 @@ function buildCoreLines({
   checkingBalance,
   savingsBalance,
   availableCashBalance,
+  stripeClearingBalance,
   trustSafetyReceivableTotal,
   pawstepReceivable,
   bookAndBarkReceivable,
+  guruPayoutsPayable,
+  salesTaxPayable,
+  refundsPayable,
   pendingReferralRewardLiability,
   ownerContributions,
   ownerDraws,
@@ -866,9 +822,13 @@ function buildCoreLines({
   checkingBalance: number;
   savingsBalance: number;
   availableCashBalance: number;
+  stripeClearingBalance: number;
   trustSafetyReceivableTotal: number;
   pawstepReceivable: number;
   bookAndBarkReceivable: number;
+  guruPayoutsPayable: number;
+  salesTaxPayable: number;
+  refundsPayable: number;
   pendingReferralRewardLiability: number;
   ownerContributions: number;
   ownerDraws: number;
@@ -887,6 +847,10 @@ function buildCoreLines({
       return { ...line, amount: availableCashBalance };
     }
 
+    if (line.id === "core-stripe-clearing") {
+      return { ...line, amount: stripeClearingBalance };
+    }
+
     if (line.id === "core-trust-safety-receivables") {
       return { ...line, amount: trustSafetyReceivableTotal };
     }
@@ -897,6 +861,18 @@ function buildCoreLines({
 
     if (line.id === "core-book-bark-receivable") {
       return { ...line, amount: bookAndBarkReceivable };
+    }
+
+    if (line.id === "core-guru-payouts-payable") {
+      return { ...line, amount: guruPayoutsPayable };
+    }
+
+    if (line.id === "core-sales-tax-payable") {
+      return { ...line, amount: salesTaxPayable };
+    }
+
+    if (line.id === "core-refunds-payable") {
+      return { ...line, amount: refundsPayable };
     }
 
     if (line.id === "core-pending-referral-reward-liability") {
@@ -930,6 +906,8 @@ function getReadinessItems({
   isBalanced,
   trustSafetyReceivableTotal,
   pendingReferralRewardLiability,
+  stripeClearingBalance,
+  salesTaxPayable,
 }: {
   businessAccountCount: number;
   bankTransactionCount: number;
@@ -941,6 +919,8 @@ function getReadinessItems({
   isBalanced: boolean;
   trustSafetyReceivableTotal: number;
   pendingReferralRewardLiability: number;
+  stripeClearingBalance: number;
+  salesTaxPayable: number;
 }): BalanceReadinessItem[] {
   return [
     {
@@ -950,6 +930,13 @@ function getReadinessItems({
         businessAccountCount >= 2
           ? `${businessAccountCount} NFCU business accounts are connected through Plaid.`
           : "Connect NFCU Business Checking and Business Savings so cash balances are complete.",
+    },
+    {
+      label: "Stripe Clearing",
+      status: stripeClearingBalance > 0 ? "ready" : "needs_review",
+      detail: stripeClearingBalance
+        ? `${money(stripeClearingBalance)} in Stripe available/pending balance is reflected.`
+        : "No live Stripe clearing balance detected yet (check STRIPE_SECRET_KEY / payouts).",
     },
     {
       label: "Bank Transactions",
@@ -978,6 +965,13 @@ function getReadinessItems({
         : "No outstanding Trust & Safety receivables are currently reflected from financed plans.",
     },
     {
+      label: "Sales Tax Payable",
+      status: salesTaxPayable > 0 ? "ready" : "needs_review",
+      detail: salesTaxPayable
+        ? `${money(salesTaxPayable)} in collected sales tax is reflected as a liability.`
+        : "No sales tax has been collected on booking payments in the ledger yet.",
+    },
+    {
       label: "Referral Reward Liability",
       status: pendingReferralRewardLiability > 0 ? "ready" : "needs_review",
       detail: pendingReferralRewardLiability
@@ -1004,7 +998,66 @@ function getReadinessItems({
   ];
 }
 
+async function loadStripeClearingBalance() {
+  try {
+    if (!process.env.STRIPE_SECRET_KEY?.trim()) {
+      return 0;
+    }
+
+    const stripe = getStripeServer();
+    const balance = await stripe.balance.retrieve();
+    const sumBuckets = (
+      buckets: Array<{ amount: number; currency: string }> | undefined,
+    ) =>
+      (buckets || [])
+        .filter((bucket) => String(bucket.currency || "").toLowerCase() === "usd")
+        .reduce((sum, bucket) => sum + bucket.amount / 100, 0);
+
+    return sumBuckets(balance.available) + sumBuckets(balance.pending);
+  } catch (error) {
+    console.warn("Balance sheet Stripe balance lookup skipped:", error);
+    return 0;
+  }
+}
+
+function isPaidBookingPayment(row: AnyRow) {
+  const status = asTrimmedString(row.status).toLowerCase();
+  return (
+    status.includes("paid") ||
+    status.includes("succeeded") ||
+    status.includes("complete")
+  );
+}
+
+function isPendingGuruPayout(row: AnyRow) {
+  const status = (
+    asTrimmedString(row.status) || asTrimmedString(row.payout_status)
+  ).toLowerCase();
+
+  if (!status) return true;
+
+  return (
+    status.includes("pending") ||
+    status.includes("scheduled") ||
+    status.includes("approved") ||
+    status.includes("processing") ||
+    status.includes("in_transit")
+  );
+}
+
+function getGuruPayoutAmount(row: AnyRow) {
+  return Math.abs(
+    toNumber(row.net_amount) ||
+      toNumber(row.amount) ||
+      toNumber(row.payout_amount) ||
+      centsToDollars(row.amount_cents) ||
+      centsToDollars(row.net_amount_cents),
+  );
+}
+
 async function getBalanceSheetData(): Promise<BalanceSheetData> {
+  const plaidEnvironment = process.env.PLAID_ENV || "production";
+
   const [
     manualLines,
     accounts,
@@ -1012,6 +1065,9 @@ async function getBalanceSheetData(): Promise<BalanceSheetData> {
     expenses,
     trustSafetyPurchases,
     referralRewardLiabilities,
+    bookingPayments,
+    guruPayouts,
+    stripeClearingBalance,
   ] = await Promise.all([
     safeRows<AnyRow>(
       supabaseAdmin
@@ -1027,8 +1083,9 @@ async function getBalanceSheetData(): Promise<BalanceSheetData> {
       supabaseAdmin
         .from("admin_plaid_accounts")
         .select(
-          "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, created_at, updated_at",
+          "id, account_id, item_id, name, official_name, mask, type, subtype, current_balance, available_balance, iso_currency_code, plaid_environment, created_at, updated_at",
         )
+        .eq("plaid_environment", plaidEnvironment)
         .order("created_at", { ascending: false })
         .limit(500),
       "admin_plaid_accounts",
@@ -1067,6 +1124,23 @@ async function getBalanceSheetData(): Promise<BalanceSheetData> {
         .limit(5000),
       "admin_referral_reward_liability",
     ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("booking_payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "booking_payments",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("guru_payouts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "guru_payouts",
+    ),
+    loadStripeClearingBalance(),
   ]);
 
   const activeManualLines = manualLines.filter((row) => !isArchivedRow(row));
@@ -1147,13 +1221,39 @@ async function getBalanceSheetData(): Promise<BalanceSheetData> {
   const pendingReferralRewardLiability =
     getPendingReferralRewardLiabilityTotal(referralRewardLiabilities);
 
+  const stripeBookingPayments = bookingPayments.filter((row) => {
+    const provider = asTrimmedString(row.provider).toLowerCase();
+    return !provider || provider === "stripe";
+  });
+
+  const salesTaxPayable = stripeBookingPayments
+    .filter(isPaidBookingPayment)
+    .reduce((sum, row) => sum + Math.max(0, centsToDollars(row.tax_cents)), 0);
+
+  const refundsPayable = stripeBookingPayments.reduce(
+    (sum, row) =>
+      sum +
+      Math.max(0, centsToDollars(row.refund_amount_cents)) +
+      Math.max(0, centsToDollars(row.dispute_amount_cents)),
+    0,
+  );
+
+  const guruPayoutsPayable = guruPayouts
+    .filter((row) => !isArchivedRow(row))
+    .filter(isPendingGuruPayout)
+    .reduce((sum, row) => sum + getGuruPayoutAmount(row), 0);
+
   const coreLines = buildCoreLines({
     checkingBalance,
     savingsBalance,
     availableCashBalance,
+    stripeClearingBalance,
     trustSafetyReceivableTotal,
     pawstepReceivable,
     bookAndBarkReceivable,
+    guruPayoutsPayable,
+    salesTaxPayable,
+    refundsPayable,
     pendingReferralRewardLiability,
     ownerContributions,
     ownerDraws,
@@ -1252,6 +1352,8 @@ async function getBalanceSheetData(): Promise<BalanceSheetData> {
     isBalanced,
     trustSafetyReceivableTotal,
     pendingReferralRewardLiability,
+    stripeClearingBalance,
+    salesTaxPayable,
   });
 
   return {
@@ -1366,7 +1468,9 @@ function BalanceExportPanel() {
         <ActionLink href="/admin/financials" label="Financials" />
         <ActionLink href="/admin/financials/profit-loss" label="P&L" />
         <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
-        <ActionLink href="/admin/financials/general-ledger" label="Ledger" />
+        <ActionLink href="/admin/financials/payment-gateway" label="Payment Gateway" />
+        <ActionLink href="/admin/financials/plaid" label="Plaid" />
+        <ActionLink href="/admin/financials/reconciliation" label="Recon" />
       </div>
 
       <div className="mt-4 rounded-2xl border border-slate-100 bg-[#fbfefd] p-4">
@@ -1374,8 +1478,8 @@ function BalanceExportPanel() {
           Statement Exports
         </p>
         <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-          Export routes are ready to connect to the same secure accounting
-          package pattern used by Profit & Loss, Cash Flow, and General Ledger.
+          Download CPA-ready Balance Sheet packages from live cash, Stripe
+          clearing, booking tax liabilities, and saved balance lines.
         </p>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -1558,11 +1662,11 @@ function BalanceReadinessPanel({ items }: { items: BalanceReadinessItem[] }) {
 
 function BalanceFlowPanel() {
   const steps = [
-    "NFCU Business Checking and Savings create the cash foundation.",
-    "Reviewed Plaid transactions feed current net income, owner contributions, and owner draws.",
-    "Manual expense rows reduce current net income until matched to bank activity or adjusted.",
-    "Manual balance lines capture opening balances, equipment, debt, owner capital, and CPA adjustments.",
-    "Balance Sheet, P&L, Cash Flow, General Ledger, and future exports stay wired to the same accounting foundation.",
+    "NFCU Business Checking and Savings create the cash foundation via Plaid.",
+    "Live Stripe available/pending balance feeds processor clearing assets.",
+    "Booking payments supply sales tax payable plus refund/dispute exposure.",
+    "Pending Guru payouts and referral rewards stay on liabilities until paid.",
+    "Reviewed bank activity, Trust & Safety receivables, and manual lines close the statement.",
   ];
 
   return (
@@ -1993,11 +2097,36 @@ export default async function AdminBalanceSheetPage() {
               </h1>
 
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                Snapshot of SitGuru assets, liabilities, and equity. This page
-                is now wired to NFCU/Plaid business accounts, categorized bank
-                transactions, manual expense rows, Trust & Safety receivables,
-                pending referral reward liabilities, and manual balance sheet lines.
+                Snapshot of SitGuru assets, liabilities, and equity wired to NFCU
+                cash, live Stripe clearing, booking sales-tax liabilities, Guru
+                payouts payable, Trust &amp; Safety receivables, referral reward
+                liabilities, and manual CPA lines.
               </p>
+
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                  Statement Wiring
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[
+                    ["Profit & Loss", "/admin/financials/profit-loss"],
+                    ["Cash Flow", "/admin/financials/cash-flow"],
+                    ["General Ledger", "/admin/financials/general-ledger"],
+                    ["Reconciliation", "/admin/financials/reconciliation"],
+                    ["Payment Gateway", "/admin/financials/payment-gateway"],
+                    ["Plaid Banking", "/admin/financials/plaid"],
+                    ["Payouts", "/admin/financials/payouts"],
+                  ].map(([label, href]) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-800 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <BalanceExportPanel />

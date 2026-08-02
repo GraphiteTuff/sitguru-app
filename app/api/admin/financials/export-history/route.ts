@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 
 export const dynamic = "force-dynamic";
 
@@ -26,16 +26,6 @@ type ExportHistoryItem = {
   href: string;
 };
 
-const FINANCE_ROLES = [
-  "owner",
-  "super_admin",
-  "admin",
-  "finance_admin",
-  "finance",
-  "accounting",
-  "bookkeeper",
-];
-
 const VALID_STATUSES: ExportStatus[] = [
   "ready",
   "processing",
@@ -46,18 +36,6 @@ const VALID_STATUSES: ExportStatus[] = [
 
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function getOptionalBoolean(value: unknown) {
-  if (typeof value === "boolean") return value;
-
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (["true", "yes", "1"].includes(normalized)) return true;
-    if (["false", "no", "0"].includes(normalized)) return false;
-  }
-
-  return false;
 }
 
 function safeMetadata(value: unknown): Record<string, unknown> {
@@ -99,22 +77,6 @@ function displayStatus(value: unknown): ExportHistoryItem["status"] {
   return labels[status];
 }
 
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function hasFinancialRole(role: string) {
-  return FINANCE_ROLES.includes(role.trim().toLowerCase());
-}
-
 async function safeRows<T>(
   query: PromiseLike<{ data: unknown; error: unknown }>,
   label: string,
@@ -134,74 +96,15 @@ async function safeRows<T>(
   }
 }
 
-async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_finance_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_finance_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_finance_access",
-    ),
-  ]);
-
-  const profile = profileChecks.flat().find(Boolean) || {};
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-  const envAllowed = envAdminEmails.includes(userEmail);
-
-  return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials:
-      active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed),
-  };
-}
-
 async function requireFinancialAdmin() {
-  const identity = await getAdminIdentity();
-
-  if (!identity?.canAccessFinancials) {
-    return null;
-  }
-
-  return identity;
+  const financeCheck = await requireFinanceAdminApi();
+  if (!financeCheck.identity) return null;
+  return {
+    id: financeCheck.identity.id,
+    email: financeCheck.identity.email,
+    role: financeCheck.identity.role,
+    canAccessFinancials: true,
+  } satisfies AdminIdentity;
 }
 
 function getCreatedAt(row: AnyRow) {
@@ -363,42 +266,23 @@ export async function GET() {
     );
   }
 
-  const [exportRows, auditRows] = await Promise.all([
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("financial_export_history")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(25),
-      "financial_export_history",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("financial_audit_logs")
-        .select("*")
-        .or("action.ilike.%export%,action.ilike.%email%")
-        .order("created_at", { ascending: false })
-        .limit(25),
-      "financial_audit_logs",
-    ),
-  ]);
-
-  const rows = [...exportRows, ...auditRows]
-    .sort((a, b) => {
-      const aTime = new Date(asTrimmedString(a.created_at)).getTime() || 0;
-      const bTime = new Date(asTrimmedString(b.created_at)).getTime() || 0;
-      return bTime - aTime;
-    })
-    .slice(0, 25);
+  const exportRows = await safeRows<AnyRow>(
+    supabaseAdmin
+      .from("financial_export_history")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(25),
+    "financial_export_history",
+  );
 
   return NextResponse.json({
     ok: true,
-    isLive: rows.length > 0,
-    history: rows.map(rowToHistoryItem),
+    isLive: exportRows.length > 0,
+    history: exportRows.map(rowToHistoryItem),
     message:
-      rows.length > 0
+      exportRows.length > 0
         ? "Live export history connected."
-        : "No export history rows found yet. Generate an export to populate this feed.",
+        : "No export history rows found yet. Save a package record to populate this feed.",
   });
 }
 
@@ -495,10 +379,13 @@ export async function POST(request: Request) {
     },
   });
 
+  const historyItem = rowToHistoryItem(createdRow, 0);
+
   return NextResponse.json({
     ok: true,
     export: createdRow,
-    historyItem: rowToHistoryItem(createdRow, 0),
+    historyItem,
+    href: historyItem.href,
   });
 }
 

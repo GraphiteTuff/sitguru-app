@@ -1,8 +1,15 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  getAdminIdentity,
+  isAdminRole,
+  isSuperUserRole,
+  type AdminIdentity,
+} from "@/lib/admin/access";
+import { isFinanceRole } from "@/lib/admin/financials/access";
 
 export const dynamic = "force-dynamic";
 
@@ -12,17 +19,6 @@ type SafeQueryResponse = {
 };
 
 type GenericRow = Record<string, unknown>;
-
-type AdminIdentity = {
-  id: string;
-  email: string;
-  role: string;
-  canAccessAdmin: boolean;
-  canAccessFinancials: boolean;
-  canManageUsers: boolean;
-  canManageRoles: boolean;
-  canResetPasswords: boolean;
-};
 
 type AuthUserRow = {
   id: string;
@@ -479,71 +475,29 @@ function getSiteUrl() {
   return `https://${siteUrl.replace(/\/$/, "")}`;
 }
 
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function hasSuperUserRole(role: string) {
-  return ["founder", "owner", "super_admin"].includes(role.trim().toLowerCase());
-}
-
-function hasAdminRole(role: string) {
-  return [
-    "founder",
-    "owner",
-    "super_admin",
-    "admin",
-    "operations_admin",
-    "hr_admin",
-    "finance_admin",
-    "billing_admin",
-    "bookkeeper",
-    "accounting",
-    "sales_admin",
-    "marketing_admin",
-    "partner_admin",
-    "support_admin",
-    "customer_service",
-    "trust_safety_admin",
-    "guru_approvals_admin",
-    "tech_support_admin",
-    "technical_support",
-    "systems_admin",
-    "developer_admin",
-    "executive_viewer",
-    "finance_viewer",
-    "support_viewer",
-    "marketing_viewer",
-  ].includes(role.trim().toLowerCase());
-}
-
 function hasFinancialRole(role: string) {
-  return [
-    "founder",
-    "owner",
-    "super_admin",
-    "finance_admin",
-    "billing_admin",
-    "bookkeeper",
-    "accounting",
-    "finance_viewer",
-  ].includes(role.trim().toLowerCase());
+  return isFinanceRole(role) || isSuperUserRole(role);
 }
 
 function roleCanResetPasswords(role?: RoleRow | null, roleKey?: string) {
   if (!role && roleKey) {
-    return ["founder", "owner", "super_admin", "hr_admin", "support_admin", "customer_service", "tech_support_admin", "technical_support", "systems_admin"].includes(roleKey);
+    return [
+      "founder",
+      "owner",
+      "super_admin",
+      "hr_admin",
+      "support_admin",
+      "customer_service",
+      "tech_support_admin",
+      "technical_support",
+      "systems_admin",
+    ].includes(roleKey);
   }
 
-  return getOptionalBoolean(role?.can_reset_passwords) || hasSuperUserRole(asTrimmedString(role?.role_key));
+  return (
+    getOptionalBoolean(role?.can_reset_passwords) ||
+    isSuperUserRole(asTrimmedString(role?.role_key))
+  );
 }
 
 function getAccessLabel(value: string) {
@@ -586,92 +540,6 @@ async function safeRows<T>(
   }
 }
 
-async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const [adminAccessRows, adminUsers, profiles, users] = await Promise.all([
-    safeRows<UserAssignmentRow>(
-      supabaseAdmin
-        .from("admin_user_access")
-        .select("*")
-        .eq("email", userEmail)
-        .eq("is_active", true)
-        .limit(1),
-      "admin_user_access_current_identity",
-    ),
-    safeRows<GenericRow>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_current_identity",
-    ),
-    safeRows<GenericRow>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_current_identity",
-    ),
-    safeRows<GenericRow>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_current_identity",
-    ),
-  ]);
-
-  const hqAccess = adminAccessRows[0];
-  const profile = [...adminUsers, ...profiles, ...users].find(Boolean) || {};
-  const role =
-    asTrimmedString(hqAccess?.role_key) || asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-  const envAllowed = envAdminEmails.includes(userEmail);
-  const superUser = hasSuperUserRole(role) || envAllowed;
-
-  return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessAdmin: active && (superUser || hasAdminRole(role)),
-    canAccessFinancials:
-      active && (superUser || hasFinancialRole(role) || explicitFinanceAccess),
-    canManageUsers:
-      active &&
-      (superUser || role === "hr_admin" || role === "tech_support_admin"),
-    canManageRoles: active && superUser,
-    canResetPasswords:
-      active &&
-      (superUser ||
-        role === "hr_admin" ||
-        role === "support_admin" ||
-        role === "customer_service" ||
-        role === "tech_support_admin" ||
-        role === "technical_support" ||
-        role === "systems_admin"),
-  };
-}
-
 async function writeAdminSettingsAuditLog({
   actor,
   action,
@@ -698,20 +566,16 @@ async function writeAdminSettingsAuditLog({
   };
 
   try {
-    const { error } = await supabaseAdmin
-      .from("admin_audit_logs")
-      .insert(payload);
-
-    if (!error) return;
-  } catch {
-    // Keep Admin Settings actions from failing if audit tables are not ready.
-  }
-
-  try {
-    await supabaseAdmin.from("financial_audit_logs").insert(payload);
+    await supabaseAdmin.from("admin_audit_logs").insert(payload);
   } catch (error) {
     console.warn("Admin settings audit log skipped:", error);
   }
+}
+
+function redirectSettings(status: "ok" | "error", message: string): never {
+  redirect(
+    `/admin/settings?status=${encodeURIComponent(status)}&message=${encodeURIComponent(message)}`,
+  );
 }
 
 async function sendPasswordReset(formData: FormData) {
@@ -719,13 +583,17 @@ async function sendPasswordReset(formData: FormData) {
 
   const actor = await getAdminIdentity();
 
-  if (!actor?.canResetPasswords) return;
+  if (!actor?.canResetPasswords) {
+    redirectSettings("error", "Password reset permission required.");
+  }
 
   const email = String(formData.get("email") || "")
     .trim()
     .toLowerCase();
 
-  if (!email) return;
+  if (!email) {
+    redirectSettings("error", "Email is required for password reset.");
+  }
 
   const redirectTo = `${getSiteUrl()}/login?reset=password`;
 
@@ -746,6 +614,12 @@ async function sendPasswordReset(formData: FormData) {
   });
 
   revalidatePath("/admin/settings");
+
+  if (error) {
+    redirectSettings("error", error.message || "Password reset email failed.");
+  }
+
+  redirectSettings("ok", `Password reset email sent to ${email}.`);
 }
 
 async function assignHqAccess(formData: FormData) {
@@ -753,14 +627,18 @@ async function assignHqAccess(formData: FormData) {
 
   const actor = await getAdminIdentity();
 
-  if (!actor?.canManageUsers) return;
+  if (!actor?.canManageUsers) {
+    redirectSettings("error", "Admin access assignment permission required.");
+  }
 
   const userId = String(formData.get("userId") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const roleKey = String(formData.get("roleKey") || "").trim();
   const notes = String(formData.get("notes") || "").trim();
 
-  if (!email || !roleKey) return;
+  if (!email || !roleKey) {
+    redirectSettings("error", "Email and role are required.");
+  }
 
   const roleRows = await safeRows<RoleRow>(
     supabaseAdmin
@@ -774,7 +652,19 @@ async function assignHqAccess(formData: FormData) {
   const role =
     roleRows[0] || FALLBACK_ROLES.find((candidate) => candidate.role_key === roleKey);
 
-  if (!role) return;
+  if (!role) {
+    redirectSettings("error", "Selected admin role was not found.");
+  }
+
+  const grantingSuperUser =
+    getOptionalBoolean(role.is_super_user) || isSuperUserRole(role.role_key);
+
+  if (grantingSuperUser && !actor.isSuperUser) {
+    redirectSettings(
+      "error",
+      "Only founder / owner / super admin can assign super-user roles.",
+    );
+  }
 
   const payload = {
     user_id: userId || null,
@@ -799,16 +689,34 @@ async function assignHqAccess(formData: FormData) {
     "admin_user_access_existing_assignment",
   );
 
+  let writeError: string | null = null;
+
   if (existingRows[0]?.id) {
-    await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from("admin_user_access")
       .update(payload)
       .eq("id", existingRows[0].id);
+    writeError = error?.message || null;
   } else {
-    await supabaseAdmin.from("admin_user_access").insert({
+    const { error } = await supabaseAdmin.from("admin_user_access").insert({
       ...payload,
       created_at: new Date().toISOString(),
     });
+    writeError = error?.message || null;
+  }
+
+  if (writeError) {
+    await writeAdminSettingsAuditLog({
+      actor,
+      action: "hq_access_assign_failed",
+      targetType: "admin_user_access",
+      targetId: email,
+      metadata: { email, role_key: role.role_key, error: writeError },
+    });
+    redirectSettings(
+      "error",
+      `Unable to save HQ access. Confirm admin_user_access exists. ${writeError}`,
+    );
   }
 
   const adminPayload = {
@@ -858,6 +766,7 @@ async function assignHqAccess(formData: FormData) {
   });
 
   revalidatePath("/admin/settings");
+  redirectSettings("ok", `Assigned ${role.name} to ${email}.`);
 }
 
 async function deactivateHqAccess(formData: FormData) {
@@ -865,12 +774,16 @@ async function deactivateHqAccess(formData: FormData) {
 
   const actor = await getAdminIdentity();
 
-  if (!actor?.canManageUsers) return;
+  if (!actor?.canManageUsers) {
+    redirectSettings("error", "Admin access assignment permission required.");
+  }
 
   const accessId = String(formData.get("accessId") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
 
-  if (!accessId && !email) return;
+  if (!accessId && !email) {
+    redirectSettings("error", "Access record or email is required.");
+  }
 
   const updatePayload = {
     is_active: false,
@@ -878,22 +791,33 @@ async function deactivateHqAccess(formData: FormData) {
     updated_at: new Date().toISOString(),
   };
 
+  let writeError: string | null = null;
+
   if (accessId) {
-    await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from("admin_user_access")
       .update(updatePayload)
       .eq("id", accessId);
+    writeError = error?.message || null;
   } else {
-    await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from("admin_user_access")
       .update(updatePayload)
       .eq("email", email);
+    writeError = error?.message || null;
+  }
+
+  if (writeError) {
+    redirectSettings(
+      "error",
+      `Unable to deactivate HQ access. ${writeError}`,
+    );
   }
 
   try {
     await supabaseAdmin
       .from("admin_users")
-      .update({ is_active: false })
+      .update({ is_active: false, can_access_financials: false })
       .eq("email", email);
   } catch (error) {
     console.warn("admin_users deactivate skipped:", error);
@@ -908,6 +832,7 @@ async function deactivateHqAccess(formData: FormData) {
   });
 
   revalidatePath("/admin/settings");
+  redirectSettings("ok", `Deactivated HQ access for ${email || accessId}.`);
 }
 
 function getRoleBadgeClass(role: string) {
@@ -1082,11 +1007,19 @@ function AssignAccessForm({
   user,
   roles,
   disabled,
+  allowSuperUserRoles,
 }: {
   user: UserAccessRow;
   roles: RoleRow[];
   disabled: boolean;
+  allowSuperUserRoles: boolean;
 }) {
+  const grantableRoles = roles.filter((role) => {
+    const isSuper =
+      getOptionalBoolean(role.is_super_user) || isSuperUserRole(role.role_key);
+    return allowSuperUserRoles || !isSuper;
+  });
+
   return (
     <form action={assignHqAccess} className="grid gap-2">
       <input type="hidden" name="userId" value={user.id} />
@@ -1099,7 +1032,7 @@ function AssignAccessForm({
         className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
       >
         <option value="">Choose admin role...</option>
-        {roles.map((role) => (
+        {grantableRoles.map((role) => (
           <option key={role.role_key} value={role.role_key}>
             {role.name} — {getAccessLabel(asTrimmedString(role.access_level) || "viewer")}
           </option>
@@ -1129,11 +1062,13 @@ function UserAccessTable({
   roles,
   canManageUsers,
   canResetPasswords,
+  allowSuperUserRoles,
 }: {
   users: UserAccessRow[];
   roles: RoleRow[];
   canManageUsers: boolean;
   canResetPasswords: boolean;
+  allowSuperUserRoles: boolean;
 }) {
   return (
     <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
@@ -1261,6 +1196,7 @@ function UserAccessTable({
                       user={user}
                       roles={roles}
                       disabled={!canManageUsers}
+                      allowSuperUserRoles={allowSuperUserRoles}
                     />
                   </td>
 
@@ -1425,13 +1361,19 @@ async function getAdminSettingsData() {
       ),
     ]);
 
-  const departments = (departmentsRows.length ? departmentsRows : FALLBACK_DEPARTMENTS).sort(
+  const departmentsUsingFallback = departmentsRows.length === 0;
+  const rolesUsingFallback = rolesRows.length === 0;
+  const departments = (departmentsUsingFallback ? FALLBACK_DEPARTMENTS : departmentsRows).sort(
     (a, b) => toNumber(a.display_order) - toNumber(b.display_order),
   );
-  const roles = (rolesRows.length ? rolesRows : FALLBACK_ROLES).sort(
+  const roles = (rolesUsingFallback ? FALLBACK_ROLES : rolesRows).sort(
     (a, b) => toNumber(a.display_order) - toNumber(b.display_order),
   );
   const permissions = permissionRows;
+  const usingFallbacks = departmentsUsingFallback || rolesUsingFallback;
+  const authListError = authUsersResponse.error
+    ? String(authUsersResponse.error.message || "Unable to list Auth users.")
+    : null;
 
   const profileById = new Map<string, GenericRow>();
   const profileByEmail = new Map<string, GenericRow>();
@@ -1440,7 +1382,12 @@ async function getAdminSettingsData() {
   const accessById = new Map<string, UserAssignmentRow>();
   const accessByEmail = new Map<string, UserAssignmentRow>();
   const roleByKey = new Map<string, RoleRow>(roles.map((role) => [role.role_key, role]));
-  const envAdminEmails = getEnvAdminEmails();
+  const envAdminEmails = new Set(
+    String(process.env.SITGURU_FINANCE_ADMIN_EMAILS || process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
 
   profiles.forEach((profile) => {
     const id = asTrimmedString(profile.id);
@@ -1510,7 +1457,7 @@ async function getAdminSettingsData() {
     const accessLevel =
       asTrimmedString(assignment?.access_level) ||
       asTrimmedString(roleConfig?.access_level) ||
-      (hasSuperUserRole(hqRoleKey) ? "super_user" : "viewer");
+      (isSuperUserRole(hqRoleKey) ? "super_user" : "viewer");
 
     const adminActive =
       legacyAdmin.is_active === undefined ? true : getOptionalBoolean(legacyAdmin.is_active);
@@ -1521,7 +1468,7 @@ async function getAdminSettingsData() {
     const assignmentActive = assignment
       ? getOptionalBoolean(assignment.is_active)
       : true;
-    const envAllowed = envAdminEmails.includes(email);
+    const envAllowed = envAdminEmails.has(email);
     const explicitFinanceAccess =
       getOptionalBoolean(legacyAdmin.can_access_financials) ||
       getOptionalBoolean(profile.can_access_financials) ||
@@ -1531,7 +1478,7 @@ async function getAdminSettingsData() {
     const superUser =
       envAllowed ||
       getOptionalBoolean(roleConfig?.is_super_user) ||
-      hasSuperUserRole(hqRoleKey);
+      isSuperUserRole(hqRoleKey);
 
     return {
       id: user.id,
@@ -1565,7 +1512,7 @@ async function getAdminSettingsData() {
         assignmentActive &&
         (superUser ||
           getOptionalBoolean(roleConfig?.can_access_admin) ||
-          hasAdminRole(hqRoleKey)),
+          isAdminRole(hqRoleKey)),
       canAccessFinancials:
         adminActive &&
         profileActive &&
@@ -1624,34 +1571,47 @@ async function getAdminSettingsData() {
   const systemChecks = [
     {
       label: "Admin Access Tables",
-      status: accessRows.length > 0 || rolesRows.length > 0,
-      detail:
-        "admin_departments, admin_roles, admin_role_permissions, and admin_user_access support corporate admin access control.",
+      status: !usingFallbacks || accessRows.length > 0,
+      detail: usingFallbacks
+        ? "Using preview department/role catalogs. Apply 20260802_create_admin_hq_access_tables.sql to persist live HQ access."
+        : "admin_departments, admin_roles, admin_role_permissions, and admin_user_access support corporate admin access control.",
+    },
+    {
+      label: "Auth User Directory",
+      status: !authListError,
+      detail: authListError
+        ? authListError
+        : "Supabase Auth user list available for Admin access management.",
     },
     {
       label: "Supabase Service Role",
       status: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
       detail: "Required for secure Admin user and access management.",
+      sensitive: true,
     },
     {
       label: "Stripe Secret Key",
       status: Boolean(process.env.STRIPE_SECRET_KEY),
       detail: "Required for payments, Trust & Safety checkout, and webhooks.",
+      sensitive: true,
     },
     {
       label: "Checkr API Key",
       status: Boolean(process.env.CHECKR_API_KEY),
       detail: "Required for background check invitations and status tracking.",
+      sensitive: true,
     },
     {
       label: "Plaid Client",
       status: Boolean(process.env.PLAID_CLIENT_ID && process.env.PLAID_SECRET),
       detail: "Required for NFCU/Plaid bank connection and reconciliation.",
+      sensitive: true,
     },
     {
       label: "Email Sending",
       status: Boolean(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY),
       detail: "Required for Admin alerts, reset support, and marketplace emails.",
+      sensitive: true,
     },
     {
       label: "Site URL",
@@ -1661,6 +1621,7 @@ async function getAdminSettingsData() {
           process.env.VERCEL_URL,
       ),
       detail: "Required for login redirects, password resets, and auth callbacks.",
+      sensitive: false,
     },
   ];
 
@@ -1672,6 +1633,9 @@ async function getAdminSettingsData() {
     rolesByDepartment,
     usersByDepartment,
     systemChecks,
+    usingFallbacks,
+    authListError,
+    accessTablesLive: !usingFallbacks,
     totals: {
       allUsers: users.length,
       admins: adminCount,
@@ -1689,14 +1653,39 @@ async function getAdminSettingsData() {
   };
 }
 
-export default async function AdminSettingsPage() {
+export default async function AdminSettingsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ status?: string; message?: string }>;
+}) {
+  const params = (await searchParams) || {};
   const actor = await getAdminIdentity();
 
   if (!actor?.canAccessAdmin) {
-    return null;
+    return (
+      <div className="min-h-screen bg-[#f9faf5] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Admin access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with an authorized SitGuru admin account to open Admin
+            Settings and HQ access control.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const settingsData = await getAdminSettingsData();
+  const flashStatus = asTrimmedString(params.status);
+  const flashMessage = asTrimmedString(params.message);
+  const visibleSystemChecks = actor.isSuperUser
+    ? settingsData.systemChecks
+    : settingsData.systemChecks.filter((check) => !check.sensitive);
 
   return (
     <main className="min-h-screen bg-[#f9faf5] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
@@ -1731,10 +1720,41 @@ export default async function AdminSettingsPage() {
                 Role: {actor.role}
               </p>
               <p className="mt-1 text-xs font-semibold text-slate-500">
-                {actor.canManageUsers ? "Can manage admin access" : "Viewer access only"}
+                {actor.canManageUsers
+                  ? actor.isSuperUser
+                    ? "Can manage all HQ roles"
+                    : "Can manage non-super-user HQ roles"
+                  : "Viewer access only"}
               </p>
             </div>
           </div>
+
+          {flashMessage ? (
+            <div
+              className={`mt-6 rounded-[1.25rem] border p-4 text-sm font-bold leading-6 ${
+                flashStatus === "ok"
+                  ? "border-emerald-100 bg-emerald-50 text-emerald-900"
+                  : "border-rose-100 bg-rose-50 text-rose-900"
+              }`}
+            >
+              {flashMessage}
+            </div>
+          ) : null}
+
+          {settingsData.usingFallbacks ? (
+            <div className="mt-6 rounded-[1.25rem] border border-amber-100 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-900">
+              HQ department/role catalogs are in preview mode until
+              `admin_departments` / `admin_roles` exist. Apply
+              `supabase/migrations/20260802_create_admin_hq_access_tables.sql`
+              before relying on Assign Access writes.
+            </div>
+          ) : null}
+
+          {settingsData.authListError ? (
+            <div className="mt-6 rounded-[1.25rem] border border-rose-100 bg-rose-50 p-4 text-sm font-bold leading-6 text-rose-900">
+              Auth directory error: {settingsData.authListError}
+            </div>
+          ) : null}
 
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <StatCard
@@ -1770,7 +1790,7 @@ export default async function AdminSettingsPage() {
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-4">
+        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
           <SettingsCard
             href="/admin/users"
             title="User Directory"
@@ -1779,12 +1799,17 @@ export default async function AdminSettingsPage() {
           <SettingsCard
             href="/admin/security"
             title="Security Center"
-            description="Review access policies, audit controls, MFA handling, and platform security readiness."
+            description="MFA and security hub. Role-based MFA gates still need shared identity alignment."
           />
           <SettingsCard
             href="/admin/audit-trail"
             title="Audit Trail"
             description="Review Admin actions, role changes, password support actions, and financial updates."
+          />
+          <SettingsCard
+            href="/admin/financials/exports"
+            title="Export Center"
+            description="CPA packages, statement downloads, and finance export history."
           />
           <SettingsCard
             href="/admin/financials"
@@ -1859,6 +1884,7 @@ export default async function AdminSettingsPage() {
               roles={settingsData.roles}
               canManageUsers={actor.canManageUsers}
               canResetPasswords={actor.canResetPasswords}
+              allowSuperUserRoles={actor.isSuperUser}
             />
           </div>
         </section>
@@ -1873,9 +1899,8 @@ export default async function AdminSettingsPage() {
                 Department role permissions.
               </h2>
               <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
-                This matrix shows the current permissions available by admin role.
-                Sidebar enforcement can be wired next so users only see the
-                Admin areas their role allows.
+                Read-only permission map for planning. Sidebar enforcement is not
+                wired yet — this matrix does not currently hide Admin nav items.
               </p>
             </div>
 
@@ -1900,19 +1925,20 @@ export default async function AdminSettingsPage() {
                 Platform access and integration checks.
               </h2>
               <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
-                These checks confirm whether Admin dependencies are configured
-                for access management, payments, Trust & Safety, banking,
-                emails, redirects, and admin role management.
+                {actor.isSuperUser
+                  ? "Super-user view includes secret-presence checks for Admin dependencies."
+                  : "Non-super-user view hides secret fingerprinting. Ask a founder/owner for full readiness."}
               </p>
             </div>
 
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800">
-              {settingsData.totals.systemReady}/{settingsData.totals.systemTotal} ready
+              {visibleSystemChecks.filter((check) => check.status).length}/
+              {visibleSystemChecks.length} ready
             </div>
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {settingsData.systemChecks.map((check) => (
+            {visibleSystemChecks.map((check) => (
               <div
                 key={check.label}
                 className="rounded-[1.5rem] border border-slate-200 bg-[#fbfefd] p-5"
@@ -1938,11 +1964,11 @@ export default async function AdminSettingsPage() {
             Next Access Control Step
           </p>
           <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
-            This page now supports Admin departments, official internal
-            roles, role assignment, password reset support, and permission
-            visibility. Next we should update the Admin sidebar so Financials,
-            Trust & Safety, Customer Service, Sales & Marketing, Tech Support,
-            and viewer-only roles only see the sections they are allowed to use.
+            HQ departments, role assignment, password reset support, and
+            permission visibility are live. Next: enforce role permissions in the
+            Admin sidebar so Financials, Trust & Safety, Customer Service, Sales
+            & Marketing, Tech Support, and viewer-only roles only see allowed
+            sections.
           </p>
         </section>
       </div>

@@ -1,906 +1,628 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import {
-  AlertCircle,
-  ArrowRight,
+  ArrowLeft,
   BarChart3,
   CalendarDays,
-  CheckCircle2,
   ClipboardCheck,
+  ExternalLink,
   FileText,
   Flag,
   Handshake,
   HeartHandshake,
   Megaphone,
-  MessageSquareText,
   PlusCircle,
+  Rocket,
+  Sparkles,
   Target,
   TrendingUp,
   Users,
 } from "lucide-react";
+import { getAdminIdentity } from "@/lib/admin/access";
+import {
+  getSalesMarketingDashboardData,
+  type SalesMarketingRecentItem,
+} from "@/lib/admin/sales-marketing/dashboard";
 
-import { supabaseAdmin } from "@/lib/supabase/admin";
+export const dynamic = "force-dynamic";
 
-type StatusTone = "emerald" | "amber" | "blue" | "rose" | "slate" | "purple";
-
-type DashboardCard = {
-  title: string;
-  value: string;
-  description: string;
-  icon: typeof ClipboardCheck;
-  tone: StatusTone;
+const routes = {
+  dashboard: "/admin",
+  hub: "/admin/sales-marketing",
+  leadEntry: "/admin/sales-marketing/lead-entry",
+  signupLeads: "/admin/sales-marketing/signup-leads",
+  dailyTracker: "/admin/sales-marketing/daily-tracker",
+  ceoReview: "/admin/sales-marketing/ceo-review",
+  weeklyReview: "/admin/sales-marketing/weekly-review",
+  monthlyReview: "/admin/sales-marketing/monthly-review",
+  outreach: "/admin/sales-marketing/outreach",
+  content: "/admin/sales-marketing/content",
+  proofLibrary: "/admin/sales-marketing/proof-library",
+  campaigns: "/admin/sales-marketing/campaigns",
+  referrals: "/admin/referrals",
+  partners: "/admin/partners",
+  analytics: "/admin/analytics",
+  launchSignups: "/admin/launch-signups",
+  ambassadors: "/admin/ambassadors",
+  ambassadorLeads: "/admin/ambassador-leads",
+  programs: "/admin/programs",
+  insights: "/admin/insights",
 };
 
-type ReviewItem = {
-  title: string;
-  owner: string;
-  status: string;
-  due: string;
-  tone: StatusTone;
-};
-
-type RoadmapMonth = {
-  month: string;
-  theme: string;
-  focus: string;
-  visibleWin: string;
-  active?: boolean;
-};
-
-type QuickLink = {
+type ModuleCard = {
+  eyebrow: string;
   title: string;
   description: string;
   href: string;
-  icon: typeof ClipboardCheck;
-  featured?: boolean;
+  wiring: "live" | "next";
+  value?: string;
+  icon: ReactNode;
 };
 
-type MarketingTaskRow = {
-  primary_task: string;
-  owner_name: string | null;
-  status: string | null;
-  task_date: string | null;
-  needs_help: boolean | null;
-  ceo_review_status: string | null;
-};
-
-type MarketingCounts = {
-  totalTasks: number;
-  awaitingCeoReview: number;
-  blockedOrHelp: number;
-  weeklyReviews: number;
-  monthlyReviews: number;
-  outreachContacts: number;
-  contentItems: number;
-  proofItems: number;
-  campaigns: number;
-  signupLeads: number;
-  referrals: number;
-};
-
-const toneStyles: Record<
-  StatusTone,
-  {
-    card: string;
-    icon: string;
-    pill: string;
-    text: string;
-    border: string;
-  }
-> = {
-  emerald: {
-    card: "border-emerald-200 bg-emerald-50",
-    icon: "bg-emerald-600 text-white",
-    pill: "bg-emerald-100 text-emerald-800",
-    text: "text-emerald-800",
-    border: "border-emerald-200",
-  },
-  amber: {
-    card: "border-amber-200 bg-amber-50",
-    icon: "bg-amber-500 text-white",
-    pill: "bg-amber-100 text-amber-800",
-    text: "text-amber-800",
-    border: "border-amber-200",
-  },
-  blue: {
-    card: "border-sky-200 bg-sky-50",
-    icon: "bg-sky-600 text-white",
-    pill: "bg-sky-100 text-sky-800",
-    text: "text-sky-800",
-    border: "border-sky-200",
-  },
-  rose: {
-    card: "border-rose-200 bg-rose-50",
-    icon: "bg-rose-600 text-white",
-    pill: "bg-rose-100 text-rose-800",
-    text: "text-rose-800",
-    border: "border-rose-200",
-  },
-  slate: {
-    card: "border-slate-200 bg-slate-50",
-    icon: "bg-slate-700 text-white",
-    pill: "bg-slate-100 text-slate-700",
-    text: "text-slate-700",
-    border: "border-slate-200",
-  },
-  purple: {
-    card: "border-violet-200 bg-violet-50",
-    icon: "bg-violet-600 text-white",
-    pill: "bg-violet-100 text-violet-800",
-    text: "text-violet-800",
-    border: "border-violet-200",
-  },
-};
-
-const roadmap: RoadmapMonth[] = [
-  {
-    month: "May",
-    theme: "Launch readiness + launch momentum",
-    focus:
-      "Launch messaging, social setup, first outreach, first assets, launch announcement, and first proof.",
-    visibleWin: "The brand feels real on day one.",
-    active: true,
-  },
-  {
-    month: "June",
-    theme: "Trust-building consistency",
-    focus:
-      "Guru spotlights, FAQs, how-it-works content, fast replies, and a visual proof library.",
-    visibleWin: "SitGuru looks active and trustworthy.",
-  },
-  {
-    month: "July",
-    theme: "Local outreach + referrals",
-    focus:
-      "Partner asks, flyers/cards, local groups, community posts, and referral prompts.",
-    visibleWin: "Local awareness begins to compound.",
-  },
-  {
-    month: "August",
-    theme: "Reviews + repeat booking",
-    focus:
-      "Collect proof, ask for testimonials, highlight happy outcomes, and prompt repeat bookings.",
-    visibleWin: "Proof-driven marketing becomes easier.",
-  },
-  {
-    month: "September",
-    theme: "Optimization + partnerships",
-    focus:
-      "Double down on what performs, refine weak spots, and deepen warm partnerships.",
-    visibleWin: "Time shifts toward highest-return work.",
-  },
-  {
-    month: "October",
-    theme: "Systems + seasonal prep",
-    focus:
-      "Create templates, clean up process, build seasonal campaigns, and archive reusable assets.",
-    visibleWin: "Marketing becomes easier to sustain.",
-  },
-];
-
-const quickLinks: QuickLink[] = [
-  {
-    title: "Lead & Signup Entry",
-    description:
-      "Add Pet Parent leads, Guru leads, Ambassador leads, partner leads, referrals, pets, and points of contact from a tablet or laptop.",
-    href: "/admin/sales-marketing/lead-entry",
-    icon: PlusCircle,
-    featured: true,
-  },
-  {
-    title: "Signup Leads & Referrals",
-    description:
-      "Review signup leads, referrals, optional pet details, message-ready status, CEO priority, and next follow-ups.",
-    href: "/admin/sales-marketing/signup-leads",
-    icon: HeartHandshake,
-    featured: true,
-  },
-  {
-    title: "Daily Tracker",
-    description: "Review today’s tasks, Danette’s status, proof, notes, and CEO confirmation.",
-    href: "/admin/sales-marketing/daily-tracker",
-    icon: CalendarDays,
-  },
-  {
-    title: "CEO Review",
-    description: "Confirm completed tasks, flag follow-up, and capture support notes.",
-    href: "/admin/sales-marketing/ceo-review",
-    icon: ClipboardCheck,
-  },
-  {
-    title: "Weekly Review",
-    description: "Review Friday summaries, blockers, wins, and next-week priorities.",
-    href: "/admin/sales-marketing/weekly-review",
-    icon: BarChart3,
-  },
-  {
-    title: "Monthly Review",
-    description: "Confirm progress against the monthly marketing theme and roadmap.",
-    href: "/admin/sales-marketing/monthly-review",
-    icon: Flag,
-  },
-  {
-    title: "Outreach",
-    description: "Track groomers, trainers, vets, apartments, schools, and local partners.",
-    href: "/admin/sales-marketing/outreach",
-    icon: Users,
-  },
-  {
-    title: "Content Planner",
-    description: "Plan social posts, launch captions, ads, campaign copy, and assets.",
-    href: "/admin/sales-marketing/content",
-    icon: Megaphone,
-  },
-  {
-    title: "Proof Library",
-    description: "Collect testimonials, screenshots, reviews, pet photos, and local wins.",
-    href: "/admin/sales-marketing/proof-library",
-    icon: MessageSquareText,
-  },
-  {
-    title: "Campaigns",
-    description: "Organize launch, Guru signup, Pet Parent signup, PawPerks, and seasonal pushes.",
-    href: "/admin/sales-marketing/campaigns",
-    icon: FileText,
-  },
-];
-
-const dailyRhythm = [
-  {
-    day: "Monday",
-    focus: "Plan & organize",
-    success: "Review the week, choose priorities, update the tracker, and align.",
-  },
-  {
-    day: "Tuesday",
-    focus: "Create content",
-    success: "Draft or batch posts, stories, reels, and Guru spotlights.",
-  },
-  {
-    day: "Wednesday",
-    focus: "Outreach & partnerships",
-    success: "Contact local businesses, log touchpoints, and set follow-ups.",
-  },
-  {
-    day: "Thursday",
-    focus: "Community engagement",
-    success: "Reply to DMs/comments, engage locally, and collect questions.",
-  },
-  {
-    day: "Friday",
-    focus: "Review & optimize",
-    success: "Check numbers, note the biggest win/blocker, and complete weekly review.",
-  },
-  {
-    day: "Saturday",
-    focus: "Capture & repurpose",
-    success: "Collect proof, photos, screenshots, and reusable assets.",
-  },
-  {
-    day: "Sunday",
-    focus: "Reset & prepare",
-    success: "Preview next week, move deferred items, and prepare Monday priorities.",
-  },
-];
-
-async function getCount(table: string) {
-  const { count, error } = await supabaseAdmin
-    .from(table)
-    .select("*", { count: "exact", head: true });
-
-  if (error) {
-    console.error(`Sales & Marketing count error for ${table}:`, error.message);
-    return 0;
-  }
-
-  return count ?? 0;
+function number(value: number) {
+  return new Intl.NumberFormat("en-US").format(
+    Number.isFinite(value) ? value : 0,
+  );
 }
 
-async function getFilteredCount(table: string, column: string, values: string[]) {
-  const { count, error } = await supabaseAdmin
-    .from(table)
-    .select("*", { count: "exact", head: true })
-    .in(column, values);
-
-  if (error) {
-    console.error(
-      `Sales & Marketing filtered count error for ${table}.${column}:`,
-      error.message,
-    );
-    return 0;
-  }
-
-  return count ?? 0;
-}
-
-async function getNeedsHelpCount() {
-  const { count, error } = await supabaseAdmin
-    .from("admin_marketing_tasks")
-    .select("*", { count: "exact", head: true })
-    .or("needs_help.eq.true,status.in.(Blocked,Needs Follow-Up),ceo_review_status.in.(Needs help,Needs Follow-Up)");
-
-  if (error) {
-    console.error("Sales & Marketing needs-help count error:", error.message);
-    return 0;
-  }
-
-  return count ?? 0;
-}
-
-async function getMarketingCounts(): Promise<MarketingCounts> {
-  const [
-    totalTasks,
-    awaitingCeoReview,
-    blockedOrHelp,
-    weeklyReviews,
-    monthlyReviews,
-    outreachContacts,
-    contentItems,
-    proofItems,
-    campaigns,
-    signupLeads,
-    referrals,
-  ] = await Promise.all([
-    getCount("admin_marketing_tasks"),
-    getFilteredCount("admin_marketing_tasks", "status", ["CEO Review", "Done"]),
-    getNeedsHelpCount(),
-    getCount("admin_marketing_weekly_reviews"),
-    getCount("admin_marketing_monthly_reviews"),
-    getCount("admin_marketing_outreach_contacts"),
-    getCount("admin_marketing_content_calendar"),
-    getCount("admin_marketing_proof_library"),
-    getCount("admin_marketing_campaigns"),
-    getCount("admin_marketing_signup_leads"),
-    getCount("admin_marketing_referrals"),
-  ]);
-
-  return {
-    totalTasks,
-    awaitingCeoReview,
-    blockedOrHelp,
-    weeklyReviews,
-    monthlyReviews,
-    outreachContacts,
-    contentItems,
-    proofItems,
-    campaigns,
-    signupLeads,
-    referrals,
-  };
-}
-
-async function getReviewItems(): Promise<ReviewItem[]> {
-  const { data, error } = await supabaseAdmin
-    .from("admin_marketing_tasks")
-    .select("primary_task, owner_name, status, task_date, needs_help, ceo_review_status")
-    .or("status.in.(CEO Review,Blocked,Waiting,Done),needs_help.eq.true")
-    .order("task_date", { ascending: true })
-    .order("sort_order", { ascending: true })
-    .limit(5);
-
-  if (error) {
-    console.error("Sales & Marketing review queue error:", error.message);
-    return [];
-  }
-
-  return ((data ?? []) as MarketingTaskRow[]).map((item) => {
-    const status = item.needs_help
-      ? "Needs Help"
-      : item.status || item.ceo_review_status || "Not Reviewed";
-
-    const tone: StatusTone =
-      status === "CEO Review" || status === "Done"
-        ? "amber"
-        : status === "Blocked" || status === "Needs Help"
-          ? "rose"
-          : status === "Waiting"
-            ? "blue"
-            : "slate";
-
-    const due = item.task_date
-      ? new Date(`${item.task_date}T00:00:00`).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : "Not scheduled";
-
-    return {
-      title: item.primary_task,
-      owner: item.owner_name || "Danette",
-      status,
-      due,
-      tone,
-    };
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 }
 
-function buildDashboardCards(counts: MarketingCounts): DashboardCard[] {
-  return [
-    {
-      title: "Lead Intake",
-      value: String(counts.signupLeads + counts.referrals),
-      description:
-        "Signup leads and referrals captured by Jason or Danette through Sales & Marketing.",
-      icon: PlusCircle,
-      tone: "emerald",
-    },
-    {
-      title: "Marketing Tasks",
-      value: String(counts.totalTasks),
-      description: "Live Supabase count of daily Sales & Marketing tasks.",
-      icon: Target,
-      tone: "blue",
-    },
-    {
-      title: "Awaiting CEO Review",
-      value: String(counts.awaitingCeoReview),
-      description: "Tasks marked Done or CEO Review that still need Jason confirmation.",
-      icon: ClipboardCheck,
-      tone: "amber",
-    },
-    {
-      title: "Needs Help / Blocked",
-      value: String(counts.blockedOrHelp),
-      description: "Tasks that may need CEO support, workflow help, or follow-up.",
-      icon: AlertCircle,
-      tone: "rose",
-    },
-  ];
-}
-
-function CardIcon({
-  icon: Icon,
-  tone,
+function MetricTile({
+  label,
+  value,
+  helper,
 }: {
-  icon: typeof ClipboardCheck;
-  tone: StatusTone;
+  label: string;
+  value: string;
+  helper: string;
 }) {
   return (
-    <div
-      className={`flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm ${toneStyles[tone].icon}`}
-    >
-      <Icon className="h-5 w-5" aria-hidden="true" />
+    <div className="rounded-[1.35rem] border border-emerald-100 bg-white p-4 shadow-sm">
+      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
+      <p className="mt-1 text-xs font-semibold text-slate-500">{helper}</p>
     </div>
   );
 }
 
-export default async function SalesMarketingAdminPage() {
-  const [counts, reviewItems] = await Promise.all([
-    getMarketingCounts(),
-    getReviewItems(),
-  ]);
+function ModuleLinkCard({ card }: { card: ModuleCard }) {
+  return (
+    <Link
+      href={card.href}
+      className="group flex h-full flex-col rounded-[1.6rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-[#0D5C3A]">
+          {card.icon}
+        </div>
+        <span
+          className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+            card.wiring === "live"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-amber-200 bg-amber-50 text-amber-800"
+          }`}
+        >
+          {card.wiring === "live" ? "Live" : "Next"}
+        </span>
+      </div>
+      <p className="mt-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
+        {card.eyebrow}
+      </p>
+      <h3 className="mt-1 text-lg font-black text-slate-950">{card.title}</h3>
+      {card.value ? (
+        <p className="mt-2 text-2xl font-black text-[#0D5C3A]">{card.value}</p>
+      ) : null}
+      <p className="mt-2 flex-1 text-sm font-semibold leading-6 text-slate-600">
+        {card.description}
+      </p>
+      <span className="mt-4 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
+        Open
+        <ExternalLink
+          size={14}
+          className="transition group-hover:translate-x-0.5"
+        />
+      </span>
+    </Link>
+  );
+}
 
-  const dashboardCards = buildDashboardCards(counts);
+function RecentList({
+  title,
+  subtitle,
+  href,
+  items,
+  emptyTitle,
+  emptyDetail,
+}: {
+  title: string;
+  subtitle: string;
+  href: string;
+  items: SalesMarketingRecentItem[];
+  emptyTitle: string;
+  emptyDetail: string;
+}) {
+  return (
+    <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black text-slate-950">{title}</h2>
+          <p className="mt-1 text-sm font-semibold text-slate-500">{subtitle}</p>
+        </div>
+        <Link
+          href={href}
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+        >
+          Open
+        </Link>
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        {items.length ? (
+          items.map((item) => (
+            <Link
+              key={item.id}
+              href={item.href}
+              className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/50"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-black text-slate-950">
+                    {item.title}
+                  </p>
+                  <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                    {item.subtitle}
+                  </p>
+                </div>
+                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">
+                  {item.status}
+                </span>
+              </div>
+              <p className="mt-3 text-xs font-bold text-slate-500">
+                {formatDate(item.date)}
+              </p>
+            </Link>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5">
+            <p className="font-black text-slate-950">{emptyTitle}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              {emptyDetail}
+            </p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export default async function SalesMarketingAdminPage() {
+  const actor = await getAdminIdentity();
+
+  if (!actor?.canAccessAdmin) {
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Admin access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with an authorized SitGuru admin, sales, or marketing account
+            to open Sales &amp; Marketing.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const data = await getSalesMarketingDashboardData();
+
+  const modules: ModuleCard[] = [
+    {
+      eyebrow: "Intake",
+      title: "Lead & Signup Entry",
+      description:
+        "Capture field leads, referrals, outreach contacts, and high-priority pet signals.",
+      href: routes.leadEntry,
+      wiring: "live",
+      icon: <PlusCircle size={20} />,
+    },
+    {
+      eyebrow: "Pipeline",
+      title: "Signup Leads",
+      description: "Review signup leads, pets, priorities, and invite readiness.",
+      href: routes.signupLeads,
+      wiring: "live",
+      value: number(data.metrics.signupLeads),
+      icon: <Users size={20} />,
+    },
+    {
+      eyebrow: "Daily Ops",
+      title: "Daily Tracker",
+      description: "Marketing tasks, owners, blockers, and day-to-day execution.",
+      href: routes.dailyTracker,
+      wiring: "live",
+      value: number(data.metrics.tasksTotal),
+      icon: <ClipboardCheck size={20} />,
+    },
+    {
+      eyebrow: "CEO Queue",
+      title: "CEO Review",
+      description: "Items waiting on CEO review, help, or follow-up decisions.",
+      href: routes.ceoReview,
+      wiring: "live",
+      value: number(data.metrics.tasksAwaitingCeo),
+      icon: <Flag size={20} />,
+    },
+    {
+      eyebrow: "Outreach",
+      title: "Outreach Contacts",
+      description: "Local partners, campuses, orgs, and relationship tracking.",
+      href: routes.outreach,
+      wiring: "live",
+      value: number(data.metrics.outreachContacts),
+      icon: <Handshake size={20} />,
+    },
+    {
+      eyebrow: "Content",
+      title: "Content Planner",
+      description: "Content calendar items for social, email, and launch stories.",
+      href: routes.content,
+      wiring: "live",
+      value: number(data.metrics.contentItems),
+      icon: <FileText size={20} />,
+    },
+    {
+      eyebrow: "Campaigns",
+      title: "Campaigns",
+      description: "Campaign records for growth pushes and market launches.",
+      href: routes.campaigns,
+      wiring: "live",
+      value: number(data.metrics.campaigns),
+      icon: <Megaphone size={20} />,
+    },
+    {
+      eyebrow: "Proof",
+      title: "Proof Library",
+      description: "Testimonials, photos, and permissioned social proof assets.",
+      href: routes.proofLibrary,
+      wiring: "live",
+      value: number(data.metrics.proofItems),
+      icon: <Sparkles size={20} />,
+    },
+    {
+      eyebrow: "Cadence",
+      title: "Weekly Review",
+      description: "Weekly marketing reviews and operating rhythm.",
+      href: routes.weeklyReview,
+      wiring: "live",
+      value: number(data.metrics.weeklyReviews),
+      icon: <CalendarDays size={20} />,
+    },
+    {
+      eyebrow: "Cadence",
+      title: "Monthly Review",
+      description: "Monthly performance reviews and roadmap check-ins.",
+      href: routes.monthlyReview,
+      wiring: "live",
+      value: number(data.metrics.monthlyReviews),
+      icon: <Target size={20} />,
+    },
+    {
+      eyebrow: "Growth",
+      title: "Growth & Referrals",
+      description: "Referral codes, rewards, and growth ledger outside field CRM.",
+      href: routes.referrals,
+      wiring: "live",
+      icon: <TrendingUp size={20} />,
+    },
+    {
+      eyebrow: "Partners",
+      title: "Partners Hub",
+      description: "Partner applications, affiliates, and partner campaigns.",
+      href: routes.partners,
+      wiring: "live",
+      value: number(data.metrics.partnerApplications),
+      icon: <Handshake size={20} />,
+    },
+    {
+      eyebrow: "Launch",
+      title: "Launch Signups",
+      description: "Launch waitlist and early market signup demand.",
+      href: routes.launchSignups,
+      wiring: "live",
+      value: number(data.metrics.launchSignups),
+      icon: <Rocket size={20} />,
+    },
+    {
+      eyebrow: "Ambassadors",
+      title: "Ambassador Leads",
+      description: "Recruiting leads that feed Student / Community / Veterans hire.",
+      href: routes.ambassadorLeads,
+      wiring: "live",
+      value: number(data.metrics.ambassadorLeads),
+      icon: <HeartHandshake size={20} />,
+    },
+    {
+      eyebrow: "Insights",
+      title: "Analytics",
+      description: "Growth analytics across bookings, referrals, and acquisition.",
+      href: routes.analytics,
+      wiring: "live",
+      icon: <BarChart3 size={20} />,
+    },
+    {
+      eyebrow: "Mutations",
+      title: "Task Status Writes",
+      description:
+        "Confirm / follow-up / invite status buttons on review pages stay Next until wired.",
+      href: routes.ceoReview,
+      wiring: "next",
+      icon: <ClipboardCheck size={20} />,
+    },
+  ];
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-sm">
-          <div className="grid gap-6 p-6 lg:grid-cols-[1.35fr_0.65fr] lg:p-8">
-            <div className="flex flex-col justify-between gap-6">
-              <div>
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800">
-                  <Megaphone className="h-4 w-4" aria-hidden="true" />
-                  Sales & Marketing Dashboard
-                </div>
+    <main className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1640px] space-y-6">
+        <section className="rounded-[2rem] border border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(13,92,58,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_55%,#f8fafc_100%)] p-5 shadow-sm sm:p-7">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div className="min-w-0">
+              <Link
+                href={routes.dashboard}
+                className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+              >
+                <ArrowLeft size={16} />
+                Back to Admin
+              </Link>
 
-                <h1 className="max-w-4xl text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
-                  CEO visibility plus field lead entry for SitGuru growth.
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl xl:text-5xl">
+                  Sales &amp; Marketing
                 </h1>
-
-                <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
-                  Jason and Danette can now track marketing work, review blockers,
-                  capture leads, enter referrals, organize outreach, and connect
-                  campaigns to future growth reporting.
-                </p>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                  Growth Command Center
+                </span>
+                <span
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+                    data.isLive
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-amber-200 bg-amber-50 text-amber-800"
+                  }`}
+                >
+                  {data.isLive ? "Live Sources" : "Preview Sources"}
+                </span>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-500">Primary owner</p>
-                  <p className="mt-1 text-lg font-bold text-slate-950">Danette</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-500">CEO support</p>
-                  <p className="mt-1 text-lg font-bold text-slate-950">Jason</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-500">Supabase status</p>
-                  <p className="mt-1 text-lg font-bold text-emerald-700">Connected</p>
-                </div>
-              </div>
-            </div>
-
-            <aside className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
-                    Field entry
-                  </p>
-                  <h2 className="mt-2 text-2xl font-extrabold text-emerald-950">
-                    Add leads fast
-                  </h2>
-                </div>
-                <CardIcon icon={PlusCircle} tone="emerald" />
-              </div>
-
-              <p className="mt-4 text-sm leading-6 text-emerald-900">
-                Use the Lead & Signup Entry page on a tablet or laptop to add Pet
-                Parent leads, Guru leads, Ambassador leads, partners, referrals,
-                and points of contact.
+              <p className="mt-3 max-w-4xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
+                Run field lead intake, outreach, content, campaigns, and CEO
+                review from one hub — with deep links into Referrals, Partners,
+                Launch Signups, Ambassadors, and Analytics.
               </p>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <Link
-                  href="/admin/sales-marketing/lead-entry"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 py-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-emerald-800"
-                >
-                  Open Lead Entry
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
+              <p className="mt-3 text-xs font-bold text-slate-500">
+                Signed in as {actor.email} · Role {actor.role}
+              </p>
+            </div>
 
-                <Link
-                  href="/admin/sales-marketing/signup-leads"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-emerald-300 bg-white px-5 py-3 text-sm font-extrabold text-emerald-800 shadow-sm transition hover:bg-emerald-50"
-                >
-                  Review Leads
-                  <HeartHandshake className="h-4 w-4" aria-hidden="true" />
-                </Link>
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-emerald-200 bg-white/80 p-4">
-                <p className="text-sm font-semibold text-emerald-900">
-                  Current intake
-                </p>
-                <p className="mt-1 text-sm leading-6 text-slate-700">
-                  {counts.signupLeads} signup leads · {counts.referrals} referrals
-                </p>
-              </div>
-            </aside>
-          </div>
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {dashboardCards.map((card) => (
-            <article
-              key={card.title}
-              className={`rounded-[1.5rem] border p-5 shadow-sm ${toneStyles[card.tone].card}`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-slate-600">{card.title}</p>
-                  <p className="mt-2 text-2xl font-extrabold text-slate-950">
-                    {card.value}
-                  </p>
-                </div>
-                <CardIcon icon={card.icon} tone={card.tone} />
-              </div>
-              <p className="mt-4 text-sm leading-6 text-slate-700">{card.description}</p>
-            </article>
-          ))}
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <Link
-            href="/admin/sales-marketing/signup-leads"
-            className="rounded-[1.5rem] border border-emerald-200 bg-white p-5 shadow-sm transition hover:bg-emerald-50"
-          >
-            <p className="text-sm font-semibold text-slate-500">Signup Leads</p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-950">
-              {counts.signupLeads}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Pet Parent, Guru, Ambassador, partner, and program applicant leads.
-            </p>
-            <span className="mt-4 inline-flex items-center gap-2 text-sm font-extrabold text-emerald-700">
-              Review leads
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </span>
-          </Link>
-
-          <Link
-            href="/admin/sales-marketing/signup-leads"
-            className="rounded-[1.5rem] border border-sky-200 bg-white p-5 shadow-sm transition hover:bg-sky-50"
-          >
-            <p className="text-sm font-semibold text-slate-500">Referrals</p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-950">
-              {counts.referrals}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Referral records captured by Jason or Danette.
-            </p>
-            <span className="mt-4 inline-flex items-center gap-2 text-sm font-extrabold text-sky-700">
-              Review referrals
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </span>
-          </Link>
-
-          <Link
-            href="/admin/sales-marketing/outreach"
-            className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:bg-emerald-50"
-          >
-            <p className="text-sm font-semibold text-slate-500">Outreach Contacts</p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-950">
-              {counts.outreachContacts}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Groomers, trainers, vet techs, partners, and local contacts.
-            </p>
-            <span className="mt-4 inline-flex items-center gap-2 text-sm font-extrabold text-emerald-700">
-              Open outreach
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </span>
-          </Link>
-
-          <Link
-            href="/admin/sales-marketing/content"
-            className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:bg-emerald-50"
-          >
-            <p className="text-sm font-semibold text-slate-500">Content + Campaigns</p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-950">
-              {counts.contentItems + counts.campaigns}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Content planner items and campaign records.
-            </p>
-            <span className="mt-4 inline-flex items-center gap-2 text-sm font-extrabold text-emerald-700">
-              Open planner
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </span>
-          </Link>
-
-          <Link
-            href="/admin/sales-marketing/proof-library"
-            className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:bg-emerald-50"
-          >
-            <p className="text-sm font-semibold text-slate-500">Proof Library</p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-950">
-              {counts.proofItems}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Testimonials, screenshots, DMs, reviews, and pet photos.
-            </p>
-            <span className="mt-4 inline-flex items-center gap-2 text-sm font-extrabold text-emerald-700">
-              Open proof
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </span>
-          </Link>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
-                  CEO Review Queue
-                </p>
-                <h2 className="mt-2 text-2xl font-extrabold text-slate-950">
-                  Live tasks needing confirmation or support
-                </h2>
-              </div>
+            <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
               <Link
-                href="/admin/sales-marketing/ceo-review"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800"
+                href={routes.leadEntry}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-900"
               >
-                Open CEO Review
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                <PlusCircle size={17} />
+                New Lead Entry
+              </Link>
+              <Link
+                href={routes.ceoReview}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+              >
+                <Flag size={17} />
+                CEO Review
+              </Link>
+              <Link
+                href={routes.dailyTracker}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+              >
+                <ClipboardCheck size={17} />
+                Daily Tracker
+              </Link>
+              <Link
+                href={routes.referrals}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
+              >
+                <TrendingUp size={17} />
+                Referrals
               </Link>
             </div>
+          </div>
+        </section>
 
-            <div className="mt-6 space-y-3">
-              {reviewItems.length > 0 ? (
-                reviewItems.map((item) => (
-                  <div
-                    key={`${item.title}-${item.due}`}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h3 className="font-bold text-slate-950">{item.title}</h3>
-                        <p className="mt-1 text-sm text-slate-600">
-                          Owner: {item.owner} · Due: {item.due}
-                        </p>
-                      </div>
-                      <span
-                        className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold ${toneStyles[item.tone].pill}`}
-                      >
-                        {item.status}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                  <p className="font-bold text-emerald-950">
-                    No current review queue items.
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-emerald-900">
-                    When Danette marks tasks as Done, CEO Review, Waiting, or
-                    Blocked, they will appear here.
-                  </p>
-                </div>
-              )}
-            </div>
-          </article>
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+          <MetricTile
+            label="Signup Leads"
+            value={number(data.metrics.signupLeads)}
+            helper="Field + signup intake"
+          />
+          <MetricTile
+            label="Referrals Logged"
+            value={number(data.metrics.referrals)}
+            helper="Marketing CRM referrals"
+          />
+          <MetricTile
+            label="Outreach"
+            value={number(data.metrics.outreachContacts)}
+            helper="Contacts in pipeline"
+          />
+          <MetricTile
+            label="Tasks"
+            value={number(data.metrics.tasksTotal)}
+            helper="Daily tracker rows"
+          />
+          <MetricTile
+            label="CEO Review"
+            value={number(data.metrics.tasksAwaitingCeo)}
+            helper="Awaiting decision"
+          />
+          <MetricTile
+            label="Blocked / Help"
+            value={number(data.metrics.tasksBlockedOrHelp)}
+            helper="Needs follow-up"
+          />
+          <MetricTile
+            label="Campaigns"
+            value={number(data.metrics.campaigns)}
+            helper="Campaign records"
+          />
+          <MetricTile
+            label="Launch Signups"
+            value={number(data.metrics.launchSignups)}
+            helper="Sibling growth demand"
+          />
+        </section>
 
-          <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <section>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
-                Quick Links
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                Manage growth from live modules
               </p>
-              <h2 className="mt-2 text-2xl font-extrabold text-slate-950">
-                Sales & Marketing work areas
+              <h2 className="mt-1 text-2xl font-black text-slate-950">
+                Sales &amp; Marketing command center
               </h2>
             </div>
+            <p className="text-sm font-semibold text-slate-500">
+              Live = readable ops · Next = status write buttons
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {modules.map((card) => (
+              <ModuleLinkCard key={card.title} card={card} />
+            ))}
+          </div>
+        </section>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              {quickLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`group rounded-2xl border p-4 transition ${
-                    link.featured
-                      ? "border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
-                      : "border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50"
-                  }`}
+        <section className="grid gap-4 xl:grid-cols-3">
+          <RecentList
+            title="Recent signup leads"
+            subtitle="Newest field and signup intake."
+            href={routes.signupLeads}
+            items={data.recentLeads}
+            emptyTitle="No signup leads yet"
+            emptyDetail="Capture leads from Lead & Signup Entry."
+          />
+          <RecentList
+            title="CEO / help queue"
+            subtitle="Tasks needing review, help, or unblock."
+            href={routes.ceoReview}
+            items={data.reviewQueue}
+            emptyTitle="Queue clear"
+            emptyDetail="No CEO Review, blocked, or needs-help tasks right now."
+          />
+          <RecentList
+            title="Recent outreach"
+            subtitle="Newest outreach contacts."
+            href={routes.outreach}
+            items={data.recentOutreach}
+            emptyTitle="No outreach contacts yet"
+            emptyDetail="Add outreach contacts from Lead Entry or Outreach."
+          />
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-2">
+          <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="text-xl font-black text-slate-950">Source health</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Hub reads live `admin_marketing_*` tables and sibling growth
+              sources.
+            </p>
+            <div className="mt-4 grid gap-3">
+              {data.sourceHealth.map((source) => (
+                <div
+                  key={source.id}
+                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
                 >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm ring-1 ${
-                        link.featured
-                          ? "bg-emerald-700 text-white ring-emerald-700"
-                          : "bg-white text-emerald-700 ring-slate-200 group-hover:ring-emerald-200"
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-black text-slate-900">{source.label}</p>
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
+                        source.ok
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : "border-amber-200 bg-amber-50 text-amber-800"
                       }`}
                     >
-                      <link.icon className="h-5 w-5" aria-hidden="true" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-950">{link.title}</h3>
-                      <p className="mt-1 text-sm leading-5 text-slate-600">
-                        {link.description}
-                      </p>
-                    </div>
+                      {source.ok ? "Connected" : "Pending"}
+                    </span>
                   </div>
-                </Link>
-              ))}
-            </div>
-          </article>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
-                Daily Operating Rhythm
-              </p>
-              <h2 className="mt-2 text-2xl font-extrabold text-slate-950">
-                Weekly rhythm Danette can follow
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                This keeps the marketing work simple: plan, create, outreach,
-                engage, review, capture proof, and reset for the next week.
-              </p>
-            </div>
-
-            <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
-              <div className="grid grid-cols-[0.7fr_1fr_1.6fr] bg-slate-100 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-600">
-                <span>Day</span>
-                <span>Focus</span>
-                <span>Success looks like</span>
-              </div>
-
-              {dailyRhythm.map((row) => (
-                <div
-                  key={row.day}
-                  className="grid grid-cols-[0.7fr_1fr_1.6fr] border-t border-slate-200 px-4 py-3 text-sm"
-                >
-                  <span className="font-bold text-slate-950">{row.day}</span>
-                  <span className="font-semibold text-emerald-800">{row.focus}</span>
-                  <span className="text-slate-600">{row.success}</span>
+                  <p className="mt-2 text-sm font-semibold text-slate-600">
+                    {source.message}
+                  </p>
+                  <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                    {number(source.rowCount)} rows
+                  </p>
                 </div>
               ))}
             </div>
-          </article>
+          </section>
 
-          <article className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
-                Six-Month Roadmap
-              </p>
-              <h2 className="mt-2 text-2xl font-extrabold text-slate-950">
-                Monthly CEO confirmation path
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                Each month has a clear marketing theme, focus, and visible win so
-                Jason can confirm whether the month’s work is moving SitGuru forward.
-              </p>
+          <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-[#0D5C3A]">
+              <Sparkles size={20} />
             </div>
-
-            <div className="mt-6 space-y-3">
-              {roadmap.map((item) => (
-                <div
-                  key={item.month}
-                  className={`rounded-2xl border p-4 ${
-                    item.active
-                      ? "border-emerald-200 bg-emerald-50"
-                      : "border-slate-200 bg-slate-50"
-                  }`}
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-extrabold text-slate-950">
-                          {item.month}
-                        </h3>
-                        {item.active ? (
-                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-                            Current
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 font-bold text-emerald-800">{item.theme}</p>
-                    </div>
-                    <CheckCircle2
-                      className={`h-5 w-5 ${
-                        item.active ? "text-emerald-700" : "text-slate-300"
-                      }`}
-                      aria-hidden="true"
-                    />
-                  </div>
-
-                  <p className="mt-3 text-sm leading-6 text-slate-600">{item.focus}</p>
-
-                  <div className="mt-3 rounded-xl border border-white/80 bg-white/80 p-3">
-                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Visible win
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-slate-800">
-                      {item.visibleWin}
-                    </p>
-                  </div>
-                </div>
-              ))}
+            <h2 className="text-xl font-black text-slate-950">
+              How to manage Sales &amp; Marketing
+            </h2>
+            <ul className="mt-3 space-y-3 text-sm font-semibold leading-6 text-slate-600">
+              <li>
+                Use this hub for KPIs and routing. Capture leads in Lead Entry.
+              </li>
+              <li>
+                Work Daily Tracker and CEO Review for execution. Keep Growth &amp;
+                Referrals / Partners as sibling systems.
+              </li>
+              <li>
+                Content, campaigns, and proof are live reads today — status write
+                buttons remain Next.
+              </li>
+              <li>
+                Ambassador recruiting stays in HR / Ambassador Leads; this hub
+                owns field marketing CRM.
+              </li>
+            </ul>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link
+                href={routes.programs}
+                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+              >
+                Hire Programs
+              </Link>
+              <Link
+                href={routes.insights}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-800 transition hover:bg-slate-50"
+              >
+                Chat Insights
+              </Link>
+              <Link
+                href={routes.ambassadors}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-800 transition hover:bg-slate-50"
+              >
+                Ambassadors
+              </Link>
             </div>
-          </article>
-        </section>
-
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
-                Safe Admin Expansion
-              </p>
-              <h2 className="mt-2 text-2xl font-extrabold text-slate-950">
-                Sales & Marketing now includes field lead intake and review.
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                This dashboard reads from Sales & Marketing Admin tables only. It
-                does not change public pages, customer flows, Guru flows, bookings,
-                payments, Stripe, Plaid, or financial logic.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                <CheckCircle2 className="h-5 w-5 text-emerald-700" aria-hidden="true" />
-                <p className="mt-3 text-sm font-bold text-emerald-950">
-                  Lead Entry Linked
-                </p>
-              </div>
-              <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
-                <CheckCircle2 className="h-5 w-5 text-sky-700" aria-hidden="true" />
-                <p className="mt-3 text-sm font-bold text-sky-950">
-                  Signup Review Live
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <CheckCircle2 className="h-5 w-5 text-slate-700" aria-hidden="true" />
-                <p className="mt-3 text-sm font-bold text-slate-950">
-                  Admin Route Only
-                </p>
-              </div>
-            </div>
-          </div>
+          </section>
         </section>
       </div>
     </main>

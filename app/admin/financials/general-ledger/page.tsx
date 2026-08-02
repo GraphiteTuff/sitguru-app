@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
+import { getPlaidEnvironment } from "@/lib/plaid";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ type LedgerSource =
   | "stripe_balance_transactions"
   | "bank_transactions"
   | "admin_plaid_transactions"
+  | "booking_payments"
   | "cash_flow_lines"
   | "financial_statement_lines"
   | "payments"
@@ -102,6 +104,8 @@ type LedgerTotals = {
   postedRows: number;
   manualRows: number;
   plaidRows: number;
+  bookingPaymentRows: number;
+  stripeRows: number;
   trustSafetyRows: number;
   trustSafetyDebits: number;
   trustSafetyCredits: number;
@@ -139,16 +143,6 @@ type GeneralLedgerData = {
   totals: LedgerTotals;
 };
 
-const FINANCE_ROLES = [
-  "owner",
-  "super_admin",
-  "admin",
-  "finance_admin",
-  "finance",
-  "accounting",
-  "bookkeeper",
-];
-
 const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
   { key: "today", label: "Today" },
   { key: "weekly", label: "This Week" },
@@ -169,6 +163,7 @@ const SOURCE_TABLES: LedgerSource[] = [
   "stripe_balance_transactions",
   "bank_transactions",
   "admin_plaid_transactions",
+  "booking_payments",
   "cash_flow_lines",
   "financial_statement_lines",
   "payments",
@@ -575,6 +570,7 @@ function sourceLabel(source: LedgerSource) {
     stripe_balance_transactions: "Stripe Balance",
     bank_transactions: "Bank Transactions",
     admin_plaid_transactions: "Plaid/NFCU Transactions",
+    booking_payments: "Booking Payments",
     cash_flow_lines: "Cash Flow Lines",
     financial_statement_lines: "P&L Statement Lines",
     payments: "Payments",
@@ -633,23 +629,10 @@ function statusClasses(status: string) {
   return "border-slate-100 bg-slate-50 text-slate-700";
 }
 
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function hasFinancialRole(role: string) {
-  return FINANCE_ROLES.includes(role.trim().toLowerCase());
-}
-
-async function safeRows<T>(query: PromiseLike<SafeQueryResponse>, label: string): Promise<T[]> {
+async function safeRows<T>(
+  query: PromiseLike<SafeQueryResponse>,
+  label: string,
+): Promise<T[]> {
   try {
     const result = await query;
 
@@ -666,58 +649,15 @@ async function safeRows<T>(query: PromiseLike<SafeQueryResponse>, label: string)
 }
 
 async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
+  const identity = await getFinanceAdminIdentity();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_general_ledger_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_general_ledger_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_general_ledger_access",
-    ),
-  ]);
-
-  const profile = (profileChecks.flat().find(Boolean) || {}) as AnyRow;
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined ? true : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(profile.can_access_financials);
-  const envAllowed = envAdminEmails.includes(userEmail);
+  if (!identity) return null;
 
   return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials:
-      active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed),
+    id: identity.id,
+    email: identity.email,
+    role: identity.role,
+    canAccessFinancials: true,
   };
 }
 
@@ -1018,6 +958,15 @@ function deriveAccountFromText(text: string, source: LedgerSource, row?: AnyRow)
     return deriveReferralRewardAccount(row || {});
   }
 
+  if (source === "booking_payments") {
+    return {
+      account: "Platform Fee Revenue",
+      quickBooksAccount: "Service Revenue: Marketplace Support",
+      taxTreatment:
+        "Platform marketplace-support fee from Stripe booking payments; CPA review.",
+    };
+  }
+
   const normalized = text.toLowerCase();
 
   if (normalized.includes("trust") && normalized.includes("safety")) {
@@ -1183,6 +1132,22 @@ function amountFromRow(row: AnyRow, source: LedgerSource) {
     );
   }
 
+  if (source === "booking_payments") {
+    const fee = Math.abs(centsToDollars(row.marketplace_support_cents));
+    const refund = Math.abs(centsToDollars(row.refund_amount_cents));
+    const dispute = Math.abs(centsToDollars(row.dispute_amount_cents));
+    const gross =
+      Math.abs(centsToDollars(row.amount_cents)) ||
+      Math.abs(centsToDollars(row.gross_amount_cents)) ||
+      Math.abs(toNumber(row.amount));
+
+    if (refund > 0 || dispute > 0) {
+      return -(refund || dispute || fee || gross);
+    }
+
+    return fee || gross;
+  }
+
   if (source === "financial_statement_lines") {
     return 0;
   }
@@ -1263,6 +1228,18 @@ function getDescription(row: AnyRow, source: LedgerSource) {
     );
   }
 
+  if (source === "booking_payments") {
+    return (
+      [
+        asTrimmedString(row.description) || "Stripe booking payment",
+        asTrimmedString(row.status),
+        asTrimmedString(row.provider) || "stripe",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    );
+  }
+
   if (source === "cash_flow_lines") {
     return asTrimmedString(row.label) || "Cash flow line";
   }
@@ -1300,6 +1277,7 @@ function getCategoryType(row: AnyRow, source: LedgerSource) {
   }
 
   if (source === "expense_ledger") return "expense";
+  if (source === "booking_payments") return "platform_fee_revenue";
   if (source === "cash_flow_lines") return "manual_cash_flow_line";
   if (source === "financial_statement_lines") return "statement_line";
 
@@ -1340,6 +1318,11 @@ function getCashImpact(amount: number, row: AnyRow, source: LedgerSource) {
     return -Math.abs(amount);
   }
 
+  if (source === "booking_payments") {
+    // Stripe ledger activity sits in clearing until payout deposits hit NFCU.
+    return 0;
+  }
+
   if (source === "admin_referral_reward_liability") {
     const treatment = asTrimmedString(row.financial_treatment).toLowerCase();
     return treatment.includes("issued") ? -Math.abs(amount) : 0;
@@ -1364,6 +1347,10 @@ function getPnlImpact(amount: number, row: AnyRow, source: LedgerSource) {
   }
 
   if (source === "admin_growth_marketing_expenses") return -Math.abs(amount);
+
+  if (source === "booking_payments") {
+    return amount;
+  }
 
   if (source === "admin_referral_reward_liability") {
     const treatment = asTrimmedString(row.financial_treatment).toLowerCase();
@@ -1463,6 +1450,7 @@ function normalizeLedgerEntry(row: AnyRow, source: LedgerSource, index: number):
       (source === "bank_transactions" ||
       source === "admin_plaid_transactions" ||
       source === "stripe_balance_transactions" ||
+      source === "booking_payments" ||
       source === "trust_safety_financial_events" ||
       source === "admin_growth_marketing_expenses" ||
       source === "admin_referral_reward_liability"
@@ -1473,7 +1461,62 @@ function normalizeLedgerEntry(row: AnyRow, source: LedgerSource, index: number):
   };
 }
 
+async function getBusinessPlaidAccountIds() {
+  const plaidEnvironment = getPlaidEnvironment();
+  const accounts = await safeRows<AnyRow>(
+    supabaseAdmin
+      .from("admin_plaid_accounts")
+      .select("account_id, name, official_name, subtype, plaid_environment")
+      .eq("plaid_environment", plaidEnvironment)
+      .limit(500),
+    "admin_plaid_accounts",
+  );
+
+  return accounts
+    .filter((account) => {
+      const name =
+        `${asTrimmedString(account.name)} ${asTrimmedString(account.official_name)}`.toLowerCase();
+      const subtype = asTrimmedString(account.subtype).toLowerCase();
+      return (
+        (subtype === "checking" || subtype === "savings") &&
+        name.includes("business")
+      );
+    })
+    .map((account) => asTrimmedString(account.account_id))
+    .filter(Boolean);
+}
+
 async function getSourceRows(source: LedgerSource) {
+  if (source === "admin_plaid_transactions") {
+    const accountIds = await getBusinessPlaidAccountIds();
+
+    if (!accountIds.length) return [];
+
+    const rows = await safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_plaid_transactions")
+        .select("*")
+        .in("account_id", accountIds)
+        .is("removed_at", null)
+        .order("date", { ascending: false })
+        .limit(2500),
+      source,
+    );
+
+    return rows.filter((row) => !row.removed_at && !row.is_excluded_from_reports);
+  }
+
+  if (source === "booking_payments") {
+    return safeRows<AnyRow>(
+      supabaseAdmin
+        .from("booking_payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2500),
+      source,
+    );
+  }
+
   if (source === "admin_growth_marketing_expenses") {
     return safeRows<AnyRow>(
       supabaseAdmin
@@ -1590,6 +1633,17 @@ function calculateTotals(entries: LedgerEntry[]): LedgerTotals {
     (entry) => entry.source === "admin_plaid_transactions",
   ).length;
 
+  const bookingPaymentRows = entries.filter(
+    (entry) => entry.source === "booking_payments",
+  ).length;
+
+  const stripeRows = entries.filter(
+    (entry) =>
+      entry.source === "booking_payments" ||
+      entry.source === "stripe_transactions" ||
+      entry.source === "stripe_balance_transactions",
+  ).length;
+
   const needsReview = entries.filter(
     (entry) =>
       entry.account === "Uncategorized Ledger Activity" ||
@@ -1616,6 +1670,8 @@ function calculateTotals(entries: LedgerEntry[]): LedgerTotals {
     postedRows,
     manualRows,
     plaidRows,
+    bookingPaymentRows,
+    stripeRows,
     trustSafetyRows: trustSafetyEntries.length,
     trustSafetyDebits,
     trustSafetyCredits,
@@ -2100,7 +2156,14 @@ function ReadinessPanel({ ledger }: { ledger: GeneralLedgerData }) {
     {
       label: "Plaid/NFCU Rows",
       ready: ledger.totals.plaidRows > 0,
-      detail: `${ledger.totals.plaidRows.toLocaleString()} Plaid/NFCU rows are included in the selected period.`,
+      detail: `${ledger.totals.plaidRows.toLocaleString()} Plaid/NFCU rows are included for ${getPlaidEnvironment()}.`,
+    },
+    {
+      label: "Stripe / Booking Payments",
+      ready: ledger.totals.bookingPaymentRows > 0 || ledger.totals.stripeRows > 0,
+      detail: ledger.totals.bookingPaymentRows
+        ? `${ledger.totals.bookingPaymentRows.toLocaleString()} booking_payments rows feed platform-fee P&L impact (cash stays in Stripe clearing until NFCU deposit).`
+        : `${ledger.totals.stripeRows.toLocaleString()} Stripe ledger rows are included for this period.`,
     },
     {
       label: "Manual Rows",
@@ -2144,9 +2207,9 @@ function ReadinessPanel({ ledger }: { ledger: GeneralLedgerData }) {
             Master accounting record checks
           </h2>
           <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
-            These checks confirm whether the ledger has bank rows, manual rows,
-            growth and referral reward rows, cash impact, and review visibility
-            for the selected period.
+            These checks confirm whether the ledger has NFCU/Plaid rows, Stripe
+            booking payments, manual rows, growth and referral reward rows, cash
+            impact, and review visibility for the selected period.
           </p>
         </div>
 
@@ -2209,11 +2272,22 @@ export default async function AdminGeneralLedgerPage({
 
   const ledger = await getGeneralLedgerData(selectedPeriod);
 
+  const exportStartDate = ledger.period.start
+    ? ledger.period.start.toISOString().slice(0, 10)
+    : "";
+  const exportEndDate = ledger.period.end
+    ? ledger.period.end.toISOString().slice(0, 10)
+    : "";
+  const exportDateQuery =
+    exportStartDate || exportEndDate
+      ? `&startDate=${exportStartDate}&endDate=${exportEndDate}`
+      : "";
+
   return (
     <main className="min-h-screen bg-[#f7fbf8] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1700px] space-y-6">
         <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(360px,520px)] 2xl:items-start">
             <div className="max-w-5xl">
               <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">
                 Admin / Financials / General Ledger
@@ -2226,9 +2300,9 @@ export default async function AdminGeneralLedgerPage({
               <p className="mt-4 max-w-4xl text-sm font-semibold leading-7 text-slate-600 sm:text-base">
                 CPA-ready master ledger view for SitGuru financial activity. This
                 combines P&L activity, Cash Flow activity, NFCU/Plaid bank rows,
-                manual expenses, Trust & Safety activity, Stripe activity,
-                payouts, commissions, growth marketing costs, referral reward
-                liabilities, and statement mappings into debit, credit,
+                Stripe booking payments, manual expenses, Trust & Safety
+                activity, payouts, commissions, growth marketing costs, referral
+                reward liabilities, and statement mappings into debit, credit,
                 cash-impact, and P&L-impact rows.
               </p>
 
@@ -2246,31 +2320,79 @@ export default async function AdminGeneralLedgerPage({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/admin/financials/profit-loss"
-                className="rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
-              >
-                Profit & Loss
-              </Link>
-              <Link
-                href="/admin/financials/cash-flow"
-                className="rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
-              >
-                Cash Flow
-              </Link>
-              <Link
-                href="/admin/financials/plaid"
-                className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-800 shadow-sm transition hover:bg-emerald-100"
-              >
-                Banking
-              </Link>
-              <Link
-                href="/admin/financials"
-                className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
-              >
-                Financial Overview
-              </Link>
+            <div className="rounded-[1.5rem] border border-emerald-100 bg-[#fbfefd] p-4 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                Ledger Actions
+              </p>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <Link
+                  href="/admin/financials"
+                  className="rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-center text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+                >
+                  Financials
+                </Link>
+                <Link
+                  href="/admin/financials/profit-loss"
+                  className="rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-center text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+                >
+                  P&L
+                </Link>
+                <Link
+                  href="/admin/financials/cash-flow"
+                  className="rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-center text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+                >
+                  Cash Flow
+                </Link>
+                <Link
+                  href="/admin/financials/balance-sheet"
+                  className="rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-center text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+                >
+                  Balance Sheet
+                </Link>
+                <Link
+                  href="/admin/financials/payment-gateway"
+                  className="rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-center text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+                >
+                  Stripe
+                </Link>
+                <Link
+                  href="/admin/financials/plaid"
+                  className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-center text-sm font-bold text-emerald-800 shadow-sm transition hover:bg-emerald-100"
+                >
+                  Banking
+                </Link>
+                <Link
+                  href="/admin/financials/reconciliation"
+                  className="rounded-xl bg-emerald-700 px-4 py-2.5 text-center text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800 sm:col-span-2"
+                >
+                  Reconcile
+                </Link>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Export Ledger
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {(
+                    [
+                      ["CSV", "csv"],
+                      ["Excel", "excel"],
+                      ["Word", "word"],
+                      ["PDF", "pdf"],
+                    ] as const
+                  ).map(([label, format]) => (
+                    <Link
+                      key={format}
+                      href={`/api/admin/financials/general-ledger/export?format=${format}${exportDateQuery}`}
+                      className="rounded-xl border border-emerald-100 bg-white px-3 py-2 text-center text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2278,7 +2400,7 @@ export default async function AdminGeneralLedgerPage({
             <StatCard
               label="Ledger Rows"
               value={ledger.totals.rowCount.toLocaleString()}
-              detail="Rows from bank, manual, Trust & Safety, Stripe, statements, payouts, payments, commissions, and growth/referral views."
+              detail="Rows from bank, booking payments, manual, Trust & Safety, Stripe, statements, payouts, commissions, and growth/referral views."
               tone="emerald"
             />
             <StatCard
@@ -2341,9 +2463,9 @@ export default async function AdminGeneralLedgerPage({
               tone="slate"
             />
             <StatCard
-              label="Manual Rows"
-              value={ledger.totals.manualRows.toLocaleString()}
-              detail="Expense ledger, manual cash-flow line, growth, and referral view rows."
+              label="Booking Payments"
+              value={ledger.totals.bookingPaymentRows.toLocaleString()}
+              detail={`${ledger.totals.stripeRows.toLocaleString()} total Stripe-linked rows including booking payments and balance transactions.`}
               tone="slate"
             />
           </div>
@@ -2418,8 +2540,8 @@ export default async function AdminGeneralLedgerPage({
 
           {ledger.entries.length > 225 ? (
             <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm font-bold text-amber-800">
-              Showing the latest 225 rows. Use exports later for the full
-              period ledger.
+              Showing the latest 225 rows. Export CSV/Excel/Word/PDF for the
+              full period ledger.
             </p>
           ) : null}
         </section>

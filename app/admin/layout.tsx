@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import {
+  ClipboardCheck,
   ClipboardList,
   BarChart3,
   ChevronDown,
@@ -34,6 +35,8 @@ import {
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import AdminAccountMenu from "@/components/AdminAccountMenu";
+import RogueFloatingAssistant from "@/components/admin/RogueFloatingAssistant";
+import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 
 const adminRoutes = {
   dashboard: "/admin",
@@ -49,9 +52,12 @@ const adminRoutes = {
   hr: "/admin/hr",
   universityTraining: "/admin/ambassador-training",
   universityAssignments: "/admin/university-assignments",
+  universityProgress: "/admin/university-progress",
+  universityCurriculum: "/admin/ambassador-training/manage",
   financials: "/admin/financials",
   banking: "/admin/financials/plaid",
-  stripe: "/admin/financials/stripe",
+  stripe: "/admin/financials/payment-gateway",
+  paymentGateway: "/admin/financials/payment-gateway",
   profitLoss: "/admin/financials/profit-loss",
   balanceSheet: "/admin/financials/balance-sheet",
   cashFlow: "/admin/financials/cash-flow",
@@ -64,6 +70,7 @@ const adminRoutes = {
   payouts: "/admin/payouts",
   financialPayouts: "/admin/financials/payouts",
   financialExports: "/admin/financials/exports",
+  reports: "/admin/financials/reports",
   reportsDaily: "/admin/financials/reports/daily",
   reportsWeekly: "/admin/financials/reports/weekly",
   reportsCustom: "/admin/financials/reports/custom",
@@ -99,6 +106,11 @@ const navSections = [
         icon: GraduationCap,
       },
       {
+        label: "Academy Progress",
+        href: adminRoutes.universityProgress,
+        icon: ClipboardCheck,
+      },
+      {
         label: "Trust & Safety",
         href: adminRoutes.trustSafety,
         icon: ShieldCheck,
@@ -123,7 +135,7 @@ const navSections = [
       { label: "Partners", href: adminRoutes.partners, icon: HandCoins },
       { label: "Analytics", href: adminRoutes.analytics, icon: Gauge },
       {
-        label: "Chat Insights",
+        label: "Insights",
         href: adminRoutes.insights,
         icon: MessageCircle,
       },
@@ -139,8 +151,8 @@ const navSections = [
       },
       { label: "Banking", href: adminRoutes.banking, icon: Landmark },
       {
-        label: "Stripe Transactions",
-        href: adminRoutes.stripe,
+        label: "Payment Gateway",
+        href: adminRoutes.paymentGateway,
         icon: CreditCard,
       },
       {
@@ -264,6 +276,11 @@ const mobileGrowthLinks = [
     label: "Academy Assignments",
     href: adminRoutes.universityAssignments,
     icon: ClipboardList,
+  },
+  {
+    label: "Academy Progress",
+    href: adminRoutes.universityProgress,
+    icon: ClipboardCheck,
   },
   {
     label: "Sales & Marketing",
@@ -535,6 +552,10 @@ function AdminFooter() {
           label: "Academy Assignments",
           href: adminRoutes.universityAssignments,
         },
+        {
+          label: "Academy Progress",
+          href: adminRoutes.universityProgress,
+        },
         { label: "Trust & Safety", href: adminRoutes.trustSafety },
         { label: "Messages", href: adminRoutes.messages },
       ],
@@ -555,7 +576,7 @@ function AdminFooter() {
       title: "Financial Operations",
       links: [
         { label: "Banking", href: adminRoutes.banking },
-        { label: "Stripe Transactions", href: adminRoutes.stripe },
+        { label: "Payment Gateway", href: adminRoutes.paymentGateway },
         { label: "Commissions", href: adminRoutes.commissions },
         { label: "Payouts", href: adminRoutes.payouts },
         {
@@ -569,6 +590,7 @@ function AdminFooter() {
       links: [
         { label: "Tax Center", href: adminRoutes.taxReports },
         { label: "CPA Handoff", href: adminRoutes.cpaHandoff },
+        { label: "Reports Hub", href: adminRoutes.reports },
         { label: "Daily Report", href: adminRoutes.reportsDaily },
         { label: "Weekly Report", href: adminRoutes.reportsWeekly },
         { label: "Custom Report", href: adminRoutes.reportsCustom },
@@ -852,6 +874,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </main>
         </div>
       </div>
+
+      <SafeAssistantBubble>
+        <RogueFloatingAssistant />
+      </SafeAssistantBubble>
     </div>
   );
 }

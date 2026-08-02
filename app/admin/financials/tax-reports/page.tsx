@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
+import { getPlaidEnvironment } from "@/lib/plaid";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,7 @@ type TaxReportCard = {
   href: string;
   tone: "green" | "blue" | "amber" | "purple" | "rose" | "slate";
   included: string[];
+  liveHint: string;
 };
 
 type TaxChecklistItem = {
@@ -36,6 +39,19 @@ type TaxAuthorityCard = {
 };
 
 type AnyRow = Record<string, unknown>;
+
+type SafeQueryResponse = {
+  data: unknown;
+  error: unknown;
+};
+
+type ReadinessStatus = "ready" | "needs_review" | "missing";
+
+type ReadinessItem = {
+  label: string;
+  status: ReadinessStatus;
+  detail: string;
+};
 
 type GrowthFinancialSummaryRow = {
   financial_category?: string | null;
@@ -80,10 +96,32 @@ type ReferralRewardLiabilityRow = {
   paid_at?: string | null;
 };
 
-type TaxCenterData = {
-  summaryRows: GrowthFinancialSummaryRow[];
-  roiRows: GrowthCampaignRoiRow[];
-  rewardRows: ReferralRewardLiabilityRow[];
+type TaxLiveTotals = {
+  paidBookingCount: number;
+  bookingPaymentCount: number;
+  grossBookingVolume: number;
+  platformRevenue: number;
+  taxCollectedSupport: number;
+  refundSupport: number;
+  expenseLedgerTotal: number;
+  expenseCount: number;
+  growthMarketingTotal: number;
+  marketingSummaryTotal: number;
+  payoutTotal: number;
+  payoutCount: number;
+  commissionTotal: number;
+  commissionCount: number;
+  stripePayoutCount: number;
+  stripePayoutTotal: number;
+  liveCashBalance: number;
+  connectedBusinessAccounts: number;
+  pendingRewardLiability: number;
+  issuedReferralRewards: number;
+  campaignCount: number;
+  totalCampaignCost: number;
+  totalAttributedRevenue: number;
+  totalBookings: number;
+  overallRoi: number | null;
 };
 
 const taxReports: TaxReportCard[] = [
@@ -103,6 +141,7 @@ const taxReports: TaxReportCard[] = [
       "Owner contributions",
       "Owner distributions",
     ],
+    liveHint: "Live support: booking_payments + P&L",
   },
   {
     eyebrow: "Deductions",
@@ -120,6 +159,7 @@ const taxReports: TaxReportCard[] = [
       "Banking and card fees",
       "Office and admin expenses",
     ],
+    liveHint: "Live support: expense_ledger + growth costs",
   },
   {
     eyebrow: "1099 Support",
@@ -137,6 +177,7 @@ const taxReports: TaxReportCard[] = [
       "1099 threshold review",
       "Exception list",
     ],
+    liveHint: "Live support: payouts + commissions",
   },
   {
     eyebrow: "Sales / Local Tax",
@@ -154,6 +195,7 @@ const taxReports: TaxReportCard[] = [
       "Marketplace fee review",
       "CPA notes",
     ],
+    liveHint: "Live support: booking_payments tax cents",
   },
   {
     eyebrow: "Reconciliation",
@@ -171,6 +213,7 @@ const taxReports: TaxReportCard[] = [
       "Deposit matching",
       "Unmatched transactions",
     ],
+    liveHint: "Live module: /admin/financials/reconciliation",
   },
   {
     eyebrow: "Audit Support",
@@ -188,6 +231,7 @@ const taxReports: TaxReportCard[] = [
       "Campaign and referral support",
       "CPA questions log",
     ],
+    liveHint: "Live support: GL + Export Center",
   },
 ];
 
@@ -257,138 +301,63 @@ const taxAuthorityCards: TaxAuthorityCard[] = [
   },
 ];
 
-const quarterlyChecklist: TaxChecklistItem[] = [
-  {
-    step: "Q1",
-    title: "January – March estimated tax review",
-    description:
-      "Review revenue, deductible expenses, cash reserves, prior-year CPA advice, and Q1 payment support.",
-    status: "Pending",
-  },
-  {
-    step: "Q2",
-    title: "April – May / June estimated tax review",
-    description:
-      "Review launch ramp, marketing spend, startup costs, payout obligations, and quarterly reserve needs.",
-    status: "Review",
-  },
-  {
-    step: "Q3",
-    title: "June – August / September estimated tax review",
-    description:
-      "Review soft-launch revenue, Guru payouts, referral rewards, marketing ROI, and tax reserve changes.",
-    status: "Pending",
-  },
-  {
-    step: "Q4",
-    title: "September – December year-end tax planning",
-    description:
-      "Review full-year taxable income, deductions, contractor support, local tax exposure, and CPA package readiness.",
-    status: "Pending",
-  },
-];
-
-const annualChecklist: TaxChecklistItem[] = [
-  {
-    step: "01",
-    title: "Confirm launch-year period",
-    description:
-      "Confirm the first SitGuru tax package covers Jun 1–Dec 31, 2026, unless your CPA requests a different treatment.",
-    status: "Review",
-  },
-  {
-    step: "02",
-    title: "Review revenue categories",
-    description:
-      "Validate gross bookings, platform revenue, service fees, refunds, chargebacks, and Stripe activity.",
-    status: "Pending",
-  },
-  {
-    step: "03",
-    title: "Review payout categories",
-    description:
-      "Separate Guru payouts, partner commissions, Ambassador rewards, referral rewards, contractor payments, payroll, vendor expenses, and owner distributions.",
-    status: "Pending",
-  },
-  {
-    step: "04",
-    title: "Review deductible expenses",
-    description:
-      "Categorize software, marketing, advertising, growth campaigns, insurance, background checks, banking fees, legal, professional, and admin expenses.",
-    status: "Pending",
-  },
-  {
-    step: "05",
-    title: "Review referral rewards and PawPerks",
-    description:
-      "Confirm issued rewards as expense support and pending rewards as liability support before CPA review.",
-    status: "Pending",
-  },
-  {
-    step: "06",
-    title: "Complete reconciliations",
-    description:
-      "Match Stripe payouts, bank deposits, credit card charges, refunds, disputes, vendor transactions, campaign costs, and reward payouts.",
-    status: "Pending",
-  },
-  {
-    step: "07",
-    title: "Generate annual tax package",
-    description:
-      "Export annual statements, tax schedules, CSV files, Excel workbook, PDF packet, and full ZIP archive.",
-    status: "Pending",
-  },
-  {
-    step: "08",
-    title: "Send to CPA",
-    description:
-      "Send the tax package, notes, open questions, and supporting files to your CPA or bookkeeper.",
-    status: "Pending",
-  },
-];
-
 const exportCards = [
   {
-    title: "Annual Tax PDF Packet",
+    title: "Tax Center CSV",
     description:
-      "Clean PDF package for CPA review, owner records, lender requests, investor review, or audit backup.",
-    href: "/admin/financials/exports?type=tax&format=pdf&period=annual",
+      "Live tax support rollup from booking_payments, expenses, payouts, commissions, rewards, Stripe payouts, and NFCU cash.",
+    href: "/api/admin/financials/tax-reports/export?format=csv",
   },
   {
-    title: "Annual Tax Excel Workbook",
+    title: "Tax Center Excel",
     description:
-      "Multi-tab workbook with annual summary, tax categories, deductions, 1099 support, reconciliations, growth ROI, and notes.",
-    href: "/admin/financials/exports?type=tax&format=xlsx&period=annual",
+      "Spreadsheet-ready tax support schedule for CPA analysis and QuickBooks-style review.",
+    href: "/api/admin/financials/tax-reports/export?format=excel",
   },
   {
-    title: "Annual Tax CSV Package",
+    title: "Tax Center Word / PDF",
     description:
-      "CSV files for QuickBooks-style imports, CPA analysis, bookkeeping review, growth campaign backup, and general ledger support.",
-    href: "/admin/financials/exports?type=tax&format=csv&period=annual",
+      "Printable HTML package for owner records, CPA review packets, and audit backup notes.",
+    href: "/api/admin/financials/tax-reports/export?format=pdf",
   },
   {
-    title: "Annual Tax ZIP Archive",
+    title: "Export Center Packages",
     description:
-      "Full archive including PDF, Excel, CSVs, backup schedules, referral reward support, reconciliation files, and audit support.",
-    href: "/admin/financials/exports?type=tax&format=zip&period=annual",
+      "Prepare broader annual tax PDF, Excel, CSV, and ZIP packages from the Export Center workflow.",
+    href: "/admin/financials/exports?type=tax&period=annual",
   },
 ];
 
-function safeNumber(value: unknown, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function asText(value: unknown) {
+function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
+function toNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const cleaned = value.replace(/[$,%\s,()]/g, "");
+    const parsed = Number(cleaned);
+    if (Number.isFinite(parsed)) {
+      return value.includes("(") && value.includes(")") ? -parsed : parsed;
+    }
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function centsToDollars(value: unknown) {
+  return toNumber(value) / 100;
+}
+
+function moneyExact(value: number) {
+  const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(Math.round(value || 0));
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(value || 0));
+
+  return value < 0 ? `(${formatted})` : formatted;
 }
 
 function formatPercent(value: number | null | undefined) {
@@ -396,7 +365,7 @@ function formatPercent(value: number | null | undefined) {
     return "Needs cost data";
   }
 
-  return `${Math.round(Number(value))}%`;
+  return `${Number(value).toFixed(1)}%`;
 }
 
 function toneClasses(tone: TaxSummaryCard["tone"] | TaxReportCard["tone"]) {
@@ -434,58 +403,525 @@ function authorityClasses(level: TaxAuthorityCard["level"]) {
   return levels[level];
 }
 
-async function safeRows<T>(table: string, query = "*", limit = 100) {
+function readinessClasses(status: ReadinessStatus) {
+  if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "needs_review") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
+async function safeRows<T>(
+  query: PromiseLike<SafeQueryResponse>,
+  label: string,
+): Promise<T[]> {
   try {
-    const { data, error } = await supabaseAdmin.from(table).select(query).limit(limit);
+    const result = await query;
 
-    if (error || !data) return [] as T[];
+    if (result.error) {
+      console.warn(`Tax Center query skipped for ${label}:`, result.error);
+      return [];
+    }
 
-    return data as unknown as T[];
-  } catch {
-    return [] as T[];
+    return Array.isArray(result.data) ? (result.data as T[]) : [];
+  } catch (error) {
+    console.warn(`Tax Center query skipped for ${label}:`, error);
+    return [];
   }
 }
 
-async function getTaxCenterData(): Promise<TaxCenterData> {
-  const [summaryRows, roiRows, rewardRows] = await Promise.all([
+function isPaidPayment(row: AnyRow) {
+  const status = asTrimmedString(row.status).toLowerCase();
+  return (
+    status.includes("paid") ||
+    status.includes("succeeded") ||
+    status.includes("complete")
+  );
+}
+
+function paymentGross(row: AnyRow) {
+  return (
+    centsToDollars(row.amount_cents) ||
+    centsToDollars(row.gross_amount_cents) ||
+    centsToDollars(row.total_cents) ||
+    toNumber(row.amount)
+  );
+}
+
+function paymentFee(row: AnyRow) {
+  return (
+    centsToDollars(row.marketplace_support_cents) ||
+    centsToDollars(row.platform_fee_cents) ||
+    toNumber(row.platform_fee)
+  );
+}
+
+function paymentTax(row: AnyRow) {
+  return (
+    centsToDollars(row.tax_cents) ||
+    centsToDollars(row.sales_tax_cents) ||
+    toNumber(row.tax_amount)
+  );
+}
+
+function paymentRefund(row: AnyRow) {
+  return (
+    centsToDollars(row.refund_amount_cents) ||
+    centsToDollars(row.dispute_amount_cents) ||
+    toNumber(row.refund_amount)
+  );
+}
+
+function isBusinessBankAccount(row: AnyRow) {
+  const name =
+    `${asTrimmedString(row.name)} ${asTrimmedString(row.official_name)}`.toLowerCase();
+  const subtype = asTrimmedString(row.subtype).toLowerCase();
+  return (
+    (subtype === "checking" || subtype === "savings") &&
+    name.includes("business")
+  );
+}
+
+async function getTaxCenterData() {
+  const plaidEnvironment = getPlaidEnvironment();
+
+  const [
+    summaryRows,
+    roiRows,
+    rewardRows,
+    bookingPayments,
+    expenseRows,
+    growthMarketingRows,
+    payoutRows,
+    commissionRows,
+    stripePayouts,
+    plaidAccounts,
+  ] = await Promise.all([
     safeRows<GrowthFinancialSummaryRow>(
+      supabaseAdmin
+        .from("admin_growth_financial_summary")
+        .select(
+          "financial_category,financial_statement_section,row_count,total_amount,first_activity_date,last_activity_date,source",
+        )
+        .limit(100),
       "admin_growth_financial_summary",
-      "financial_category,financial_statement_section,row_count,total_amount,first_activity_date,last_activity_date,source",
-      100,
     ),
     safeRows<GrowthCampaignRoiRow>(
+      supabaseAdmin
+        .from("admin_growth_campaign_roi")
+        .select(
+          "campaign_name,channel,campaign_type,clicks,leads,signups,bookings,attributed_revenue,total_cost,net_growth_return,roi_percent,cost_per_signup,cost_per_booking,growth_signal,admin_recommendation",
+        )
+        .limit(100),
       "admin_growth_campaign_roi",
-      "campaign_name,channel,campaign_type,clicks,leads,signups,bookings,attributed_revenue,total_cost,net_growth_return,roi_percent,cost_per_signup,cost_per_booking,growth_signal,admin_recommendation",
-      100,
     ),
     safeRows<ReferralRewardLiabilityRow>(
+      supabaseAdmin.from("admin_referral_reward_liability").select("*").limit(2500),
       "admin_referral_reward_liability",
-      "*",
-      250,
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("booking_payments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      "booking_payments",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("expense_ledger")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(2500),
+      "expense_ledger",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_growth_marketing_expenses")
+        .select("*")
+        .order("cost_date", { ascending: false })
+        .limit(1000),
+      "admin_growth_marketing_expenses",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("payouts").select("*").limit(2500),
+      "payouts",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("commissions").select("*").limit(2500),
+      "commissions",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("stripe_payouts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      "stripe_payouts",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_plaid_accounts")
+        .select(
+          "account_id, name, official_name, subtype, current_balance, available_balance, plaid_environment",
+        )
+        .eq("plaid_environment", plaidEnvironment)
+        .limit(500),
+      "admin_plaid_accounts",
     ),
   ]);
+
+  const stripePayments = bookingPayments.filter((row) => {
+    const provider = asTrimmedString(row.provider).toLowerCase();
+    return !provider || provider === "stripe";
+  });
+  const paid = stripePayments.filter(isPaidPayment);
+
+  let grossBookingVolume = 0;
+  let platformRevenue = 0;
+  let taxCollectedSupport = 0;
+  let refundSupport = 0;
+
+  for (const row of paid) {
+    grossBookingVolume += Math.abs(paymentGross(row));
+    platformRevenue += Math.abs(paymentFee(row));
+    taxCollectedSupport += Math.abs(paymentTax(row));
+    refundSupport += Math.abs(paymentRefund(row));
+  }
+
+  const expenseLedgerTotal = expenseRows.reduce(
+    (sum, row) =>
+      sum +
+      Math.abs(
+        toNumber(row.amount) ||
+          centsToDollars(row.amount_cents) ||
+          toNumber(row.total_amount),
+      ),
+    0,
+  );
+
+  const growthMarketingTotal = growthMarketingRows.reduce(
+    (sum, row) =>
+      sum +
+      Math.abs(
+        toNumber(row.amount) || toNumber(row.total_cost) || toNumber(row.cost),
+      ),
+    0,
+  );
+
+  const marketingSummaryTotal = summaryRows
+    .filter((row) =>
+      `${row.financial_category || ""} ${row.financial_statement_section || ""}`
+        .toLowerCase()
+        .includes("marketing"),
+    )
+    .reduce((sum, row) => sum + Math.abs(toNumber(row.total_amount)), 0);
+
+  const pendingRewardLiability = rewardRows.reduce((sum, row) => {
+    const status = `${row.reward_status || ""} ${row.financial_statement_section || ""}`.toLowerCase();
+    const isPending =
+      status.includes("pending") ||
+      status.includes("liability") ||
+      status.includes("payable");
+    if (!isPending) return sum;
+    return sum + Math.abs(toNumber(row.amount || row.reward_amount || row.total_amount));
+  }, 0);
+
+  const issuedReferralRewards = rewardRows.reduce((sum, row) => {
+    const status = `${row.reward_status || ""} ${row.financial_statement_section || ""}`.toLowerCase();
+    const isIssued =
+      status.includes("issued") ||
+      status.includes("paid") ||
+      status.includes("credited") ||
+      status.includes("expense");
+    if (!isIssued) return sum;
+    return sum + Math.abs(toNumber(row.amount || row.reward_amount || row.total_amount));
+  }, 0);
+
+  const payoutTotal = payoutRows.reduce(
+    (sum, row) =>
+      sum +
+      Math.abs(
+        toNumber(row.amount) ||
+          toNumber(row.payout_amount) ||
+          centsToDollars(row.amount_cents),
+      ),
+    0,
+  );
+
+  const commissionTotal = commissionRows.reduce(
+    (sum, row) =>
+      sum +
+      Math.abs(
+        toNumber(row.amount) ||
+          toNumber(row.commission_amount) ||
+          centsToDollars(row.amount_cents),
+      ),
+    0,
+  );
+
+  const stripePayoutTotal = stripePayouts.reduce(
+    (sum, row) =>
+      sum +
+      Math.abs(
+        centsToDollars(row.amount) ||
+          centsToDollars(row.amount_cents) ||
+          toNumber(row.amount),
+      ),
+    0,
+  );
+
+  const businessAccounts = plaidAccounts.filter(isBusinessBankAccount);
+  const liveCashBalance = businessAccounts.reduce(
+    (sum, row) => sum + toNumber(row.current_balance),
+    0,
+  );
+
+  const totalCampaignCost = roiRows.reduce(
+    (sum, row) => sum + toNumber(row.total_cost),
+    0,
+  );
+  const totalAttributedRevenue = roiRows.reduce(
+    (sum, row) => sum + toNumber(row.attributed_revenue),
+    0,
+  );
+  const totalBookings = roiRows.reduce(
+    (sum, row) => sum + toNumber(row.bookings),
+    0,
+  );
+  const overallRoi =
+    totalCampaignCost > 0
+      ? ((totalAttributedRevenue - totalCampaignCost) / totalCampaignCost) * 100
+      : null;
+
+  const live: TaxLiveTotals = {
+    paidBookingCount: paid.length,
+    bookingPaymentCount: stripePayments.length,
+    grossBookingVolume,
+    platformRevenue,
+    taxCollectedSupport,
+    refundSupport,
+    expenseLedgerTotal,
+    expenseCount: expenseRows.length,
+    growthMarketingTotal,
+    marketingSummaryTotal,
+    payoutTotal,
+    payoutCount: payoutRows.length,
+    commissionTotal,
+    commissionCount: commissionRows.length,
+    stripePayoutCount: stripePayouts.length,
+    stripePayoutTotal,
+    liveCashBalance,
+    connectedBusinessAccounts: businessAccounts.length,
+    pendingRewardLiability,
+    issuedReferralRewards,
+    campaignCount: roiRows.length,
+    totalCampaignCost,
+    totalAttributedRevenue,
+    totalBookings,
+    overallRoi,
+  };
 
   return {
     summaryRows,
     roiRows,
     rewardRows,
+    live,
+    plaidEnvironment,
   };
 }
 
-function sumRows<T extends AnyRow>(
-  rows: T[],
-  predicate: (row: T) => boolean,
-  valueKeys: string[],
-) {
-  return rows
-    .filter(predicate)
-    .reduce((sum, row) => {
-      const value = valueKeys
-        .map((key) => safeNumber(row[key]))
-        .find((candidate) => candidate !== 0);
+function getReadinessItems(live: TaxLiveTotals): ReadinessItem[] {
+  return [
+    {
+      label: "Stripe booking_payments",
+      status: live.paidBookingCount > 0 ? "ready" : "needs_review",
+      detail: live.paidBookingCount
+        ? `${live.paidBookingCount.toLocaleString()} paid payments · platform fees ${moneyExact(live.platformRevenue)} · tax support ${moneyExact(live.taxCollectedSupport)}.`
+        : "No paid booking_payments yet for revenue / marketplace tax calibration.",
+    },
+    {
+      label: "Deduction support",
+      status:
+        live.expenseCount > 0 || live.growthMarketingTotal > 0
+          ? "ready"
+          : "needs_review",
+      detail: `${live.expenseCount.toLocaleString()} expense_ledger rows (${moneyExact(live.expenseLedgerTotal)}) · growth marketing ${moneyExact(live.growthMarketingTotal + live.marketingSummaryTotal)}.`,
+    },
+    {
+      label: "1099 / payout support",
+      status:
+        live.payoutCount > 0 || live.commissionCount > 0
+          ? "ready"
+          : "needs_review",
+      detail: `${live.payoutCount.toLocaleString()} payouts (${moneyExact(live.payoutTotal)}) · ${live.commissionCount.toLocaleString()} commissions (${moneyExact(live.commissionTotal)}).`,
+    },
+    {
+      label: "Bank / Stripe reconciliation",
+      status:
+        live.connectedBusinessAccounts > 0 && live.stripePayoutCount > 0
+          ? "ready"
+          : "needs_review",
+      detail: `${live.connectedBusinessAccounts} NFCU business account${live.connectedBusinessAccounts === 1 ? "" : "s"} · ${live.stripePayoutCount.toLocaleString()} Stripe payouts · cash ${moneyExact(live.liveCashBalance)}.`,
+    },
+    {
+      label: "Referral / PawPerks liabilities",
+      status:
+        live.pendingRewardLiability > 0 || live.issuedReferralRewards > 0
+          ? "ready"
+          : "needs_review",
+      detail: `Pending ${moneyExact(live.pendingRewardLiability)} · issued ${moneyExact(live.issuedReferralRewards)}.`,
+    },
+    {
+      label: "Growth campaign ROI",
+      status: live.campaignCount > 0 ? "ready" : "needs_review",
+      detail: live.campaignCount
+        ? `${live.campaignCount.toLocaleString()} campaigns · ROI ${formatPercent(live.overallRoi)}.`
+        : "No campaign ROI rows yet for marketing deduction backup.",
+    },
+  ];
+}
 
-      return sum + safeNumber(value);
-    }, 0);
+function buildQuarterlyChecklist(live: TaxLiveTotals): TaxChecklistItem[] {
+  const hasRevenue = live.paidBookingCount > 0;
+  const hasSpend =
+    live.expenseCount > 0 ||
+    live.growthMarketingTotal > 0 ||
+    live.issuedReferralRewards > 0;
+  const hasCash = live.connectedBusinessAccounts > 0;
+
+  return [
+    {
+      step: "Q1",
+      title: "January – March estimated tax review",
+      description:
+        "Review revenue, deductible expenses, cash reserves, prior-year CPA advice, and Q1 payment support.",
+      status: hasRevenue || hasSpend ? "Review" : "Pending",
+    },
+    {
+      step: "Q2",
+      title: "April – May / June estimated tax review",
+      description:
+        "Review launch ramp, marketing spend, startup costs, payout obligations, and quarterly reserve needs.",
+      status: hasSpend ? "Review" : "Pending",
+    },
+    {
+      step: "Q3",
+      title: "June – August / September estimated tax review",
+      description:
+        "Review soft-launch revenue, Guru payouts, referral rewards, marketing ROI, and tax reserve changes.",
+      status:
+        hasRevenue && (live.payoutCount > 0 || live.campaignCount > 0)
+          ? "Review"
+          : "Pending",
+    },
+    {
+      step: "Q4",
+      title: "September – December year-end tax planning",
+      description:
+        "Review full-year taxable income, deductions, contractor support, local tax exposure, and CPA package readiness.",
+      status: hasRevenue && hasSpend && hasCash ? "Ready" : "Pending",
+    },
+  ];
+}
+
+function buildAnnualChecklist(live: TaxLiveTotals): TaxChecklistItem[] {
+  return [
+    {
+      step: "01",
+      title: "Confirm launch-year period",
+      description:
+        "Confirm the first SitGuru tax package covers Jun 1–Dec 31, 2026, unless your CPA requests a different treatment.",
+      status: "Review",
+    },
+    {
+      step: "02",
+      title: "Review revenue categories",
+      description:
+        "Validate gross bookings, platform revenue, service fees, refunds, chargebacks, and Stripe activity.",
+      status: live.paidBookingCount > 0 ? "Ready" : "Pending",
+    },
+    {
+      step: "03",
+      title: "Review payout categories",
+      description:
+        "Separate Guru payouts, partner commissions, Ambassador rewards, referral rewards, contractor payments, payroll, vendor expenses, and owner distributions.",
+      status:
+        live.payoutCount > 0 || live.commissionCount > 0 ? "Ready" : "Pending",
+    },
+    {
+      step: "04",
+      title: "Review deductible expenses",
+      description:
+        "Categorize software, marketing, advertising, growth campaigns, insurance, background checks, banking fees, legal, professional, and admin expenses.",
+      status:
+        live.expenseCount > 0 || live.growthMarketingTotal > 0
+          ? "Ready"
+          : "Pending",
+    },
+    {
+      step: "05",
+      title: "Review referral rewards and PawPerks",
+      description:
+        "Confirm issued rewards as expense support and pending rewards as liability support before CPA review.",
+      status:
+        live.pendingRewardLiability > 0 || live.issuedReferralRewards > 0
+          ? "Ready"
+          : "Pending",
+    },
+    {
+      step: "06",
+      title: "Complete reconciliations",
+      description:
+        "Match Stripe payouts, bank deposits, credit card charges, refunds, disputes, vendor transactions, campaign costs, and reward payouts.",
+      status:
+        live.stripePayoutCount > 0 && live.connectedBusinessAccounts > 0
+          ? "Ready"
+          : "Pending",
+    },
+    {
+      step: "07",
+      title: "Generate annual tax package",
+      description:
+        "Export annual statements, tax schedules, CSV files, Excel workbook, PDF packet, and full ZIP archive.",
+      status: "Review",
+    },
+    {
+      step: "08",
+      title: "Send to CPA",
+      description:
+        "Send the tax package, notes, open questions, and supporting files to your CPA or bookkeeper.",
+      status: "Pending",
+    },
+  ];
+}
+
+function ActionLink({
+  href,
+  label,
+  primary = false,
+}: {
+  href: string;
+  label: string;
+  primary?: boolean;
+}) {
+  if (primary) {
+    return (
+      <Link
+        href={href}
+        className="inline-flex items-center justify-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
+      >
+        {label}
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center justify-center rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+    >
+      {label}
+    </Link>
+  );
 }
 
 function ArrowCircle() {
@@ -564,116 +1000,100 @@ function ChecklistBlock({
   );
 }
 
-export default async function AdminFinancialsTaxReportsPage() {
+export default async function AdminFinancialsTaxReportsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{
+    section?: string;
+    period?: string;
+  }>;
+}) {
+  const actor = await getFinanceAdminIdentity();
+
+  if (!actor) {
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Financial access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with a finance-enabled admin account to view SitGuru Tax
+            Center records.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const params = (await searchParams) || {};
+  const section = asTrimmedString(params.section).toLowerCase();
+  const period = asTrimmedString(params.period) || "2026";
+
   const taxData = await getTaxCenterData();
-
-  const marketingExpense = sumRows(
-    taxData.summaryRows as unknown as AnyRow[],
-    (row) =>
-      `${row.financial_category || ""} ${row.financial_statement_section || ""}`
-        .toLowerCase()
-        .includes("marketing"),
-    ["total_amount"],
-  );
-
-  const pendingRewardLiability = taxData.rewardRows.reduce((sum, row) => {
-    const status = `${row.reward_status || ""} ${row.financial_statement_section || ""}`.toLowerCase();
-    const isPending =
-      status.includes("pending") ||
-      status.includes("liability") ||
-      status.includes("payable");
-
-    if (!isPending) return sum;
-
-    return (
-      sum +
-      safeNumber(row.amount || row.reward_amount || row.total_amount)
-    );
-  }, 0);
-
-  const issuedReferralRewards = taxData.rewardRows.reduce((sum, row) => {
-    const status = `${row.reward_status || ""} ${row.financial_statement_section || ""}`.toLowerCase();
-    const isIssued =
-      status.includes("issued") ||
-      status.includes("paid") ||
-      status.includes("credited") ||
-      status.includes("expense");
-
-    if (!isIssued) return sum;
-
-    return (
-      sum +
-      safeNumber(row.amount || row.reward_amount || row.total_amount)
-    );
-  }, 0);
-
-  const totalCampaignCost = taxData.roiRows.reduce(
-    (sum, row) => sum + safeNumber(row.total_cost),
-    0,
-  );
-  const totalAttributedRevenue = taxData.roiRows.reduce(
-    (sum, row) => sum + safeNumber(row.attributed_revenue),
-    0,
-  );
-  const totalBookings = taxData.roiRows.reduce(
-    (sum, row) => sum + safeNumber(row.bookings),
-    0,
-  );
-  const overallRoi =
-    totalCampaignCost > 0
-      ? ((totalAttributedRevenue - totalCampaignCost) / totalCampaignCost) * 100
-      : null;
+  const { live } = taxData;
+  const readinessItems = getReadinessItems(live);
+  const quarterlyChecklist = buildQuarterlyChecklist(live);
+  const annualChecklist = buildAnnualChecklist(live);
+  const marketingDeductions =
+    live.marketingSummaryTotal +
+    live.growthMarketingTotal +
+    live.totalCampaignCost;
 
   const taxSummaryCards: TaxSummaryCard[] = [
     {
       label: "Tax Year Package",
-      value: "2026",
-      helper: "Launch-year package can support Jun 1–Dec 31, 2026, subject to CPA confirmation.",
+      value: period === "annual" ? "2026" : period,
+      helper:
+        "Launch-year package can support Jun 1–Dec 31, 2026, subject to CPA confirmation.",
+      tone: "green",
+    },
+    {
+      label: "Platform Revenue",
+      value: moneyExact(live.platformRevenue),
+      helper: `${live.paidBookingCount.toLocaleString()} paid booking_payments · gross ${moneyExact(live.grossBookingVolume)}.`,
       tone: "green",
     },
     {
       label: "Marketing Deductions",
-      value: formatCurrency(marketingExpense + totalCampaignCost),
+      value: moneyExact(marketingDeductions),
       helper: "Campaign costs, ads, print, QR, and growth marketing expense support.",
       tone: "blue",
     },
     {
-      label: "Reward Liability",
-      value: formatCurrency(pendingRewardLiability),
-      helper: "Pending PawPerks, Guru, Ambassador, and Partner reward exposure for CPA review.",
+      label: "1099 Payout Support",
+      value: moneyExact(live.payoutTotal + live.commissionTotal),
+      helper: `${live.payoutCount.toLocaleString()} payouts · ${live.commissionCount.toLocaleString()} commissions.`,
       tone: "amber",
     },
     {
-      label: "Issued Rewards",
-      value: formatCurrency(issuedReferralRewards),
-      helper: "Issued or paid referral rewards that may support expense treatment.",
+      label: "Tax / Local Support",
+      value: moneyExact(live.taxCollectedSupport),
+      helper: "Customer tax cents captured on booking payments when present.",
       tone: "purple",
     },
     {
-      label: "Campaign ROI",
-      value: formatPercent(overallRoi),
-      helper: `${taxData.roiRows.length} campaign rows, ${totalBookings.toLocaleString()} tracked bookings.`,
-      tone: overallRoi !== null && overallRoi >= 0 ? "green" : "rose",
-    },
-    {
-      label: "CPA Export Status",
-      value: "Ready to Build",
-      helper: "Use Export Center for PDF, Excel, CSV, and ZIP tax packages.",
-      tone: "slate",
+      label: "Live NFCU Cash",
+      value: moneyExact(live.liveCashBalance),
+      helper: `${live.connectedBusinessAccounts} business account${live.connectedBusinessAccounts === 1 ? "" : "s"} · Plaid ${taxData.plaidEnvironment}.`,
+      tone: live.connectedBusinessAccounts > 0 ? "green" : "rose",
     },
   ];
 
   const topCampaigns = [...taxData.roiRows].sort(
     (a, b) =>
-      safeNumber(b.bookings) - safeNumber(a.bookings) ||
-      safeNumber(b.attributed_revenue) - safeNumber(a.attributed_revenue),
+      toNumber(b.bookings) - toNumber(a.bookings) ||
+      toNumber(b.attributed_revenue) - toNumber(a.attributed_revenue),
   );
 
   return (
     <main className="min-h-screen bg-[#f7fbf8] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1500px] space-y-6">
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(340px,480px)] 2xl:items-start">
             <div>
               <Link
                 href="/admin/financials"
@@ -692,40 +1112,81 @@ export default async function AdminFinancialsTaxReportsPage() {
               </div>
 
               <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
-                Prepare tax-ready records for SitGuru, including revenue,
-                refunds, Stripe fees, Guru payouts, partner commissions,
-                contractor payments, vendor expenses, deductions, marketing
-                costs, Growth campaign ROI, PawPerks rewards, referral
-                liabilities, reconciliations, and CPA backup. This page organizes
-                the tax workflow and supporting records; final filing and tax
-                treatment should be confirmed by your CPA or tax professional.
+                Prepare tax-ready records from live Stripe booking_payments,
+                NFCU cash, expense ledgers, Guru payouts, commissions, growth
+                campaigns, referral liabilities, and reconciliation support.
+                This organizes the tax workflow; final filing and tax treatment
+                should be confirmed by your CPA.
               </p>
+
+              {section === "local" ? (
+                <div className="mt-5 rounded-2xl border border-purple-100 bg-purple-50 p-4">
+                  <p className="text-sm font-black text-purple-950">
+                    Local tax review mode
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-purple-700">
+                    Capture city, township, borough, payroll locality, and
+                    operating license questions by market, then send them through
+                    CPA Handoff.
+                  </p>
+                </div>
+              ) : null}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[420px]">
-              <Link
-                href="/admin/financials/cpa-handoff"
-                className="rounded-[1.25rem] border border-emerald-100 bg-emerald-50 p-4 transition hover:bg-emerald-100"
-              >
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                  CPA Handoff
-                </p>
-                <p className="mt-2 text-2xl font-black text-slate-950">
-                  Open Tracker →
-                </p>
-              </Link>
+            <div className="rounded-[1.5rem] border border-emerald-100 bg-[#fbfefd] p-4 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+                Tax Actions
+              </p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <ActionLink href="/admin/financials" label="Financials" />
+                <ActionLink href="/admin/financials/profit-loss" label="P&L" />
+                <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
+                <ActionLink
+                  href="/admin/financials/balance-sheet"
+                  label="Balance Sheet"
+                />
+                <ActionLink href="/admin/financials/payment-gateway" label="Payment Gateway" />
+                <ActionLink href="/admin/financials/plaid" label="Banking" />
+                <ActionLink
+                  href="/admin/financials/general-ledger"
+                  label="Ledger"
+                />
+                <ActionLink
+                  href="/admin/financials/reconciliation"
+                  label="Reconcile"
+                />
+                <ActionLink href="/admin/financials/payouts" label="Payouts" />
+                <ActionLink
+                  href="/admin/financials/cpa-handoff"
+                  label="CPA Handoff"
+                  primary
+                />
+              </div>
 
-              <Link
-                href="/admin/financials/exports?type=tax"
-                className="rounded-[1.25rem] border border-blue-100 bg-blue-50 p-4 transition hover:bg-blue-100"
-              >
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
-                  Export Center
+              <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Export Tax Support
                 </p>
-                <p className="mt-2 text-2xl font-black text-slate-950">
-                  Prepare Files →
-                </p>
-              </Link>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <ActionLink
+                    href="/api/admin/financials/tax-reports/export?format=csv"
+                    label="CSV"
+                  />
+                  <ActionLink
+                    href="/api/admin/financials/tax-reports/export?format=excel"
+                    label="Excel"
+                  />
+                  <ActionLink
+                    href="/api/admin/financials/tax-reports/export?format=word"
+                    label="Word"
+                  />
+                  <ActionLink
+                    href="/api/admin/financials/tax-reports/export?format=pdf"
+                    label="PDF"
+                    primary
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -753,6 +1214,37 @@ export default async function AdminFinancialsTaxReportsPage() {
               </p>
             </div>
           ))}
+        </section>
+
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <SectionHeader
+            eyebrow="Tax Package Readiness"
+            title="Live source wiring for CPA package support"
+            description="These checks use the same finance sources already wired into P&L, Cash Flow, Balance Sheet, General Ledger, Reconciliation, Stripe, and Banking."
+          />
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {readinessItems.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-[1.25rem] border border-slate-100 bg-slate-50 p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-slate-950">{item.label}</p>
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${readinessClasses(
+                      item.status,
+                    )}`}
+                  >
+                    {item.status.replace("_", " ")}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
+                  {item.detail}
+                </p>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
@@ -808,7 +1300,7 @@ export default async function AdminFinancialsTaxReportsPage() {
           <SectionHeader
             eyebrow="Tax Package"
             title="Annual Tax Report Builder"
-            description="Use these reports to organize the tax package before CPA review. Each card represents a major schedule or support package that should be reviewed before year-end export."
+            description="Use these reports to organize the tax package before CPA review. Dedicated schedules are shipping next; each card already links to live sibling modules and Tax Center exports."
           />
 
           <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -833,6 +1325,10 @@ export default async function AdminFinancialsTaxReportsPage() {
 
                   <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
                     {report.description}
+                  </p>
+
+                  <p className="mt-3 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+                    {report.liveHint}
                   </p>
 
                   <div className="mt-5 grid gap-2">
@@ -861,7 +1357,7 @@ export default async function AdminFinancialsTaxReportsPage() {
         <section className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
           <ChecklistBlock
             title="Quarterly Estimated Tax Checklist"
-            description="Use this workflow to stay organized for quarterly estimated tax review, payment planning, CPA questions, and reserve planning."
+            description="Statuses update from live Stripe, expense, payout, campaign, and bank wiring so quarterly reviews stay grounded in current SitGuru books."
             items={quarterlyChecklist}
           />
 
@@ -886,59 +1382,23 @@ export default async function AdminFinancialsTaxReportsPage() {
 
             <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
               <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-700">
-                Growth / PawPerks Tax Support
+                Live Tax Support Totals
               </p>
 
               <h2 className="mt-2 text-2xl font-black text-slate-950">
-                Reward and campaign records
+                Current books snapshot
               </h2>
 
               <div className="mt-5 grid gap-2 text-sm font-bold text-slate-600">
                 {[
-                  `Marketing expense support: ${formatCurrency(marketingExpense + totalCampaignCost)}`,
-                  `Pending reward liability: ${formatCurrency(pendingRewardLiability)}`,
-                  `Issued referral rewards: ${formatCurrency(issuedReferralRewards)}`,
-                  `Attributed campaign revenue: ${formatCurrency(totalAttributedRevenue)}`,
-                  `Tracked campaign bookings: ${totalBookings.toLocaleString()}`,
-                  `Campaign ROI: ${formatPercent(overallRoi)}`,
-                ].map((item) => (
-                  <p
-                    key={item}
-                    className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
-                  >
-                    ✓ {item}
-                  </p>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-              <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-700">
-                Common tax categories
-              </p>
-
-              <h2 className="mt-2 text-2xl font-black text-slate-950">
-                Categories to review
-              </h2>
-
-              <div className="mt-5 grid gap-2 text-sm font-bold text-slate-600">
-                {[
-                  "Platform revenue",
-                  "Stripe processing fees",
-                  "Refunds and chargebacks",
-                  "Guru payouts",
-                  "Partner commissions",
-                  "Ambassador rewards",
-                  "PawPerks credits",
-                  "Contractor payments",
-                  "Software subscriptions",
-                  "Insurance",
-                  "Marketing and advertising",
-                  "Background checks",
-                  "Banking and card fees",
-                  "Legal and professional fees",
-                  "Payroll and benefits",
-                  "Owner contributions/distributions",
+                  `Platform revenue: ${moneyExact(live.platformRevenue)}`,
+                  `Refund / dispute support: ${moneyExact(live.refundSupport)}`,
+                  `Expense ledger: ${moneyExact(live.expenseLedgerTotal)}`,
+                  `Marketing deductions: ${moneyExact(marketingDeductions)}`,
+                  `Pending reward liability: ${moneyExact(live.pendingRewardLiability)}`,
+                  `Issued referral rewards: ${moneyExact(live.issuedReferralRewards)}`,
+                  `Stripe payouts: ${moneyExact(live.stripePayoutTotal)}`,
+                  `Campaign ROI: ${formatPercent(live.overallRoi)}`,
                 ].map((item) => (
                   <p
                     key={item}
@@ -954,7 +1414,7 @@ export default async function AdminFinancialsTaxReportsPage() {
 
         <ChecklistBlock
           title="Annual Tax Preparation Checklist"
-          description="Use this checklist to prepare SitGuru’s annual tax package before sending files to your CPA or tax preparer."
+          description="Checklist statuses now reflect live revenue, payout, deduction, reward, and reconciliation readiness before CPA handoff."
           items={annualChecklist}
         />
 
@@ -1006,13 +1466,13 @@ export default async function AdminFinancialsTaxReportsPage() {
                             </p>
                           </td>
                           <td className="px-5 py-4 font-bold text-slate-700">
-                            {safeNumber(row.bookings).toLocaleString()}
+                            {toNumber(row.bookings).toLocaleString()}
                           </td>
                           <td className="px-5 py-4 font-bold text-slate-700">
-                            {formatCurrency(safeNumber(row.attributed_revenue))}
+                            {moneyExact(toNumber(row.attributed_revenue))}
                           </td>
                           <td className="px-5 py-4 font-bold text-slate-700">
-                            {formatCurrency(safeNumber(row.total_cost))}
+                            {moneyExact(toNumber(row.total_cost))}
                           </td>
                           <td className="px-5 py-4 font-black text-emerald-700">
                             {formatPercent(row.roi_percent)}
@@ -1057,12 +1517,12 @@ export default async function AdminFinancialsTaxReportsPage() {
                         </div>
 
                         <p className="text-xl font-black text-emerald-800">
-                          {formatCurrency(safeNumber(row.total_amount))}
+                          {moneyExact(toNumber(row.total_amount))}
                         </p>
                       </div>
 
                       <p className="mt-2 text-xs font-bold text-slate-500">
-                        {safeNumber(row.row_count).toLocaleString()} support row(s)
+                        {toNumber(row.row_count).toLocaleString()} support row(s)
                       </p>
                     </div>
                   ))
@@ -1079,8 +1539,8 @@ export default async function AdminFinancialsTaxReportsPage() {
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <SectionHeader
             eyebrow="Export Tax Files"
-            title="Download Annual Tax Package"
-            description="Export the annual package in the format your CPA, bookkeeper, or accounting system needs. These exports should include statements, deductions, 1099 support, tax payment support, campaign records, reward liabilities, reconciliations, and audit backup."
+            title="Download Tax Support Package"
+            description="Export live tax support totals now, or open Export Center for broader annual package workflows."
           />
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

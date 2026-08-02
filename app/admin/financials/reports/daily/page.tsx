@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -110,140 +112,68 @@ type DailyGrowthData = {
   };
 };
 
-const dailyMetrics: DailyMetric[] = [
-  {
-    label: "Gross Bookings",
-    value: "$18,420",
-    helper: "Today’s customer booking volume.",
-    tone: "green",
-  },
-  {
-    label: "Payments Collected",
-    value: "$16,875",
-    helper: "Customer payments captured today.",
-    tone: "green",
-  },
-  {
-    label: "Platform Revenue",
-    value: "$2,531",
-    helper: "Estimated SitGuru revenue today.",
-    tone: "blue",
-  },
-  {
-    label: "Guru Payouts Due",
-    value: "$10,940",
-    helper: "Payable guru balance from eligible stays.",
-    tone: "amber",
-  },
-  {
-    label: "Stripe Fees",
-    value: "$489",
-    helper: "Estimated processing fees.",
-    tone: "slate",
-  },
-  {
-    label: "Refunds / Chargebacks",
-    value: "$320",
-    helper: "Refunds, disputes, and chargebacks today.",
-    tone: "rose",
-  },
-  {
-    label: "Partner Commissions",
-    value: "$615",
-    helper: "Partner commissions accrued today.",
-    tone: "blue",
-  },
-  {
-    label: "Net Cash Movement",
-    value: "$4,511",
-    helper: "Estimated retained cash after payouts and fees.",
-    tone: "green",
-  },
-];
+type OverviewKpi = {
+  label: string;
+  value: string;
+  rawValue: number;
+  change: string;
+  helper: string;
+  tone: "green" | "blue" | "red";
+};
 
-const activityCards: ActivityCard[] = [
-  {
-    eyebrow: "Bookings",
-    title: "Daily Booking Activity",
-    description:
-      "Review bookings created, confirmed, cancelled, completed, and pending for today.",
-    value: "124",
-    href: "/admin/bookings",
-    tone: "green",
-  },
-  {
-    eyebrow: "Customers",
-    title: "Customer Payment Activity",
-    description:
-      "Review customer charges, failed payments, refunds, disputes, and payment exceptions.",
-    value: "$16.9K",
-    href: "/admin/financials/stripe",
-    tone: "blue",
-  },
-  {
-    eyebrow: "Gurus",
-    title: "Guru Payout Watch",
-    description:
-      "Review payable balances, payout eligibility, payout holds, and exception items.",
-    value: "$10.9K",
-    href: "/admin/financials/payouts",
-    tone: "amber",
-  },
-  {
-    eyebrow: "Partners",
-    title: "Partner Commission Watch",
-    description:
-      "Review partner referral earnings, commission accruals, approval status, and exceptions.",
-    value: "$615",
-    href: "/admin/financials/commissions",
-    tone: "purple",
-  },
-  {
-    eyebrow: "Stripe",
-    title: "Stripe Settlement Check",
-    description:
-      "Review daily payments, fees, refunds, transfers, payout timing, and dispute activity.",
-    value: "Ready",
-    href: "/admin/financials/stripe",
-    tone: "slate",
-  },
-  {
-    eyebrow: "Banking",
-    title: "Cash Deposit Review",
-    description:
-      "Compare Stripe settlements and cash receipts to expected bank deposit timing.",
-    value: "2 pending",
-    href: "/admin/financials/reconciliation",
-    tone: "rose",
-  },
-];
+type OverviewFunnelRow = {
+  label: string;
+  value: string;
+  rawValue: number;
+  widthClass: string;
+};
 
-const exceptions: ExceptionItem[] = [
-  {
-    title: "Two Stripe transfers pending bank match",
-    description:
-      "Expected settlement deposits should be reviewed against Navy Federal business banking once posted.",
-    severity: "Medium",
-    status: "Review",
-    href: "/admin/financials/reconciliation",
-  },
-  {
-    title: "One refund requires category confirmation",
-    description:
-      "Confirm whether the refund relates to customer cancellation, service credit, dispute, or admin adjustment.",
-    severity: "Medium",
-    status: "Open",
-    href: "/admin/financials/stripe",
-  },
-  {
-    title: "Partner commission batch needs approval",
-    description:
-      "Review accrued partner commissions before moving them into the payable batch.",
-    severity: "Low",
-    status: "Watching",
-    href: "/admin/financials/commissions",
-  },
-];
+type OverviewPayoutStatus = {
+  paid: number;
+  processing: number;
+  pending: number;
+  total: number;
+};
+
+type OverviewManagementAlert = {
+  id: string;
+  title: string;
+  description: string;
+  severity: "info" | "warning" | "critical" | "success";
+  href: string;
+};
+
+type PlaidBankingSummary = {
+  pendingTransactions: number;
+  needsReviewTransactions: number;
+  status: "ready" | "needs_review" | "not_connected";
+  message: string;
+};
+
+type FinancialOverviewResponse = {
+  ok: boolean;
+  isLive: boolean;
+  generatedAt: string;
+  filters: {
+    range: string;
+    startDate: string | null;
+    endDate: string | null;
+    segment: string;
+  };
+  kpis: OverviewKpi[];
+  bookingsToCashFunnel: OverviewFunnelRow[];
+  guruPayoutStatus: OverviewPayoutStatus;
+  partnerCommissionStatus: OverviewPayoutStatus;
+  plaidBanking: PlaidBankingSummary;
+  managementAlerts: OverviewManagementAlert[];
+};
+
+type DailyOverviewData = {
+  ok: boolean;
+  isLive: boolean;
+  message: string;
+  overview: FinancialOverviewResponse | null;
+};
 
 const dailyCloseSteps = [
   "Review today’s bookings, cancellations, refunds, and payment exceptions.",
@@ -258,28 +188,28 @@ const dailyCloseSteps = [
 
 const exportCards: ExportCard[] = [
   {
-    title: "Daily PDF Snapshot",
+    title: "Daily HTML Snapshot",
     description:
-      "Readable daily report for owner review, CPA notes, management handoff, growth/referral activity, and internal records.",
-    href: "/admin/financials/exports?type=daily&format=pdf",
-  },
-  {
-    title: "Daily Excel Workbook",
-    description:
-      "Workbook with daily metrics, booking activity, payment activity, growth ROI, reward liability, exceptions, and notes.",
-    href: "/admin/financials/exports?type=daily&format=xlsx",
+      "Readable generated daily report for owner review, CPA notes, management handoff, growth/referral activity, and internal records.",
+    href: "/api/admin/reports/generate?reportType=daily&format=html",
   },
   {
     title: "Daily CSV Package",
     description:
-      "CSV files for daily transactions, Stripe activity, payouts, commissions, campaign costs, referral rewards, and exceptions.",
-    href: "/admin/financials/exports?type=daily&format=csv",
+      "CSV download with daily metrics, booking activity, payment activity, growth ROI, reward liability, exceptions, and notes.",
+    href: "/api/admin/reports/generate?reportType=daily&format=csv",
   },
   {
-    title: "Daily ZIP Archive",
+    title: "Admin Report Generator",
     description:
-      "Full daily backup package containing PDF, Excel, CSV files, campaign ROI support, referral liability support, and schedules.",
-    href: "/admin/financials/exports?type=daily&format=zip",
+      "Open the daily/weekly generate form with optional save-to-history for export archive.",
+    href: "/admin/reports",
+  },
+  {
+    title: "Export Center Package",
+    description:
+      "Build ZIP/PDF/Excel CPA packages and review export history from the Finance Export Center.",
+    href: "/admin/financials/exports",
   },
 ];
 
@@ -338,6 +268,421 @@ function formatCurrency(value: number) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(Math.round(value || 0));
+}
+
+function formatCompactCurrency(value: number) {
+  if (Math.abs(value) >= 1000) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(value);
+  }
+
+  return formatCurrency(value);
+}
+
+function getSiteUrl() {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.VERCEL_URL ||
+    "http://localhost:3000";
+
+  if (siteUrl.startsWith("http://") || siteUrl.startsWith("https://")) {
+    return siteUrl;
+  }
+
+  return `https://${siteUrl}`;
+}
+
+function getOverviewKpi(overview: FinancialOverviewResponse, label: string) {
+  return overview.kpis.find((kpi) => kpi.label === label);
+}
+
+function getOverviewFunnelRow(
+  overview: FinancialOverviewResponse,
+  label: string,
+) {
+  return overview.bookingsToCashFunnel.find((row) => row.label === label);
+}
+
+function mapOverviewTone(
+  tone: OverviewKpi["tone"],
+  label?: string,
+): DailyMetric["tone"] {
+  if (tone === "red") return "rose";
+  if (label === "Guru Payouts Due" || label === "Guru Payouts") return "amber";
+  if (label === "Stripe Fees") return "slate";
+  if (tone === "blue") return "blue";
+  return "green";
+}
+
+function mapAlertSeverity(
+  severity: OverviewManagementAlert["severity"],
+): ExceptionItem["severity"] {
+  if (severity === "critical") return "High";
+  if (severity === "warning") return "Medium";
+  return "Low";
+}
+
+function mapAlertStatus(
+  severity: OverviewManagementAlert["severity"],
+): ExceptionItem["status"] {
+  if (severity === "critical") return "Open";
+  if (severity === "warning") return "Review";
+  return "Watching";
+}
+
+async function getDailyOverview(): Promise<DailyOverviewData> {
+  try {
+    const cookieStore = await cookies();
+    const cookieHeader = cookieStore
+      .getAll()
+      .map((cookie) => `${cookie.name}=${cookie.value}`)
+      .join("; ");
+
+    const response = await fetch(
+      `${getSiteUrl()}/api/admin/financials/overview?range=today`,
+      {
+        headers: {
+          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        },
+        cache: "no-store",
+      },
+    );
+
+    const json = (await response.json()) as FinancialOverviewResponse & {
+      error?: string;
+    };
+
+    if (!response.ok || !json.ok) {
+      return {
+        ok: false,
+        isLive: false,
+        message:
+          json.error ||
+          "Unable to load live financial overview for today. Showing zero-only placeholders.",
+        overview: null,
+      };
+    }
+
+    return {
+      ok: true,
+      isLive: json.isLive,
+      message: json.isLive
+        ? "Live financial overview connected for today."
+        : "Overview API returned no live rows for today.",
+      overview: json,
+    };
+  } catch (error) {
+    console.warn("Daily report overview fetch failed:", error);
+    return {
+      ok: false,
+      isLive: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unable to load live financial overview for today.",
+      overview: null,
+    };
+  }
+}
+
+function buildDailyMetrics(
+  overviewData: DailyOverviewData,
+  growth: DailyGrowthData,
+): DailyMetric[] {
+  const overview = overviewData.overview;
+
+  const baseMetrics: DailyMetric[] = overview
+    ? (() => {
+        const grossBookings = getOverviewKpi(overview, "Gross Bookings");
+        const platformRevenue = getOverviewKpi(overview, "Platform Revenue");
+        const guruPayouts = getOverviewKpi(overview, "Guru Payouts");
+        const partnerCommissions = getOverviewKpi(
+          overview,
+          "Partner Commissions",
+        );
+        const stripeFees = getOverviewKpi(overview, "Stripe Fees");
+        const refunds = getOverviewKpi(overview, "Refunds / Chargebacks");
+        const collectedCash = getOverviewFunnelRow(overview, "Collected Cash");
+        const netCashRetained = getOverviewFunnelRow(
+          overview,
+          "Net Cash Retained",
+        );
+
+        return [
+          {
+            label: "Gross Bookings",
+            value: grossBookings?.value ?? formatCurrency(0),
+            helper: "Today’s customer booking volume.",
+            tone: mapOverviewTone(
+              grossBookings?.tone ?? "green",
+              "Gross Bookings",
+            ),
+          },
+          {
+            label: "Payments Collected",
+            value: collectedCash?.value ?? formatCurrency(0),
+            helper: "Customer payments captured today.",
+            tone: "green",
+          },
+          {
+            label: "Platform Revenue",
+            value: platformRevenue?.value ?? formatCurrency(0),
+            helper: "SitGuru platform revenue recorded today.",
+            tone: mapOverviewTone(
+              platformRevenue?.tone ?? "blue",
+              "Platform Revenue",
+            ),
+          },
+          {
+            label: "Guru Payouts Due",
+            value: guruPayouts?.value ?? formatCurrency(0),
+            helper: "Payable guru balance from eligible stays.",
+            tone: "amber",
+          },
+          {
+            label: "Stripe Fees",
+            value: stripeFees?.value ?? formatCurrency(0),
+            helper: "Processing fees from Stripe activity today.",
+            tone: "slate",
+          },
+          {
+            label: "Refunds / Chargebacks",
+            value: refunds?.value ?? formatCurrency(0),
+            helper: "Refunds, disputes, and chargebacks today.",
+            tone:
+              (refunds?.rawValue ?? 0) > 0
+                ? "rose"
+                : mapOverviewTone(
+                    refunds?.tone ?? "green",
+                    "Refunds / Chargebacks",
+                  ),
+          },
+          {
+            label: "Partner Commissions",
+            value: partnerCommissions?.value ?? formatCurrency(0),
+            helper: "Partner commissions accrued today.",
+            tone: mapOverviewTone(
+              partnerCommissions?.tone ?? "blue",
+              "Partner Commissions",
+            ),
+          },
+          {
+            label: "Net Cash Movement",
+            value: netCashRetained?.value ?? formatCurrency(0),
+            helper: "Retained cash after payouts and fees today.",
+            tone: (netCashRetained?.rawValue ?? 0) < 0 ? "rose" : "green",
+          },
+        ];
+      })()
+    : [
+        {
+          label: "Gross Bookings",
+          value: formatCurrency(0),
+          helper: "Today’s customer booking volume.",
+          tone: "green",
+        },
+        {
+          label: "Payments Collected",
+          value: formatCurrency(0),
+          helper: "Customer payments captured today.",
+          tone: "green",
+        },
+        {
+          label: "Platform Revenue",
+          value: formatCurrency(0),
+          helper: "SitGuru platform revenue recorded today.",
+          tone: "blue",
+        },
+        {
+          label: "Guru Payouts Due",
+          value: formatCurrency(0),
+          helper: "Payable guru balance from eligible stays.",
+          tone: "amber",
+        },
+        {
+          label: "Stripe Fees",
+          value: formatCurrency(0),
+          helper: "Processing fees from Stripe activity today.",
+          tone: "slate",
+        },
+        {
+          label: "Refunds / Chargebacks",
+          value: formatCurrency(0),
+          helper: "Refunds, disputes, and chargebacks today.",
+          tone: "rose",
+        },
+        {
+          label: "Partner Commissions",
+          value: formatCurrency(0),
+          helper: "Partner commissions accrued today.",
+          tone: "blue",
+        },
+        {
+          label: "Net Cash Movement",
+          value: formatCurrency(0),
+          helper: "Retained cash after payouts and fees today.",
+          tone: "green",
+        },
+      ];
+
+  return [
+    ...baseMetrics,
+    {
+      label: "Growth Marketing",
+      value: formatCurrency(growth.totals.marketingExpense),
+      helper: "Campaign costs visible in today’s growth financial views.",
+      tone: "blue",
+    },
+    {
+      label: "Reward Liability",
+      value: formatCurrency(growth.totals.pendingRewardLiability),
+      helper: "Pending PawPerks, Guru, Ambassador, and Partner reward exposure.",
+      tone: "amber",
+    },
+    {
+      label: "Growth ROI",
+      value: formatPercent(growth.totals.overallRoiPercent),
+      helper: "Attributed revenue vs. tracked daily growth cost.",
+      tone:
+        growth.totals.overallRoiPercent !== null &&
+        growth.totals.overallRoiPercent < 0
+          ? "rose"
+          : "green",
+    },
+  ];
+}
+
+function buildDailyActivityCards(
+  overviewData: DailyOverviewData,
+  growth: DailyGrowthData,
+): ActivityCard[] {
+  const overview = overviewData.overview;
+  const grossBookings = overview
+    ? getOverviewKpi(overview, "Gross Bookings")?.rawValue ?? 0
+    : 0;
+  const collectedCash = overview
+    ? getOverviewFunnelRow(overview, "Collected Cash")?.rawValue ?? 0
+    : 0;
+  const guruPayouts = overview
+    ? getOverviewKpi(overview, "Guru Payouts")?.rawValue ?? 0
+    : 0;
+  const partnerCommissions = overview
+    ? getOverviewKpi(overview, "Partner Commissions")?.rawValue ?? 0
+    : 0;
+  const pendingPayouts = overview?.guruPayoutStatus.pending ?? 0;
+  const pendingCommissions = overview?.partnerCommissionStatus.pending ?? 0;
+  const pendingBankRows = overview?.plaidBanking.pendingTransactions ?? 0;
+  const stripeStatus = overview?.plaidBanking.status ?? "not_connected";
+
+  const stripeLabel =
+    stripeStatus === "ready"
+      ? "Ready"
+      : stripeStatus === "needs_review"
+        ? "Review"
+        : "Connect";
+
+  const baseCards: ActivityCard[] = [
+    {
+      eyebrow: "Bookings",
+      title: "Daily Booking Activity",
+      description:
+        "Review bookings created, confirmed, cancelled, completed, and pending for today.",
+      value: formatCompactCurrency(grossBookings),
+      href: "/admin/bookings",
+      tone: "green",
+    },
+    {
+      eyebrow: "Customers",
+      title: "Customer Payment Activity",
+      description:
+        "Review customer charges, failed payments, refunds, disputes, and payment exceptions.",
+      value: formatCompactCurrency(collectedCash),
+      href: "/admin/financials/payment-gateway",
+      tone: "blue",
+    },
+    {
+      eyebrow: "Gurus",
+      title: "Guru Payout Watch",
+      description:
+        "Review payable balances, payout eligibility, payout holds, and exception items.",
+      value:
+        pendingPayouts > 0
+          ? `${formatCompactCurrency(guruPayouts)} · ${pendingPayouts} pending`
+          : formatCompactCurrency(guruPayouts),
+      href: "/admin/financials/payouts",
+      tone: "amber",
+    },
+    {
+      eyebrow: "Partners",
+      title: "Partner Commission Watch",
+      description:
+        "Review partner referral earnings, commission accruals, approval status, and exceptions.",
+      value:
+        pendingCommissions > 0
+          ? `${formatCompactCurrency(partnerCommissions)} · ${pendingCommissions} pending`
+          : formatCompactCurrency(partnerCommissions),
+      href: "/admin/financials/commissions",
+      tone: "purple",
+    },
+    {
+      eyebrow: "Stripe",
+      title: "Stripe Settlement Check",
+      description:
+        "Review daily payments, fees, refunds, transfers, payout timing, and dispute activity.",
+      value: stripeLabel,
+      href: "/admin/financials/payment-gateway",
+      tone: "slate",
+    },
+    {
+      eyebrow: "Banking",
+      title: "Cash Deposit Review",
+      description:
+        "Compare Stripe settlements and cash receipts to expected bank deposit timing.",
+      value: `${pendingBankRows} pending`,
+      href: "/admin/financials/reconciliation",
+      tone: pendingBankRows > 0 ? "rose" : "slate",
+    },
+  ];
+
+  return [
+    ...baseCards,
+    {
+      eyebrow: "Growth",
+      title: "Campaign ROI Watch",
+      description:
+        "Review daily QR scans, paid ads, referral links, campaign costs, attributed revenue, signups, and bookings.",
+      value: `${growth.totals.campaignsTracked}`,
+      href: "/admin/analytics",
+      tone: "green",
+    },
+    {
+      eyebrow: "Rewards",
+      title: "Referral Reward Queue",
+      description:
+        "Review today’s PawPerks, Guru referral, Ambassador, and Partner reward liabilities and issued reward expense.",
+      value: formatCurrency(growth.totals.pendingRewardLiability),
+      href: "/admin/referrals",
+      tone: "amber",
+    },
+  ];
+}
+
+function buildOverviewExceptions(
+  overviewData: DailyOverviewData,
+): ExceptionItem[] {
+  if (!overviewData.overview) return [];
+
+  return overviewData.overview.managementAlerts.map((alert) => ({
+    title: alert.title,
+    description: alert.description,
+    severity: mapAlertSeverity(alert.severity),
+    status: mapAlertStatus(alert.severity),
+    href: alert.href,
+  }));
 }
 
 function formatPercent(value: number | null) {
@@ -456,59 +801,7 @@ function getRewardStatus(row: Record<string, unknown>) {
   );
 }
 
-function buildDynamicMetrics(growth: DailyGrowthData): DailyMetric[] {
-  return [
-    ...dailyMetrics,
-    {
-      label: "Growth Marketing",
-      value: formatCurrency(growth.totals.marketingExpense),
-      helper: "Campaign costs visible in today’s growth financial views.",
-      tone: "blue",
-    },
-    {
-      label: "Reward Liability",
-      value: formatCurrency(growth.totals.pendingRewardLiability),
-      helper: "Pending PawPerks, Guru, Ambassador, and Partner reward exposure.",
-      tone: "amber",
-    },
-    {
-      label: "Growth ROI",
-      value: formatPercent(growth.totals.overallRoiPercent),
-      helper: "Attributed revenue vs. tracked daily growth cost.",
-      tone:
-        growth.totals.overallRoiPercent !== null &&
-        growth.totals.overallRoiPercent < 0
-          ? "rose"
-          : "green",
-    },
-  ];
-}
-
-function buildDynamicActivityCards(growth: DailyGrowthData): ActivityCard[] {
-  return [
-    ...activityCards,
-    {
-      eyebrow: "Growth",
-      title: "Campaign ROI Watch",
-      description:
-        "Review daily QR scans, paid ads, referral links, campaign costs, attributed revenue, signups, and bookings.",
-      value: `${growth.totals.campaignsTracked}`,
-      href: "/admin/analytics",
-      tone: "green",
-    },
-    {
-      eyebrow: "Rewards",
-      title: "Referral Reward Queue",
-      description:
-        "Review today’s PawPerks, Guru referral, Ambassador, and Partner reward liabilities and issued reward expense.",
-      value: formatCurrency(growth.totals.pendingRewardLiability),
-      href: "/admin/referrals",
-      tone: "amber",
-    },
-  ];
-}
-
-function buildDynamicExceptions(growth: DailyGrowthData): ExceptionItem[] {
+function buildGrowthExceptions(growth: DailyGrowthData): ExceptionItem[] {
   const dynamicExceptions: ExceptionItem[] = [];
 
   if (growth.totals.totalGrowthCost > 0 && growth.totals.bookings === 0) {
@@ -544,7 +837,14 @@ function buildDynamicExceptions(growth: DailyGrowthData): ExceptionItem[] {
     });
   }
 
-  return [...exceptions, ...dynamicExceptions];
+  return dynamicExceptions;
+}
+
+function buildDailyExceptions(
+  overviewData: DailyOverviewData,
+  growth: DailyGrowthData,
+): ExceptionItem[] {
+  return [...buildOverviewExceptions(overviewData), ...buildGrowthExceptions(growth)];
 }
 
 async function getDailyGrowthData(): Promise<DailyGrowthData> {
@@ -1067,10 +1367,34 @@ function GrowthReferralDailyPanel({ growth }: { growth: DailyGrowthData }) {
 }
 
 export default async function AdminFinancialsDailyReportPage() {
-  const growth = await getDailyGrowthData();
-  const dynamicMetrics = buildDynamicMetrics(growth);
-  const dynamicActivityCards = buildDynamicActivityCards(growth);
-  const dynamicExceptions = buildDynamicExceptions(growth);
+  const actor = await getFinanceAdminIdentity();
+
+  if (!actor) {
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Financial access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with a finance-enabled admin account to open the Daily
+            Financial Report.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const [overviewData, growth] = await Promise.all([
+    getDailyOverview(),
+    getDailyGrowthData(),
+  ]);
+  const dailyMetrics = buildDailyMetrics(overviewData, growth);
+  const dailyActivityCards = buildDailyActivityCards(overviewData, growth);
+  const dailyExceptions = buildDailyExceptions(overviewData, growth);
 
   return (
     <main className="min-h-screen bg-[#f7fbf8] px-4 py-6 sm:px-6 lg:px-8">
@@ -1078,12 +1402,20 @@ export default async function AdminFinancialsDailyReportPage() {
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <Link
-                href="/admin/financials"
-                className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
-              >
-                ← Back to Financial Overview
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/admin/financials/reports"
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
+                >
+                  ← Back to Financial Reports
+                </Link>
+                <Link
+                  href="/admin/financials"
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
+                >
+                  Financial Overview
+                </Link>
+              </div>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <h1 className="text-4xl font-black tracking-tight text-slate-950">
@@ -1095,6 +1427,15 @@ export default async function AdminFinancialsDailyReportPage() {
                 <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-blue-800">
                   Growth &amp; Referrals Wired
                 </span>
+                <span
+                  className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.16em] ${
+                    overviewData.isLive
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-amber-200 bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {overviewData.isLive ? "Live Overview" : "Overview Unavailable"}
+                </span>
               </div>
 
               <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
@@ -1104,6 +1445,29 @@ export default async function AdminFinancialsDailyReportPage() {
                 spend, PawPerks and referral reward liability, campaign ROI, and
                 exceptions before they become month-end issues.
               </p>
+
+              <p className="mt-3 text-xs font-bold text-slate-500">
+                Signed in as {actor.email} · Role {actor.role}
+              </p>
+
+              <div
+                className={`mt-4 rounded-[1.25rem] border p-4 ${
+                  overviewData.ok
+                    ? "border-emerald-100 bg-emerald-50"
+                    : "border-amber-100 bg-amber-50"
+                }`}
+              >
+                <p
+                  className={`text-xs font-black uppercase tracking-[0.18em] ${
+                    overviewData.ok ? "text-emerald-700" : "text-amber-700"
+                  }`}
+                >
+                  Core Financial Overview Status
+                </p>
+                <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
+                  {overviewData.message}
+                </p>
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[560px]">
@@ -1130,15 +1494,42 @@ export default async function AdminFinancialsDailyReportPage() {
                   Exceptions
                 </p>
                 <p className="mt-2 text-2xl font-black text-slate-950">
-                  {dynamicExceptions.length}
+                  {dailyExceptions.length}
                 </p>
               </div>
             </div>
           </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Link
+              href="/api/admin/reports/generate?reportType=daily&format=html"
+              className="rounded-2xl border border-emerald-200 bg-[#0D5C3A] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-emerald-900"
+            >
+              Generate HTML
+            </Link>
+            <Link
+              href="/api/admin/reports/generate?reportType=daily&format=csv"
+              className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-black text-emerald-900 transition hover:bg-emerald-50"
+            >
+              Download CSV
+            </Link>
+            <Link
+              href="/admin/financials/reports/weekly"
+              className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-black text-emerald-900 transition hover:bg-emerald-50"
+            >
+              Weekly Report
+            </Link>
+            <Link
+              href="/admin/financials/exports"
+              className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm font-black text-emerald-900 transition hover:bg-emerald-100"
+            >
+              Export Center
+            </Link>
+          </div>
         </section>
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-11">
-          {dynamicMetrics.map((metric) => (
+          {dailyMetrics.map((metric) => (
             <div
               key={metric.label}
               className="rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm"
@@ -1172,7 +1563,7 @@ export default async function AdminFinancialsDailyReportPage() {
           />
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {dynamicActivityCards.map((card) => (
+            {dailyActivityCards.map((card) => (
               <Link
                 key={card.title}
                 href={card.href}
@@ -1224,43 +1615,52 @@ export default async function AdminFinancialsDailyReportPage() {
             />
 
             <div className="space-y-3">
-              {dynamicExceptions.map((item) => (
-                <Link
-                  key={item.title}
-                  href={item.href}
-                  className="group grid gap-4 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4 transition hover:-translate-y-1 hover:border-emerald-200 hover:bg-white hover:shadow-lg sm:grid-cols-[1fr_auto] sm:items-center"
-                >
-                  <div>
-                    <div className="flex flex-wrap gap-2">
-                      <span
-                        className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${severityClasses(
-                          item.severity,
-                        )}`}
-                      >
-                        {item.severity}
-                      </span>
+              {dailyExceptions.length > 0 ? (
+                dailyExceptions.map((item) => (
+                  <Link
+                    key={item.title}
+                    href={item.href}
+                    className="group grid gap-4 rounded-[1.5rem] border border-slate-100 bg-slate-50 p-4 transition hover:-translate-y-1 hover:border-emerald-200 hover:bg-white hover:shadow-lg sm:grid-cols-[1fr_auto] sm:items-center"
+                  >
+                    <div>
+                      <div className="flex flex-wrap gap-2">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${severityClasses(
+                            item.severity,
+                          )}`}
+                        >
+                          {item.severity}
+                        </span>
 
-                      <span
-                        className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${statusClasses(
-                          item.status,
-                        )}`}
-                      >
-                        {item.status}
-                      </span>
+                        <span
+                          className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${statusClasses(
+                            item.status,
+                          )}`}
+                        >
+                          {item.status}
+                        </span>
+                      </div>
+
+                      <h3 className="mt-3 text-lg font-black text-slate-950">
+                        {item.title}
+                      </h3>
+
+                      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                        {item.description}
+                      </p>
                     </div>
 
-                    <h3 className="mt-3 text-lg font-black text-slate-950">
-                      {item.title}
-                    </h3>
-
-                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                      {item.description}
-                    </p>
-                  </div>
-
-                  <ArrowCircle />
-                </Link>
-              ))}
+                    <ArrowCircle />
+                  </Link>
+                ))
+              ) : (
+                <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50 p-5">
+                  <p className="text-sm font-bold leading-6 text-slate-700">
+                    No daily financial exceptions flagged for today. Overview and
+                    growth alerts will appear here when action is needed.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

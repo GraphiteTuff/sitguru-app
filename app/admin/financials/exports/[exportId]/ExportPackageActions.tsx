@@ -55,7 +55,7 @@ export default function ExportPackageActions({
     setMessage("Preparing CPA package links and updating export metadata...");
 
     try {
-      const response = await fetch("/api/admin/financials/export-packages", {
+      const response = await fetch("/api/admin/financials/export-package", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -117,8 +117,9 @@ export default function ExportPackageActions({
       </h2>
 
       <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
-        This creates the package metadata, refreshes the linked export list, and
-        audit-logs that the CPA package was prepared. ZIP storage comes next.
+        This refreshes linked statement downloads for the package period, merges
+        package metadata onto the saved record, and audit-logs the prepare
+        action. Multi-file ZIP storage upload comes next.
       </p>
 
       <div className={`mt-5 rounded-[1.25rem] border p-4 text-sm font-bold leading-6 ${toneClass}`}>

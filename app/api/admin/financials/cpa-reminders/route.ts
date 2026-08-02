@@ -1,4 +1,142 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+
+export const dynamic = "force-dynamic";
+
+type AnyRow = Record<string, unknown>;
+
+type AdminIdentity = {
+  id: string;
+  email: string;
+  role: string;
+  canAccessFinancials: boolean;
+};
+
+const FINANCE_ROLES = [
+  "owner",
+  "super_admin",
+  "admin",
+  "finance_admin",
+  "finance",
+  "accounting",
+  "bookkeeper",
+];
+
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getOptionalBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "yes", "1"].includes(normalized)) return true;
+    if (["false", "no", "0"].includes(normalized)) return false;
+  }
+
+  return false;
+}
+
+function getEnvAdminEmails() {
+  return String(
+    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
+      process.env.ADMIN_EMAILS ||
+      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
+      "",
+  )
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function hasFinancialRole(role: string) {
+  return FINANCE_ROLES.includes(role.trim().toLowerCase());
+}
+
+async function safeRows<T>(
+  query: PromiseLike<{ data: unknown; error: unknown }>,
+  label: string,
+): Promise<T[]> {
+  try {
+    const result = await query;
+
+    if (result.error) {
+      console.warn(`CPA reminders query skipped for ${label}:`, result.error);
+      return [];
+    }
+
+    return Array.isArray(result.data) ? (result.data as T[]) : [];
+  } catch (error) {
+    console.warn(`CPA reminders query skipped for ${label}:`, error);
+    return [];
+  }
+}
+
+async function requireFinancialAdmin() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+
+  const userEmail = (user.email || "").toLowerCase();
+  const envAdminEmails = getEnvAdminEmails();
+
+  const profileChecks = await Promise.all([
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("user_id", user.id)
+        .limit(1),
+      "admin_users_cpa_reminders_access",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("profiles")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "profiles_cpa_reminders_access",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("users")
+        .select("role,email,is_active,can_access_financials")
+        .eq("id", user.id)
+        .limit(1),
+      "users_cpa_reminders_access",
+    ),
+  ]);
+
+  const profile = profileChecks.flat().find(Boolean) || {};
+  const role = asTrimmedString(profile.role) || "admin";
+  const active =
+    profile.is_active === undefined
+      ? true
+      : getOptionalBoolean(profile.is_active);
+  const explicitFinanceAccess = getOptionalBoolean(
+    profile.can_access_financials,
+  );
+  const envAllowed = envAdminEmails.includes(userEmail);
+
+  const canAccessFinancials =
+    active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed);
+
+  if (!canAccessFinancials) return null;
+
+  return {
+    id: user.id,
+    email: userEmail,
+    role,
+    canAccessFinancials,
+  } satisfies AdminIdentity;
+}
 
 type ReminderSeverity = "critical" | "warning" | "info";
 
@@ -233,6 +371,15 @@ async function sendSmsReminder(
 }
 
 export async function POST(request: Request) {
+  const actor = await requireFinancialAdmin();
+
+  if (!actor) {
+    return NextResponse.json(
+      { ok: false, message: "Not authorized to send CPA reminders." },
+      { status: 403 },
+    );
+  }
+
   try {
     const incoming = (await request.json()) as ReminderRequestBody;
 

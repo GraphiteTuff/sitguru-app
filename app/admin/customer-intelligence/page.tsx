@@ -23,6 +23,7 @@ import {
   Users,
 } from "lucide-react";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { avatarImageFallback, fallbackInitials } from "@/lib/sitguru/display";
 import CustomerInsightsTable from "./CustomerInsightsTable";
 
 export const dynamic = "force-dynamic";
@@ -190,6 +191,8 @@ type PetParentRegistrationHealthRow = {
   profile_phone?: string | null;
   auth_email?: string | null;
   auth_phone?: string | null;
+  auth_avatar_url?: string | null;
+  auth_picture?: string | null;
   role?: string | null;
   admin_status?: string | null;
   admin_notes?: string | null;
@@ -453,9 +456,66 @@ function getEmailSource(row: AnyRow) {
 
 function getPhotoSource(row: AnyRow) {
   if (getText(row, ["avatar_url"])) return "Profile avatar";
-  if (getText(row, ["photo_url", "profile_photo_url", "image_url"])) return "Fallback / legacy photo";
+  if (getText(row, ["profile_photo_url", "photo_url", "image_url", "picture"])) {
+    return "Fallback / legacy photo";
+  }
+  if (getText(row, ["auth_avatar_url", "auth_picture"])) return "Account photo";
 
   return "Missing";
+}
+
+function getProfileAvatarUrl(row: AnyRow) {
+  return avatarImageFallback(
+    getText(row, [
+      "avatar_url",
+      "profile_photo_url",
+      "photo_url",
+      "image_url",
+      "picture",
+      "auth_avatar_url",
+      "auth_picture",
+    ]),
+    "",
+  );
+}
+
+function CustomerAvatar({
+  name,
+  email,
+  src,
+  size = "md",
+}: {
+  name: string;
+  email?: string;
+  src?: string;
+  size?: "sm" | "md" | "lg";
+}) {
+  const sizeClass =
+    size === "lg"
+      ? "h-14 w-14 text-sm sm:h-16 sm:w-16"
+      : size === "sm"
+        ? "h-10 w-10 text-xs"
+        : "h-11 w-11 text-sm";
+
+  return (
+    <div
+      className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-emerald-100 bg-white font-black text-[#0D5C3A] shadow-sm`}
+    >
+      <div className="absolute inset-0 bg-white" aria-hidden />
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt=""
+          className="relative z-[1] h-full w-full object-cover object-center"
+        />
+      ) : (
+        <span className="relative z-[1]">
+          {fallbackInitials(name, email, "PP")}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function getLocationSource(row: AnyRow) {
@@ -1426,14 +1486,22 @@ async function getCustomerIntelligenceData() {
       name: getAccountDisplayName(displayRow, "Customer"),
       email: getAccountEmail(displayRow),
       phone: getText(displayRow, ["phone", "phone_number", "profile_phone", "auth_phone"]),
-      avatarUrl: profile.avatar_url || getText(profile as AnyRow, ["photo_url", "profile_photo_url", "image_url"]),
+      avatarUrl: getProfileAvatarUrl({
+        ...(profile as AnyRow),
+        auth_avatar_url: asString(health?.auth_avatar_url),
+        auth_picture: asString(health?.auth_picture),
+      }),
       city: getCity(profile as AnyRow),
       state: getState(profile as AnyRow),
       country: getCountry(profile as AnyRow),
       zipCode: getZipCode(profile as AnyRow),
       nameSource: getAccountDisplaySource(displayRow),
       emailSource: getEmailSource(displayRow),
-      photoSource: getPhotoSource(profile as AnyRow),
+      photoSource: getPhotoSource({
+        ...(profile as AnyRow),
+        auth_avatar_url: asString(health?.auth_avatar_url),
+        auth_picture: asString(health?.auth_picture),
+      }),
       locationSource: getLocationSource(profile as AnyRow),
       source,
       campaign: getCampaign(profile as AnyRow),
@@ -1854,30 +1922,29 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
             {recentCustomers.map((customer) => (
               <div
                 key={customer.id}
-                className="grid gap-4 bg-white px-4 py-4 transition hover:bg-green-50/60 xl:grid-cols-[1.3fr_0.95fr_0.72fr_0.62fr_0.55fr_0.55fr_1.45fr] xl:items-center"
+                className="grid gap-4 bg-white px-4 py-4 transition hover:bg-emerald-50/60 sm:px-5 xl:grid-cols-[1.3fr_0.95fr_0.72fr_0.62fr_0.55fr_0.55fr_1.45fr] xl:items-center"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-green-800 text-sm font-black text-white">
-                      {customer.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={customer.avatarUrl}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        customer.name.slice(0, 1).toUpperCase()
-                      )}
-                    </div>
+                    <CustomerAvatar
+                      name={customer.name}
+                      email={customer.email}
+                      src={customer.avatarUrl}
+                      size="lg"
+                    />
 
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-slate-950">
+                      <p className="truncate text-base font-black text-slate-950">
                         {customer.name}
                       </p>
                       <p className="truncate text-xs font-bold text-slate-500">
                         {customer.email || "No email on profile yet"}
                       </p>
+                      {customer.phone ? (
+                        <p className="truncate text-xs font-semibold text-slate-400">
+                          {customer.phone}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>

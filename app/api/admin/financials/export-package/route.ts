@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 
 export const dynamic = "force-dynamic";
 
@@ -33,16 +33,6 @@ type PackageDownloadLink = {
   included: boolean;
   source: string;
 };
-
-const FINANCE_ROLES = [
-  "owner",
-  "super_admin",
-  "admin",
-  "finance_admin",
-  "finance",
-  "accounting",
-  "bookkeeper",
-];
 
 const DEFAULT_MONTHLY_CPA_ITEMS = [
   "Profit & Loss",
@@ -130,22 +120,6 @@ function appendDateRange(href: string, startDate: string | null, endDate: string
   return `${href}${href.includes("?") ? "&" : "?"}${query}`;
 }
 
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function hasFinancialRole(role: string) {
-  return FINANCE_ROLES.includes(role.trim().toLowerCase());
-}
-
 async function safeRows<T>(
   query: PromiseLike<{ data: unknown; error: unknown }>,
   label: string,
@@ -165,72 +139,15 @@ async function safeRows<T>(
   }
 }
 
-async function getAdminIdentity(): Promise<AdminIdentity | null> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-
-  const userEmail = (user.email || "").toLowerCase();
-  const envAdminEmails = getEnvAdminEmails();
-
-  const profileChecks = await Promise.all([
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("admin_users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("user_id", user.id)
-        .limit(1),
-      "admin_users_package_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("profiles")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "profiles_package_access",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("users")
-        .select("role,email,is_active,can_access_financials")
-        .eq("id", user.id)
-        .limit(1),
-      "users_package_access",
-    ),
-  ]);
-
-  const profile = profileChecks.flat().find(Boolean) || {};
-  const role = asTrimmedString(profile.role) || "admin";
-  const active =
-    profile.is_active === undefined
-      ? true
-      : getOptionalBoolean(profile.is_active);
-  const explicitFinanceAccess = getOptionalBoolean(
-    profile.can_access_financials,
-  );
-  const envAllowed = envAdminEmails.includes(userEmail);
-
-  return {
-    id: user.id,
-    email: userEmail,
-    role,
-    canAccessFinancials:
-      active && (hasFinancialRole(role) || explicitFinanceAccess || envAllowed),
-  };
-}
-
 async function requireFinancialAdmin() {
-  const actor = await getAdminIdentity();
-
-  if (!actor?.canAccessFinancials) return null;
-
-  return actor;
+  const financeCheck = await requireFinanceAdminApi();
+  if (!financeCheck.identity) return null;
+  return {
+    id: financeCheck.identity.id,
+    email: financeCheck.identity.email,
+    role: financeCheck.identity.role,
+    canAccessFinancials: true,
+  };
 }
 
 async function writeAuditLog({
@@ -288,10 +205,22 @@ async function getExportRecord(exportId: string) {
   return rows[0] || null;
 }
 
+function normalizePackageFormat(format: PackageFormat | string): PackageFormat {
+  const normalized = String(format || "").toLowerCase();
+  if (normalized === "zip") return "excel";
+  if (normalized === "xlsx" || normalized === "xls") return "excel";
+  if (normalized === "doc" || normalized === "docx") return "word";
+  if (normalized === "html" || normalized === "print") return "pdf";
+  if (normalized === "csv") return "csv";
+  if (normalized === "word") return "word";
+  if (normalized === "pdf") return "pdf";
+  return "excel";
+}
+
 function buildDownloadLinks({
   record,
   included,
-  format,
+  format: rawFormat,
   startDate,
   endDate,
 }: {
@@ -303,6 +232,7 @@ function buildDownloadLinks({
 }) {
   const labels = included.length ? included : DEFAULT_MONTHLY_CPA_ITEMS;
   const links: PackageDownloadLink[] = [];
+  const format = normalizePackageFormat(rawFormat);
 
   function addUnique(link: PackageDownloadLink) {
     if (!links.some((existing) => existing.href === link.href && existing.label === link.label)) {
@@ -325,11 +255,11 @@ function buildDownloadLinks({
       continue;
     }
 
-    if (normalized.includes("weekly") || normalized.includes("summary")) {
+    if (normalized.includes("weekly") || normalized === "weekly summary") {
       addUnique({
         label: "Weekly Admin Report",
         description: "Open the weekly management report preview.",
-        href: "/api/admin/reports/generate?reportType=weekly&format=html",
+        href: "/admin/financials/reports/weekly",
         format,
         included: true,
         source: "weekly-admin-report",
@@ -353,7 +283,7 @@ function buildDownloadLinks({
       addUnique({
         label: String(item || "Management Report"),
         description: "Open the Daily / Weekly Reports page for this management package item.",
-        href: "/admin/reports",
+        href: "/admin/financials/reports/daily",
         format,
         included: true,
         source: "management-reporting",
@@ -417,7 +347,11 @@ function buildDownloadLinks({
       addUnique({
         label: "Pro Forma",
         description: "Forecast, runway, and scenario planning export.",
-        href: `/api/admin/financials/pro-forma/export?format=${format}`,
+        href: appendDateRange(
+          `/api/admin/financials/pro-forma/export?format=${format}`,
+          startDate,
+          endDate,
+        ),
         format,
         included: true,
         source: "pro-forma",
@@ -428,8 +362,12 @@ function buildDownloadLinks({
     if (normalized.includes("ledger")) {
       addUnique({
         label: "General Ledger",
-        description: "Open ledger and financial report support.",
-        href: "/admin/financials/general-ledger",
+        description: "General ledger export with growth and reward detail.",
+        href: appendDateRange(
+          `/api/admin/financials/general-ledger/export?format=${format}`,
+          startDate,
+          endDate,
+        ),
         format,
         included: true,
         source: "general-ledger",
@@ -439,21 +377,33 @@ function buildDownloadLinks({
 
     if (normalized.includes("stripe")) {
       addUnique({
-        label: "Stripe Reconciliation",
-        description: "Open Stripe payout, fee, refund, and dispute reconciliation support.",
-        href: "/admin/financials/cash-flow",
-        format,
+        label: "Stripe Export",
+        description: "Stripe payout and transaction CSV backup.",
+        href: appendDateRange(
+          "/api/admin/financials/stripe/export?format=csv",
+          startDate,
+          endDate,
+        ),
+        format: "csv",
         included: true,
         source: "stripe-reconciliation",
       });
       continue;
     }
 
-    if (normalized.includes("bank") || normalized.includes("navy federal")) {
+    if (
+      normalized.includes("bank") ||
+      normalized.includes("navy federal") ||
+      normalized.includes("reconciliation")
+    ) {
       addUnique({
-        label: "Bank Reconciliation",
-        description: "Open Navy Federal checking/savings cash reconciliation support.",
-        href: "/admin/financials/cash-flow",
+        label: "Reconciliation",
+        description: "Bank, Stripe, payout, and reward reconciliation export.",
+        href: appendDateRange(
+          `/api/admin/financials/reconciliation/export?format=${format}`,
+          startDate,
+          endDate,
+        ),
         format,
         included: true,
         source: "bank-reconciliation",
@@ -461,23 +411,67 @@ function buildDownloadLinks({
       continue;
     }
 
+    if (normalized.includes("tax") || normalized.includes("1099") || normalized.includes("deduction") || normalized.includes("estimated tax")) {
+      addUnique({
+        label: "Tax Center Export",
+        description: "Tax support export for federal, quarterly, deduction, and 1099 backup.",
+        href: appendDateRange(
+          `/api/admin/financials/tax-reports/export?format=${format === "pdf" ? "pdf" : format}`,
+          startDate,
+          endDate,
+        ),
+        format,
+        included: true,
+        source: "tax-center",
+      });
+      continue;
+    }
+
+    if (
+      normalized.includes("growth") ||
+      normalized.includes("referral") ||
+      normalized.includes("marketing") ||
+      normalized.includes("campaign") ||
+      normalized.includes("roi") ||
+      normalized.includes("pawperks") ||
+      normalized.includes("reward")
+    ) {
+      addUnique({
+        label: "Growth & Referrals",
+        description: "Open Growth & Referrals for campaign ROI and reward backup.",
+        href: "/admin/referrals",
+        format,
+        included: true,
+        source: "growth-referrals",
+      });
+      continue;
+    }
+
     if (normalized.includes("guru") || normalized.includes("payout")) {
       addUnique({
         label: "Guru Payouts",
-        description: "Open Guru payout support records.",
-        href: "/admin/payouts",
-        format,
+        description: "Payout analytics CSV export.",
+        href: appendDateRange(
+          "/api/admin/financials/payouts/export?format=csv",
+          startDate,
+          endDate,
+        ),
+        format: "csv",
         included: true,
         source: "guru-payouts",
       });
       continue;
     }
 
-    if (normalized.includes("partner") || normalized.includes("commission")) {
+    if (normalized.includes("partner") || normalized.includes("commission") || normalized.includes("ambassador")) {
       addUnique({
         label: "Partner Commissions",
-        description: "Open partner commission support records.",
-        href: "/admin/commissions",
+        description: "Commissions and referral rewards export.",
+        href: appendDateRange(
+          `/api/admin/commissions/export?format=${format === "word" || format === "excel" || format === "csv" ? format : "csv"}`,
+          startDate,
+          endDate,
+        ),
         format,
         included: true,
         source: "partner-commissions",
@@ -560,7 +554,11 @@ async function updateExportRecordWithPackage({
 }) {
   if (!exportId) return;
 
+  const existing = await getExportRecord(exportId);
+  const existingMetadata = safeMetadata(existing?.metadata);
+
   const packageMetadata = {
+    ...existingMetadata,
     packagePreparedAt: new Date().toISOString(),
     packageFormat: format,
     packageMode: "linked_exports",
@@ -598,10 +596,14 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const exportId = asTrimmedString(url.searchParams.get("exportId"));
   const format = normalizeFormat(url.searchParams.get("format"));
-  const startDate = getDateParam("startDate", url.searchParams.get("startDate"));
-  const endDate = getDateParam("endDate", url.searchParams.get("endDate"));
-
   const record = await getExportRecord(exportId);
+  const startDate =
+    getDateParam("startDate", url.searchParams.get("startDate")) ||
+    getDateParam("startDate", record?.period_start);
+  const endDate =
+    getDateParam("endDate", url.searchParams.get("endDate")) ||
+    getDateParam("endDate", record?.period_end);
+
   const metadata = safeMetadata(record?.metadata);
   const included = Array.isArray(metadata.included) ? metadata.included : [];
 
@@ -617,7 +619,7 @@ export async function GET(request: Request) {
     ok: true,
     mode: "linked_exports",
     message:
-      "CPA package links prepared. ZIP storage generation is the next upgrade.",
+      "CPA package links prepared. Linked statement downloads are ready. Multi-file ZIP storage is the next upgrade.",
     exportId: exportId || null,
     packageType:
       asTrimmedString(record?.package_type) ||
@@ -650,9 +652,13 @@ export async function POST(request: Request) {
 
   const exportId = asTrimmedString(body.exportId);
   const format = normalizeFormat(body.format);
-  const startDate = getDateParam("startDate", body.startDate);
-  const endDate = getDateParam("endDate", body.endDate);
   const record = await getExportRecord(exportId);
+  const startDate =
+    getDateParam("startDate", body.startDate) ||
+    getDateParam("startDate", record?.period_start);
+  const endDate =
+    getDateParam("endDate", body.endDate) ||
+    getDateParam("endDate", record?.period_end);
   const metadata = safeMetadata(record?.metadata);
   const included = Array.isArray(metadata.included) ? metadata.included : [];
 
@@ -694,7 +700,7 @@ export async function POST(request: Request) {
     ok: true,
     mode: "linked_exports",
     message:
-      "CPA package prepared with linked statement exports. ZIP storage generation is the next upgrade.",
+      "CPA package prepared with linked statement exports. Multi-file ZIP storage is the next upgrade.",
     exportId: exportId || null,
     packageType:
       asTrimmedString(body.packageType) ||
