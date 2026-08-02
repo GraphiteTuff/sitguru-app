@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import {
+  ClipboardCheck,
   ClipboardList,
   BarChart3,
   ChevronDown,
@@ -49,6 +50,8 @@ const adminRoutes = {
   hr: "/admin/hr",
   universityTraining: "/admin/ambassador-training",
   universityAssignments: "/admin/university-assignments",
+  universityProgress: "/admin/university-progress",
+  universityCurriculum: "/admin/ambassador-training/manage",
   financials: "/admin/financials",
   banking: "/admin/financials/plaid",
   stripe: "/admin/financials/payment-gateway",
@@ -98,6 +101,11 @@ const navSections = [
         label: "SitGuru University",
         href: adminRoutes.universityTraining,
         icon: GraduationCap,
+      },
+      {
+        label: "Academy Progress",
+        href: adminRoutes.universityProgress,
+        icon: ClipboardCheck,
       },
       {
         label: "Trust & Safety",
@@ -265,6 +273,11 @@ const mobileGrowthLinks = [
     label: "Academy Assignments",
     href: adminRoutes.universityAssignments,
     icon: ClipboardList,
+  },
+  {
+    label: "Academy Progress",
+    href: adminRoutes.universityProgress,
+    icon: ClipboardCheck,
   },
   {
     label: "Sales & Marketing",
@@ -535,6 +548,10 @@ function AdminFooter() {
         {
           label: "Academy Assignments",
           href: adminRoutes.universityAssignments,
+        },
+        {
+          label: "Academy Progress",
+          href: adminRoutes.universityProgress,
         },
         { label: "Trust & Safety", href: adminRoutes.trustSafety },
         { label: "Messages", href: adminRoutes.messages },

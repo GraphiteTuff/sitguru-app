@@ -4,6 +4,7 @@ import {
   Archive,
   ArrowLeft,
   BadgeCheck,
+  BookOpenCheck,
   BriefcaseBusiness,
   ClipboardCheck,
   ClipboardList,
@@ -39,6 +40,7 @@ const routes = {
   ambassadorLeads: "/admin/ambassador-leads",
   ambassadorLeadsArchived: "/admin/ambassador-leads?status=archived",
   ambassadorTraining: "/admin/ambassador-training",
+  ambassadorTrainingManage: "/admin/ambassador-training/manage",
   universityAssignments: "/admin/university-assignments",
   universityProgress: "/admin/university-progress",
   programs: "/admin/programs",
@@ -684,9 +686,14 @@ export default async function AdminHrPage() {
               <div className="mt-4 grid gap-3">
                 {[
                   [
-                    "Training Manager",
+                    "SitGuru University Hub",
                     routes.ambassadorTraining,
                     <GraduationCap key="t" size={16} />,
+                  ],
+                  [
+                    "Training Manager",
+                    routes.ambassadorTrainingManage,
+                    <BookOpenCheck key="m" size={16} />,
                   ],
                   [
                     "Academy Assignments",

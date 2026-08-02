@@ -583,11 +583,14 @@ function statusFromProgress(progress: number, bucket: ProgressBucket) {
 }
 
 function profileHref(person: AdminPerson | null) {
-  if (!person) return "/admin/data-cleanup";
+  if (!person) return "/admin/users";
   if (person.role === "guru") return person.guruId ? `/admin/gurus?highlight=${person.guruId}` : "/admin/gurus";
   if (person.role === "ambassador") return person.ambassadorId ? `/admin/ambassadors?highlight=${person.ambassadorId}` : "/admin/ambassadors";
-  if (person.role === "pet_parent") return person.profileId ? `/admin/pet-parents?highlight=${person.profileId}` : "/admin/pet-parents";
-  return "/admin";
+  if (person.role === "pet_parent") {
+    const id = person.profileId || person.userId || person.petParentId;
+    return id ? `/admin/customers?highlight=${encodeURIComponent(id)}` : "/admin/customers";
+  }
+  return "/admin/users";
 }
 
 function messageHref(person: AdminPerson | null) {
@@ -698,6 +701,8 @@ export async function getAcademyProgressDashboardData(): Promise<AcademyProgress
     academyStepMaterialsResult,
     ambassadorTrainingStepsResult,
     academyCertificationsResult,
+    ambassadorProgressResult,
+    ambassadorsResult,
   ] = await Promise.all([
     safeAdminQuery(supabaseAdmin.from("academy_assignments").select("*").limit(5000), "academy_assignments"),
     safeAdminQuery(supabaseAdmin.from("university_assignments").select("*").limit(5000), "university_assignments"),
@@ -706,6 +711,14 @@ export async function getAcademyProgressDashboardData(): Promise<AcademyProgress
     safeAdminQuery(supabaseAdmin.from("academy_step_materials").select("*").limit(10000), "academy_step_materials"),
     safeAdminQuery(supabaseAdmin.from("ambassador_training_steps").select("*").limit(5000), "ambassador_training_steps"),
     safeAdminQuery(supabaseAdmin.from("academy_certifications").select("*").limit(5000), "academy_certifications"),
+    safeAdminQuery(
+      supabaseAdmin.from("ambassador_training_progress").select("*").limit(10000),
+      "ambassador_training_progress",
+    ),
+    safeAdminQuery(
+      supabaseAdmin.from("ambassadors").select("id,user_id,profile_id,email").limit(5000),
+      "ambassadors",
+    ),
   ]);
 
   const academyAssignments = ((academyAssignmentsResult.data || []) as AnyRow[]).map((row) => withSourceTable(row, "academy_assignments"));
@@ -715,6 +728,38 @@ export async function getAcademyProgressDashboardData(): Promise<AcademyProgress
   const academyStepMaterials = ((academyStepMaterialsResult.data || []) as AnyRow[]).map((row) => withSourceTable(row, "academy_step_materials"));
   const ambassadorTrainingSteps = ((ambassadorTrainingStepsResult.data || []) as AnyRow[]).map((row) => withSourceTable(row, "ambassador_training_steps"));
   const academyCertifications = ((academyCertificationsResult.data || []) as AnyRow[]).map((row) => withSourceTable(row, "academy_certifications"));
+  const ambassadors = ((ambassadorsResult.data || []) as AnyRow[]).map((row) =>
+    withSourceTable(row, "ambassadors"),
+  );
+  const ambassadorIdToUserKey = new Map<string, string>();
+  for (const row of ambassadors) {
+    const ambassadorId = asString(row.id);
+    const userKey =
+      asString(row.user_id) ||
+      asString(row.profile_id) ||
+      asString(row.email).toLowerCase() ||
+      ambassadorId;
+    if (ambassadorId && userKey) {
+      ambassadorIdToUserKey.set(ambassadorId, userKey);
+    }
+  }
+  const ambassadorTrainingProgress = (
+    (ambassadorProgressResult.data || []) as AnyRow[]
+  ).map((row) => {
+    const ambassadorId = asString(row.ambassador_id) || asString(row.id);
+    const mappedUserKey =
+      ambassadorIdToUserKey.get(ambassadorId) ||
+      asString(row.user_id) ||
+      ambassadorId;
+    return withSourceTable(
+      {
+        ...row,
+        user_id: mappedUserKey,
+        academy_type: "ambassador",
+      },
+      "ambassador_training_progress",
+    );
+  });
 
   const progressSourceRows = [
     ...academyAssignments,
@@ -722,6 +767,7 @@ export async function getAcademyProgressDashboardData(): Promise<AcademyProgress
     ...academyStepProgress,
     ...academyMaterialProgress,
     ...academyCertifications,
+    ...ambassadorTrainingProgress,
   ];
   const progressUserKeys = Array.from(
     new Set(progressSourceRows.map((row) => getUserKey(row)).filter(Boolean)),
@@ -741,6 +787,7 @@ export async function getAcademyProgressDashboardData(): Promise<AcademyProgress
   universityAssignments.forEach((row) => addAssignmentToBucket(buckets, row));
   academyStepProgress.forEach((row) => addStepProgressToBucket(buckets, row));
   academyMaterialProgress.forEach((row) => addMaterialProgressToBucket(buckets, row));
+  ambassadorTrainingProgress.forEach((row) => addStepProgressToBucket(buckets, row));
 
   for (const row of academyCertifications) {
     const rawUserKey = getUserKey(row);

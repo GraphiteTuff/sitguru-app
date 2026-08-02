@@ -13,8 +13,8 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAdminIdentity } from "@/lib/admin/access";
 import { getAdminPeopleDirectory } from "@/lib/admin/peopleResolver";
 
 export const dynamic = "force-dynamic";
@@ -38,13 +38,13 @@ type TrainingStep = {
   is_required?: boolean | null;
 };
 
-const superAdminEmails = ["jason@sitguru.com", "nette@sitguru.com"];
-
 const adminRoutes = {
   dashboard: "/admin",
   hr: "/admin/hr",
-  trainingManager: "/admin/ambassador-training",
+  universityHub: "/admin/ambassador-training",
+  trainingManager: "/admin/ambassador-training/manage",
   universityAssignments: "/admin/university-assignments",
+  universityProgress: "/admin/university-progress",
 };
 
 const academyOptions: {
@@ -139,31 +139,20 @@ function getNotice(
   return null;
 }
 
-async function requireSuperAdmin() {
-  const supabase = await createClient();
+async function requireUniversityAdmin() {
+  const actor = await getAdminIdentity();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  if (!actor?.canAccessAdmin) {
     redirect("/admin/login");
   }
 
-  const email = asString(user.email).toLowerCase();
-
-  if (!superAdminEmails.includes(email)) {
-    redirect("/admin/login");
-  }
-
-  return user;
+  return actor;
 }
 
 async function updateAcademyAssignments(formData: FormData) {
   "use server";
 
-  const adminUser = await requireSuperAdmin();
+  const adminUser = await requireUniversityAdmin();
 
   const userId = asString(formData.get("user_id"));
   const selectedAcademies = formData
@@ -223,7 +212,7 @@ type PageProps = {
 export default async function UniversityAssignmentsPage({
   searchParams,
 }: PageProps) {
-  await requireSuperAdmin();
+  await requireUniversityAdmin();
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const notice = getNotice(resolvedSearchParams);
@@ -298,11 +287,11 @@ export default async function UniversityAssignmentsPage({
           <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
             <div>
               <Link
-                href={adminRoutes.hr}
+                href={adminRoutes.universityHub}
                 className="mb-4 inline-flex items-center gap-2 rounded-full border border-green-100 bg-green-50 px-3 py-2 text-xs font-black text-green-900 transition hover:bg-green-100 sm:text-sm"
               >
                 <ArrowLeft size={16} />
-                Back to HR
+                Back to University
               </Link>
 
               <div className="flex flex-wrap items-center gap-3">
@@ -330,7 +319,7 @@ export default async function UniversityAssignmentsPage({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <Link
-                href={adminRoutes.trainingManager}
+                href={adminRoutes.universityHub}
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
               >
                 <BookOpenCheck size={17} />

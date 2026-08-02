@@ -9,12 +9,11 @@ import {
   GraduationCap,
   ShieldAlert,
 } from "lucide-react";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import {
   getAcademyProgressDashboardData,
   type AcademyProgressRecord,
 } from "@/lib/admin/academyProgressResolver";
+import { getAdminIdentity } from "@/lib/admin/access";
 import AcademyProgressClient from "./AcademyProgressClient";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +23,7 @@ export type { AcademyProgressRecord };
 const adminRoutes = {
   hr: "/admin/hr",
   university: "/admin/ambassador-training",
+  manage: "/admin/ambassador-training/manage",
   assignments: "/admin/university-assignments",
 };
 
@@ -31,22 +31,26 @@ function number(value: number) {
   return new Intl.NumberFormat("en-US").format(Number.isFinite(value) ? value : 0);
 }
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    redirect("/admin/login");
-  }
-
-  return user;
-}
-
 export default async function AdminUniversityProgressPage() {
-  await requireAdmin();
+  const actor = await getAdminIdentity();
+
+  if (!actor?.canAccessAdmin) {
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Admin access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with an authorized SitGuru admin account to open Academy Progress Tracker.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const data = await getAcademyProgressDashboardData();
 
@@ -56,11 +60,11 @@ export default async function AdminUniversityProgressPage() {
         <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
           <div className="min-w-0">
             <Link
-              href={adminRoutes.hr}
+              href={adminRoutes.university}
               className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-2 text-xs font-black text-green-800 shadow-sm ring-1 ring-green-100 transition hover:bg-green-50 hover:text-green-950 sm:text-sm"
             >
               <ArrowLeft size={16} />
-              Back to HR
+              Back to University
             </Link>
 
             <div className="flex flex-wrap items-center gap-3">

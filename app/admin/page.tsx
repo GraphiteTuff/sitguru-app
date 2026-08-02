@@ -446,7 +446,7 @@ export default async function AdminOperationsDashboard() {
         ["Sales & Marketing", "/admin/sales-marketing"],
         ["Partners", "/admin/partners"],
         ["Analytics", "/admin/analytics"],
-        ["SitGuru University", "/admin/university-progress"],
+        ["SitGuru University", "/admin/ambassador-training"],
       ],
     },
   ];
