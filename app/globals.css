@@ -1839,17 +1839,25 @@ p {
   }
 }
 
-.homepage-chat-panel__header {
+.homepage-chat-panel__header,
+.homepage-chat-panel > .homepage-chat-panel__header,
+div.homepage-chat-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.85rem 3rem 0.85rem 0.85rem;
-  background: linear-gradient(
-    135deg,
-    var(--hcb-green, #0d5c3a) 0%,
-    var(--hcb-green-deep, #09462c) 100%
-  ) !important;
+  background: linear-gradient(135deg, #0d5c3a 0%, #09462c 100%) !important;
+  color: #ffffff !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Beat `.admin-theme header { background: white !important }` if panel is nested. */
+.admin-theme .homepage-chat-panel__header,
+.admin-theme header.homepage-chat-panel__header,
+.admin-theme div.homepage-chat-panel__header {
+  background: linear-gradient(135deg, #0d5c3a 0%, #09462c 100%) !important;
   color: #ffffff !important;
   border-bottom: 0 !important;
   box-shadow: none !important;
