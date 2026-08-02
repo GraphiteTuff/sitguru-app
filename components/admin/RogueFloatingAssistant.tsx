@@ -23,9 +23,19 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 
 const BRAND_GREEN = "#0D5C3A";
 const ROGUE_AVATAR_SRC = "/images/rogue-avatar.png";
+
+type ReportPeriod = "daily" | "weekly" | "monthly" | "yearly";
+
+const PERIOD_OPTIONS: { id: ReportPeriod; label: string }[] = [
+  { id: "daily", label: "Daily" },
+  { id: "weekly", label: "Weekly" },
+  { id: "monthly", label: "Monthly" },
+  { id: "yearly", label: "Yearly" },
+];
 
 const QUICK_CHIPS = [
   {
@@ -94,8 +104,8 @@ function AdminRogueMarkdown({ text }: { text: string }) {
               <table className="min-w-full text-left text-xs">
                 <thead className="bg-emerald-50 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
                   <tr>
-                    {header.map((cell) => (
-                      <th key={cell} className="px-3 py-2">
+                    {(header || []).map((cell, cellIndex) => (
+                      <th key={`${cell}-${cellIndex}`} className="px-3 py-2">
                         {cell}
                       </th>
                     ))}
@@ -108,7 +118,10 @@ function AdminRogueMarkdown({ text }: { text: string }) {
                       className="border-t border-emerald-50 bg-white"
                     >
                       {row.map((cell, cellIndex) => (
-                        <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2 font-semibold">
+                        <td
+                          key={`${rowIndex}-${cellIndex}`}
+                          className="px-3 py-2 font-semibold"
+                        >
                           {renderInline(cell)}
                         </td>
                       ))}
@@ -167,7 +180,10 @@ function AdminRogueMarkdown({ text }: { text: string }) {
         }
 
         return (
-          <p key={`p-${blockIndex}`} className="font-semibold whitespace-pre-wrap">
+          <p
+            key={`p-${blockIndex}`}
+            className="whitespace-pre-wrap font-semibold"
+          >
             {lines.map((line, idx) => (
               <span key={idx}>
                 {renderInline(line)}
@@ -203,10 +219,9 @@ function renderInline(text: string): ReactNode {
 export default function RogueFloatingAssistant() {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [panelReady, setPanelReady] = useState(false);
   const [preset, setPreset] = useState<string>("");
-  const [period, setPeriod] = useState<"daily" | "weekly" | "monthly" | "yearly">(
-    "daily",
-  );
+  const [period, setPeriod] = useState<ReportPeriod>("daily");
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -245,6 +260,15 @@ export default function RogueFloatingAssistant() {
   );
 
   useEffect(() => {
+    if (!open) {
+      setPanelReady(false);
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => setPanelReady(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     const el = scrollerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -272,6 +296,7 @@ export default function RogueFloatingAssistant() {
         },
       },
     );
+    window.setTimeout(() => inputRef.current?.focus(), 40);
   }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -296,13 +321,18 @@ export default function RogueFloatingAssistant() {
       },
     ]);
     setPreset("");
+    setInput("");
   }
 
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-[80] flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
       {open ? (
         <section
-          className={`pointer-events-auto flex ${panelClass} origin-bottom-right flex-col overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-[0_24px_60px_rgba(13,92,58,0.18)] transition-all duration-300`}
+          className={`pointer-events-auto flex ${panelClass} origin-bottom-right flex-col overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-[0_24px_60px_rgba(13,92,58,0.18)] transition-all duration-300 ease-out ${
+            panelReady
+              ? "translate-y-0 scale-100 opacity-100"
+              : "translate-y-3 scale-[0.97] opacity-0"
+          }`}
           aria-label="Rogue, Chief Treat Officer admin assistant"
         >
           <header className="flex items-start gap-3 border-b border-emerald-50 bg-[radial-gradient(circle_at_top_left,rgba(13,92,58,0.14),transparent_42%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_55%,#f8fafc_100%)] px-4 py-3">
@@ -368,6 +398,30 @@ export default function RogueFloatingAssistant() {
             </button>
           </div>
 
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-emerald-50 bg-white px-3 py-2">
+            <span className="mr-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+              Period
+            </span>
+            {PERIOD_OPTIONS.map((option) => {
+              const active = period === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setPeriod(option.id)}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-black transition ${
+                    active
+                      ? "bg-[#0D5C3A] text-white shadow-sm"
+                      : "border border-emerald-100 bg-[#f7fbf8] text-emerald-900 hover:bg-emerald-50"
+                  }`}
+                  aria-pressed={active}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
           <div
             ref={scrollerRef}
             className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#f7fbf8] px-3 py-3"
@@ -377,7 +431,9 @@ export default function RogueFloatingAssistant() {
               return (
                 <div
                   key={message.id}
-                  className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                  className={`flex transition duration-200 ${
+                    isUser ? "justify-end" : "justify-start"
+                  }`}
                 >
                   <div
                     className={`max-w-[92%] rounded-[1.35rem] px-3.5 py-3 shadow-sm ${
@@ -387,11 +443,13 @@ export default function RogueFloatingAssistant() {
                     }`}
                   >
                     {isUser ? (
-                      <p className="text-sm font-semibold leading-6 whitespace-pre-wrap">
+                      <p className="whitespace-pre-wrap text-sm font-semibold leading-6">
                         {message.content}
                       </p>
                     ) : (
-                      <AdminRogueMarkdown text={message.content} />
+                      <SafeAssistantBubble contentHint={message.content}>
+                        <AdminRogueMarkdown text={message.content} />
+                      </SafeAssistantBubble>
                     )}
                   </div>
                 </div>
@@ -416,7 +474,7 @@ export default function RogueFloatingAssistant() {
             onSubmit={onSubmit}
             className="border-t border-emerald-50 bg-white p-3"
           >
-            <div className="flex items-center gap-2 rounded-[1.35rem] border border-emerald-100 bg-[#fbfefd] p-1.5 shadow-sm focus-within:border-emerald-300">
+            <div className="flex items-center gap-2 rounded-[1.35rem] border border-emerald-100 bg-[#fbfefd] p-1.5 shadow-sm transition focus-within:border-emerald-300 focus-within:shadow-[0_0_0_3px_rgba(13,92,58,0.08)]">
               <input
                 ref={inputRef}
                 value={input}
@@ -450,7 +508,7 @@ export default function RogueFloatingAssistant() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="pointer-events-auto group relative flex h-16 w-16 items-center justify-center rounded-full border border-emerald-100 bg-white shadow-[0_18px_40px_rgba(13,92,58,0.28)] transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(13,92,58,0.34)] sm:h-[4.5rem] sm:w-[4.5rem]"
+        className="pointer-events-auto group relative flex h-16 w-16 items-center justify-center rounded-full border border-emerald-100 bg-white shadow-[0_18px_40px_rgba(13,92,58,0.28)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(13,92,58,0.34)] sm:h-[4.5rem] sm:w-[4.5rem]"
         aria-label={
           open
             ? "Close Rogue, Chief Treat Officer"
@@ -458,6 +516,11 @@ export default function RogueFloatingAssistant() {
         }
       >
         <span className="absolute inset-0 rounded-full bg-white" />
+        <span
+          className={`absolute inset-[-3px] rounded-full border-2 border-[#0D5C3A]/25 transition duration-500 ${
+            open ? "scale-110 opacity-0" : "animate-pulse opacity-100"
+          }`}
+        />
         <span className="relative h-14 w-14 overflow-hidden rounded-full sm:h-16 sm:w-16">
           <Image
             src={ROGUE_AVATAR_SRC}

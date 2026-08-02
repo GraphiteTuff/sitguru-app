@@ -1503,6 +1503,55 @@ export const ALL_ADMIN_REPORT_MODULES: AdminReportModuleId[] = [
   "settings_tech",
 ];
 
+/** Modules that require finance-capable admin access. */
+export const FINANCIAL_REPORT_MODULES: AdminReportModuleId[] = [
+  "financial_overview",
+  "banking",
+  "stripe_transactions",
+  "profit_loss",
+  "balance_sheet",
+  "cash_flow",
+  "general_ledger",
+  "reconciliation",
+  "pro_forma",
+  "tax_center",
+  "commissions",
+  "payouts",
+  "ambassador_ledger",
+];
+
+const FINANCIAL_MODULE_SET = new Set<AdminReportModuleId>(
+  FINANCIAL_REPORT_MODULES,
+);
+
+export function isFinancialReportModule(id: AdminReportModuleId) {
+  return FINANCIAL_MODULE_SET.has(id);
+}
+
+/**
+ * Strip finance modules when the actor lacks finance capability.
+ * Always returns at least a safe non-empty ops pulse when everything is gated.
+ */
+export function filterModulesForAccess(
+  modules: AdminReportModuleId[],
+  canAccessFinancials: boolean,
+): AdminReportModuleId[] {
+  const base = Array.isArray(modules) ? modules.filter(Boolean) : [];
+  const filtered = canAccessFinancials
+    ? base
+    : base.filter((id) => !isFinancialReportModule(id));
+
+  if (filtered.length > 0) return filtered;
+
+  return [
+    "dashboard",
+    "bookings",
+    "messages",
+    "analytics",
+    "growth_referrals",
+  ];
+}
+
 const MODULE_KEYWORDS: Record<AdminReportModuleId, string[]> = {
   dashboard: ["dashboard", "kpi", "alert", "overview pulse", "daily sync"],
   live_walks: ["live walk", "gps", "geofence", "check-in", "check in", "walk session"],
@@ -1777,29 +1826,68 @@ export async function compileAdminReportingSnapshot(opts?: {
   modules?: AdminReportModuleId[];
   query?: string;
   preset?: string | null;
+  /** When false, finance modules are excluded from the snapshot. Defaults true. */
+  canAccessFinancials?: boolean;
 }): Promise<AdminReportingSnapshot> {
-  const now = new Date();
-  const query = asString(opts?.query);
-  const period = opts?.period || inferPeriodFromText(query || opts?.preset || "daily");
-  const start = getPeriodStart(period, now);
-  const sinceIso = start.toISOString();
-  const selected =
-    opts?.modules?.length
-      ? opts.modules
-      : resolveModulesForQuery(query || opts?.preset || "", opts?.preset);
+  try {
+    const now = new Date();
+    const query = asString(opts?.query);
+    const period =
+      opts?.period || inferPeriodFromText(query || opts?.preset || "daily");
+    const start = getPeriodStart(period, now);
+    const sinceIso = start.toISOString();
+    const canAccessFinancials = opts?.canAccessFinancials !== false;
+    const resolved =
+      opts?.modules?.length
+        ? opts.modules
+        : resolveModulesForQuery(query || opts?.preset || "", opts?.preset);
+    const selected = filterModulesForAccess(resolved, canAccessFinancials);
 
-  const modules = await Promise.all(
-    selected.map((id) => runModule(id, sinceIso)),
-  );
+    const modules = await Promise.all(
+      selected.map(async (id) => {
+        try {
+          return await runModule(id, sinceIso);
+        } catch (error) {
+          return finalize(
+            snapshotBase(id, id, "analytics_admin", []),
+            false,
+            "Module failed safely.",
+            {},
+            [],
+            [error instanceof Error ? error.message : "Module failure"],
+          );
+        }
+      }),
+    );
 
-  const compiledAt = now.toISOString();
-  return {
-    compiledAt,
-    period,
-    periodStart: sinceIso,
-    periodLabel: periodLabel(period, now),
-    selectedModules: selected,
-    modules,
-    markdownContext: modulesToMarkdown(modules, period, compiledAt),
-  };
+    const compiledAt = now.toISOString();
+    const financeNote = canAccessFinancials
+      ? ""
+      : "\n\n_Finance modules omitted — actor lacks finance-capable admin access._\n";
+
+    return {
+      compiledAt,
+      period,
+      periodStart: sinceIso,
+      periodLabel: periodLabel(period, now),
+      selectedModules: selected,
+      modules,
+      markdownContext:
+        modulesToMarkdown(modules, period, compiledAt) + financeNote,
+    };
+  } catch (error) {
+    const now = new Date();
+    const period = opts?.period || "daily";
+    return {
+      compiledAt: now.toISOString(),
+      period,
+      periodStart: getPeriodStart(period, now).toISOString(),
+      periodLabel: periodLabel(period, now),
+      selectedModules: [],
+      modules: [],
+      markdownContext: `# SitGuru Admin Snapshot\n- Compiled at: ${now.toISOString()}\n- Status: snapshot compiler recovered from error\n- Detail: ${
+        error instanceof Error ? error.message : "unknown"
+      }\n`,
+    };
+  }
 }

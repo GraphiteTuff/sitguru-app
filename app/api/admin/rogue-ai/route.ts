@@ -17,6 +17,13 @@ import {
   isSitGuruAiConfigured,
 } from "@/lib/messaging/ai-model";
 
+const VALID_PERIODS = new Set<ReportPeriod>([
+  "daily",
+  "weekly",
+  "monthly",
+  "yearly",
+]);
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -72,24 +79,28 @@ function buildAdminRogueSystemPrompt(opts: {
   periodLabel: string;
   actorEmail: string;
   actorRole: string;
+  canAccessFinancials: boolean;
   snapshotMarkdown: string;
   preset?: string;
 }) {
   return `
-You are Rogue, Chief Treat Officer 🦴 — SitGuru's floating semantic administrator inside the Admin Portal.
+You are Rogue, Chief Treat Officer — SitGuru's floating semantic administrator inside the Admin Portal.
 
 PERSONA:
 - Sharp, analytical, delightful, and pet-centric.
 - You are fiercely loyal to the pack and obsessed with clean ops, fair payouts, trusted care, and growth that doesn't smell like snake oil.
 - Occasional GSP flair is welcome (pointing, zoomies, naps) — but never at the expense of clarity.
 - Admin tone: mature, precise, trustworthy. Still warm. Not cutesy spam.
+- Keep replies punchy and scannable — lead with signal, not filler.
 
 MISSION:
 - Scan the injected ADMIN DATA SNAPSHOT and answer the admin's question.
-- Compile daily / weekly / monthly / yearly style reports when asked.
+- Dynamically route across Operations, Growth & Marketing, Financials, and Analytics & Admin (33 subcategories).
+- Compile daily / weekly / monthly / yearly style reports when asked or when a quick-tap preset is set.
 - Prefer actionable findings: exceptions, queues, risks, opportunities, and next clicks.
 - Never invent financial numbers. If a module is unavailable or zero, say so plainly.
 - Never expose secrets, service-role keys, env values, or raw PII dumps beyond what the snapshot already summarizes.
+${!opts.canAccessFinancials ? "- This admin lacks finance-capable access. Do NOT invent or speculate on GMV, banking, Stripe, P&L, tax, commissions, or payout figures. Say finance ledgers are gated." : ""}
 
 OUTPUT RULES:
 - Use clean Markdown: headings, short bullets, and tables when comparing metrics.
@@ -101,10 +112,11 @@ TEMPORAL CONTEXT:
 - Current UTC datetime: ${opts.nowIso}
 - Active report period: ${opts.period} (${opts.periodLabel})
 - Requesting admin: ${opts.actorEmail} (${opts.actorRole})
+- Finance access: ${opts.canAccessFinancials ? "granted" : "restricted"}
 ${opts.preset ? `- Quick-tap preset: ${opts.preset}` : ""}
 
 ADMIN DATA SNAPSHOT (read-only, defensive aggregates):
-${opts.snapshotMarkdown}
+${opts.snapshotMarkdown || "_No live module rows available._"}
 `.trim();
 }
 
@@ -145,22 +157,27 @@ export async function POST(req: Request) {
       );
     }
 
-    const lastUserText = messageContent(messages[messages.length - 1]);
+    const lastUserText = messageContent(
+      [...messages].reverse().find((message) => message.role === "user") ||
+        messages[messages.length - 1],
+    );
     const preset = asString(body.preset);
-    const periodHint = asString(body.period || body.reportPeriod);
-    const period: ReportPeriod =
-      periodHint === "daily" ||
-      periodHint === "weekly" ||
-      periodHint === "monthly" ||
-      periodHint === "yearly"
-        ? periodHint
-        : inferPeriodFromText(`${preset} ${lastUserText}`);
+    const periodHint = asString(body.period || body.reportPeriod).toLowerCase();
+    const period: ReportPeriod = VALID_PERIODS.has(periodHint as ReportPeriod)
+      ? (periodHint as ReportPeriod)
+      : inferPeriodFromText(`${preset} ${lastUserText}`);
+
+    const canAccessFinancials = Boolean(actor.canAccessFinancials);
 
     const snapshot = await compileAdminReportingSnapshot({
       period,
       query: lastUserText,
       preset: preset || null,
-    }).catch(() => null);
+      canAccessFinancials,
+    }).catch((error) => {
+      console.error("[rogue-ai] snapshot compile failed:", error);
+      return null;
+    });
 
     const snapshotMarkdown =
       snapshot?.markdownContext ||
@@ -171,8 +188,9 @@ export async function POST(req: Request) {
       nowIso,
       period: snapshot?.period || period,
       periodLabel: snapshot?.periodLabel || period,
-      actorEmail: actor.email,
-      actorRole: actor.role,
+      actorEmail: actor.email || "admin",
+      actorRole: actor.role || "admin",
+      canAccessFinancials,
       snapshotMarkdown,
       preset: preset || undefined,
     });
