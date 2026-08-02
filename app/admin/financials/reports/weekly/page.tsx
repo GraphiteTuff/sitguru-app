@@ -114,28 +114,28 @@ type WeeklyGrowthData = {
 
 const exportCards: ExportCard[] = [
   {
-    title: "Weekly PDF Report",
+    title: "Weekly HTML Snapshot",
     description:
-      "Readable weekly management report for owner review, leadership updates, CPA notes, growth results, reward liabilities, and internal records.",
-    href: "/admin/financials/exports?type=weekly&format=pdf",
-  },
-  {
-    title: "Weekly Excel Workbook",
-    description:
-      "Multi-tab workbook with weekly KPIs, bookings, payment activity, payouts, commissions, campaign ROI, reward liabilities, and notes.",
-    href: "/admin/financials/exports?type=weekly&format=xlsx",
+      "Readable generated weekly management report for owner review, leadership updates, CPA notes, growth results, and internal records.",
+    href: "/api/admin/reports/generate?reportType=weekly&format=html",
   },
   {
     title: "Weekly CSV Package",
     description:
-      "CSV files for weekly transactions, Stripe activity, payouts, commissions, campaign costs, referral rewards, bank matching, and exceptions.",
-    href: "/admin/financials/exports?type=weekly&format=csv",
+      "CSV download with weekly KPIs, bookings, payment activity, payouts, commissions, campaign ROI, and reward liabilities.",
+    href: "/api/admin/reports/generate?reportType=weekly&format=csv",
   },
   {
-    title: "Weekly ZIP Archive",
+    title: "Admin Report Generator",
     description:
-      "Full weekly archive containing PDF, Excel workbook, CSV files, schedules, growth/referral support records, and CPA notes.",
-    href: "/admin/financials/exports?type=weekly&format=zip",
+      "Open the daily/weekly generate form with optional save-to-history for export archive.",
+    href: "/admin/reports",
+  },
+  {
+    title: "Export Center Package",
+    description:
+      "Build ZIP/PDF/Excel CPA packages and review export history from the Finance Export Center.",
+    href: "/admin/financials/exports",
   },
 ];
 
@@ -970,10 +970,10 @@ export default async function AdminFinancialsWeeklyReportPage() {
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <Link
-                href="/admin/financials"
+                href="/admin/financials/reports"
                 className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
               >
-                ← Back to Financial Overview
+                ← Back to Financial Reports
               </Link>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">

@@ -68,6 +68,7 @@ const adminRoutes = {
   payouts: "/admin/payouts",
   financialPayouts: "/admin/financials/payouts",
   financialExports: "/admin/financials/exports",
+  reports: "/admin/financials/reports",
   reportsDaily: "/admin/financials/reports/daily",
   reportsWeekly: "/admin/financials/reports/weekly",
   reportsCustom: "/admin/financials/reports/custom",
@@ -587,6 +588,7 @@ function AdminFooter() {
       links: [
         { label: "Tax Center", href: adminRoutes.taxReports },
         { label: "CPA Handoff", href: adminRoutes.cpaHandoff },
+        { label: "Reports Hub", href: adminRoutes.reports },
         { label: "Daily Report", href: adminRoutes.reportsDaily },
         { label: "Weekly Report", href: adminRoutes.reportsWeekly },
         { label: "Custom Report", href: adminRoutes.reportsCustom },

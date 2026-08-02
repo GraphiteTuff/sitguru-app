@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 
+import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -187,28 +188,28 @@ const dailyCloseSteps = [
 
 const exportCards: ExportCard[] = [
   {
-    title: "Daily PDF Snapshot",
+    title: "Daily HTML Snapshot",
     description:
-      "Readable daily report for owner review, CPA notes, management handoff, growth/referral activity, and internal records.",
-    href: "/admin/financials/exports?type=daily&format=pdf",
-  },
-  {
-    title: "Daily Excel Workbook",
-    description:
-      "Workbook with daily metrics, booking activity, payment activity, growth ROI, reward liability, exceptions, and notes.",
-    href: "/admin/financials/exports?type=daily&format=xlsx",
+      "Readable generated daily report for owner review, CPA notes, management handoff, growth/referral activity, and internal records.",
+    href: "/api/admin/reports/generate?reportType=daily&format=html",
   },
   {
     title: "Daily CSV Package",
     description:
-      "CSV files for daily transactions, Stripe activity, payouts, commissions, campaign costs, referral rewards, and exceptions.",
-    href: "/admin/financials/exports?type=daily&format=csv",
+      "CSV download with daily metrics, booking activity, payment activity, growth ROI, reward liability, exceptions, and notes.",
+    href: "/api/admin/reports/generate?reportType=daily&format=csv",
   },
   {
-    title: "Daily ZIP Archive",
+    title: "Admin Report Generator",
     description:
-      "Full daily backup package containing PDF, Excel, CSV files, campaign ROI support, referral liability support, and schedules.",
-    href: "/admin/financials/exports?type=daily&format=zip",
+      "Open the daily/weekly generate form with optional save-to-history for export archive.",
+    href: "/admin/reports",
+  },
+  {
+    title: "Export Center Package",
+    description:
+      "Build ZIP/PDF/Excel CPA packages and review export history from the Finance Export Center.",
+    href: "/admin/financials/exports",
   },
 ];
 
@@ -1366,6 +1367,27 @@ function GrowthReferralDailyPanel({ growth }: { growth: DailyGrowthData }) {
 }
 
 export default async function AdminFinancialsDailyReportPage() {
+  const actor = await getFinanceAdminIdentity();
+
+  if (!actor) {
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Financial access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with a finance-enabled admin account to open the Daily
+            Financial Report.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const [overviewData, growth] = await Promise.all([
     getDailyOverview(),
     getDailyGrowthData(),
@@ -1380,12 +1402,20 @@ export default async function AdminFinancialsDailyReportPage() {
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <Link
-                href="/admin/financials"
-                className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
-              >
-                ← Back to Financial Overview
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/admin/financials/reports"
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
+                >
+                  ← Back to Financial Reports
+                </Link>
+                <Link
+                  href="/admin/financials"
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
+                >
+                  Financial Overview
+                </Link>
+              </div>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <h1 className="text-4xl font-black tracking-tight text-slate-950">
@@ -1414,6 +1444,10 @@ export default async function AdminFinancialsDailyReportPage() {
                 payouts, partner commissions, cash movement, growth marketing
                 spend, PawPerks and referral reward liability, campaign ROI, and
                 exceptions before they become month-end issues.
+              </p>
+
+              <p className="mt-3 text-xs font-bold text-slate-500">
+                Signed in as {actor.email} · Role {actor.role}
               </p>
 
               <div
@@ -1464,6 +1498,33 @@ export default async function AdminFinancialsDailyReportPage() {
                 </p>
               </div>
             </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Link
+              href="/api/admin/reports/generate?reportType=daily&format=html"
+              className="rounded-2xl border border-emerald-200 bg-[#0D5C3A] px-4 py-3 text-center text-sm font-black text-white transition hover:bg-emerald-900"
+            >
+              Generate HTML
+            </Link>
+            <Link
+              href="/api/admin/reports/generate?reportType=daily&format=csv"
+              className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-black text-emerald-900 transition hover:bg-emerald-50"
+            >
+              Download CSV
+            </Link>
+            <Link
+              href="/admin/financials/reports/weekly"
+              className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-black text-emerald-900 transition hover:bg-emerald-50"
+            >
+              Weekly Report
+            </Link>
+            <Link
+              href="/admin/financials/exports"
+              className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm font-black text-emerald-900 transition hover:bg-emerald-100"
+            >
+              Export Center
+            </Link>
           </div>
         </section>
 

@@ -318,28 +318,28 @@ const reviewSteps: ReviewStep[] = [
 
 const exportCards: ExportCard[] = [
   {
-    title: "Custom PDF Packet",
+    title: "Custom Package via Export Center",
     description:
-      "Readable report packet for CPA review, owner records, lender requests, investor reporting, or internal management.",
-    href: "/admin/financials/exports?type=custom&format=pdf",
+      "Build a custom PDF/Excel/CSV/ZIP packet for CPA review, owner records, lender requests, or investor reporting.",
+    href: "/admin/financials/exports",
   },
   {
-    title: "Custom Excel Workbook",
+    title: "Daily HTML Snapshot",
     description:
-      "Multi-tab workbook with selected statements, schedules, transactions, reconciliations, tax categories, growth ROI, reward liability, and notes.",
-    href: "/admin/financials/exports?type=custom&format=xlsx",
+      "Generate today’s daily admin report HTML preview for a quick custom date check-in.",
+    href: "/api/admin/reports/generate?reportType=daily&format=html",
   },
   {
-    title: "Custom CSV Package",
+    title: "Weekly HTML Snapshot",
     description:
-      "CSV files for selected date range, QuickBooks-style import, CPA analysis, bookkeeping review, and audit backup.",
-    href: "/admin/financials/exports?type=custom&format=csv",
+      "Generate the weekly management report HTML preview for leadership handoff.",
+    href: "/api/admin/reports/generate?reportType=weekly&format=html",
   },
   {
-    title: "Custom ZIP Archive",
+    title: "Admin Report Generator",
     description:
-      "Full archive containing PDF, Excel workbook, CSV files, reconciliations, audit schedules, growth/referral backup, and report packages.",
-    href: "/admin/financials/exports?type=custom&format=zip",
+      "Open the daily/weekly generate form with optional save-to-history for export archive.",
+    href: "/admin/reports",
   },
 ];
 
@@ -1001,10 +1001,10 @@ export default async function AdminFinancialsCustomReportPage() {
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <Link
-                href="/admin/financials"
+                href="/admin/financials/reports"
                 className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
               >
-                ← Back to Financial Overview
+                ← Back to Financial Reports
               </Link>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">

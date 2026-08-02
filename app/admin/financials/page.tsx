@@ -549,6 +549,12 @@ const fallbackOverview: FinancialOverviewResponse = {
 
 const reportingPeriods: PeriodCard[] = [
   {
+    title: "Reports Hub",
+    description:
+      "Daily, weekly, and custom financial report command center with generate + export deep links.",
+    href: "/admin/financials/reports",
+  },
+  {
     title: "Daily Report",
     description:
       "Today or yesterday owner snapshot, bookings, Stripe activity, refunds, deposits, disputes, and operating activity.",
