@@ -1,31 +1,30 @@
 "use client";
 
 /**
- * Floating Rogue admin assistant — visible across /admin routes.
+ * Floating Rogue admin assistant — homepage tip bubble + panel (no AI badge).
  * Streams via Vercel AI SDK useChat → /api/admin/rogue-ai.
  */
 
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type FormEvent,
   type ReactNode,
 } from "react";
-import Image from "next/image";
+import { createPortal } from "react-dom";
 import { useChat } from "ai/react";
-import {
-  Loader2,
-  Maximize2,
-  Minimize2,
-  SendHorizontal,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { Maximize2, Minimize2, Sparkles, X } from "lucide-react";
 
 const BRAND_GREEN = "#0D5C3A";
 const ROGUE_AVATAR_SRC = "/images/rogue-avatar.png";
+
+const REPORTING_STATEMENT =
+  "**Rogue reporting for duty.** I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap a chip or ask me anything admin-shaped.";
+
+/** Admin tip bubble — reporting-for-duty statement. */
+const TIP_STATEMENT =
+  "Rogue reporting for duty. I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap a chip or ask me anything admin-shaped!";
 
 const QUICK_CHIPS = [
   {
@@ -57,6 +56,21 @@ const QUICK_CHIPS = [
       "Run a System Audit: admin audit trail, trust & safety escalations, settings/config, webhook/integration health, export queues, and support load.",
   },
 ] as const;
+
+const CHIP_CLASS =
+  "px-4 py-1.5 bg-[#0D5C3A] text-white text-xs font-medium rounded-full shadow-sm hover:bg-opacity-95 active:scale-95 transition-all whitespace-nowrap flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
+
+function RogueAvatar({ className = "h-8 w-8" }: { className?: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={ROGUE_AVATAR_SRC}
+      alt=""
+      className={`${className} rounded-full object-cover object-[center_18%]`}
+      style={{ backgroundColor: "#fff" }}
+    />
+  );
+}
 
 function AdminRogueMarkdown({ text }: { text: string }) {
   const normalized = String(text || "").replace(/\r\n/g, "\n").trim();
@@ -108,7 +122,10 @@ function AdminRogueMarkdown({ text }: { text: string }) {
                       className="border-t border-emerald-50 bg-white"
                     >
                       {row.map((cell, cellIndex) => (
-                        <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2 font-semibold">
+                        <td
+                          key={`${rowIndex}-${cellIndex}`}
+                          className="px-3 py-2 font-semibold"
+                        >
                           {renderInline(cell)}
                         </td>
                       ))}
@@ -167,7 +184,10 @@ function AdminRogueMarkdown({ text }: { text: string }) {
         }
 
         return (
-          <p key={`p-${blockIndex}`} className="font-semibold whitespace-pre-wrap">
+          <p
+            key={`p-${blockIndex}`}
+            className="font-semibold whitespace-pre-wrap"
+          >
             {lines.map((line, idx) => (
               <span key={idx}>
                 {renderInline(line)}
@@ -201,6 +221,7 @@ function renderInline(text: string): ReactNode {
 }
 
 export default function RogueFloatingAssistant() {
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [preset, setPreset] = useState<string>("");
@@ -208,12 +229,11 @@ export default function RogueFloatingAssistant() {
     "daily",
   );
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const {
     messages,
     input,
-    setInput,
     handleInputChange,
     handleSubmit,
     append,
@@ -226,8 +246,7 @@ export default function RogueFloatingAssistant() {
       {
         id: "rogue-admin-hello",
         role: "assistant",
-        content:
-          "**Rogue reporting for duty.** I'm your Chief Treat Officer — ready to sniff Operations, Growth, Financials, and Audit logs. Tap a chip or ask me anything admin-shaped.",
+        content: REPORTING_STATEMENT,
       },
     ],
     body: {
@@ -236,13 +255,9 @@ export default function RogueFloatingAssistant() {
     },
   });
 
-  const panelClass = useMemo(
-    () =>
-      expanded
-        ? "h-[min(820px,92dvh)] w-[min(560px,96vw)]"
-        : "h-[min(640px,78dvh)] w-[min(420px,94vw)]",
-    [expanded],
-  );
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -255,6 +270,15 @@ export default function RogueFloatingAssistant() {
       window.setTimeout(() => inputRef.current?.focus(), 80);
     }
   }, [open]);
+
+  function openPanel() {
+    setOpen(true);
+  }
+
+  function closePanel() {
+    setOpen(false);
+    setExpanded(false);
+  }
 
   async function runChip(chip: (typeof QUICK_CHIPS)[number]) {
     setPreset(chip.id);
@@ -272,6 +296,7 @@ export default function RogueFloatingAssistant() {
         },
       },
     );
+    window.setTimeout(() => inputRef.current?.focus(), 40);
   }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -296,65 +321,113 @@ export default function RogueFloatingAssistant() {
       },
     ]);
     setPreset("");
+    window.setTimeout(() => inputRef.current?.focus(), 40);
   }
 
-  return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[80] flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
+  if (!mounted) return null;
+
+  const panelSize = expanded
+    ? "sm:h-[min(820px,92dvh)] sm:w-[min(560px,96vw)]"
+    : "sm:h-[600px] sm:w-[400px]";
+
+  const ui = (
+    <div
+      className="pointer-events-none fixed bottom-4 right-4 z-[90] flex flex-row items-center justify-end gap-3 overflow-visible md:bottom-6 md:right-6"
+      data-rogue-admin-dock
+      style={{ ["--hcb-green" as string]: BRAND_GREEN }}
+    >
+      <div className="homepage-chat-bubble-root !relative !inset-auto !z-auto !max-w-none">
+        {!open ? (
+          <button
+            type="button"
+            className="homepage-chat-tip"
+            style={{ maxWidth: "min(280px, calc(100vw - 6.5rem))" }}
+            onClick={openPanel}
+            aria-label="Open Rogue reporting terminal"
+          >
+            <span className="homepage-chat-tip__pulse" aria-hidden />
+            <span className="homepage-chat-tip__text">{TIP_STATEMENT}</span>
+          </button>
+        ) : null}
+
+        <button
+          type="button"
+          className="homepage-chat-launcher"
+          onClick={() => (open ? closePanel() : openPanel())}
+          aria-label={
+            open
+              ? "Close Rogue, Chief Treat Officer"
+              : "Open Rogue, Chief Treat Officer"
+          }
+          aria-expanded={open}
+        >
+          {open ? (
+            <span className="homepage-chat-launcher__icon">×</span>
+          ) : (
+            <span className="homepage-chat-launcher__icon" aria-hidden>
+              <RogueAvatar className="h-full w-full overflow-hidden rounded-full flex-shrink-0" />
+            </span>
+          )}
+        </button>
+      </div>
+
       {open ? (
-        <section
-          className={`pointer-events-auto flex ${panelClass} origin-bottom-right flex-col overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white shadow-[0_24px_60px_rgba(13,92,58,0.18)] transition-all duration-300`}
+        <div
+          className={`homepage-chat-panel pointer-events-auto fixed inset-0 z-[91] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:rounded-2xl sm:shadow-2xl ${panelSize}`}
+          role="dialog"
           aria-label="Rogue, Chief Treat Officer admin assistant"
         >
-          <header className="flex items-start gap-3 border-b border-emerald-50 bg-[radial-gradient(circle_at_top_left,rgba(13,92,58,0.14),transparent_42%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_55%,#f8fafc_100%)] px-4 py-3">
-            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
-              <span className="absolute inset-0 bg-white" />
-              <Image
-                src={ROGUE_AVATAR_SRC}
-                alt="Rogue"
-                fill
-                className="object-cover object-[center_18%] mix-blend-multiply"
-                sizes="48px"
-              />
+          <header className="homepage-chat-panel__header relative shrink-0">
+            <div className="homepage-chat-panel__brand">
+              <span
+                className="homepage-chat-panel__avatar homepage-chat-panel__avatar--dog"
+                aria-hidden
+              >
+                <RogueAvatar className="!h-full !w-full max-h-full max-w-full rounded-full" />
+              </span>
+              <div className="min-w-0 flex-1 pr-14">
+                <p className="homepage-chat-panel__title">
+                  Rogue, Chief Treat Officer 🦴
+                </p>
+                <p className="homepage-chat-panel__sub">
+                  Semantic admin · live report compiler
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
-                SitGuru Admin AI
-              </p>
-              <h2 className="truncate text-lg font-black tracking-tight text-slate-950">
-                Rogue, Chief Treat Officer
-              </h2>
-              <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                Semantic admin · live report compiler
-              </p>
-            </div>
-            <div className="flex items-center gap-1">
+            <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setExpanded((value) => !value)}
-                className="rounded-xl border border-emerald-100 bg-white p-2 text-emerald-800 transition hover:bg-emerald-50"
+                className="hidden h-9 w-9 place-items-center rounded-full bg-white/14 text-white transition hover:bg-white/22 sm:grid"
                 aria-label={expanded ? "Collapse panel" : "Expand panel"}
+                title={expanded ? "Collapse" : "Expand"}
               >
                 {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-xl border border-emerald-100 bg-white p-2 text-emerald-800 transition hover:bg-emerald-50"
+                onClick={closePanel}
+                className="homepage-chat-panel__close"
                 aria-label="Close Rogue assistant"
+                title="Close"
               >
-                <X size={16} />
+                <X className="h-5 w-5 text-white" aria-hidden="true" />
               </button>
             </div>
           </header>
 
-          <div className="flex flex-wrap gap-2 border-b border-emerald-50 bg-[#fbfefd] px-3 py-2.5">
+          <div
+            className="flex shrink-0 flex-row items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-gray-50 p-2 scrollbar-none"
+            role="toolbar"
+            aria-label="Quick admin reports"
+          >
             {QUICK_CHIPS.map((chip) => (
               <button
                 key={chip.id}
                 type="button"
                 disabled={isLoading}
                 onClick={() => void runChip(chip)}
-                className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-black text-emerald-900 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50 disabled:opacity-60"
+                className={CHIP_CLASS}
               >
                 {chip.label}
               </button>
@@ -362,7 +435,7 @@ export default function RogueFloatingAssistant() {
             <button
               type="button"
               onClick={clearChat}
-              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-black text-slate-600 transition hover:bg-white"
+              className="flex-shrink-0 cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
             >
               Clear
             </button>
@@ -370,38 +443,53 @@ export default function RogueFloatingAssistant() {
 
           <div
             ref={scrollerRef}
-            className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#f7fbf8] px-3 py-3"
+            className="homepage-chat-panel__messages min-h-0 flex-1"
           >
             {messages.map((message) => {
-              const isUser = message.role === "user";
-              return (
-                <div
-                  key={message.id}
-                  className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                >
+              if (message.role === "user") {
+                return (
                   <div
-                    className={`max-w-[92%] rounded-[1.35rem] px-3.5 py-3 shadow-sm ${
-                      isUser
-                        ? "bg-[#0D5C3A] text-white"
-                        : "border border-emerald-100 bg-white text-slate-800"
-                    }`}
+                    key={message.id}
+                    className="homepage-chat-bubble homepage-chat-bubble--user"
                   >
-                    {isUser ? (
-                      <p className="text-sm font-semibold leading-6 whitespace-pre-wrap">
-                        {message.content}
-                      </p>
-                    ) : (
-                      <AdminRogueMarkdown text={message.content} />
-                    )}
+                    {message.content}
+                  </div>
+                );
+              }
+
+              if (message.role !== "assistant") return null;
+
+              return (
+                <div key={message.id} className="flex items-start gap-2">
+                  <span
+                    className="mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-emerald-100"
+                    aria-hidden
+                  >
+                    <RogueAvatar className="h-full w-full" />
+                  </span>
+                  <div className="homepage-chat-bubble homepage-chat-bubble--ai min-w-0 flex-1">
+                    <AdminRogueMarkdown text={message.content} />
                   </div>
                 </div>
               );
             })}
 
             {isLoading ? (
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800 shadow-sm">
-                <Loader2 size={14} className="animate-spin" />
-                Rogue is sniffing the ledgers…
+              <div className="flex items-start gap-2">
+                <span
+                  className="mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-emerald-100"
+                  aria-hidden
+                >
+                  <RogueAvatar className="h-full w-full" />
+                </span>
+                <div
+                  className="homepage-chat-bubble homepage-chat-bubble--ai homepage-chat-typing"
+                  aria-live="polite"
+                >
+                  <span />
+                  <span />
+                  <span />
+                </div>
               </div>
             ) : null}
 
@@ -414,64 +502,42 @@ export default function RogueFloatingAssistant() {
 
           <form
             onSubmit={onSubmit}
-            className="border-t border-emerald-50 bg-white p-3"
+            className="homepage-chat-panel__composer shrink-0"
           >
-            <div className="flex items-center gap-2 rounded-[1.35rem] border border-emerald-100 bg-[#fbfefd] p-1.5 shadow-sm focus-within:border-emerald-300">
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={handleInputChange}
-                placeholder="Ask Rogue about payouts, growth, audits…"
-                className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400"
-                disabled={isLoading}
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-sm transition hover:opacity-95 disabled:opacity-50"
-                style={{ backgroundColor: BRAND_GREEN }}
-                aria-label="Send to Rogue"
-              >
-                {isLoading ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <SendHorizontal size={16} />
-                )}
-              </button>
-            </div>
-            <p className="mt-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-              <Sparkles size={12} />
-              Read-only admin snapshots · Markdown reports
-            </p>
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={input}
+              onChange={handleInputChange}
+              placeholder="Ask Rogue about payouts, growth, audits…"
+              disabled={isLoading}
+              aria-label="Message Rogue"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (isLoading) return;
+                  const form = e.currentTarget.form;
+                  if (form) form.requestSubmit();
+                }
+              }}
+            />
+            <button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              aria-label="Send to Rogue"
+            >
+              {isLoading ? "…" : "Send"}
+            </button>
           </form>
-        </section>
-      ) : null}
 
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="pointer-events-auto group relative flex h-16 w-16 items-center justify-center rounded-full border border-emerald-100 bg-white shadow-[0_18px_40px_rgba(13,92,58,0.28)] transition hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(13,92,58,0.34)] sm:h-[4.5rem] sm:w-[4.5rem]"
-        aria-label={
-          open
-            ? "Close Rogue, Chief Treat Officer"
-            : "Open Rogue, Chief Treat Officer"
-        }
-      >
-        <span className="absolute inset-0 rounded-full bg-white" />
-        <span className="relative h-14 w-14 overflow-hidden rounded-full sm:h-16 sm:w-16">
-          <Image
-            src={ROGUE_AVATAR_SRC}
-            alt="Rogue, Chief Treat Officer"
-            fill
-            className="object-cover object-[center_18%] mix-blend-multiply transition duration-300 group-hover:scale-105"
-            sizes="64px"
-            priority
-          />
-        </span>
-        <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#0D5C3A] text-[10px] font-black text-white shadow-sm">
-          AI
-        </span>
-      </button>
+          <p className="flex items-center gap-1.5 border-t border-gray-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+            <Sparkles size={12} />
+            Read-only admin snapshots · Markdown reports
+          </p>
+        </div>
+      ) : null}
     </div>
   );
+
+  return createPortal(ui, document.body);
 }

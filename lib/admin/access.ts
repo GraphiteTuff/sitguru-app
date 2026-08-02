@@ -6,6 +6,7 @@ import {
   isFinanceRole,
   type FinanceAdminIdentity,
 } from "@/lib/admin/financials/access";
+import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
 
 /** Roles that unlock general /admin access across SitGuru. */
 export const ADMIN_ROLES = [
@@ -102,6 +103,47 @@ export function isAdminRole(role: string | null | undefined) {
   );
 }
 
+function normalizeRoleCandidate(value: unknown) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+/** Map legacy / mistaken keys onto canonical admin roles. */
+function canonicalizeRole(role: string, accessLevel?: string | null) {
+  const normalized = normalizeRoleCandidate(role);
+  const level = normalizeRoleCandidate(accessLevel);
+
+  if (
+    normalized === "super_user" ||
+    normalized === "superuser" ||
+    level === "super_user" ||
+    level === "superuser"
+  ) {
+    return "super_admin";
+  }
+
+  if (normalized === "administrator" || normalized === "sitguru_admin") {
+    return "admin";
+  }
+
+  return normalized;
+}
+
+function pickBestRole(candidates: string[]) {
+  const normalized = candidates
+    .map((role) => canonicalizeRole(role))
+    .filter(Boolean);
+
+  const superRole = normalized.find((role) => isSuperUserRole(role));
+  if (superRole) return superRole;
+
+  const adminRole = normalized.find((role) => isAdminRole(role));
+  if (adminRole) return adminRole;
+
+  return normalized[0] || "";
+}
+
 function buildCapabilities(role: string, explicitFinance = false) {
   const normalized = role.trim().toLowerCase();
   const isSuperUser = isSuperUserRole(normalized);
@@ -133,7 +175,8 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
   const email = String(user.email || "").toLowerCase();
   const envEmails = getEnvAdminEmails();
 
-  if (envEmails.includes(email)) {
+  // Match proxy.ts / admin login: hardcoded HQ emails + env allowlist.
+  if (isHardcodedSuperUserEmail(email) || envEmails.includes(email)) {
     const caps = buildCapabilities("super_admin");
     return {
       id: user.id,
@@ -168,14 +211,17 @@ export async function getAdminIdentity(): Promise<AdminIdentity | null> {
   ]);
 
   const hqRow = hqAccess.data?.[0] || null;
-  const row =
-    adminUser.data?.[0] || profile.data?.[0] || users.data?.[0] || null;
+  const adminRow = adminUser.data?.[0] || null;
+  const profileRow = profile.data?.[0] || null;
+  const usersRow = users.data?.[0] || null;
+  const row = adminRow || profileRow || usersRow || null;
 
-  const role = String(
-    hqRow?.role_key || row?.role || "",
-  )
-    .trim()
-    .toLowerCase();
+  const role = pickBestRole([
+    canonicalizeRole(hqRow?.role_key, hqRow?.access_level),
+    normalizeRoleCandidate(adminRow?.role),
+    normalizeRoleCandidate(profileRow?.role),
+    normalizeRoleCandidate(usersRow?.role),
+  ]);
 
   if (!role || !isAdminRole(role)) return null;
 

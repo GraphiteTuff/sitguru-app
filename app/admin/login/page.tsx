@@ -18,13 +18,9 @@ import {
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
+import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
 
 type LoginMethod = "email" | "phone";
-
-const APPROVED_ADMIN_EMAILS = new Set([
-  "jason@sitguru.com",
-  "nette@sitguru.com",
-]);
 
 function decodeMessage(value: string | null) {
   if (!value) return "";

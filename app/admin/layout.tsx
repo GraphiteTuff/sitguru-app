@@ -722,6 +722,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   return (
+    <>
     <div className="min-h-dvh overflow-x-hidden bg-[#f7f8f4] text-slate-950">
       <div className="grid min-h-dvh lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="hidden border-r border-[#e5ebe2] bg-[#fcfdfb] lg:block">
@@ -875,9 +876,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
+    </div>
+
+      {/* Outside overflow-x-hidden so the tip bubble isn't clipped */}
       <SafeAssistantBubble>
         <RogueFloatingAssistant />
       </SafeAssistantBubble>
-    </div>
+    </>
   );
 }
