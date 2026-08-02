@@ -2,10 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import {
+  appendDateRange,
+  getLaunchToDatePeriod,
+  getMonthPeriod,
+  getQuarterPeriod,
+  getYearPeriod,
+  getYtdPeriod,
+} from "@/lib/admin/financials/periods";
 
 type ExportFormatValue = "pdf" | "xlsx" | "csv" | "zip" | "word";
 type ExportStatusValue = "ready" | "processing" | "sent" | "needs_review" | "failed";
 type Tone = "green" | "blue" | "amber" | "purple" | "rose" | "slate";
+type ReadinessStatus = "Ready" | "Linked" | "Coming Soon" | "Setup Needed";
 
 type ReportCard = {
   title: string;
@@ -14,6 +23,12 @@ type ReportCard = {
   csvHref?: string;
   excelHref?: string;
   wordHref?: string;
+};
+
+type ReadinessItem = {
+  label: string;
+  status: ReadinessStatus;
+  detail: string;
 };
 
 type ExportPackage = {
@@ -168,91 +183,98 @@ const fallbackGrowthReferralFinancials: GrowthReferralFinancialsResponse = {
   roiRows: [],
 };
 
+const monthPeriod = getMonthPeriod();
+const quarterPeriod = getQuarterPeriod();
+const yearPeriod = getYearPeriod();
+const ytdPeriod = getYtdPeriod();
+const launchPeriod = getLaunchToDatePeriod();
+
+function datedExport(path: string, format: string, start = monthPeriod.start, end = monthPeriod.end) {
+  return appendDateRange(`${path}?format=${format}`, start, end);
+}
+
 const REPORTS: ReportCard[] = [
   {
     title: "Profit & Loss",
     description: "Revenue, growth marketing expenses, issued referral rewards, operating expenses, margins, and net income / loss.",
     openHref: "/admin/financials/profit-loss",
-    csvHref: "/api/admin/financials/profit-loss/export?format=csv",
-    excelHref: "/api/admin/financials/profit-loss/export?format=excel",
-    wordHref: "/api/admin/financials/profit-loss/export?format=word",
+    csvHref: datedExport("/api/admin/financials/profit-loss/export", "csv"),
+    excelHref: datedExport("/api/admin/financials/profit-loss/export", "excel"),
+    wordHref: datedExport("/api/admin/financials/profit-loss/export", "word"),
   },
   {
     title: "Balance Sheet",
     description: "Assets, liabilities, equity, pending referral reward liabilities, and balance check at a specific point in time.",
     openHref: "/admin/financials/balance-sheet",
-    csvHref: "/api/admin/financials/balance-sheet/export?format=csv",
-    excelHref: "/api/admin/financials/balance-sheet/export?format=excel",
-    wordHref: "/api/admin/financials/balance-sheet/export?format=word",
+    csvHref: datedExport("/api/admin/financials/balance-sheet/export", "csv"),
+    excelHref: datedExport("/api/admin/financials/balance-sheet/export", "excel"),
+    wordHref: datedExport("/api/admin/financials/balance-sheet/export", "word"),
   },
   {
     title: "Cash Flow Statement",
     description: "Operating, investing, and financing cash movement including growth spend and issued reward cash outflows.",
     openHref: "/admin/financials/cash-flow",
-    csvHref: "/api/admin/financials/cash-flow/export?format=csv",
-    excelHref: "/api/admin/financials/cash-flow/export?format=excel",
-    wordHref: "/api/admin/financials/cash-flow/export?format=word",
+    csvHref: datedExport("/api/admin/financials/cash-flow/export", "csv"),
+    excelHref: datedExport("/api/admin/financials/cash-flow/export", "excel"),
+    wordHref: datedExport("/api/admin/financials/cash-flow/export", "word"),
   },
   {
     title: "Pro Forma Forecast",
     description: "Forward-looking revenue, growth acquisition costs, campaign ROI assumptions, cash, and break-even modeling.",
     openHref: "/admin/financials/pro-forma",
-    csvHref: "/api/admin/financials/pro-forma/export?format=csv",
-    excelHref: "/api/admin/financials/pro-forma/export?format=excel",
-    wordHref: "/api/admin/financials/pro-forma/export?format=word",
+    csvHref: datedExport("/api/admin/financials/pro-forma/export", "csv"),
+    excelHref: datedExport("/api/admin/financials/pro-forma/export", "excel"),
+    wordHref: datedExport("/api/admin/financials/pro-forma/export", "word"),
   },
   {
     title: "Commissions / Referral Rewards",
     description: "Referral rewards, ambassador payouts, partner commissions, Guru referral rewards, and payout eligibility review.",
     openHref: "/admin/financials/commissions",
-    csvHref: "/api/admin/commissions/export?format=csv",
-    excelHref: "/api/admin/commissions/export?format=excel",
-    wordHref: "/api/admin/commissions/export?format=word",
+    csvHref: datedExport("/api/admin/commissions/export", "csv"),
+    excelHref: datedExport("/api/admin/commissions/export", "excel"),
+    wordHref: datedExport("/api/admin/commissions/export", "word"),
   },
   {
     title: "Payout Analytics",
     description: "Guru payouts, partner payouts, PawPerks reward payouts, payout exceptions, and accounting-ready payout reporting.",
     openHref: "/admin/payouts",
-    csvHref: "/api/admin/financials/payouts/export?format=csv",
-    excelHref: "/api/admin/financials/payouts/export?format=json",
+    csvHref: datedExport("/api/admin/financials/payouts/export", "csv"),
   },
   {
     title: "General Ledger",
     description: "Audit-ready transaction detail including growth marketing debits, reward expense, and reward payable entries.",
     openHref: "/admin/financials/general-ledger",
-    csvHref: "/api/admin/financials/general-ledger/export?format=csv",
-    excelHref: "/api/admin/financials/general-ledger/export?format=excel",
-    wordHref: "/api/admin/financials/general-ledger/export?format=word",
+    csvHref: datedExport("/api/admin/financials/general-ledger/export", "csv"),
+    excelHref: datedExport("/api/admin/financials/general-ledger/export", "excel"),
+    wordHref: datedExport("/api/admin/financials/general-ledger/export", "word"),
   },
   {
     title: "Reconciliation",
     description: "Reconcile Stripe, Plaid/NFCU, campaign costs, issued rewards, payouts, and bank activity.",
     openHref: "/admin/financials/reconciliation",
-    csvHref: "/api/admin/financials/reconciliation/export?format=csv",
-    excelHref: "/api/admin/financials/reconciliation/export?format=excel",
-    wordHref: "/api/admin/financials/reconciliation/export?format=word",
+    csvHref: datedExport("/api/admin/financials/reconciliation/export", "csv"),
+    excelHref: datedExport("/api/admin/financials/reconciliation/export", "excel"),
+    wordHref: datedExport("/api/admin/financials/reconciliation/export", "word"),
   },
   {
     title: "Tax Center",
     description: "Federal, quarterly, annual, state/local, city/county, deduction, 1099, and CPA tax package support.",
     openHref: "/admin/financials/tax-reports",
-    csvHref: "/api/admin/financials/tax-reports/export?format=csv",
-    excelHref: "/api/admin/financials/tax-reports/export?format=excel",
-    wordHref: "/api/admin/financials/tax-reports/export?format=word",
+    csvHref: datedExport("/api/admin/financials/tax-reports/export", "csv", yearPeriod.start, yearPeriod.end),
+    excelHref: datedExport("/api/admin/financials/tax-reports/export", "excel", yearPeriod.start, yearPeriod.end),
+    wordHref: datedExport("/api/admin/financials/tax-reports/export", "word", yearPeriod.start, yearPeriod.end),
   },
   {
     title: "Stripe",
     description: "Stripe balances, booking_payments marketplace fees, payouts, and clearing support.",
     openHref: "/admin/financials/stripe",
-    csvHref: "/api/admin/financials/stripe/export?format=csv",
-    excelHref: "/api/admin/financials/stripe/export?format=excel",
+    csvHref: datedExport("/api/admin/financials/stripe/export", "csv"),
   },
   {
     title: "Banking (Plaid / NFCU)",
     description: "Live NFCU business account balances and transaction export for reconciliation backup.",
     openHref: "/admin/financials/plaid",
-    csvHref: "/api/admin/financials/plaid/export?format=csv",
-    excelHref: "/api/admin/financials/plaid/export?format=excel",
+    csvHref: datedExport("/api/admin/financials/plaid/export", "csv"),
   },
 ];
 
@@ -261,12 +283,12 @@ const exportPackages: ExportPackage[] = [
     eyebrow: "CPA Handoff",
     title: "Monthly CPA Package",
     description: "Monthly close package with statements, ledger detail, reconciliations, Stripe backup, payouts, commissions, growth/referral activity, expenses, and CPA notes.",
-    href: "/admin/financials/cpa-handoff",
+    href: `/admin/financials/cpa-handoff?period=${monthPeriod.start.slice(0, 7)}`,
     packageType: "monthly-cpa",
     reportType: "cpa",
-    periodLabel: "Jun 1–Jun 30, 2026",
-    periodStart: "2026-06-01",
-    periodEnd: "2026-06-30",
+    periodLabel: monthPeriod.label,
+    periodStart: monthPeriod.start,
+    periodEnd: monthPeriod.end,
     exportFormat: "zip",
     exportStatus: "needs_review",
     tone: "green",
@@ -288,9 +310,9 @@ const exportPackages: ExportPackage[] = [
     href: "/admin/financials/cpa-handoff?section=quarterly",
     packageType: "quarterly-cpa",
     reportType: "cpa",
-    periodLabel: "Jun 1–Jun 30, 2026",
-    periodStart: "2026-06-01",
-    periodEnd: "2026-06-30",
+    periodLabel: quarterPeriod.label,
+    periodStart: quarterPeriod.start,
+    periodEnd: quarterPeriod.end,
     exportFormat: "zip",
     exportStatus: "processing",
     tone: "blue",
@@ -309,12 +331,12 @@ const exportPackages: ExportPackage[] = [
     eyebrow: "Tax Prep",
     title: "Annual Tax Package",
     description: "Year-end tax package for CPA preparation, deductible expenses, 1099 support, federal/state/local readiness, audit backup, and reconciliation support.",
-    href: "/admin/financials/tax-reports?period=annual",
+    href: `/admin/financials/tax-reports?period=${yearPeriod.start.slice(0, 4)}`,
     packageType: "annual-tax",
     reportType: "tax",
-    periodLabel: "Jun 1–Dec 31, 2026",
-    periodStart: "2026-06-01",
-    periodEnd: "2026-12-31",
+    periodLabel: yearPeriod.label,
+    periodStart: yearPeriod.start,
+    periodEnd: yearPeriod.end,
     exportFormat: "zip",
     exportStatus: "processing",
     tone: "amber",
@@ -336,9 +358,9 @@ const exportPackages: ExportPackage[] = [
     href: "/admin/referrals",
     packageType: "growth-referrals-roi",
     reportType: "growth",
-    periodLabel: "Growth / Referral Performance",
-    periodStart: null,
-    periodEnd: null,
+    periodLabel: launchPeriod.label,
+    periodStart: launchPeriod.start,
+    periodEnd: launchPeriod.end,
     exportFormat: "xlsx",
     exportStatus: "ready",
     tone: "purple",
@@ -360,9 +382,9 @@ const exportPackages: ExportPackage[] = [
     href: "/admin/financials/reports/daily",
     packageType: "daily-weekly-reports",
     reportType: "management",
-    periodLabel: "Daily / Weekly Management Review",
-    periodStart: null,
-    periodEnd: null,
+    periodLabel: `MTD · ${monthPeriod.label}`,
+    periodStart: monthPeriod.start,
+    periodEnd: monthPeriod.end,
     exportFormat: "zip",
     exportStatus: "ready",
     tone: "slate",
@@ -384,9 +406,9 @@ const exportPackages: ExportPackage[] = [
     href: "/admin/financials/reports/custom",
     packageType: "custom-ytd",
     reportType: "financial",
-    periodLabel: "Custom / YTD Period",
-    periodStart: null,
-    periodEnd: null,
+    periodLabel: ytdPeriod.label,
+    periodStart: ytdPeriod.start,
+    periodEnd: ytdPeriod.end,
     exportFormat: "zip",
     exportStatus: "needs_review",
     tone: "rose",
@@ -405,78 +427,78 @@ const exportPackages: ExportPackage[] = [
 
 const formatCards: FormatCard[] = [
   {
-    title: "PDF Review Packet",
-    description: "Clean PDF package for CPA, owner, lender, investor, tax, or management review.",
+    title: "PDF Tax Sample",
+    description: "Single-file tax support PDF for the current year. Use Prepare Package on a saved record for multi-statement linked exports.",
     fileType: "PDF",
     exportFormat: "pdf",
-    href: "/api/admin/financials/tax-reports/export?format=pdf",
+    href: datedExport("/api/admin/financials/tax-reports/export", "pdf", yearPeriod.start, yearPeriod.end),
     tone: "green",
   },
   {
-    title: "Excel Workbook",
-    description: "Multi-tab workbook with statements, schedules, ledgers, reconciliations, growth ROI, and tax notes.",
+    title: "Excel P&L Sample",
+    description: "Month-to-date Profit & Loss workbook sample. Save a CPA package record to prepare the full linked statement set.",
     fileType: "XLSX",
     exportFormat: "xlsx",
-    href: "/api/admin/financials/profit-loss/export?format=excel",
+    href: datedExport("/api/admin/financials/profit-loss/export", "excel"),
     tone: "blue",
   },
   {
-    title: "CSV Package",
-    description: "QuickBooks-style CSV files for transactions, ledgers, payouts, commissions, tax categories, and campaign activity.",
+    title: "CSV Ledger Sample",
+    description: "Month-to-date General Ledger CSV for accounting imports. Pair with payout and commission CSVs from Individual Reports.",
     fileType: "CSV",
     exportFormat: "csv",
-    href: "/api/admin/financials/general-ledger/export?format=csv",
+    href: datedExport("/api/admin/financials/general-ledger/export", "csv"),
     tone: "amber",
   },
   {
-    title: "Full ZIP Archive",
-    description: "Complete export package with PDF, Excel, CSV files, schedules, growth/referral backup, and supporting tax records.",
-    fileType: "ZIP",
+    title: "Linked Export Bundle",
+    description: "Open CPA Handoff to review and prepare linked statement downloads. Multi-file ZIP storage upload is the next upgrade.",
+    fileType: "LINKED",
     exportFormat: "zip",
     href: "/admin/financials/cpa-handoff",
     tone: "purple",
   },
 ];
 
-const fallbackExportHistory: ExportHistoryItem[] = [
+const starterTemplates: ExportHistoryItem[] = [
   {
-    id: "preview-june-2026-monthly-cpa",
-    title: "June 2026 Monthly CPA Package",
-    period: "Jun 1–Jun 30, 2026",
-    format: "PDF / Excel / CSV / ZIP",
+    id: "template-monthly-cpa",
+    title: "Monthly CPA Package template",
+    period: monthPeriod.label,
+    format: "Linked exports",
     status: "Needs Review",
-    createdBy: "Admin User",
-    createdAt: "Pending first close",
-    href: "/admin/financials/cpa-handoff?period=2026-06",
+    createdBy: "SitGuru Admin",
+    createdAt: "Save a record to start history",
+    href: `/admin/financials/cpa-handoff?period=${monthPeriod.start.slice(0, 7)}`,
   },
   {
-    id: "preview-2026-growth-roi",
-    title: "2026 Growth & Referral ROI Package",
-    period: "Launch-to-date",
-    format: "Excel / CSV / ZIP",
+    id: "template-growth-roi",
+    title: "Growth & Referral ROI template",
+    period: launchPeriod.label,
+    format: "Excel / CSV",
     status: "Ready",
-    createdBy: "Admin User",
-    createdAt: "Live when campaigns populate",
+    createdBy: "SitGuru Admin",
+    createdAt: "Open Growth hub or save a record",
     href: "/admin/referrals",
   },
   {
-    id: "preview-2026-annual-tax",
-    title: "2026 Annual Tax Package",
-    period: "Jun 1–Dec 31, 2026",
-    format: "PDF / Excel / CSV / ZIP",
+    id: "template-annual-tax",
+    title: "Annual Tax Package template",
+    period: yearPeriod.label,
+    format: "Linked exports",
     status: "Processing",
-    createdBy: "Admin User",
-    createdAt: "Pending year-end",
-    href: "/admin/financials/tax-reports?period=2026",
+    createdBy: "SitGuru Admin",
+    createdAt: "Open Tax Center or save a record",
+    href: `/admin/financials/tax-reports?period=${yearPeriod.start.slice(0, 4)}`,
   },
 ];
 
 const deliveryOptions: DeliveryOption[] = [
   {
     title: "Download to Device",
-    description: "Download the selected report package directly as PDF, Excel, CSV, or ZIP.",
+    description: "Use Individual Reports or Prepare Package links for live CSV / Excel / Word / PDF downloads.",
     status: "Ready",
-    href: "/admin/financials/profit-loss",
+    href: "#individual-reports",
   },
   {
     title: "Save to Export History",
@@ -497,6 +519,59 @@ const deliveryOptions: DeliveryOption[] = [
     href: "/admin/financials/cpa-handoff#management-alerts",
   },
 ];
+
+function getReadinessItems(input: {
+  historyLive: boolean;
+  historyCount: number;
+  growthLive: boolean;
+}): ReadinessItem[] {
+  return [
+    {
+      label: "Export history table",
+      status: input.historyLive ? "Ready" : "Setup Needed",
+      detail: input.historyLive
+        ? `${input.historyCount} saved package record${input.historyCount === 1 ? "" : "s"}.`
+        : "Save a package record once financial_export_history is available.",
+    },
+    {
+      label: "Statement exports",
+      status: "Ready",
+      detail: `P&L, Balance Sheet, Cash Flow, GL, and Reconciliation downloads for ${monthPeriod.label}.`,
+    },
+    {
+      label: "Growth & referrals",
+      status: input.growthLive ? "Ready" : "Linked",
+      detail: input.growthLive
+        ? "Live campaign ROI, marketing costs, and reward liability connected."
+        : "Growth API connected in preview until campaign costs populate.",
+    },
+    {
+      label: "Payouts & commissions",
+      status: "Ready",
+      detail: "CSV exports available from payouts and commissions ledgers.",
+    },
+    {
+      label: "Stripe & banking",
+      status: "Ready",
+      detail: "Stripe and Plaid/NFCU CSV backup exports available.",
+    },
+    {
+      label: "Package prepare",
+      status: "Linked",
+      detail: "Prepare Package builds linked statement downloads. Multi-file ZIP storage is next.",
+    },
+    {
+      label: "CPA email delivery",
+      status: "Coming Soon",
+      detail: "Email handoff stays on CPA Handoff until outbound delivery is wired.",
+    },
+    {
+      label: "Invoice / PO docs",
+      status: "Coming Soon",
+      detail: "Print previews only — not connected to live invoice or vendor records yet.",
+    },
+  ];
+}
 
 const exportChecklist = [
   "Choose report period: daily, weekly, monthly, quarterly, annual, YTD, launch-to-date, or custom.",
@@ -544,9 +619,12 @@ function toneClasses(tone: Tone | FormatCard["tone"]) {
   return tones[tone];
 }
 
-function statusClasses(status: ExportHistoryItem["status"] | DeliveryOption["status"]) {
-  const statuses = {
+function statusClasses(
+  status: ExportHistoryItem["status"] | DeliveryOption["status"] | ReadinessStatus,
+) {
+  const statuses: Record<string, string> = {
     Ready: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    Linked: "border-blue-200 bg-blue-50 text-blue-800",
     Processing: "border-blue-200 bg-blue-50 text-blue-800",
     Sent: "border-emerald-200 bg-emerald-50 text-emerald-800",
     "Needs Review": "border-amber-200 bg-amber-50 text-amber-800",
@@ -555,7 +633,12 @@ function statusClasses(status: ExportHistoryItem["status"] | DeliveryOption["sta
     "Setup Needed": "border-amber-200 bg-amber-50 text-amber-800",
   };
 
-  return statuses[status];
+  return statuses[status] || "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function formatRoiPercent(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return "Need cost";
+  return `${value.toFixed(1)}%`;
 }
 
 function ArrowCircle() {
@@ -700,7 +783,7 @@ function GrowthExportSupportPanel({
           ["Reward Liability", formatCurrency(totals.pendingRewardLiability), "Pending rewards"],
           ["Issued Rewards", formatCurrency(totals.issuedReferralRewards), "Expensed rewards"],
           ["Attributed Revenue", formatCurrency(totals.totalAttributedRevenue), "Campaign revenue"],
-          ["Growth ROI", totals.overallRoiPercent === null ? "Need cost data" : `${Math.round(totals.overallRoiPercent)}%`, "Revenue vs cost"],
+          ["Growth ROI", formatRoiPercent(totals.overallRoiPercent), "Revenue vs cost"],
           ["Campaigns", totals.campaignsTracked.toLocaleString(), "ROI rows"],
         ].map(([label, value, helper]) => (
           <div key={label} className="rounded-[1.25rem] border border-emerald-100 bg-emerald-50 p-4">
@@ -746,8 +829,8 @@ function GrowthExportSupportPanel({
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
-            <ActionLink href="/api/admin/financials/tax-reports/export?format=excel" label="Excel Tax Support" />
-            <ActionLink href="/api/admin/financials/tax-reports/export?format=csv" label="CSV Tax Support" />
+            <ActionLink href={datedExport("/api/admin/financials/tax-reports/export", "excel", yearPeriod.start, yearPeriod.end)} label="Excel Tax Support" />
+            <ActionLink href={datedExport("/api/admin/financials/tax-reports/export", "csv", yearPeriod.start, yearPeriod.end)} label="CSV Tax Support" />
             <ActionLink href="/admin/referrals" label="Open Growth Hub" primary />
           </div>
         </div>
@@ -880,8 +963,8 @@ function InvoicePreview() {
           <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
             Invoice Preview
           </p>
-          <p className="mt-2 text-2xl font-black text-slate-950">INV-2026-0001</p>
-          <p className="mt-1 text-sm font-bold text-slate-600">Due on receipt</p>
+          <p className="mt-2 text-2xl font-black text-slate-950">INV-PREVIEW</p>
+          <p className="mt-1 text-sm font-bold text-slate-600">Sample draft · not live</p>
         </div>
       </div>
 
@@ -934,8 +1017,8 @@ function PurchaseOrderPreview() {
           <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">
             Purchase Order Preview
           </p>
-          <p className="mt-2 text-2xl font-black text-slate-950">PO-2026-0001</p>
-          <p className="mt-1 text-sm font-bold text-slate-600">Draft</p>
+          <p className="mt-2 text-2xl font-black text-slate-950">PO-PREVIEW</p>
+          <p className="mt-1 text-sm font-bold text-slate-600">Sample draft · not live</p>
         </div>
       </div>
 
@@ -968,7 +1051,7 @@ function PurchaseOrderPreview() {
 }
 
 export default function FinancialExportCenterPage() {
-  const [history, setHistory] = useState<ExportHistoryItem[]>(fallbackExportHistory);
+  const [history, setHistory] = useState<ExportHistoryItem[]>([]);
   const [historyMessage, setHistoryMessage] = useState("Loading export history...");
   const [historyLive, setHistoryLive] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -977,7 +1060,18 @@ export default function FinancialExportCenterPage() {
   const [growthFinancials, setGrowthFinancials] = useState<GrowthReferralFinancialsResponse>(fallbackGrowthReferralFinancials);
 
   const hasLiveGrowthData = growthFinancials.isLive;
-  const latestHistory = useMemo(() => history.slice(0, 6), [history]);
+  const displayHistory = history.length ? history : starterTemplates;
+  const showingTemplates = history.length === 0;
+  const latestHistory = useMemo(() => displayHistory.slice(0, 6), [displayHistory]);
+  const readinessItems = useMemo(
+    () =>
+      getReadinessItems({
+        historyLive,
+        historyCount: history.length,
+        growthLive: hasLiveGrowthData,
+      }),
+    [historyLive, history.length, hasLiveGrowthData],
+  );
 
   async function loadHistory() {
     setHistoryLoading(true);
@@ -989,26 +1083,27 @@ export default function FinancialExportCenterPage() {
       const json = (await response.json()) as ExportHistoryResponse;
 
       if (!response.ok || !json.ok) {
-        setHistory(fallbackExportHistory);
+        setHistory([]);
         setHistoryLive(false);
-        setHistoryMessage(json.message || "Unable to load live export history. Preview records are shown.");
+        setHistoryMessage(json.message || "Unable to load live export history. Starter templates are shown.");
         return;
       }
 
-      setHistory(Array.isArray(json.history) && json.history.length ? json.history : fallbackExportHistory);
-      setHistoryLive(Boolean(json.isLive));
+      const rows = Array.isArray(json.history) ? json.history : [];
+      setHistory(rows);
+      setHistoryLive(Boolean(json.isLive && rows.length));
       setHistoryMessage(
-        json.isLive
-          ? "Live export history connected."
-          : json.message || "Preview export history is shown until saved export records exist.",
+        rows.length
+          ? json.message || "Live export history connected."
+          : json.message || "No saved export records yet. Use Save record on a package to start history.",
       );
     } catch (error) {
-      setHistory(fallbackExportHistory);
+      setHistory([]);
       setHistoryLive(false);
       setHistoryMessage(
         error instanceof Error
           ? error.message
-          : "Unable to load live export history. Preview records are shown.",
+          : "Unable to load live export history. Starter templates are shown.",
       );
     } finally {
       setHistoryLoading(false);
@@ -1192,8 +1287,8 @@ export default function FinancialExportCenterPage() {
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {[
-            ["Export History", historyLive ? "Live" : "Preview", historyMessage],
-            ["Growth ROI", growthFinancials.totals.overallRoiPercent === null ? "Need cost" : `${Math.round(growthFinancials.totals.overallRoiPercent)}%`, "Campaign revenue versus marketing and reward costs."],
+            ["Export History", historyLive ? "Live" : showingTemplates ? "Templates" : "Empty", historyMessage],
+            ["Growth ROI", formatRoiPercent(growthFinancials.totals.overallRoiPercent), "Campaign revenue versus marketing and reward costs."],
             ["Marketing Costs", formatCurrency(growthFinancials.totals.marketingExpense), "Deductible marketing and campaign spend backup."],
             ["Reward Liability", formatCurrency(growthFinancials.totals.pendingRewardLiability), "Pending PawPerks / referral reward liability."],
             ["Issued Rewards", formatCurrency(growthFinancials.totals.issuedReferralRewards), "Reward expense and payout support."],
@@ -1206,6 +1301,37 @@ export default function FinancialExportCenterPage() {
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{helper}</p>
             </div>
           ))}
+        </section>
+
+        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <SectionHeader
+            eyebrow="Wiring & Readiness"
+            title="Live Export Source Checks"
+            description={`Period defaults use ${monthPeriod.label} for statement downloads, ${quarterPeriod.label} for quarterly packages, and ${yearPeriod.label} for annual tax support.`}
+          />
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {readinessItems.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-[1.35rem] border border-slate-100 bg-[#fbfefd] p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-black text-slate-950">{item.label}</p>
+                  <span
+                    className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${statusClasses(
+                      item.status,
+                    )}`}
+                  >
+                    {item.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs font-bold leading-5 text-slate-600">
+                  {item.detail}
+                </p>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
@@ -1302,8 +1428,8 @@ export default function FinancialExportCenterPage() {
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <SectionHeader
             eyebrow="Export Formats"
-            title="Choose PDF, Excel, CSV, Word, or ZIP"
-            description="Use PDF for review, Excel for CPA analysis, CSV for accounting imports, Word for editable notes, and ZIP for full backup packages."
+            title="Sample single-file downloads"
+            description="These cards download one live sample file for the active period. Save a package record and use Prepare Package for the full linked statement set. Multi-file ZIP storage is next."
           />
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1329,7 +1455,9 @@ export default function FinancialExportCenterPage() {
                 </div>
 
                 <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-                  <span className="text-sm font-black text-emerald-800">Prepare format</span>
+                  <span className="text-sm font-black text-emerald-800">
+                    {card.exportFormat === "zip" ? "Open workspace" : "Download sample"}
+                  </span>
                   <ArrowCircle />
                 </div>
               </Link>
@@ -1337,12 +1465,12 @@ export default function FinancialExportCenterPage() {
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
+        <section id="individual-reports" className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
           <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
             <SectionHeader
               eyebrow="Individual Reports"
               title="Statement and Support Report Shortcuts"
-              description="Open individual reports or export common file formats directly where export routes are available."
+              description={`Open individual reports or download ${monthPeriod.label} exports where live routes exist. Stripe, Plaid, and payouts currently export CSV.`}
             />
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -1412,11 +1540,15 @@ export default function FinancialExportCenterPage() {
           </aside>
         </section>
 
-        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+        <section id="export-history" className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <SectionHeader
             eyebrow="Recent Export Activity"
             title="Saved Export History"
-            description="Recent CPA, tax, management, growth ROI, and audit packages saved from the export workflow."
+            description={
+              showingTemplates
+                ? "No saved records yet. Starter templates open live workflows — use Save record on a package to create durable history entries."
+                : "Recent CPA, tax, management, growth ROI, and audit packages saved from the export workflow."
+            }
           />
 
           <div
@@ -1441,9 +1573,16 @@ export default function FinancialExportCenterPage() {
             {latestHistory.map((item) => (
               <Link key={item.id} href={item.href} className="group flex min-h-[230px] flex-col justify-between rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-emerald-200 hover:bg-emerald-50/40 hover:shadow-lg">
                 <div>
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${statusClasses(item.status)}`}>
-                    {item.status}
-                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${statusClasses(item.status)}`}>
+                      {item.status}
+                    </span>
+                    {showingTemplates ? (
+                      <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">
+                        Template
+                      </span>
+                    ) : null}
+                  </div>
 
                   <h3 className="mt-3 text-base font-black leading-tight text-slate-950">
                     {item.title}
@@ -1479,11 +1618,11 @@ export default function FinancialExportCenterPage() {
           <PurchaseOrderPreview />
         </section>
 
-        <section id="export-history" className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+        <section id="document-previews" className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <SectionHeader
             eyebrow="Document Actions"
-            title="Invoice and Purchase Order Print Support"
-            description="Use these quick print previews for future invoice and purchase order support. They include SitGuru contact information and are ready to connect to live records later."
+            title="Invoice and Purchase Order Print Previews"
+            description="Preview layouts only — not connected to live invoice or vendor records yet. Print for layout review until invoice/PO data is wired."
           />
 
           <div className="flex flex-wrap gap-3">

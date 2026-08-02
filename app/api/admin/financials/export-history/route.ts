@@ -77,18 +77,6 @@ function displayStatus(value: unknown): ExportHistoryItem["status"] {
   return labels[status];
 }
 
-function getEnvAdminEmails() {
-  return String(
-    process.env.SITGURU_FINANCE_ADMIN_EMAILS ||
-      process.env.ADMIN_EMAILS ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-      "",
-  )
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
 async function safeRows<T>(
   query: PromiseLike<{ data: unknown; error: unknown }>,
   label: string,
@@ -278,42 +266,23 @@ export async function GET() {
     );
   }
 
-  const [exportRows, auditRows] = await Promise.all([
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("financial_export_history")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(25),
-      "financial_export_history",
-    ),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("financial_audit_logs")
-        .select("*")
-        .or("action.ilike.%export%,action.ilike.%email%")
-        .order("created_at", { ascending: false })
-        .limit(25),
-      "financial_audit_logs",
-    ),
-  ]);
-
-  const rows = [...exportRows, ...auditRows]
-    .sort((a, b) => {
-      const aTime = new Date(asTrimmedString(a.created_at)).getTime() || 0;
-      const bTime = new Date(asTrimmedString(b.created_at)).getTime() || 0;
-      return bTime - aTime;
-    })
-    .slice(0, 25);
+  const exportRows = await safeRows<AnyRow>(
+    supabaseAdmin
+      .from("financial_export_history")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(25),
+    "financial_export_history",
+  );
 
   return NextResponse.json({
     ok: true,
-    isLive: rows.length > 0,
-    history: rows.map(rowToHistoryItem),
+    isLive: exportRows.length > 0,
+    history: exportRows.map(rowToHistoryItem),
     message:
-      rows.length > 0
+      exportRows.length > 0
         ? "Live export history connected."
-        : "No export history rows found yet. Generate an export to populate this feed.",
+        : "No export history rows found yet. Save a package record to populate this feed.",
   });
 }
 

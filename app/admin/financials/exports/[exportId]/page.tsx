@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
+import { appendDateRange } from "@/lib/admin/financials/periods";
 import ExportStatusActions from "./ExportStatusActions";
 import ExportPackageActions from "./ExportPackageActions";
 
@@ -233,9 +234,14 @@ function getMetadataList(record: ExportRecord, keys: string[]) {
 
 function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLink | null {
   const normalized = normalizeIncludedLabel(label);
-  const statementFormat = ["csv", "excel", "word", "pdf"].includes(String(record.export_format || "").toLowerCase())
-    ? String(record.export_format).toLowerCase()
-    : "excel";
+  const rawFormat = String(record.export_format || "").toLowerCase();
+  const statementFormat = ["csv", "excel", "word", "pdf"].includes(rawFormat)
+    ? rawFormat
+    : rawFormat === "xlsx" || rawFormat === "xls" || rawFormat === "zip"
+      ? "excel"
+      : "excel";
+  const startDate = record.period_start;
+  const endDate = record.period_end;
 
   if (normalized.includes("daily") || normalized.includes("snapshot")) {
     return {
@@ -247,7 +253,7 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
     };
   }
 
-  if (normalized.includes("weekly") || normalized.includes("summary")) {
+  if (normalized.includes("weekly") || normalized === "weekly summary") {
     return {
       label: "Weekly Admin Report",
       description: "Open the weekly management report preview.",
@@ -267,11 +273,15 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
     };
   }
 
-  if (normalized.includes("profit") || normalized.includes("loss") || normalized.includes("income") || normalized.includes("statement of operations")) {
+  if (normalized.includes("profit") || normalized.includes("loss") || normalized.includes("income") || normalized.includes("statement of operations") || normalized.includes("quarterly statements") || normalized.includes("annual financial")) {
     return {
       label: "Profit & Loss",
       description: "Download the Statement of Operations export for this package.",
-      href: `/api/admin/financials/profit-loss/export?format=${statementFormat}`,
+      href: appendDateRange(
+        `/api/admin/financials/profit-loss/export?format=${statementFormat}`,
+        startDate,
+        endDate,
+      ),
       kind: "download",
       badge: statementFormat.toUpperCase(),
     };
@@ -281,7 +291,11 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
     return {
       label: "Balance Sheet",
       description: "Download the assets, liabilities, equity, and reward liability statement export.",
-      href: `/api/admin/financials/balance-sheet/export?format=${statementFormat}`,
+      href: appendDateRange(
+        `/api/admin/financials/balance-sheet/export?format=${statementFormat}`,
+        startDate,
+        endDate,
+      ),
       kind: "download",
       badge: statementFormat.toUpperCase(),
     };
@@ -291,7 +305,11 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
     return {
       label: "Cash Flow",
       description: "Download operating cash movement, payout, Stripe, banking, and growth cash activity.",
-      href: `/api/admin/financials/cash-flow/export?format=${statementFormat}`,
+      href: appendDateRange(
+        `/api/admin/financials/cash-flow/export?format=${statementFormat}`,
+        startDate,
+        endDate,
+      ),
       kind: "download",
       badge: statementFormat.toUpperCase(),
     };
@@ -301,7 +319,11 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
     return {
       label: "Pro Forma",
       description: "Download forecast, runway, growth spend, and scenario planning support.",
-      href: `/api/admin/financials/pro-forma/export?format=${statementFormat}`,
+      href: appendDateRange(
+        `/api/admin/financials/pro-forma/export?format=${statementFormat}`,
+        startDate,
+        endDate,
+      ),
       kind: "download",
       badge: statementFormat.toUpperCase(),
     };
@@ -310,50 +332,84 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
   if (normalized.includes("general ledger") || normalized.includes("ledger")) {
     return {
       label: "General Ledger",
-      description: "Open ledger detail, including campaign expenses and referral rewards.",
-      href: `/api/admin/financials/general-ledger/export?format=${statementFormat}`,
-      kind: "open",
-      badge: "LEDGER",
+      description: "Download ledger detail, including campaign expenses and referral rewards.",
+      href: appendDateRange(
+        `/api/admin/financials/general-ledger/export?format=${statementFormat}`,
+        startDate,
+        endDate,
+      ),
+      kind: "download",
+      badge: statementFormat.toUpperCase(),
     };
   }
 
   if (normalized.includes("reconciliation") || normalized.includes("bank") || normalized.includes("stripe")) {
+    if (normalized.includes("stripe") && !normalized.includes("reconcil")) {
+      return {
+        label: "Stripe Export",
+        description: "Download Stripe payout and transaction CSV backup.",
+        href: appendDateRange(
+          "/api/admin/financials/stripe/export?format=csv",
+          startDate,
+          endDate,
+        ),
+        kind: "download",
+        badge: "CSV",
+      };
+    }
+
     return {
       label: "Reconciliation",
-      description: "Open reconciliation support for bank, Stripe, payouts, campaign costs, and rewards.",
-      href: `/api/admin/financials/reconciliation/export?format=${statementFormat}`,
-      kind: "open",
-      badge: "RECON",
+      description: "Download reconciliation support for bank, Stripe, payouts, campaign costs, and rewards.",
+      href: appendDateRange(
+        `/api/admin/financials/reconciliation/export?format=${statementFormat}`,
+        startDate,
+        endDate,
+      ),
+      kind: "download",
+      badge: statementFormat.toUpperCase(),
     };
   }
 
   if (normalized.includes("payout") || normalized.includes("guru")) {
     return {
       label: "Payout Analytics",
-      description: "Open Guru, platform, and referral payout support.",
-      href: "/api/admin/financials/payouts/export?format=csv",
-      kind: "open",
-      badge: "PAYOUTS",
+      description: "Download Guru, platform, and referral payout support.",
+      href: appendDateRange(
+        "/api/admin/financials/payouts/export?format=csv",
+        startDate,
+        endDate,
+      ),
+      kind: "download",
+      badge: "CSV",
     };
   }
 
   if (normalized.includes("commission") || normalized.includes("partner") || normalized.includes("ambassador")) {
     return {
       label: "Commissions & Referral Rewards",
-      description: "Open partner, ambassador, Guru referral, and PawPerks reward support.",
-      href: "/api/admin/commissions/export?format=csv",
-      kind: "open",
-      badge: "REWARDS",
+      description: "Download partner, ambassador, Guru referral, and PawPerks reward support.",
+      href: appendDateRange(
+        `/api/admin/commissions/export?format=${statementFormat === "word" || statementFormat === "excel" ? statementFormat : "csv"}`,
+        startDate,
+        endDate,
+      ),
+      kind: "download",
+      badge: statementFormat.toUpperCase(),
     };
   }
 
-  if (normalized.includes("tax") || normalized.includes("1099") || normalized.includes("deduction")) {
+  if (normalized.includes("tax") || normalized.includes("1099") || normalized.includes("deduction") || normalized.includes("estimated tax")) {
     return {
       label: "Tax Center",
-      description: "Open annual, quarterly, federal, state, local, and deduction support.",
-      href: `/api/admin/financials/tax-reports/export?format=${statementFormat}`,
-      kind: "open",
-      badge: "TAX",
+      description: "Download annual, quarterly, federal, state, local, and deduction support.",
+      href: appendDateRange(
+        `/api/admin/financials/tax-reports/export?format=${statementFormat}`,
+        startDate,
+        endDate,
+      ),
+      kind: "download",
+      badge: statementFormat.toUpperCase(),
     };
   }
 
@@ -367,7 +423,7 @@ function getReportDownloadLink(label: unknown, record: ExportRecord): DownloadLi
     };
   }
 
-  if (normalized.includes("growth") || normalized.includes("referral") || normalized.includes("pawperks") || normalized.includes("marketing") || normalized.includes("roi") || normalized.includes("campaign")) {
+  if (normalized.includes("growth") || normalized.includes("referral") || normalized.includes("pawperks") || normalized.includes("marketing") || normalized.includes("roi") || normalized.includes("campaign") || normalized.includes("reward")) {
     return {
       label: "Growth & Referrals ROI",
       description: "Open Growth & Referrals for campaign ROI, reward liability, issued rewards, and PawPerks backup.",
