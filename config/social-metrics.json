@@ -1,0 +1,11 @@
+{
+  "updatedAt": "2026-08-03T00:00:00.000Z",
+  "handle": "@SitGuruOfficial",
+  "notes": "Manual SitGuru brand tracking. Update current when follower counts change. Used when Meta/X/TikTok live APIs are unavailable (e.g. Consumer app type).",
+  "channels": {
+    "facebook": { "baseline": 0, "current": 20 },
+    "instagram": { "baseline": 0, "current": 0 },
+    "tiktok": { "baseline": 0, "current": 0 },
+    "twitter": { "baseline": 0, "current": 0 }
+  }
+}
