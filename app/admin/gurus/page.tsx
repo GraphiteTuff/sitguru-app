@@ -1469,15 +1469,29 @@ export default async function AdminGurusPage({ searchParams }: PageProps) {
                 </div>
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                    Admin / Guru Review
+                    Super Admin Guru Registry
                   </p>
                   <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
                     {activeQueue?.title || "Guru Management"}
                   </h1>
                   <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600 sm:text-base">
                     {activeQueue?.description ||
-                      "One clear place for Jason and Danette to review real Guru people, see their other SitGuru roles, understand what is missing, and take the next best action."}
+                      "One clear place for Jason and Danette to review real Guru people, see their other SitGuru roles, understand what is missing, and take the next best action. Pet Parents and Ambassadors stay in their own registries."}
                   </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      href="/admin/customer-intelligence"
+                      className="rounded-2xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
+                    >
+                      Pet Parent Registry
+                    </Link>
+                    <Link
+                      href="/admin/ambassadors"
+                      className="rounded-2xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
+                    >
+                      Ambassador Registry
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
