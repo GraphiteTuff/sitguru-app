@@ -1,11 +1,10 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   AlertTriangle,
-  Mail,
-  MapPin,
   MessageCircle,
-  Phone,
+  RefreshCw,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -35,6 +34,27 @@ type AmbassadorRegistryRow = {
 };
 
 const SUPER_USER_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
+
+/**
+ * Admin Cleanup — click-only Server Action.
+ * Never call revalidatePath / revalidateTag from the Page render body.
+ */
+async function handleCleanup() {
+  "use server";
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const email = user?.email?.toLowerCase() || "";
+  if (!user || !SUPER_USER_EMAILS.has(email)) {
+    redirect("/admin/login");
+  }
+
+  revalidatePath("/admin/ambassadors");
+  redirect("/admin/ambassadors?cleaned=1");
+}
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -281,7 +301,11 @@ function MatchBadge({ reason }: { reason: AmbassadorRegistryRow["matchReason"] }
   );
 }
 
-export default async function AdminAmbassadorsPage() {
+export default async function AdminAmbassadorsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -292,6 +316,14 @@ export default async function AdminAmbassadorsPage() {
     redirect("/admin/login");
   }
 
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const cleanedParam = resolvedSearchParams?.cleaned;
+  const showCleanedNotice =
+    cleanedParam === "1" ||
+    (Array.isArray(cleanedParam) && cleanedParam.includes("1"));
+
+  // Page render must never call revalidatePath / revalidateTag.
+  // Cache refresh happens only inside handleCleanup() on button click.
   const [profilesResult, rolesResult] = await Promise.all([
     safeSelect("profiles"),
     safeSelect("user_roles"),
@@ -387,8 +419,27 @@ export default async function AdminAmbassadorsPage() {
             >
               All Users
             </Link>
+            <form action={handleCleanup}>
+              <button
+                type="submit"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-100"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Admin Cleanup
+              </button>
+            </form>
           </div>
         </section>
+
+        {showCleanedNotice ? (
+          <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900">
+            <h2 className="text-lg font-extrabold">Registry refreshed</h2>
+            <p className="mt-1 text-sm font-semibold">
+              Cache revalidation ran from the Admin Cleanup server action — not
+              during page render.
+            </p>
+          </section>
+        ) : null}
 
         {loadErrors.length > 0 ? (
           <section className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-rose-800">
@@ -410,7 +461,7 @@ export default async function AdminAmbassadorsPage() {
           </section>
         ) : null}
 
-        <section className="rounded-[2rem] border border-[#dbe8d5] bg-white shadow-sm">
+        <section className="overflow-hidden rounded-[2rem] border border-[#dbe8d5] bg-white shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e2ecd9] p-4 sm:p-5">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-[#0D5C3A]" />
@@ -427,7 +478,7 @@ export default async function AdminAmbassadorsPage() {
             </div>
             <span className="inline-flex items-center gap-1.5 rounded-2xl bg-[#f0f7ed] px-3 py-2 text-xs font-black text-[#0D5C3A]">
               <ShieldCheck className="h-3.5 w-3.5" />
-              No ambassadors table queries
+              No render-time revalidatePath
             </span>
           </div>
 
@@ -438,123 +489,109 @@ export default async function AdminAmbassadorsPage() {
               <code>ambassador</code>.
             </div>
           ) : (
-            <div className="grid gap-4 p-4 sm:p-5">
-              {ambassadors.map((row) => {
-                const location = [row.city, row.state, row.zipCode]
-                  .filter(Boolean)
-                  .join(", ");
+            <div className="overflow-x-auto">
+              <table className="min-w-full border-collapse text-left text-sm">
+                <thead className="bg-[#f5f8f3] text-xs font-black uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 sm:px-5">Ambassador</th>
+                    <th className="px-4 py-3 sm:px-5">Email</th>
+                    <th className="px-4 py-3 sm:px-5">Role</th>
+                    <th className="px-4 py-3 sm:px-5">Location</th>
+                    <th className="px-4 py-3 sm:px-5">Referral</th>
+                    <th className="px-4 py-3 sm:px-5">Match</th>
+                    <th className="px-4 py-3 sm:px-5">Created</th>
+                    <th className="px-4 py-3 sm:px-5">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ambassadors.map((row) => {
+                    const location =
+                      [row.city, row.state, row.zipCode]
+                        .filter(Boolean)
+                        .join(", ") || "—";
 
-                return (
-                  <article
-                    key={row.id}
-                    className="rounded-[1.6rem] border border-[#e2ecd9] bg-white p-4 shadow-sm transition hover:border-[#b9d5b7] hover:shadow-md sm:p-5"
-                  >
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start">
-                      <div className="flex min-w-0 gap-4">
-                        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-[#e8f5e9] ring-1 ring-[#dbe8d5]">
-                          <div className="absolute inset-0 bg-white" />
-                          {row.avatarUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={row.avatarUrl}
-                              alt=""
-                              className="absolute inset-0 h-full w-full object-cover object-center"
-                            />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-[#0D5C3A]">
-                              {getInitials(row.fullName)}
+                    return (
+                      <tr
+                        key={row.id}
+                        className="border-t border-[#e2ecd9] align-top hover:bg-[#fafdf8]"
+                      >
+                        <td className="px-4 py-4 sm:px-5">
+                          <div className="flex items-start gap-3">
+                            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-[#e8f5e9] ring-1 ring-[#dbe8d5]">
+                              <div className="absolute inset-0 bg-white" />
+                              {row.avatarUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={row.avatarUrl}
+                                  alt=""
+                                  className="absolute inset-0 h-full w-full object-cover object-center"
+                                />
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-[#0D5C3A]">
+                                  {getInitials(row.fullName)}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-lg font-black text-[#102819]">
-                              {row.fullName}
-                            </p>
-                            <MatchBadge reason={row.matchReason} />
+                            <div className="min-w-0">
+                              <p className="font-black text-[#102819]">
+                                {row.fullName}
+                              </p>
+                              <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                                {row.phone || "No phone"}
+                              </p>
+                            </div>
                           </div>
-
-                          <p className="mt-1 flex items-center gap-1.5 break-words text-sm font-semibold text-slate-600">
-                            <Mail className="h-3.5 w-3.5 shrink-0" />
-                            {row.email || "No email saved"}
+                        </td>
+                        <td className="px-4 py-4 font-semibold text-slate-700 sm:px-5">
+                          <span className="break-all">
+                            {row.email || "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 sm:px-5">
+                          <p className="font-bold text-[#102819]">
+                            {row.role || "—"}
                           </p>
-                          <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-slate-600">
-                            <Phone className="h-3.5 w-3.5 shrink-0" />
-                            {row.phone || "No phone saved"}
+                          <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                            {row.accountType ||
+                              (row.assignedRoles.length
+                                ? row.assignedRoles.join(", ")
+                                : "—")}
                           </p>
-                          <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-[#0D5C3A]">
-                            <MapPin className="h-3.5 w-3.5 shrink-0" />
-                            {location || "No location saved"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="rounded-2xl bg-[#f5f8f3] px-3 py-2">
-                            <p className="font-black uppercase tracking-wide text-slate-500">
-                              Role
-                            </p>
-                            <p className="mt-1 font-bold text-[#102819]">
-                              {row.role || "—"}
-                            </p>
+                        </td>
+                        <td className="px-4 py-4 font-semibold text-slate-700 sm:px-5">
+                          {location}
+                        </td>
+                        <td className="px-4 py-4 font-bold text-[#102819] sm:px-5">
+                          {row.referralCode || "—"}
+                        </td>
+                        <td className="px-4 py-4 sm:px-5">
+                          <MatchBadge reason={row.matchReason} />
+                        </td>
+                        <td className="px-4 py-4 font-semibold text-slate-700 sm:px-5">
+                          {formatDate(row.createdAt)}
+                        </td>
+                        <td className="px-4 py-4 sm:px-5">
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <Link
+                              href={buildLifecycleHref(row)}
+                              className="inline-flex min-h-9 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 py-1.5 text-xs font-black text-white transition hover:bg-[#09472d]"
+                            >
+                              Lifecycle
+                            </Link>
+                            <Link
+                              href={buildMessageHref(row)}
+                              className="inline-flex min-h-9 items-center justify-center gap-1 rounded-xl border border-[#cfe4c8] bg-white px-3 py-1.5 text-xs font-black text-[#0D5C3A] transition hover:bg-[#eef7ea]"
+                            >
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              Message
+                            </Link>
                           </div>
-                          <div className="rounded-2xl bg-[#f5f8f3] px-3 py-2">
-                            <p className="font-black uppercase tracking-wide text-slate-500">
-                              Account type
-                            </p>
-                            <p className="mt-1 font-bold text-[#102819]">
-                              {row.accountType || "—"}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl bg-[#f5f8f3] px-3 py-2">
-                            <p className="font-black uppercase tracking-wide text-slate-500">
-                              Referral code
-                            </p>
-                            <p className="mt-1 font-bold text-[#102819]">
-                              {row.referralCode || "—"}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl bg-[#f5f8f3] px-3 py-2">
-                            <p className="font-black uppercase tracking-wide text-slate-500">
-                              Created
-                            </p>
-                            <p className="mt-1 font-bold text-[#102819]">
-                              {formatDate(row.createdAt)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {row.assignedRoles.length > 0 ? (
-                          <p className="text-xs font-semibold text-slate-600">
-                            user_roles:{" "}
-                            <span className="font-bold text-[#102819]">
-                              {row.assignedRoles.join(", ")}
-                            </span>
-                          </p>
-                        ) : null}
-
-                        <div className="flex flex-wrap gap-2">
-                          <Link
-                            href={buildLifecycleHref(row)}
-                            className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-[#09472d]"
-                          >
-                            Account Lifecycle
-                          </Link>
-                          <Link
-                            href={buildMessageHref(row)}
-                            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-xs font-black text-[#0D5C3A] shadow-sm transition hover:bg-[#eef7ea]"
-                          >
-                            <MessageCircle className="h-3.5 w-3.5" />
-                            Message
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
