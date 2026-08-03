@@ -335,14 +335,20 @@ function isWithinDays(value: string | null | undefined, days: number) {
 }
 
 function isMissingAmbassadorWorkspace(ambassador: AmbassadorSummaryRow) {
+  const ambassadorId = asString(ambassador.ambassador_id);
   return (
     ambassador.workspace_exists === false ||
-    ambassador.ambassador_id.startsWith("pending:")
+    !ambassadorId ||
+    ambassadorId.startsWith("pending:")
   );
 }
 
 function getAccountLifecycleHref(ambassador: AmbassadorSummaryRow) {
-  const query = ambassador.user_id || ambassador.email || ambassador.ambassador_id;
+  const query =
+    asString(ambassador.user_id) ||
+    asString(ambassador.email) ||
+    asString(ambassador.ambassador_id) ||
+    "unknown";
   return `/admin/account-lifecycle?query=${encodeURIComponent(query)}`;
 }
 
@@ -351,7 +357,12 @@ function getPrimaryAdminHref(ambassador: AmbassadorSummaryRow) {
     return getAccountLifecycleHref(ambassador);
   }
 
-  return `/admin/ambassadors/${ambassador.ambassador_id}`;
+  const ambassadorId = asString(ambassador.ambassador_id);
+  if (!ambassadorId) {
+    return getAccountLifecycleHref(ambassador);
+  }
+
+  return `/admin/ambassadors/${encodeURIComponent(ambassadorId)}`;
 }
 
 function getPrimaryAdminLabel(ambassador: AmbassadorSummaryRow) {
@@ -1043,10 +1054,16 @@ function buildUnifiedAmbassadorRows({
   trainingProgressRows: GenericRow[];
   onboardingRows: GenericRow[];
 }) {
-  const detailMap = new Map(detailRows.map((row) => [row.id, row]));
+  const detailMap = new Map(
+    detailRows
+      .filter((row) => row && asString(row.id))
+      .map((row) => [asString(row.id), row]),
+  );
   const profileByUserId = new Map<string, GenericRow>();
   const profileByEmail = new Map<string, GenericRow>();
-  const authByUserId = new Map(authUsers.map((user) => [user.id, user]));
+  const authByUserId = new Map(
+    authUsers.filter((user) => user?.id).map((user) => [user.id, user]),
+  );
   const authByEmail = new Map(
     authUsers
       .filter((user) => user.email)
@@ -1084,8 +1101,9 @@ function buildUnifiedAmbassadorRows({
   );
 
   const enrichedRows = summaryRows.map((row) => {
-    const detail = detailMap.get(row.ambassador_id);
-    const userId = row.user_id || "";
+    const ambassadorId = asString(row.ambassador_id);
+    const detail = detailMap.get(ambassadorId);
+    const userId = asString(row.user_id);
     const email = asString(row.email).toLowerCase();
     const profile =
       profileByUserId.get(userId) || profileByEmail.get(email) || undefined;
@@ -1123,7 +1141,7 @@ function buildUnifiedAmbassadorRows({
       ),
     );
     const metrics = buildOperationalMetrics({
-      ambassadorId: row.ambassador_id,
+      ambassadorId: ambassadorId || null,
       userId,
       referralRows,
       leadRows,
@@ -1131,12 +1149,12 @@ function buildUnifiedAmbassadorRows({
       activityRows,
     });
     const trainingSummary = getCanonicalTrainingSummary({
-      ambassadorId: row.ambassador_id,
+      ambassadorId,
       trainingStepRows,
       trainingProgressRows,
     });
     const onboardingSummary = getCanonicalOnboardingSummary({
-      ambassadorId: row.ambassador_id,
+      ambassadorId,
       onboardingRows,
     });
     const payoutReadiness = getCanonicalPayoutReadiness(detail);
@@ -1163,6 +1181,10 @@ function buildUnifiedAmbassadorRows({
 
     return {
       ...row,
+      ambassador_id:
+        ambassadorId ||
+        (userId ? `pending:${userId}` : email ? `pending:${email}` : "pending:unknown"),
+      user_id: userId || row.user_id || null,
       display_name: detail?.display_name || row.display_name || null,
       ambassador_type: detail?.ambassador_type || row.ambassador_type || null,
       tier: detail?.tier || row.tier || null,
@@ -1578,21 +1600,25 @@ function buildAmbassadorDirectMessageHref(ambassador: AmbassadorSummaryRow) {
     ambassadorName,
   });
 
-  if (!isMissingAmbassadorWorkspace(ambassador)) {
-    params.set("ambassadorId", ambassador.ambassador_id);
+  const ambassadorId = asString(ambassador.ambassador_id);
+  if (!isMissingAmbassadorWorkspace(ambassador) && ambassadorId) {
+    params.set("ambassadorId", ambassadorId);
   }
 
-  if (ambassador.user_id) {
-    params.set("recipientId", ambassador.user_id);
+  const userId = asString(ambassador.user_id);
+  if (userId) {
+    params.set("recipientId", userId);
   }
 
-  if (ambassador.email) {
-    params.set("recipientEmail", ambassador.email);
-    params.set("ambassadorEmail", ambassador.email);
+  const email = asString(ambassador.email);
+  if (email) {
+    params.set("recipientEmail", email);
+    params.set("ambassadorEmail", email);
   }
 
-  if (ambassador.referral_code) {
-    params.set("referralCode", ambassador.referral_code);
+  const referralCode = asString(ambassador.referral_code);
+  if (referralCode) {
+    params.set("referralCode", referralCode);
   }
 
   return `/admin/messages?${params.toString()}`;
@@ -2473,8 +2499,10 @@ function filterAmbassadorsForRegistry(
   filters: AmbassadorRegistryFilters,
 ) {
   const query = normalizeText(filters.q);
+  const rows = Array.isArray(ambassadors) ? ambassadors : [];
 
-  return ambassadors.filter((ambassador) => {
+  return rows.filter((ambassador) => {
+    if (!ambassador || typeof ambassador !== "object") return false;
     const status = isArchivedAmbassador(ambassador)
       ? "archived"
       : normalizeText(ambassador.status);
@@ -2603,7 +2631,12 @@ function AmbassadorGroupSection({
       <div className="grid gap-4 xl:grid-cols-2">
         {ambassadors.map((ambassador) => (
           <AmbassadorCard
-            key={ambassador.ambassador_id}
+            key={
+              asString(ambassador.ambassador_id) ||
+              asString(ambassador.user_id) ||
+              asString(ambassador.email) ||
+              getAmbassadorName(ambassador)
+            }
             ambassador={ambassador}
           />
         ))}
@@ -2618,7 +2651,8 @@ function SignupHealthSection({
 }: {
   ambassadors: AmbassadorSummaryRow[];
 }) {
-  const recentOrAttention = ambassadors
+  const rows = Array.isArray(ambassadors) ? ambassadors : [];
+  const recentOrAttention = rows
     .filter(
       (ambassador) =>
         hasNeedsAttention(ambassador) ||
@@ -2626,17 +2660,17 @@ function SignupHealthSection({
     )
     .slice(0, 12);
 
-  const missingWorkspaceCount = ambassadors.filter(
+  const missingWorkspaceCount = rows.filter(
     isMissingAmbassadorWorkspace,
   ).length;
-  const roleIssueCount = ambassadors.filter((ambassador) =>
+  const roleIssueCount = rows.filter((ambassador) =>
     (ambassador.attention_items || []).some((item) =>
-      item.toLowerCase().includes("role"),
+      asString(item).toLowerCase().includes("role"),
     ),
   ).length;
-  const verificationCount = ambassadors.filter((ambassador) =>
+  const verificationCount = rows.filter((ambassador) =>
     (ambassador.attention_items || []).some((item) =>
-      item.toLowerCase().includes("verification"),
+      asString(item).toLowerCase().includes("verification"),
     ),
   ).length;
 
@@ -2794,14 +2828,18 @@ function SignupHealthSection({
 
 
 function AmbassadorRegistryTable({
-  ambassadors,
-  allAmbassadors,
+  ambassadors: ambassadorsProp,
+  allAmbassadors: allAmbassadorsProp,
   filters,
 }: {
   ambassadors: AmbassadorSummaryRow[];
   allAmbassadors: AmbassadorSummaryRow[];
   filters: AmbassadorRegistryFilters;
 }) {
+  const ambassadors = Array.isArray(ambassadorsProp) ? ambassadorsProp : [];
+  const allAmbassadors = Array.isArray(allAmbassadorsProp)
+    ? allAmbassadorsProp
+    : [];
   const activeFilters = hasActiveRegistryFilters(filters);
   const statusOptions = [
     { value: "active", label: "Active" },
@@ -3087,10 +3125,15 @@ function AmbassadorRegistryTable({
               numberValue(ambassador.paid_rewards);
             const missingWorkspace = isMissingAmbassadorWorkspace(ambassador);
             const attentionItems = ambassador.attention_items || [];
+            const rowKey =
+              asString(ambassador.ambassador_id) ||
+              asString(ambassador.user_id) ||
+              asString(ambassador.email) ||
+              ambassadorName;
 
             return (
               <article
-                key={ambassador.ambassador_id}
+                key={rowKey}
                 className={`rounded-[1.6rem] border bg-white p-4 shadow-sm transition hover:shadow-md sm:p-5 ${
                   hasNeedsAttention(ambassador)
                     ? "border-rose-200 hover:border-rose-300"
@@ -3343,25 +3386,29 @@ export default async function AdminAmbassadorsPage({
 
   const isSuperUser = isSuperUserEmail(email);
 
-  // If fixture ambassadors are still in the live table, hard-purge them before
-  // rendering so Archive soft-deletes cannot leave junk cards in the grid.
+  // Soft-fail fixture cleanup so purge never takes down the registry page.
   let autoPurgeMessage: string | null = null;
-  const { data: fixtureProbe } = await supabaseAdmin
-    .from("ambassadors")
-    .select("id,email")
-    .or("email.ilike.%sitguru.local%,email.ilike.%journey.amb.%")
-    .limit(25);
+  try {
+    const { data: fixtureProbe } = await supabaseAdmin
+      .from("ambassadors")
+      .select("id,email")
+      .or("email.ilike.%sitguru.local%,email.ilike.%journey.amb.%")
+      .limit(25);
 
-  const fixtureRows = ((fixtureProbe || []) as Array<{ email?: string | null }>).filter(
-    (row) => isTestAmbassadorEmail(row.email),
-  );
+    const fixtureRows = (
+      (fixtureProbe || []) as Array<{ email?: string | null }>
+    ).filter((row) => isTestAmbassadorEmail(row.email));
 
-  if (fixtureRows.length > 0) {
-    const autoPurge = await purgeTestAmbassadors();
-    autoPurgeMessage = autoPurge.message;
-    revalidatePath("/admin/ambassadors");
-    revalidatePath("/admin/ambassador-leads");
-    revalidatePath("/admin/users");
+    if (fixtureRows.length > 0) {
+      const autoPurge = await purgeTestAmbassadors();
+      autoPurgeMessage = autoPurge.message;
+      // Do not call revalidatePath during RSC render — it can throw in production.
+    }
+  } catch (purgeError) {
+    console.warn(
+      "[admin/ambassadors] fixture auto-purge soft-failed:",
+      purgeError instanceof Error ? purgeError.message : purgeError,
+    );
   }
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
@@ -3375,12 +3422,30 @@ export default async function AdminAmbassadorsPage({
         }
       : null);
 
-  const { data, error } = await supabaseAdmin
-    .from("admin_ambassador_dashboard_summary")
-    .select("*")
-    .order("created_at", { ascending: false });
+  let summaryRows: AmbassadorSummaryRow[] = [];
+  let error: { message: string } | null = null;
 
-  const summaryRows = (data || []) as AmbassadorSummaryRow[];
+  try {
+    const summaryResult = await supabaseAdmin
+      .from("admin_ambassador_dashboard_summary")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    error = summaryResult.error
+      ? { message: summaryResult.error.message }
+      : null;
+    summaryRows = ((summaryResult.data || []) as AmbassadorSummaryRow[]).filter(
+      (row) => row && typeof row === "object",
+    );
+  } catch (summaryError) {
+    error = {
+      message:
+        summaryError instanceof Error
+          ? summaryError.message
+          : "Unable to load ambassador summary.",
+    };
+    summaryRows = [];
+  }
 
   const [
     authUsers,
@@ -3394,7 +3459,10 @@ export default async function AdminAmbassadorsPage({
     trainingProgressRows,
     onboardingRows,
   ] = await Promise.all([
-    loadAllAuthUsers(),
+    loadAllAuthUsers().catch((err) => {
+      console.warn("[admin/ambassadors] auth users soft-failed:", err);
+      return [] as AuthUserSnapshot[];
+    }),
     loadOptionalAdminRows("profiles"),
     loadOptionalAdminRows("user_roles"),
     loadOptionalAdminRows("ambassador_referrals"),
@@ -3410,8 +3478,8 @@ export default async function AdminAmbassadorsPage({
 
   if (summaryRows.length > 0) {
     const realAmbassadorIds = summaryRows
-      .map((row) => row.ambassador_id)
-      .filter((id) => id && !id.startsWith("pending:"));
+      .map((row) => asString(row.ambassador_id))
+      .filter((id) => Boolean(id) && !id.startsWith("pending:"));
 
     if (realAmbassadorIds.length > 0) {
       const { data: detailData, error: detailError } = await supabaseAdmin
@@ -3420,27 +3488,47 @@ export default async function AdminAmbassadorsPage({
         .in("id", realAmbassadorIds);
 
       if (detailError) {
-        console.warn("Unable to load Ambassador detail enrichment:", detailError.message);
+        console.warn(
+          "Unable to load Ambassador detail enrichment:",
+          detailError.message,
+        );
       }
 
-      detailRows = (detailData || []) as AmbassadorDetailRow[];
+      detailRows = ((detailData || []) as AmbassadorDetailRow[]).filter(
+        (row) => row && typeof row === "object",
+      );
     }
   }
 
-  const ambassadors = buildUnifiedAmbassadorRows({
-    summaryRows,
-    detailRows,
-    profileRows,
-    roleRows,
-    authUsers,
-    referralRows,
-    leadRows,
-    rewardRows,
-    activityRows,
-    trainingStepRows,
-    trainingProgressRows,
-    onboardingRows,
-  });
+  let ambassadors: AmbassadorSummaryRow[] = [];
+  try {
+    ambassadors = buildUnifiedAmbassadorRows({
+      summaryRows,
+      detailRows,
+      profileRows: Array.isArray(profileRows) ? profileRows : [],
+      roleRows: Array.isArray(roleRows) ? roleRows : [],
+      authUsers: Array.isArray(authUsers) ? authUsers : [],
+      referralRows: Array.isArray(referralRows) ? referralRows : [],
+      leadRows: Array.isArray(leadRows) ? leadRows : [],
+      rewardRows: Array.isArray(rewardRows) ? rewardRows : [],
+      activityRows: Array.isArray(activityRows) ? activityRows : [],
+      trainingStepRows: Array.isArray(trainingStepRows) ? trainingStepRows : [],
+      trainingProgressRows: Array.isArray(trainingProgressRows)
+        ? trainingProgressRows
+        : [],
+      onboardingRows: Array.isArray(onboardingRows) ? onboardingRows : [],
+    });
+  } catch (buildError) {
+    console.error(
+      "[admin/ambassadors] buildUnifiedAmbassadorRows failed:",
+      buildError instanceof Error ? buildError.message : buildError,
+    );
+    ambassadors = summaryRows;
+  }
+
+  ambassadors = (Array.isArray(ambassadors) ? ambassadors : []).filter(
+    (row) => row && typeof row === "object",
+  );
 
   const registryFilters = buildRegistryFilters(resolvedSearchParams);
   const registryAmbassadors = filterAmbassadorsForRegistry(
