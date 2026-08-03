@@ -9,7 +9,10 @@ import { streamText, type CoreMessage } from "ai";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
-import { fetchLiveSocialFollowersTool } from "@/lib/chat/rogue-social-tool";
+import {
+  createAmbassadorSocialFollowersTool,
+} from "@/lib/chat/rogue-social-tool";
+import { resolveChatAudience } from "@/lib/chat/chat-audience";
 import {
   isReservedPreferredName,
   sanitizePreferredName,
@@ -174,6 +177,9 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
     const userId = user?.id || null;
 
+    // Role for tools/prompts comes from the validated JWT session — never body.user_role.
+    const audience = await resolveChatAudience();
+
     const body = (await req.json()) as {
       messages?: CoreMessage[];
       walkId?: string;
@@ -195,9 +201,18 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       ? ""
       : clientFirstNameRaw;
     parsedClientFirstName = clientFirstName;
-    const userTypeLabel = normalizeRogueUserType(
-      body?.userRole || body?.user_type || body?.user_role || "Guest Pet Parent",
-    );
+    // Soft tone hint may still use client label, but tools ignore it.
+    const userTypeLabel =
+      audience.kind === "ambassador"
+        ? "Ambassador"
+        : audience.kind === "admin"
+          ? "Admin"
+          : normalizeRogueUserType(
+              body?.userRole ||
+                body?.user_type ||
+                body?.user_role ||
+                "Guest Pet Parent",
+            );
     const insightChannel =
       walkId || safeString(body?.channel) === "ACTIVE_WALK"
         ? "ACTIVE_WALK"
@@ -260,12 +275,31 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       void recordChatInsight(lastUserText, insightChannel);
     }
 
+    const socialMetricsMode =
+      audience.kind === "ambassador"
+        ? ("ambassador_self" as const)
+        : ("none" as const);
+
     const systemPrompt = buildRogueSystemPrompt({
       clientFirstName,
       userRole: userTypeLabel,
       lastUserText,
       walkId: walkId || undefined,
+      allowSocialMetrics: audience.kind === "ambassador",
+      socialMetricsMode,
     });
+
+    // Pet parents / guests / public: lookupGurus only — no social or financial tools.
+    // Ambassadors: Delilah self-scoped social tool (forced ambassadorId from session).
+    // Admins use /api/admin/rogue-ai for brand metrics — not this public send path.
+    const tools: Record<string, unknown> = {
+      lookupGurus: lookupGurusTool,
+    };
+    if (audience.kind === "ambassador") {
+      tools.fetchLiveSocialFollowers = createAmbassadorSocialFollowersTool(
+        audience.ambassador,
+      );
+    }
 
     let result;
     try {
@@ -274,10 +308,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
         messages,
         system: systemPrompt,
         maxTokens: 500,
-        tools: {
-          lookupGurus: lookupGurusTool,
-          fetchLiveSocialFollowers: fetchLiveSocialFollowersTool,
-        },
+        tools: tools as Parameters<typeof streamText>[0]["tools"],
         maxSteps: 3,
         onFinish: async ({ text }) => {
           try {

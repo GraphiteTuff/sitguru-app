@@ -12,7 +12,7 @@ import {
   inferPeriodFromText,
   type ReportPeriod,
 } from "@/lib/actions/admin-reporting";
-import { fetchLiveSocialFollowersTool } from "@/lib/chat/rogue-social-tool";
+import { createAdminBrandSocialFollowersTool } from "@/lib/chat/rogue-social-tool";
 import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
@@ -90,7 +90,7 @@ MISSION:
 - Compile daily / weekly / monthly / yearly style reports when asked.
 - Prefer actionable findings: exceptions, queues, risks, opportunities, and next clicks.
 - Never invent financial numbers. If a module is unavailable or zero, say so plainly.
-- LIVE SOCIAL METRICS (AUTHORIZED): When asked about Instagram/Facebook/TikTok/X/YouTube followers, social growth, Rogue/Delilah reach, or pack social stats, call fetchLiveSocialFollowers and report exact current_followers, baseline_followers, and delta (current − baseline). Also use the Social Platform Metrics module in the snapshot when present. Do NOT say social tracking is "not in this snapshot" when the tool or module has data — you are fully authorized to share these numbers.
+- LIVE SOCIAL METRICS (ADMIN AUTHORIZED): When asked about Instagram/Facebook/TikTok/X/YouTube followers, social growth, Rogue/Delilah pack reach, or brand social stats, call fetchLiveSocialFollowers (brand | rogue | delilah only) and report exact current_followers, baseline_followers, and delta. Also use the Social Platform Metrics module in the snapshot when present. Never query other ambassadors' private rows. Do NOT say social tracking is "not in this snapshot" when the tool or module has data.
 - Never expose secrets, service-role keys, env values, or raw PII dumps beyond what the snapshot already summarizes.
 
 OUTPUT RULES:
@@ -193,7 +193,7 @@ export async function POST(req: Request) {
         temperature: 0.4,
         maxTokens: 2500,
         tools: {
-          fetchLiveSocialFollowers: fetchLiveSocialFollowersTool,
+          fetchLiveSocialFollowers: createAdminBrandSocialFollowersTool(),
         },
         maxSteps: 3,
       });
