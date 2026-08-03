@@ -1,7 +1,8 @@
 /**
  * Rogue Admin AI — authenticated streaming intelligence route.
- * Verifies SitGuru admin identity, compiles read-only reporting snapshots,
- * and streams Claude responses via the Vercel AI SDK data stream protocol.
+ * Verifies SitGuru admin identity via Supabase JWT session BEFORE any LLM call.
+ * Exposes global brand social metrics only (scope: admin). Spoofed client
+ * role/scope flags from non-admins are rejected with HTTP 403.
  */
 
 import { anthropic } from "@ai-sdk/anthropic";
@@ -12,11 +13,17 @@ import {
   inferPeriodFromText,
   type ReportPeriod,
 } from "@/lib/actions/admin-reporting";
+import {
+  detectSpoofedAdminElevation,
+  evaluatePersonaRouteGate,
+  personaForbiddenResponse,
+} from "@/lib/chat/persona-route-gate";
 import { createAdminBrandSocialFollowersTool } from "@/lib/chat/rogue-social-tool";
 import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
 } from "@/lib/messaging/ai-model";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -124,10 +131,32 @@ function fallbackReport(snapshotMarkdown: string, question: string) {
 
 export async function POST(req: Request) {
   try {
+    // Session cookie present + server-validated user (getSession + getUser).
+    const supabase = await createClient();
+    const [{ data: sessionData }, { data: userData }] = await Promise.all([
+      supabase.auth.getSession().catch(() => ({
+        data: { session: null as null },
+      })),
+      supabase.auth.getUser().catch(() => ({
+        data: { user: null as null },
+      })),
+    ]);
+
+    if (!sessionData?.session && !userData?.user) {
+      return Response.json(
+        { error: "Authentication required.", code: "AUTH_REQUIRED" },
+        { status: 401 },
+      );
+    }
+
     const actor = await getAdminIdentity();
     if (!actor?.canAccessAdmin) {
       return Response.json(
-        { error: "Admin access required." },
+        {
+          error:
+            "Forbidden: Admin Portal Rogue requires a verified admin session.",
+          code: "FORBIDDEN_PERSONA_SCOPE",
+        },
         { status: 403 },
       );
     }
@@ -137,6 +166,11 @@ export async function POST(req: Request) {
       preset?: string;
       period?: ReportPeriod | string;
       reportPeriod?: ReportPeriod | string;
+      role?: string;
+      scope?: string;
+      user_role?: string;
+      metadata?: { role?: string };
+      [key: string]: unknown;
     };
 
     const messages = Array.isArray(body.messages) ? body.messages : [];
@@ -146,6 +180,28 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+
+    // Defense-in-depth: persona gate with admin surface (also catches spoof payloads).
+    const gate = await evaluatePersonaRouteGate({
+      req,
+      body: { ...body, portal: "admin" },
+      messages,
+    });
+    if (!gate.ok) {
+      return personaForbiddenResponse(gate);
+    }
+    if (gate.surface !== "admin" || gate.audience.kind !== "admin") {
+      return Response.json(
+        {
+          error: "Forbidden: admin scope required.",
+          code: "FORBIDDEN_PERSONA_SCOPE",
+        },
+        { status: 403 },
+      );
+    }
+
+    // Non-admins never reach here; keep spoof detector imported for shared tests.
+    void detectSpoofedAdminElevation;
 
     const lastUserText = messageContent(messages[messages.length - 1]);
     const preset = asString(body.preset);
@@ -193,6 +249,7 @@ export async function POST(req: Request) {
         temperature: 0.4,
         maxTokens: 2500,
         tools: {
+          // Global brand scope only — admin factory re-checks session on invoke.
           fetchLiveSocialFollowers: createAdminBrandSocialFollowersTool(),
         },
         maxSteps: 3,

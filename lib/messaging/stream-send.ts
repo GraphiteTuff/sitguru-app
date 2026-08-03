@@ -8,11 +8,10 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { streamText, type CoreMessage } from "ai";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
 import {
-  createAmbassadorSocialFollowersTool,
-} from "@/lib/chat/rogue-social-tool";
-import { resolveChatAudience } from "@/lib/chat/chat-audience";
+  evaluatePersonaRouteGate,
+  personaForbiddenResponse,
+} from "@/lib/chat/persona-route-gate";
 import {
   isReservedPreferredName,
   sanitizePreferredName,
@@ -169,16 +168,6 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser().catch(() => ({
-      data: { user: null },
-    }));
-
-    const userId = user?.id || null;
-
-    // Role for tools/prompts comes from the validated JWT session — never body.user_role.
-    const audience = await resolveChatAudience();
 
     const body = (await req.json()) as {
       messages?: CoreMessage[];
@@ -189,9 +178,36 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       user_type?: string;
       userRole?: string;
       channel?: string;
+      portal?: string;
+      surface?: string;
+      domainContext?: string;
+      scope?: string;
+      role?: string;
+      metadata?: { role?: string };
+      [key: string]: unknown;
     };
 
     const messages = Array.isArray(body?.messages) ? body.messages : [];
+    if (messages.length === 0) {
+      return new Response(JSON.stringify({ error: "messages are required." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Route-level identity + persona gate (JWT session). Runs BEFORE any LLM call.
+    const gate = await evaluatePersonaRouteGate({
+      req,
+      body: body as Record<string, unknown>,
+      messages,
+    });
+    if (!gate.ok) {
+      return personaForbiddenResponse(gate);
+    }
+
+    const audience = gate.audience;
+    const userId = gate.sessionUserId;
+
     const walkId = safeString(body?.walkId);
     const conversationId = safeString(body?.conversationId);
     const clientFirstNameRaw = sanitizePreferredName(
@@ -201,7 +217,8 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       ? ""
       : clientFirstNameRaw;
     parsedClientFirstName = clientFirstName;
-    // Soft tone hint may still use client label, but tools ignore it.
+
+    // Soft tone hint only — tools/authorization ignore client role strings.
     const userTypeLabel =
       audience.kind === "ambassador"
         ? "Ambassador"
@@ -217,13 +234,6 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       walkId || safeString(body?.channel) === "ACTIVE_WALK"
         ? "ACTIVE_WALK"
         : "HOMEPAGE_LEAD";
-
-    if (messages.length === 0) {
-      return new Response(JSON.stringify({ error: "messages are required." }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
 
     const lastUserMessage = messages[messages.length - 1];
     const lastUserText = messageContent(lastUserMessage);
@@ -275,31 +285,17 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       void recordChatInsight(lastUserText, insightChannel);
     }
 
-    const socialMetricsMode =
-      audience.kind === "ambassador"
-        ? ("ambassador_self" as const)
-        : ("none" as const);
-
     const systemPrompt = buildRogueSystemPrompt({
       clientFirstName,
       userRole: userTypeLabel,
       lastUserText,
       walkId: walkId || undefined,
-      allowSocialMetrics: audience.kind === "ambassador",
-      socialMetricsMode,
+      allowSocialMetrics: gate.socialMetricsMode !== "none",
+      socialMetricsMode: gate.socialMetricsMode,
     });
 
-    // Pet parents / guests / public: lookupGurus only — no social or financial tools.
-    // Ambassadors: Delilah self-scoped social tool (forced ambassadorId from session).
-    // Admins use /api/admin/rogue-ai for brand metrics — not this public send path.
-    const tools: Record<string, unknown> = {
-      lookupGurus: lookupGurusTool,
-    };
-    if (audience.kind === "ambassador") {
-      tools.fetchLiveSocialFollowers = createAmbassadorSocialFollowersTool(
-        audience.ambassador,
-      );
-    }
+    // Tools come exclusively from the persona gate (session-scoped).
+    const tools = gate.tools;
 
     let result;
     try {
