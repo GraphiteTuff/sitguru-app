@@ -2473,7 +2473,9 @@ function getAttentionFilterMatch(
   ambassador: AmbassadorSummaryRow,
   filter: string,
 ) {
-  const issues = ambassador.attention_items || [];
+  const issues = (ambassador.attention_items || []).map((item) =>
+    asString(item),
+  );
   const issueText = issues.join(" ").toLowerCase();
 
   if (!filter) return true;
