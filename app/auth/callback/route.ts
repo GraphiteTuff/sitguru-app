@@ -383,15 +383,7 @@ async function updateAuthMetadata({
 }) {
   const supabaseAdmin = createSupabaseAdminClient();
   const profileRole = getProfileRoleFromIntent(intent);
-
-  const authorizedRoles =
-    intent === "both"
-      ? (["parent", "guru"] as const)
-      : intent === "guru"
-        ? (["guru"] as const)
-        : intent === "ambassador"
-          ? (["ambassador"] as const)
-          : (["parent"] as const);
+  const authorizedRoles = authorizedRolesFromSignupIntent(intent);
 
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
     user_metadata: {
@@ -400,8 +392,8 @@ async function updateAuthMetadata({
       account_type: profileRole,
       signup_role: profileRole,
       account_intent: intent,
-      authorizedRoles: [...authorizedRoles],
-      authorized_roles: [...authorizedRoles],
+      authorizedRoles,
+      authorized_roles: authorizedRoles,
       signup_status: "auth_callback_verified",
       signup_source: tracking.source,
       ambassador_program: tracking.program || null,
