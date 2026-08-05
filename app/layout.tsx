@@ -6,6 +6,7 @@ import "./globals.css";
 import CrispWidget from "@/components/CrispWidget";
 import RouteShell from "@/components/RouteShell";
 import AmbassadorReferralCapture from "@/components/ambassador/AmbassadorReferralCapture";
+import GoogleOneTapHost from "@/components/auth/GoogleOneTapHost";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -154,6 +155,7 @@ export default function RootLayout({
 
         <RouteShell>{children}</RouteShell>
         <AmbassadorReferralCapture />
+        <GoogleOneTapHost />
         <CrispWidget />
       </body>
     </html>
