@@ -11,8 +11,9 @@ alwaysApply: true
 - Goal: Flawless layouts, strong conversion flows, production-ready Git commands when deploying.
 
 ## Git & deployment
-NEVER create pull requests, feature branches, or separate previews.
-All updates go directly to production branch `sitguru-main`.
+Primary production project: `sitguru_main`.
+NEVER create pull requests, feature branches, standalone branch previews, or separate tracking repositories.
+All finished updates commit locally and push straight to production:
 - Before edits: `git pull origin sitguru-main`
 - **Modified files only**: `git commit -am "Short descriptive message" && git push origin sitguru-main`
 - **Any new/untracked files** (components, utils, etc.): `git add -A && git commit -m "Include missing modules" && git push origin sitguru-main`
