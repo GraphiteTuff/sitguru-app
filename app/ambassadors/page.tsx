@@ -19,7 +19,6 @@ import {
   Trophy,
   UsersRound,
 } from "lucide-react";
-import AITacoCompanion from "@/components/officers/AITacoCompanion";
 import { TACO_AVATAR } from "@/lib/companions/avatar-assets";
 
 type AmbassadorLane = {
@@ -640,7 +639,6 @@ export default function AmbassadorsPage() {
           </div>
         </div>
       </section>
-      <AITacoCompanion mode="onboarding" />
     </main>
   );
 }

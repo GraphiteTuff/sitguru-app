@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * Scout — Guru companion only.
- * Mount when mode is `workspace` (Guru dashboard) or `public-guru` (Become a Guru).
- * Public onboarding never calls useGuruAuth and never waits on a session.
+ * Route-aware AI companion host.
+ * - `/become-a-guru` (and Guru workspace) → Scout
+ * - `/ambassadors` (and Ambassador workspace) → Taco
+ * Public surfaces never call useGuruAuth / never wait on a session.
  */
 
 import {
@@ -18,16 +19,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useChat } from "ai/react";
 import { useGuruAuth, type GuruAuthUser } from "@/hooks/useGuruAuth";
+import AITacoCompanion from "@/components/officers/AITacoCompanion";
 import {
   COMPANION_DOCK_CLASS,
   COMPANION_FAB_CLASS,
   SCOUT_AVATAR,
 } from "@/lib/companions/avatar-assets";
 import {
-  matchesRoutePrefix,
-  SCOUT_PUBLIC_GURU_ROUTE_PREFIXES,
-  SCOUT_WORKSPACE_ROUTE_PREFIXES,
-} from "@/lib/companions/scout-routes";
+  getBotConfig,
+  type CompanionLayoutMode,
+} from "@/lib/companions/bot-config";
 
 const SCOUT_BRAND = "#047857";
 const SCOUT_BRAND_DEEP = "#065f46";
@@ -81,27 +82,13 @@ const PUBLIC_CHIPS = [
 const PUBLIC_GREETING =
   "Hi! I'm Scout, your Guru Matching Officer. Don't worry about onboarding—I'm right here to guide you through our profile steps, handle background check questions, and unlock your local pet care earnings window!";
 
-export type ScoutCompanionMode = "workspace" | "public-guru" | "auto";
+export type ScoutCompanionMode = CompanionLayoutMode;
 
 export type AIScoutCompanionProps = {
-  mode?: ScoutCompanionMode | "onboarding";
+  mode?: CompanionLayoutMode;
+  /** Optional path override (Layout passes this; falls back to usePathname / window). */
+  currentPath?: string | null;
 };
-
-function resolveScoutMode(
-  mode: AIScoutCompanionProps["mode"],
-  pathname: string | null,
-): "workspace" | "public-guru" | null {
-  // Explicit public mode + public path always win — no Guru auth required.
-  if (mode === "public-guru" || mode === "onboarding") return "public-guru";
-  if (matchesRoutePrefix(pathname, SCOUT_PUBLIC_GURU_ROUTE_PREFIXES)) {
-    return "public-guru";
-  }
-  if (mode === "workspace") return "workspace";
-  if (matchesRoutePrefix(pathname, SCOUT_WORKSPACE_ROUTE_PREFIXES)) {
-    return "workspace";
-  }
-  return null;
-}
 
 function buildWorkspaceGreeting(firstName: string) {
   return `Hi ${firstName}! I'm your Scout AI Companion. How can I assist you with your dashboard schedule today?`;
@@ -405,30 +392,44 @@ function WorkspaceScoutCompanionWidget() {
 
 export default function AIScoutCompanion({
   mode = "auto",
+  currentPath,
 }: AIScoutCompanionProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
-  const resolvedMode = resolveScoutMode(mode, pathname);
+
+  const resolvedPath =
+    currentPath ||
+    pathname ||
+    (typeof window !== "undefined" ? window.location.pathname : "");
+
+  const bot = getBotConfig({ mode, currentPath: resolvedPath });
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Mount Scout on Guru workspace dashboards OR public Guru application routes.
-  const shouldRenderScout =
-    resolvedMode === "workspace" || resolvedMode === "public-guru";
+  if (!bot.shouldRender || !mounted || !bot.variant) return null;
 
-  if (!shouldRenderScout || !mounted) return null;
+  // `/ambassadors` (+ ambassador workspace) → Taco (own body portal + dock).
+  if (bot.variant === "taco") {
+    return (
+      <AITacoCompanion
+        mode={bot.surface === "workspace" ? "workspace" : "onboarding"}
+      />
+    );
+  }
 
-  const isPublic = resolvedMode === "public-guru";
+  // `/become-a-guru` (+ Guru workspace) → Scout, portaled like homepage Rogue.
+  const isPublic = bot.surface === "public-guru";
 
   return createPortal(
     <div
       className={COMPANION_DOCK_CLASS}
       data-ai-scout-companion
-      data-scout-mode={resolvedMode}
+      data-scout-mode={bot.surface ?? "workspace"}
       data-scout-public={isPublic ? "true" : "false"}
       data-bot-variant="scout"
+      data-companion-path={resolvedPath}
     >
       {isPublic ? (
         <PublicScoutCompanionWidget />
