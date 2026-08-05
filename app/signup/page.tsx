@@ -21,6 +21,12 @@ import {
   UserRound,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dispatchSignupPostback } from "@/utils/analyticsTelemetry";
+import {
+  normalizeOneTapRole,
+  type OneTapRole,
+} from "@/lib/auth/google-one-tap";
+import { getPublicAppleClientId } from "@/lib/auth/apple-auth";
 
 type AccountIntent = "pet_parent" | "guru" | "ambassador" | "both";
 type SignupProfileRole = "customer" | "guru" | "ambassador" | "both";
@@ -85,6 +91,56 @@ function GoogleIcon() {
       />
     </svg>
   );
+}
+
+function getPostbackRole(intent: AccountIntent): OneTapRole {
+  if (intent === "guru" || intent === "both") return "guru";
+  if (intent === "ambassador") return "ambassador";
+  return "pet_parent";
+}
+
+declare global {
+  interface Window {
+    AppleID?: {
+      auth: {
+        init: (config: Record<string, unknown>) => void;
+        signIn: () => Promise<{
+          authorization?: { id_token?: string; code?: string };
+          user?: {
+            email?: string;
+            name?: { firstName?: string; lastName?: string };
+          };
+        }>;
+      };
+    };
+  }
+}
+
+async function loadAppleIdScript() {
+  if (typeof window === "undefined") return;
+  if (window.AppleID?.auth) return;
+
+  await new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById("sitguru-apple-id-sdk");
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("Apple ID SDK failed to load")),
+        { once: true },
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "sitguru-apple-id-sdk";
+    script.src =
+      "https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Apple ID SDK failed to load"));
+    document.head.appendChild(script);
+  });
 }
 
 function formatPhoneNumber(value: string) {
@@ -612,6 +668,13 @@ function SignupPageContent() {
       });
 
       if (oauthError) throw oauthError;
+
+      void dispatchSignupPostback({
+        email: "",
+        role: getPostbackRole(intent),
+        provider: "google",
+        isNewUser: true,
+      });
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -768,6 +831,14 @@ function SignupPageContent() {
           source: emailSignupSource,
         });
       }
+
+      void dispatchSignupPostback({
+        email: cleanEmail,
+        role: getPostbackRole(intent),
+        provider: "email",
+        isNewUser: true,
+      });
+
       setMessage(
         intent === "ambassador"
           ? "Your Ambassador account and workspace were created. Please check your email to confirm your SitGuru account and continue onboarding."
@@ -1026,11 +1097,104 @@ function SignupPageContent() {
   }
 
   async function handleAppleSignup() {
-    setAppleLoading(true);
-    setError(
-      "Apple signup is almost ready. Please use email, phone, or Google for now.",
-    );
-    setAppleLoading(false);
+    try {
+      resetAlerts();
+      setAppleLoading(true);
+
+      const appleClientId = getPublicAppleClientId();
+      const role = getPostbackRole(intent);
+      const origin =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : "https://www.sitguru.com";
+
+      // Prefer native Apple ID token popup → verified server callback.
+      if (appleClientId) {
+        await loadAppleIdScript();
+        if (!window.AppleID?.auth) {
+          throw new Error("Apple Sign-In SDK is unavailable in this browser.");
+        }
+
+        window.AppleID.auth.init({
+          clientId: appleClientId,
+          scope: "name email",
+          redirectURI: `${origin}/auth/callback`,
+          usePopup: true,
+          state: `sitguru_apple_${role}`,
+        });
+
+        const appleResult = await window.AppleID.auth.signIn();
+        const idToken = appleResult.authorization?.id_token;
+        if (!idToken) {
+          throw new Error("Apple did not return an identity token.");
+        }
+
+        const response = await fetch(
+          `/api/auth/callback/apple?role=${encodeURIComponent(role)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id_token: idToken,
+              user: appleResult.user || undefined,
+              role,
+            }),
+          },
+        );
+
+        const result = (await response.json()) as {
+          success?: boolean;
+          redirectUrl?: string;
+          userEmail?: string;
+          isNewUser?: boolean;
+          error?: string;
+        };
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "Apple Sign-In could not complete.");
+        }
+
+        await dispatchSignupPostback({
+          email: result.userEmail || "",
+          role,
+          provider: "apple",
+          isNewUser: result.isNewUser !== false,
+        });
+
+        window.location.href = result.redirectUrl || redirectPath;
+        return;
+      }
+
+      // Fallback: Supabase OAuth redirect when Apple Services ID is unset in env.
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "apple",
+        options: {
+          redirectTo: buildAuthCallbackUrl({
+            origin,
+            nextPath: redirectPath,
+            intent,
+            referralCode: normalizeReferralCode(referralCode),
+            tracking: signupTracking,
+          }),
+        },
+      });
+
+      if (oauthError) throw oauthError;
+
+      void dispatchSignupPostback({
+        email: "",
+        role,
+        provider: "apple",
+        isNewUser: true,
+      });
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Apple signup could not start. Please try again.",
+      );
+      setAppleLoading(false);
+    }
   }
 
   return (

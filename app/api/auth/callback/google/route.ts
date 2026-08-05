@@ -202,6 +202,24 @@ export async function POST(request: NextRequest) {
       fullName: name,
     });
 
+    try {
+      await fetch(`${origin}/api/analytics/event-log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event: "user_registered_completed",
+          role: targetRole,
+          provider: "google",
+          isNewUser: true,
+          userEmail: email,
+          ambassadorCodeApplied: referralCode || null,
+          campaignSource: referralCode ? "ambassador_referral" : "direct",
+        }),
+      });
+    } catch (telemetryError) {
+      console.warn("Google signup analytics postback dropped:", telemetryError);
+    }
+
     return NextResponse.json({
       success: true,
       redirectUrl,

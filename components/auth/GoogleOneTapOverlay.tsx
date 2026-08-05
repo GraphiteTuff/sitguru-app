@@ -162,6 +162,20 @@ export default function GoogleOneTapOverlay({
           );
         }
 
+        try {
+          const { dispatchSignupPostback } = await import(
+            "@/utils/analyticsTelemetry"
+          );
+          await dispatchSignupPostback({
+            email: String((data as { email?: string }).email || ""),
+            role: resolvedRole,
+            provider: "google",
+            isNewUser: true,
+          });
+        } catch {
+          // Telemetry must never block redirect.
+        }
+
         window.location.href = data.redirectUrl || "/customer/dashboard";
       } catch (err) {
         handledCredentialRef.current = false;
