@@ -73,6 +73,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (feedback.length < 15) {
+      return NextResponse.json(
+        {
+          error:
+            "Please share at least 15 characters about why you are leaving.",
+        },
+        { status: 400 },
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
 
     const {

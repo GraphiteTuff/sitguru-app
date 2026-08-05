@@ -82,7 +82,7 @@ type FriendlyStatus = {
 
 const routes = {
   dashboard: "/guru/dashboard",
-  profile: "/guru/dashboard/profile",
+  profile: "/guru/dashboard/profile/services",
   messages: "/guru/dashboard/messages",
   login: "/guru/login",
 };

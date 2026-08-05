@@ -168,7 +168,7 @@ export default function UniversalRoleDashboard({
     role === "guru"
       ? "/guru/dashboard/profile"
       : role === "ambassador"
-        ? "/ambassador/dashboard"
+        ? "/ambassador/dashboard/profile"
         : "/customer/dashboard/profile";
 
   return (

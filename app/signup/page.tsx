@@ -285,7 +285,7 @@ function buildAuthCallbackUrl({
 }
 
 function getRedirectPath(intent: AccountIntent) {
-  if (intent === "guru" || intent === "both") return "/guru/dashboard/profile";
+  if (intent === "guru" || intent === "both") return "/guru/dashboard/profile/services";
   if (intent === "ambassador") return "/ambassador/dashboard";
   return "/customer/dashboard";
 }

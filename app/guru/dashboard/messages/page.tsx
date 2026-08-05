@@ -1239,7 +1239,7 @@ function GuruDashboardMessagesPageContent() {
                 </Link>
 
                 <Link
-                  href="/guru/dashboard/profile"
+                  href="/guru/dashboard/profile/services"
                   className="inline-flex items-center justify-center rounded-2xl bg-white/90 px-5 py-3 text-sm font-black !text-slate-950 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:bg-white"
                 >
                   Update Profile

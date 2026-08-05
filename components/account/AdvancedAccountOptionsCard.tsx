@@ -2,10 +2,13 @@ import Link from "next/link";
 
 type AdvancedAccountOptionsCardProps = {
   isGuru?: boolean;
+  /** Role-aware profile settings destination with visibility controls. */
+  manageHref?: string;
 };
 
 export default function AdvancedAccountOptionsCard({
   isGuru = false,
+  manageHref = "/customer/dashboard/profile#account-visibility",
 }: AdvancedAccountOptionsCardProps) {
   return (
     <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
@@ -27,7 +30,7 @@ export default function AdvancedAccountOptionsCard({
         </div>
 
         <Link
-          href="/account/advanced"
+          href={manageHref}
           className="inline-flex shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
         >
           Manage options
@@ -47,18 +50,16 @@ export default function AdvancedAccountOptionsCard({
         ) : null}
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-black text-slate-800">
-            Deactivate account
-          </p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Temporarily disable access without permanent deletion.
+          <p className="text-sm font-black text-slate-800">Pause account</p>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            Freeze visibility for 30–90 days with a short feedback survey.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-black text-slate-800">Delete account</p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Review permanent deletion only after safer options.
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+          <p className="text-sm font-black text-rose-800">Permanent deletion</p>
+          <p className="mt-1 text-xs leading-5 text-rose-700">
+            Exit survey + DELETE confirmation before any wipe.
           </p>
         </div>
       </div>

@@ -1698,7 +1698,7 @@ function GuruSetupChecklist({
       helper: hasProfile
         ? `${profileCompletion}% complete`
         : "Add the basics Pet Parents want to see.",
-      href: "/guru/dashboard/profile?step=1",
+      href: "/guru/dashboard/profile/services?step=1",
       icon: "👤",
     },
     {
@@ -1708,7 +1708,7 @@ function GuruSetupChecklist({
       helper: hasServiceArea
         ? "Local Pet Parents can find you."
         : "Add your city, ZIP, and travel radius.",
-      href: "/guru/dashboard/profile?step=2",
+      href: "/guru/dashboard/profile/services?step=2",
       icon: "📍",
     },
     {
@@ -1821,7 +1821,7 @@ function GuruSetupChecklist({
             </p>
           </div>
           <Link
-            href={allComplete ? "/guru/dashboard/profile" : nextStep.href}
+            href={allComplete ? "/guru/dashboard/profile/services" : nextStep.href}
             className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-800 px-4 py-2 text-sm font-black !text-white transition hover:bg-emerald-900"
           >
             {allComplete ? "View setup" : "Continue setup"} →
@@ -2410,7 +2410,7 @@ export default async function GuruDashboardPage() {
               </p>
             </div>
             <Link
-              href="/guru/dashboard/profile"
+              href="/guru/dashboard/profile/services"
               className="mt-5 flex min-h-[54px] items-center justify-center rounded-[1rem] bg-[#07132f] px-6 py-3 text-base font-black !text-white hover:bg-[#0b1436]"
             >
               Update Profile

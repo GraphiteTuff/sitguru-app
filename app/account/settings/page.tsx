@@ -30,8 +30,28 @@ export default function AccountSettingsPage() {
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Update your name, contact details, profile photo, and basic
-              account information.
+              account information from your role dashboard settings.
             </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                href="/customer/dashboard/profile"
+                className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800"
+              >
+                Pet Parent settings
+              </Link>
+              <Link
+                href="/guru/dashboard/profile"
+                className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800"
+              >
+                Guru settings
+              </Link>
+              <Link
+                href="/ambassador/dashboard/profile"
+                className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800"
+              >
+                Ambassador settings
+              </Link>
+            </div>
           </section>
 
           <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
