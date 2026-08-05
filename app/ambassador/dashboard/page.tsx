@@ -2068,7 +2068,7 @@ function DashboardSwitcherPanel({
   return (
     <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-green-800">
-        Switch Dashboard
+        Switch Portal
       </p>
       <div className="mt-3 grid gap-2">
         {switchTargets.map((dashboard) => (
