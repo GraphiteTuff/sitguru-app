@@ -32,6 +32,7 @@ import {
   companionModeFromPartnerType,
   type CompanionLayoutMode,
 } from "@/lib/companions/bot-config";
+import { submitPartnershipInquiry } from "@/lib/contact/partner-api";
 
 export type PartnerType = "parent" | "guru" | "ambassador" | "investor";
 
@@ -222,6 +223,7 @@ export function ContactPartnerForm() {
   const investorPanelId = `${formId}-investor-label`;
 
   const [partnerType, setPartnerType] = useState<PartnerType>("parent");
+  const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState<ContactFormState>(() => ({
     ...initialForm,
     source: detectSourceFromUrl(),
@@ -273,6 +275,13 @@ export function ContactPartnerForm() {
     setErrors({});
     setFormError("");
     setFormSuccess("");
+    setStep(2);
+  }
+
+  function goToPathStep() {
+    setStep(1);
+    setErrors({});
+    setFormError("");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -285,60 +294,26 @@ export function ContactPartnerForm() {
     setFormError("");
     setFormSuccess("");
 
-    const topic = partnerToTopic(partnerType);
-    const displayName =
-      partnerType === "investor"
-        ? form.organization.trim() || form.fullName.trim()
-        : form.fullName.trim();
-
-    const messageParts = [form.message.trim()];
-    if (partnerType === "parent" && form.zipCode.trim()) {
-      messageParts.push(`ZIP: ${form.zipCode.trim()}`);
-    }
-    if (partnerType === "ambassador") {
-      if (form.ambassadorCode.trim()) {
-        messageParts.push(
-          `Ambassador code preference: ${form.ambassadorCode.trim()}`,
-        );
-      }
-      if (form.organization.trim()) {
-        messageParts.push(`Organization/School: ${form.organization.trim()}`);
-      }
-    }
-    if (partnerType === "investor") {
-      if (form.organization.trim()) {
-        messageParts.push(`Organization / Firm: ${form.organization.trim()}`);
-      }
-      if (form.urgentMedia) {
-        messageParts.push("URGENT MEDIA DEADLINE requested");
-      }
-    }
-
     try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: displayName,
-          email: form.email.trim(),
-          phone: form.zipCode.trim() || undefined,
-          topic,
-          programInterest:
-            partnerType === "ambassador" ? form.programInterest : "",
-          message: messageParts.filter(Boolean).join("\n\n"),
-          source: form.source || "contact-page",
-          pagePath:
-            typeof window !== "undefined"
-              ? window.location.pathname
-              : "/contact",
-        }),
+      const result = await submitPartnershipInquiry({
+        partnerType,
+        fullName: form.fullName,
+        email: form.email,
+        zipCode: form.zipCode,
+        message: form.message,
+        ambassadorCode: form.ambassadorCode,
+        organization: form.organization,
+        programInterest: form.programInterest,
+        urgentMedia: form.urgentMedia,
+        source: form.source || "contact-page",
+        pagePath:
+          typeof window !== "undefined"
+            ? window.location.pathname
+            : "/contact",
       });
 
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(
-          payload?.error || "Unable to submit your message right now.",
-        );
+      if (!result.success) {
+        throw new Error(result.error || "Unable to submit your message right now.");
       }
 
       setFormSuccess(
@@ -349,6 +324,7 @@ export function ContactPartnerForm() {
         source: previous.source,
       }));
       setErrors({});
+      setStep(1);
     } catch (error) {
       setFormError(
         error instanceof Error
@@ -380,8 +356,8 @@ export function ContactPartnerForm() {
             Partner with SitGuru
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-pretty text-sm font-semibold text-slate-500 sm:text-base md:text-lg">
-            Pick your profile tier. Your choice re-arranges inputs and triggers
-            the designated companion immediately.
+            Select your track below. The form elements rewrite themselves and
+            call your matching AI assistant.
           </p>
         </header>
 
@@ -476,6 +452,35 @@ export function ContactPartnerForm() {
               Partnership request form
             </h2>
 
+            {!showSuccess ? (
+              <nav
+                aria-label="Partnership form steps"
+                className="mb-5 flex items-center gap-2 sm:mb-6"
+              >
+                <button
+                  type="button"
+                  onClick={goToPathStep}
+                  className={`inline-flex min-h-9 items-center rounded-full px-3 text-xs font-black transition focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 ${
+                    step === 1
+                      ? "bg-[#0D5C3A] text-white"
+                      : "bg-emerald-50 text-[#0D5C3A] hover:bg-emerald-100"
+                  }`}
+                >
+                  1 · Path
+                </button>
+                <span className="h-px flex-1 bg-slate-200" aria-hidden />
+                <span
+                  className={`inline-flex min-h-9 items-center rounded-full px-3 text-xs font-black ${
+                    step === 2
+                      ? "bg-[#0D5C3A] text-white"
+                      : "bg-slate-100 text-slate-400"
+                  }`}
+                >
+                  2 · Details
+                </span>
+              </nav>
+            ) : null}
+
             {showSuccess ? (
               <div
                 id={`${formId}-success`}
@@ -489,11 +494,11 @@ export function ContactPartnerForm() {
                   <Check className="h-7 w-7" strokeWidth={2.5} />
                 </span>
                 <h3 className="mt-4 text-xl font-black text-slate-900">
-                  Partnership Parameters Logged!
+                  Inquiry Received Successfully!
                 </h3>
                 <p className="mx-auto mt-2 max-w-sm text-sm font-semibold text-slate-500">
-                  Validation complete. Your active companion agent keeps your
-                  context parameters ready.
+                  Your route context payload has been verified and stored for
+                  the SitGuru team.
                 </p>
                 <button
                   type="button"
@@ -504,10 +509,11 @@ export function ContactPartnerForm() {
                       source: previous.source,
                     }));
                     setErrors({});
+                    setStep(1);
                   }}
                   className="mt-6 text-sm font-black text-[#0D5C3A] transition hover:text-[#09462C] focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
                 >
-                  ← File a new partnership case
+                  ← Submit another operational request
                 </button>
               </div>
             ) : (
@@ -515,14 +521,27 @@ export function ContactPartnerForm() {
                 <div
                   role="radiogroup"
                   aria-labelledby={pathGroupId}
-                  className="space-y-3 sm:space-y-4"
+                  className={`space-y-3 sm:space-y-4 ${step === 2 ? "mb-5" : ""}`}
                 >
-                  <p
-                    id={pathGroupId}
-                    className="text-sm font-black tracking-tight text-slate-800"
-                  >
-                    Select Your Partnership Path
-                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p
+                      id={pathGroupId}
+                      className="text-sm font-black tracking-tight text-slate-800"
+                    >
+                      {step === 1
+                        ? "Select Your Partnership Path"
+                        : `Path · ${selectedPath.label}`}
+                    </p>
+                    {step === 2 ? (
+                      <button
+                        type="button"
+                        onClick={goToPathStep}
+                        className="text-xs font-black text-[#0D5C3A] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
+                      >
+                        Change path
+                      </button>
+                    ) : null}
+                  </div>
 
                   <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
                     {partnerPaths.map((item) => {
@@ -593,8 +612,14 @@ export function ContactPartnerForm() {
                   </div>
                 </div>
 
+                {step === 1 ? (
+                  <p className="mt-6 animate-fadeIn rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm font-semibold text-emerald-900">
+                    Choose a path to continue. We&apos;ll tailor the fields and
+                    load your matching AI companion.
+                  </p>
+                ) : (
                 <form
-                  className="mt-6 space-y-4 sm:mt-8 sm:space-y-5"
+                  className="mt-6 animate-fadeIn space-y-4 sm:mt-8 sm:space-y-5"
                   onSubmit={handleSubmit}
                   noValidate
                   aria-describedby={
@@ -897,6 +922,7 @@ export function ContactPartnerForm() {
                     · No spam — SitGuru team only
                   </p>
                 </form>
+                )}
               </>
             )}
           </section>
