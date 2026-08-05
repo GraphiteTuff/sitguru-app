@@ -332,6 +332,52 @@ export default function AmbassadorsPage() {
         </div>
       </section>
 
+      <section
+        aria-label="Meet Delilah, your AI Ambassador Advocate"
+        className="border-b border-emerald-100 bg-gradient-to-b from-[#f8faf7] via-white to-[#f8faf7] py-12 sm:py-16"
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-[32px] border border-emerald-100 bg-white shadow-[0_18px_50px_rgba(13,92,58,0.08)]">
+            <div className="grid items-center gap-8 p-7 sm:p-10 lg:grid-cols-[auto_1fr] lg:gap-12">
+              <div className="mx-auto flex flex-col items-center text-center lg:mx-0">
+                <div className="relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 sm:h-32 sm:w-32">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/about/delilah.jpeg"
+                    alt="Delilah, AI Ambassador Advocate"
+                    width={128}
+                    height={128}
+                    className="absolute inset-0 h-full w-full object-cover object-[center_28%]"
+                    style={{ backgroundColor: "#fff" }}
+                  />
+                </div>
+                <p className="mt-4 text-xl font-black tracking-tight text-slate-950">
+                  Delilah
+                </p>
+                <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#0D5C3A]">
+                  Ambassador Advocate
+                </p>
+              </div>
+
+              <div className="text-center lg:text-left">
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
+                  AI Pet Companion
+                </p>
+                <h2 className="mt-3 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-4xl">
+                  Your personalized outreach partner.
+                </h2>
+                <p className="mt-4 max-w-3xl text-base font-semibold leading-7 text-slate-600 sm:text-lg sm:leading-8">
+                  As a SitGuru Ambassador, you won&apos;t navigate your journey
+                  alone. You will be assigned Delilah, your personalized AI
+                  Ambassador Advocate companion, to assist you with tracking
+                  your outreach and growing your impact!
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         <SectionHeading
           eyebrow="The role"
