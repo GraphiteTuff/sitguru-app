@@ -23,7 +23,6 @@ import {
 import { supabase } from "@/lib/supabase";
 import { dispatchSignupPostback } from "@/utils/analyticsTelemetry";
 import {
-  normalizeOneTapRole,
   type OneTapRole,
 } from "@/lib/auth/google-one-tap";
 import { getPublicAppleClientId } from "@/lib/auth/apple-auth";
