@@ -4,7 +4,6 @@ import { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import ScrollToTopButton from "@/components/ScrollToTopButton";
 import GlobalMessageNotifier from "@/components/GlobalMessageNotifier";
 import FloatingActionStack from "@/components/FloatingActionStack";
 import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
@@ -138,7 +137,6 @@ export default function RouteShell({ children }: { children: ReactNode }) {
 
   const floatingControls = (
     <FloatingActionStack>
-      <ScrollToTopButton nested />
       {/* Rogue chat + intro tip on public marketing surfaces (all viewports). */}
       {isHomePage || isPublicPage ? <HomepageChatBubble /> : null}
     </FloatingActionStack>

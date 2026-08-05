@@ -8,7 +8,7 @@ type FloatingActionStackProps = {
 };
 
 /**
- * Shared viewport dock for floating controls (scroll-to-top, homepage chat, etc.).
+ * Shared viewport dock for floating controls (homepage chat, etc.).
  * Children must opt into pointer-events-auto; the dock itself ignores pointer events.
  */
 export default function FloatingActionStack({
