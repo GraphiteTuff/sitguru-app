@@ -94,11 +94,11 @@ export default function ScoutFloatingAssistant({
     typeof guruName === "string" && guruName.trim() ? guruName.trim() : null;
 
   const personalizedGreeting = safeName
-    ? `**Scout on watch — Guru Logistics Captain.** ${safeName}, I'm tracking the trail with you: assigned walks, safety checks, route completion, and earning your certification badges. Tap a chip or ask away.`
-    : profile.greetingMarkdown;
+    ? `Hi ${safeName.split(/\s+/)[0] || safeName}! I'm your Scout AI Companion. How can I assist you with your dashboard schedule today?`
+    : "Hi! I'm your Scout AI Companion. How can I assist you with your dashboard schedule today?";
 
   const personalizedTip = safeName
-    ? `Scout on watch, ${safeName}! Walks, safety checks, certifications, and payouts — ask your Logistics Captain.`
+    ? `Hi ${safeName.split(/\s+/)[0] || safeName}! Scout here — tap to review your dashboard schedule.`
     : profile.tipStatement;
 
   return (
