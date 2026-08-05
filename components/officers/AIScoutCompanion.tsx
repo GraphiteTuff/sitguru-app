@@ -24,7 +24,6 @@ import AITacoCompanion from "@/components/officers/AITacoCompanion";
 import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
 import {
   COMPANION_DOCK_CLASS,
-  COMPANION_FAB_CLASS,
   SCOUT_AVATAR,
 } from "@/lib/companions/avatar-assets";
 import {
@@ -382,23 +381,26 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
           isOpen ? "Close Scout AI Companion" : "Open Scout AI Companion"
         }
         aria-expanded={isOpen}
-        className={`${COMPANION_FAB_CLASS} homepage-chat-launcher flex items-center justify-center bg-emerald-600 hover:bg-emerald-700`}
+        className="homepage-chat-launcher"
       >
         {isOpen ? (
-          <span className="text-2xl font-light leading-none text-white">×</span>
+          <span className="homepage-chat-launcher__icon">×</span>
         ) : (
-          <Image
-            src={SCOUT_AVATAR.src}
-            alt={SCOUT_AVATAR.alt}
-            width={56}
-            height={56}
-            className="h-full w-full object-cover"
-            style={{
-              backgroundColor: "#fff",
-              objectPosition: SCOUT_AVATAR.objectPosition,
-            }}
-            priority
-          />
+          <span className="homepage-chat-launcher__icon" aria-hidden>
+            {/* Plain img matches Rogue launcher fill (Next/Image can look inset). */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={SCOUT_AVATAR.src}
+              alt={SCOUT_AVATAR.alt}
+              width={64}
+              height={64}
+              className="h-full w-full rounded-full overflow-hidden flex-shrink-0 object-cover"
+              style={{
+                backgroundColor: "#fff",
+                objectPosition: SCOUT_AVATAR.objectPosition,
+              }}
+            />
+          </span>
         )}
       </button>
     </>

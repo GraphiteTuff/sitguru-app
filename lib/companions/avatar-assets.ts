@@ -9,19 +9,25 @@ export const SCOUT_AVATAR = {
   /** Official circular Meet-the-Pack Scout portrait (GSP / Guru Matching Officer). */
   src: "/images/scout-avatar.png",
   alt: "Scout, Guru Matching Officer",
-  objectPosition: "center 22%",
+  /** Match Rogue homepage launcher face crop. */
+  objectPosition: "50% 28%",
 } as const;
 
 export const TACO_AVATAR = {
   /** Official circular Meet-the-Pack Taco portrait (Ambassador Advocate). */
   src: "/images/taco-avatar.png",
   alt: "Taco, Ambassador Advocate",
-  objectPosition: "center 22%",
+  /** Match Rogue homepage launcher face crop. */
+  objectPosition: "50% 28%",
 } as const;
 
-/** Shared floating action-bubble framing for onboarding companions. */
+/**
+ * Floating companion launcher — same 60px round size as Rogue
+ * (`.homepage-chat-launcher`). Prefer the Rogue launcher class on the button;
+ * this utility keeps size parity when used alone.
+ */
 export const COMPANION_FAB_CLASS =
-  "h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-white shadow-xl transition-all hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2";
+  "h-[60px] w-[60px] shrink-0 overflow-hidden rounded-full transition-all hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2";
 
 /** Bottom-right dock — tip + avatar row (mirrors Rogue homepage bubble). */
 export const COMPANION_DOCK_CLASS =

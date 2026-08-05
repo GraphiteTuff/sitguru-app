@@ -22,7 +22,6 @@ import { useChat } from "ai/react";
 import { supabase } from "@/lib/supabase";
 import {
   COMPANION_DOCK_CLASS,
-  COMPANION_FAB_CLASS,
   TACO_AVATAR,
 } from "@/lib/companions/avatar-assets";
 
@@ -484,23 +483,26 @@ export default function AITacoCompanion({
           isOpen ? "Close Taco AI Companion" : "Open Taco AI Companion"
         }
         aria-expanded={isOpen}
-        className={`${COMPANION_FAB_CLASS} homepage-chat-launcher flex items-center justify-center bg-[#0D5C3A] hover:bg-[#09462C]`}
+        className="homepage-chat-launcher"
       >
         {isOpen ? (
-          <span className="text-2xl font-light leading-none text-white">×</span>
+          <span className="homepage-chat-launcher__icon">×</span>
         ) : (
-          <Image
-            src={TACO_AVATAR.src}
-            alt={TACO_AVATAR.alt}
-            width={56}
-            height={56}
-            className="h-full w-full object-cover"
-            style={{
-              backgroundColor: "#fff",
-              objectPosition: TACO_AVATAR.objectPosition,
-            }}
-            priority
-          />
+          <span className="homepage-chat-launcher__icon" aria-hidden>
+            {/* Plain img matches Rogue launcher fill (Next/Image can look inset). */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={TACO_AVATAR.src}
+              alt={TACO_AVATAR.alt}
+              width={64}
+              height={64}
+              className="h-full w-full rounded-full overflow-hidden flex-shrink-0 object-cover"
+              style={{
+                backgroundColor: "#fff",
+                objectPosition: TACO_AVATAR.objectPosition,
+              }}
+            />
+          </span>
         )}
       </button>
     </div>,
