@@ -1,35 +1,72 @@
 /**
  * Shared role-switch dropdown for dashboard header shells.
+ * Renders only authorized signup tracks, excluding the active workspace.
  */
 
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ArrowRight, Repeat2 } from "lucide-react";
 import DashboardSwitchChevron from "@/components/nav/DashboardSwitchChevron";
+import {
+  getAvailableDashboardSwitches,
+  resolveDashboardRoleFromPath,
+  toRoleSwitchOptions,
+  type DashboardSwitchRole,
+} from "@/lib/dashboard/role-switch";
 
 export type RoleSwitchOption = {
+  id?: DashboardSwitchRole;
   label: string;
   href: string;
+  helper?: string;
 };
 
 type RoleSwitchDropdownProps = {
   label?: string;
-  options: RoleSwitchOption[];
+  /** Precomputed switch links (already filtered). */
+  options?: RoleSwitchOption[];
+  /** Signup / profile authorized role tracks (e.g. parent, guru, ambassador). */
+  authorizedRoles?: readonly DashboardSwitchRole[] | null;
+  /** Active workspace; inferred from pathname when omitted. */
+  currentRole?: DashboardSwitchRole | null;
   className?: string;
   /** Compact chip style for mobile scroll rows */
   compact?: boolean;
+  includeAdmin?: boolean;
 };
 
 export default function RoleSwitchDropdown({
   label = "Switch Dashboard",
   options,
+  authorizedRoles = null,
+  currentRole: currentRoleProp = null,
   className = "",
   compact = false,
+  includeAdmin = true,
 }: RoleSwitchDropdownProps) {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+
+  const currentRole =
+    currentRoleProp ?? resolveDashboardRoleFromPath(pathname);
+
+  const resolvedOptions = useMemo(() => {
+    if (options) return options;
+
+    if (!authorizedRoles?.length) return [];
+
+    return toRoleSwitchOptions(
+      getAvailableDashboardSwitches({
+        currentRole,
+        authorizedRoles,
+        includeAdmin,
+      }),
+    );
+  }, [authorizedRoles, currentRole, includeAdmin, options]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -52,7 +89,7 @@ export default function RoleSwitchDropdown({
     };
   }, [isOpen]);
 
-  if (!options.length) return null;
+  if (!resolvedOptions.length) return null;
 
   return (
     <div ref={rootRef} className={`relative inline-flex ${className}`}>
@@ -69,7 +106,10 @@ export default function RoleSwitchDropdown({
       >
         <Repeat2 className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
         <span className="whitespace-nowrap">{label}</span>
-        <DashboardSwitchChevron isOpen={isOpen} className="ml-0.5 text-emerald-700" />
+        <DashboardSwitchChevron
+          isOpen={isOpen}
+          className="ml-0.5 text-emerald-700"
+        />
       </button>
 
       {isOpen ? (
@@ -81,17 +121,28 @@ export default function RoleSwitchDropdown({
             Switch Dashboard
           </p>
           <div className="grid gap-1">
-            {options.map((option) => (
+            {resolvedOptions.map((option) => (
               <Link
                 key={option.href}
                 href={option.href}
                 role="menuitem"
                 onClick={() => setIsOpen(false)}
-                className="flex w-full items-center justify-between gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm font-bold text-slate-800 transition hover:border-emerald-100 hover:bg-emerald-50"
+                className="flex w-full items-center justify-between gap-3 rounded-xl border border-transparent px-3 py-3 text-left transition hover:border-emerald-100 hover:bg-emerald-50"
               >
                 <span className="inline-flex min-w-0 items-center gap-2">
-                  <Repeat2 className="h-4 w-4 shrink-0 text-emerald-700" />
-                  <span className="truncate">{option.label}</span>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700">
+                    <Repeat2 className="h-4 w-4" aria-hidden />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-slate-800">
+                      {option.label}
+                    </span>
+                    {option.helper ? (
+                      <span className="mt-0.5 block truncate text-[10px] font-semibold text-slate-500">
+                        {option.helper}
+                      </span>
+                    ) : null}
+                  </span>
                 </span>
                 <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
               </Link>

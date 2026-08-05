@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { authorizedRolesFromSignupIntent } from "@/lib/dashboard/role-switch";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -383,6 +384,15 @@ async function updateAuthMetadata({
   const supabaseAdmin = createSupabaseAdminClient();
   const profileRole = getProfileRoleFromIntent(intent);
 
+  const authorizedRoles =
+    intent === "both"
+      ? (["parent", "guru"] as const)
+      : intent === "guru"
+        ? (["guru"] as const)
+        : intent === "ambassador"
+          ? (["ambassador"] as const)
+          : (["parent"] as const);
+
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
     user_metadata: {
       ...existingMetadata,
@@ -390,6 +400,8 @@ async function updateAuthMetadata({
       account_type: profileRole,
       signup_role: profileRole,
       account_intent: intent,
+      authorizedRoles: [...authorizedRoles],
+      authorized_roles: [...authorizedRoles],
       signup_status: "auth_callback_verified",
       signup_source: tracking.source,
       ambassador_program: tracking.program || null,

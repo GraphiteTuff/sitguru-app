@@ -20,6 +20,12 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import RoleSwitchDropdown from "@/components/nav/RoleSwitchDropdown";
+import {
+  getAvailableDashboardSwitches,
+  resolveAuthorizedRolesFromProfile,
+  toRoleSwitchOptions,
+  type DashboardSwitchRole,
+} from "@/lib/dashboard/role-switch";
 
 type GuruProfileForHeader = {
   display_name?: string | null;
@@ -30,12 +36,24 @@ type GuruProfileForHeader = {
   profile_photo_url?: string | null;
   avatar_url?: string | null;
   image_url?: string | null;
+  role?: string | null;
+  account_type?: string | null;
+  signup_role?: string | null;
+  account_intent?: string | null;
+  is_pet_parent?: boolean | null;
+  is_customer?: boolean | null;
+  is_guru?: boolean | null;
+  is_guru_interested?: boolean | null;
+  is_ambassador?: boolean | null;
+  authorizedRoles?: unknown;
+  authorized_roles?: unknown;
 };
 
 type LoadedHeaderProfile = {
   name: string;
   email: string;
   photoUrl: string;
+  authorizedRoles: DashboardSwitchRole[];
 };
 
 type ActiveGuruTab =
@@ -240,22 +258,21 @@ export default function GuruDashboardHeader({
     photoUrl: normalizePhotoUrl(
       firstText(imageUrl, getPhotoFromProfile(guruProfile)),
     ),
+    authorizedRoles: ["guru"],
   });
 
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
   const guruSwitchOptions = useMemo(
-    () => [
-      {
-        label: "Switch to Pet Parent",
-        href: "/customer/dashboard",
-      },
-      {
-        label: "Switch to Ambassador",
-        href: "/ambassador/dashboard",
-      },
-    ],
-    [],
+    () =>
+      toRoleSwitchOptions(
+        getAvailableDashboardSwitches({
+          currentRole: "guru",
+          authorizedRoles: loadedProfile.authorizedRoles,
+          includeAdmin: true,
+        }),
+      ),
+    [loadedProfile.authorizedRoles],
   );
 
   useEffect(() => {
@@ -268,6 +285,7 @@ export default function GuruDashboardHeader({
       photoUrl:
         normalizePhotoUrl(firstText(imageUrl, getPhotoFromProfile(guruProfile))) ||
         current.photoUrl,
+      authorizedRoles: current.authorizedRoles,
     }));
   }, [displayName, imageUrl, guruProfile]);
 
@@ -317,13 +335,21 @@ export default function GuruDashboardHeader({
         );
       }
 
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select(
-          "display_name,full_name,name,email,photo_url,profile_photo_url,avatar_url,image_url",
-        )
-        .eq("id", user.id)
-        .maybeSingle();
+      const [{ data: profileData }, { data: roleRows }, { data: ambassadorRow }] =
+        await Promise.all([
+          supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .maybeSingle(),
+          supabase.from("user_roles").select("role").eq("user_id", user.id),
+          supabase
+            .from("ambassadors")
+            .select("id")
+            .eq("user_id", user.id)
+            .limit(1)
+            .maybeSingle(),
+        ]);
 
       if (profileData) {
         const profile = profileData as GuruProfileForHeader;
@@ -349,12 +375,33 @@ export default function GuruDashboardHeader({
         );
       }
 
+      const metadataPayload = {
+        ...(user.app_metadata || {}),
+        ...(user.user_metadata || {}),
+      } as Record<string, unknown>;
+
+      const authorizedRoles = resolveAuthorizedRolesFromProfile({
+        profile: (profileData as Record<string, unknown> | null) || null,
+        roleRows: (roleRows || []).map(
+          (row: { role?: string | null }) => row.role,
+        ),
+        metadata: metadataPayload,
+        hasGuruRecord: Boolean(guruData),
+        hasAmbassadorRecord: Boolean(ambassadorRow?.id),
+      });
+
+      // Guru header viewers always retain the guru track in their session mask.
+      const withGuruTrack = authorizedRoles.includes("guru")
+        ? authorizedRoles
+        : (["guru", ...authorizedRoles] as DashboardSwitchRole[]);
+
       if (!mounted) return;
 
       setLoadedProfile({
         name: profileName || profileEmail || "Guru",
         email: profileEmail,
         photoUrl: profilePhoto,
+        authorizedRoles: withGuruTrack,
       });
     }
 
@@ -497,6 +544,8 @@ export default function GuruDashboardHeader({
           <RoleSwitchDropdown
             label="Switch Dashboard"
             options={guruSwitchOptions}
+            authorizedRoles={loadedProfile.authorizedRoles}
+            currentRole="guru"
           />
 
           <Link
@@ -594,6 +643,8 @@ export default function GuruDashboardHeader({
                     <RoleSwitchDropdown
                       label="Switch Dashboard"
                       options={guruSwitchOptions}
+                      authorizedRoles={loadedProfile.authorizedRoles}
+                      currentRole="guru"
                       className="w-full"
                     />
                   </div>
@@ -654,6 +705,8 @@ export default function GuruDashboardHeader({
             compact
             label="Switch Dashboard"
             options={guruSwitchOptions}
+            authorizedRoles={loadedProfile.authorizedRoles}
+            currentRole="guru"
             className="shrink-0"
           />
 
@@ -742,6 +795,8 @@ export default function GuruDashboardHeader({
               <RoleSwitchDropdown
                 label="Switch Dashboard"
                 options={guruSwitchOptions}
+                authorizedRoles={loadedProfile.authorizedRoles}
+                currentRole="guru"
                 className="w-full"
               />
             </div>

@@ -21,6 +21,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { authorizedRolesFromSignupIntent } from "@/lib/dashboard/role-switch";
 
 type AccountIntent = "pet_parent" | "guru" | "ambassador" | "both";
 type SignupProfileRole = "customer" | "guru" | "ambassador" | "both";
@@ -684,6 +685,8 @@ function SignupPageContent() {
             account_type: profileRole,
             signup_role: profileRole,
             account_intent: intent,
+            authorizedRoles: authorizedRolesFromSignupIntent(intent),
+            authorized_roles: authorizedRolesFromSignupIntent(intent),
             signup_source: emailSignupSource,
             signup_status: "pending_email_verification",
             phone: normalizedOptionalPhone || null,
@@ -826,6 +829,8 @@ function SignupPageContent() {
             account_type: profileRole,
             signup_role: profileRole,
             account_intent: intent,
+            authorizedRoles: authorizedRolesFromSignupIntent(intent),
+            authorized_roles: authorizedRolesFromSignupIntent(intent),
             signup_source: phoneSignupSource,
             signup_status: "pending_phone_verification",
             email: cleanOptionalEmail || null,
@@ -939,6 +944,8 @@ function SignupPageContent() {
           account_type: profileRole,
           signup_role: profileRole,
           account_intent: intent,
+          authorizedRoles: authorizedRolesFromSignupIntent(intent),
+          authorized_roles: authorizedRolesFromSignupIntent(intent),
           signup_source: phoneSignupSource,
           signup_status: "phone_verified",
           email: cleanOptionalEmail || null,

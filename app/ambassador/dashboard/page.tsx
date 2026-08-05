@@ -30,6 +30,11 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
 import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
 import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
+import {
+  getAvailableDashboardSwitches,
+  resolveAuthorizedRolesFromProfile,
+  type DashboardSwitchRole,
+} from "@/lib/dashboard/role-switch";
 
 export const dynamic = "force-dynamic";
 
@@ -88,12 +93,22 @@ type ProfileRow = {
   image_url?: string | null;
   role?: string | null;
   account_type?: string | null;
+  signup_role?: string | null;
+  account_intent?: string | null;
+  is_pet_parent?: boolean | null;
+  is_customer?: boolean | null;
+  is_guru?: boolean | null;
+  is_guru_interested?: boolean | null;
+  is_ambassador?: boolean | null;
+  authorizedRoles?: unknown;
+  authorized_roles?: unknown;
 };
 
 type DashboardAccess = {
   petParent: boolean;
   guru: boolean;
   ambassador: boolean;
+  authorizedRoles: DashboardSwitchRole[];
 };
 
 type ReferralStats = {
@@ -320,53 +335,6 @@ function getInitials(name: string) {
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
       .join("") || "SG"
-  );
-}
-
-function normalizeRoleValue(value: unknown) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
-
-function hasPetParentRole(value: unknown) {
-  const role = normalizeRoleValue(value);
-
-  return (
-    role === "customer" ||
-    role === "pet_parent" ||
-    role === "pet-parent" ||
-    role === "pet_owner" ||
-    role === "pet-owner" ||
-    role === "parent" ||
-    role === "both"
-  );
-}
-
-function hasGuruRole(value: unknown) {
-  const role = normalizeRoleValue(value);
-
-  return (
-    role === "guru" ||
-    role === "future_guru" ||
-    role === "future-guru" ||
-    role === "provider" ||
-    role === "sitter" ||
-    role === "walker" ||
-    role === "caretaker" ||
-    role === "both"
-  );
-}
-
-function hasAmbassadorRole(value: unknown) {
-  const role = normalizeRoleValue(value);
-
-  return (
-    role === "ambassador" ||
-    role === "ambassadors" ||
-    role === "rep" ||
-    role === "representative" ||
-    role === "sitguru_rep"
   );
 }
 
@@ -1028,9 +996,7 @@ export default async function AmbassadorDashboardPage() {
   const [profileResult, roleRowsResult, guruAccessResult] = await Promise.all([
     supabaseAdmin
       .from("profiles")
-      .select(
-        "avatar_url,profile_photo_url,photo_url,image_url,role,account_type",
-      )
+      .select("*")
       .eq("id", user.id)
       .maybeSingle(),
     supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
@@ -1039,23 +1005,32 @@ export default async function AmbassadorDashboardPage() {
 
   const ambassadorRecord = ambassador;
   const profile = (profileResult.data || null) as ProfileRow | null;
-  const roleValues = new Set<string>();
+  const roleValues = ((roleRowsResult.data || []) as AnyRow[])
+    .map((row) => asString(row.role))
+    .filter(Boolean);
 
-  if (profile?.role) roleValues.add(profile.role);
-  if (profile?.account_type) roleValues.add(profile.account_type);
+  const metadataPayload = {
+    ...(user.app_metadata || {}),
+    ...(user.user_metadata || {}),
+  } as Record<string, unknown>;
 
-  (roleRowsResult.data || []).forEach((row: AnyRow) => {
-    const role = asString(row.role);
-    if (role) roleValues.add(role);
+  const authorizedRoles = resolveAuthorizedRolesFromProfile({
+    profile: (profile as Record<string, unknown> | null) || null,
+    roleRows: roleValues,
+    metadata: metadataPayload,
+    hasGuruRecord: Boolean(guruAccessResult.data?.length),
+    hasAmbassadorRecord: Boolean(ambassadorRecord.id),
   });
 
-  const roleList = Array.from(roleValues);
+  const withAmbassadorTrack = authorizedRoles.includes("ambassador")
+    ? authorizedRoles
+    : (["ambassador", ...authorizedRoles] as DashboardSwitchRole[]);
 
   const dashboardAccess: DashboardAccess = {
-    petParent: roleList.some(hasPetParentRole),
-    guru: roleList.some(hasGuruRole) || Boolean(guruAccessResult.data?.length),
-    ambassador:
-      roleList.some(hasAmbassadorRole) || Boolean(ambassadorRecord.id),
+    petParent: withAmbassadorTrack.includes("parent"),
+    guru: withAmbassadorTrack.includes("guru"),
+    ambassador: withAmbassadorTrack.includes("ambassador"),
+    authorizedRoles: withAmbassadorTrack,
   };
   const fullName = asString(ambassadorRecord.full_name) || "SitGuru Ambassador";
   const firstName = getFirstName(fullName);
@@ -1198,7 +1173,7 @@ export default async function AmbassadorDashboardPage() {
           actionsFooter={
             <div className="space-y-3">
               <DashboardSwitcherPanel
-                access={dashboardAccess}
+                authorizedRoles={dashboardAccess.authorizedRoles}
                 current="ambassador"
               />
               <form action={signOutAction}>
@@ -2076,45 +2051,19 @@ function AmbassadorProgressPanel({
 }
 
 function DashboardSwitcherPanel({
-  access,
+  authorizedRoles,
   current,
 }: {
-  access: DashboardAccess;
-  current: "pet_parent" | "guru" | "ambassador";
+  authorizedRoles: readonly DashboardSwitchRole[];
+  current: DashboardSwitchRole;
 }) {
-  const dashboardLinks = [
-    access.petParent
-      ? {
-          key: "pet_parent",
-          label: "Pet Parent Dashboard",
-          href: "/customer/dashboard",
-          helper: "Pets, bookings, PawPerks, and care details",
-        }
-      : null,
-    access.guru
-      ? {
-          key: "guru",
-          label: "Guru Dashboard",
-          href: "/guru/dashboard",
-          helper: "Services, bookings, messages, and earnings",
-        }
-      : null,
-    access.ambassador
-      ? {
-          key: "ambassador",
-          label: "Ambassador Dashboard",
-          href: "/ambassador/dashboard",
-          helper: "Referrals, training, rewards, and outreach",
-        }
-      : null,
-  ].filter(Boolean) as {
-    key: "pet_parent" | "guru" | "ambassador";
-    label: string;
-    href: string;
-    helper: string;
-  }[];
+  const switchTargets = getAvailableDashboardSwitches({
+    currentRole: current,
+    authorizedRoles,
+    includeAdmin: false,
+  });
 
-  if (dashboardLinks.length <= 1) return null;
+  if (!switchTargets.length) return null;
 
   return (
     <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
@@ -2122,51 +2071,26 @@ function DashboardSwitcherPanel({
         Switch Dashboard
       </p>
       <div className="mt-3 grid gap-2">
-        {dashboardLinks.map((dashboard) => {
-          const isCurrent = dashboard.key === current;
-
-          if (isCurrent) {
-            return (
-              <div
-                key={dashboard.key}
-                className="rounded-2xl border border-green-200 bg-white px-4 py-3"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-black text-green-950">
-                    {dashboard.label}
-                  </p>
-                  <span className="rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-green-800">
-                    Current
-                  </span>
-                </div>
-                <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
-                  {dashboard.helper}
-                </p>
-              </div>
-            );
-          }
-
-          return (
-            <Link
-              key={dashboard.key}
-              href={dashboard.href}
-              className="group rounded-2xl border border-green-100 bg-white px-4 py-3 transition hover:border-green-200 hover:bg-green-100/50"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-black text-green-950">
-                  {dashboard.label}
-                </p>
-                <ArrowRight
-                  size={15}
-                  className="text-green-800 transition group-hover:translate-x-0.5"
-                />
-              </div>
-              <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
-                {dashboard.helper}
+        {switchTargets.map((dashboard) => (
+          <Link
+            key={dashboard.id}
+            href={dashboard.path}
+            className="group rounded-2xl border border-green-100 bg-white px-4 py-3 transition hover:border-green-200 hover:bg-green-100/50"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-black text-green-950">
+                {dashboard.label}
               </p>
-            </Link>
-          );
-        })}
+              <ArrowRight
+                size={15}
+                className="text-green-800 transition group-hover:translate-x-0.5"
+              />
+            </div>
+            <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
+              {dashboard.helper}
+            </p>
+          </Link>
+        ))}
       </div>
     </div>
   );
