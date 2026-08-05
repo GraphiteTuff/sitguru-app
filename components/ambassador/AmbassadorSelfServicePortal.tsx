@@ -1,10 +1,9 @@
 // components/ambassador/AmbassadorSelfServicePortal.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy, Loader2, Wallet } from "lucide-react";
-
-type WeeklyPoint = { label: string; signups: number; earnings: number };
+import AmbassadorMetricsCircuit from "@/components/ambassador/metrics/AmbassadorMetricsCircuit";
 
 type MePayload = {
   ok?: boolean;
@@ -14,7 +13,6 @@ type MePayload = {
   referralsTotal?: number;
   pendingCommissions?: number;
   lifetimePaid?: number;
-  weekly?: WeeklyPoint[];
   payoutReceipts?: Array<{ amount: number; paidAt: string; batchId: string }>;
   profile?: {
     referral_code_slug?: string;
@@ -28,6 +26,11 @@ function money(value: number) {
     style: "currency",
     currency: "USD",
   }).format(value || 0);
+}
+
+function hasReferralCode(payload: MePayload | null) {
+  const code = payload?.profile?.referral_code_slug;
+  return typeof code === "string" && code.trim().length > 0;
 }
 
 export default function AmbassadorSelfServicePortal() {
@@ -59,11 +62,7 @@ export default function AmbassadorSelfServicePortal() {
     };
   }, []);
 
-  const maxSignups = useMemo(() => {
-    const weeks = data?.weekly || [];
-    return Math.max(1, ...weeks.map((w) => w.signups));
-  }, [data?.weekly]);
-
+  const frozen = !hasReferralCode(data);
   const displayLink = (
     data?.referralLink || "https://sitguru.com/r/YOUR_CODE"
   ).replace(/^https?:\/\//, "://");
@@ -89,103 +88,110 @@ export default function AmbassadorSelfServicePortal() {
     );
   }
 
-  if (error || !data) {
-    return (
-      <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-semibold text-amber-950">
-        {error ||
-          "Ambassador ledger profile not ready yet. Ask SitGuru Admin to sync your referral code."}
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      <section className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-950 to-emerald-800 p-5 text-white shadow-lg">
-        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200">
+    <div className="w-full space-y-4">
+      <AmbassadorMetricsCircuit initHref="/ambassador/dashboard/referrals" />
+
+      <section
+        data-brand-green={frozen ? undefined : true}
+        className={`rounded-3xl border p-5 shadow-lg ${
+          frozen
+            ? "border-amber-200 bg-amber-50 text-amber-950"
+            : "public-dark-section border-emerald-100 bg-gradient-to-br from-emerald-950 to-emerald-800 text-white"
+        }`}
+      >
+        <p
+          className={`text-[10px] font-black uppercase tracking-[0.16em] ${
+            frozen ? "text-amber-800" : "text-emerald-200"
+          }`}
+        >
           Your referral link
         </p>
-        <p className="mt-2 break-all font-mono text-sm font-bold text-emerald-50">
-          {displayLink}
+        <p
+          className={`mt-2 break-all font-mono text-sm font-bold ${
+            frozen ? "text-amber-950" : "text-emerald-50"
+          }`}
+        >
+          {frozen
+            ? "Circuit offline — initialize tracking to unlock link"
+            : displayLink}
         </p>
         <button
           type="button"
           onClick={() => void copyLink()}
-          className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-black text-emerald-950"
+          disabled={frozen}
+          className={`mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black disabled:cursor-not-allowed disabled:opacity-50 ${
+            frozen
+              ? "bg-amber-200 text-amber-950"
+              : "bg-white text-emerald-950"
+          }`}
         >
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-          {copied ? "Copied" : "Copy Link"}
+          {copied ? "Copied" : frozen ? "Tracking required" : "Copy Link"}
         </button>
       </section>
 
-      <section className="grid grid-cols-2 gap-3">
-        <SummaryCard label="Clicks" value={String(data.clicksTotal || 0)} />
-        <SummaryCard
-          label="Signups"
-          value={String(data.referralsTotal || 0)}
-        />
-        <SummaryCard
-          label="Pending $"
-          value={money(data.pendingCommissions || 0)}
-        />
-        <SummaryCard
-          label="Paid lifetime"
-          value={money(data.lifetimePaid || 0)}
-        />
-      </section>
+      {error || !data ? (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-semibold text-amber-950">
+          {error ||
+            "Ambassador ledger profile not ready yet. Ask SitGuru Admin to sync your referral code."}
+        </div>
+      ) : (
+        <>
+          <section className="grid w-full grid-cols-2 gap-3">
+            <SummaryCard
+              label="Clicks"
+              value={String(frozen ? 0 : data.clicksTotal || 0)}
+            />
+            <SummaryCard
+              label="Signups"
+              value={String(frozen ? 0 : data.referralsTotal || 0)}
+            />
+            <SummaryCard
+              label="Pending $"
+              value={money(frozen ? 0 : data.pendingCommissions || 0)}
+            />
+            <SummaryCard
+              label="Paid lifetime"
+              value={money(frozen ? 0 : data.lifetimePaid || 0)}
+            />
+          </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-          Weekly signup volume
-        </h2>
-        <div className="mt-4 flex h-36 items-end gap-1.5">
-          {(data.weekly || []).map((week) => (
-            <div key={week.label} className="flex flex-1 flex-col items-center gap-1">
-              <div
-                className="w-full rounded-t-md bg-emerald-600/90"
-                style={{
-                  height: `${Math.max(8, (week.signups / maxSignups) * 100)}%`,
-                }}
-                title={`${week.signups} signups`}
-              />
-              <span className="text-[9px] font-bold text-slate-400">
-                {week.label}
-              </span>
+          <section className="w-full rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-emerald-700" />
+              <h2 className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                Bank payout receipts
+              </h2>
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-2">
-          <Wallet className="h-4 w-4 text-emerald-700" />
-          <h2 className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-            Bank payout receipts
-          </h2>
-        </div>
-        {(data.payoutReceipts || []).length === 0 ? (
-          <p className="mt-3 text-sm font-semibold text-slate-500">
-            No paid batches yet. Approved commissions show above as pending.
-          </p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {(data.payoutReceipts || []).slice(0, 8).map((receipt, idx) => (
-              <li
-                key={`${receipt.batchId}-${idx}`}
-                className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2.5 text-sm"
-              >
-                <span className="font-black text-emerald-900">
-                  {money(receipt.amount)}
-                </span>
-                <span className="text-xs font-semibold text-slate-500">
-                  {receipt.paidAt
-                    ? new Date(receipt.paidAt).toLocaleDateString()
-                    : "Paid"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+            {(data.payoutReceipts || []).length === 0 || frozen ? (
+              <p className="mt-3 text-sm font-semibold text-slate-500">
+                {frozen
+                  ? "Payout history frozen until referralCode is connected."
+                  : "No paid batches yet. Approved commissions show above as pending."}
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {(data.payoutReceipts || []).slice(0, 8).map((receipt, idx) => (
+                  <li
+                    key={`${receipt.batchId}-${idx}`}
+                    className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2.5 text-sm"
+                  >
+                    <span className="font-black text-emerald-900">
+                      {money(receipt.amount)}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {receipt.paidAt
+                        ? new Date(receipt.paidAt).toLocaleDateString()
+                        : "Paid"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }

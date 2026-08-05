@@ -28,6 +28,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
+import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -1384,28 +1385,30 @@ export default async function AmbassadorDashboardPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
-                  Verified Social Signup Milestones
+                  Connected metrics circuit
                 </p>
                 <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-                  Updated milestone schedule: 25 verified signups earns $25,
-                  50 earns $100, and 150 earns $200 after SitGuru review.
+                  Live charts are gated by your referralCode. Pipeline targets:
+                  25 → $25, 50 → $100, 150 → $200 after SitGuru review.
                 </p>
               </div>
               <span className="rounded-full bg-green-800 px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-white">
-                {stats.socialSignups} verified
+                {referralCode?.trim()
+                  ? `${stats.socialSignups} verified`
+                  : "Circuit offline"}
               </span>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {socialMilestones.map((milestone) => (
-                <MilestoneCard
-                  key={milestone.verified}
-                  verified={milestone.verified}
-                  reward={milestone.reward}
-                  current={stats.socialSignups}
-                  reached={milestone.reached}
-                />
-              ))}
+            <div className="mt-4">
+              <AmbassadorMetricsChartsPanel
+                referralCode={referralCode}
+                referralCount={stats.socialSignups}
+                clicksCount={Math.max(
+                  verifiedReferralTotal,
+                  stats.socialSignups,
+                )}
+                initHref="/ambassador/dashboard/referrals"
+              />
             </div>
 
             <p className="mt-3 text-xs font-bold leading-5 text-slate-600">

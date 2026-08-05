@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -1366,25 +1367,22 @@ export default async function AmbassadorSocialPage() {
           </div>
         </section>
 
-        <section className="space-y-3">
+        <section className="w-full space-y-3">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-              Verified Social Milestones
+              Connected metrics circuit
             </p>
             <h2 className="mt-1 text-2xl font-black text-slate-950">
-              Updated reward schedule
+              Milestone pipeline and traffic charts
             </h2>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {SOCIAL_MILESTONES.map((milestone) => (
-              <MilestoneCard
-                key={milestone.signups}
-                milestone={milestone}
-                verifiedSignups={socialReferrals.length}
-              />
-            ))}
-          </div>
+          <AmbassadorMetricsChartsPanel
+            referralCode={referralCode}
+            referralCount={socialReferrals.length}
+            clicksCount={totalLinkVisits + totalQrScans}
+            initHref="/ambassador/dashboard/referrals"
+          />
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[1fr_0.75fr]">
