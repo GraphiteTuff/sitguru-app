@@ -6,7 +6,6 @@
  */
 
 import Link from "next/link";
-import Header from "@/components/Header";
 import { PawReportLiveDashboard } from "@/components/pawreport";
 
 export const metadata = {
@@ -18,8 +17,6 @@ export const metadata = {
 export default function PawReportLiveMarketingPage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-white via-emerald-50/40 to-sky-50/50 text-slate-950">
-      <Header />
-
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
