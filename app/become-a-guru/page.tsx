@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import { SCOUT_AVATAR } from "@/lib/companions/avatar-assets";
-import Layout from "@/components/layouts/Layout";
-
 const guruLoginLink = "/login?role=guru&next=/guru/dashboard";
 
 function buildGuruApplyLink(refCode?: string | null) {
@@ -702,9 +700,5 @@ export default async function BecomeAGuruPage({
   const refCode = Array.isArray(rawRef) ? rawRef[0] : rawRef;
   const guruApplyLink = buildGuruApplyLink(refCode);
 
-  return (
-    <Layout mode="public-guru">
-      <BecomeAGuruPageContent guruApplyLink={guruApplyLink} />
-    </Layout>
-  );
+  return <BecomeAGuruPageContent guruApplyLink={guruApplyLink} />;
 }

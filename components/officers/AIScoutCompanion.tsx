@@ -3,6 +3,7 @@
 /**
  * Scout — Guru companion only.
  * Mount when mode is `workspace` (Guru dashboard) or `public-guru` (Become a Guru).
+ * Public onboarding never calls useGuruAuth and never waits on a session.
  */
 
 import {
@@ -16,31 +17,20 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useChat } from "ai/react";
-import { useGuruAuth } from "@/hooks/useGuruAuth";
+import { useGuruAuth, type GuruAuthUser } from "@/hooks/useGuruAuth";
 import {
+  COMPANION_DOCK_CLASS,
   COMPANION_FAB_CLASS,
   SCOUT_AVATAR,
 } from "@/lib/companions/avatar-assets";
+import {
+  matchesRoutePrefix,
+  SCOUT_PUBLIC_GURU_ROUTE_PREFIXES,
+  SCOUT_WORKSPACE_ROUTE_PREFIXES,
+} from "@/lib/companions/scout-routes";
 
 const SCOUT_BRAND = "#047857";
 const SCOUT_BRAND_DEEP = "#065f46";
-
-const WORKSPACE_ROUTE_PREFIXES = [
-  "/guru/dashboard",
-  "/guru/bookings",
-  "/guru/referrals",
-  "/guru/messages",
-  "/guru/profile",
-  "/guru/availability",
-  "/guru/earnings",
-  "/guru/success-center",
-] as const;
-
-const PUBLIC_GURU_ROUTE_PREFIXES = [
-  "/become-a-guru",
-  "/guru/signup",
-  "/guru/application",
-] as const;
 
 const WORKSPACE_CHIPS = [
   {
@@ -97,21 +87,19 @@ export type AIScoutCompanionProps = {
   mode?: ScoutCompanionMode | "onboarding";
 };
 
-function matchesPrefix(pathname: string | null, prefixes: readonly string[]) {
-  if (!pathname) return false;
-  return prefixes.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
-}
-
 function resolveScoutMode(
   mode: AIScoutCompanionProps["mode"],
   pathname: string | null,
 ): "workspace" | "public-guru" | null {
-  if (mode === "workspace") return "workspace";
+  // Explicit public mode + public path always win — no Guru auth required.
   if (mode === "public-guru" || mode === "onboarding") return "public-guru";
-  if (matchesPrefix(pathname, PUBLIC_GURU_ROUTE_PREFIXES)) return "public-guru";
-  if (matchesPrefix(pathname, WORKSPACE_ROUTE_PREFIXES)) return "workspace";
+  if (matchesRoutePrefix(pathname, SCOUT_PUBLIC_GURU_ROUTE_PREFIXES)) {
+    return "public-guru";
+  }
+  if (mode === "workspace") return "workspace";
+  if (matchesRoutePrefix(pathname, SCOUT_WORKSPACE_ROUTE_PREFIXES)) {
+    return "workspace";
+  }
   return null;
 }
 
@@ -119,13 +107,13 @@ function buildWorkspaceGreeting(firstName: string) {
   return `Hi ${firstName}! I'm your Scout AI Companion. How can I assist you with your dashboard schedule today?`;
 }
 
-type ScoutWidgetProps = {
-  /** Unauthenticated Become a Guru conversion surface. */
+type ScoutShellProps = {
   isPublic: boolean;
+  user: GuruAuthUser | null;
+  loading: boolean;
 };
 
-function ScoutCompanionWidget({ isPublic }: ScoutWidgetProps) {
-  const { user, loading } = useGuruAuth();
+function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
   const [isOpen, setIsOpen] = useState(isPublic);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -139,7 +127,6 @@ function ScoutCompanionWidget({ isPublic }: ScoutWidgetProps) {
   const requestBody = {
     officer: "scout" as const,
     surface: isPublic ? ("public" as const) : ("dashboard" as const),
-    // Pass authenticated Guru context only on workspace surfaces.
     ...(!isPublic && user?.accessToken
       ? { accessToken: user.accessToken }
       : {}),
@@ -405,6 +392,17 @@ function ScoutCompanionWidget({ isPublic }: ScoutWidgetProps) {
   );
 }
 
+/** Public Become a Guru widget — no useGuruAuth / session gate. */
+function PublicScoutCompanionWidget() {
+  return <ScoutCompanionShell isPublic user={null} loading={false} />;
+}
+
+/** Authenticated Guru dashboard widget — personalizes after session loads. */
+function WorkspaceScoutCompanionWidget() {
+  const { user, loading } = useGuruAuth();
+  return <ScoutCompanionShell isPublic={false} user={user} loading={loading} />;
+}
+
 export default function AIScoutCompanion({
   mode = "auto",
 }: AIScoutCompanionProps) {
@@ -416,20 +414,27 @@ export default function AIScoutCompanion({
     setMounted(true);
   }, []);
 
-  // Mount Scout only on Guru workspace dashboards or public Guru application routes.
+  // Mount Scout on Guru workspace dashboards OR public Guru application routes.
   const shouldRenderScout =
     resolvedMode === "workspace" || resolvedMode === "public-guru";
 
   if (!shouldRenderScout || !mounted) return null;
 
+  const isPublic = resolvedMode === "public-guru";
+
   return createPortal(
     <div
-      className="fixed bottom-6 right-6 z-[9999] font-sans"
+      className={COMPANION_DOCK_CLASS}
       data-ai-scout-companion
       data-scout-mode={resolvedMode}
+      data-scout-public={isPublic ? "true" : "false"}
       data-bot-variant="scout"
     >
-      <ScoutCompanionWidget isPublic={resolvedMode === "public-guru"} />
+      {isPublic ? (
+        <PublicScoutCompanionWidget />
+      ) : (
+        <WorkspaceScoutCompanionWidget />
+      )}
     </div>,
     document.body,
   );
