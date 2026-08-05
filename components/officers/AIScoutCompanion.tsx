@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * Personalized floating AI Scout companion.
- * - workspace: signed-in Guru dashboards (schedule/logistics)
- * - onboarding: public Become a Guru conversion surface
+ * Scout — Guru companion only.
+ * Mount when mode is `workspace` (Guru dashboard) or `public-guru` (Become a Guru).
  */
 
 import {
@@ -19,7 +18,6 @@ import { usePathname } from "next/navigation";
 import { useChat } from "ai/react";
 import { useGuruAuth } from "@/hooks/useGuruAuth";
 import {
-  COMPANION_DOCK_CLASS,
   COMPANION_FAB_CLASS,
   SCOUT_AVATAR,
 } from "@/lib/companions/avatar-assets";
@@ -38,7 +36,7 @@ const WORKSPACE_ROUTE_PREFIXES = [
   "/guru/success-center",
 ] as const;
 
-const ONBOARDING_ROUTE_PREFIXES = [
+const PUBLIC_GURU_ROUTE_PREFIXES = [
   "/become-a-guru",
   "/guru/signup",
   "/guru/application",
@@ -65,7 +63,7 @@ const WORKSPACE_CHIPS = [
   },
 ] as const;
 
-const ONBOARDING_CHIPS = [
+const PUBLIC_CHIPS = [
   {
     id: "start_profile",
     label: "Start Free Profile",
@@ -90,82 +88,64 @@ const ONBOARDING_CHIPS = [
   },
 ] as const;
 
-const ONBOARDING_GREETING =
+const PUBLIC_GREETING =
   "Hi! I'm Scout, your Guru Matching Officer. Don't worry about onboarding—I'm right here to guide you through our profile steps, handle background check questions, and unlock your local pet care earnings window!";
 
+export type ScoutCompanionMode = "workspace" | "public-guru" | "auto";
+
 export type AIScoutCompanionProps = {
-  /**
-   * `public-guru` / `onboarding` = Become a Guru conversion (Scout).
-   * `workspace` = signed-in Guru dashboards (Scout).
-   * `auto` = detect from pathname.
-   */
-  mode?: "workspace" | "onboarding" | "public-guru" | "auto";
+  mode?: ScoutCompanionMode | "onboarding";
 };
 
-function matchesPrefix(
-  pathname: string | null,
-  prefixes: readonly string[],
-) {
+function matchesPrefix(pathname: string | null, prefixes: readonly string[]) {
   if (!pathname) return false;
   return prefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }
 
+function resolveScoutMode(
+  mode: AIScoutCompanionProps["mode"],
+  pathname: string | null,
+): "workspace" | "public-guru" | null {
+  if (mode === "workspace") return "workspace";
+  if (mode === "public-guru" || mode === "onboarding") return "public-guru";
+  if (matchesPrefix(pathname, PUBLIC_GURU_ROUTE_PREFIXES)) return "public-guru";
+  if (matchesPrefix(pathname, WORKSPACE_ROUTE_PREFIXES)) return "workspace";
+  return null;
+}
+
 function buildWorkspaceGreeting(firstName: string) {
   return `Hi ${firstName}! I'm your Scout AI Companion. How can I assist you with your dashboard schedule today?`;
 }
 
-function normalizeScoutMode(
-  mode: AIScoutCompanionProps["mode"],
-  pathname: string | null,
-): "workspace" | "onboarding" {
-  if (mode === "public-guru" || mode === "onboarding") return "onboarding";
-  if (mode === "workspace") return "workspace";
-  return matchesPrefix(pathname, ONBOARDING_ROUTE_PREFIXES)
-    ? "onboarding"
-    : "workspace";
-}
+type ScoutWidgetProps = {
+  /** Unauthenticated Become a Guru conversion surface. */
+  isPublic: boolean;
+};
 
-export default function AIScoutCompanion({
-  mode = "auto",
-}: AIScoutCompanionProps) {
-  const pathname = usePathname();
-  const resolvedMode = normalizeScoutMode(mode, pathname);
-
-  const isOnboarding = resolvedMode === "onboarding";
-  const routeEnabled = isOnboarding
-    ? matchesPrefix(pathname, ONBOARDING_ROUTE_PREFIXES) ||
-      mode === "onboarding" ||
-      mode === "public-guru"
-    : matchesPrefix(pathname, WORKSPACE_ROUTE_PREFIXES) ||
-      mode === "workspace";
-
+function ScoutCompanionWidget({ isPublic }: ScoutWidgetProps) {
   const { user, loading } = useGuruAuth();
-  const [mounted, setMounted] = useState(false);
-  const [isOpen, setIsOpen] = useState(isOnboarding);
+  const [isOpen, setIsOpen] = useState(isPublic);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const firstName = user?.firstName || "Guru";
-  const greeting = isOnboarding
-    ? ONBOARDING_GREETING
+  const greeting = isPublic
+    ? PUBLIC_GREETING
     : buildWorkspaceGreeting(firstName);
-  const chips = isOnboarding ? ONBOARDING_CHIPS : WORKSPACE_CHIPS;
+  const chips = isPublic ? PUBLIC_CHIPS : WORKSPACE_CHIPS;
 
   const requestBody = {
     officer: "scout" as const,
-    surface: isOnboarding ? ("public" as const) : ("dashboard" as const),
-    ...(!isOnboarding && user?.accessToken
+    surface: isPublic ? ("public" as const) : ("dashboard" as const),
+    // Pass authenticated Guru context only on workspace surfaces.
+    ...(!isPublic && user?.accessToken
       ? { accessToken: user.accessToken }
       : {}),
-    ...(!isOnboarding && user?.guruId ? { providerId: user.guruId } : {}),
-    ...(!isOnboarding && user?.name ? { guruName: user.name } : {}),
-    ...(!isOnboarding && user?.email ? { guruEmail: user.email } : {}),
+    ...(!isPublic && user?.guruId ? { providerId: user.guruId } : {}),
+    ...(!isPublic && user?.name ? { guruName: user.name } : {}),
+    ...(!isPublic && user?.email ? { guruEmail: user.email } : {}),
   };
 
   const {
@@ -190,12 +170,12 @@ export default function AIScoutCompanion({
   });
 
   useEffect(() => {
-    if (isOnboarding) {
+    if (isPublic) {
       setMessages([
         {
-          id: "scout-onboarding-hello",
+          id: "scout-public-hello",
           role: "assistant",
-          content: ONBOARDING_GREETING,
+          content: PUBLIC_GREETING,
         },
       ]);
       return;
@@ -208,13 +188,7 @@ export default function AIScoutCompanion({
         content: buildWorkspaceGreeting(user.firstName),
       },
     ]);
-  }, [
-    isOnboarding,
-    user?.id,
-    user?.guruId,
-    user?.firstName,
-    setMessages,
-  ]);
+  }, [isPublic, user?.id, user?.guruId, user?.firstName, setMessages]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -230,11 +204,6 @@ export default function AIScoutCompanion({
     );
     return () => window.clearTimeout(t);
   }, [isOpen]);
-
-  if (!routeEnabled) return null;
-  // Always mount the FAB on enabled Guru routes — never stay hidden while
-  // auth/hydration catches up. Personalization fills in once session resolves.
-  if (!mounted) return null;
 
   async function runChip(chip: (typeof chips)[number]) {
     setIsOpen(true);
@@ -258,19 +227,14 @@ export default function AIScoutCompanion({
     );
   }
 
-  return createPortal(
-    <div
-      className={COMPANION_DOCK_CLASS}
-      data-ai-scout-companion
-      data-scout-mode={resolvedMode}
-      data-scout-auth={loading ? "loading" : user ? "ready" : "guest"}
-      data-guru-id={user?.guruId || user?.id || "guest"}
-    >
+  return (
+    <>
       {isOpen ? (
         <div
           className="absolute bottom-[4.75rem] right-0 flex h-[min(28rem,70dvh)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white text-slate-900 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200"
           role="dialog"
           aria-label="Scout AI Companion"
+          data-scout-public={isPublic ? "true" : "false"}
         >
           <div
             className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 text-white"
@@ -296,12 +260,12 @@ export default function AIScoutCompanion({
               </span>
               <div className="min-w-0">
                 <h3 className="truncate text-sm font-black tracking-tight text-white">
-                  {isOnboarding
+                  {isPublic
                     ? "Scout · Guru Matching Officer"
                     : "Scout AI Companion"}
                 </h3>
                 <p className="truncate text-[11px] font-semibold text-white/90">
-                  {isOnboarding
+                  {isPublic
                     ? "Here to get you set up & earning"
                     : loading
                       ? "Connecting to your Guru workspace…"
@@ -344,7 +308,7 @@ export default function AIScoutCompanion({
             })}
             {isLoading ? (
               <p className="text-xs font-semibold text-emerald-700">
-                {isOnboarding
+                {isPublic
                   ? "Scout is lining up your next onboarding step…"
                   : "Scout is sniffing your schedule…"}
               </p>
@@ -357,7 +321,7 @@ export default function AIScoutCompanion({
           </div>
 
           <div className="shrink-0 border-t border-emerald-50 bg-white px-3 py-2">
-            {isOnboarding ? (
+            {isPublic ? (
               <Link
                 href="/signup?role=guru&next=/guru/dashboard"
                 className="mb-2 flex min-h-10 items-center justify-center rounded-xl bg-emerald-800 px-3 text-xs font-black text-white transition hover:bg-emerald-900"
@@ -385,7 +349,7 @@ export default function AIScoutCompanion({
                 onChange={handleInputChange}
                 rows={1}
                 placeholder={
-                  isOnboarding
+                  isPublic
                     ? "Ask Scout about applying, checks, payouts…"
                     : "Ask Scout about your schedule…"
                 }
@@ -437,6 +401,35 @@ export default function AIScoutCompanion({
           />
         )}
       </button>
+    </>
+  );
+}
+
+export default function AIScoutCompanion({
+  mode = "auto",
+}: AIScoutCompanionProps) {
+  const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+  const resolvedMode = resolveScoutMode(mode, pathname);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Mount Scout only on Guru workspace dashboards or public Guru application routes.
+  const shouldRenderScout =
+    resolvedMode === "workspace" || resolvedMode === "public-guru";
+
+  if (!shouldRenderScout || !mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed bottom-6 right-6 z-[9999] font-sans"
+      data-ai-scout-companion
+      data-scout-mode={resolvedMode}
+      data-bot-variant="scout"
+    >
+      <ScoutCompanionWidget isPublic={resolvedMode === "public-guru"} />
     </div>,
     document.body,
   );
