@@ -21,7 +21,7 @@ export default function DashboardSwitchChevron({
       strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={`h-4 w-4 shrink-0 will-change-transform transition-transform duration-200 ease-out ${
+      className={`h-4 w-4 shrink-0 transform-gpu will-change-transform transition-transform duration-200 ease-out ${
         isOpen ? "rotate-180" : "rotate-0"
       } ${className}`}
     >
