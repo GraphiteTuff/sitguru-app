@@ -49,9 +49,17 @@ function normalizePath(pathname: string | null | undefined) {
 }
 
 /**
- * Resolve which companion bot to mount from layout mode + current route.
- * Mirrors homepage Rogue: public pages render without auth redirects.
+ * Explicit public form-route entry map (contact + onboarding shells).
+ * Prefer this helper from forms; getBotConfig remains the shared resolver.
  */
+export function resolvePublicFormVariant(
+  mode: CompanionLayoutMode | undefined,
+): CompanionBotVariant | null {
+  if (mode === "public-guru") return "scout";
+  if (mode === "public-ambassador") return "taco";
+  if (mode === "public-parent" || mode === "public-investor") return "rogue";
+  return null;
+}
 export function getBotConfig(options: {
   mode?: CompanionLayoutMode | null;
   currentPath?: string | null;

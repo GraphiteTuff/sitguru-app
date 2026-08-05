@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -20,7 +21,6 @@ import { usePathname } from "next/navigation";
 import { useChat } from "ai/react";
 import { useGuruAuth, type GuruAuthUser } from "@/hooks/useGuruAuth";
 import AITacoCompanion from "@/components/officers/AITacoCompanion";
-import FloatingActionStack from "@/components/FloatingActionStack";
 import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
 import {
   COMPANION_DOCK_CLASS,
@@ -29,6 +29,7 @@ import {
 } from "@/lib/companions/avatar-assets";
 import {
   getBotConfig,
+  resolvePublicFormVariant,
   type CompanionLayoutMode,
 } from "@/lib/companions/bot-config";
 
@@ -392,6 +393,27 @@ function WorkspaceScoutCompanionWidget() {
   return <ScoutCompanionShell isPublic={false} user={user} loading={loading} />;
 }
 
+/**
+ * Explicit public form-route entry map (contact + onboarding shells):
+ * - public-guru → scout
+ * - public-ambassador → taco
+ * - public-parent → rogue
+ * (implemented via resolvePublicFormVariant in bot-config)
+ */
+
+/** Standard main-branch dock: fixed bottom-right, high z-index, body portal. */
+function portalCompanionDock(
+  children: ReactNode,
+  attrs: Record<string, string>,
+) {
+  return createPortal(
+    <div className={COMPANION_DOCK_CLASS} {...attrs}>
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
 function AIScoutCompanion({
   mode = "auto",
   currentPath,
@@ -404,53 +426,60 @@ function AIScoutCompanion({
     pathname ||
     (typeof window !== "undefined" ? window.location.pathname : "");
 
+  // Prefer explicit public form modes, then path/workspace auto-detect.
+  const publicVariant = resolvePublicFormVariant(mode);
   const bot = getBotConfig({ mode, currentPath: resolvedPath });
+  const variant = publicVariant ?? bot.variant;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!bot.shouldRender || !mounted || !bot.variant) return null;
+  if (!mounted || !variant) return null;
+  if (!publicVariant && !bot.shouldRender) return null;
 
-  // Parent / Investor contact lanes → Rogue (homepage companion).
-  if (bot.variant === "rogue") {
-    return (
-      <div data-bot-variant="rogue" data-companion-mode={mode}>
-        <FloatingActionStack>
-          <HomepageChatBubble />
-        </FloatingActionStack>
-      </div>
-    );
-  }
-
-  // `/ambassadors` (+ ambassador workspace) → Taco (own body portal + dock).
-  if (bot.variant === "taco") {
+  // public-ambassador → Taco (companion already portals with COMPANION_DOCK_CLASS).
+  if (variant === "taco") {
     return (
       <AITacoCompanion
-        mode={bot.surface === "workspace" ? "workspace" : "onboarding"}
+        mode={
+          bot.surface === "workspace" || mode === "ambassador-workspace"
+            ? "workspace"
+            : "onboarding"
+        }
       />
     );
   }
 
-  // `/become-a-guru` (+ Guru workspace) → Scout, portaled like homepage Rogue.
-  const isPublic = bot.surface === "public-guru";
+  // public-parent → Rogue at the standard bottom-right body portal.
+  if (variant === "rogue") {
+    return portalCompanionDock(<HomepageChatBubble />, {
+      "data-ai-rogue-companion": "true",
+      "data-bot-variant": "rogue",
+      "data-companion-mode": mode || "public-parent",
+      "data-companion-path": resolvedPath,
+    });
+  }
 
-  return createPortal(
-    <div
-      className={COMPANION_DOCK_CLASS}
-      data-ai-scout-companion
-      data-scout-mode={bot.surface ?? "workspace"}
-      data-scout-public={isPublic ? "true" : "false"}
-      data-bot-variant="scout"
-      data-companion-path={resolvedPath}
-    >
-      {isPublic ? (
-        <PublicScoutCompanionWidget />
-      ) : (
-        <WorkspaceScoutCompanionWidget />
-      )}
-    </div>,
-    document.body,
+  // public-guru → Scout at the standard bottom-right body portal.
+  const isPublic =
+    mode === "public-guru" || bot.surface === "public-guru";
+
+  return portalCompanionDock(
+    isPublic ? (
+      <PublicScoutCompanionWidget />
+    ) : (
+      <WorkspaceScoutCompanionWidget />
+    ),
+    {
+      "data-ai-scout-companion": "true",
+      "data-scout-mode": isPublic
+        ? "public-guru"
+        : (bot.surface ?? "workspace"),
+      "data-scout-public": isPublic ? "true" : "false",
+      "data-bot-variant": "scout",
+      "data-companion-path": resolvedPath,
+    },
   );
 }
 
