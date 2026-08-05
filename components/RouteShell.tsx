@@ -135,12 +135,13 @@ export default function RouteShell({ children }: { children: ReactNode }) {
 
   const shouldShowGlobalMessageNotifier = !isAuthPage;
 
-  const floatingControls = (
-    <FloatingActionStack>
-      {/* Rogue chat + intro tip on public marketing surfaces (all viewports). */}
-      {isHomePage || isPublicPage ? <HomepageChatBubble /> : null}
-    </FloatingActionStack>
-  );
+  const floatingControls =
+    isHomePage || isPublicPage ? (
+      <FloatingActionStack>
+        {/* Rogue chat + intro tip on public marketing surfaces (all viewports). */}
+        <HomepageChatBubble />
+      </FloatingActionStack>
+    ) : null;
 
   if (isAdminPage) {
     return (
