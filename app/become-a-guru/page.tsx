@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import { SCOUT_AVATAR } from "@/lib/companions/avatar-assets";
+import Layout from "@/components/layouts/Layout";
 
 const guruLoginLink = "/login?role=guru&next=/guru/dashboard";
 
@@ -305,17 +306,11 @@ function GuruProfilePreview() {
   );
 }
 
-export default async function BecomeAGuruPage({
-  searchParams,
+export function BecomeAGuruPageContent({
+  guruApplyLink,
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  guruApplyLink: string;
 }) {
-  const resolved: Record<string, string | string[] | undefined> =
-    (await Promise.resolve(searchParams)) || {};
-  const rawRef = resolved.ref;
-  const refCode = Array.isArray(rawRef) ? rawRef[0] : rawRef;
-  const guruApplyLink = buildGuruApplyLink(refCode);
-
   return (
     <main className="public-page min-h-screen bg-white pb-24 !text-slate-950 sm:pb-0">
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden">
@@ -693,5 +688,23 @@ export default async function BecomeAGuruPage({
         </div>
       </section>
     </main>
+  );
+}
+
+export default async function BecomeAGuruPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const resolved: Record<string, string | string[] | undefined> =
+    (await Promise.resolve(searchParams)) || {};
+  const rawRef = resolved.ref;
+  const refCode = Array.isArray(rawRef) ? rawRef[0] : rawRef;
+  const guruApplyLink = buildGuruApplyLink(refCode);
+
+  return (
+    <Layout mode="public-guru">
+      <BecomeAGuruPageContent guruApplyLink={guruApplyLink} />
+    </Layout>
   );
 }

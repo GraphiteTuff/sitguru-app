@@ -94,8 +94,12 @@ const ONBOARDING_GREETING =
   "Hi! I'm Scout, your Guru Matching Officer. Don't worry about onboarding—I'm right here to guide you through our profile steps, handle background check questions, and unlock your local pet care earnings window!";
 
 export type AIScoutCompanionProps = {
-  /** `onboarding` = public Become a Guru conversion; default auto-detects from path. */
-  mode?: "workspace" | "onboarding" | "auto";
+  /**
+   * `public-guru` / `onboarding` = Become a Guru conversion (Scout).
+   * `workspace` = signed-in Guru dashboards (Scout).
+   * `auto` = detect from pathname.
+   */
+  mode?: "workspace" | "onboarding" | "public-guru" | "auto";
 };
 
 function matchesPrefix(
@@ -112,21 +116,30 @@ function buildWorkspaceGreeting(firstName: string) {
   return `Hi ${firstName}! I'm your Scout AI Companion. How can I assist you with your dashboard schedule today?`;
 }
 
+function normalizeScoutMode(
+  mode: AIScoutCompanionProps["mode"],
+  pathname: string | null,
+): "workspace" | "onboarding" {
+  if (mode === "public-guru" || mode === "onboarding") return "onboarding";
+  if (mode === "workspace") return "workspace";
+  return matchesPrefix(pathname, ONBOARDING_ROUTE_PREFIXES)
+    ? "onboarding"
+    : "workspace";
+}
+
 export default function AIScoutCompanion({
   mode = "auto",
 }: AIScoutCompanionProps) {
   const pathname = usePathname();
-  const resolvedMode =
-    mode === "auto"
-      ? matchesPrefix(pathname, ONBOARDING_ROUTE_PREFIXES)
-        ? "onboarding"
-        : "workspace"
-      : mode;
+  const resolvedMode = normalizeScoutMode(mode, pathname);
 
   const isOnboarding = resolvedMode === "onboarding";
   const routeEnabled = isOnboarding
-    ? matchesPrefix(pathname, ONBOARDING_ROUTE_PREFIXES) || mode === "onboarding"
-    : matchesPrefix(pathname, WORKSPACE_ROUTE_PREFIXES);
+    ? matchesPrefix(pathname, ONBOARDING_ROUTE_PREFIXES) ||
+      mode === "onboarding" ||
+      mode === "public-guru"
+    : matchesPrefix(pathname, WORKSPACE_ROUTE_PREFIXES) ||
+      mode === "workspace";
 
   const { user, loading } = useGuruAuth();
   const [mounted, setMounted] = useState(false);
