@@ -10,12 +10,15 @@ export const SCOUT_AVATAR = {
   objectPosition: "center 22%",
 } as const;
 
-export const DELILAH_AVATAR = {
-  /** Official Delilah portrait (American Cocker Spaniel / Ambassador Advocate). */
-  src: "/about/delilah.jpeg",
-  alt: "Delilah, Ambassador Advocate",
-  objectPosition: "center 28%",
+export const TACO_AVATAR = {
+  /** Official circular Meet-the-Pack Taco portrait (Ambassador Advocate). */
+  src: "/images/taco-avatar.png",
+  alt: "Taco, Ambassador Advocate",
+  objectPosition: "center 22%",
 } as const;
+
+/** @deprecated Delilah is not the Ambassador companion — use TACO_AVATAR. */
+export const DELILAH_AVATAR = TACO_AVATAR;
 
 /** Shared floating action-bubble framing for onboarding companions. */
 export const COMPANION_FAB_CLASS =

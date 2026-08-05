@@ -19,8 +19,8 @@ import {
   Trophy,
   UsersRound,
 } from "lucide-react";
-import AIDelilahCompanion from "@/components/officers/AIDelilahCompanion";
-import { DELILAH_AVATAR } from "@/lib/companions/avatar-assets";
+import AITacoCompanion from "@/components/officers/AITacoCompanion";
+import { TACO_AVATAR } from "@/lib/companions/avatar-assets";
 
 type AmbassadorLane = {
   title: string;
@@ -335,7 +335,7 @@ export default function AmbassadorsPage() {
       </section>
 
       <section
-        aria-label="Meet Delilah, your AI Ambassador Advocate"
+        aria-label="Meet Taco, your AI Ambassador Advocate"
         className="border-b border-emerald-100 bg-gradient-to-b from-[#f8faf7] via-white to-[#f8faf7] py-12 sm:py-16"
       >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -345,19 +345,19 @@ export default function AmbassadorsPage() {
                 <div className="relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 sm:h-32 sm:w-32">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={DELILAH_AVATAR.src}
-                    alt={DELILAH_AVATAR.alt}
+                    src={TACO_AVATAR.src}
+                    alt={TACO_AVATAR.alt}
                     width={128}
                     height={128}
                     className="absolute inset-0 h-full w-full object-cover"
                     style={{
                       backgroundColor: "#fff",
-                      objectPosition: DELILAH_AVATAR.objectPosition,
+                      objectPosition: TACO_AVATAR.objectPosition,
                     }}
                   />
                 </div>
                 <p className="mt-4 text-xl font-black tracking-tight text-slate-950">
-                  Delilah
+                  Taco
                 </p>
                 <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#0D5C3A]">
                   Ambassador Advocate
@@ -373,7 +373,7 @@ export default function AmbassadorsPage() {
                 </h2>
                 <p className="mt-4 max-w-3xl text-base font-semibold leading-7 text-slate-600 sm:text-lg sm:leading-8">
                   As a SitGuru Ambassador, you won&apos;t navigate your journey
-                  alone. You will be assigned Delilah, your personalized AI
+                  alone. You will be assigned Taco, your personalized AI
                   Ambassador Advocate companion, to assist you with tracking
                   your outreach and growing your impact!
                 </p>
@@ -640,7 +640,7 @@ export default function AmbassadorsPage() {
           </div>
         </div>
       </section>
-      <AIDelilahCompanion />
+      <AITacoCompanion />
     </main>
   );
 }
