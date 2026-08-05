@@ -15,7 +15,6 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useChat } from "ai/react";
@@ -226,7 +225,8 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
           >
             <div className="flex min-w-0 items-center gap-3">
               <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 border-white/80 bg-white shadow-sm">
-                <Image
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src={SCOUT_AVATAR.src}
                   alt={SCOUT_AVATAR.alt}
                   width={40}
@@ -236,7 +236,6 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                     backgroundColor: "#fff",
                     objectPosition: SCOUT_AVATAR.objectPosition,
                   }}
-                  priority
                 />
               </span>
               <div className="min-w-0">
@@ -272,7 +271,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
 
           <div
             ref={scrollerRef}
-            className="flex-1 space-y-3 overflow-y-auto bg-[#f7fffb] px-4 py-3 text-sm text-slate-700"
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-[#f7fffb] px-4 py-3 text-sm text-slate-700"
           >
             {messages.map((message) => {
               const isAssistant = message.role === "assistant";

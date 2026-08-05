@@ -15,7 +15,6 @@ import {
   type FormEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useChat } from "ai/react";
@@ -310,7 +309,8 @@ export default function AITacoCompanion({
           >
             <div className="flex min-w-0 items-center gap-3">
               <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 border-white/80 bg-white shadow-sm">
-                <Image
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src={TACO_AVATAR.src}
                   alt={TACO_AVATAR.alt}
                   width={40}
@@ -320,7 +320,6 @@ export default function AITacoCompanion({
                     backgroundColor: "#fff",
                     objectPosition: TACO_AVATAR.objectPosition,
                   }}
-                  priority
                 />
               </span>
               <div className="min-w-0">
@@ -354,7 +353,7 @@ export default function AITacoCompanion({
 
           <div
             ref={scrollerRef}
-            className="flex-1 space-y-3 overflow-y-auto bg-[#f7fbf8] px-4 py-3 text-sm text-slate-700"
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-[#f7fbf8] px-4 py-3 text-sm text-slate-700"
           >
             {messages.map((message) => {
               const isAssistant = message.role === "assistant";
@@ -377,11 +376,16 @@ export default function AITacoCompanion({
             })}
 
             {isOnboarding ? (
-              <div className="rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                  Ambassador advantages
-                </p>
-                <ul className="mt-2 space-y-1.5">
+              <details className="rounded-2xl border border-emerald-100 bg-white shadow-sm open:pb-0">
+                <summary className="cursor-pointer list-none px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 marker:content-none [&::-webkit-details-marker]:hidden">
+                  <span className="flex items-center justify-between gap-2">
+                    Ambassador advantages
+                    <span className="text-[10px] font-bold normal-case tracking-normal text-emerald-600/80">
+                      tap to expand
+                    </span>
+                  </span>
+                </summary>
+                <ul className="space-y-1.5 border-t border-emerald-50 px-3 pb-3 pt-2">
                   {REWARD_CALLOUTS.map((item) => (
                     <li
                       key={item}
@@ -394,7 +398,7 @@ export default function AITacoCompanion({
                     </li>
                   ))}
                 </ul>
-              </div>
+              </details>
             ) : null}
 
             {isLoading ? (
@@ -442,7 +446,7 @@ export default function AITacoCompanion({
                     ? "Ask Taco about rewards, referrals…"
                     : "Ask Taco about your pack growth…"
                 }
-                className="min-h-[40px] flex-1 resize-none rounded-xl border border-emerald-100 bg-[#f7fbf8] px-3 py-2 text-sm text-slate-800 outline-none ring-emerald-600/30 placeholder:text-slate-400 focus:ring-2"
+                className="max-h-24 min-h-10 flex-1 resize-none overflow-y-auto rounded-xl border border-emerald-100 bg-[#f7fbf8] px-3 py-2 text-sm text-slate-800 outline-none ring-emerald-600/30 placeholder:text-slate-400 focus:ring-2"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
