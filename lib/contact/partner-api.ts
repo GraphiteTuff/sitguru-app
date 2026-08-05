@@ -4,10 +4,7 @@
  */
 
 export type PartnershipPartnerType =
-  | "parent"
-  | "guru"
-  | "ambassador"
-  | "investor";
+  "parent" | "guru" | "ambassador" | "investor";
 
 export type PartnershipPayload = {
   partnerType: PartnershipPartnerType;
@@ -37,6 +34,16 @@ function partnerToTopic(partnerType: PartnershipPartnerType) {
 
 function buildMessage(payload: PartnershipPayload) {
   const parts = [payload.message.trim()];
+
+  if (payload.organization?.trim()) {
+    // Always surface org for partners-landing / investor / community tracks.
+    if (
+      payload.partnerType !== "investor" &&
+      payload.partnerType !== "ambassador"
+    ) {
+      parts.push(`Organization: ${payload.organization.trim()}`);
+    }
+  }
 
   if (payload.partnerType === "parent" && payload.zipCode?.trim()) {
     parts.push(`ZIP: ${payload.zipCode.trim()}`);
@@ -89,9 +96,7 @@ export async function submitPartnershipInquiry(
       source: payload.source || "contact-page",
       pagePath:
         payload.pagePath ||
-        (typeof window !== "undefined"
-          ? window.location.pathname
-          : "/contact"),
+        (typeof window !== "undefined" ? window.location.pathname : "/contact"),
       trafficSource:
         typeof window !== "undefined" ? window.location.hostname : "unknown",
     }),

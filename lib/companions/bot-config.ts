@@ -15,15 +15,13 @@ export type CompanionBotConfig = {
   shouldRender: boolean;
   variant: CompanionBotVariant | null;
   /** Scout / Taco / Rogue surface keys. */
-  surface:
-    | "public-guru"
-    | "public-parent"
-    | "workspace"
-    | "onboarding"
-    | null;
+  surface: "public-guru" | "public-parent" | "workspace" | "onboarding" | null;
 };
 
-const AMBASSADOR_PUBLIC_PREFIXES = ["/ambassadors", "/programs/ambassadors"] as const;
+const AMBASSADOR_PUBLIC_PREFIXES = [
+  "/ambassadors",
+  "/programs/ambassadors",
+] as const;
 const AMBASSADOR_WORKSPACE_PREFIXES = [
   "/ambassador/dashboard",
   "/ambassador/training",
@@ -115,6 +113,18 @@ export function getBotConfig(options: {
     return { shouldRender: true, variant: "taco", surface: "onboarding" };
   }
   if (currentPath === "/contact" || currentPath.startsWith("/contact/")) {
+    return { shouldRender: true, variant: "rogue", surface: "public-parent" };
+  }
+  if (
+    (currentPath === "/partners" ||
+      currentPath === "/partners/local" ||
+      currentPath === "/partners/national" ||
+      currentPath === "/partners/affiliates" ||
+      currentPath === "/partners/ambassadors" ||
+      currentPath === "/partners/apply") &&
+    !currentPath.startsWith("/partners/dashboard")
+  ) {
+    // Public partners hub — Rogue by default; form pages override via mode prop.
     return { shouldRender: true, variant: "rogue", surface: "public-parent" };
   }
   if (matchesRoutePrefix(currentPath, SCOUT_WORKSPACE_ROUTE_PREFIXES)) {
