@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
-
+import { SCOUT_AVATAR } from "@/lib/companions/avatar-assets";
 const guruLoginLink = "/login?role=guru&next=/guru/dashboard";
 
 function buildGuruApplyLink(refCode?: string | null) {
@@ -304,17 +304,11 @@ function GuruProfilePreview() {
   );
 }
 
-export default async function BecomeAGuruPage({
-  searchParams,
+export function BecomeAGuruPageContent({
+  guruApplyLink,
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  guruApplyLink: string;
 }) {
-  const resolved: Record<string, string | string[] | undefined> =
-    (await Promise.resolve(searchParams)) || {};
-  const rawRef = resolved.ref;
-  const refCode = Array.isArray(rawRef) ? rawRef[0] : rawRef;
-  const guruApplyLink = buildGuruApplyLink(refCode);
-
   return (
     <main className="public-page min-h-screen bg-white pb-24 !text-slate-950 sm:pb-0">
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden">
@@ -374,6 +368,55 @@ export default async function BecomeAGuruPage({
             </div>
 
             <GuruProfilePreview />
+          </div>
+        </div>
+      </section>
+
+      <section
+        aria-label="Meet Scout, your AI Pet Companion"
+        className="border-b border-emerald-100 bg-gradient-to-b from-white via-[#f4faf7] to-white py-12 sm:py-16"
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-[32px] border border-emerald-100 bg-white shadow-[0_18px_50px_rgba(13,92,58,0.08)]">
+            <div className="grid items-center gap-8 p-7 sm:p-10 lg:grid-cols-[auto_1fr] lg:gap-12">
+              <div className="mx-auto flex flex-col items-center text-center lg:mx-0">
+                <div className="relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 sm:h-32 sm:w-32">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={SCOUT_AVATAR.src}
+                    alt={SCOUT_AVATAR.alt}
+                    width={128}
+                    height={128}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    style={{
+                      backgroundColor: "#fff",
+                      objectPosition: SCOUT_AVATAR.objectPosition,
+                    }}
+                  />
+                </div>
+                <p className="mt-4 text-xl font-black tracking-tight !text-slate-950">
+                  Scout
+                </p>
+                <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] !text-[#0D5C3A]">
+                  Guru Matching Officer
+                </p>
+              </div>
+
+              <div className="text-center lg:text-left">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
+                  AI Pet Companion
+                </p>
+                <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
+                  Your personalized guide from day one.
+                </h2>
+                <p className="mt-4 max-w-3xl text-base font-semibold leading-7 !text-slate-700 sm:text-lg sm:leading-8">
+                  Every Pet Guru receives their own personalized AI Pet
+                  Companion to guide them along the way! Meet Scout, your
+                  dedicated Guru Matching Officer, who is ready to seamlessly
+                  help pair you up with local Pet Parents.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -644,4 +687,18 @@ export default async function BecomeAGuruPage({
       </section>
     </main>
   );
+}
+
+export default async function BecomeAGuruPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const resolved: Record<string, string | string[] | undefined> =
+    (await Promise.resolve(searchParams)) || {};
+  const rawRef = resolved.ref;
+  const refCode = Array.isArray(rawRef) ? rawRef[0] : rawRef;
+  const guruApplyLink = buildGuruApplyLink(refCode);
+
+  return <BecomeAGuruPageContent guruApplyLink={guruApplyLink} />;
 }
