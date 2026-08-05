@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
 import GuruRecognitionBadge from "@/components/guru/GuruRecognitionBadge";
+import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
 import {
   getTrustSafetyBypassStatusPayload,
   isGuruTrustSafetyAlreadyBypassed,
@@ -2016,102 +2017,50 @@ export default async function GuruDashboardPage() {
   return (
     <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 !text-slate-950 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-sm">
-          <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-            <div className="bg-[radial-gradient(circle_at_95%_10%,rgba(16,185,129,0.18),transparent_28%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_100%)] p-5 sm:p-6">
-              <div className="flex min-w-0 items-start gap-4">
-                <GuruAvatar name={name} imageUrl={imageUrl} />
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] !text-emerald-700 sm:text-xs">
-                    SitGuru Guru Dashboard
-                  </p>
-                  <h1 className="mt-1 text-3xl font-black tracking-tight !text-emerald-950 sm:text-4xl">
-                    Hey, {welcomeName} 👋
-                  </h1>
-                  <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 !text-slate-600">
-                    Bookings, PawReports, messages, pricing, availability, and
-                    earnings — all in one easy dashboard.
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className={`rounded-full border px-3 py-1 text-xs font-black ${guruTier.badgeClassName}`}>
-                      {guruTier.label}
-                    </span>
-                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-900">
-                      {bookable ? "Bookable" : "Setup in progress"}
-                    </span>
-                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-black !text-emerald-900">
-                      {paymentSetup.statusLabel}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <div>
-                      <p className="text-lg font-black !text-emerald-950">
-                        {name}
-                      </p>
-                      <p className="text-xs font-bold !text-slate-600">
-                        {getGuruTitle(guruProfile)} • {location}
-                      </p>
-                    </div>
-                    {universityProgress.isComplete ? (
-                      <GuruRecognitionBadge
-                        label="Certified SitGuru Guru"
-                        sublabel="Guru Academy Graduate"
-                        size="sm"
-                        showStars={false}
-                      />
-                    ) : null}
-                  </div>
-                </div>
+        <UniversalRoleDashboard
+          role="guru"
+          userName={welcomeName}
+          avatarUrl={imageUrl}
+          tags={[
+            guruTier.label,
+            bookable ? "Bookable" : "Setup in progress",
+            paymentSetup.statusLabel,
+          ]}
+          metaExtra={
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <p className="text-lg font-black !text-emerald-950">{name}</p>
+                <p className="text-xs font-bold !text-slate-600">
+                  {getGuruTitle(guruProfile)} • {location}
+                </p>
               </div>
+              {universityProgress.isComplete ? (
+                <GuruRecognitionBadge
+                  label="Certified SitGuru Guru"
+                  sublabel="Guru Academy Graduate"
+                  size="sm"
+                  showStars={false}
+                />
+              ) : null}
             </div>
-
-            <div className="border-t border-emerald-100 bg-white p-5 lg:border-l lg:border-t-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] !text-emerald-700">
-                Quick actions
-              </p>
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
-                {[
-                  ["Bookings", "/guru/dashboard/bookings", "🗓️"],
-                  ["PawReports", "/guru/dashboard/bookings", "🐾"],
-                  ["Messages", "/guru/dashboard/messages", "💬"],
-                  ["Earnings", "/guru/dashboard/earnings", "💸"],
-                  ["Availability", "/guru/dashboard/availability", "⏱️"],
-                  ["Pricing", "/guru/dashboard/pricing", "💚"],
-                ].map(([label, href, icon]) => (
-                  <Link
-                    key={label}
-                    href={href}
-                    className="flex min-h-12 items-center justify-between gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-xs font-black !text-emerald-950 transition hover:border-emerald-200 hover:bg-emerald-100"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <span aria-hidden="true">{icon}</span>
-                      {label}
-                    </span>
-                    <span>→</span>
-                  </Link>
-                ))}
+          }
+          actionsFooter={
+            <details className="group rounded-2xl border border-slate-200 bg-slate-50">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-black !text-slate-800">
+                Update profile photo
+                <span className="transition group-open:rotate-90">→</span>
+              </summary>
+              <div className="border-t border-slate-200 p-4">
+                <GuruMediaUploader
+                  userId={user.id}
+                  guruProfileId={String(guruProfile.id ?? "")}
+                  displayName={name}
+                  initialPhotoUrl={imageUrl}
+                />
               </div>
-
-              <details className="group mt-3 rounded-2xl border border-slate-200 bg-slate-50">
-                <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-black !text-slate-800">
-                  Update profile photo
-                  <span className="transition group-open:rotate-90">→</span>
-                </summary>
-                <div className="border-t border-slate-200 p-4">
-                  <GuruMediaUploader
-                    userId={user.id}
-                    guruProfileId={String(guruProfile.id ?? "")}
-                    displayName={name}
-                    initialPhotoUrl={imageUrl}
-                  />
-                </div>
-              </details>
-            </div>
-          </div>
-        </section>
+            </details>
+          }
+        />
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           <StatCard label="Bookings" value={bookings.length} icon="🗓️" />

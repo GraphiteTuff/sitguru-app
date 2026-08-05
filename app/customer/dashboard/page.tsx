@@ -14,12 +14,16 @@ import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   CheckCircle2,
+  ClipboardList,
   Clock3,
   CreditCard,
   HeartHandshake,
+  Home,
   LockKeyhole,
   MessageCircle,
+  PawPrint,
   Receipt,
+  Search,
   ShieldCheck,
   Sparkles,
   Star,
@@ -30,6 +34,7 @@ import Header from "@/components/Header";
 import { PawIcon } from "@/components/ui/PawIcon";
 import MultiPetProfileCenter from "@/components/customer/MultiPetProfileCenter";
 import UniversityExpress from "@/components/dashboard/UniversityExpress";
+import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
 import { normalizeCanonicalPet } from "@/lib/pets/canonical";
 import {
   findPetForBooking as findLinkedPetForBooking,
@@ -3376,111 +3381,78 @@ export default function CustomerDashboardPage() {
             academyHref={routes.university}
           />
 
-          <section className="relative overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-[0_20px_70px_rgba(15,118,110,0.10)] sm:rounded-[2.4rem]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(52,211,153,0.22),transparent_30%),radial-gradient(circle_at_92%_12%,rgba(251,191,36,0.18),transparent_26%),linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#fff7ed_100%)]" />
-            <div className="relative grid gap-5 px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-center lg:px-10 lg:py-9">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-800 ring-1 ring-emerald-200">
-                    Pet Parent Home
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 text-[11px] font-black text-emerald-800 ring-1 ring-emerald-200">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                    Updates live
-                  </span>
-                </div>
-
-                <h1 className="mt-4 text-4xl font-black tracking-[-0.045em] text-slate-950 sm:text-5xl lg:text-6xl">
-                  Hey, {firstName} <span aria-hidden="true">👋</span>
-                </h1>
-                <p className="mt-3 max-w-2xl text-base font-bold leading-7 text-slate-700 sm:text-lg">
-                  Care, updates, pets, and rewards—one tap away.
-                </p>
-
-                <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
-                  <Link
-                    href={routes.findGuru}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700"
-                  >
-                    Find Care
-                  </Link>
-                  <Link
-                    href={routes.bookings}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-slate-800"
-                  >
-                    My Bookings
-                  </Link>
-                  <Link
-                    href={routes.messages}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-50"
-                  >
-                    My Messages
-                  </Link>
-                  <Link
-                    href={routes.pets}
-                    className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-slate-50"
-                  >
-                    My Pets
-                  </Link>
-                </div>
+          <UniversalRoleDashboard
+            role="parent"
+            userName={firstName}
+            avatarUrl={showCustomerProfilePhoto ? customerAvatarSrc : null}
+            avatarFallback={customerInitials}
+            tags={[
+              "Pet Parent",
+              `${profileCompletion}% ready`,
+              getCustomerLocationLabel(customerProfile) || "Add care location",
+            ]}
+            metaExtra={
+              <div className="grid grid-cols-3 gap-2">
+                <Link
+                  href={routes.pets}
+                  className="rounded-2xl bg-emerald-50 p-3 text-center ring-1 ring-emerald-100 transition hover:bg-emerald-100"
+                >
+                  <p className="text-xl font-black text-slate-950">
+                    {pets.length}
+                  </p>
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                    Pets
+                  </p>
+                </Link>
+                <Link
+                  href={routes.bookings}
+                  className="rounded-2xl bg-emerald-50 p-3 text-center ring-1 ring-emerald-100 transition hover:bg-emerald-100"
+                >
+                  <p className="text-xl font-black text-slate-950">
+                    {upcomingBookings.length}
+                  </p>
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                    Upcoming
+                  </p>
+                </Link>
+                <Link
+                  href={routes.pawPerks}
+                  className="rounded-2xl bg-emerald-50 p-3 text-center ring-1 ring-emerald-100 transition hover:bg-emerald-100"
+                >
+                  <p className="text-xl font-black text-slate-950">
+                    {formatMoney(pawPerksState.redeemedCashCredits)}
+                  </p>
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                    PawPerks
+                  </p>
+                </Link>
               </div>
-
-              <div className="rounded-[1.8rem] border border-white bg-white/90 p-4 shadow-xl ring-1 ring-emerald-100 backdrop-blur sm:p-5">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.5rem] bg-emerald-50 text-2xl font-black text-emerald-700 ring-1 ring-emerald-100">
-                    {showCustomerProfilePhoto ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={customerAvatarSrc}
-                        alt={`${customerDisplayName} profile photo`}
-                        onError={() => setCustomerPhotoFailed(true)}
-                        className="h-full w-full object-cover object-center"
-                      />
-                    ) : (
-                      customerInitials
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-xl font-black text-slate-950">
-                      {customerDisplayName}
-                    </p>
-                    <p className="mt-1 text-sm font-bold text-emerald-700">
-                      Pet Parent • {profileCompletion}% ready
-                    </p>
-                    <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-                      {getCustomerLocationLabel(customerProfile) || "Add care location"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid grid-cols-3 gap-2">
-                  <Link
-                    href={routes.pets}
-                    className="rounded-2xl bg-emerald-50 p-3 text-center ring-1 ring-emerald-100 transition hover:bg-emerald-100"
-                  >
-                    <p className="text-xl font-black text-slate-950">{pets.length}</p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">Pets</p>
-                  </Link>
-                  <Link
-                    href={routes.bookings}
-                    className="rounded-2xl bg-sky-50 p-3 text-center ring-1 ring-sky-100 transition hover:bg-sky-100"
-                  >
-                    <p className="text-xl font-black text-slate-950">{upcomingBookings.length}</p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">Upcoming</p>
-                  </Link>
-                  <Link
-                    href={routes.pawPerks}
-                    className="rounded-2xl bg-amber-100 p-3 text-center ring-1 ring-amber-200 transition hover:bg-amber-200"
-                  >
-                    <p className="text-xl font-black text-slate-950">
-                      {formatMoney(pawPerksState.redeemedCashCredits)}
-                    </p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-800">PawPerks</p>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </section>
+            }
+            actions={[
+              { label: "My Pets", href: routes.pets, icon: PawPrint },
+              { label: "Find a Guru", href: routes.findGuru, icon: Search },
+              {
+                label: "Active Care",
+                href: routes.bookings,
+                icon: Home,
+              },
+              {
+                label: "PawReports",
+                href: routes.bookings,
+                icon: ClipboardList,
+              },
+              {
+                label: "Messages",
+                href: routes.messages,
+                icon: MessageCircle,
+              },
+              {
+                label: "Payments",
+                href: routes.pawPerks,
+                icon: CreditCard,
+              },
+            ]}
+          />
           <NearbyGurusCarousel
             gurus={nearbyGurus}
             careZip={careZip}

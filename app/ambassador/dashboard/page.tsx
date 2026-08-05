@@ -29,6 +29,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
 import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
+import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -1169,101 +1170,38 @@ export default async function AmbassadorDashboardPage() {
         </div>
         <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-4">
           <div className="min-w-0 space-y-4">
-        <section className="overflow-hidden rounded-[28px] border border-green-100 bg-white shadow-sm">
-          <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-            <div className="bg-[radial-gradient(circle_at_95%_10%,rgba(16,185,129,0.16),transparent_28%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_100%)] p-5 sm:p-6">
-              <div className="flex min-w-0 items-start gap-4">
-                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-green-100 text-xl font-black text-green-900 ring-1 ring-green-200">
-                  {ambassadorAvatarUrl ? (
-                    <Image
-                      src={ambassadorAvatarUrl}
-                      alt={`${fullName} profile photo`}
-                      fill
-                      sizes="80px"
-                      className="object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    getInitials(fullName)
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-700 sm:text-xs">
-                    SitGuru Ambassador Dashboard
-                  </p>
-                  <h1 className="mt-1 text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-                    Hi, {firstName}
-                  </h1>
-                  <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
-                    Event-ready referral, social, commission, training, payout,
-                    and support tools in one compact dashboard.
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Pill>{asString(ambassadorRecord.status) || "active"}</Pill>
-                    <Pill>{onboardingPacket.label}</Pill>
-                    <Pill>{trainingProgress.label}</Pill>
-                  </div>
-
-                  <div className="mt-4 flex flex-col gap-2 rounded-2xl border border-green-200 bg-white/90 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-green-700">
-                        Ambassador Code
-                      </p>
-                      <p className="mt-1 break-all text-3xl font-black tracking-tight text-green-950">
-                        {referralCode}
-                      </p>
-                    </div>
-                    <p className="max-w-xl text-xs font-bold leading-5 text-slate-600">
-                      Use this code on every referral, social post, QR flyer,
-                      vendor table, and local outreach conversation.
-                    </p>
-                  </div>
-                </div>
+        <UniversalRoleDashboard
+          role="ambassador"
+          userName={firstName}
+          avatarUrl={ambassadorAvatarUrl}
+          tags={[
+            asString(ambassadorRecord.status) || "active",
+            onboardingPacket.label,
+            trainingProgress.label,
+          ]}
+          metaExtra={
+            <div className="flex flex-col gap-2 rounded-2xl border border-emerald-200 bg-white/90 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
+                  Ambassador Code
+                </p>
+                <p className="mt-1 break-all text-3xl font-black tracking-tight text-emerald-950">
+                  {referralCode}
+                </p>
               </div>
+              <p className="max-w-xl text-xs font-bold leading-5 text-slate-600">
+                Use this code on every referral, social post, QR flyer, vendor
+                table, and local outreach conversation.
+              </p>
             </div>
-
-            <div className="border-t border-green-100 bg-white p-5 lg:border-l lg:border-t-0">
+          }
+          actionsFooter={
+            <div className="space-y-3">
               <DashboardSwitcherPanel
                 access={dashboardAccess}
                 current="ambassador"
               />
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <QuickActionLink
-                  href="/ambassador/dashboard/social"
-                  icon={<Share2 size={17} />}
-                  label="Social"
-                />
-                <QuickActionLink
-                  href="/ambassador/dashboard/commissions"
-                  icon={<WalletCards size={17} />}
-                  label="Commissions"
-                />
-                <QuickActionLink
-                  href="/ambassador/dashboard/referrals"
-                  icon={<Users size={17} />}
-                  label="Referrals"
-                />
-                <QuickActionLink
-                  href="/ambassador/dashboard/payouts"
-                  icon={<DollarSign size={17} />}
-                  label="Payouts"
-                />
-                <QuickActionLink
-                  href="/ambassador/dashboard/training"
-                  icon={<GraduationCap size={17} />}
-                  label="Training"
-                />
-                <QuickActionLink
-                  href="/ambassador/dashboard/messages?support=admin&role=ambassador"
-                  icon={<MessageCircle size={17} />}
-                  label="Messages"
-                />
-              </div>
-
-              <form action={signOutAction} className="mt-3">
+              <form action={signOutAction}>
                 <button
                   type="submit"
                   className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black text-slate-800 transition hover:bg-slate-100"
@@ -1273,8 +1211,8 @@ export default async function AmbassadorDashboardPage() {
                 </button>
               </form>
             </div>
-          </div>
-        </section>
+          }
+        />
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           <StatCard
@@ -2149,7 +2087,7 @@ function DashboardSwitcherPanel({
       ? {
           key: "pet_parent",
           label: "Pet Parent Dashboard",
-          href: "/customer/dashboard/profile",
+          href: "/customer/dashboard",
           helper: "Pets, bookings, PawPerks, and care details",
         }
       : null,

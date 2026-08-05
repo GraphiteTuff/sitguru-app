@@ -449,7 +449,7 @@ export default async function LoginRoutePage({
 
   if (preferred === "pet_parent") {
     if (hasPetParentAccess) {
-      redirect(safeNextPath || "/customer/dashboard/profile");
+      redirect(safeNextPath || "/customer/dashboard");
     }
 
     redirect(
@@ -475,7 +475,7 @@ export default async function LoginRoutePage({
   }
 
   if (hasPetParentAccess) {
-    redirect("/customer/dashboard/profile");
+    redirect("/customer/dashboard");
   }
 
   redirect(

@@ -30,7 +30,7 @@ type TrackingContext = {
 
 const fallbackRoutes = {
   admin: "/admin",
-  customerProfile: "/customer/dashboard/profile",
+  customerProfile: "/customer/dashboard",
   guruProfile: "/guru/dashboard/profile",
   ambassadorDashboard: "/ambassador/dashboard",
   resetPassword: "/reset-password",
