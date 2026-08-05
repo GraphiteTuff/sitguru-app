@@ -21,7 +21,8 @@ export const TACO_AVATAR = {
 
 /** Shared floating action-bubble framing for onboarding companions. */
 export const COMPANION_FAB_CLASS =
-  "h-14 w-14 overflow-hidden rounded-full border-2 border-white shadow-xl transition-all hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2";
+  "h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-white shadow-xl transition-all hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2";
 
+/** Bottom-right dock — tip + avatar row (mirrors Rogue homepage bubble). */
 export const COMPANION_DOCK_CLASS =
-  "fixed bottom-6 right-6 z-[9999] font-sans";
+  "fixed bottom-6 right-6 z-[9999] font-sans flex flex-row items-center justify-end gap-2.5 max-w-[min(100vw-1.5rem,22rem)]";

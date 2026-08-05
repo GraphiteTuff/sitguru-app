@@ -144,7 +144,7 @@ export default function AITacoCompanion({
       mode === "workspace";
 
   const [mounted, setMounted] = useState(false);
-  const [isOpen, setIsOpen] = useState(isOnboarding);
+  const [isOpen, setIsOpen] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [ambassadorName, setAmbassadorName] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -206,6 +206,11 @@ export default function AITacoCompanion({
       ? `Hey ${ambassadorName.split(/\s+/)[0]}! Taco here — your Ambassador Advocate. Let's grow the pack: referrals, link clicks, PetPerks rewards, and your dashboard metrics.`
       : WORKSPACE_GREETING;
   const chips = isOnboarding ? ONBOARDING_CHIPS : WORKSPACE_CHIPS;
+  const tipText = isOnboarding
+    ? "Hey! I'm Taco — tap to chat. I'll help you claim PetPerks and grow your pack!"
+    : ambassadorName
+      ? `Hey ${ambassadorName.split(/\s+/)[0]}! I'm Taco — tap to chat about referrals and rewards.`
+      : "Hey! I'm Taco — tap to chat about referrals, PetPerks, and your dashboard.";
 
   const requestBody = {
     officer: "taco" as const,
@@ -296,10 +301,12 @@ export default function AITacoCompanion({
           aria-label="Taco AI Companion"
         >
           <div
+            data-companion-header
             className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 text-white"
             style={{
               backgroundImage: `linear-gradient(135deg, ${TACO_BRAND} 0%, ${TACO_BRAND_DEEP} 100%)`,
               backgroundColor: TACO_BRAND,
+              color: "#ffffff",
             }}
           >
             <div className="flex min-w-0 items-center gap-3">
@@ -318,10 +325,16 @@ export default function AITacoCompanion({
                 />
               </span>
               <div className="min-w-0">
-                <h3 className="truncate text-sm font-black tracking-tight text-white">
+                <p
+                  className="companion-header-title truncate text-sm font-black tracking-tight !text-white"
+                  style={{ color: "#ffffff" }}
+                >
                   Taco · Ambassador Advocate
-                </h3>
-                <p className="truncate text-[11px] font-semibold text-white/90">
+                </p>
+                <p
+                  className="truncate text-[11px] font-semibold !text-white/90"
+                  style={{ color: "rgba(255,255,255,0.92)" }}
+                >
                   {isOnboarding
                     ? "Your growth & rewards guide"
                     : ambassadorName
@@ -452,6 +465,18 @@ export default function AITacoCompanion({
         </div>
       ) : null}
 
+      {!isOpen ? (
+        <button
+          type="button"
+          className="homepage-chat-tip"
+          onClick={() => setIsOpen(true)}
+          aria-label="Open chat with Taco, Ambassador Advocate"
+        >
+          <span className="homepage-chat-tip__pulse" aria-hidden />
+          <span className="homepage-chat-tip__text">{tipText}</span>
+        </button>
+      ) : null}
+
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
@@ -459,7 +484,7 @@ export default function AITacoCompanion({
           isOpen ? "Close Taco AI Companion" : "Open Taco AI Companion"
         }
         aria-expanded={isOpen}
-        className={`${COMPANION_FAB_CLASS} flex items-center justify-center bg-[#0D5C3A] hover:bg-[#09462C]`}
+        className={`${COMPANION_FAB_CLASS} homepage-chat-launcher flex items-center justify-center bg-[#0D5C3A] hover:bg-[#09462C]`}
       >
         {isOpen ? (
           <span className="text-2xl font-light leading-none text-white">×</span>

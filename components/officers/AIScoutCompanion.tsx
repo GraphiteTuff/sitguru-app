@@ -104,7 +104,7 @@ type ScoutShellProps = {
 };
 
 function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
-  const [isOpen, setIsOpen] = useState(isPublic);
+  const [isOpen, setIsOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -113,6 +113,9 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
     ? PUBLIC_GREETING
     : buildWorkspaceGreeting(firstName);
   const chips = isPublic ? PUBLIC_CHIPS : WORKSPACE_CHIPS;
+  const tipText = isPublic
+    ? "Hi! I'm Scout — tap to chat. I'll guide your Guru setup, checks, and earnings path!"
+    : `Hi ${firstName}! I'm Scout — tap to chat about your schedule, trails, and payouts.`;
 
   const requestBody = {
     officer: "scout" as const,
@@ -214,10 +217,12 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
           data-scout-public={isPublic ? "true" : "false"}
         >
           <div
+            data-companion-header
             className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 text-white"
             style={{
               backgroundImage: `linear-gradient(135deg, ${SCOUT_BRAND} 0%, ${SCOUT_BRAND_DEEP} 100%)`,
               backgroundColor: SCOUT_BRAND,
+              color: "#ffffff",
             }}
           >
             <div className="flex min-w-0 items-center gap-3">
@@ -236,12 +241,18 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                 />
               </span>
               <div className="min-w-0">
-                <h3 className="truncate text-sm font-black tracking-tight text-white">
+                <p
+                  className="companion-header-title truncate text-sm font-black tracking-tight !text-white"
+                  style={{ color: "#ffffff" }}
+                >
                   {isPublic
                     ? "Scout · Guru Matching Officer"
                     : "Scout AI Companion"}
-                </h3>
-                <p className="truncate text-[11px] font-semibold text-white/90">
+                </p>
+                <p
+                  className="truncate text-[11px] font-semibold !text-white/90"
+                  style={{ color: "rgba(255,255,255,0.92)" }}
+                >
                   {isPublic
                     ? "Here to get you set up & earning"
                     : loading
@@ -352,6 +363,18 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
         </div>
       ) : null}
 
+      {!isOpen ? (
+        <button
+          type="button"
+          className="homepage-chat-tip"
+          onClick={() => setIsOpen(true)}
+          aria-label="Open chat with Scout, Guru Matching Officer"
+        >
+          <span className="homepage-chat-tip__pulse" aria-hidden />
+          <span className="homepage-chat-tip__text">{tipText}</span>
+        </button>
+      ) : null}
+
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
@@ -359,7 +382,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
           isOpen ? "Close Scout AI Companion" : "Open Scout AI Companion"
         }
         aria-expanded={isOpen}
-        className={`${COMPANION_FAB_CLASS} flex items-center justify-center bg-emerald-600 hover:bg-emerald-700`}
+        className={`${COMPANION_FAB_CLASS} homepage-chat-launcher flex items-center justify-center bg-emerald-600 hover:bg-emerald-700`}
       >
         {isOpen ? (
           <span className="text-2xl font-light leading-none text-white">×</span>

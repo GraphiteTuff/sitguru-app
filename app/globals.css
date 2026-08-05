@@ -198,6 +198,14 @@ h3 {
   font-weight: 800;
 }
 
+/* Companion chat headers sit on brand green — force legible white titles */
+[data-ai-scout-companion] h3,
+[data-ai-taco-companion] h3,
+[data-companion-header] h3,
+[data-companion-header] .companion-header-title {
+  color: #ffffff !important;
+}
+
 p {
   margin: 0;
 }
