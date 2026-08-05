@@ -11,9 +11,11 @@ alwaysApply: true
 - Goal: Flawless layouts, strong conversion flows, production-ready Git commands when deploying.
 
 ## Git & deployment
-Protect builds from missing modules / untracked files.
-- **Modified files only**: `git commit -am "Short descriptive message" && git push origin main`
-- **Any new/untracked files** (components, utils, etc.): `git add -A && git commit -m "Include missing modules" && git push origin main`
+NEVER create pull requests, feature branches, or separate previews.
+All updates go directly to production branch `sitguru-main`.
+- Before edits: `git pull origin sitguru-main`
+- **Modified files only**: `git commit -am "Short descriptive message" && git push origin sitguru-main`
+- **Any new/untracked files** (components, utils, etc.): `git add -A && git commit -m "Include missing modules" && git push origin sitguru-main`
 - Only run commit/push when the user asks to commit, deploy, ship, or push — then use the matching rule above.
 
 ## UI / UX visual rules
