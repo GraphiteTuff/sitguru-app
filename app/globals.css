@@ -1880,7 +1880,9 @@ p {
   height: 100%;
   border-radius: 999px;
   object-fit: cover;
-  object-position: top center;
+  /* Match Rogue SitGuruAvatar face crop (was top-center, which left Scout/Taco small). */
+  object-position: 50% 28%;
+  background-color: #fff;
 }
 
 .homepage-chat-launcher__badge {

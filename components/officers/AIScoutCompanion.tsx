@@ -387,7 +387,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
           <span className="homepage-chat-launcher__icon">×</span>
         ) : (
           <span className="homepage-chat-launcher__icon" aria-hidden>
-            {/* Plain img matches Rogue launcher fill (Next/Image can look inset). */}
+            {/* Match Rogue SitGuruAvatar: plain img + object-cover fill. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={SCOUT_AVATAR.src}

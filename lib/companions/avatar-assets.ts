@@ -9,7 +9,10 @@ export const SCOUT_AVATAR = {
   /** Official circular Meet-the-Pack Scout portrait (GSP / Guru Matching Officer). */
   src: "/images/scout-avatar.png",
   alt: "Scout, Guru Matching Officer",
-  /** Match Rogue homepage launcher face crop. */
+  /**
+   * Match Rogue launcher face crop (HomepageChatBubble SitGuruAvatar).
+   * Asset is reframed to Rogue fill; keep the same object-position.
+   */
   objectPosition: "50% 28%",
 } as const;
 
@@ -17,7 +20,7 @@ export const TACO_AVATAR = {
   /** Official circular Meet-the-Pack Taco portrait (Ambassador Advocate). */
   src: "/images/taco-avatar.png",
   alt: "Taco, Ambassador Advocate",
-  /** Match Rogue homepage launcher face crop. */
+  /** Match Rogue launcher face crop. */
   objectPosition: "50% 28%",
 } as const;
 
