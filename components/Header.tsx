@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
-import RoleSwitchDropdown from "@/components/nav/RoleSwitchDropdown";
 import {
   accessFlagsFromAuthorizedRoles,
   getAvailableDashboardSwitches,
@@ -897,27 +896,6 @@ export default function Header({ user = null }: HeaderProps) {
             <div className="h-11 w-48 animate-pulse rounded-full bg-slate-100" />
           ) : isLoggedIn ? (
             <>
-              {roleSwitchLinks.length ? (
-                <RoleSwitchDropdown
-                  className="hidden xl:inline-flex"
-                  authorizedRoles={authorizedRoles}
-                  currentRole={headerModeToSwitchRole(headerMode)}
-                  options={roleSwitchLinks.map((link) => ({
-                    label: link.label,
-                    href: link.href,
-                    helper: link.helper,
-                    id:
-                      link.mode === "customer"
-                        ? "parent"
-                        : link.mode === "guru"
-                          ? "guru"
-                          : link.mode === "ambassador"
-                            ? "ambassador"
-                            : "admin",
-                  }))}
-                />
-              ) : null}
-
               {isGuru ? (
                 <Link
                   href={resourcesHref}
@@ -1085,25 +1063,25 @@ export default function Header({ user = null }: HeaderProps) {
                   </div>
                   <NotificationBell />
                 </div>
-              </div>
-            ) : null}
 
-            {roleSwitchLinks.length ? (
-              <div className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2">
-                <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                  Switch Portal
-                </p>
-                {roleSwitchLinks.map((link) => (
-                  <Link
-                    key={`mobile-switch-${link.href}`}
-                    href={link.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold tracking-[-0.01em] text-emerald-800 transition hover:bg-white"
-                  >
-                    <Repeat2 className="h-4 w-4" />
-                    {link.label}
-                  </Link>
-                ))}
+                {roleSwitchLinks.length ? (
+                  <div className="mt-3 rounded-2xl border border-emerald-100 bg-white/80 p-2">
+                    <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                      Switch Portal
+                    </p>
+                    {roleSwitchLinks.map((link) => (
+                      <Link
+                        key={`mobile-switch-${link.href}`}
+                        href={link.href}
+                        onClick={() => setMobileOpen(false)}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold tracking-[-0.01em] text-emerald-800 transition hover:bg-emerald-50"
+                      >
+                        <Repeat2 className="h-4 w-4" />
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

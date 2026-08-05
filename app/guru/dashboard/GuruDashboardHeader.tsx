@@ -5,6 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import {
+  getAvailableDashboardSwitches,
+  resolveAuthorizedRolesFromProfile,
+  toRoleSwitchOptions,
+  type DashboardSwitchRole,
+} from "@/lib/dashboard/role-switch";
 import {
   Bell,
   BookOpen,
@@ -14,18 +21,11 @@ import {
   LayoutDashboard,
   LogOut,
   MessageCircle,
+  Repeat2,
   UserCircle,
   UserPlus,
   Wallet,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import RoleSwitchDropdown from "@/components/nav/RoleSwitchDropdown";
-import {
-  getAvailableDashboardSwitches,
-  resolveAuthorizedRolesFromProfile,
-  toRoleSwitchOptions,
-  type DashboardSwitchRole,
-} from "@/lib/dashboard/role-switch";
 
 type GuruProfileForHeader = {
   display_name?: string | null;
@@ -541,13 +541,6 @@ export default function GuruDashboardHeader({
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <RoleSwitchDropdown
-            label="Switch Dashboard"
-            options={guruSwitchOptions}
-            authorizedRoles={loadedProfile.authorizedRoles}
-            currentRole="guru"
-          />
-
           <Link
             href="/guru/success-center"
             className="sg-guru-success-link inline-flex h-11 min-w-[205px] items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
@@ -639,15 +632,25 @@ export default function GuruDashboardHeader({
                 </div>
 
                 <div className="grid gap-1 bg-white p-3">
-                  <div className="mb-1">
-                    <RoleSwitchDropdown
-                      label="Switch Dashboard"
-                      options={guruSwitchOptions}
-                      authorizedRoles={loadedProfile.authorizedRoles}
-                      currentRole="guru"
-                      className="w-full"
-                    />
-                  </div>
+                  {guruSwitchOptions.length ? (
+                    <div className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2">
+                      <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                        Switch Portal
+                      </p>
+                      {guruSwitchOptions.map((option) => (
+                        <Link
+                          key={option.href}
+                          href={option.href}
+                          role="menuitem"
+                          onClick={() => setAccountMenuOpen(false)}
+                          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-semibold tracking-[-0.01em] text-emerald-900 transition hover:bg-white"
+                        >
+                          <Repeat2 className="h-4 w-4" />
+                          {option.label}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
 
                   {guruAccountMenuLinks.map((item) => (
                     <Link
@@ -701,15 +704,6 @@ export default function GuruDashboardHeader({
 
       <div className="border-t border-slate-100 bg-white lg:hidden">
         <div className="mx-auto flex max-w-[1500px] gap-2 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">
-          <RoleSwitchDropdown
-            compact
-            label="Switch Dashboard"
-            options={guruSwitchOptions}
-            authorizedRoles={loadedProfile.authorizedRoles}
-            currentRole="guru"
-            className="shrink-0"
-          />
-
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -789,16 +783,25 @@ export default function GuruDashboardHeader({
                   ) : null}
                 </div>
               </div>
-            </div>
 
-            <div className="mb-1">
-              <RoleSwitchDropdown
-                label="Switch Dashboard"
-                options={guruSwitchOptions}
-                authorizedRoles={loadedProfile.authorizedRoles}
-                currentRole="guru"
-                className="w-full"
-              />
+              {guruSwitchOptions.length ? (
+                <div className="mt-3 rounded-2xl border border-emerald-100 bg-white/80 p-2">
+                  <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                    Switch Portal
+                  </p>
+                  {guruSwitchOptions.map((option) => (
+                    <Link
+                      key={`mobile-switch-${option.href}`}
+                      href={option.href}
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold tracking-[-0.01em] text-emerald-800 transition hover:bg-emerald-50"
+                    >
+                      <Repeat2 className="h-4 w-4" />
+                      {option.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             {guruAccountMenuLinks.map((item) => (
