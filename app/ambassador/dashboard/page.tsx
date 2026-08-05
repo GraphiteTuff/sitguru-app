@@ -30,6 +30,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
 import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
 import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
+import GlobalDashboardSwitcher from "@/components/GlobalDashboardSwitcher";
 
 export const dynamic = "force-dynamic";
 
@@ -1197,9 +1198,14 @@ export default async function AmbassadorDashboardPage() {
           }
           actionsFooter={
             <div className="space-y-3">
-              <DashboardSwitcherPanel
-                access={dashboardAccess}
-                current="ambassador"
+              <GlobalDashboardSwitcher
+                currentRole="ambassador"
+                access={{
+                  parent: dashboardAccess.petParent,
+                  guru: dashboardAccess.guru,
+                  ambassador: dashboardAccess.ambassador,
+                }}
+                variant="panel"
               />
               <form action={signOutAction}>
                 <button
@@ -2072,103 +2078,6 @@ function AmbassadorProgressPanel({
         ))}
       </div>
     </section>
-  );
-}
-
-function DashboardSwitcherPanel({
-  access,
-  current,
-}: {
-  access: DashboardAccess;
-  current: "pet_parent" | "guru" | "ambassador";
-}) {
-  const dashboardLinks = [
-    access.petParent
-      ? {
-          key: "pet_parent",
-          label: "Pet Parent Dashboard",
-          href: "/customer/dashboard",
-          helper: "Pets, bookings, PawPerks, and care details",
-        }
-      : null,
-    access.guru
-      ? {
-          key: "guru",
-          label: "Guru Dashboard",
-          href: "/guru/dashboard",
-          helper: "Services, bookings, messages, and earnings",
-        }
-      : null,
-    access.ambassador
-      ? {
-          key: "ambassador",
-          label: "Ambassador Dashboard",
-          href: "/ambassador/dashboard",
-          helper: "Referrals, training, rewards, and outreach",
-        }
-      : null,
-  ].filter(Boolean) as {
-    key: "pet_parent" | "guru" | "ambassador";
-    label: string;
-    href: string;
-    helper: string;
-  }[];
-
-  if (dashboardLinks.length <= 1) return null;
-
-  return (
-    <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-green-800">
-        Switch Dashboard
-      </p>
-      <div className="mt-3 grid gap-2">
-        {dashboardLinks.map((dashboard) => {
-          const isCurrent = dashboard.key === current;
-
-          if (isCurrent) {
-            return (
-              <div
-                key={dashboard.key}
-                className="rounded-2xl border border-green-200 bg-white px-4 py-3"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-black text-green-950">
-                    {dashboard.label}
-                  </p>
-                  <span className="rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-green-800">
-                    Current
-                  </span>
-                </div>
-                <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
-                  {dashboard.helper}
-                </p>
-              </div>
-            );
-          }
-
-          return (
-            <Link
-              key={dashboard.key}
-              href={dashboard.href}
-              className="group rounded-2xl border border-green-100 bg-white px-4 py-3 transition hover:border-green-200 hover:bg-green-100/50"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-black text-green-950">
-                  {dashboard.label}
-                </p>
-                <ArrowRight
-                  size={15}
-                  className="text-green-800 transition group-hover:translate-x-0.5"
-                />
-              </div>
-              <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
-                {dashboard.helper}
-              </p>
-            </Link>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 

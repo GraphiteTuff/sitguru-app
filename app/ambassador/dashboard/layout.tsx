@@ -17,6 +17,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import AIScoutCompanion from "@/components/officers/AIScoutCompanion";
+import GlobalDashboardSwitcher from "@/components/GlobalDashboardSwitcher";
 
 type AmbassadorDashboardLayoutProps = {
   children: ReactNode;
@@ -138,6 +139,19 @@ export default function AmbassadorDashboardLayout({
                 })}
               </div>
             </nav>
+
+            <div className="hidden shrink-0 sm:block">
+              <GlobalDashboardSwitcher
+                currentRole="ambassador"
+                variant="nav"
+              />
+            </div>
+          </div>
+          <div className="pb-3 sm:hidden">
+            <GlobalDashboardSwitcher
+              currentRole="ambassador"
+              variant="sheet"
+            />
           </div>
         </div>
       </header>
