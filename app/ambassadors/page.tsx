@@ -19,6 +19,7 @@ import {
   Trophy,
   UsersRound,
 } from "lucide-react";
+import AIDelilahCompanion from "@/components/officers/AIDelilahCompanion";
 
 type AmbassadorLane = {
   title: string;
@@ -635,6 +636,7 @@ export default function AmbassadorsPage() {
           </div>
         </div>
       </section>
+      <AIDelilahCompanion />
     </main>
   );
 }

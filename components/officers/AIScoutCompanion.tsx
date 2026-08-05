@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Personalized floating AI Scout companion for Guru workspace views.
- * Uses Supabase session (via useGuruAuth) so each logged-in Guru gets their
- * own greeting, provider id, and Scout chat context.
+ * Personalized floating AI Scout companion.
+ * - workspace: signed-in Guru dashboards (schedule/logistics)
+ * - onboarding: public Become a Guru conversion surface
  */
 
 import {
@@ -13,6 +13,7 @@ import {
   type FormEvent,
 } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useChat } from "ai/react";
 import { useGuruAuth } from "@/hooks/useGuruAuth";
@@ -21,7 +22,7 @@ const SCOUT_AVATAR_SRC = "/images/scout-avatar.png";
 const SCOUT_BRAND = "#047857";
 const SCOUT_BRAND_DEEP = "#065f46";
 
-const SCOUT_ROUTE_PREFIXES = [
+const WORKSPACE_ROUTE_PREFIXES = [
   "/guru/dashboard",
   "/guru/bookings",
   "/guru/referrals",
@@ -32,7 +33,13 @@ const SCOUT_ROUTE_PREFIXES = [
   "/guru/success-center",
 ] as const;
 
-const QUICK_CHIPS = [
+const ONBOARDING_ROUTE_PREFIXES = [
+  "/become-a-guru",
+  "/guru/signup",
+  "/guru/application",
+] as const;
+
+const WORKSPACE_CHIPS = [
   {
     id: "schedule",
     label: "My Schedule",
@@ -53,35 +60,89 @@ const QUICK_CHIPS = [
   },
 ] as const;
 
-function isGuruScoutRoute(pathname: string | null) {
+const ONBOARDING_CHIPS = [
+  {
+    id: "start_profile",
+    label: "Start Free Profile",
+    prompt:
+      "I want to start my free Guru profile. Walk me through the first setup steps so I can get bookable.",
+  },
+  {
+    id: "free_to_apply",
+    label: "Free to apply?",
+    prompt: "Is it free to apply?",
+  },
+  {
+    id: "background_check",
+    label: "Background Check",
+    prompt:
+      "What should I know about background checks and trust steps before I become bookable?",
+  },
+  {
+    id: "payments_work",
+    label: "Payments",
+    prompt: "How do payments work?",
+  },
+] as const;
+
+const ONBOARDING_GREETING =
+  "Hi! I'm Scout, your Guru Matching Officer. Don't worry about onboarding—I'm right here to guide you through our profile steps, handle background check questions, and unlock your local pet care earnings window!";
+
+export type AIScoutCompanionProps = {
+  /** `onboarding` = public Become a Guru conversion; default auto-detects from path. */
+  mode?: "workspace" | "onboarding" | "auto";
+};
+
+function matchesPrefix(
+  pathname: string | null,
+  prefixes: readonly string[],
+) {
   if (!pathname) return false;
-  return SCOUT_ROUTE_PREFIXES.some(
+  return prefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }
 
-function buildGreeting(firstName: string) {
+function buildWorkspaceGreeting(firstName: string) {
   return `Hi ${firstName}! I'm your Scout AI Companion. How can I assist you with your dashboard schedule today?`;
 }
 
-export default function AIScoutCompanion() {
+export default function AIScoutCompanion({
+  mode = "auto",
+}: AIScoutCompanionProps) {
   const pathname = usePathname();
-  const enabled = isGuruScoutRoute(pathname);
+  const resolvedMode =
+    mode === "auto"
+      ? matchesPrefix(pathname, ONBOARDING_ROUTE_PREFIXES)
+        ? "onboarding"
+        : "workspace"
+      : mode;
+
+  const isOnboarding = resolvedMode === "onboarding";
+  const routeEnabled = isOnboarding
+    ? matchesPrefix(pathname, ONBOARDING_ROUTE_PREFIXES) || mode === "onboarding"
+    : matchesPrefix(pathname, WORKSPACE_ROUTE_PREFIXES);
+
   const { user, loading } = useGuruAuth();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(isOnboarding);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const firstName = user?.firstName || "Guru";
-  const greeting = buildGreeting(firstName);
+  const greeting = isOnboarding
+    ? ONBOARDING_GREETING
+    : buildWorkspaceGreeting(firstName);
+  const chips = isOnboarding ? ONBOARDING_CHIPS : WORKSPACE_CHIPS;
 
   const requestBody = {
     officer: "scout" as const,
-    surface: "dashboard" as const,
-    ...(user?.accessToken ? { accessToken: user.accessToken } : {}),
-    ...(user?.guruId ? { providerId: user.guruId } : {}),
-    ...(user?.name ? { guruName: user.name } : {}),
-    ...(user?.email ? { guruEmail: user.email } : {}),
+    surface: isOnboarding ? ("public" as const) : ("dashboard" as const),
+    ...(!isOnboarding && user?.accessToken
+      ? { accessToken: user.accessToken }
+      : {}),
+    ...(!isOnboarding && user?.guruId ? { providerId: user.guruId } : {}),
+    ...(!isOnboarding && user?.name ? { guruName: user.name } : {}),
+    ...(!isOnboarding && user?.email ? { guruEmail: user.email } : {}),
   };
 
   const {
@@ -105,17 +166,32 @@ export default function AIScoutCompanion() {
     body: requestBody,
   });
 
-  // Refresh greeting when Guru identity resolves / changes.
   useEffect(() => {
+    if (isOnboarding) {
+      setMessages([
+        {
+          id: "scout-onboarding-hello",
+          role: "assistant",
+          content: ONBOARDING_GREETING,
+        },
+      ]);
+      return;
+    }
     if (!user?.id) return;
     setMessages([
       {
         id: `scout-hello-${user.guruId || user.id}`,
         role: "assistant",
-        content: buildGreeting(user.firstName),
+        content: buildWorkspaceGreeting(user.firstName),
       },
     ]);
-  }, [user?.id, user?.guruId, user?.firstName, setMessages]);
+  }, [
+    isOnboarding,
+    user?.id,
+    user?.guruId,
+    user?.firstName,
+    setMessages,
+  ]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -132,11 +208,10 @@ export default function AIScoutCompanion() {
     return () => window.clearTimeout(t);
   }, [isOpen]);
 
-  if (!enabled || loading || !user) {
-    return null;
-  }
+  if (!routeEnabled) return null;
+  if (!isOnboarding && (loading || !user)) return null;
 
-  async function runChip(chip: (typeof QUICK_CHIPS)[number]) {
+  async function runChip(chip: (typeof chips)[number]) {
     setIsOpen(true);
     await append(
       { role: "user", content: chip.prompt },
@@ -151,9 +226,7 @@ export default function AIScoutCompanion() {
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!input.trim() || isLoading) return;
-    handleSubmit(event, {
-      body: { ...requestBody },
-    });
+    handleSubmit(event, { body: { ...requestBody } });
     window.setTimeout(
       () => inputRef.current?.focus({ preventScroll: true }),
       40,
@@ -162,13 +235,16 @@ export default function AIScoutCompanion() {
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-50 font-sans"
+      className={`fixed right-6 z-50 font-sans ${
+        isOnboarding ? "bottom-24 sm:bottom-6" : "bottom-6"
+      }`}
       data-ai-scout-companion
-      data-guru-id={user.guruId || user.id}
+      data-scout-mode={resolvedMode}
+      data-guru-id={user?.guruId || user?.id || "guest"}
     >
       {isOpen ? (
         <div
-          className="absolute bottom-[4.75rem] right-0 flex h-[min(28rem,70dvh)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200"
+          className="absolute bottom-[4.75rem] right-0 flex h-[min(28rem,70dvh)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white text-slate-900 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200"
           role="dialog"
           aria-label="Scout AI Companion"
         >
@@ -193,10 +269,14 @@ export default function AIScoutCompanion() {
               </span>
               <div className="min-w-0">
                 <h3 className="truncate text-sm font-black tracking-tight text-white">
-                  Scout AI Companion
+                  {isOnboarding
+                    ? "Scout · Guru Matching Officer"
+                    : "Scout AI Companion"}
                 </h3>
                 <p className="truncate text-[11px] font-semibold text-white/90">
-                  Helping {firstName} · your routes only
+                  {isOnboarding
+                    ? "Here to get you set up & earning"
+                    : `Helping ${firstName} · your routes only`}
                 </p>
               </div>
             </div>
@@ -222,7 +302,7 @@ export default function AIScoutCompanion() {
                   className={`flex ${isAssistant ? "justify-start" : "justify-end"}`}
                 >
                   <div
-                    className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 leading-relaxed shadow-sm ${
+                    className={`max-w-[90%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 leading-relaxed shadow-sm ${
                       isAssistant
                         ? "border border-emerald-100 bg-white text-slate-700"
                         : "bg-emerald-700 text-white"
@@ -235,7 +315,9 @@ export default function AIScoutCompanion() {
             })}
             {isLoading ? (
               <p className="text-xs font-semibold text-emerald-700">
-                Scout is sniffing your schedule…
+                {isOnboarding
+                  ? "Scout is lining up your next onboarding step…"
+                  : "Scout is sniffing your schedule…"}
               </p>
             ) : null}
             {error ? (
@@ -246,8 +328,16 @@ export default function AIScoutCompanion() {
           </div>
 
           <div className="shrink-0 border-t border-emerald-50 bg-white px-3 py-2">
+            {isOnboarding ? (
+              <Link
+                href="/signup?role=guru&next=/guru/dashboard"
+                className="mb-2 flex min-h-10 items-center justify-center rounded-xl bg-emerald-800 px-3 text-xs font-black text-white transition hover:bg-emerald-900"
+              >
+                Start Free Guru Profile
+              </Link>
+            ) : null}
             <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-              {QUICK_CHIPS.map((chip) => (
+              {chips.map((chip) => (
                 <button
                   key={chip.id}
                   type="button"
@@ -265,7 +355,11 @@ export default function AIScoutCompanion() {
                 value={input}
                 onChange={handleInputChange}
                 rows={1}
-                placeholder="Ask Scout about your schedule…"
+                placeholder={
+                  isOnboarding
+                    ? "Ask Scout about applying, checks, payouts…"
+                    : "Ask Scout about your schedule…"
+                }
                 className="min-h-[40px] flex-1 resize-none rounded-xl border border-emerald-100 bg-[#f7fffb] px-3 py-2 text-sm text-slate-800 outline-none ring-emerald-600/30 placeholder:text-slate-400 focus:ring-2"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
@@ -288,7 +382,6 @@ export default function AIScoutCompanion() {
         </div>
       ) : null}
 
-      {/* Floating Action Button — Scout custom avatar */}
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
