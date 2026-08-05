@@ -338,8 +338,8 @@ export default function PartnerApplyPage() {
             <p className="mt-6 max-w-3xl text-lg font-semibold leading-8 text-slate-600">
               Tell us how you want to connect with SitGuru. This inquiry flow is
               for organizations, veterinarians, pet stores, schools, nonprofits,
-              workforce groups, military-connected organizations, local and
-              national brands, affiliates, creators, and ambassadors.
+              workforce groups, local and national brands, affiliates, creators,
+              and ambassadors.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-2">
@@ -351,7 +351,6 @@ export default function PartnerApplyPage() {
                 "Veterinarians",
                 "Schools",
                 "Nonprofits",
-                "Military groups",
                 "Creators",
               ].map((item) => (
                 <span
@@ -370,18 +369,26 @@ export default function PartnerApplyPage() {
 
             <div className="relative rounded-[2rem] border border-emerald-100 bg-[#f8fff9] p-5 shadow-2xl shadow-emerald-950/10">
               <div className="overflow-hidden rounded-[1.5rem] bg-white shadow-sm">
-                <div className="relative h-72 w-full overflow-hidden">
+                <div className="relative h-[min(18rem,52vw)] w-full min-h-[220px] overflow-hidden sm:h-72">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src="https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=1100&q=80"
                     alt="Dog and cat together representing pet-friendly partnerships"
-                    className="h-full w-full object-cover"
+                    className="absolute inset-0 h-full w-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/65 via-slate-950/10 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-5">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100">
+                  {/* Semi-transparent gradient so title stays readable on dark image areas */}
+                  <div
+                    className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/50 to-transparent"
+                    aria-hidden
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 z-10 p-5 sm:p-6 text-white animate-fadeIn">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-300 sm:text-xs">
                       Build pet-friendly reach
                     </p>
-                    <h2 className="mt-2 text-3xl font-black text-white">
+                    <h2
+                      className="mt-2 max-w-sm text-2xl font-black leading-tight tracking-tight !text-white drop-shadow-sm sm:text-3xl"
+                      style={{ color: "#ffffff" }}
+                    >
                       Help more pets, people, and communities connect.
                     </h2>
                   </div>
