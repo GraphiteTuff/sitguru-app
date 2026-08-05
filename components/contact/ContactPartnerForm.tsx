@@ -27,6 +27,11 @@ import {
   Zap,
 } from "lucide-react";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
+import { AIScoutCompanion } from "@/components/officers/AIScoutCompanion";
+import {
+  companionModeFromPartnerType,
+  type CompanionLayoutMode,
+} from "@/lib/companions/bot-config";
 
 export type PartnerType = "parent" | "guru" | "ambassador" | "investor";
 
@@ -195,10 +200,14 @@ export function ContactPartnerForm() {
     [partnerType],
   );
 
+  const companionMode: CompanionLayoutMode =
+    companionModeFromPartnerType(partnerType);
+
   const showAmbassador = partnerType === "ambassador";
   const showInvestor = partnerType === "investor";
   const showParent = partnerType === "parent";
   const showGuru = partnerType === "guru";
+  const showSuccess = Boolean(formSuccess) && !formError;
 
   function updateField<K extends keyof ContactFormState>(
     key: K,
@@ -315,8 +324,8 @@ export function ContactPartnerForm() {
             Partner with SitGuru
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-pretty text-sm font-semibold text-slate-500 sm:text-base md:text-lg">
-            Pick a path—we&apos;ll display only the tailored options that match
-            your goals.
+            Pick your lane. SitGuru updates fields, tracks context parameters,
+            and loads tailored AI agents instantly.
           </p>
         </header>
 
@@ -334,11 +343,11 @@ export function ContactPartnerForm() {
                 id={`${formId}-why-title`}
                 className="text-lg font-black tracking-tight sm:text-xl"
               >
-                Why Partner?
+                The SitGuru Ecosystem
               </h2>
               <p className="mt-2 text-sm font-medium leading-relaxed text-emerald-50/95">
-                Join a modern ecosystem built on reliable pet logistics,
-                interactive AI companion tooling, and streamlined rewards.
+                A comprehensive pet care marketplace built for scale across
+                desktop platforms, web applications, and native mobile builds.
               </p>
 
               <ul className="mt-5 space-y-3 text-xs font-semibold text-emerald-50 sm:mt-6 sm:text-[13px]">
@@ -347,7 +356,7 @@ export function ContactPartnerForm() {
                     <Zap className="h-3.5 w-3.5" aria-hidden />
                   </span>
                   <span className="pt-1.5 leading-snug">
-                    Real-time companion matching dashboards
+                    Active companion asset switching on context click
                   </span>
                 </li>
                 <li className="flex items-start gap-3">
@@ -355,7 +364,7 @@ export function ContactPartnerForm() {
                     <LineChart className="h-3.5 w-3.5" aria-hidden />
                   </span>
                   <span className="pt-1.5 leading-snug">
-                    Optimized ledger tracking tools
+                    Fluid, lightweight responsive layers for every viewport
                   </span>
                 </li>
                 <li className="flex items-start gap-3">
@@ -363,28 +372,42 @@ export function ContactPartnerForm() {
                     <BriefcaseBusiness className="h-3.5 w-3.5" aria-hidden />
                   </span>
                   <span className="pt-1.5 leading-snug">
-                    Guru, Ambassador, and Parent support paths
+                    Scout for Gurus · Taco for Ambassadors · Rogue for Parents
                   </span>
                 </li>
               </ul>
 
-              <button
-                type="button"
-                onClick={openRogueChat}
-                className="mt-6 flex w-full items-start gap-3 rounded-xl border border-white/20 bg-white/10 px-3 py-3 text-left transition hover:bg-white/15 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/30 sm:mt-8"
-              >
-                <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/20">
-                  <Lightbulb className="h-4 w-4" aria-hidden />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-black leading-5">
-                    Need a quick answer?
+              {companionMode === "public-parent" ||
+              companionMode === "public-investor" ? (
+                <button
+                  type="button"
+                  onClick={openRogueChat}
+                  className="mt-6 flex w-full items-start gap-3 rounded-xl border border-white/20 bg-white/10 px-3 py-3 text-left transition hover:bg-white/15 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/30 sm:mt-8"
+                >
+                  <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/20">
+                    <Lightbulb className="h-4 w-4" aria-hidden />
                   </span>
-                  <span className="mt-0.5 block text-[11px] font-semibold text-emerald-100">
-                    Chat with Rogue · {selectedPath.label}
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black leading-5">
+                      Need a quick answer?
+                    </span>
+                    <span className="mt-0.5 block text-[11px] font-semibold text-emerald-100">
+                      Chat with Rogue · {selectedPath.label}
+                    </span>
                   </span>
-                </span>
-              </button>
+                </button>
+              ) : (
+                <div className="mt-6 rounded-xl border border-white/20 bg-white/10 px-3 py-3 sm:mt-8">
+                  <p className="text-sm font-black leading-5">
+                    {companionMode === "public-guru"
+                      ? "Scout is ready"
+                      : "Taco is ready"}
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-emerald-100">
+                    Open the companion bubble in the corner for instant help.
+                  </p>
+                </div>
+              )}
             </div>
           </aside>
 
@@ -398,6 +421,35 @@ export function ContactPartnerForm() {
               Partnership request form
             </h2>
 
+            {showSuccess ? (
+              <div
+                id={`${formId}-success`}
+                role="status"
+                className="py-10 text-center sm:py-12"
+              >
+                <span
+                  className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-[#0D5C3A]"
+                  aria-hidden
+                >
+                  <Check className="h-7 w-7" strokeWidth={2.5} />
+                </span>
+                <h3 className="mt-4 text-xl font-black text-slate-900">
+                  Partnership Inquiry Saved!
+                </h3>
+                <p className="mx-auto mt-2 max-w-sm text-sm font-semibold text-slate-500">
+                  Our integrations team will review your contact submission
+                  parameters shortly.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setFormSuccess("")}
+                  className="mt-6 text-sm font-black text-[#0D5C3A] transition hover:text-[#09462C] focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                >
+                  ← Submit another inquiry
+                </button>
+              </div>
+            ) : (
+              <>
             <div
               role="radiogroup"
               aria-labelledby={pathGroupId}
@@ -705,15 +757,6 @@ export function ContactPartnerForm() {
                   {formError}
                 </p>
               ) : null}
-              {formSuccess ? (
-                <p
-                  id={`${formId}-success`}
-                  role="status"
-                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-900"
-                >
-                  {formSuccess}
-                </p>
-              ) : null}
 
               <button
                 type="submit"
@@ -727,13 +770,24 @@ export function ContactPartnerForm() {
               </button>
 
               <p className="text-center text-[11px] font-semibold text-slate-400">
-                Routed as {partnerToTopic(partnerType).replace(/-/g, " ")} · No
-                spam — SitGuru team only
+                Routed as {partnerToTopic(partnerType).replace(/-/g, " ")} ·
+                Companion:{" "}
+                {companionMode === "public-guru"
+                  ? "Scout"
+                  : companionMode === "public-ambassador"
+                    ? "Taco"
+                    : "Rogue"}{" "}
+                · No spam — SitGuru team only
               </p>
             </form>
+              </>
+            )}
           </section>
         </div>
       </div>
+
+      {/* Dynamic companion — remounts instantly when partnership path changes */}
+      <AIScoutCompanion key={companionMode} mode={companionMode} />
     </div>
   );
 }

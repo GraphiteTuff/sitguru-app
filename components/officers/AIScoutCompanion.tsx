@@ -20,6 +20,8 @@ import { usePathname } from "next/navigation";
 import { useChat } from "ai/react";
 import { useGuruAuth, type GuruAuthUser } from "@/hooks/useGuruAuth";
 import AITacoCompanion from "@/components/officers/AITacoCompanion";
+import FloatingActionStack from "@/components/FloatingActionStack";
+import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
 import {
   COMPANION_DOCK_CLASS,
   COMPANION_FAB_CLASS,
@@ -390,7 +392,7 @@ function WorkspaceScoutCompanionWidget() {
   return <ScoutCompanionShell isPublic={false} user={user} loading={loading} />;
 }
 
-export default function AIScoutCompanion({
+function AIScoutCompanion({
   mode = "auto",
   currentPath,
 }: AIScoutCompanionProps) {
@@ -409,6 +411,17 @@ export default function AIScoutCompanion({
   }, []);
 
   if (!bot.shouldRender || !mounted || !bot.variant) return null;
+
+  // Parent / Investor contact lanes → Rogue (homepage companion).
+  if (bot.variant === "rogue") {
+    return (
+      <div data-bot-variant="rogue" data-companion-mode={mode}>
+        <FloatingActionStack>
+          <HomepageChatBubble />
+        </FloatingActionStack>
+      </div>
+    );
+  }
 
   // `/ambassadors` (+ ambassador workspace) → Taco (own body portal + dock).
   if (bot.variant === "taco") {
@@ -440,3 +453,6 @@ export default function AIScoutCompanion({
     document.body,
   );
 }
+
+export { AIScoutCompanion };
+export default AIScoutCompanion;

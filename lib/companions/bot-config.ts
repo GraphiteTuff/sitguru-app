@@ -9,13 +9,18 @@ import {
   SCOUT_WORKSPACE_ROUTE_PREFIXES,
 } from "@/lib/companions/scout-routes";
 
-export type CompanionBotVariant = "scout" | "taco";
+export type CompanionBotVariant = "scout" | "taco" | "rogue";
 
 export type CompanionBotConfig = {
   shouldRender: boolean;
   variant: CompanionBotVariant | null;
-  /** Scout: public-guru | workspace. Taco: onboarding | workspace. */
-  surface: "public-guru" | "workspace" | "onboarding" | null;
+  /** Scout / Taco / Rogue surface keys. */
+  surface:
+    | "public-guru"
+    | "public-parent"
+    | "workspace"
+    | "onboarding"
+    | null;
 };
 
 const AMBASSADOR_PUBLIC_PREFIXES = ["/ambassadors", "/programs/ambassadors"] as const;
@@ -26,8 +31,10 @@ const AMBASSADOR_WORKSPACE_PREFIXES = [
 
 export type CompanionLayoutMode =
   | "public-guru"
-  | "guru-workspace"
   | "public-ambassador"
+  | "public-parent"
+  | "public-investor"
+  | "guru-workspace"
   | "ambassador-workspace"
   | "onboarding"
   | "workspace"
@@ -56,6 +63,12 @@ export function getBotConfig(options: {
   if (mode === "public-guru") {
     return { shouldRender: true, variant: "scout", surface: "public-guru" };
   }
+  if (mode === "public-ambassador") {
+    return { shouldRender: true, variant: "taco", surface: "onboarding" };
+  }
+  if (mode === "public-parent" || mode === "public-investor") {
+    return { shouldRender: true, variant: "rogue", surface: "public-parent" };
+  }
   if (mode === "guru-workspace" || mode === "workspace") {
     // Path can still override to public Scout when under Become a Guru.
     if (
@@ -66,8 +79,8 @@ export function getBotConfig(options: {
     }
     return { shouldRender: true, variant: "scout", surface: "workspace" };
   }
-  if (mode === "public-ambassador" || mode === "onboarding") {
-    // `onboarding` historically meant public conversion; prefer path when present.
+  if (mode === "onboarding") {
+    // Legacy onboarding: prefer Guru path, else Taco conversion.
     if (
       currentPath === "/become-a-guru" ||
       matchesRoutePrefix(currentPath, SCOUT_PUBLIC_GURU_ROUTE_PREFIXES)
@@ -93,6 +106,9 @@ export function getBotConfig(options: {
   ) {
     return { shouldRender: true, variant: "taco", surface: "onboarding" };
   }
+  if (currentPath === "/contact" || currentPath.startsWith("/contact/")) {
+    return { shouldRender: true, variant: "rogue", surface: "public-parent" };
+  }
   if (matchesRoutePrefix(currentPath, SCOUT_WORKSPACE_ROUTE_PREFIXES)) {
     return { shouldRender: true, variant: "scout", surface: "workspace" };
   }
@@ -103,10 +119,22 @@ export function getBotConfig(options: {
   return { shouldRender: false, variant: null, surface: null };
 }
 
+/** Map contact partnership path → companion layout mode. */
+export function companionModeFromPartnerType(
+  partnerType: "parent" | "guru" | "ambassador" | "investor",
+): CompanionLayoutMode {
+  if (partnerType === "guru") return "public-guru";
+  if (partnerType === "ambassador") return "public-ambassador";
+  if (partnerType === "investor") return "public-investor";
+  return "public-parent";
+}
+
 export function isPublicCompanionPath(pathname: string | null | undefined) {
   const config = getBotConfig({ mode: "auto", currentPath: pathname });
   return (
     config.shouldRender &&
-    (config.surface === "public-guru" || config.surface === "onboarding")
+    (config.surface === "public-guru" ||
+      config.surface === "onboarding" ||
+      config.surface === "public-parent")
   );
 }
