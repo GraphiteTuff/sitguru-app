@@ -14,12 +14,12 @@ import {
   LayoutDashboard,
   LogOut,
   MessageCircle,
-  Repeat2,
   UserCircle,
   UserPlus,
   Wallet,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import RoleSwitchDropdown from "@/components/nav/RoleSwitchDropdown";
 
 type GuruProfileForHeader = {
   display_name?: string | null;
@@ -243,6 +243,20 @@ export default function GuruDashboardHeader({
   });
 
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const guruSwitchOptions = useMemo(
+    () => [
+      {
+        label: "Switch to Pet Parent",
+        href: "/customer/dashboard",
+      },
+      {
+        label: "Switch to Ambassador",
+        href: "/ambassador/dashboard",
+      },
+    ],
+    [],
+  );
 
   useEffect(() => {
     setLoadedProfile((current) => ({
@@ -480,22 +494,10 @@ export default function GuruDashboardHeader({
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <Link
-            href="/customer/dashboard"
-            className="sg-guru-switch-link inline-flex h-11 min-w-[190px] items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold tracking-[-0.01em] shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100"
-            style={{ color: "#065f46" }}
-          >
-            <Repeat2
-              className="h-4 w-4 shrink-0"
-              style={{ color: "#047857" }}
-            />
-            <span
-              className="whitespace-nowrap text-sm font-semibold leading-none"
-              style={{ color: "#065f46" }}
-            >
-              Switch to Pet Parent
-            </span>
-          </Link>
+          <RoleSwitchDropdown
+            label="Switch Dashboard"
+            options={guruSwitchOptions}
+          />
 
           <Link
             href="/guru/success-center"
@@ -588,16 +590,13 @@ export default function GuruDashboardHeader({
                 </div>
 
                 <div className="grid gap-1 bg-white p-3">
-                  <Link
-                    href="/customer/dashboard"
-                    role="menuitem"
-                    onClick={() => setAccountMenuOpen(false)}
-                    className="mb-1 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] transition hover:bg-emerald-100"
-                    style={{ color: "#065f46" }}
-                  >
-                    <Repeat2 className="h-4 w-4" />
-                    Switch to Pet Parent
-                  </Link>
+                  <div className="mb-1">
+                    <RoleSwitchDropdown
+                      label="Switch Dashboard"
+                      options={guruSwitchOptions}
+                      className="w-full"
+                    />
+                  </div>
 
                   {guruAccountMenuLinks.map((item) => (
                     <Link
@@ -651,14 +650,12 @@ export default function GuruDashboardHeader({
 
       <div className="border-t border-slate-100 bg-white lg:hidden">
         <div className="mx-auto flex max-w-[1500px] gap-2 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">
-          <Link
-            href="/customer/dashboard"
-            className="inline-flex shrink-0 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold tracking-[-0.01em] hover:bg-emerald-100"
-            style={{ color: "#065f46" }}
-          >
-            <Repeat2 className="h-4 w-4" />
-            Switch to Pet Parent
-          </Link>
+          <RoleSwitchDropdown
+            compact
+            label="Switch Dashboard"
+            options={guruSwitchOptions}
+            className="shrink-0"
+          />
 
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -741,15 +738,13 @@ export default function GuruDashboardHeader({
               </div>
             </div>
 
-            <Link
-              href="/customer/dashboard"
-              onClick={() => setAccountMenuOpen(false)}
-              className="mb-1 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold tracking-[-0.01em] transition hover:bg-emerald-100"
-              style={{ color: "#065f46" }}
-            >
-              <Repeat2 className="h-4 w-4" />
-              Switch to Pet Parent
-            </Link>
+            <div className="mb-1">
+              <RoleSwitchDropdown
+                label="Switch Dashboard"
+                options={guruSwitchOptions}
+                className="w-full"
+              />
+            </div>
 
             {guruAccountMenuLinks.map((item) => (
               <Link
