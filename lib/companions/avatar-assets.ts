@@ -1,6 +1,8 @@
 /**
  * Canonical AI Pet Companion avatar assets.
- * Keep these aligned with homepage "Meet the Pack" + About pet portraits.
+ * Role map (locked):
+ * - Scout → Guru companion (`/images/scout-avatar.png`)
+ * - Taco  → Ambassador companion (`/images/taco-avatar.png`)
  */
 
 export const SCOUT_AVATAR = {
@@ -16,9 +18,6 @@ export const TACO_AVATAR = {
   alt: "Taco, Ambassador Advocate",
   objectPosition: "center 22%",
 } as const;
-
-/** @deprecated Delilah is not the Ambassador companion — use TACO_AVATAR. */
-export const DELILAH_AVATAR = TACO_AVATAR;
 
 /** Shared floating action-bubble framing for onboarding companions. */
 export const COMPANION_FAB_CLASS =

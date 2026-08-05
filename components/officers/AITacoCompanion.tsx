@@ -1,8 +1,11 @@
 "use client";
 
 /**
- * Floating Taco companion for public Ambassador onboarding conversion.
- * Streams via /api/ai/officer-stream (taco public surface) with Meet-the-Pack Taco avatar.
+ * Floating Taco — Ambassador Advocate companion.
+ * - onboarding: public /ambassadors signup conversion
+ * - workspace: signed-in /ambassador/dashboard surfaces
+ *
+ * Scout remains the Guru companion. Taco is Ambassador-only.
  */
 
 import {
@@ -11,9 +14,12 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useChat } from "ai/react";
+import { supabase } from "@/lib/supabase";
 import {
   COMPANION_DOCK_CLASS,
   COMPANION_FAB_CLASS,
@@ -23,10 +29,23 @@ import {
 const TACO_BRAND = "#0D5C3A";
 const TACO_BRAND_DEEP = "#09462C";
 
-const TACO_GREETING =
+const WORKSPACE_ROUTE_PREFIXES = [
+  "/ambassador/dashboard",
+  "/ambassador/training",
+] as const;
+
+const ONBOARDING_ROUTE_PREFIXES = [
+  "/ambassadors",
+  "/programs/ambassadors",
+] as const;
+
+const ONBOARDING_GREETING =
   "Hey there! Ready to lead your local community? I am Taco, your personal Ambassador Advocate. Sign up today and I will fetch your personalized referral link, show you how to easily claim your $10 to $20 PetPerks rewards, and track your metrics right from your custom workspace dashboard!";
 
-const CONVERSION_CHIPS = [
+const WORKSPACE_GREETING =
+  "Hey! Taco here — your Ambassador Advocate. Let's grow the pack: referrals, link clicks, PetPerks rewards, and your dashboard metrics. Tap a chip or ask me anything!";
+
+const ONBOARDING_CHIPS = [
   {
     id: "join_pack",
     label: "Join the Pack",
@@ -58,6 +77,32 @@ const CONVERSION_CHIPS = [
   },
 ] as const;
 
+const WORKSPACE_CHIPS = [
+  {
+    id: "referrals",
+    label: "My Referrals",
+    prompt:
+      "Summarize my referral activity and what I should focus on to grow the pack this week.",
+  },
+  {
+    id: "petperks_rewards",
+    label: "PetPerks",
+    prompt:
+      "How am I doing on PetPerks rewards, and how do I claim $10 to $20 rewards?",
+  },
+  {
+    id: "link_clicks",
+    label: "Link Clicks",
+    prompt:
+      "Check my referral link performance and give me one tip to get more clicks.",
+  },
+  {
+    id: "what_ambassadors_do",
+    label: "Role refresh",
+    prompt: "What do Ambassadors do?",
+  },
+] as const;
+
 const REWARD_CALLOUTS = [
   "Personalized referral link + QR tools",
   "$10–$20 PetPerks reward opportunities",
@@ -65,14 +110,107 @@ const REWARD_CALLOUTS = [
   "Campus, community & pet-pro lanes",
 ] as const;
 
-export default function AITacoCompanion() {
-  const [isOpen, setIsOpen] = useState(true);
+export type AITacoCompanionProps = {
+  mode?: "workspace" | "onboarding" | "auto";
+};
+
+function matchesPrefix(pathname: string | null, prefixes: readonly string[]) {
+  if (!pathname) return false;
+  return prefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+function asTrimmed(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+export default function AITacoCompanion({
+  mode = "auto",
+}: AITacoCompanionProps) {
+  const pathname = usePathname();
+  const resolvedMode =
+    mode === "auto"
+      ? matchesPrefix(pathname, WORKSPACE_ROUTE_PREFIXES)
+        ? "workspace"
+        : "onboarding"
+      : mode;
+
+  const isOnboarding = resolvedMode === "onboarding";
+  const routeEnabled = isOnboarding
+    ? matchesPrefix(pathname, ONBOARDING_ROUTE_PREFIXES) ||
+      mode === "onboarding"
+    : matchesPrefix(pathname, WORKSPACE_ROUTE_PREFIXES) ||
+      mode === "workspace";
+
+  const [mounted, setMounted] = useState(false);
+  const [isOpen, setIsOpen] = useState(isOnboarding);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [ambassadorName, setAmbassadorName] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isOnboarding) return;
+    let cancelled = false;
+
+    async function loadSession() {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const session = sessionData?.session ?? null;
+        const user = session?.user ?? null;
+        if (!user?.id) return;
+
+        const [{ data: ambassador }, { data: profile }] = await Promise.all([
+          supabase
+            .from("ambassadors")
+            .select("full_name,email")
+            .eq("user_id", user.id)
+            .maybeSingle(),
+          supabase
+            .from("profiles")
+            .select("full_name,email")
+            .eq("id", user.id)
+            .maybeSingle(),
+        ]);
+
+        const name =
+          asTrimmed((ambassador as { full_name?: string } | null)?.full_name) ||
+          asTrimmed((profile as { full_name?: string } | null)?.full_name) ||
+          asTrimmed(user.user_metadata?.full_name) ||
+          asTrimmed(user.email?.split("@")[0]) ||
+          "Ambassador";
+
+        if (!cancelled) {
+          setAccessToken(asTrimmed(session?.access_token));
+          setAmbassadorName(name);
+        }
+      } catch (error) {
+        console.error("Taco session load failed:", error);
+      }
+    }
+
+    void loadSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOnboarding]);
+
+  const greeting = isOnboarding
+    ? ONBOARDING_GREETING
+    : ambassadorName
+      ? `Hey ${ambassadorName.split(/\s+/)[0]}! Taco here — your Ambassador Advocate. Let's grow the pack: referrals, link clicks, PetPerks rewards, and your dashboard metrics.`
+      : WORKSPACE_GREETING;
+  const chips = isOnboarding ? ONBOARDING_CHIPS : WORKSPACE_CHIPS;
+
   const requestBody = {
     officer: "taco" as const,
-    surface: "public" as const,
+    surface: isOnboarding ? ("public" as const) : ("dashboard" as const),
+    ...(!isOnboarding && accessToken ? { accessToken } : {}),
   };
 
   const {
@@ -83,17 +221,28 @@ export default function AITacoCompanion() {
     append,
     isLoading,
     error,
+    setMessages,
   } = useChat({
     api: "/api/ai/officer-stream",
     initialMessages: [
       {
         id: "taco-hello",
         role: "assistant",
-        content: TACO_GREETING,
+        content: greeting,
       },
     ],
     body: requestBody,
   });
+
+  useEffect(() => {
+    setMessages([
+      {
+        id: `taco-hello-${resolvedMode}-${ambassadorName || "guest"}`,
+        role: "assistant",
+        content: greeting,
+      },
+    ]);
+  }, [resolvedMode, ambassadorName, greeting, setMessages]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -110,7 +259,9 @@ export default function AITacoCompanion() {
     return () => window.clearTimeout(t);
   }, [isOpen]);
 
-  async function runChip(chip: (typeof CONVERSION_CHIPS)[number]) {
+  if (!routeEnabled || !mounted) return null;
+
+  async function runChip(chip: (typeof chips)[number]) {
     setIsOpen(true);
     await append(
       { role: "user", content: chip.prompt },
@@ -132,8 +283,12 @@ export default function AITacoCompanion() {
     );
   }
 
-  return (
-    <div className={COMPANION_DOCK_CLASS} data-ai-taco-companion>
+  return createPortal(
+    <div
+      className={COMPANION_DOCK_CLASS}
+      data-ai-taco-companion
+      data-taco-mode={resolvedMode}
+    >
       {isOpen ? (
         <div
           className="absolute bottom-[4.75rem] right-0 flex h-[min(30rem,72dvh)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white text-slate-900 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200"
@@ -167,7 +322,11 @@ export default function AITacoCompanion() {
                   Taco · Ambassador Advocate
                 </h3>
                 <p className="truncate text-[11px] font-semibold text-white/90">
-                  Your growth & rewards guide
+                  {isOnboarding
+                    ? "Your growth & rewards guide"
+                    : ambassadorName
+                      ? `Helping ${ambassadorName.split(/\s+/)[0]} · your pack only`
+                      : "Your growth & rewards guide"}
                 </p>
               </div>
             </div>
@@ -205,24 +364,26 @@ export default function AITacoCompanion() {
               );
             })}
 
-            <div className="rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                Ambassador advantages
-              </p>
-              <ul className="mt-2 space-y-1.5">
-                {REWARD_CALLOUTS.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-2 text-xs font-semibold text-slate-700"
-                  >
-                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-black text-emerald-800">
-                      ✓
-                    </span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {isOnboarding ? (
+              <div className="rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                  Ambassador advantages
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {REWARD_CALLOUTS.map((item) => (
+                    <li
+                      key={item}
+                      className="flex items-start gap-2 text-xs font-semibold text-slate-700"
+                    >
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-black text-emerald-800">
+                        ✓
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             {isLoading ? (
               <p className="text-xs font-semibold text-emerald-700">
@@ -237,14 +398,16 @@ export default function AITacoCompanion() {
           </div>
 
           <div className="shrink-0 border-t border-emerald-50 bg-white px-3 py-2">
-            <Link
-              href="/programs/ambassadors/apply?type=community&source=taco_companion"
-              className="mb-2 flex min-h-10 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C]"
-            >
-              Sign Up & Claim Your Tools
-            </Link>
+            {isOnboarding ? (
+              <Link
+                href="/programs/ambassadors/apply?type=community&source=taco_companion"
+                className="mb-2 flex min-h-10 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C]"
+              >
+                Sign Up & Claim Your Tools
+              </Link>
+            ) : null}
             <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-              {CONVERSION_CHIPS.map((chip) => (
+              {chips.map((chip) => (
                 <button
                   key={chip.id}
                   type="button"
@@ -262,7 +425,11 @@ export default function AITacoCompanion() {
                 value={input}
                 onChange={handleInputChange}
                 rows={1}
-                placeholder="Ask Taco about rewards, referrals…"
+                placeholder={
+                  isOnboarding
+                    ? "Ask Taco about rewards, referrals…"
+                    : "Ask Taco about your pack growth…"
+                }
                 className="min-h-[40px] flex-1 resize-none rounded-xl border border-emerald-100 bg-[#f7fbf8] px-3 py-2 text-sm text-slate-800 outline-none ring-emerald-600/30 placeholder:text-slate-400 focus:ring-2"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
@@ -311,6 +478,7 @@ export default function AITacoCompanion() {
           />
         )}
       </button>
-    </div>
+    </div>,
+    document.body,
   );
 }

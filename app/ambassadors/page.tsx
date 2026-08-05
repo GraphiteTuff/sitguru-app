@@ -640,7 +640,7 @@ export default function AmbassadorsPage() {
           </div>
         </div>
       </section>
-      <AITacoCompanion />
+      <AITacoCompanion mode="onboarding" />
     </main>
   );
 }
