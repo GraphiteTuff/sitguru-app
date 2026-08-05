@@ -22,4 +22,4 @@ export const COMPANION_FAB_CLASS =
   "h-14 w-14 overflow-hidden rounded-full border-2 border-white shadow-xl transition-all hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2";
 
 export const COMPANION_DOCK_CLASS =
-  "fixed bottom-6 right-6 z-50 font-sans";
+  "fixed bottom-6 right-6 z-[9999] font-sans";

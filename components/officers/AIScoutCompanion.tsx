@@ -12,6 +12,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -128,9 +129,14 @@ export default function AIScoutCompanion({
     : matchesPrefix(pathname, WORKSPACE_ROUTE_PREFIXES);
 
   const { user, loading } = useGuruAuth();
+  const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(isOnboarding);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const firstName = user?.firstName || "Guru";
   const greeting = isOnboarding
@@ -213,7 +219,9 @@ export default function AIScoutCompanion({
   }, [isOpen]);
 
   if (!routeEnabled) return null;
-  if (!isOnboarding && (loading || !user)) return null;
+  // Always mount the FAB on enabled Guru routes — never stay hidden while
+  // auth/hydration catches up. Personalization fills in once session resolves.
+  if (!mounted) return null;
 
   async function runChip(chip: (typeof chips)[number]) {
     setIsOpen(true);
@@ -237,11 +245,12 @@ export default function AIScoutCompanion({
     );
   }
 
-  return (
+  return createPortal(
     <div
       className={COMPANION_DOCK_CLASS}
       data-ai-scout-companion
       data-scout-mode={resolvedMode}
+      data-scout-auth={loading ? "loading" : user ? "ready" : "guest"}
       data-guru-id={user?.guruId || user?.id || "guest"}
     >
       {isOpen ? (
@@ -281,7 +290,9 @@ export default function AIScoutCompanion({
                 <p className="truncate text-[11px] font-semibold text-white/90">
                   {isOnboarding
                     ? "Here to get you set up & earning"
-                    : `Helping ${firstName} · your routes only`}
+                    : loading
+                      ? "Connecting to your Guru workspace…"
+                      : `Helping ${firstName} · your routes only`}
                 </p>
               </div>
             </div>
@@ -413,6 +424,7 @@ export default function AIScoutCompanion({
           />
         )}
       </button>
-    </div>
+    </div>,
+    document.body,
   );
 }

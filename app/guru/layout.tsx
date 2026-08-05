@@ -5,8 +5,8 @@ import AIScoutCompanion from "@/components/officers/AIScoutCompanion";
 /**
  * Guru root layout — mounts personalized AI Scout across provider routes
  * (/guru/dashboard, bookings, referrals, messages, profile, availability,
- * earnings, success-center). Scout sits outside the dark text-white wrapper
- * so chat bubbles stay readable.
+ * earnings, success-center). Scout portals to document.body so dashboard
+ * overflow/stacking never hides the FAB.
  */
 export default function GuruLayout({
   children,
@@ -22,7 +22,7 @@ export default function GuruLayout({
           </div>
         </div>
       </div>
-      <AIScoutCompanion />
+      <AIScoutCompanion mode="workspace" />
     </>
   );
 }
