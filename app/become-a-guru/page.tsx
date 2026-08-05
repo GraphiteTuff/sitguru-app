@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
+import { SCOUT_AVATAR } from "@/lib/companions/avatar-assets";
 
 const guruLoginLink = "/login?role=guru&next=/guru/dashboard";
 
@@ -389,12 +390,15 @@ export default async function BecomeAGuruPage({
                 <div className="relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 sm:h-32 sm:w-32">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/images/scout-avatar.png"
-                    alt="Scout, Guru Matching Officer"
+                    src={SCOUT_AVATAR.src}
+                    alt={SCOUT_AVATAR.alt}
                     width={128}
                     height={128}
-                    className="absolute inset-0 h-full w-full object-cover object-[center_22%]"
-                    style={{ backgroundColor: "#fff" }}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    style={{
+                      backgroundColor: "#fff",
+                      objectPosition: SCOUT_AVATAR.objectPosition,
+                    }}
                   />
                 </div>
                 <p className="mt-4 text-xl font-black tracking-tight !text-slate-950">

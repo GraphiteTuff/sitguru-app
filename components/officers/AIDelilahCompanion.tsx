@@ -14,8 +14,12 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useChat } from "ai/react";
+import {
+  COMPANION_DOCK_CLASS,
+  COMPANION_FAB_CLASS,
+  DELILAH_AVATAR,
+} from "@/lib/companions/avatar-assets";
 
-const DELILAH_AVATAR_SRC = "/about/delilah.jpeg";
 const DELILAH_BRAND = "#0D5C3A";
 const DELILAH_BRAND_DEEP = "#09462C";
 
@@ -130,7 +134,7 @@ export default function AIDelilahCompanion() {
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-50 font-sans"
+      className={COMPANION_DOCK_CLASS}
       data-ai-delilah-companion
     >
       {isOpen ? (
@@ -149,12 +153,15 @@ export default function AIDelilahCompanion() {
             <div className="flex min-w-0 items-center gap-3">
               <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 border-white/80 bg-white shadow-sm">
                 <Image
-                  src={DELILAH_AVATAR_SRC}
-                  alt="Delilah AI"
+                  src={DELILAH_AVATAR.src}
+                  alt={DELILAH_AVATAR.alt}
                   width={40}
                   height={40}
-                  className="h-full w-full object-cover object-[center_28%]"
-                  style={{ backgroundColor: "#fff" }}
+                  className="h-full w-full object-cover"
+                  style={{
+                    backgroundColor: "#fff",
+                    objectPosition: DELILAH_AVATAR.objectPosition,
+                  }}
                   priority
                 />
               </span>
@@ -289,18 +296,21 @@ export default function AIDelilahCompanion() {
           isOpen ? "Close Delilah AI Companion" : "Open Delilah AI Companion"
         }
         aria-expanded={isOpen}
-        className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-[#0D5C3A] shadow-xl transition-all hover:scale-105 hover:bg-[#09462C] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+        className={`${COMPANION_FAB_CLASS} flex items-center justify-center bg-[#0D5C3A] hover:bg-[#09462C]`}
       >
         {isOpen ? (
           <span className="text-2xl font-light leading-none text-white">×</span>
         ) : (
           <Image
-            src={DELILAH_AVATAR_SRC}
-            alt="Delilah AI"
+            src={DELILAH_AVATAR.src}
+            alt={DELILAH_AVATAR.alt}
             width={56}
             height={56}
-            className="h-full w-full object-cover object-[center_28%]"
-            style={{ backgroundColor: "#fff" }}
+            className="h-full w-full object-cover"
+            style={{
+              backgroundColor: "#fff",
+              objectPosition: DELILAH_AVATAR.objectPosition,
+            }}
             priority
           />
         )}

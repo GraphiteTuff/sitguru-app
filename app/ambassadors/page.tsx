@@ -20,6 +20,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import AIDelilahCompanion from "@/components/officers/AIDelilahCompanion";
+import { DELILAH_AVATAR } from "@/lib/companions/avatar-assets";
 
 type AmbassadorLane = {
   title: string;
@@ -344,12 +345,15 @@ export default function AmbassadorsPage() {
                 <div className="relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 sm:h-32 sm:w-32">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/about/delilah.jpeg"
-                    alt="Delilah, AI Ambassador Advocate"
+                    src={DELILAH_AVATAR.src}
+                    alt={DELILAH_AVATAR.alt}
                     width={128}
                     height={128}
-                    className="absolute inset-0 h-full w-full object-cover object-[center_28%]"
-                    style={{ backgroundColor: "#fff" }}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    style={{
+                      backgroundColor: "#fff",
+                      objectPosition: DELILAH_AVATAR.objectPosition,
+                    }}
                   />
                 </div>
                 <p className="mt-4 text-xl font-black tracking-tight text-slate-950">

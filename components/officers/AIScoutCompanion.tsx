@@ -17,8 +17,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useChat } from "ai/react";
 import { useGuruAuth } from "@/hooks/useGuruAuth";
+import {
+  COMPANION_DOCK_CLASS,
+  COMPANION_FAB_CLASS,
+  SCOUT_AVATAR,
+} from "@/lib/companions/avatar-assets";
 
-const SCOUT_AVATAR_SRC = "/images/scout-avatar.png";
 const SCOUT_BRAND = "#047857";
 const SCOUT_BRAND_DEEP = "#065f46";
 
@@ -235,9 +239,7 @@ export default function AIScoutCompanion({
 
   return (
     <div
-      className={`fixed right-6 z-50 font-sans ${
-        isOnboarding ? "bottom-24 sm:bottom-6" : "bottom-6"
-      }`}
+      className={COMPANION_DOCK_CLASS}
       data-ai-scout-companion
       data-scout-mode={resolvedMode}
       data-guru-id={user?.guruId || user?.id || "guest"}
@@ -258,12 +260,15 @@ export default function AIScoutCompanion({
             <div className="flex min-w-0 items-center gap-3">
               <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 border-white/80 bg-white shadow-sm">
                 <Image
-                  src={SCOUT_AVATAR_SRC}
-                  alt="Scout AI"
+                  src={SCOUT_AVATAR.src}
+                  alt={SCOUT_AVATAR.alt}
                   width={40}
                   height={40}
-                  className="h-full w-full object-cover object-[center_22%]"
-                  style={{ backgroundColor: "#fff" }}
+                  className="h-full w-full object-cover"
+                  style={{
+                    backgroundColor: "#fff",
+                    objectPosition: SCOUT_AVATAR.objectPosition,
+                  }}
                   priority
                 />
               </span>
@@ -389,18 +394,21 @@ export default function AIScoutCompanion({
           isOpen ? "Close Scout AI Companion" : "Open Scout AI Companion"
         }
         aria-expanded={isOpen}
-        className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-emerald-600 shadow-xl transition-all hover:scale-105 hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+        className={`${COMPANION_FAB_CLASS} flex items-center justify-center bg-emerald-600 hover:bg-emerald-700`}
       >
         {isOpen ? (
           <span className="text-2xl font-light leading-none text-white">×</span>
         ) : (
           <Image
-            src={SCOUT_AVATAR_SRC}
-            alt="Scout AI"
+            src={SCOUT_AVATAR.src}
+            alt={SCOUT_AVATAR.alt}
             width={56}
             height={56}
-            className="h-full w-full object-cover object-[center_22%]"
-            style={{ backgroundColor: "#fff" }}
+            className="h-full w-full object-cover"
+            style={{
+              backgroundColor: "#fff",
+              objectPosition: SCOUT_AVATAR.objectPosition,
+            }}
             priority
           />
         )}
