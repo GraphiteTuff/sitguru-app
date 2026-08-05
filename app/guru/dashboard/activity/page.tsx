@@ -92,7 +92,7 @@ const demoActivity: ActivityItem[] = [
     createdAt: "2026-04-12T09:30:00.000Z",
     priority: "medium",
     actionLabel: "Open Profile",
-    actionHref: "/guru/dashboard/profile",
+    actionHref: "/guru/dashboard/profile/services",
     meta: "Payments",
   },
   {
@@ -104,7 +104,7 @@ const demoActivity: ActivityItem[] = [
     createdAt: "2026-04-11T18:05:00.000Z",
     priority: "medium",
     actionLabel: "Edit Profile",
-    actionHref: "/guru/dashboard/profile",
+    actionHref: "/guru/dashboard/profile/services",
     meta: "Public profile",
   },
   {
@@ -284,7 +284,7 @@ export default function GuruActivityPage() {
           createdAt: new Date().toISOString(),
           priority: typedGuru.avatar_url ? "normal" : "medium",
           actionLabel: "Open Profile",
-          actionHref: "/guru/dashboard/profile",
+          actionHref: "/guru/dashboard/profile/services",
           meta: "Profile status",
         });
 
@@ -309,7 +309,7 @@ export default function GuruActivityPage() {
               ? "normal"
               : "high",
           actionLabel: "Manage Profile",
-          actionHref: "/guru/dashboard/profile",
+          actionHref: "/guru/dashboard/profile/services",
           meta: "Payouts",
         });
 
@@ -761,7 +761,7 @@ export default function GuruActivityPage() {
                 </Link>
 
                 <Link
-                  href="/guru/dashboard/profile"
+                  href="/guru/dashboard/profile/services"
                   className="flex items-center justify-between rounded-3xl border border-white/10 bg-slate-950/60 p-4 transition hover:border-white/20 hover:bg-white/10"
                 >
                   <div className="flex items-center gap-3">

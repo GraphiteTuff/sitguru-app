@@ -94,7 +94,7 @@ const academyType = "guru";
 const guruRoutes = {
   dashboard: "/guru/dashboard",
   university: "/guru/dashboard/university",
-  profile: "/guru/dashboard/profile",
+  profile: "/guru/dashboard/profile/services",
 };
 
 function asString(value: unknown) {

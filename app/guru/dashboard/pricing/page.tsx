@@ -343,7 +343,7 @@ const defaultAvailability: DayAvailability[] = [
 
 const routes = {
   dashboard: "/guru/dashboard",
-  profile: "/guru/dashboard/profile?step=3",
+  profile: "/guru/dashboard/profile/services?step=3",
   bookings: "/guru/dashboard/bookings",
   messages: "/guru/dashboard/messages",
   login: "/guru/login",
@@ -1649,7 +1649,7 @@ export default function GuruDashboardPricingPage() {
               and booking calendar settings.
             </p>
             <Link
-              href="/guru/dashboard/profile"
+              href="/guru/dashboard/profile/services"
               className="mt-4 inline-flex rounded-2xl bg-amber-600 px-5 py-3 text-sm font-black text-white"
             >
               Open Profile Builder

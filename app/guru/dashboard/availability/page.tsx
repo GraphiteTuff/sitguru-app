@@ -1980,7 +1980,7 @@ export default function GuruAvailabilityPage() {
                     icon: BellRing,
                   },
                   {
-                    href: "/guru/dashboard/profile",
+                    href: "/guru/dashboard/profile/services",
                     title: "Profile",
                     description: "Keep trust and public identity strong",
                     icon: UserCircle2,

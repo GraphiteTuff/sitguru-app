@@ -13,6 +13,7 @@ import {
   MessageCircle,
   QrCode,
   Share2,
+  UserRound,
   Users,
   WalletCards,
 } from "lucide-react";
@@ -77,6 +78,13 @@ const navItems: AmbassadorNavItem[] = [
     icon: <MessageCircle size={16} />,
     isActive: (pathname) =>
       pathname.startsWith("/ambassador/dashboard/messages"),
+  },
+  {
+    label: "Profile",
+    href: "/ambassador/dashboard/profile",
+    icon: <UserRound size={16} />,
+    isActive: (pathname) =>
+      pathname.startsWith("/ambassador/dashboard/profile"),
   },
   {
     label: "Rewards",

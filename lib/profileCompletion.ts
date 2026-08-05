@@ -115,7 +115,7 @@ export function calculateSitGuruProfileCompletion(input: ProfileCompletionInput)
   const technicalIssue = !profile ? "auth_only_no_profile" : roles.length === 0 ? "role_missing" : uniqueMissing.includes("Guru profile record") || uniqueMissing.includes("Ambassador profile record") ? "role_profile_missing" : "";
   const completionStatus = uniqueMissing.length === 0 ? "complete" : percentage >= 75 ? "ready_for_review" : percentage <= 10 ? "not_started" : "partially_completed";
   const dashboardUrl = role === "guru" ? "/guru/dashboard" : role === "ambassador" ? "/ambassador/dashboard" : "/customer/dashboard";
-  const completionUrl = role === "guru" ? "/guru/dashboard/profile" : role === "ambassador" ? "/ambassador/dashboard" : "/customer/dashboard";
+  const completionUrl = role === "guru" ? "/guru/dashboard/profile/services" : role === "ambassador" ? "/ambassador/dashboard/profile" : "/customer/dashboard/profile";
   const referral = referralCode || text(ambassador, ["referral_code"]);
 
   return {
