@@ -201,9 +201,29 @@ h3 {
 /* Companion chat headers sit on brand green — force legible white titles */
 [data-ai-scout-companion] h3,
 [data-ai-taco-companion] h3,
+[data-companion-header] h1,
+[data-companion-header] h2,
 [data-companion-header] h3,
 [data-companion-header] .companion-header-title {
   color: #ffffff !important;
+}
+
+/*
+ * SitGuru green / brand panels — global h* slate must never win on green.
+ * Prefer `public-dark-section` and/or `data-brand-green` on those surfaces.
+ */
+[data-brand-green],
+[data-brand-green] h1,
+[data-brand-green] h2,
+[data-brand-green] h3,
+[data-brand-green] h4,
+[data-brand-green] h5,
+[data-brand-green] h6 {
+  color: #ffffff !important;
+}
+
+[data-brand-green] p {
+  color: #ecfdf5 !important;
 }
 
 p {

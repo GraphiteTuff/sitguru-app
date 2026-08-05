@@ -23,6 +23,7 @@ All finished updates commit locally and push straight to production:
 - **Logo on colored headers**: Avoid white bounding boxes — use `mix-blend-multiply` / `mix-blend-mode: multiply` on logo images so pure white reads as transparent.
 - **Avatars**: White fill layer under the image; crop absolute-centered on faces.
 - **Composer focus**: After send/submit, programmatically refocus the chat/composer input immediately.
+- **Never dark text on SitGuru green**: Global `h1–h6` default to slate and will override inherited white. On any `#0D5C3A` / emerald brand surface, add `public-dark-section` and/or `data-brand-green`, plus `!text-white` (or inline `color: #fff`) on headings. Do not ship dark-on-green titles.
 
 ## Env & security (Next.js)
 - Browser/`"use client"`: only `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` via `@/utils/supabase/client` or `@/lib/supabase/client`.

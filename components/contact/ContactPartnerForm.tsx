@@ -364,17 +364,20 @@ export function ContactPartnerForm() {
         <div className="flex flex-col gap-5 sm:gap-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-8">
           <aside
             aria-labelledby={`${formId}-why-title`}
-            className="order-1 overflow-hidden rounded-2xl text-white shadow-xl shadow-emerald-900/15 lg:sticky lg:top-6 lg:order-none lg:col-span-4 lg:self-start"
+            data-brand-green
+            className="public-dark-section order-1 overflow-hidden rounded-2xl text-white shadow-xl shadow-emerald-900/15 lg:sticky lg:top-6 lg:order-none lg:col-span-4 lg:self-start"
             style={{
               backgroundImage: `linear-gradient(155deg, ${BRAND} 0%, ${BRAND_DEEP} 52%, #0f766e 100%)`,
+              color: "#ffffff",
             }}
           >
             <div className="p-5 sm:p-6">
               <h2
                 id={`${formId}-why-title`}
-                className="text-lg font-black tracking-tight sm:text-xl"
+                className="text-lg font-black tracking-tight !text-white sm:text-xl"
+                style={{ color: "#ffffff" }}
               >
-                The SitGuru Platform
+                Why Partner?
               </h2>
               <p className="mt-2 text-sm font-medium leading-relaxed text-emerald-50/95">
                 An interconnected platform supporting unified pet care mechanics
