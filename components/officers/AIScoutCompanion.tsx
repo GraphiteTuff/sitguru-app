@@ -21,6 +21,7 @@ import { useChat } from "ai/react";
 import { useGuruAuth, type GuruAuthUser } from "@/hooks/useGuruAuth";
 import AITacoCompanion from "@/components/officers/AITacoCompanion";
 import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
+import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
 import {
   COMPANION_DOCK_CLASS,
   SCOUT_AVATAR,
@@ -30,9 +31,15 @@ import {
   resolvePublicFormVariant,
   type CompanionLayoutMode,
 } from "@/lib/companions/bot-config";
+import {
+  COMPANION_BENEFITS_CHIP_ID,
+  getCompanionBenefitsChip,
+} from "@/lib/companions/companion-benefits";
 
 const SCOUT_BRAND = "#047857";
 const SCOUT_BRAND_DEEP = "#065f46";
+const ACTIVE_COMPANION = "scout" as const;
+const SCOUT_BENEFITS_CHIP = getCompanionBenefitsChip(ACTIVE_COMPANION);
 
 const WORKSPACE_CHIPS = [
   {
@@ -68,10 +75,9 @@ const PUBLIC_CHIPS = [
     prompt: "Is it free to apply?",
   },
   {
-    id: "background_check",
-    label: "Background Check",
-    prompt:
-      "What should I know about background checks and trust steps before I become bookable?",
+    id: SCOUT_BENEFITS_CHIP.id,
+    label: SCOUT_BENEFITS_CHIP.label,
+    prompt: SCOUT_BENEFITS_CHIP.prompt,
   },
   {
     id: "payments_work",
@@ -103,6 +109,7 @@ type ScoutShellProps = {
 
 function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeCompanion] = useState<typeof ACTIVE_COMPANION>(ACTIVE_COMPANION);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -110,6 +117,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
   const greeting = isPublic
     ? PUBLIC_GREETING
     : buildWorkspaceGreeting(firstName);
+  const benefitsChip = getCompanionBenefitsChip(activeCompanion);
   const chips = isPublic ? PUBLIC_CHIPS : WORKSPACE_CHIPS;
   const tipText = isPublic
     ? "Hi! I'm Scout — tap to chat. I'll guide your Guru setup, checks, and earnings path!"
@@ -185,6 +193,29 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
 
   async function runChip(chip: (typeof chips)[number]) {
     setIsOpen(true);
+
+    if (chip.id === COMPANION_BENEFITS_CHIP_ID) {
+      const stamp = Date.now();
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: `scout-benefits-user-${stamp}`,
+          role: "user",
+          content: chip.prompt,
+        },
+        {
+          id: `scout-benefits-assistant-${stamp}`,
+          role: "assistant",
+          content: benefitsChip.response,
+        },
+      ]);
+      window.setTimeout(
+        () => inputRef.current?.focus({ preventScroll: true }),
+        40,
+      );
+      return;
+    }
+
     await append(
       { role: "user", content: chip.prompt },
       { body: { ...requestBody, preset: chip.id } },
@@ -281,13 +312,17 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                   className={`flex ${isAssistant ? "justify-start" : "justify-end"}`}
                 >
                   <div
-                    className={`max-w-[90%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 leading-relaxed shadow-sm ${
+                    className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 leading-relaxed shadow-sm ${
                       isAssistant
                         ? "border border-emerald-100 bg-white text-slate-700"
-                        : "bg-emerald-700 text-white"
+                        : "whitespace-pre-wrap bg-emerald-700 text-white"
                     }`}
                   >
-                    {message.content}
+                    {isAssistant ? (
+                      <RogueMarkdownText text={message.content} />
+                    ) : (
+                      message.content
+                    )}
                   </div>
                 </div>
               );

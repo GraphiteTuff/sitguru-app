@@ -9,6 +9,9 @@ import OfficerFloatingAssistant, {
   type OfficerSurface,
 } from "@/components/officers/OfficerFloatingAssistant";
 import { SCOUT_OFFICER_PROMPT } from "@/lib/ai/officer-prompts";
+import { getCompanionBenefitsChip } from "@/lib/companions/companion-benefits";
+
+const SCOUT_BENEFITS_CHIP = getCompanionBenefitsChip("scout");
 
 const SCOUT_THEME = {
   /** Provider dashboard mint / emerald palette */
@@ -56,6 +59,12 @@ const SCOUT_PUBLIC_CHIPS = [
     id: "free_to_apply",
     label: "Free to apply?",
     prompt: "Is it free to apply?",
+  },
+  {
+    id: SCOUT_BENEFITS_CHIP.id,
+    label: SCOUT_BENEFITS_CHIP.label,
+    prompt: SCOUT_BENEFITS_CHIP.prompt,
+    localResponse: SCOUT_BENEFITS_CHIP.response,
   },
   {
     id: "payments_work",

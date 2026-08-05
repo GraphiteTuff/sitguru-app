@@ -44,12 +44,18 @@ import {
   type RogueUserTypeLabel,
 } from "@/lib/chat/rogue-user-type";
 import { supabase } from "@/lib/supabase";
+import {
+  COMPANION_BENEFITS_USER_PROMPT,
+  getCompanionBenefitsChip,
+} from "@/lib/companions/companion-benefits";
 
 const BRAND_GREEN = "#0D5C3A";
 const STORAGE_KEY = "sitguru-homepage-lead-chat";
 const NAME_STORAGE_KEY = "sitguru_client_first_name";
 const LEGACY_HISTORY_KEY = "sitguru_chat_history";
 const ROGUE_AVATAR_SRC = "/images/rogue-avatar.png";
+const ACTIVE_COMPANION = "rogue" as const;
+const ROGUE_BENEFITS_CHIP = getCompanionBenefitsChip(ACTIVE_COMPANION);
 
 /** Clean Title Case chip labels for the compact horizontal rail. */
 const CARE_INTENT_CHIPS = [
@@ -68,6 +74,10 @@ const CARE_INTENT_CHIPS = [
   {
     label: "Boarding",
     content: "Looking for Boarding",
+  },
+  {
+    label: ROGUE_BENEFITS_CHIP.label,
+    content: ROGUE_BENEFITS_CHIP.prompt,
   },
 ] as const;
 
@@ -329,10 +339,12 @@ export default function HomepageChatBubble() {
   const [clientFirstName, setClientFirstName] = useState("");
   const [awaitingName, setAwaitingName] = useState(false);
   const [userType, setUserType] = useState<RogueUserTypeLabel>("Guest Pet Parent");
+  const [activeCompanion] = useState<typeof ACTIVE_COMPANION>(ACTIVE_COMPANION);
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const clientFirstNameRef = useRef("");
   const userTypeRef = useRef<RogueUserTypeLabel>("Guest Pet Parent");
+  const benefitsChip = getCompanionBenefitsChip(activeCompanion);
 
   const {
     messages,
@@ -614,6 +626,29 @@ export default function HomepageChatBubble() {
 
   async function sendChip(content: string) {
     if (!content.trim() || isLoading || awaitingName) return;
+
+    if (
+      content === benefitsChip.prompt ||
+      content === COMPANION_BENEFITS_USER_PROMPT.rogue
+    ) {
+      const stamp = Date.now();
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: `rogue-benefits-user-${stamp}`,
+          role: "user",
+          content: benefitsChip.prompt,
+        },
+        {
+          id: `rogue-benefits-assistant-${stamp}`,
+          role: "assistant",
+          content: benefitsChip.response,
+        },
+      ]);
+      focusComposer(40);
+      return;
+    }
+
     const inferred = inferRogueUserTypeFromIntent(content);
     if (inferred) setRogueUserType(inferred);
     await append({ role: "user", content }, chatRequestOptions());

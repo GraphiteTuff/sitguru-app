@@ -35,6 +35,8 @@ export type OfficerQuickChip = {
   id: string;
   label: string;
   prompt: string;
+  /** When set, inject this assistant reply locally (skip the stream API). */
+  localResponse?: string;
 };
 
 export type OfficerSurface = "dashboard" | "public";
@@ -433,6 +435,26 @@ export default function OfficerFloatingAssistant({
   async function runChip(chip: OfficerQuickChip) {
     setPreset(chip.id);
     setOpen(true);
+
+    if (chip.localResponse) {
+      const stamp = Date.now();
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: `${officerId}-chip-user-${stamp}`,
+          role: "user",
+          content: chip.prompt,
+        },
+        {
+          id: `${officerId}-chip-assistant-${stamp}`,
+          role: "assistant",
+          content: chip.localResponse as string,
+        },
+      ]);
+      focusComposer(40);
+      return;
+    }
+
     await append(
       {
         role: "user",

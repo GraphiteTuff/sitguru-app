@@ -23,9 +23,16 @@ import {
   COMPANION_DOCK_CLASS,
   TACO_AVATAR,
 } from "@/lib/companions/avatar-assets";
+import {
+  COMPANION_BENEFITS_CHIP_ID,
+  getCompanionBenefitsChip,
+} from "@/lib/companions/companion-benefits";
+import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
 
 const TACO_BRAND = "#0D5C3A";
 const TACO_BRAND_DEEP = "#09462C";
+const ACTIVE_COMPANION = "taco" as const;
+const TACO_BENEFITS_CHIP = getCompanionBenefitsChip(ACTIVE_COMPANION);
 
 const WORKSPACE_ROUTE_PREFIXES = [
   "/ambassador/dashboard",
@@ -49,6 +56,11 @@ const ONBOARDING_CHIPS = [
     label: "Join the Pack",
     prompt:
       "I want to become a SitGuru Ambassador. What are the first steps to apply and get my referral tools?",
+  },
+  {
+    id: TACO_BENEFITS_CHIP.id,
+    label: TACO_BENEFITS_CHIP.label,
+    prompt: TACO_BENEFITS_CHIP.prompt,
   },
   {
     id: "petperks_rewards",
@@ -81,6 +93,11 @@ const WORKSPACE_CHIPS = [
     label: "My Referrals",
     prompt:
       "Summarize my referral activity and what I should focus on to grow the pack this week.",
+  },
+  {
+    id: TACO_BENEFITS_CHIP.id,
+    label: TACO_BENEFITS_CHIP.label,
+    prompt: TACO_BENEFITS_CHIP.prompt,
   },
   {
     id: "petperks_rewards",
@@ -143,10 +160,12 @@ export default function AITacoCompanion({
 
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [activeCompanion] = useState<typeof ACTIVE_COMPANION>(ACTIVE_COMPANION);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [ambassadorName, setAmbassadorName] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const benefitsChip = getCompanionBenefitsChip(activeCompanion);
 
   useEffect(() => {
     setMounted(true);
@@ -266,6 +285,29 @@ export default function AITacoCompanion({
 
   async function runChip(chip: (typeof chips)[number]) {
     setIsOpen(true);
+
+    if (chip.id === COMPANION_BENEFITS_CHIP_ID) {
+      const stamp = Date.now();
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: `taco-benefits-user-${stamp}`,
+          role: "user",
+          content: chip.prompt,
+        },
+        {
+          id: `taco-benefits-assistant-${stamp}`,
+          role: "assistant",
+          content: benefitsChip.response,
+        },
+      ]);
+      window.setTimeout(
+        () => inputRef.current?.focus({ preventScroll: true }),
+        40,
+      );
+      return;
+    }
+
     await append(
       { role: "user", content: chip.prompt },
       { body: { ...requestBody, preset: chip.id } },
@@ -363,13 +405,17 @@ export default function AITacoCompanion({
                   className={`flex ${isAssistant ? "justify-start" : "justify-end"}`}
                 >
                   <div
-                    className={`max-w-[90%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 leading-relaxed shadow-sm ${
+                    className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 leading-relaxed shadow-sm ${
                       isAssistant
                         ? "border border-emerald-100 bg-white text-slate-700"
-                        : "bg-[#0D5C3A] text-white"
+                        : "whitespace-pre-wrap bg-[#0D5C3A] text-white"
                     }`}
                   >
-                    {message.content}
+                    {isAssistant ? (
+                      <RogueMarkdownText text={message.content} />
+                    ) : (
+                      message.content
+                    )}
                   </div>
                 </div>
               );

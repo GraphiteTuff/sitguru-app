@@ -39,8 +39,16 @@ function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
   return nodes.length > 0 ? nodes : [text];
 }
 
+function isBulletLine(line: string) {
+  return /^\s*[*•-]\s+/.test(line);
+}
+
+function stripBulletPrefix(line: string) {
+  return line.replace(/^\s*[*•-]\s+/, "");
+}
+
 /**
- * Render Rogue copy with bold + paragraph/line-break structure for mobile chat.
+ * Render Rogue / Scout / Taco copy with bold + bullet breaks for chat bubbles.
  */
 export function RogueMarkdownText({
   text,
@@ -63,12 +71,43 @@ export function RogueMarkdownText({
     <div className={`rogue-md space-y-2 ${className}`.trim()}>
       {blocks.map((block, blockIdx) => {
         const lines = block.split("\n");
+        const allBullets =
+          lines.length > 0 && lines.every((line) => isBulletLine(line));
+
+        if (allBullets) {
+          return (
+            <ul
+              key={`block-${blockIdx}`}
+              className="m-0 list-disc space-y-1.5 pl-4 leading-snug"
+            >
+              {lines.map((line, lineIdx) => (
+                <li key={`li-${blockIdx}-${lineIdx}`} className="pl-0.5">
+                  {renderInlineMarkdown(
+                    stripBulletPrefix(line),
+                    `${blockIdx}-${lineIdx}`,
+                  )}
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
         return (
           <p key={`block-${blockIdx}`} className="m-0 leading-snug">
             {lines.map((line, lineIdx) => (
               <span key={`line-${blockIdx}-${lineIdx}`}>
                 {lineIdx > 0 ? <br /> : null}
-                {renderInlineMarkdown(line, `${blockIdx}-${lineIdx}`)}
+                {isBulletLine(line) ? (
+                  <>
+                    <span aria-hidden="true">• </span>
+                    {renderInlineMarkdown(
+                      stripBulletPrefix(line),
+                      `${blockIdx}-${lineIdx}`,
+                    )}
+                  </>
+                ) : (
+                  renderInlineMarkdown(line, `${blockIdx}-${lineIdx}`)
+                )}
               </span>
             ))}
           </p>
