@@ -353,11 +353,20 @@ export function ContactPartnerForm() {
             Contact SitGuru
           </p>
           <h1 className="mt-2 text-balance text-3xl font-black tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
-            Partner with SitGuru
+            How can we help?
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-pretty text-sm font-semibold text-slate-500 sm:text-base md:text-lg">
             Select your track below. The form elements rewrite themselves and
             call your matching AI assistant.
+          </p>
+          <p className="mx-auto mt-3 max-w-xl text-sm font-semibold text-slate-500">
+            Exploring a business or community partnership?{" "}
+            <Link
+              href="/partners"
+              className="font-black text-[#0D5C3A] underline-offset-2 hover:underline"
+            >
+              Partner with SitGuru
+            </Link>
           </p>
         </header>
 

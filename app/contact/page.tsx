@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Contact page — Partner with SitGuru routing form.
+ * Contact page — support / inquiry routing form.
  */
 
 import { ContactPartnerForm } from "@/components/contact/ContactPartnerForm";

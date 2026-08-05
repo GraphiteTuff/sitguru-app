@@ -1091,8 +1091,8 @@ function CompactPartnerSection({
         `}</style>
 
         <Link
-          href="/contact"
-          onClick={() => onTrack("Become a SitGuru Partner", "/contact")}
+          href="/partners"
+          onClick={() => onTrack("Become a SitGuru Partner", "/partners")}
           className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2.5 text-sm font-black text-emerald-700 hover:bg-emerald-50 hover:underline"
         >
           Become a partner →
@@ -2334,9 +2334,9 @@ export default function HomePage() {
               PetPerks
             </Link>
             <Link
-              href="/contact"
+              href="/partners"
               onClick={() =>
-                trackHomepageClick("Contact SitGuru", "/contact")
+                trackHomepageClick("Partner with SitGuru", "/partners")
               }
               className="hover:text-emerald-700 hover:underline"
             >

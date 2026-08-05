@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
@@ -20,6 +21,15 @@ import {
   Trophy,
   UsersRound,
 } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Partner with SitGuru | SitGuru Partner Network",
+  description:
+    "Partner with SitGuru to grow trusted pet care access, community reach, and shared opportunity across local, national, veterinary, retail, school, nonprofit, and affiliate pathways.",
+  alternates: {
+    canonical: "/partners",
+  },
+};
 
 const partnerCategories = [
   {
@@ -142,7 +152,7 @@ const growthChannels = [
     description:
       "For organizations, businesses, schools, nonprofits, pet care professionals, local groups, national brands, and community partners.",
     icon: <Handshake size={22} />,
-    href: "#become-a-partner",
+    href: "/partners/apply",
     cta: "Become a Partner",
   },
   {
@@ -268,7 +278,7 @@ export default function PartnerNetworkPage() {
           <div className="flex flex-col justify-center">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-emerald-800">
               <Sparkles size={15} />
-              SitGuru Partner Network
+              Partner with SitGuru
             </div>
 
             <h1 className="mt-6 text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">
@@ -286,7 +296,7 @@ export default function PartnerNetworkPage() {
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
-                href="#become-a-partner"
+                href="/partners/apply"
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-6 py-4 text-sm font-black text-white shadow-lg shadow-emerald-950/15 transition hover:bg-emerald-900"
               >
                 Become a Partner
@@ -602,18 +612,18 @@ export default function PartnerNetworkPage() {
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
-                  href="/contact"
+                  href="/partners/apply"
                   className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-6 py-4 text-sm font-black text-white shadow-lg shadow-emerald-950/15 transition hover:bg-emerald-900"
                 >
-                  Contact SitGuru
+                  Apply to Partner
                   <ArrowRight size={17} />
                 </Link>
 
                 <Link
-                  href="/affiliate-program"
+                  href="/contact"
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-6 py-4 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
                 >
-                  Affiliate Program
+                  Contact SitGuru
                   <ArrowRight size={17} />
                 </Link>
               </div>
