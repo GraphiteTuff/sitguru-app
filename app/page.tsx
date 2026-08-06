@@ -93,6 +93,7 @@ const featuredHomepageGuruTargets: FeaturedHomepageGuruTarget[] = [
   { label: "Adonai", firstName: "adonai" },
   { label: "Amanda Costello", fullName: "amanda costello" },
   { label: "Anna Fryer", fullName: "anna fryer" },
+  { label: "Bethany Staab", fullName: "bethany staab" },
   { label: "Carol Detweiler", fullName: "carol detweiler" },
   { label: "George Medina", fullName: "george medina" },
   { label: "Jazzy", firstName: "jazzy" },
@@ -101,6 +102,7 @@ const featuredHomepageGuruTargets: FeaturedHomepageGuruTarget[] = [
   { label: "Millisant George", fullName: "millisant george" },
   { label: "Norah Wallace", fullName: "norah wallace" },
   { label: "Olivia Goode", fullName: "olivia goode" },
+  { label: "Ru", firstName: "ru" },
   { label: "Vanessa Guedez", fullName: "vanessa guedez" },
 ];
 
