@@ -5,6 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import {
+  getAvailableDashboardSwitches,
+  resolveAuthorizedRolesFromProfile,
+  toRoleSwitchOptions,
+  type DashboardSwitchRole,
+} from "@/lib/dashboard/role-switch";
 import {
   Bell,
   BookOpen,
@@ -19,7 +26,6 @@ import {
   UserPlus,
   Wallet,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 
 type GuruProfileForHeader = {
   display_name?: string | null;
@@ -30,12 +36,24 @@ type GuruProfileForHeader = {
   profile_photo_url?: string | null;
   avatar_url?: string | null;
   image_url?: string | null;
+  role?: string | null;
+  account_type?: string | null;
+  signup_role?: string | null;
+  account_intent?: string | null;
+  is_pet_parent?: boolean | null;
+  is_customer?: boolean | null;
+  is_guru?: boolean | null;
+  is_guru_interested?: boolean | null;
+  is_ambassador?: boolean | null;
+  authorizedRoles?: unknown;
+  authorized_roles?: unknown;
 };
 
 type LoadedHeaderProfile = {
   name: string;
   email: string;
   photoUrl: string;
+  authorizedRoles: DashboardSwitchRole[];
 };
 
 type ActiveGuruTab =
@@ -240,9 +258,22 @@ export default function GuruDashboardHeader({
     photoUrl: normalizePhotoUrl(
       firstText(imageUrl, getPhotoFromProfile(guruProfile)),
     ),
+    authorizedRoles: ["guru"],
   });
 
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const guruSwitchOptions = useMemo(
+    () =>
+      toRoleSwitchOptions(
+        getAvailableDashboardSwitches({
+          currentRole: "guru",
+          authorizedRoles: loadedProfile.authorizedRoles,
+          includeAdmin: true,
+        }),
+      ),
+    [loadedProfile.authorizedRoles],
+  );
 
   useEffect(() => {
     setLoadedProfile((current) => ({
@@ -254,6 +285,7 @@ export default function GuruDashboardHeader({
       photoUrl:
         normalizePhotoUrl(firstText(imageUrl, getPhotoFromProfile(guruProfile))) ||
         current.photoUrl,
+      authorizedRoles: current.authorizedRoles,
     }));
   }, [displayName, imageUrl, guruProfile]);
 
@@ -303,13 +335,21 @@ export default function GuruDashboardHeader({
         );
       }
 
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select(
-          "display_name,full_name,name,email,photo_url,profile_photo_url,avatar_url,image_url",
-        )
-        .eq("id", user.id)
-        .maybeSingle();
+      const [{ data: profileData }, { data: roleRows }, { data: ambassadorRow }] =
+        await Promise.all([
+          supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .maybeSingle(),
+          supabase.from("user_roles").select("role").eq("user_id", user.id),
+          supabase
+            .from("ambassadors")
+            .select("id")
+            .eq("user_id", user.id)
+            .limit(1)
+            .maybeSingle(),
+        ]);
 
       if (profileData) {
         const profile = profileData as GuruProfileForHeader;
@@ -335,12 +375,33 @@ export default function GuruDashboardHeader({
         );
       }
 
+      const metadataPayload = {
+        ...(user.app_metadata || {}),
+        ...(user.user_metadata || {}),
+      } as Record<string, unknown>;
+
+      const authorizedRoles = resolveAuthorizedRolesFromProfile({
+        profile: (profileData as Record<string, unknown> | null) || null,
+        roleRows: (roleRows || []).map(
+          (row: { role?: string | null }) => row.role,
+        ),
+        metadata: metadataPayload,
+        hasGuruRecord: Boolean(guruData),
+        hasAmbassadorRecord: Boolean(ambassadorRow?.id),
+      });
+
+      // Guru header viewers always retain the guru track in their session mask.
+      const withGuruTrack = authorizedRoles.includes("guru")
+        ? authorizedRoles
+        : (["guru", ...authorizedRoles] as DashboardSwitchRole[]);
+
       if (!mounted) return;
 
       setLoadedProfile({
         name: profileName || profileEmail || "Guru",
         email: profileEmail,
         photoUrl: profilePhoto,
+        authorizedRoles: withGuruTrack,
       });
     }
 
@@ -481,23 +542,6 @@ export default function GuruDashboardHeader({
 
         <div className="hidden items-center gap-3 lg:flex">
           <Link
-            href="/customer/dashboard"
-            className="sg-guru-switch-link inline-flex h-11 min-w-[190px] items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold tracking-[-0.01em] shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100"
-            style={{ color: "#065f46" }}
-          >
-            <Repeat2
-              className="h-4 w-4 shrink-0"
-              style={{ color: "#047857" }}
-            />
-            <span
-              className="whitespace-nowrap text-sm font-semibold leading-none"
-              style={{ color: "#065f46" }}
-            >
-              Switch to Pet Parent
-            </span>
-          </Link>
-
-          <Link
             href="/guru/success-center"
             className="sg-guru-success-link inline-flex h-11 min-w-[205px] items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50"
             style={{ color: "#0f172a" }}
@@ -588,16 +632,25 @@ export default function GuruDashboardHeader({
                 </div>
 
                 <div className="grid gap-1 bg-white p-3">
-                  <Link
-                    href="/customer/dashboard"
-                    role="menuitem"
-                    onClick={() => setAccountMenuOpen(false)}
-                    className="mb-1 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] transition hover:bg-emerald-100"
-                    style={{ color: "#065f46" }}
-                  >
-                    <Repeat2 className="h-4 w-4" />
-                    Switch to Pet Parent
-                  </Link>
+                  {guruSwitchOptions.length ? (
+                    <div className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2">
+                      <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                        Switch Portal
+                      </p>
+                      {guruSwitchOptions.map((option) => (
+                        <Link
+                          key={option.href}
+                          href={option.href}
+                          role="menuitem"
+                          onClick={() => setAccountMenuOpen(false)}
+                          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-semibold tracking-[-0.01em] text-emerald-900 transition hover:bg-white"
+                        >
+                          <Repeat2 className="h-4 w-4" />
+                          {option.label}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
 
                   {guruAccountMenuLinks.map((item) => (
                     <Link
@@ -651,15 +704,6 @@ export default function GuruDashboardHeader({
 
       <div className="border-t border-slate-100 bg-white lg:hidden">
         <div className="mx-auto flex max-w-[1500px] gap-2 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">
-          <Link
-            href="/customer/dashboard"
-            className="inline-flex shrink-0 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold tracking-[-0.01em] hover:bg-emerald-100"
-            style={{ color: "#065f46" }}
-          >
-            <Repeat2 className="h-4 w-4" />
-            Switch to Pet Parent
-          </Link>
-
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -739,17 +783,26 @@ export default function GuruDashboardHeader({
                   ) : null}
                 </div>
               </div>
-            </div>
 
-            <Link
-              href="/customer/dashboard"
-              onClick={() => setAccountMenuOpen(false)}
-              className="mb-1 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold tracking-[-0.01em] transition hover:bg-emerald-100"
-              style={{ color: "#065f46" }}
-            >
-              <Repeat2 className="h-4 w-4" />
-              Switch to Pet Parent
-            </Link>
+              {guruSwitchOptions.length ? (
+                <div className="mt-3 rounded-2xl border border-emerald-100 bg-white/80 p-2">
+                  <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                    Switch Portal
+                  </p>
+                  {guruSwitchOptions.map((option) => (
+                    <Link
+                      key={`mobile-switch-${option.href}`}
+                      href={option.href}
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold tracking-[-0.01em] text-emerald-800 transition hover:bg-emerald-50"
+                    >
+                      <Repeat2 className="h-4 w-4" />
+                      {option.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
 
             {guruAccountMenuLinks.map((item) => (
               <Link

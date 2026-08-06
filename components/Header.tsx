@@ -19,6 +19,14 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
+import {
+  accessFlagsFromAuthorizedRoles,
+  getAvailableDashboardSwitches,
+  resolveAuthorizedRolesFromProfile,
+  resolveDashboardRoleFromPath,
+  toRoleSwitchOptions,
+  type DashboardSwitchRole,
+} from "@/lib/dashboard/role-switch";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 type HeaderMode = "public" | "customer" | "guru" | "ambassador" | "admin";
@@ -29,6 +37,7 @@ type HeaderUser = {
   email?: string | null;
   avatarUrl?: string | null;
   role?: "customer" | "guru" | "ambassador" | "admin" | "both" | string | null;
+  authorizedRoles?: DashboardSwitchRole[];
   hasCustomerAccess?: boolean;
   hasGuruAccess?: boolean;
   hasAmbassadorAccess?: boolean;
@@ -60,6 +69,10 @@ type ProfileRow = {
   is_guru?: boolean | null;
   is_guru_interested?: boolean | null;
   is_ambassador?: boolean | null;
+  authorizedRoles?: unknown;
+  authorized_roles?: unknown;
+  signup_role?: string | null;
+  account_intent?: string | null;
 };
 
 type GuruRow = {
@@ -95,6 +108,7 @@ type RoleSwitchLink = {
   label: string;
   href: string;
   mode: HeaderMode;
+  helper?: string;
 };
 
 const PUBLIC_GURU_SEARCH_HREF = "/search";
@@ -423,54 +437,59 @@ function getAmbassadorStatus(ambassador: AmbassadorRow | null) {
   );
 }
 
+function headerModeToSwitchRole(
+  headerMode: HeaderMode,
+): DashboardSwitchRole | null {
+  if (headerMode === "customer") return "parent";
+  if (headerMode === "guru") return "guru";
+  if (headerMode === "ambassador") return "ambassador";
+  if (headerMode === "admin") return "admin";
+  return null;
+}
+
+function switchRoleToHeaderMode(role: DashboardSwitchRole): HeaderMode {
+  if (role === "parent") return "customer";
+  return role;
+}
+
 function buildRoleSwitchLinks({
   headerMode,
-  hasCustomerAccess,
-  hasGuruAccess,
-  hasAmbassadorAccess,
-  hasAdminAccess,
+  authorizedRoles,
   guruStatus,
 }: {
   headerMode: HeaderMode;
-  hasCustomerAccess: boolean;
-  hasGuruAccess: boolean;
-  hasAmbassadorAccess: boolean;
-  hasAdminAccess: boolean;
+  authorizedRoles: readonly DashboardSwitchRole[];
   guruStatus?: string | null;
 }): RoleSwitchLink[] {
-  const links: RoleSwitchLink[] = [];
-  if (hasCustomerAccess && headerMode !== "customer") {
-    links.push({
-      label: "Switch to Pet Parent",
-      href: "/customer/dashboard",
-      mode: "customer",
-    });
-  }
-  if (hasGuruAccess && headerMode !== "guru") {
+  const currentRole =
+    headerModeToSwitchRole(headerMode) ||
+    resolveDashboardRoleFromPath(null);
+
+  return toRoleSwitchOptions(
+    getAvailableDashboardSwitches({
+      currentRole,
+      authorizedRoles,
+      includeAdmin: true,
+    }),
+  ).map((option) => {
+    const mode = switchRoleToHeaderMode(option.id);
     const status = normalizeRole(guruStatus);
-    links.push({
-      label:
-        status.includes("pending") ||
+    const label =
+      option.id === "guru" &&
+      (status.includes("pending") ||
         status.includes("review") ||
         status.includes("started") ||
-        status.includes("setup")
-          ? "Switch to Guru Setup"
-          : "Switch to Guru",
-      href: "/guru/dashboard",
-      mode: "guru",
-    });
-  }
-  if (hasAmbassadorAccess && headerMode !== "ambassador") {
-    links.push({
-      label: "Switch to Ambassador",
-      href: "/ambassador/dashboard",
-      mode: "ambassador",
-    });
-  }
-  if (hasAdminAccess && headerMode !== "admin") {
-    links.push({ label: "Admin Dashboard", href: "/admin", mode: "admin" });
-  }
-  return links;
+        status.includes("setup"))
+        ? "Switch to Guru Setup"
+        : option.label;
+
+    return {
+      label,
+      href: option.href,
+      mode,
+      helper: option.helper,
+    };
+  });
 }
 
 export default function Header({ user = null }: HeaderProps) {
@@ -575,36 +594,32 @@ export default function Header({ user = null }: HeaderProps) {
               ? activeUser.app_metadata.account_type
               : null;
 
-        const allRoleSignals = [
-          profile?.role,
-          profile?.account_type,
-          metadataRole,
-          metadataAccountType,
-          ...roles,
-        ].filter(Boolean) as string[];
-        const hasAdminAccess = allRoleSignals.some(isAdminRole);
-        const hasGuruAccess =
-          Boolean(guru?.id) ||
-          Boolean(profile?.is_guru) ||
-          Boolean(profile?.is_guru_interested) ||
-          allRoleSignals.some(isGuruRole) ||
-          allRoleSignals.some(isBothRole);
-        const hasAmbassadorAccess =
-          Boolean(ambassador?.id) ||
-          Boolean(profile?.is_ambassador) ||
-          allRoleSignals.some(isAmbassadorRole);
-        const hasCustomerAccess =
-          Boolean(profile?.is_pet_parent) ||
-          Boolean(profile?.is_customer) ||
-          allRoleSignals.some(isCustomerRole) ||
-          allRoleSignals.some(isBothRole) ||
-          (!hasAdminAccess && !hasAmbassadorAccess);
+        const metadataPayload = {
+          ...(activeUser.app_metadata || {}),
+          ...(activeUser.user_metadata || {}),
+          role: metadataRole,
+          account_type: metadataAccountType,
+        } as Record<string, unknown>;
+
+        const authorizedRoles = resolveAuthorizedRolesFromProfile({
+          profile: (profile as Record<string, unknown> | null) || null,
+          roleRows: roles,
+          metadata: metadataPayload,
+          hasGuruRecord: Boolean(guru?.id),
+          hasAmbassadorRecord: Boolean(ambassador?.id),
+        });
+
+        const accessFlags = accessFlagsFromAuthorizedRoles(authorizedRoles);
+        const hasAdminAccess = Boolean(accessFlags.admin);
+        const hasGuruAccess = Boolean(accessFlags.guru);
+        const hasAmbassadorAccess = Boolean(accessFlags.ambassador);
+        const hasCustomerAccess = Boolean(accessFlags.parent);
 
         const rawRole = hasAdminAccess
           ? "admin"
           : hasGuruAccess && hasCustomerAccess
             ? "both"
-            : hasAmbassadorAccess
+            : hasAmbassadorAccess && !hasGuruAccess && !hasCustomerAccess
               ? "ambassador"
               : hasGuruAccess
                 ? "guru"
@@ -616,6 +631,7 @@ export default function Header({ user = null }: HeaderProps) {
           name: getProfileName(profile, activeEmail),
           avatarUrl: getProfileAvatar(profile),
           role: rawRole,
+          authorizedRoles,
           hasCustomerAccess,
           hasGuruAccess,
           hasAmbassadorAccess,
@@ -688,17 +704,11 @@ export default function Header({ user = null }: HeaderProps) {
   const isAmbassador = headerMode === "ambassador";
   const isAdmin = headerMode === "admin";
 
-  const hasCustomerAccess = Boolean(activeUser?.hasCustomerAccess);
-  const hasGuruAccess = Boolean(activeUser?.hasGuruAccess);
-  const hasAmbassadorAccess = Boolean(activeUser?.hasAmbassadorAccess);
-  const hasAdminAccess = Boolean(activeUser?.hasAdminAccess);
+  const authorizedRoles = activeUser?.authorizedRoles || [];
 
   const roleSwitchLinks = buildRoleSwitchLinks({
     headerMode,
-    hasCustomerAccess,
-    hasGuruAccess,
-    hasAmbassadorAccess,
-    hasAdminAccess,
+    authorizedRoles,
     guruStatus: activeUser?.guruStatus,
   });
   const navLinks = useMemo(() => {
@@ -886,38 +896,6 @@ export default function Header({ user = null }: HeaderProps) {
             <div className="h-11 w-48 animate-pulse rounded-full bg-slate-100" />
           ) : isLoggedIn ? (
             <>
-              {roleSwitchLinks.length ? (
-                <details className="group relative hidden xl:block">
-                  <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold tracking-[-0.01em] text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-100 [&::-webkit-details-marker]:hidden">
-                    <Repeat2 className="h-4 w-4" />
-                    Switch Dashboard
-                    <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
-                  </summary>
-
-                  <div className="absolute right-0 top-full z-50 mt-3 w-72 overflow-hidden rounded-3xl border border-slate-200 bg-white p-2 shadow-[0_24px_60px_rgba(15,23,42,0.16)]">
-                    <p className="px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-                      Switch Dashboard
-                    </p>
-
-                    <div className="grid gap-1">
-                      {roleSwitchLinks.map((link) => (
-                        <Link
-                          key={`desktop-switch-${link.href}`}
-                          href={link.href}
-                          className="flex items-center justify-between gap-3 rounded-2xl px-3 py-3 text-sm font-black text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-800"
-                        >
-                          <span className="inline-flex items-center gap-2">
-                            <Repeat2 className="h-4 w-4 text-emerald-700" />
-                            {link.label}
-                          </span>
-                          <ArrowRight className="h-4 w-4 text-slate-400" />
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                </details>
-              ) : null}
-
               {isGuru ? (
                 <Link
                   href={resourcesHref}
@@ -1085,25 +1063,25 @@ export default function Header({ user = null }: HeaderProps) {
                   </div>
                   <NotificationBell />
                 </div>
-              </div>
-            ) : null}
 
-            {roleSwitchLinks.length ? (
-              <div className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2">
-                <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                  Switch Portal
-                </p>
-                {roleSwitchLinks.map((link) => (
-                  <Link
-                    key={`mobile-switch-${link.href}`}
-                    href={link.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold tracking-[-0.01em] text-emerald-800 transition hover:bg-white"
-                  >
-                    <Repeat2 className="h-4 w-4" />
-                    {link.label}
-                  </Link>
-                ))}
+                {roleSwitchLinks.length ? (
+                  <div className="mt-3 rounded-2xl border border-emerald-100 bg-white/80 p-2">
+                    <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                      Switch Portal
+                    </p>
+                    {roleSwitchLinks.map((link) => (
+                      <Link
+                        key={`mobile-switch-${link.href}`}
+                        href={link.href}
+                        onClick={() => setMobileOpen(false)}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold tracking-[-0.01em] text-emerald-800 transition hover:bg-emerald-50"
+                      >
+                        <Repeat2 className="h-4 w-4" />
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
