@@ -2829,8 +2829,23 @@ function AmbassadorRegistryTable({
             <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-600">
               View every Ambassador profile, onboarding status, referral code,
               Pet Parent and Guru referral activity, rewards, messages, and admin
-              controls from one mobile-friendly registry.
+              controls from one mobile-friendly registry. Pet Parents and Gurus
+              stay in their own registries.
             </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                href="/admin/customer-intelligence"
+                className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-3 py-1.5 text-xs font-black text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+              >
+                Pet Parent Registry
+              </Link>
+              <Link
+                href="/admin/gurus"
+                className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-3 py-1.5 text-xs font-black text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+              >
+                Guru Registry
+              </Link>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">

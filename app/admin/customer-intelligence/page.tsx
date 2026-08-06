@@ -241,6 +241,8 @@ const adminRoutes = {
   launchSignups: "/admin/launch-signups",
   referrals: "/admin/referrals",
   partners: "/admin/partners",
+  gurus: "/admin/gurus",
+  ambassadors: "/admin/ambassadors",
 };
 
 const socialPlatforms = [
@@ -694,11 +696,65 @@ function getRole(row: AnyRow) {
   return getText(row, ["role", "user_role", "account_type", "type"]).toLowerCase();
 }
 
-function isCustomerProfile(profile: ProfileRow) {
-  const role = getRole(profile as AnyRow);
+function getProfileEmail(row: AnyRow) {
+  return getText(row, [
+    "email",
+    "profile_email",
+    "auth_email",
+    "customer_email",
+    "pet_parent_email",
+    "owner_email",
+    "login_email",
+    "contact_email",
+  ]).toLowerCase();
+}
 
-  if (!role) return true;
+/** Journey seed / fixture email prefixes used in testFullJourney. */
+function isJourneyParentEmail(email: string) {
+  return email.includes("journey.parent.");
+}
 
+function isJourneyAmbassadorEmail(email: string) {
+  return email.includes("journey.amb.");
+}
+
+function isJourneyGuruEmail(email: string) {
+  return email.includes("journey.guru.");
+}
+
+function roleTokens(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function isAmbassadorRoleValue(role: string) {
+  const normalized = role.toLowerCase().trim();
+  if (!normalized) return false;
+  if (normalized.includes("ambassador")) return true;
+  return ["ambassadors", "student ambassador", "community ambassador"].some(
+    (token) => normalized.includes(token),
+  );
+}
+
+function isGuruRoleValue(role: string) {
+  const normalized = role.toLowerCase().trim();
+  if (!normalized) return false;
+  if (normalized.includes("ambassador")) return false;
+  if (normalized.includes("guru")) return true;
+  return ["provider", "sitter", "walker", "caregiver", "handler"].some(
+    (token) => roleTokens(normalized).includes(token),
+  );
+}
+
+function isPetParentRoleValue(role: string) {
+  const normalized = role.toLowerCase().trim();
+  if (!normalized) return false;
+  // Multi-role "both" is intentionally NOT treated as Pet-Parent-only here;
+  // workspace tables (ambassadors/gurus) decide exclusivity below.
   return [
     "customer",
     "pet_parent",
@@ -706,8 +762,75 @@ function isCustomerProfile(profile: ProfileRow) {
     "pet parent",
     "parent",
     "client",
-    "both",
-  ].includes(role);
+    "pet_owner",
+    "pet owner",
+    "owner",
+  ].includes(normalized);
+}
+
+/**
+ * Pet Parent registry eligibility.
+ * Empty roles are no longer treated as customers — Ambassadors/Gurus with blank
+ * profile roles (e.g. journey.amb.*) were leaking into this list.
+ */
+function isCustomerProfile(
+  profile: ProfileRow,
+  opts?: {
+    ambassadorUserIds?: Set<string>;
+    guruUserIds?: Set<string>;
+    userRoleMap?: Map<string, Set<string>>;
+  },
+) {
+  const email = getProfileEmail(profile as AnyRow);
+  const profileId = String(profile.id || "").trim();
+  const role = getRole(profile as AnyRow);
+  const assignedRoles = opts?.userRoleMap?.get(profileId);
+
+  if (isJourneyAmbassadorEmail(email) || isJourneyGuruEmail(email)) {
+    return false;
+  }
+
+  if (profileId && opts?.ambassadorUserIds?.has(profileId)) {
+    return false;
+  }
+
+  if (profileId && opts?.guruUserIds?.has(profileId)) {
+    return false;
+  }
+
+  if (isAmbassadorRoleValue(role) || isGuruRoleValue(role)) {
+    return false;
+  }
+
+  if (assignedRoles) {
+    for (const assigned of assignedRoles) {
+      if (isAmbassadorRoleValue(assigned) || isGuruRoleValue(assigned)) {
+        return false;
+      }
+    }
+  }
+
+  // Explicit Pet Parent / journey.parent seed accounts always qualify.
+  if (isJourneyParentEmail(email) || isPetParentRoleValue(role)) {
+    return true;
+  }
+
+  // Assigned pet_parent role via user_roles without conflicting ambassador/guru.
+  if (assignedRoles) {
+    for (const assigned of assignedRoles) {
+      if (isPetParentRoleValue(assigned)) return true;
+    }
+  }
+
+  // No role and not in ambassador/guru workspaces → do NOT auto-include.
+  return false;
+}
+
+function looksLikeNonPetParentContact(row: AnyRow) {
+  const email = getProfileEmail(row);
+  if (isJourneyAmbassadorEmail(email) || isJourneyGuruEmail(email)) return true;
+  const role = getRole(row);
+  return isAmbassadorRoleValue(role) || isGuruRoleValue(role);
 }
 
 function getRowBoolean(row: AnyRow, keys: string[]) {
@@ -1262,6 +1385,9 @@ async function getCustomerIntelligenceData() {
     networkClicksResult,
     partnerCampaignsResult,
     registrationHealthResult,
+    ambassadorsResult,
+    gurusResult,
+    userRolesResult,
   ] = await Promise.all([
     safeAdminQuery(
       supabaseAdmin
@@ -1351,6 +1477,24 @@ async function getCustomerIntelligenceData() {
         .limit(1000),
       "admin_pet_parent_registration_health",
     ),
+    safeAdminQuery(
+      supabaseAdmin
+        .from("ambassadors")
+        .select("id, user_id, email, login_email, contact_email, status")
+        .limit(5000),
+      "ambassadors",
+    ),
+    safeAdminQuery(
+      supabaseAdmin
+        .from("gurus")
+        .select("id, user_id, profile_id, email, status")
+        .limit(5000),
+      "gurus",
+    ),
+    safeAdminQuery(
+      supabaseAdmin.from("user_roles").select("user_id, role").limit(5000),
+      "user_roles",
+    ),
   ]);
 
   const rawProfiles = ((profilesResult.data || []) as ProfileRow[]).filter(Boolean);
@@ -1366,6 +1510,43 @@ async function getCustomerIntelligenceData() {
   const rawRegistrationHealth = (
     (registrationHealthResult.data || []) as PetParentRegistrationHealthRow[]
   ).filter(Boolean);
+  const rawAmbassadors = ((ambassadorsResult.data || []) as AnyRow[]).filter(Boolean);
+  const rawGurus = ((gurusResult.data || []) as AnyRow[]).filter(Boolean);
+  const rawUserRoles = ((userRolesResult.data || []) as AnyRow[]).filter(Boolean);
+
+  const userRoleMap = new Map<string, Set<string>>();
+  for (const roleRow of rawUserRoles) {
+    const userId = asString(roleRow.user_id);
+    const role = asString(roleRow.role);
+    if (!userId || !role) continue;
+    const roles = userRoleMap.get(userId) || new Set<string>();
+    roles.add(role);
+    userRoleMap.set(userId, roles);
+  }
+
+  const ambassadorUserIds = new Set<string>();
+  const ambassadorEmails = new Set<string>();
+  for (const row of rawAmbassadors) {
+    for (const key of [row.user_id, row.id]) {
+      const id = asString(key);
+      if (id) ambassadorUserIds.add(id);
+    }
+    for (const key of [row.email, row.login_email, row.contact_email]) {
+      const email = asString(key).toLowerCase();
+      if (email) ambassadorEmails.add(email);
+    }
+  }
+
+  const guruUserIds = new Set<string>();
+  const guruEmails = new Set<string>();
+  for (const row of rawGurus) {
+    for (const key of [row.user_id, row.profile_id, row.id]) {
+      const id = asString(key);
+      if (id) guruUserIds.add(id);
+    }
+    const email = asString(row.email).toLowerCase();
+    if (email) guruEmails.add(email);
+  }
 
   const registrationHealthByProfileId = new Map(
     rawRegistrationHealth
@@ -1394,15 +1575,25 @@ async function getCustomerIntelligenceData() {
       .filter(Boolean),
   );
 
+  const nonPetParentWorkspaceIds = new Set([
+    ...Array.from(ambassadorUserIds),
+    ...Array.from(guruUserIds),
+  ]);
+
   const excludedCustomerIds = new Set([
     ...Array.from(hiddenCustomerIds),
     ...Array.from(separatedCustomerIds),
     ...Array.from(healthExcludedCustomerIds),
+    ...Array.from(nonPetParentWorkspaceIds),
   ]);
 
   const profiles = rawProfiles.filter((profile) => {
     return (
-      isCustomerProfile(profile) &&
+      isCustomerProfile(profile, {
+        ambassadorUserIds,
+        guruUserIds,
+        userRoleMap,
+      }) &&
       !isDemoLikeRow(profile as AnyRow) &&
       !hiddenCustomerIds.has(profile.id) &&
       !separatedCustomerIds.has(profile.id) &&
@@ -1412,6 +1603,7 @@ async function getCustomerIntelligenceData() {
   const bookings = rawBookings.filter(
     (booking) =>
       !isDemoLikeRow(booking as AnyRow) &&
+      !looksLikeNonPetParentContact(booking as AnyRow) &&
       !hasHiddenCustomerReference(booking as AnyRow, excludedCustomerIds),
   );
   const pets = rawPets.filter(
@@ -1529,6 +1721,17 @@ async function getCustomerIntelligenceData() {
 
   for (const booking of bookings) {
     const customerId = getCustomerId(booking);
+    if (customerId && excludedCustomerIds.has(customerId)) continue;
+    if (looksLikeNonPetParentContact(booking as AnyRow)) continue;
+
+    const bookingEmail = getProfileEmail(booking as AnyRow);
+    if (
+      (bookingEmail && ambassadorEmails.has(bookingEmail)) ||
+      (bookingEmail && guruEmails.has(bookingEmail))
+    ) {
+      continue;
+    }
+
     const fallbackId =
       customerId ||
       booking.customer_email ||
@@ -1538,6 +1741,7 @@ async function getCustomerIntelligenceData() {
       booking.id;
 
     if (!fallbackId) continue;
+    if (excludedCustomerIds.has(String(fallbackId))) continue;
 
     const bookingSource = normalizeSource(getSource(booking as AnyRow));
 
@@ -1684,6 +1888,18 @@ async function getCustomerIntelligenceData() {
       ...signupQuality,
       profileCompletion,
     };
+  }).filter((customer) => {
+    const email = String(customer.email || "").trim().toLowerCase();
+    if (email && (ambassadorEmails.has(email) || guruEmails.has(email))) {
+      return false;
+    }
+    if (isJourneyAmbassadorEmail(email) || isJourneyGuruEmail(email)) {
+      return false;
+    }
+    if (customer.id && excludedCustomerIds.has(customer.id)) {
+      return false;
+    }
+    return true;
   });
 
   const sortedCustomers = customers.sort((a, b) => b.totalSpend - a.totalSpend);
@@ -1894,7 +2110,23 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
             View each Pet Parent through their dashboard preview, public profile
             preview, or admin cleanup controls. Dashboard and public profile
             previews are read-only. Admin cleanup controls are updatable.
+            Ambassadors and Gurus are excluded here — use their dedicated
+            registries instead.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={adminRoutes.ambassadors}
+              className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-3 py-1.5 text-xs font-black text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+            >
+              Ambassador Registry
+            </Link>
+            <Link
+              href={adminRoutes.gurus}
+              className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-3 py-1.5 text-xs font-black text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
+            >
+              Guru Registry
+            </Link>
+          </div>
         </div>
 
         <Link
@@ -2019,7 +2251,8 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
         <div className="rounded-[24px] border border-dashed border-green-200 bg-green-50/60 p-6 text-sm font-bold leading-6 text-green-900">
           No visible Pet Parent profiles were found yet. New Google/email/phone
           signups should appear here once their `profiles` row is created with
-          the customer/Pet Parent role.
+          the customer/Pet Parent role. Ambassadors (`journey.amb.*`) and Gurus
+          are listed in their own registries, not here.
         </div>
       )}
     </DashboardCard>
