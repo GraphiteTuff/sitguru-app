@@ -33,6 +33,8 @@ type GuruRow = {
   email?: string | null;
   city?: string | null;
   state?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
   rating_avg?: number | string | null;
   review_count?: number | string | null;
 };
