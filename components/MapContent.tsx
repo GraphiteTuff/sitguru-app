@@ -35,7 +35,7 @@ const MAP_HEIGHT = 420;
 const DEFAULT_CENTER: [number, number] = [39.8283, -98.5795];
 const DEFAULT_ZOOM = 4;
 const SEARCH_ZOOM = 10;
-const HOVER_ZOOM = 10;
+const HOVER_ZOOM = 11.5;
 const DEFAULT_SERVICE_RADIUS_MILES = 25;
 const MAX_SERVICE_RADIUS_MILES = 100;
 const METERS_PER_MILE = 1609.344;
@@ -368,6 +368,26 @@ function getGenericCoordinates(marker: RawMarker) {
   return { latitude, longitude };
 }
 
+function zoomForServiceRadius(radiusMiles: number) {
+  if (radiusMiles <= 5) return 12.5;
+  if (radiusMiles <= 10) return 11.5;
+  if (radiusMiles <= 15) return 11;
+  if (radiusMiles <= 25) return 10;
+  if (radiusMiles <= 40) return 9.25;
+  return 8.5;
+}
+
+function getPreNormalizedCoordinates(marker: RawMarker) {
+  const latitude =
+    asNumber(marker.__sitguruMapLatitude) ??
+    asNumber(marker.__sitguru_map_latitude);
+  const longitude =
+    asNumber(marker.__sitguruMapLongitude) ??
+    asNumber(marker.__sitguru_map_longitude);
+
+  return { latitude, longitude };
+}
+
 function normalizeMarker(marker: RawMarker): NormalizedMarker | null {
   const id = getId(marker);
   const name = getName(marker);
@@ -380,6 +400,7 @@ function normalizeMarker(marker: RawMarker): NormalizedMarker | null {
   const zipCoordinates = zipCode ? KNOWN_ZIP_COORDINATES[zipCode] : undefined;
   const cityCoordinates =
     city && state ? CITY_COORDINATES[cityKey(city, state)] : undefined;
+  const preNormalized = getPreNormalizedCoordinates(marker);
   const serviceCoordinates = getServiceCoordinates(marker);
   const genericCoordinates = getGenericCoordinates(marker);
 
@@ -387,12 +408,12 @@ function normalizeMarker(marker: RawMarker): NormalizedMarker | null {
   let longitude: number | null = null;
   let source: NormalizedMarker["source"] = "coordinates";
 
-  if (zipCoordinates) {
-    [latitude, longitude] = zipCoordinates;
-    source = "zip";
-  } else if (cityCoordinates) {
-    [latitude, longitude] = cityCoordinates;
-    source = "city";
+  // Real profile/service coordinates win over hardcoded ZIP/city tables so
+  // Gurus in VA/NC/etc. are not pinned to Pennsylvania fallback cities.
+  if (isValidMainlandCoordinate(preNormalized.latitude, preNormalized.longitude)) {
+    latitude = preNormalized.latitude;
+    longitude = preNormalized.longitude;
+    source = "service_coordinates";
   } else if (
     isValidMainlandCoordinate(serviceCoordinates.latitude, serviceCoordinates.longitude)
   ) {
@@ -405,6 +426,12 @@ function normalizeMarker(marker: RawMarker): NormalizedMarker | null {
     latitude = genericCoordinates.latitude;
     longitude = genericCoordinates.longitude;
     source = "coordinates";
+  } else if (zipCoordinates) {
+    [latitude, longitude] = zipCoordinates;
+    source = "zip";
+  } else if (cityCoordinates) {
+    [latitude, longitude] = cityCoordinates;
+    source = "city";
   }
 
   if (
@@ -539,6 +566,89 @@ function getViewportSignature(markers: NormalizedMarker[], center?: [number, num
   return `${centerSignature}::${markerSignature}`;
 }
 
+/**
+ * Dynamic viewport updater (Leaflet mapRef equivalent of a react-leaflet MapViewUpdater).
+ * Case A: fly to a focused Guru. Case B: fitBounds around all active markers.
+ */
+function updateMapViewport({
+  map,
+  markers,
+  center,
+  highlightedMarkerPosition,
+  highlightedMarker,
+  animate,
+}: {
+  map: L.Map;
+  markers: NormalizedMarker[];
+  center?: [number, number];
+  highlightedMarkerPosition?: [number, number];
+  highlightedMarker?: NormalizedMarker;
+  animate: boolean;
+}) {
+  // Case A: User has highlighted or focused a specific Guru (e.g., Hazel or Kayla)
+  const hoverTarget = isValidCenter(highlightedMarkerPosition)
+    ? (highlightedMarkerPosition as [number, number])
+    : highlightedMarker
+      ? ([highlightedMarker.latitude, highlightedMarker.longitude] as [
+          number,
+          number,
+        ])
+      : null;
+
+  if (hoverTarget) {
+    const hoverZoom = highlightedMarker
+      ? zoomForServiceRadius(highlightedMarker.serviceRadiusMiles)
+      : HOVER_ZOOM;
+
+    map.stop();
+    map.flyTo(L.latLng(hoverTarget[0], hoverTarget[1]), hoverZoom, {
+      animate: true,
+      duration: 1.5,
+    });
+    return;
+  }
+
+  // Case B: Broadly re-center the map viewport to encompass ALL active Gurus
+  if (markers.length > 0) {
+    const bounds = L.latLngBounds([]);
+    let validPointsFound = false;
+
+    if (isValidCenter(center)) {
+      bounds.extend(center as [number, number]);
+      validPointsFound = true;
+    }
+
+    markers.forEach((marker) => {
+      if (isValidMainlandCoordinate(marker.latitude, marker.longitude)) {
+        bounds.extend([marker.latitude, marker.longitude]);
+        validPointsFound = true;
+      }
+    });
+
+    if (validPointsFound && bounds.isValid()) {
+      if (markers.length === 1 && !isValidCenter(center)) {
+        map.setView(
+          [markers[0].latitude, markers[0].longitude],
+          zoomForServiceRadius(markers[0].serviceRadiusMiles),
+          { animate },
+        );
+        return;
+      }
+
+      // Pad the viewport frame edges slightly so marker pins aren't clipped
+      map.fitBounds(bounds.pad(0.18), {
+        animate,
+        duration: animate ? 1.2 : undefined,
+        maxZoom: 11,
+        padding: [50, 50],
+      });
+      return;
+    }
+  }
+
+  map.setView(DEFAULT_CENTER, DEFAULT_ZOOM, { animate });
+}
+
 function fitMapToMarkers({
   map,
   markers,
@@ -550,38 +660,12 @@ function fitMapToMarkers({
   center?: [number, number];
   animate: boolean;
 }) {
-  const boundsPoints: [number, number][] = [];
-
-  if (isValidCenter(center)) {
-    boundsPoints.push(center as [number, number]);
-  }
-
-  markers.forEach((marker) => {
-    boundsPoints.push([marker.latitude, marker.longitude]);
+  updateMapViewport({
+    map,
+    markers,
+    center,
+    animate,
   });
-
-  if (boundsPoints.length === 0) {
-    map.setView(DEFAULT_CENTER, DEFAULT_ZOOM, { animate });
-    return;
-  }
-
-  if (boundsPoints.length === 1) {
-    map.setView(boundsPoints[0], isValidCenter(center) ? SEARCH_ZOOM : DEFAULT_ZOOM, {
-      animate,
-    });
-    return;
-  }
-
-  const bounds = L.latLngBounds(boundsPoints);
-
-  if (bounds.isValid()) {
-    map.fitBounds(bounds.pad(0.24), {
-      animate,
-      duration: animate ? 0.65 : undefined,
-      maxZoom: isValidCenter(center) ? 11 : 8,
-      padding: [44, 44],
-    });
-  }
 }
 
 export default function MapContent({
@@ -765,27 +849,77 @@ export default function MapContent({
 
     if (!map) return;
 
+    const highlightedMarker = highlightedMarkerId
+      ? normalizedMarkers.find((marker) => marker.id === highlightedMarkerId)
+      : undefined;
+
     const hoverIsActive =
       Boolean(highlightedMarkerId) ||
       isValidCenter(highlightedMarkerPosition);
 
-    // Never let a routine marker/search refit cancel an active card-hover zoom.
-    // The latest marker bounds will be applied when the pointer leaves the card.
-    if (hoverIsActive) return;
+    // Case A: focused Guru — flyTo with radius-aware zoom
+    if (hoverIsActive) {
+      const hoverTarget = isValidCenter(highlightedMarkerPosition)
+        ? (highlightedMarkerPosition as [number, number])
+        : highlightedMarker
+          ? ([highlightedMarker.latitude, highlightedMarker.longitude] as [
+              number,
+              number,
+            ])
+          : null;
 
-    if (lastViewportSignatureRef.current === viewportSignature) return;
+      if (!hoverTarget) return;
 
+      const hoverTargetSignature = [
+        highlightedMarkerId || "coordinate-only",
+        hoverTarget[0].toFixed(6),
+        hoverTarget[1].toFixed(6),
+      ].join(":");
+
+      if (lastHoverTargetSignatureRef.current === hoverTargetSignature) {
+        return;
+      }
+
+      lastHoverTargetSignatureRef.current = hoverTargetSignature;
+
+      const timer = window.setTimeout(() => {
+        map.invalidateSize({ animate: false });
+        updateMapViewport({
+          map,
+          markers: normalizedMarkers,
+          center,
+          highlightedMarkerPosition: hoverTarget,
+          highlightedMarker,
+          animate: true,
+        });
+      }, 0);
+
+      return () => window.clearTimeout(timer);
+    }
+
+    // Case B: no focus — fit all active Gurus (skip duplicate signature work)
+    const hadHover = Boolean(lastHoverTargetSignatureRef.current);
+
+    if (
+      lastViewportSignatureRef.current === viewportSignature &&
+      !hadHover
+    ) {
+      return;
+    }
+
+    lastHoverTargetSignatureRef.current = "";
     lastViewportSignatureRef.current = viewportSignature;
 
     const timer = window.setTimeout(() => {
       map.invalidateSize({ animate: false });
-      fitMapToMarkers({
+      if (hadHover) map.stop();
+      updateMapViewport({
         map,
         markers: normalizedMarkers,
         center,
         animate: true,
       });
-    }, 150);
+    }, hadHover ? 120 : 150);
 
     return () => window.clearTimeout(timer);
   }, [
@@ -794,83 +928,6 @@ export default function MapContent({
     highlightedMarkerPosition,
     normalizedMarkers,
     viewportSignature,
-  ]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-
-    if (!map) return;
-
-    const highlightedMarker = highlightedMarkerId
-      ? normalizedMarkers.find(
-          (marker) => marker.id === highlightedMarkerId,
-        )
-      : undefined;
-
-    // Coordinates sent directly from the hovered card are the source of truth.
-    // Marker ID matching remains a fallback for visual highlighting and older rows.
-    const hoverTarget = isValidCenter(highlightedMarkerPosition)
-      ? (highlightedMarkerPosition as [number, number])
-      : highlightedMarker
-        ? [highlightedMarker.latitude, highlightedMarker.longitude] as [
-            number,
-            number,
-          ]
-        : null;
-
-    if (hoverTarget) {
-      const hoverTargetSignature = [
-        highlightedMarkerId || "coordinate-only",
-        hoverTarget[0].toFixed(6),
-        hoverTarget[1].toFixed(6),
-      ].join(":");
-
-      if (
-        lastHoverTargetSignatureRef.current === hoverTargetSignature
-      ) {
-        return;
-      }
-
-      lastHoverTargetSignatureRef.current = hoverTargetSignature;
-
-      const timer = window.setTimeout(() => {
-        map.invalidateSize({ animate: false });
-        map.stop();
-        map.flyTo(
-          L.latLng(hoverTarget[0], hoverTarget[1]),
-          HOVER_ZOOM,
-          {
-            animate: true,
-            duration: 0.55,
-          },
-        );
-      }, 0);
-
-      return () => window.clearTimeout(timer);
-    }
-
-    // Do not refit on initial render. Refit only after an actual hover ends.
-    if (!lastHoverTargetSignatureRef.current) return;
-
-    lastHoverTargetSignatureRef.current = "";
-
-    const timer = window.setTimeout(() => {
-      map.invalidateSize({ animate: false });
-      map.stop();
-      fitMapToMarkers({
-        map,
-        markers: normalizedMarkers,
-        center,
-        animate: true,
-      });
-    }, 120);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    center,
-    highlightedMarkerId,
-    highlightedMarkerPosition,
-    normalizedMarkers,
   ]);
 
   return (

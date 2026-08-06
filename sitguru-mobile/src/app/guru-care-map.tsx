@@ -144,14 +144,14 @@ const WEB_MAP_STYLE_DARK = {
 } as const;
 
 const DEFAULT_SERVICE_COORDINATE: MapCoordinate = {
-  latitude: 40.4418,
-  longitude: -75.3416,
+  latitude: 39.8283,
+  longitude: -98.5795,
 };
 
 const DEFAULT_MAP_REGION: MapRegion = {
   ...DEFAULT_SERVICE_COORDINATE,
-  latitudeDelta: 0.55,
-  longitudeDelta: 0.66,
+  latitudeDelta: 28,
+  longitudeDelta: 48,
 };
 
 const CITY_COORDS: Record<string, MapCoordinate> = {
