@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import {
+  getGuruProfilePhotoUrl,
+  hasGuruProfilePhoto,
+} from "@/lib/gurus/profile-photo";
 import { supabase } from "@/lib/supabase";
 
 type CarouselItem = {
@@ -88,13 +92,7 @@ function getGuruName(guru: GuruRow) {
 }
 
 function getGuruImage(guru: GuruRow) {
-  return (
-    guru.profile_photo_url ||
-    guru.photo_url ||
-    guru.avatar_url ||
-    guru.image_url ||
-    "/images/demo/avery-johnson.png"
-  );
+  return getGuruProfilePhotoUrl(guru) || "/images/demo/avery-johnson.png";
 }
 
 function getGuruHref(guru: GuruRow) {
@@ -125,7 +123,11 @@ function getPrimaryPetType(guru: GuruRow) {
 }
 
 function isPublicCarouselGuru(guru: GuruRow) {
-  return guru.is_active !== false && guru.is_public !== false;
+  return (
+    guru.is_active !== false &&
+    guru.is_public !== false &&
+    hasGuruProfilePhoto(guru)
+  );
 }
 
 function mapGuruToCarouselItem(guru: GuruRow): CarouselItem {

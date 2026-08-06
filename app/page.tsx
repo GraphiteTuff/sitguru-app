@@ -6,6 +6,10 @@ import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGr
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { PawIcon } from "@/components/ui/PawIcon";
 import { trackEvent } from "@/lib/analytics/track";
+import {
+  getGuruProfilePhotoUrl,
+  hasGuruProfilePhoto,
+} from "@/lib/gurus/profile-photo";
 import { supabase } from "@/lib/supabase";
 
 const heroVideoPaths = [
@@ -390,25 +394,7 @@ function orderHomepageGurus(gurus: Guru[]) {
 }
 
 function getGuruPhotoUrl(guru: Guru) {
-  const possiblePhoto =
-    guru.profile_photo_url ||
-    guru.photo_url ||
-    guru.avatar_url ||
-    guru.image_url ||
-    "";
-
-  const photoUrl = String(possiblePhoto || "").trim();
-  if (!photoUrl) return defaultGuruAvatarPath;
-
-  const lowerPhotoUrl = photoUrl.toLowerCase();
-  if (
-    lowerPhotoUrl.includes("sitguru-logo") ||
-    lowerPhotoUrl.includes("sitguru-admin-avatar")
-  ) {
-    return defaultGuruAvatarPath;
-  }
-
-  return photoUrl;
+  return getGuruProfilePhotoUrl(guru) || defaultGuruAvatarPath;
 }
 
 function getGuruHref(guru: Guru) {
@@ -1742,7 +1728,10 @@ export default function HomePage() {
       }
 
       const liveGuruRows = ((data || []) as Guru[]).filter(
-        (guru) => guru.is_active !== false && guru.is_public !== false,
+        (guru) =>
+          guru.is_active !== false &&
+          guru.is_public !== false &&
+          hasGuruProfilePhoto(guru),
       );
       const orderedGuruRows = orderHomepageGurus(liveGuruRows);
       const missingFeaturedGuruNames = featuredHomepageGuruTargets
