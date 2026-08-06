@@ -154,7 +154,7 @@ const SERVICE_OPTIONS = [
   "Custom Care",
 ];
 
-const DEFAULT_MAP_CENTER: [number, number] = [39.9526, -75.1652];
+const DEFAULT_MAP_CENTER: [number, number] = [39.8283, -98.5795];
 
 const PERMANENTLY_BLOCKED_GURU_IDS = new Set([
   "5d132f82-6899-42cf-9690-446a25320fc6",
@@ -1353,6 +1353,8 @@ function getSearchMapCenter({
   stateFilter: string;
   zipLookup: ZipLookupResult | null;
 }): [number, number] {
+  // Prefer the user's searched ZIP geocode so the map follows search context,
+  // not a hardcoded Pennsylvania default.
   if (
     typeof zipLookup?.latitude === "number" &&
     typeof zipLookup?.longitude === "number" &&
@@ -1387,6 +1389,7 @@ function getSearchMapCenter({
     if (fallback) return fallback;
   }
 
+  // National fallback when no search location or guru coordinates are available.
   return DEFAULT_MAP_CENTER;
 }
 

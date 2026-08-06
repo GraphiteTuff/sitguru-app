@@ -253,18 +253,7 @@ function getMarkerRadiusMiles(marker: MapMarker) {
 }
 
 function getPreferredMarkerCoordinates(marker: MapMarker): [number, number] | null {
-  const zipCode = getMarkerZipCode(marker);
-  const zipCoordinates = zipCode ? KNOWN_ZIP_COORDINATES[zipCode] : undefined;
-
-  if (zipCoordinates) return zipCoordinates;
-
-  const city = getMarkerCity(marker);
-  const state = getMarkerState(marker);
-  const cityCoordinates =
-    city && state ? CITY_COORDINATES[cityKey(city, state)] : undefined;
-
-  if (cityCoordinates) return cityCoordinates;
-
+  // 1. Check explicit coordinates FIRST
   const latitude = getMarkerLatitude(marker);
   const longitude = getMarkerLongitude(marker);
 
@@ -275,6 +264,19 @@ function getPreferredMarkerCoordinates(marker: MapMarker): [number, number] | nu
   ) {
     return [latitude, longitude];
   }
+
+  // 2. Fall back to hardcoded ZIP codes if explicit database coords are null
+  const zipCode = getMarkerZipCode(marker);
+  const zipCoordinates = zipCode ? KNOWN_ZIP_COORDINATES[zipCode] : undefined;
+  if (zipCoordinates) return zipCoordinates;
+
+  // 3. Fall back to hardcoded Cities
+  const city = getMarkerCity(marker);
+  const state = getMarkerState(marker);
+  const cityCoordinates =
+    city && state ? CITY_COORDINATES[cityKey(city, state)] : undefined;
+
+  if (cityCoordinates) return cityCoordinates;
 
   return null;
 }
