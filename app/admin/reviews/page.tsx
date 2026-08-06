@@ -141,8 +141,8 @@ function getGuruName(guru?: GuruRow | null) {
 
 function getGuruLocation(guru?: GuruRow | null) {
   if (!guru) return "Location not listed";
-  const city = String(guru.city || "").trim();
-  const state = String(guru.state || "").trim();
+  const city = String(guru.service_city || guru.city || "").trim();
+  const state = String(guru.service_state || guru.state || "").trim();
   if (city && state) return `${city}, ${state}`;
   if (city) return city;
   if (state) return state;

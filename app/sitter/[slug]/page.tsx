@@ -13,6 +13,8 @@ type Guru = {
   bio?: string | null;
   city?: string | null;
   state?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
   hourly_rate?: number | null;
   experience_years?: number | null;
   is_verified?: boolean | null;
@@ -36,7 +38,7 @@ async function getGuru(slug: string) {
   const { data, error } = await supabase
     .from("gurus")
     .select(
-      "id, slug, display_name, bio, city, state, hourly_rate, experience_years, is_verified, rating_avg, review_count"
+      "id, slug, display_name, bio, city, state, service_city, service_state, hourly_rate, experience_years, is_verified, rating_avg, review_count"
     )
     .or(`slug.eq.${slug},id.eq.${slug}`)
     .maybeSingle();
@@ -59,7 +61,10 @@ export default async function Page({ params }: PageProps) {
   }
 
   const displayName = guru.display_name || "Trusted Guru";
-  const location = formatLocation(guru.city, guru.state);
+  const location = formatLocation(
+    guru.service_city || guru.city,
+    guru.service_state || guru.state,
+  );
   const price = formatPrice(guru.hourly_rate);
 
   const guruBookingSlug = guru.slug?.trim() || String(guru.id);

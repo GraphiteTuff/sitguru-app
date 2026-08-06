@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import GuruRecordsTable from "./GuruRecordsTable";
 import { validateGuruProfileForBookability } from "@/lib/guruProfileValidation";
+import { resolveLocationParts } from "@/lib/location/zip-lookup";
 import {
   CANONICAL_ROLE,
   PET_PARENT_DISPLAY_LABEL,
@@ -473,7 +474,7 @@ function getGuruServices(guru: GuruRow, profile?: ProfileRow) {
   );
 }
 
-function getGuruLocation(guru: GuruRow, profile?: ProfileRow) {
+async function getGuruLocation(guru: GuruRow, profile?: ProfileRow) {
   const city =
     asTrimmedString(guru.service_city) ||
     asTrimmedString(guru.city) ||
@@ -490,8 +491,25 @@ function getGuruLocation(guru: GuruRow, profile?: ProfileRow) {
     asTrimmedString(profile?.service_zip) ||
     asTrimmedString(profile?.zip_code);
 
-  const cityState = [city, state].filter(Boolean).join(", ");
-  return [cityState, zip].filter(Boolean).join(" ") || "Location not listed";
+  if (city && state) {
+    const cityState = [city, state].filter(Boolean).join(", ");
+    return [cityState, zip].filter(Boolean).join(" ") || "Location not listed";
+  }
+
+  if (zip) {
+    const resolved = await resolveLocationParts({
+      city,
+      state,
+      zip,
+      serviceCity: asTrimmedString(guru.service_city) || asTrimmedString(profile?.service_city),
+      serviceState:
+        asTrimmedString(guru.service_state) ||
+        asTrimmedString(profile?.service_state),
+    });
+    return resolved.label || zip;
+  }
+
+  return "Location not listed";
 }
 
 function getGuruExperience(guru: GuruRow, profile?: ProfileRow) {
@@ -591,7 +609,16 @@ function getSetupStep({
   const hasPhoto = Boolean(getGuruAvatarUrl(guru, profile));
   const hasBio = Boolean(asTrimmedString(guru.bio) || asTrimmedString(profile?.bio));
   const hasServices = getGuruServices(guru, profile) !== "Services not added";
-  const hasLocation = getGuruLocation(guru, profile) !== "Location not listed";
+  const hasLocation = Boolean(
+    asTrimmedString(guru.service_city) ||
+      asTrimmedString(guru.city) ||
+      asTrimmedString(profile?.service_city) ||
+      asTrimmedString(profile?.city) ||
+      asTrimmedString(guru.service_zip) ||
+      asTrimmedString(guru.zip_code) ||
+      asTrimmedString(profile?.service_zip) ||
+      asTrimmedString(profile?.zip_code),
+  );
   const hasRate = Boolean(
     toNumber(guru.hourly_rate) ||
       toNumber(guru.rate) ||
@@ -1088,7 +1115,8 @@ async function getGuruManagementData(searchParams: SearchParams) {
     }
   }
 
-  const canonicalRows: GuruDisplayRow[] = activeGurus.map((guru) => {
+  const canonicalRows: GuruDisplayRow[] = await Promise.all(
+    activeGurus.map(async (guru) => {
     const profile = findProfileForGuru(guru, profileMap);
     const id = getGuruId(guru);
     const userId = getGuruUserId(guru, profile);
@@ -1204,7 +1232,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       avatarUrl: getGuruAvatarUrl(guru, profile, authUser),
       slug,
       services: getGuruServices(guru, profile),
-      location: getGuruLocation(guru, profile),
+      location: await getGuruLocation(guru, profile),
       experience: getGuruExperience(guru, profile),
       applicationStatus,
       statusLabel: getApplicationStatusLabel(applicationStatus),
@@ -1242,7 +1270,8 @@ async function getGuruManagementData(searchParams: SearchParams) {
       possibleDuplicate: duplicate,
       readyForReview,
     };
-  });
+    }),
+  );
 
   const repairUserIds = new Set<string>();
 
@@ -1284,7 +1313,8 @@ async function getGuruManagementData(searchParams: SearchParams) {
     repairUserIds.delete(retiredUserId);
   }
 
-  const repairRows: GuruDisplayRow[] = Array.from(repairUserIds).map((userId) => {
+  const repairRows: GuruDisplayRow[] = await Promise.all(
+    Array.from(repairUserIds).map(async (userId) => {
     const profile = profileMap.get(userId);
     const authUser = authMap.get(userId);
     const pseudoGuru: GuruRow = {
@@ -1321,7 +1351,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       avatarUrl: getGuruAvatarUrl(pseudoGuru, profile, authUser),
       slug: slugify(name),
       services: "Guru workspace missing",
-      location: getGuruLocation(pseudoGuru, profile),
+      location: await getGuruLocation(pseudoGuru, profile),
       experience: "Not listed",
       applicationStatus: "needs_info",
       statusLabel: "Account Repair Needed",
@@ -1355,7 +1385,8 @@ async function getGuruManagementData(searchParams: SearchParams) {
       possibleDuplicate: false,
       readyForReview: false,
     };
-  });
+    }),
+  );
 
   const allRows = [...canonicalRows, ...repairRows];
   const operationalRows = allRows.filter((row) =>

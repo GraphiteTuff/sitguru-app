@@ -1,18 +1,22 @@
 "use client";
 
 /**
- * Guru referral dashboard — conversion-first cards, share strip, pipeline columns.
+ * Guru referral dashboard — share toolkit, reward stats, and referral pipeline.
  */
 
 import Link from "next/link";
 import {
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   Clock3,
+  Gift,
   Loader2,
+  Sparkles,
+  UsersRound,
   Wallet,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import GuruLinkShareCard from "@/components/guru/GuruLinkShareCard";
 import { supabase } from "@/lib/supabase";
 
@@ -71,6 +75,8 @@ type ProgramSettingsRow = {
 
 type PipelineColumn = "invited" | "verifying" | "paid";
 
+const BRAND = "#0D5C3A";
+
 function asText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -93,6 +99,7 @@ function currency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
+    maximumFractionDigits: value % 1 === 0 ? 0 : 2,
   }).format(value);
 }
 
@@ -180,6 +187,10 @@ function getStatusLabel(status?: string | null) {
   return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function getFirstName(name: string) {
+  return name.trim().split(/\s+/)[0] || "Guru";
+}
+
 function referralDisplayName(referral: ReferralRow) {
   return (
     firstText(referral.referred_name, referral.referred_email) || "Referred Guru"
@@ -190,27 +201,41 @@ function ReferralFeedCard({ referral }: { referral: ReferralRow }) {
   const column = getPipelineColumn(referral);
   const tone =
     column === "paid"
-      ? "border-emerald-200 bg-emerald-50"
+      ? "border-emerald-200 bg-emerald-50/80"
       : column === "verifying"
-        ? "border-amber-200 bg-amber-50"
+        ? "border-amber-200 bg-amber-50/80"
         : "border-slate-200 bg-white";
+  const badge =
+    column === "paid"
+      ? "bg-emerald-600 text-white"
+      : column === "verifying"
+        ? "bg-amber-500 text-white"
+        : "bg-slate-800 text-white";
 
   return (
-    <article className={`rounded-2xl border p-4 shadow-sm ${tone}`}>
+    <article
+      className={`rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${tone}`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-black text-slate-950">
-            {referralDisplayName(referral)}
-          </p>
-          <p className="mt-1 text-xs font-semibold text-slate-500">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-sm font-black text-slate-950">
+              {referralDisplayName(referral)}
+            </p>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${badge}`}
+            >
+              {column === "paid"
+                ? "Paid"
+                : column === "verifying"
+                  ? "In review"
+                  : "Invited"}
+            </span>
+          </div>
+          <p className="mt-1.5 text-xs font-semibold text-slate-500">
             {getStatusLabel(referral.status)} ·{" "}
             {safeDateLabel(referral.updated_at || referral.created_at)}
           </p>
-          {referral.referred_user_id ? (
-            <p className="mt-1 truncate font-mono text-[10px] font-bold text-slate-400">
-              uid {referral.referred_user_id}
-            </p>
-          ) : null}
         </div>
         <p className="shrink-0 text-sm font-black tabular-nums text-slate-900">
           {currency(
@@ -224,30 +249,52 @@ function ReferralFeedCard({ referral }: { referral: ReferralRow }) {
 
 function PipelineColumnPanel({
   title,
+  helper,
   count,
+  icon,
   tone,
+  emptyTitle,
+  emptyBody,
   items,
 }: {
   title: string;
+  helper: string;
   count: number;
+  icon: ReactNode;
   tone: string;
+  emptyTitle: string;
+  emptyBody: string;
   items: ReferralRow[];
 }) {
   return (
-    <section className={`rounded-[1.5rem] border bg-white p-4 shadow-sm ${tone}`}>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">
-          {title}
-        </h3>
+    <section
+      className={`flex min-h-[280px] flex-col rounded-[1.75rem] border bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.06)] ${tone}`}
+    >
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-50 text-slate-700 ring-1 ring-slate-200">
+            {icon}
+          </span>
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-700">
+              {title}
+            </h3>
+            <p className="mt-1 text-xs font-semibold text-slate-500">{helper}</p>
+          </div>
+        </div>
         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black tabular-nums text-slate-800">
           {count}
         </span>
       </div>
-      <div className="space-y-2">
+
+      <div className="flex-1 space-y-2">
         {items.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-xs font-bold text-slate-400">
-            Empty
-          </p>
+          <div className="flex h-full min-h-[140px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center">
+            <p className="text-sm font-black text-slate-700">{emptyTitle}</p>
+            <p className="mt-1 max-w-[220px] text-xs font-semibold leading-5 text-slate-500">
+              {emptyBody}
+            </p>
+          </div>
         ) : (
           items.map((referral) => (
             <ReferralFeedCard key={referral.id} referral={referral} />
@@ -258,10 +305,42 @@ function PipelineColumnPanel({
   );
 }
 
+function StatCard({
+  label,
+  value,
+  helper,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  helper: string;
+  icon: ReactNode;
+  tone: string;
+}) {
+  return (
+    <article
+      className={`rounded-[1.75rem] border p-5 shadow-[0_14px_36px_rgba(15,23,42,0.06)] ${tone}`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-700">
+          {label}
+        </p>
+        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/80 ring-1 ring-black/5">
+          {icon}
+        </span>
+      </div>
+      <p className="mt-4 text-4xl font-black tracking-tight tabular-nums text-slate-950">
+        {value}
+      </p>
+      <p className="mt-1.5 text-xs font-semibold text-slate-600">{helper}</p>
+    </article>
+  );
+}
+
 export default function GuruDashboardReferralsPage() {
   const [loading, setLoading] = useState(true);
   const [guruName, setGuruName] = useState("Guru");
-  const [guruId, setGuruId] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState("");
   const [referralUrl, setReferralUrl] = useState("");
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
@@ -321,7 +400,6 @@ export default function GuruDashboardReferralsPage() {
         if (!mounted) return;
 
         setGuruName(resolvedName);
-        setGuruId(guru?.id != null ? String(guru.id) : null);
         setReferralCode(generatedCode);
         setReferralUrl(generatedReferralUrl);
 
@@ -423,7 +501,10 @@ export default function GuruDashboardReferralsPage() {
 
   const activeReferralUrl = useMemo(() => {
     const fromCampaign = firstText(campaigns[0]?.referral_url);
-    if (fromCampaign.includes("become-a-guru") || fromCampaign.includes("signup")) {
+    if (
+      fromCampaign.includes("become-a-guru") ||
+      fromCampaign.includes("signup")
+    ) {
       return fromCampaign;
     }
     if (referralCode) {
@@ -437,11 +518,12 @@ export default function GuruDashboardReferralsPage() {
   }, [campaigns, referralCode, referralUrl]);
 
   const activeCode = firstText(campaigns[0]?.referral_code, referralCode);
+  const firstName = getFirstName(guruName);
+  const rewardLabel = `Earn ${currency(baseReward)} when a Guru you refer completes ${requiredBookings} bookings.`;
 
-  const pendingApprovalCount = referrals.filter((referral) => {
-    const column = getPipelineColumn(referral);
-    return column === "verifying";
-  }).length;
+  const pendingApprovalCount = referrals.filter(
+    (referral) => getPipelineColumn(referral) === "verifying",
+  ).length;
 
   const approvedGurusCount = referrals.filter((referral) =>
     isQualifiedStatus(referral.status),
@@ -485,32 +567,85 @@ export default function GuruDashboardReferralsPage() {
     (referral) => getPipelineColumn(referral) === "paid",
   );
 
+  const howItWorks = [
+    {
+      step: "1",
+      title: "Share your link",
+      body: "Send your tracking link to friends who would make great SitGuru Gurus.",
+    },
+    {
+      step: "2",
+      title: "They join & get approved",
+      body: "Track invite progress as they apply, get approved, and start caring for pets.",
+    },
+    {
+      step: "3",
+      title: "Earn your reward",
+      body: `When they complete ${requiredBookings} bookings, you earn ${currency(baseReward)} via Stripe payouts.`,
+    },
+  ];
+
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_45%,#ecfdf5_100%)] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+        <section className="overflow-hidden rounded-[2rem] border border-white bg-[radial-gradient(circle_at_18%_15%,rgba(255,255,255,0.42)_0%,transparent_28%),linear-gradient(105deg,#03d39c_0%,#72dec5_45%,#b9e3ff_100%)] shadow-[0_24px_52px_rgba(15,23,42,0.12)]">
+          <div className="p-6 sm:p-8 lg:p-10">
             <Link
               href="/guru/dashboard"
-              className="inline-flex items-center gap-2 text-sm font-bold text-emerald-800 hover:text-emerald-950"
+              className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1.5 text-sm font-bold text-emerald-900 shadow-sm transition hover:bg-white"
             >
               <ArrowLeft className="h-4 w-4" />
               Dashboard
             </Link>
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-              Guru Referrals
-            </h1>
-            <p className="mt-1 text-sm font-semibold text-slate-600">
-              {guruName} · Earn {currency(baseReward)} after {requiredBookings}{" "}
-              completed bookings
-            </p>
+
+            <div className="mt-5 grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#07132f]/80">
+                  Guru Growth Studio
+                </p>
+                <h1 className="mt-2 text-4xl font-black tracking-[-0.045em] text-[#07132f] sm:text-5xl">
+                  Referrals, {firstName}
+                </h1>
+                <p className="mt-3 max-w-2xl text-base font-semibold leading-7 text-slate-800/90 sm:text-lg">
+                  Invite trusted pet caregivers to SitGuru. Share your link,
+                  track progress, and earn {currency(baseReward)} after{" "}
+                  {requiredBookings} completed bookings.
+                </p>
+
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <a
+                    href="#referral-share"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#07132f] px-5 text-sm font-black text-white shadow-[0_12px_28px_rgba(7,19,47,0.18)] transition hover:bg-[#0b1436]"
+                  >
+                    Copy my link
+                    <ArrowRight className="h-4 w-4" />
+                  </a>
+                  <Link
+                    href="/guru/dashboard/earnings"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/85 px-5 text-sm font-black text-[#07132f] shadow-sm transition hover:bg-white"
+                  >
+                    View earnings
+                  </Link>
+                </div>
+              </div>
+
+              <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur">
+                <div className="flex items-center gap-2 text-[#0D5C3A]">
+                  <Sparkles className="h-4 w-4" />
+                  <p className="text-xs font-black uppercase tracking-[0.16em]">
+                    Current reward
+                  </p>
+                </div>
+                <p className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+                  {currency(baseReward)}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  after {requiredBookings} completed bookings from your referral
+                </p>
+              </div>
+            </div>
           </div>
-          {guruId ? (
-            <p className="rounded-full border border-slate-200 bg-white px-3 py-1.5 font-mono text-[10px] font-bold text-slate-500">
-              guru_id {guruId}
-            </p>
-          ) : null}
-        </header>
+        </section>
 
         {pageNotice ? (
           <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900">
@@ -525,76 +660,93 @@ export default function GuruDashboardReferralsPage() {
         ) : null}
 
         {loading ? (
-          <section className="rounded-[1.75rem] border border-slate-200 bg-white p-10 text-center shadow-sm">
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-12 text-center shadow-sm">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-600" />
             <p className="mt-3 text-sm font-black text-slate-800">
-              Loading referrals…
+              Loading your referral studio…
             </p>
           </section>
         ) : (
           <>
-            <GuruLinkShareCard
-              referralCode={activeCode}
-              referralUrl={activeReferralUrl}
-              guruName={guruName}
-            />
+            <div id="referral-share">
+              <GuruLinkShareCard
+                referralCode={activeCode}
+                referralUrl={activeReferralUrl}
+                guruName={guruName}
+                rewardLabel={rewardLabel}
+              />
+            </div>
 
-            <section className="grid gap-3 sm:grid-cols-3">
-              <article className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4 shadow-sm">
-                <div className="flex items-center gap-2 text-amber-800">
-                  <Clock3 className="h-4 w-4" />
-                  <p className="text-[11px] font-black uppercase tracking-[0.14em]">
-                    ⏳ Pending Approval
-                  </p>
-                </div>
-                <p className="mt-3 text-3xl font-black tabular-nums text-slate-950">
-                  {pendingApprovalCount}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-amber-900/80">
-                  {currency(pendingRewardAmount)} awaiting payout review
-                </p>
-              </article>
-
-              <article className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-                <div className="flex items-center gap-2 text-emerald-800">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <p className="text-[11px] font-black uppercase tracking-[0.14em]">
-                    ✅ Approved Gurus
-                  </p>
-                </div>
-                <p className="mt-3 text-3xl font-black tabular-nums text-slate-950">
-                  {approvedGurusCount}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-emerald-900/80">
-                  Qualified / reward-ready referrals
-                </p>
-              </article>
-
-              <article className="rounded-[1.5rem] border border-sky-200 bg-sky-50 p-4 shadow-sm">
-                <div className="flex items-center gap-2 text-sky-800">
-                  <Wallet className="h-4 w-4" />
-                  <p className="text-[11px] font-black uppercase tracking-[0.14em]">
-                    💰 Total Cash Payouts
-                  </p>
-                </div>
-                <p className="mt-3 text-3xl font-black tabular-nums text-slate-950">
-                  {currency(paidRewardAmount)}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-sky-900/80">
-                  Stripe-linked paid rewards
-                </p>
-              </article>
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.06)] sm:p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <Gift className="h-4 w-4" style={{ color: BRAND }} />
+                <h2 className="text-sm font-black uppercase tracking-[0.16em] text-slate-700">
+                  How referrals work
+                </h2>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                {howItWorks.map((item) => (
+                  <article
+                    key={item.step}
+                    className="rounded-2xl border border-emerald-100 bg-[linear-gradient(180deg,#f7fffb_0%,#ffffff_100%)] p-4"
+                  >
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#0D5C3A] text-sm font-black text-white">
+                      {item.step}
+                    </span>
+                    <h3 className="mt-3 text-base font-black text-slate-950">
+                      {item.title}
+                    </h3>
+                    <p className="mt-1.5 text-sm font-semibold leading-6 text-slate-600">
+                      {item.body}
+                    </p>
+                  </article>
+                ))}
+              </div>
             </section>
 
-            {/* Mobile: single-column vertical feed */}
-            <section className="space-y-2 md:hidden">
-              <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-600">
-                Tracking feed
-              </h2>
+            <section className="grid gap-3 sm:grid-cols-3">
+              <StatCard
+                label="Pending approval"
+                value={String(pendingApprovalCount)}
+                helper={`${currency(pendingRewardAmount)} awaiting payout review`}
+                icon={<Clock3 className="h-4 w-4 text-amber-700" />}
+                tone="border-amber-200 bg-amber-50"
+              />
+              <StatCard
+                label="Approved Gurus"
+                value={String(approvedGurusCount)}
+                helper="Qualified / reward-ready referrals"
+                icon={<CheckCircle2 className="h-4 w-4 text-emerald-700" />}
+                tone="border-emerald-200 bg-emerald-50"
+              />
+              <StatCard
+                label="Total cash payouts"
+                value={currency(paidRewardAmount)}
+                helper="Stripe-linked paid rewards"
+                icon={<Wallet className="h-4 w-4 text-sky-700" />}
+                tone="border-sky-200 bg-sky-50"
+              />
+            </section>
+
+            <section className="space-y-3 md:hidden">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-600">
+                  Tracking feed
+                </h2>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black tabular-nums text-slate-700">
+                  {referrals.length}
+                </span>
+              </div>
               {referrals.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm font-bold text-slate-400">
-                  Share your link to start tracking referrals.
-                </p>
+                <div className="rounded-[1.75rem] border border-dashed border-emerald-200 bg-white px-5 py-10 text-center shadow-sm">
+                  <UsersRound className="mx-auto h-8 w-8 text-emerald-600" />
+                  <p className="mt-3 text-base font-black text-slate-900">
+                    No referrals yet
+                  </p>
+                  <p className="mx-auto mt-1 max-w-sm text-sm font-semibold text-slate-500">
+                    Share your tracking link to start filling this feed.
+                  </p>
+                </div>
               ) : (
                 referrals.map((referral) => (
                   <ReferralFeedCard key={referral.id} referral={referral} />
@@ -602,24 +754,35 @@ export default function GuruDashboardReferralsPage() {
               )}
             </section>
 
-            {/* Desktop / large tablet: 3-column workspace */}
             <section className="hidden gap-4 md:grid md:grid-cols-1 lg:grid-cols-3">
               <PipelineColumnPanel
                 title="Invited"
+                helper="Signed up with your link"
                 count={invited.length}
+                icon={<UsersRound className="h-4 w-4" />}
                 tone="border-slate-200"
+                emptyTitle="No invites yet"
+                emptyBody="Share your link to start tracking new Guru signups."
                 items={invited}
               />
               <PipelineColumnPanel
-                title="Verifying"
+                title="In review"
+                helper="Approved / qualifying"
                 count={verifying.length}
+                icon={<Clock3 className="h-4 w-4" />}
                 tone="border-amber-100"
+                emptyTitle="Nothing in review"
+                emptyBody="Referrals appear here while they complete setup and bookings."
                 items={verifying}
               />
               <PipelineColumnPanel
-                title="Paid"
+                title="Paid out"
+                helper="Reward completed"
                 count={paid.length}
+                icon={<Wallet className="h-4 w-4" />}
                 tone="border-emerald-100"
+                emptyTitle="No payouts yet"
+                emptyBody="Paid referral rewards will show here once Stripe payouts clear."
                 items={paid}
               />
             </section>

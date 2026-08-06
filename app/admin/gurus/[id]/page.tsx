@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { enrichAndPersistLocationFromZip } from "@/lib/location/enrich-from-zip";
+import { formatCityState, resolveLocationParts } from "@/lib/location/zip-lookup";
 
 export const dynamic = "force-dynamic";
 
@@ -408,7 +410,7 @@ function getGuruPhone(guru: GuruRow, profile?: ProfileRow | null) {
   );
 }
 
-function getGuruLocation(guru: GuruRow, profile?: ProfileRow | null) {
+async function getGuruLocation(guru: GuruRow, profile?: ProfileRow | null) {
   const city =
     asTrimmedString(guru.city) ||
     asTrimmedString(guru.service_city) ||
@@ -437,14 +439,28 @@ function getGuruLocation(guru: GuruRow, profile?: ProfileRow | null) {
     asTrimmedString(guru.service_area) ||
     asTrimmedString(profile?.service_area);
 
-  const cityState = [city, state].filter(Boolean).join(", ");
-
-  if (cityState && zipCode) {
-    return `${cityState} ${zipCode}`;
+  if (city && state) {
+    return formatCityState(city, state, zipCode) || "Location not listed";
   }
 
-  if (cityState) return cityState;
-  if (zipCode) return zipCode;
+  if (zipCode) {
+    const resolved = await resolveLocationParts({
+      city,
+      state,
+      zip: zipCode,
+      serviceCity: asTrimmedString(guru.service_city) || asTrimmedString(profile?.service_city),
+      serviceState:
+        asTrimmedString(guru.service_state) ||
+        asTrimmedString(profile?.service_state),
+    });
+
+    if (resolved.city && resolved.state) {
+      return resolved.label;
+    }
+
+    return zipCode;
+  }
+
   if (serviceArea) return serviceArea;
 
   return "Location not listed";
@@ -1694,7 +1710,23 @@ export default async function AdminGuruDetailPage({
   const name = getGuruName(guru, profile);
   const email = getGuruEmail(guru, profile);
   const phone = getGuruPhone(guru, profile);
-  const location = getGuruLocation(guru, profile);
+
+  // Fill missing city/state from ZIP and persist for the rest of SitGuru.
+  const enrichedLocation = await enrichAndPersistLocationFromZip({
+    guruId,
+    profileId: userId || asTrimmedString(profile?.id) || null,
+    guru: guru as Record<string, string | null>,
+    profile: (profile || null) as Record<string, string | null> | null,
+  });
+
+  const location =
+    enrichedLocation.city && enrichedLocation.state
+      ? formatCityState(
+          enrichedLocation.city,
+          enrichedLocation.state,
+          enrichedLocation.zip,
+        )
+      : await getGuruLocation(guru, profile);
   const services = getGuruServices(guru, profile);
   const experience = getGuruExperience(guru);
   const status = normalizeApplicationStatus(guru);

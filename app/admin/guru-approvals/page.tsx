@@ -8,6 +8,7 @@ import {
   isTrustSafetyScreeningBypassed,
   TRUST_SAFETY_SCREENING_BYPASS,
 } from "@/lib/config/trust-safety";
+import { resolveLocationParts } from "@/lib/location/zip-lookup";
 
 export const dynamic = "force-dynamic";
 
@@ -201,7 +202,7 @@ function getGuruEmail(guru: GuruRow, profile?: ProfileRow) {
   return asTrimmedString(guru.email) || asTrimmedString(profile?.email) || "";
 }
 
-function getGuruLocation(guru: GuruRow, profile?: ProfileRow) {
+async function getGuruLocation(guru: GuruRow, profile?: ProfileRow) {
   const city =
     asTrimmedString(guru.city) ||
     asTrimmedString(profile?.city) ||
@@ -212,7 +213,33 @@ function getGuruLocation(guru: GuruRow, profile?: ProfileRow) {
     asTrimmedString(profile?.state) ||
     asTrimmedString(guru.service_state);
 
-  return [city, state].filter(Boolean).join(", ") || "Location not listed";
+  const zip =
+    asTrimmedString(guru.zip_code) ||
+    asTrimmedString(guru.service_zip) ||
+    asTrimmedString(guru.service_zip_code) ||
+    asTrimmedString(profile?.zip_code) ||
+    asTrimmedString(profile?.service_zip);
+
+  if (city && state) {
+    return [city, state].filter(Boolean).join(", ");
+  }
+
+  if (zip) {
+    const resolved = await resolveLocationParts({
+      city,
+      state,
+      zip,
+      serviceCity: asTrimmedString(guru.service_city) || asTrimmedString(profile?.service_city),
+      serviceState:
+        asTrimmedString(guru.service_state) ||
+        asTrimmedString(profile?.service_state),
+    });
+    if (resolved.city && resolved.state) {
+      return `${resolved.city}, ${resolved.state}`;
+    }
+  }
+
+  return "Location not listed";
 }
 
 function getGuruServices(guru: GuruRow) {
@@ -955,41 +982,43 @@ async function getGuruApprovalData() {
     },
   );
 
-  const applications: GuruApplicationRow[] = gurus.map((guru) => {
-    const id = getGuruId(guru);
-    const profile = profileMap.get(getGuruProfileKey(guru));
-    const check = backgroundCheckMap.get(id);
-    const status = getGuruApprovalStatus(guru);
-    const backgroundCheckStatus = getBackgroundCheckStatus(guru, check);
+  const applications: GuruApplicationRow[] = await Promise.all(
+    gurus.map(async (guru) => {
+      const id = getGuruId(guru);
+      const profile = profileMap.get(getGuruProfileKey(guru));
+      const check = backgroundCheckMap.get(id);
+      const status = getGuruApprovalStatus(guru);
+      const backgroundCheckStatus = getBackgroundCheckStatus(guru, check);
 
-    return {
-      id: id || "guru",
-      name: getGuruName(guru, profile),
-      specialty: getGuruServices(guru),
-      location: getGuruLocation(guru, profile),
-      experience: getGuruExperience(guru),
-      status,
-      joined: formatDateShort(asTrimmedString(guru.created_at)),
-      href: adminGuruReviewHref(id),
-      backgroundCheckStatus,
-      backgroundCheckLabel: getBackgroundCheckLabel(backgroundCheckStatus),
-      checkrCandidateId:
-        asTrimmedString(guru.checkr_candidate_id) ||
-        asTrimmedString(check?.checkr_candidate_id),
-      checkrInvitationId:
-        asTrimmedString(guru.checkr_invitation_id) ||
-        asTrimmedString(check?.checkr_invitation_id),
-      checkrReportId:
-        asTrimmedString(guru.checkr_report_id) ||
-        asTrimmedString(check?.checkr_report_id),
-      checkrInvitationUrl:
-        asTrimmedString(guru.checkr_invitation_url) ||
-        asTrimmedString(check?.invitation_url),
-      checkrLastWebhookAt:
-        asTrimmedString(guru.checkr_last_webhook_at) ||
-        asTrimmedString(check?.last_webhook_at),
-    };
-  });
+      return {
+        id: id || "guru",
+        name: getGuruName(guru, profile),
+        specialty: getGuruServices(guru),
+        location: await getGuruLocation(guru, profile),
+        experience: getGuruExperience(guru),
+        status,
+        joined: formatDateShort(asTrimmedString(guru.created_at)),
+        href: adminGuruReviewHref(id),
+        backgroundCheckStatus,
+        backgroundCheckLabel: getBackgroundCheckLabel(backgroundCheckStatus),
+        checkrCandidateId:
+          asTrimmedString(guru.checkr_candidate_id) ||
+          asTrimmedString(check?.checkr_candidate_id),
+        checkrInvitationId:
+          asTrimmedString(guru.checkr_invitation_id) ||
+          asTrimmedString(check?.checkr_invitation_id),
+        checkrReportId:
+          asTrimmedString(guru.checkr_report_id) ||
+          asTrimmedString(check?.checkr_report_id),
+        checkrInvitationUrl:
+          asTrimmedString(guru.checkr_invitation_url) ||
+          asTrimmedString(check?.invitation_url),
+        checkrLastWebhookAt:
+          asTrimmedString(guru.checkr_last_webhook_at) ||
+          asTrimmedString(check?.last_webhook_at),
+      };
+    }),
+  );
 
   const step1Started = gurus.filter((guru) => {
     const profile = profileMap.get(getGuruProfileKey(guru));

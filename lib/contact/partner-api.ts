@@ -4,7 +4,11 @@
  */
 
 export type PartnershipPartnerType =
-  "parent" | "guru" | "ambassador" | "investor";
+  | "parent"
+  | "guru"
+  | "ambassador"
+  | "partner"
+  | "investor";
 
 export type PartnershipPayload = {
   partnerType: PartnershipPartnerType;
@@ -14,6 +18,7 @@ export type PartnershipPayload = {
   message: string;
   ambassadorCode?: string;
   organization?: string;
+  partnerCategory?: string;
   programInterest?: string;
   urgentMedia?: boolean;
   source?: string;
@@ -29,6 +34,7 @@ function partnerToTopic(partnerType: PartnershipPartnerType) {
   if (partnerType === "parent") return "pet-parent";
   if (partnerType === "guru") return "guru";
   if (partnerType === "ambassador") return "ambassadors";
+  if (partnerType === "partner") return "partners";
   return "investors";
 }
 
@@ -39,7 +45,8 @@ function buildMessage(payload: PartnershipPayload) {
     // Always surface org for partners-landing / investor / community tracks.
     if (
       payload.partnerType !== "investor" &&
-      payload.partnerType !== "ambassador"
+      payload.partnerType !== "ambassador" &&
+      payload.partnerType !== "partner"
     ) {
       parts.push(`Organization: ${payload.organization.trim()}`);
     }
@@ -57,6 +64,15 @@ function buildMessage(payload: PartnershipPayload) {
     if (payload.organization?.trim()) {
       parts.push(`Organization/School: ${payload.organization.trim()}`);
     }
+  }
+  if (payload.partnerType === "partner") {
+    if (payload.partnerCategory?.trim()) {
+      parts.push(`Partner type: ${payload.partnerCategory.trim()}`);
+    }
+    if (payload.organization?.trim()) {
+      parts.push(`Organization: ${payload.organization.trim()}`);
+    }
+    parts.push("Inquiry type: Partnership Request");
   }
   if (payload.partnerType === "investor") {
     if (payload.organization?.trim()) {
@@ -76,7 +92,7 @@ export async function submitPartnershipInquiry(
 ): Promise<PartnershipSubmitResult> {
   const topic = partnerToTopic(payload.partnerType);
   const displayName =
-    payload.partnerType === "investor"
+    payload.partnerType === "investor" || payload.partnerType === "partner"
       ? payload.organization?.trim() || payload.fullName.trim()
       : payload.fullName.trim();
 
@@ -91,7 +107,9 @@ export async function submitPartnershipInquiry(
       programInterest:
         payload.partnerType === "ambassador"
           ? payload.programInterest || ""
-          : "",
+          : payload.partnerType === "partner"
+            ? payload.partnerCategory || "Partnership Request"
+            : "",
       message: buildMessage(payload),
       source: payload.source || "contact-page",
       pagePath:

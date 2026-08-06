@@ -216,6 +216,10 @@ type Guru = {
   title?: string | null;
   city?: string | null;
   state?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
+  zip_code?: string | null;
+  postal_code?: string | null;
   hourly_rate?: number | null;
   rate?: number | null;
   rating_avg?: number | null;
@@ -284,6 +288,12 @@ function formatLocation(city?: string | null, state?: string | null) {
   if (city) return city;
   if (state) return state;
   return "Local area";
+}
+
+function getGuruCardLocation(guru: Guru) {
+  const city = String(guru.service_city || guru.city || "").trim();
+  const state = String(guru.service_state || guru.state || "").trim();
+  return formatLocation(city, state);
 }
 
 async function lookupZipCode(zipCode: string): Promise<ZipLookupResult | null> {
@@ -515,7 +525,7 @@ function mapGurusToCards(
       userId,
       name: getGuruName(guru),
       role: getGuruRole(guru),
-      location: formatLocation(guru.city, guru.state),
+      location: getGuruCardLocation(guru),
       rating: rating > 0 ? rating.toFixed(1) : "New",
       reviewCount: Number(guru.review_count || 0),
       priceLabel: getGuruPriceLabel(guru),

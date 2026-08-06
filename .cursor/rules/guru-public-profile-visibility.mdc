@@ -1,0 +1,31 @@
+---
+description: Guru public profile 404 visibility (name-shortID + NULL flags)
+globs: app/guru/**/*.{ts,tsx},lib/gurus/**/*.{ts,tsx},app/api/gurus/**/*.{ts,tsx},supabase/migrations/**/*.sql
+alwaysApply: false
+---
+
+# Guru public profile visibility (no false 404s)
+
+## Two causes of Hazel/Kayla-style 404s
+
+1. **Name-shortID URLs** — Public URLs look like `kayla-keeter-f7706ea3` / `hazel-cronister-96f46272` (name slug + first 8 of `user_id`). Matchers must generate that combined format in slug candidates, not only name / full UUID / stored slug.
+2. **NULL → false coercion** — Never convert missing `is_public` / `is_public_visible` / `is_active` to `false`. Use `asOptionalBoolean()` from `@/lib/gurus/public-visibility` so setup-in-progress Gurus are not treated as intentionally hidden.
+
+## Rule
+If a Guru resolves by slug and is **not** hard-blocked (`rejected` / `suspended` / `deleted` / `archived` / `inactive` / `paused` / `disabled` / `hidden`) and **not** explicitly `public_status` `private`|`hidden`:
+
+1. The public profile page **must render** (setup / “bookings opening soon” is OK).
+2. Missing visibility columns stay `null` — only explicit `false` means hidden (with listed-setup slug exception for legacy false+`not_listed` rows).
+3. Keep bookings closed via strict `isBookable()` — visibility ≠ bookable. Empty service city/state/ZIP keeps Book disabled.
+4. Prefer `service_city` / `service_state` (and profile hydration) for location display.
+5. DB auto-publish to `listed_only` only when `service_city` + `service_state` exist.
+
+## Canonical helpers
+- `@/lib/gurus/public-visibility` — `isPubliclyVisibleGuruProfile`, `asOptionalBoolean`, `GURU_LISTED_ONLY_PUBLIC_FLAGS`
+- Slug candidates include `{name}-{userIdPrefix8}` in `app/guru/[slug]/page.tsx`
+
+## Do not
+- 404 a slug URL just because onboarding flags are null/false while setup is in progress
+- Coerce missing booleans with `value === true` / `=== false` when building Guru profiles for public pages
+- Auto-publish rows with `public_status = private` or rejected/suspended statuses
+- Loosen `isBookable()` when fixing visibility

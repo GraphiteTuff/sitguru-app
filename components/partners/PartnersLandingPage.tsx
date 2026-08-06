@@ -121,10 +121,9 @@ function companionModeForTrack(track: PartnerTrack): CompanionLayoutMode {
 
 function apiPartnerTypeForTrack(
   track: PartnerTrack,
-): "parent" | "guru" | "ambassador" | "investor" {
+): "parent" | "guru" | "ambassador" | "partner" | "investor" {
   if (track === "investor") return "investor";
-  if (track === "corporate" || track === "community") return "ambassador";
-  return "guru";
+  return "partner";
 }
 
 function fieldClass(hasError: boolean) {

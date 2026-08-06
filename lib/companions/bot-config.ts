@@ -139,11 +139,13 @@ export function getBotConfig(options: {
 
 /** Map contact partnership path → companion layout mode. */
 export function companionModeFromPartnerType(
-  partnerType: "parent" | "guru" | "ambassador" | "investor",
+  partnerType: "parent" | "guru" | "ambassador" | "partner" | "investor",
 ): CompanionLayoutMode {
   if (partnerType === "guru") return "public-guru";
   if (partnerType === "ambassador") return "public-ambassador";
-  if (partnerType === "investor") return "public-investor";
+  if (partnerType === "investor" || partnerType === "partner") {
+    return "public-investor";
+  }
   return "public-parent";
 }
 

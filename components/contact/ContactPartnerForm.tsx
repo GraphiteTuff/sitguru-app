@@ -18,6 +18,7 @@ import {
   ArrowRight,
   BriefcaseBusiness,
   Check,
+  Handshake,
   Lightbulb,
   LineChart,
   PawPrint,
@@ -34,7 +35,12 @@ import {
 } from "@/lib/companions/bot-config";
 import { submitPartnershipInquiry } from "@/lib/contact/partner-api";
 
-export type PartnerType = "parent" | "guru" | "ambassador" | "investor";
+export type PartnerType =
+  | "parent"
+  | "guru"
+  | "ambassador"
+  | "partner"
+  | "investor";
 
 type ContactFormState = {
   fullName: string;
@@ -42,6 +48,7 @@ type ContactFormState = {
   zipCode: string;
   ambassadorCode: string;
   organization: string;
+  partnerCategory: string;
   programInterest: string;
   message: string;
   urgentMedia: boolean;
@@ -53,6 +60,8 @@ type FormErrors = {
   email?: string;
   zipCode?: string;
   message?: string;
+  organization?: string;
+  partnerCategory?: string;
 };
 
 const initialForm: ContactFormState = {
@@ -61,6 +70,7 @@ const initialForm: ContactFormState = {
   zipCode: "",
   ambassadorCode: "",
   organization: "",
+  partnerCategory: "",
   programInterest: "",
   message: "",
   urgentMedia: false,
@@ -96,10 +106,17 @@ const partnerPaths: Array<{
     icon: Rocket,
   },
   {
+    id: "partner",
+    label: "Partners",
+    shortLabel: "Partners",
+    description: "Stores, rescues, vets & orgs",
+    icon: Handshake,
+  },
+  {
     id: "investor",
     label: "Investor / Press",
     shortLabel: "Investor",
-    description: "Firm, media, partnerships",
+    description: "Funding, media & press",
     icon: LineChart,
   },
 ];
@@ -110,6 +127,17 @@ const programOptions = [
   VETERANS_MILITARY_FAMILIES_PROGRAM.displayName,
   "Ambassador Program",
   "Not sure yet",
+];
+
+const partnerCategoryOptions = [
+  "Pet Store",
+  "Rescue / Shelter",
+  "Trainer",
+  "Veterinarian",
+  "Pet Care Organization",
+  "Groomer",
+  "Boarding / Daycare",
+  "Other",
 ];
 
 const BRAND = "#0D5C3A";
@@ -136,6 +164,7 @@ function partnerToTopic(partnerType: PartnerType) {
   if (partnerType === "parent") return "pet-parent";
   if (partnerType === "guru") return "guru";
   if (partnerType === "ambassador") return "ambassadors";
+  if (partnerType === "partner") return "partners";
   return "investors";
 }
 
@@ -210,6 +239,14 @@ function validateForm(
       next.zipCode = "ZIP must be a valid 5-digit code.";
     }
   }
+  if (partnerType === "partner") {
+    if (!fields.partnerCategory.trim()) {
+      next.partnerCategory = "Please select your organization type.";
+    }
+    if (!fields.organization.trim()) {
+      next.organization = "Please share your organization name.";
+    }
+  }
   if (fields.message.trim().length < 10) {
     next.message = "Please share at least 10 characters about your inquiry.";
   }
@@ -220,6 +257,7 @@ export function ContactPartnerForm() {
   const formId = useId();
   const pathGroupId = `${formId}-path`;
   const ambassadorPanelId = `${formId}-ambassador-label`;
+  const partnerPanelId = `${formId}-partner-label`;
   const investorPanelId = `${formId}-investor-label`;
 
   const [partnerType, setPartnerType] = useState<PartnerType>("parent");
@@ -242,6 +280,7 @@ export function ContactPartnerForm() {
     companionModeFromPartnerType(partnerType);
 
   const showAmbassador = partnerType === "ambassador";
+  const showPartner = partnerType === "partner";
   const showInvestor = partnerType === "investor";
   const showParent = partnerType === "parent";
   const showGuru = partnerType === "guru";
@@ -303,6 +342,7 @@ export function ContactPartnerForm() {
         message: form.message,
         ambassadorCode: form.ambassadorCode,
         organization: form.organization,
+        partnerCategory: form.partnerCategory,
         programInterest: form.programInterest,
         urgentMedia: form.urgentMedia,
         source: form.source || "contact-page",
@@ -317,7 +357,11 @@ export function ContactPartnerForm() {
       }
 
       setFormSuccess(
-        "Thanks — your partnership request was routed to the right SitGuru team.",
+        partnerType === "partner"
+          ? "Thanks — your Partnership Request was routed to the SitGuru partnerships team."
+          : partnerType === "investor"
+            ? "Thanks — your Investor / Press inquiry was routed to the right SitGuru team."
+            : "Thanks — your request was routed to the right SitGuru team.",
       );
       setForm((previous) => ({
         ...initialForm,
@@ -360,13 +404,24 @@ export function ContactPartnerForm() {
             call your matching AI assistant.
           </p>
           <p className="mx-auto mt-3 max-w-xl text-sm font-semibold text-slate-500">
-            Exploring a business or community partnership?{" "}
+            Pet stores, rescues, trainers, veterinarians, and pet care orgs can
+            choose{" "}
+            <button
+              type="button"
+              onClick={() => selectPartner("partner")}
+              className="font-black text-[#0D5C3A] underline-offset-2 hover:underline"
+            >
+              Partners
+            </button>{" "}
+            for Partnership Requests. Investors and press stay on their own
+            track. Or explore{" "}
             <Link
               href="/partners"
               className="font-black text-[#0D5C3A] underline-offset-2 hover:underline"
             >
               Partner with SitGuru
             </Link>
+            .
           </p>
         </header>
 
@@ -555,7 +610,7 @@ export function ContactPartnerForm() {
                     ) : null}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
                     {partnerPaths.map((item) => {
                       const selected = partnerType === item.id;
                       const Icon = item.icon;
@@ -839,6 +894,78 @@ export function ContactPartnerForm() {
                     </div>
                   </RevealPanel>
 
+                  <RevealPanel open={showPartner} labelledBy={partnerPanelId}>
+                    <p
+                      id={partnerPanelId}
+                      className="mb-3 text-xs font-black uppercase tracking-[0.12em] text-[#0D5C3A]"
+                    >
+                      Partnership Request details
+                    </p>
+                    <div className="space-y-4">
+                      <div>
+                        <label
+                          className={labelClass}
+                          htmlFor={`${formId}-partner-category`}
+                        >
+                          Organization type
+                        </label>
+                        <select
+                          id={`${formId}-partner-category`}
+                          name="partnerCategory"
+                          value={form.partnerCategory}
+                          onChange={handleInputChange}
+                          className={`${fieldClass} ${errors.partnerCategory ? fieldErrClass : fieldOkClass}`}
+                          tabIndex={showPartner ? 0 : -1}
+                          aria-invalid={Boolean(errors.partnerCategory)}
+                        >
+                          <option value="">Select type</option>
+                          {partnerCategoryOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                        {errors.partnerCategory ? (
+                          <p className="mt-1 animate-fadeIn text-xs font-semibold text-rose-600">
+                            {errors.partnerCategory}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div>
+                        <label
+                          className={labelClass}
+                          htmlFor={`${formId}-org-partner`}
+                        >
+                          Organization name
+                        </label>
+                        <input
+                          id={`${formId}-org-partner`}
+                          name="organization"
+                          type="text"
+                          value={form.organization}
+                          onChange={handleInputChange}
+                          placeholder="Pet store, rescue, clinic, or organization"
+                          className={`${fieldClass} ${errors.organization ? fieldErrClass : fieldOkClass}`}
+                          tabIndex={showPartner ? 0 : -1}
+                          aria-invalid={Boolean(errors.organization)}
+                        />
+                        {errors.organization ? (
+                          <p className="mt-1 animate-fadeIn text-xs font-semibold text-rose-600">
+                            {errors.organization}
+                          </p>
+                        ) : null}
+                      </div>
+                      <Link
+                        href="/partners"
+                        className="inline-flex items-center gap-1.5 text-xs font-black text-[#0D5C3A] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
+                        tabIndex={showPartner ? 0 : -1}
+                      >
+                        Learn about SitGuru partnerships
+                        <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                      </Link>
+                    </div>
+                  </RevealPanel>
+
                   <RevealPanel open={showInvestor} labelledBy={investorPanelId}>
                     <p
                       id={investorPanelId}
@@ -917,7 +1044,11 @@ export function ContactPartnerForm() {
                   >
                     {isSubmitting
                       ? "Validating Payload…"
-                      : "Send Partnership Request"}
+                      : partnerType === "partner"
+                        ? "Send Partnership Request"
+                        : partnerType === "investor"
+                          ? "Send Investor / Press Request"
+                          : "Send Request"}
                     {!isSubmitting ? (
                       <ArrowRight className="h-4 w-4" aria-hidden />
                     ) : null}

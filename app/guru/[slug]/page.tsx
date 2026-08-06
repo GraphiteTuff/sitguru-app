@@ -10,6 +10,8 @@ import {
   isTrustSafetyScreeningBypassed,
   TRUST_SAFETY_SCREENING_BYPASS,
 } from "@/lib/config/trust-safety";
+import { isPubliclyVisibleGuruProfile, asOptionalBoolean } from "@/lib/gurus/public-visibility";
+import { enrichAndPersistLocationFromZip } from "@/lib/location/enrich-from-zip";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +50,8 @@ type GuruProfile = {
   state?: string | null;
   service_city?: string | null;
   service_state?: string | null;
+  service_latitude?: number | string | null;
+  service_longitude?: number | string | null;
   slug?: string | null;
   public_slug?: string | null;
   profile_id?: string | null;
@@ -324,12 +328,7 @@ function getGuruSlugCandidates(profile: GuruProfile | null) {
   const combinedName = `${firstName} ${lastName}`.trim();
   const emailUser = profile.email?.split("@")[0] || "";
 
-  const values = [
-    profile.slug,
-    profile.public_slug,
-    profile.id != null ? String(profile.id) : null,
-    profile.user_id,
-    profile.profile_id,
+  const nameValues = [
     profile.full_name,
     profile.display_name,
     profile.name,
@@ -337,6 +336,32 @@ function getGuruSlugCandidates(profile: GuruProfile | null) {
     firstName && lastName ? `${lastName} ${firstName}` : null,
     emailUser,
     emailUser.replace(/[._-]+/g, " "),
+  ];
+
+  const nameSlugs = Array.from(
+    new Set(
+      nameValues
+        .map((value) => slugifyPublicIdentifier(value))
+        .filter(Boolean),
+    ),
+  );
+
+  // SitGuru public URLs: {name-slug}-{first-8-of-user_id}
+  // e.g. kayla-keeter-f7706ea3, hazel-cronister-96f46272
+  const idPrefixes = getGuruIdPrefixTokens(profile);
+  const nameShortIdSlugs = nameSlugs.flatMap((nameSlug) =>
+    idPrefixes.map((prefix) => `${nameSlug}-${prefix}`),
+  );
+
+  const values = [
+    profile.slug,
+    profile.public_slug,
+    profile.id != null ? String(profile.id) : null,
+    profile.user_id,
+    profile.profile_id,
+    ...nameValues,
+    ...nameShortIdSlugs,
+    ...idPrefixes,
   ];
 
   return Array.from(
@@ -348,12 +373,29 @@ function getGuruSlugCandidates(profile: GuruProfile | null) {
   );
 }
 
+function getGuruIdPrefixTokens(profile: GuruProfile | null) {
+  return Array.from(
+    new Set(
+      [profile?.id, profile?.user_id, profile?.profile_id]
+        .map((value) =>
+          String(value || "")
+            .replace(/-/g, "")
+            .trim()
+            .toLowerCase()
+            .slice(0, 8),
+        )
+        .filter((value) => value.length >= 6),
+    ),
+  );
+}
+
 function isIdentifierMatchForGuru(profile: GuruProfile | null, identifier: string) {
   const cleanedIdentifier = cleanIdentifier(identifier);
   const requestedSlug = slugifyPublicIdentifier(cleanedIdentifier);
   const requestedCompact = compactPublicIdentifier(cleanedIdentifier);
   const requestedTokens = getIdentifierTokens(cleanedIdentifier);
   const candidates = getGuruSlugCandidates(profile);
+  const idPrefixes = getGuruIdPrefixTokens(profile);
 
   if (!requestedSlug || !requestedCompact || !candidates.length) return false;
 
@@ -368,20 +410,44 @@ function isIdentifierMatchForGuru(profile: GuruProfile | null, identifier: strin
   }
 
   const requestedLastToken = requestedTokens[requestedTokens.length - 1] || "";
+  const requestedSuffixMatchesId =
+    Boolean(requestedLastToken) &&
+    idPrefixes.some(
+      (prefix) =>
+        prefix === requestedLastToken ||
+        prefix.startsWith(requestedLastToken) ||
+        requestedLastToken.startsWith(prefix),
+    );
 
   return candidates.some((candidate) => {
     const candidateTokens = getIdentifierTokens(candidate);
     const candidateLastToken = candidateTokens[candidateTokens.length - 1] || "";
 
+    // Allow name-only stored slugs to match URLs that append the UUID prefix.
     if (
       requestedLastToken &&
       candidateLastToken &&
-      requestedLastToken !== candidateLastToken
+      requestedLastToken !== candidateLastToken &&
+      !requestedSuffixMatchesId
     ) {
       return false;
     }
 
-    return getSmallEditDistance(candidate, requestedSlug, 2) <= 2;
+    const candidateForDistance =
+      requestedSuffixMatchesId &&
+      candidateLastToken &&
+      requestedLastToken !== candidateLastToken
+        ? candidateTokens.slice(0, -1).join("-") || candidate
+        : candidate;
+
+    const requestedForDistance =
+      requestedSuffixMatchesId && requestedTokens.length > 1
+        ? requestedTokens.slice(0, -1).join("-")
+        : requestedSlug;
+
+    return (
+      getSmallEditDistance(candidateForDistance, requestedForDistance, 2) <= 2
+    );
   });
 }
 
@@ -525,8 +591,8 @@ function getGuruTitle(profile: GuruProfile | null) {
 }
 
 function getGuruLocation(profile: GuruProfile | null) {
-  const city = String(profile?.city || profile?.service_city || "").trim();
-  const state = String(profile?.state || profile?.service_state || "").trim();
+  const city = String(profile?.service_city || profile?.city || "").trim();
+  const state = String(profile?.service_state || profile?.state || "").trim();
 
   if (city && state) return `${city}, ${state}`;
   if (city) return city;
@@ -630,58 +696,6 @@ function isBookable(profile: GuruProfile | null) {
   );
 }
 
-function isPubliclyVisibleGuruProfile(profile: GuruProfile | null) {
-  if (!profile) return false;
-
-  const status = String(profile.status || "").trim().toLowerCase();
-  const applicationStatus = String(profile.application_status || "")
-    .trim()
-    .toLowerCase();
-  const publicStatus = String(profile.public_status || "")
-    .trim()
-    .toLowerCase();
-  const bookingStatus = String(profile.booking_status || "")
-    .trim()
-    .toLowerCase();
-
-  const blockedStatuses = new Set([
-    "inactive",
-    "suspended",
-    "rejected",
-    "paused",
-    "deleted",
-    "archived",
-    "not_approved",
-    "not approved",
-    "hidden",
-  ]);
-
-  if (
-    profile.is_public === false ||
-    profile.is_public_visible === false ||
-    profile.is_active === false ||
-    blockedStatuses.has(status) ||
-    blockedStatuses.has(applicationStatus) ||
-    blockedStatuses.has(publicStatus)
-  ) {
-    return false;
-  }
-
-  return Boolean(
-    profile.is_public === true ||
-      profile.is_public_visible === true ||
-      [
-        "public",
-        "visible",
-        "visible_setup_in_progress",
-        "visible_placeholder",
-      ].includes(publicStatus) ||
-      ["public", "visible", "bookable"].includes(applicationStatus) ||
-      bookingStatus === "listed_only" ||
-      bookingStatus === "requestable" ||
-      bookingStatus === "bookable",
-  );
-}
 
 function getPublicAreaPhrase(profile: GuruProfile | null) {
   const location = getGuruLocation(profile);
@@ -1127,9 +1141,9 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
       "profile_incomplete",
     role: "guru",
     account_type: "guru",
-    is_public: profile.is_public === true,
-    is_active: profile.is_active === true,
-    is_public_visible: profile.is_public_visible === true,
+    is_public: asOptionalBoolean(profile.is_public),
+    is_active: asOptionalBoolean(profile.is_active),
+    is_public_visible: asOptionalBoolean(profile.is_public_visible),
     is_bookable: false,
     is_accepting_bookings: profile.is_accepting_bookings ?? null,
     accepting_bookings: profile.accepting_bookings ?? null,
@@ -1337,9 +1351,77 @@ async function findGuruUploadedPhotoFromMediaTables(guruProfile: GuruProfile) {
   return null;
 }
 
+function mergeAccountProfileLocation(
+  guruProfile: GuruProfile,
+  profile: Record<string, any> | null,
+): GuruProfile {
+  if (!profile) return guruProfile;
+
+  const pickText = (...values: unknown[]) => {
+    for (const value of values) {
+      const text = String(value || "").trim();
+      if (text) return text;
+    }
+    return null;
+  };
+
+  const pickCoord = (...values: unknown[]) => {
+    for (const value of values) {
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      if (typeof value === "string" && value.trim()) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    }
+    return null;
+  };
+
+  const serviceCity = pickText(
+    guruProfile.service_city,
+    profile.service_city,
+    guruProfile.city,
+    profile.city,
+  );
+  const serviceState = pickText(
+    guruProfile.service_state,
+    profile.service_state,
+    guruProfile.state,
+    profile.state,
+  );
+
+  return {
+    ...guruProfile,
+    service_city: serviceCity,
+    service_state: serviceState,
+    city: pickText(guruProfile.city, profile.city, serviceCity),
+    state: pickText(guruProfile.state, profile.state, serviceState),
+    zip_code: pickText(
+      guruProfile.zip_code,
+      profile.zip_code,
+      profile.service_zip,
+      profile.postal_code,
+      guruProfile.postal_code,
+    ),
+    postal_code: pickText(
+      guruProfile.postal_code,
+      profile.postal_code,
+      profile.zip_code,
+      profile.service_zip,
+      guruProfile.zip_code,
+    ),
+    service_latitude: pickCoord(
+      guruProfile.service_latitude,
+      profile.service_latitude,
+    ),
+    service_longitude: pickCoord(
+      guruProfile.service_longitude,
+      profile.service_longitude,
+    ),
+  };
+}
+
 async function findGuruPhotoFromProfiles(guruProfile: GuruProfile) {
-  const profileSelect =
-    "id, user_id, email, profile_photo_url, avatar_url, image_url, full_name, display_name, name, first_name, last_name";
+  const profileSelect = "*";
 
   const profileLookups = [
     guruProfile.user_id
@@ -1408,31 +1490,71 @@ async function hydrateGuruProfilePhotoFields(
 
   const profileFallback = await findGuruPhotoFromProfiles(guruProfile);
   const profile = profileFallback.profile;
-  const guruProfileWithAccountNames = profile
-    ? {
-        ...guruProfile,
-        full_name:
-          guruProfile.full_name ||
-          profile.full_name ||
-          profile.display_name ||
-          profile.name ||
-          null,
-        display_name:
-          guruProfile.display_name ||
-          profile.display_name ||
-          profile.full_name ||
-          profile.name ||
-          null,
-        name:
-          guruProfile.name ||
-          profile.name ||
-          profile.full_name ||
-          profile.display_name ||
-          null,
-        first_name: guruProfile.first_name || profile.first_name || null,
-        last_name: guruProfile.last_name || profile.last_name || null,
-      }
+  const mergedAccountProfile = profile
+    ? mergeAccountProfileLocation(
+        {
+          ...guruProfile,
+          full_name:
+            guruProfile.full_name ||
+            profile.full_name ||
+            profile.display_name ||
+            profile.name ||
+            null,
+          display_name:
+            guruProfile.display_name ||
+            profile.display_name ||
+            profile.full_name ||
+            profile.name ||
+            null,
+          name:
+            guruProfile.name ||
+            profile.name ||
+            profile.full_name ||
+            profile.display_name ||
+            null,
+          first_name: guruProfile.first_name || profile.first_name || null,
+          last_name: guruProfile.last_name || profile.last_name || null,
+        },
+        profile,
+      )
     : guruProfile;
+
+  // When city/state are missing but ZIP exists, resolve and persist for SitGuru-wide use.
+  const resolvedLocation = await enrichAndPersistLocationFromZip({
+    guruId: mergedAccountProfile.id != null ? String(mergedAccountProfile.id) : null,
+    profileId:
+      mergedAccountProfile.user_id ||
+      mergedAccountProfile.profile_id ||
+      (profile?.id != null ? String(profile.id) : null) ||
+      null,
+    guru: mergedAccountProfile,
+    profile,
+  });
+
+  const guruProfileWithAccountNames =
+    resolvedLocation.city && resolvedLocation.state
+      ? {
+          ...mergedAccountProfile,
+          city: mergedAccountProfile.city || resolvedLocation.city,
+          state: mergedAccountProfile.state || resolvedLocation.state,
+          service_city:
+            mergedAccountProfile.service_city || resolvedLocation.city,
+          service_state:
+            mergedAccountProfile.service_state || resolvedLocation.state,
+          zip_code:
+            mergedAccountProfile.zip_code || resolvedLocation.zip || null,
+          postal_code:
+            mergedAccountProfile.postal_code || resolvedLocation.zip || null,
+          service_latitude:
+            mergedAccountProfile.service_latitude ??
+            resolvedLocation.latitude ??
+            null,
+          service_longitude:
+            mergedAccountProfile.service_longitude ??
+            resolvedLocation.longitude ??
+            null,
+        }
+      : mergedAccountProfile;
 
   if (profileFallback.avatarUrl) {
     return mergeAccountProfileAvatar(
@@ -1606,10 +1728,10 @@ function normalizeGuruProfileFromBookingLookupRow(
     status: row.status || row.application_status || row.approval_status || null,
     role: "guru",
     account_type: "guru",
-    is_public: row.is_public === true,
-    is_active: row.is_active === true,
-    is_public_visible: row.is_public_visible === true,
-    is_bookable: row.is_bookable === true,
+    is_public: asOptionalBoolean(row.is_public),
+    is_active: asOptionalBoolean(row.is_active),
+    is_public_visible: asOptionalBoolean(row.is_public_visible),
+    is_bookable: asOptionalBoolean(row.is_bookable) === true,
     is_accepting_bookings: row.is_accepting_bookings ?? null,
     accepting_bookings: row.accepting_bookings ?? null,
     booking_status: row.booking_status || null,
@@ -1840,10 +1962,10 @@ function buildGuruProfileFromPublicSearchRow(row: Record<string, any>): GuruProf
     status: row.status || row.application_status || row.approval_status || null,
     role: "guru",
     account_type: "guru",
-    is_public: row.is_public === true,
-    is_active: row.is_active === true,
-    is_public_visible: row.is_public_visible === true,
-    is_bookable: row.is_bookable === true,
+    is_public: asOptionalBoolean(row.is_public),
+    is_active: asOptionalBoolean(row.is_active),
+    is_public_visible: asOptionalBoolean(row.is_public_visible),
+    is_bookable: asOptionalBoolean(row.is_bookable) === true,
     is_accepting_bookings: row.is_accepting_bookings ?? null,
     accepting_bookings: row.accepting_bookings ?? null,
     booking_status: row.booking_status || null,
@@ -2037,8 +2159,8 @@ async function getGuruProfile(
         admin_status: null,
         public_status: null,
         profile_quality_status: null,
-        is_public: false,
-        is_public_visible: false,
+        is_public: null,
+        is_public_visible: null,
       };
     }
   }

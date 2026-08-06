@@ -26,7 +26,10 @@ type GuruRow = {
   title?: string | null;
   city?: string | null;
   state?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
   zip_code?: string | null;
+  postal_code?: string | null;
   services?: string[] | null;
   profile_photo_url?: string | null;
   photo_url?: string | null;
@@ -132,7 +135,11 @@ function mapGuruToCarouselItem(guru: GuruRow): CarouselItem {
     id: `live-${guru.id}`,
     name,
     role: guru.title || "Pet Care Guru",
-    location: formatLocation(guru.city, guru.state, guru.zip_code),
+    location: formatLocation(
+      guru.service_city || guru.city,
+      guru.service_state || guru.state,
+      guru.zip_code || guru.postal_code,
+    ),
     rating: getGuruRatingLabel(guru),
     image: getGuruImage(guru),
     petType: getPrimaryPetType(guru),

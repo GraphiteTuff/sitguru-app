@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { resolveLocationParts } from "@/lib/location/zip-lookup";
 
 export const dynamic = "force-dynamic";
 
@@ -145,13 +145,6 @@ function getGuruState(guru: AnyRow, profile?: AnyRow) {
     getText(guru, ["state_code"]) ||
     getText(profile, ["state_code"])
   );
-}
-
-function getGuruLocation(guru: AnyRow, profile?: AnyRow) {
-  const city = getGuruCity(guru, profile);
-  const state = getGuruState(guru, profile);
-
-  return [city, state].filter(Boolean).join(", ") || "Location not listed";
 }
 
 function getGuruExperience(guru: AnyRow) {
@@ -431,40 +424,68 @@ async function getGuruReportRows() {
     if (email) profileMap.set(email, profile);
   }
 
-  return gurus
-    .map((guru) => {
-      const profile = profileMap.get(getGuruProfileKey(guru));
-      const guruId = getGuruId(guru);
-      const slug = getText(guru, ["slug"]);
-      const status = normalizeApplicationStatus(guru);
-      const city = getGuruCity(guru, profile);
-      const state = getGuruState(guru, profile);
-      const publicProfileUrl = slug ? `/guru/${slug}` : "";
+  return (
+    await Promise.all(
+      gurus.map(async (guru) => {
+        const profile = profileMap.get(getGuruProfileKey(guru));
+        const guruId = getGuruId(guru);
+        const slug = getText(guru, ["slug"]);
+        const status = normalizeApplicationStatus(guru);
+        const resolved = await resolveLocationParts({
+          city: getGuruCity(guru, profile),
+          state: getGuruState(guru, profile),
+          zip:
+            getText(guru, [
+              "zip_code",
+              "service_zip",
+              "service_zip_code",
+              "postal_code",
+            ]) ||
+            getText(profile || {}, [
+              "zip_code",
+              "service_zip",
+              "service_zip_code",
+              "postal_code",
+            ]),
+          serviceCity:
+            getText(guru, ["service_city"]) ||
+            getText(profile || {}, ["service_city"]),
+          serviceState:
+            getText(guru, ["service_state"]) ||
+            getText(profile || {}, ["service_state"]),
+        });
+        const city = resolved.city;
+        const state = resolved.state;
+        const publicProfileUrl = slug ? `/guru/${slug}` : "";
 
-      return {
-        guru_id: guruId,
-        guru_name: getGuruName(guru, profile),
-        email: getGuruEmail(guru, profile),
-        slug,
-        services: getGuruServices(guru),
-        location: getGuruLocation(guru, profile),
-        city,
-        state,
-        experience: getGuruExperience(guru),
-        application_status: status,
-        status_label: getApplicationStatusLabel(status),
-        profile_quality: getProfileQuality(guru),
-        identity_status: getCredentialStatus(
-          guru.stripe_identity_status || guru.identity_status,
-        ),
-        background_check_status: getCredentialStatus(guru.background_check_status),
-        safety_status: getCredentialStatus(guru.safety_cert_status),
-        bookable: isGuruBookable(guru) ? "Yes" : "No",
-        public_profile_url: publicProfileUrl,
-        joined_date: getText(guru, ["created_at"]),
-      };
-    })
-    .sort((a, b) => a.guru_name.localeCompare(b.guru_name));
+        return {
+          guru_id: guruId,
+          guru_name: getGuruName(guru, profile),
+          email: getGuruEmail(guru, profile),
+          slug,
+          services: getGuruServices(guru),
+          location:
+            city && state ? `${city}, ${state}` : "Location not listed",
+          city,
+          state,
+          experience: getGuruExperience(guru),
+          application_status: status,
+          status_label: getApplicationStatusLabel(status),
+          profile_quality: getProfileQuality(guru),
+          identity_status: getCredentialStatus(
+            guru.stripe_identity_status || guru.identity_status,
+          ),
+          background_check_status: getCredentialStatus(
+            guru.background_check_status,
+          ),
+          safety_status: getCredentialStatus(guru.safety_cert_status),
+          bookable: isGuruBookable(guru) ? "Yes" : "No",
+          public_profile_url: publicProfileUrl,
+          joined_date: getText(guru, ["created_at"]),
+        };
+      }),
+    )
+  ).sort((a, b) => a.guru_name.localeCompare(b.guru_name));
 }
 
 export async function GET() {
