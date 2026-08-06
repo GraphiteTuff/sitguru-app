@@ -8,8 +8,10 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { streamText, type CoreMessage } from "ai";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
-import { fetchLiveSocialFollowersTool } from "@/lib/chat/rogue-social-tool";
+import {
+  evaluatePersonaRouteGate,
+  personaForbiddenResponse,
+} from "@/lib/chat/persona-route-gate";
 import {
   isReservedPreferredName,
   sanitizePreferredName,
@@ -166,13 +168,6 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser().catch(() => ({
-      data: { user: null },
-    }));
-
-    const userId = user?.id || null;
 
     const body = (await req.json()) as {
       messages?: CoreMessage[];
@@ -183,9 +178,36 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       user_type?: string;
       userRole?: string;
       channel?: string;
+      portal?: string;
+      surface?: string;
+      domainContext?: string;
+      scope?: string;
+      role?: string;
+      metadata?: { role?: string };
+      [key: string]: unknown;
     };
 
     const messages = Array.isArray(body?.messages) ? body.messages : [];
+    if (messages.length === 0) {
+      return new Response(JSON.stringify({ error: "messages are required." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Route-level identity + persona gate (JWT session). Runs BEFORE any LLM call.
+    const gate = await evaluatePersonaRouteGate({
+      req,
+      body: body as Record<string, unknown>,
+      messages,
+    });
+    if (!gate.ok) {
+      return personaForbiddenResponse(gate);
+    }
+
+    const audience = gate.audience;
+    const userId = gate.sessionUserId;
+
     const walkId = safeString(body?.walkId);
     const conversationId = safeString(body?.conversationId);
     const clientFirstNameRaw = sanitizePreferredName(
@@ -195,20 +217,23 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       ? ""
       : clientFirstNameRaw;
     parsedClientFirstName = clientFirstName;
-    const userTypeLabel = normalizeRogueUserType(
-      body?.userRole || body?.user_type || body?.user_role || "Guest Pet Parent",
-    );
+
+    // Soft tone hint only — tools/authorization ignore client role strings.
+    const userTypeLabel =
+      audience.kind === "ambassador"
+        ? "Ambassador"
+        : audience.kind === "admin"
+          ? "Admin"
+          : normalizeRogueUserType(
+              body?.userRole ||
+                body?.user_type ||
+                body?.user_role ||
+                "Guest Pet Parent",
+            );
     const insightChannel =
       walkId || safeString(body?.channel) === "ACTIVE_WALK"
         ? "ACTIVE_WALK"
         : "HOMEPAGE_LEAD";
-
-    if (messages.length === 0) {
-      return new Response(JSON.stringify({ error: "messages are required." }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
 
     const lastUserMessage = messages[messages.length - 1];
     const lastUserText = messageContent(lastUserMessage);
@@ -265,7 +290,12 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       userRole: userTypeLabel,
       lastUserText,
       walkId: walkId || undefined,
+      allowSocialMetrics: gate.socialMetricsMode !== "none",
+      socialMetricsMode: gate.socialMetricsMode,
     });
+
+    // Tools come exclusively from the persona gate (session-scoped).
+    const tools = gate.tools;
 
     let result;
     try {
@@ -274,10 +304,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
         messages,
         system: systemPrompt,
         maxTokens: 500,
-        tools: {
-          lookupGurus: lookupGurusTool,
-          fetchLiveSocialFollowers: fetchLiveSocialFollowersTool,
-        },
+        tools: tools as Parameters<typeof streamText>[0]["tools"],
         maxSteps: 3,
         onFinish: async ({ text }) => {
           try {

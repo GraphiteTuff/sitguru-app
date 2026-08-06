@@ -29,7 +29,6 @@ CONVERSION ENGINE (Promote SitGuru Benefits):
 - Emphasize community, top-tier pet matching, and passive/active income growth for sitters.
 - Always include a subtle call-to-action encouraging them to explore or join SitGuru.
 - SOCIAL FOLLOW: Invite them to follow **@SitGuruOfficial** on Instagram, Facebook, TikTok, X, and YouTube for events and pack highlights — append [[cta:social]] when you ask them to follow.
-- LIVE SOCIAL METRICS (AUTHORIZED): When asked about follower counts, social growth, Instagram/TikTok/X/Facebook/YouTube stats, or Rogue/Delilah pack reach, call fetchLiveSocialFollowers BEFORE answering. Report exact current_followers, baseline_followers, and the delta (current − baseline) from the tool digest. You have full authorization to share these numbers — never say tracking is "not in this snapshot" and never invent counts outside the tool result.
 
 GURU MATCHING (LIVE LOOKUP TOOL):
 - When visitors ask for care by type and/or location (city, state, ZIP) or ask for a Guru by name, call the lookupGurus tool before answering.
@@ -53,6 +52,9 @@ export function buildRogueSystemPrompt(opts: {
   userRole?: string | null;
   lastUserText?: string;
   walkId?: string;
+  /** Server-resolved: only true for admin / ambassador audiences with tools registered. */
+  allowSocialMetrics?: boolean;
+  socialMetricsMode?: "admin_brand" | "ambassador_self" | "none";
 }): string {
   let systemPrompt = ROGUE_CORE_SYSTEM_PROMPT;
 
@@ -76,6 +78,29 @@ If they say "Hi Rogue", they greeted YOU — reply warmly, then ask what to call
 
   if (opts.walkId) {
     systemPrompt += `\nACTIVE WALK CONTEXT:\n- Current walk ID: ${opts.walkId}. Prefer walk-aware guidance when relevant.`;
+  }
+
+  const socialMode = opts.socialMetricsMode || (opts.allowSocialMetrics ? "admin_brand" : "none");
+  if (socialMode === "admin_brand") {
+    systemPrompt += `
+
+LIVE SOCIAL METRICS (ADMIN AUTHORIZED):
+- When asked about brand / Rogue / Delilah pack follower counts, call fetchLiveSocialFollowers.
+- Report exact current_followers, baseline_followers, and delta from the tool digest only.
+- Never invent counts. Never query other ambassadors' private rows.`;
+  } else if (socialMode === "ambassador_self") {
+    systemPrompt += `
+
+LIVE SOCIAL METRICS (AMBASSADOR / DELILAH — SELF ONLY):
+- When asked about YOUR referral / social metrics, call fetchLiveSocialFollowers.
+- The server force-filters to your ambassador id — you cannot see global brand stats or other ambassadors.
+- Report exact numbers from the tool digest only. Never invent counts.`;
+  } else {
+    systemPrompt += `
+
+PRIVACY — BUSINESS DATA:
+- You do NOT have access to live social follower metrics, financials, or admin business data for this visitor.
+- If asked for follower counts or internal metrics, politely say you can't share internal pack numbers here and invite them to follow **@SitGuruOfficial** with [[cta:social]] instead.`;
   }
 
   systemPrompt += `\n\n${HOMEPAGE_CTO_VOICE_RULES}`;
