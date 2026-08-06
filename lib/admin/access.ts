@@ -11,6 +11,7 @@ import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
 /** Roles that unlock general /admin access across SitGuru. */
 export const ADMIN_ROLES = [
   ...FINANCE_ROLES,
+  "admin",
   "founder",
   "support_admin",
   "operations",
@@ -34,7 +35,12 @@ export const ADMIN_ROLES = [
   "marketing_viewer",
 ] as const;
 
-const SUPER_USER_ROLES = new Set(["founder", "owner", "super_admin"]);
+const SUPER_USER_ROLES = new Set([
+  "founder",
+  "owner",
+  "super_admin",
+  "super_user",
+]);
 
 const MANAGE_USERS_ROLES = new Set([
   "founder",
