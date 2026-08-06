@@ -559,6 +559,23 @@ function SignupPageContent() {
     resetAlerts();
     setIntent(nextIntent);
     setPhoneCodeSent(false);
+
+    try {
+      const params = new URLSearchParams(searchParams.toString());
+      const roleParam =
+        nextIntent === "guru"
+          ? "guru"
+          : nextIntent === "ambassador"
+            ? "ambassador"
+            : nextIntent === "both"
+              ? "pet_parent"
+              : "pet_parent";
+      params.set("role", roleParam);
+      params.set("intent", nextIntent);
+      router.replace(`/signup?${params.toString()}`, { scroll: false });
+    } catch {
+      // URL sync is best-effort for One-Tap role continuity.
+    }
   }
 
   function handleModeChange(nextMode: SignupMode) {
