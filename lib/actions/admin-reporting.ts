@@ -571,18 +571,47 @@ async function modulePetParents(since: string): Promise<ModuleSnapshot> {
     );
   }).length;
   const ok = profiles.ok || customers.ok || pets.ok;
+
+  let intelligenceSummary = "";
+  let intelligenceMetrics: Record<string, number | string> = {};
+  try {
+    const { getCustomerIntelligenceReportDigest } = await import(
+      "@/lib/admin/customer-intelligence/report"
+    );
+    const report = await getCustomerIntelligenceReportDigest();
+    intelligenceSummary = ` Customer Intelligence: ${number(report.metrics.totalCustomers)} visible Pet Parents · LTV avg ${money(report.metrics.averageLifetimeValue)} · repeat ${report.metrics.repeatRate.toFixed(1)}% · social customers ${number(report.metrics.socialCustomers)} · social revenue ${money(report.metrics.socialRevenue)}.`;
+    intelligenceMetrics = {
+      ciPetParents: report.metrics.totalCustomers,
+      ciAverageLtv: report.metrics.averageLifetimeValue,
+      ciRepeatRate: report.metrics.repeatRate,
+      ciActive30d: report.metrics.activeCustomersLast30,
+      ciSocialCustomers: report.metrics.socialCustomers,
+      ciSocialRevenue: report.metrics.socialRevenue,
+      ciSocialClicks: report.metrics.socialClicks,
+      ciTopSocialPlatform: report.metrics.topSocialPlatform,
+    };
+  } catch {
+    // Best-effort enrichment for Rogue snapshots.
+  }
+
   return finalize(
     snap,
     ok,
-    `Pet Parent signals: ${number(Math.max(parentish, customers.count))} parents/customers in period · ${number(pets.count)} pets total.`,
+    `Pet Parent signals: ${number(Math.max(parentish, customers.count))} parents/customers in period · ${number(pets.count)} pets total.${intelligenceSummary}`,
     {
       parentsInPeriod: Math.max(parentish, customers.count),
       petsTotal: pets.count,
       profilesInPeriod: profiles.count,
+      ...intelligenceMetrics,
     },
     [
       `${number(Math.max(parentish, customers.count))} parent signals`,
       `${number(pets.count)} pets`,
+      ...(intelligenceSummary
+        ? [
+            `${number(Number(intelligenceMetrics.ciSocialCustomers || 0))} social customers`,
+          ]
+        : []),
     ],
     [profiles, customers, pets].filter((r) => !r.ok).map((r) => r.message),
   );
@@ -1994,7 +2023,21 @@ const MODULE_KEYWORDS: Record<AdminReportModuleId, string[]> = {
   dashboard: ["dashboard", "kpi", "alert", "overview pulse", "daily sync"],
   live_walks: ["live walk", "gps", "geofence", "check-in", "check in", "walk session"],
   bookings: ["booking", "cancellation", "fulfillment", "matching pipeline"],
-  pet_parents: ["pet parent", "customer", "ltv", "retention", "onboarding funnel"],
+  pet_parents: [
+    "pet parent",
+    "customer",
+    "ltv",
+    "retention",
+    "onboarding funnel",
+    "customer intelligence",
+    "lifetime value",
+    "repeat rate",
+    "social customers",
+    "social signups",
+    "social revenue",
+    "social bookings",
+    "social clicks",
+  ],
   gurus: ["guru", "provider", "capacity", "rating", "vetting"],
   ambassadors: ["ambassador", "affiliate", "influencer"],
   ambassador_ledger: ["ambassador ledger", "affiliate payout", "commission queue"],

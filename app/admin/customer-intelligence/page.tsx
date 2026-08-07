@@ -24,6 +24,14 @@ import {
 } from "lucide-react";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { avatarImageFallback, fallbackInitials } from "@/lib/sitguru/display";
+import { resolveLocationParts } from "@/lib/location/zip-lookup";
+import {
+  filterCustomersForMetric,
+  getCustomerIntelligenceMetricHref,
+  getCustomerIntelligenceMetricMeta,
+  parseCustomerIntelligenceMetric,
+  type CustomerIntelligenceMetricId,
+} from "@/lib/admin/customer-intelligence/metrics";
 import CustomerInsightsTable from "./CustomerInsightsTable";
 
 export const dynamic = "force-dynamic";
@@ -193,6 +201,7 @@ type PetParentRegistrationHealthRow = {
   auth_phone?: string | null;
   auth_avatar_url?: string | null;
   auth_picture?: string | null;
+  raw_user_meta_data?: Record<string, unknown> | null;
   role?: string | null;
   admin_status?: string | null;
   admin_notes?: string | null;
@@ -459,23 +468,65 @@ function getPhotoSource(row: AnyRow) {
   if (getText(row, ["profile_photo_url", "photo_url", "image_url", "picture"])) {
     return "Fallback / legacy photo";
   }
-  if (getText(row, ["auth_avatar_url", "auth_picture"])) return "Account photo";
+  if (
+    getText(row, ["auth_avatar_url", "auth_picture"]) ||
+    getAuthMetadataPhoto(row)
+  ) {
+    return "Account photo";
+  }
 
   return "Missing";
 }
 
-function getProfileAvatarUrl(row: AnyRow) {
-  return avatarImageFallback(
-    getText(row, [
+function getAuthMetadataPhoto(row: AnyRow | null | undefined) {
+  if (!row) return "";
+
+  const metadata = row.raw_user_meta_data;
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    return getText(metadata as AnyRow, [
       "avatar_url",
-      "profile_photo_url",
-      "photo_url",
-      "image_url",
       "picture",
-      "auth_avatar_url",
-      "auth_picture",
-    ]),
-    "",
+      "photo_url",
+      "profile_photo_url",
+      "image_url",
+    ]);
+  }
+
+  return "";
+}
+
+function sanitizeCustomerAvatarUrl(value: string) {
+  const photoUrl = String(value || "").trim();
+  if (!photoUrl) return "";
+
+  const lower = photoUrl.toLowerCase();
+  if (
+    lower.includes("sitguru-logo") ||
+    lower.includes("sitguru-admin-avatar") ||
+    lower.includes("sitguru-message-avatar") ||
+    lower.includes("avatar-placeholder") ||
+    lower.includes("/images/demo/")
+  ) {
+    return "";
+  }
+
+  return photoUrl;
+}
+
+function getProfileAvatarUrl(row: AnyRow) {
+  return sanitizeCustomerAvatarUrl(
+    avatarImageFallback(
+      getText(row, [
+        "avatar_url",
+        "profile_photo_url",
+        "photo_url",
+        "image_url",
+        "picture",
+        "auth_avatar_url",
+        "auth_picture",
+      ]) || getAuthMetadataPhoto(row),
+      "",
+    ),
   );
 }
 
@@ -507,6 +558,7 @@ function CustomerAvatar({
         <img
           src={src}
           alt=""
+          referrerPolicy="no-referrer"
           className="relative z-[1] h-full w-full object-cover object-center"
         />
       ) : (
@@ -519,11 +571,37 @@ function CustomerAvatar({
 }
 
 function getLocationSource(row: AnyRow) {
-  if (getText(row, ["city", "state", "zip", "zipcode", "zip_code", "postal_code"])) {
+  if (
+    getText(row, [
+      "city",
+      "service_city",
+      "home_city",
+      "state",
+      "service_state",
+      "home_state",
+      "zip",
+      "zipcode",
+      "zip_code",
+      "service_zip",
+      "service_zip_code",
+      "postal_code",
+    ])
+  ) {
     return "Profile";
   }
 
-  if (getText(row, ["customer_city", "location_city", "customer_state", "customer_zip", "customer_zip_code"])) {
+  if (
+    getText(row, [
+      "customer_city",
+      "location_city",
+      "customer_state",
+      "care_city",
+      "care_state",
+      "customer_zip",
+      "customer_zip_code",
+      "care_zip_code",
+    ])
+  ) {
     return "Fallback / legacy";
   }
 
@@ -954,11 +1032,26 @@ function getCustomerSegment(customer: CustomerInsight) {
 }
 
 function getCity(row: AnyRow) {
-  return getText(row, ["city", "customer_city", "location_city"]);
+  return getText(row, [
+    "city",
+    "service_city",
+    "home_city",
+    "customer_city",
+    "location_city",
+    "care_city",
+  ]);
 }
 
 function getState(row: AnyRow) {
-  return getText(row, ["state", "State", "state_code", "customer_state"]);
+  return getText(row, [
+    "state",
+    "State",
+    "state_code",
+    "service_state",
+    "home_state",
+    "customer_state",
+    "care_state",
+  ]);
 }
 
 function getCountry(row: AnyRow) {
@@ -970,9 +1063,12 @@ function getZipCode(row: AnyRow) {
     "zip",
     "zipcode",
     "zip_code",
+    "service_zip",
+    "service_zip_code",
     "postal_code",
     "customer_zip",
     "customer_zip_code",
+    "care_zip_code",
   ]);
 }
 
@@ -1490,6 +1586,7 @@ async function getCustomerIntelligenceData() {
         ...(profile as AnyRow),
         auth_avatar_url: asString(health?.auth_avatar_url),
         auth_picture: asString(health?.auth_picture),
+        raw_user_meta_data: health?.raw_user_meta_data || null,
       }),
       city: getCity(profile as AnyRow),
       state: getState(profile as AnyRow),
@@ -1501,6 +1598,7 @@ async function getCustomerIntelligenceData() {
         ...(profile as AnyRow),
         auth_avatar_url: asString(health?.auth_avatar_url),
         auth_picture: asString(health?.auth_picture),
+        raw_user_meta_data: health?.raw_user_meta_data || null,
       }),
       locationSource: getLocationSource(profile as AnyRow),
       source,
@@ -1644,47 +1742,79 @@ async function getCustomerIntelligenceData() {
     if (existing) existing.messageCount = messageCount;
   }
 
-  const customers = Array.from(customerMap.values()).map((customer) => {
-    const averageBookingValue =
-      customer.bookingCount > 0 ? customer.totalSpend / customer.bookingCount : 0;
+  const customers = await Promise.all(
+    Array.from(customerMap.values()).map(async (customer) => {
+      const averageBookingValue =
+        customer.bookingCount > 0 ? customer.totalSpend / customer.bookingCount : 0;
 
-    const enriched = {
-      ...customer,
-      averageBookingValue,
-    };
+      let city = customer.city;
+      let state = customer.state;
+      let zipCode = customer.zipCode;
+      let locationSource = customer.locationSource;
 
-    const segment = getCustomerSegment(enriched);
-    const registrationHealth = registrationHealthByProfileId.get(customer.id);
-    const healthSignupQuality = mapRegistrationHealthToSignupQuality(registrationHealth);
-    const healthLabel = getRegistrationHealthLabel(registrationHealth);
-    const calculatedSignupQuality = getCustomerSignupQuality({
-      ...enriched,
-      segment,
-      signupQuality: "incomplete",
-      signupQualityLabel: "Registered",
-      profileCompletion: 0,
-    });
-    const signupQuality = healthSignupQuality
-      ? {
-          signupQuality: healthSignupQuality,
-          signupQualityLabel: getReviewSignupQualityLabel(enriched, healthLabel, healthLabel || calculatedSignupQuality.signupQualityLabel),
+      if ((!city || !state) && zipCode) {
+        const resolved = await resolveLocationParts({
+          city,
+          state,
+          zip: zipCode,
+        });
+
+        if (resolved.city || resolved.state) {
+          city = city || resolved.city;
+          state = state || resolved.state;
+          zipCode = zipCode || resolved.zip;
+          if (resolved.resolvedFromZip) {
+            locationSource = "ZIP lookup";
+          }
         }
-      : calculatedSignupQuality;
+      }
 
-    const profileCompletion = getCustomerProfileCompletion({
-      ...enriched,
-      segment,
-      ...signupQuality,
-      profileCompletion: 0,
-    });
+      const enriched = {
+        ...customer,
+        city,
+        state,
+        zipCode,
+        locationSource,
+        averageBookingValue,
+      };
 
-    return {
-      ...enriched,
-      segment,
-      ...signupQuality,
-      profileCompletion,
-    };
-  });
+      const segment = getCustomerSegment(enriched);
+      const registrationHealth = registrationHealthByProfileId.get(customer.id);
+      const healthSignupQuality = mapRegistrationHealthToSignupQuality(registrationHealth);
+      const healthLabel = getRegistrationHealthLabel(registrationHealth);
+      const calculatedSignupQuality = getCustomerSignupQuality({
+        ...enriched,
+        segment,
+        signupQuality: "incomplete",
+        signupQualityLabel: "Registered",
+        profileCompletion: 0,
+      });
+      const signupQuality = healthSignupQuality
+        ? {
+            signupQuality: healthSignupQuality,
+            signupQualityLabel: getReviewSignupQualityLabel(
+              enriched,
+              healthLabel,
+              healthLabel || calculatedSignupQuality.signupQualityLabel,
+            ),
+          }
+        : calculatedSignupQuality;
+
+      const profileCompletion = getCustomerProfileCompletion({
+        ...enriched,
+        segment,
+        ...signupQuality,
+        profileCompletion: 0,
+      });
+
+      return {
+        ...enriched,
+        segment,
+        ...signupQuality,
+        profileCompletion,
+      };
+    }),
+  );
 
   const sortedCustomers = customers.sort((a, b) => b.totalSpend - a.totalSpend);
 
@@ -1870,7 +2000,13 @@ function getCustomerLocationLabel(customer: CustomerInsight) {
   return cityState || customer.zipCode || "Location not added yet";
 }
 
-function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) {
+function CustomerRegistryPanel({
+  customers,
+  activeMetric,
+}: {
+  customers: CustomerInsight[];
+  activeMetric: CustomerIntelligenceMetricId | null;
+}) {
   const recentCustomers = [...customers]
     .sort((a, b) => {
       const aTime = a.firstSeenDate ? new Date(a.firstSeenDate).getTime() : 0;
@@ -1878,7 +2014,11 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
 
       return bTime - aTime;
     })
-    .slice(0, 12);
+    .slice(0, activeMetric ? 40 : 12);
+
+  const metricMeta = activeMetric
+    ? getCustomerIntelligenceMetricMeta(activeMetric)
+    : null;
 
   return (
     <DashboardCard>
@@ -1888,22 +2028,34 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
             Super Admin Pet Parent Registry
           </p>
           <h2 className="mt-1 text-2xl font-black text-slate-950">
-            Click into each Pet Parent view
+            {metricMeta
+              ? `${metricMeta.label} drill-down`
+              : "Click into each Pet Parent view"}
           </h2>
           <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
-            View each Pet Parent through their dashboard preview, public profile
-            preview, or admin cleanup controls. Dashboard and public profile
-            previews are read-only. Admin cleanup controls are updatable.
+            {metricMeta
+              ? metricMeta.description
+              : "View each Pet Parent through their dashboard preview, public profile preview, or admin cleanup controls. Dashboard and public profile previews are read-only. Admin cleanup controls are updatable."}
           </p>
         </div>
 
-        <Link
-          href={adminRoutes.customers}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-        >
-          <Users size={17} />
-          Open Customers
-        </Link>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          {activeMetric ? (
+            <Link
+              href="/admin/customers"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              Clear drill-down
+            </Link>
+          ) : null}
+          <Link
+            href={adminRoutes.customers}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
+          >
+            <Users size={17} />
+            Open Customers
+          </Link>
+        </div>
       </div>
 
       {recentCustomers.length ? (
@@ -2026,8 +2178,21 @@ function CustomerRegistryPanel({ customers }: { customers: CustomerInsight[] }) 
   );
 }
 
-export default async function AdminCustomerIntelligencePage() {
+export default async function AdminCustomerIntelligencePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = (await searchParams) || {};
+  const activeMetric = parseCustomerIntelligenceMetric(params.metric);
   const data = await getCustomerIntelligenceData();
+  const drilledCustomers = filterCustomersForMetric(
+    data.customers,
+    activeMetric,
+  );
+  const metricMeta = activeMetric
+    ? getCustomerIntelligenceMetricMeta(activeMetric)
+    : null;
 
   return (
     <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
@@ -2058,6 +2223,8 @@ export default async function AdminCustomerIntelligencePage() {
                   Live Supabase insights for real Pet Parent value, repeat
                   behavior, location demand, source attribution, social growth,
                   and exportable reporting with demo/test rows filtered out.
+                  Click any metric card to drill down. Rogue can pull the same
+                  pack stats into admin reports.
                 </p>
               </div>
             </div>
@@ -2104,6 +2271,8 @@ export default async function AdminCustomerIntelligencePage() {
             label="Pet Parents"
             value={number(data.metrics.totalCustomers)}
             detail="Real Pet Parents, including incomplete profiles for admin follow-up"
+            href={getCustomerIntelligenceMetricHref("pet_parents")}
+            active={activeMetric === "pet_parents"}
           />
 
           <StatCard
@@ -2111,6 +2280,8 @@ export default async function AdminCustomerIntelligencePage() {
             label="Lifetime Value"
             value={money(data.metrics.averageLifetimeValue)}
             detail={`${money(data.metrics.totalRevenue)} total customer spend`}
+            href={getCustomerIntelligenceMetricHref("lifetime_value")}
+            active={activeMetric === "lifetime_value"}
           />
 
           <StatCard
@@ -2118,6 +2289,8 @@ export default async function AdminCustomerIntelligencePage() {
             label="Repeat Rate"
             value={`${data.metrics.repeatRate.toFixed(1)}%`}
             detail={`${number(data.metrics.repeatCustomers)} repeat customers`}
+            href={getCustomerIntelligenceMetricHref("repeat_rate")}
+            active={activeMetric === "repeat_rate"}
           />
 
           <StatCard
@@ -2127,6 +2300,8 @@ export default async function AdminCustomerIntelligencePage() {
             detail={`${data.metrics.averageBookingsPerCustomer.toFixed(
               1,
             )} avg bookings per customer`}
+            href={getCustomerIntelligenceMetricHref("active_30d")}
+            active={activeMetric === "active_30d"}
           />
 
           <StatCard
@@ -2134,6 +2309,8 @@ export default async function AdminCustomerIntelligencePage() {
             label="Rows Excluded"
             value={number(data.metrics.hiddenDemoRows)}
             detail={`${number(data.metrics.separatedAdminRows)} archived/spam/deleted cleanup rows removed; ${number(data.metrics.reviewQueueRows)} incomplete or needs-review Pet Parents remain visible`}
+            href={getCustomerIntelligenceMetricHref("rows_excluded")}
+            active={activeMetric === "rows_excluded"}
           />
         </section>
 
@@ -2143,6 +2320,8 @@ export default async function AdminCustomerIntelligencePage() {
             label="Social Signups"
             value={number(data.metrics.socialSignups)}
             detail="Launch signups or waitlist rows from social"
+            href={getCustomerIntelligenceMetricHref("social_signups")}
+            active={activeMetric === "social_signups"}
           />
 
           <StatCard
@@ -2150,6 +2329,8 @@ export default async function AdminCustomerIntelligencePage() {
             label="Social Customers"
             value={number(data.metrics.socialCustomers)}
             detail="Customers attributed to social sources"
+            href={getCustomerIntelligenceMetricHref("social_customers")}
+            active={activeMetric === "social_customers"}
           />
 
           <StatCard
@@ -2157,6 +2338,8 @@ export default async function AdminCustomerIntelligencePage() {
             label="Social Bookings"
             value={number(data.metrics.socialBookings)}
             detail="Bookings from social-attributed customers"
+            href={getCustomerIntelligenceMetricHref("social_bookings")}
+            active={activeMetric === "social_bookings"}
           />
 
           <StatCard
@@ -2164,6 +2347,8 @@ export default async function AdminCustomerIntelligencePage() {
             label="Social Revenue"
             value={money(data.metrics.socialRevenue)}
             detail="Customer spend attributed to social"
+            href={getCustomerIntelligenceMetricHref("social_revenue")}
+            active={activeMetric === "social_revenue"}
           />
 
           <StatCard
@@ -2171,11 +2356,84 @@ export default async function AdminCustomerIntelligencePage() {
             label="Social Clicks"
             value={number(data.metrics.socialClicks)}
             detail={`Top platform: ${data.metrics.topSocialPlatform}`}
+            href={getCustomerIntelligenceMetricHref("social_clicks")}
+            active={activeMetric === "social_clicks"}
           />
         </section>
 
+        {metricMeta ? (
+          <section
+            id="ci-drill-down"
+            className="rounded-[26px] border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm"
+          >
+            <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                  Active drill-down
+                </p>
+                <h2 className="mt-1 text-xl font-black text-slate-950">
+                  {metricMeta.label}
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  {metricMeta.description} Showing{" "}
+                  {number(
+                    activeMetric === "social_signups"
+                      ? data.metrics.socialSignups
+                      : activeMetric === "social_clicks"
+                        ? data.metrics.socialClicks
+                        : drilledCustomers.length,
+                  )}{" "}
+                  matching records.
+                </p>
+              </div>
+              <Link
+                href="/admin/customers"
+                className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-900 transition hover:bg-emerald-50"
+              >
+                Clear filter
+              </Link>
+            </div>
+
+            {activeMetric === "social_clicks" ||
+            activeMetric === "social_signups" ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {(data.socialSourceInsights.length
+                  ? data.socialSourceInsights
+                  : data.sourceInsights
+                )
+                  .slice(0, 9)
+                  .map((row) => (
+                    <div
+                      key={row.label}
+                      className="rounded-2xl border border-emerald-100 bg-white p-4"
+                    >
+                      <p className="text-sm font-black text-slate-950">
+                        {row.label}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        {number(row.customers || row.signups || 0)} people ·{" "}
+                        {number(row.bookings || 0)} bookings ·{" "}
+                        {money(row.revenue || 0)}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
         <section>
-          <CustomerRegistryPanel customers={data.customers} />
+          <CustomerRegistryPanel
+            customers={
+              activeMetric &&
+              activeMetric !== "social_signups" &&
+              activeMetric !== "social_clicks" &&
+              activeMetric !== "rows_excluded"
+                ? drilledCustomers
+                : data.customers
+            }
+            activeMetric={activeMetric}
+          />
         </section>
 
         <section className="grid items-start gap-5 xl:grid-cols-12">
@@ -2384,7 +2642,14 @@ export default async function AdminCustomerIntelligencePage() {
         <section>
           <DashboardCard>
             <CustomerInsightsTable
-              customers={data.customers}
+              customers={
+                activeMetric &&
+                activeMetric !== "social_signups" &&
+                activeMetric !== "social_clicks" &&
+                activeMetric !== "rows_excluded"
+                  ? drilledCustomers
+                  : data.customers
+              }
               exportHref={adminRoutes.customerExport}
               usersHref={adminRoutes.users}
             />
@@ -2448,14 +2713,28 @@ function StatCard({
   label,
   value,
   detail,
+  href,
+  active = false,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   detail: string;
+  href?: string;
+  active?: boolean;
 }) {
-  return (
-    <div className="rounded-[26px] border border-[#e3ece5] bg-white p-5 shadow-sm">
+  const className = [
+    "rounded-[26px] border bg-white p-5 shadow-sm transition",
+    active
+      ? "border-emerald-400 ring-2 ring-emerald-100"
+      : "border-[#e3ece5] hover:border-emerald-200 hover:shadow-md",
+    href ? "block focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const body = (
+    <>
       <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-green-800 text-white">
         {icon}
       </div>
@@ -2469,8 +2748,23 @@ function StatCard({
       <p className="mt-2 text-sm font-semibold leading-5 text-slate-500">
         {detail}
       </p>
-    </div>
+      {href ? (
+        <p className="mt-3 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">
+          {active ? "Viewing drill-down" : "Click to drill down"}
+        </p>
+      ) : null}
+    </>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {body}
+      </Link>
+    );
+  }
+
+  return <div className={className}>{body}</div>;
 }
 
 function SegmentRow({

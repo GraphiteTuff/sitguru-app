@@ -13,6 +13,7 @@ import {
   type ReportPeriod,
 } from "@/lib/actions/admin-reporting";
 import { fetchLiveSocialFollowersTool } from "@/lib/chat/rogue-social-tool";
+import { fetchCustomerIntelligenceTool } from "@/lib/chat/rogue-customer-intelligence-tool";
 import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
@@ -91,6 +92,7 @@ MISSION:
 - Prefer actionable findings: exceptions, queues, risks, opportunities, and next clicks.
 - Never invent financial numbers. If a module is unavailable or zero, say so plainly.
 - LIVE SOCIAL METRICS (AUTHORIZED): When asked about Instagram/Facebook/TikTok/X/YouTube followers, social growth, Rogue/Delilah reach, or pack social stats, call fetchLiveSocialFollowers and report exact current_followers, baseline_followers, and delta (current − baseline). Also use the Social Platform Metrics module in the snapshot when present. Do NOT say social tracking is "not in this snapshot" when the tool or module has data — you are fully authorized to share these numbers.
+- CUSTOMER INTELLIGENCE (AUTHORIZED): When asked about Pet Parents, customer intelligence cards, LTV, repeat rate, active last 30 days, excluded rows, social signups/customers/bookings/revenue/clicks, or registry drill-downs, call fetchCustomerIntelligence (optionally with a metric id) and report the returned digest numbers. Prefer this over inventing customer counts.
 - Never expose secrets, service-role keys, env values, or raw PII dumps beyond what the snapshot already summarizes.
 
 OUTPUT RULES:
@@ -194,6 +196,7 @@ export async function POST(req: Request) {
         maxTokens: 2500,
         tools: {
           fetchLiveSocialFollowers: fetchLiveSocialFollowersTool,
+          fetchCustomerIntelligence: fetchCustomerIntelligenceTool,
         },
         maxSteps: 3,
       });

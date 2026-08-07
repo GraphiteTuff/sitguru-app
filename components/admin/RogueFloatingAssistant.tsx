@@ -72,6 +72,13 @@ const QUICK_CHIPS = [
       "Produce Growth Analytics: campaigns/CAC signals, referrals, programs (including Veterans & Military Families), partners, analytics MoM KPIs, and chat insight friction.",
   },
   {
+    id: "customer_intelligence",
+    label: "Customer Intelligence",
+    period: "monthly" as const,
+    prompt:
+      "Pull Customer Intelligence for Pet Parents. Use fetchCustomerIntelligence and report Pet Parents, lifetime value, repeat rate, active last 30 days, excluded rows, plus social signups, social customers, social bookings, social revenue, and social clicks. Include drill-down highlights and next hops to /admin/customers.",
+  },
+  {
     id: "system_audit",
     label: "System Audit",
     period: "weekly" as const,

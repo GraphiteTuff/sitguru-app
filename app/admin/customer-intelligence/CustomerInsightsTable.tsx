@@ -233,14 +233,25 @@ function Avatar({
   email?: string;
   src?: string;
 }) {
+  const photoUrl = String(src || "").trim();
+  const lower = photoUrl.toLowerCase();
+  const hasPhoto =
+    Boolean(photoUrl) &&
+    !lower.includes("sitguru-logo") &&
+    !lower.includes("sitguru-admin-avatar") &&
+    !lower.includes("sitguru-message-avatar") &&
+    !lower.includes("avatar-placeholder") &&
+    !lower.includes("/images/demo/");
+
   return (
     <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-emerald-100 bg-white text-sm font-black text-[#0D5C3A] shadow-sm sm:h-16 sm:w-16">
       <div className="absolute inset-0 bg-white" aria-hidden />
-      {src ? (
+      {hasPhoto ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
+          src={photoUrl}
           alt=""
+          referrerPolicy="no-referrer"
           className="relative z-[1] h-full w-full object-cover object-center"
         />
       ) : (
