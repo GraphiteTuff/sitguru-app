@@ -2,8 +2,12 @@ import { Buffer } from "node:buffer";
 import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  mobileCorsHeaders,
+  optionsWithMobileCors,
+  resolveRequestUser,
+} from "@/lib/supabase/request-auth";
 import { scanMessageForOffPlatformContact } from "@/lib/messaging/contact-guard";
 
 export const dynamic = "force-dynamic";
@@ -1351,6 +1355,10 @@ function matchesIdempotentMessage({
   );
 }
 
+export async function OPTIONS(req: NextRequest) {
+  return optionsWithMobileCors(req);
+}
+
 export async function POST(req: NextRequest) {
   const delivery: DeliveryResult = {
     messageSaved: false,
@@ -1362,18 +1370,16 @@ export async function POST(req: NextRequest) {
   };
 
   let createdNewConversation = false;
+  const cors = mobileCorsHeaders(req);
 
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const resolved = await resolveRequestUser(req);
+    const user = resolved?.user ?? null;
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { ok: false, error: "Please log in to send a message.", delivery },
-        { status: 401 },
+        { status: 401, headers: cors },
       );
     }
 

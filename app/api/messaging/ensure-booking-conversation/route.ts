@@ -4,8 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import {
+  mobileCorsHeaders,
+  optionsWithMobileCors,
+  resolveRequestUser,
+} from "@/lib/supabase/request-auth";
 import {
   bookingAssignedGuruId,
   loadBookingForPawReport,
@@ -17,15 +21,22 @@ function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+export async function OPTIONS(req: NextRequest) {
+  return optionsWithMobileCors(req);
+}
+
 export async function POST(req: NextRequest) {
+  const cors = mobileCorsHeaders(req);
+
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const resolved = await resolveRequestUser(req);
+    const user = resolved?.user ?? null;
 
     if (!user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "Unauthorized" },
+        { status: 401, headers: cors },
+      );
     }
 
     const body = (await req.json().catch(() => null)) as Record<

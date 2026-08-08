@@ -9,10 +9,14 @@
  * Broadcasts SSE via walk-event-bus and triggers Pet Parent notifications.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { executeWalkAction } from "@/lib/pawreport/walk-actions";
 import type { WalkActionName } from "@/lib/pawreport/walk-events";
-import { createClient } from "@/utils/supabase/server";
+import {
+  mobileCorsHeaders,
+  optionsWithMobileCors,
+  resolveRequestUser,
+} from "@/lib/supabase/request-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -29,22 +33,30 @@ const ALLOWED_ACTIONS = new Set<WalkActionName>([
   "ping_coordinate",
 ]);
 
+export async function OPTIONS(request: NextRequest) {
+  return optionsWithMobileCors(request);
+}
+
 export async function POST(request: Request, context: RouteContext) {
+  const cors = mobileCorsHeaders(request);
   const { bookingId: raw } = await context.params;
   const bookingId = String(raw || "").trim();
 
   if (!bookingId) {
-    return NextResponse.json({ error: "Missing booking ID." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing booking ID." },
+      { status: 400, headers: cors },
+    );
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+  const resolved = await resolveRequestUser(request);
+  const user = resolved?.user ?? null;
 
-  if (userError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: cors },
+    );
   }
 
   const body = (await request.json().catch(() => ({}))) as {
@@ -58,7 +70,10 @@ export async function POST(request: Request, context: RouteContext) {
 
   const action = String(body.action || "").trim() as WalkActionName;
   if (!ALLOWED_ACTIONS.has(action)) {
-    return NextResponse.json({ error: "Invalid walk action." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid walk action." },
+      { status: 400, headers: cors },
+    );
   }
 
   const result = await executeWalkAction({
@@ -74,8 +89,14 @@ export async function POST(request: Request, context: RouteContext) {
   });
 
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json(
+      { error: result.error },
+      { status: result.status, headers: cors },
+    );
   }
 
-  return NextResponse.json({ ok: true, event: result.event });
+  return NextResponse.json(
+    { ok: true, event: result.event },
+    { headers: cors },
+  );
 }

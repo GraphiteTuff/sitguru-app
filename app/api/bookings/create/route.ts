@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  optionsWithMobileCors,
+  resolveRequestUser,
+} from "@/lib/supabase/request-auth";
 import { buildBookingPetWriteCache } from "@/lib/bookings/load-booking-pets";
 import type { LivePetProfile } from "@/lib/bookings/booking-pet";
 
@@ -442,6 +445,10 @@ export async function GET() {
   });
 }
 
+export async function OPTIONS(req: NextRequest) {
+  return optionsWithMobileCors(req);
+}
+
 export async function POST(req: NextRequest) {
   try {
     let body: BookingCreateBody;
@@ -457,15 +464,11 @@ export async function POST(req: NextRequest) {
 
     console.log("BOOKING CREATE BODY:", body);
 
-    const supabase = await createClient();
+    const resolved = await resolveRequestUser(req);
+    const user = resolved?.user ?? null;
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return jsonError("You must be signed in to create a booking.", 401, userError);
+    if (!user) {
+      return jsonError("You must be signed in to create a booking.", 401);
     }
 
     const guruSlug = getFirstText(body, ["guruSlug", "slug", "guru_slug"]);
