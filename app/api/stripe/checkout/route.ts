@@ -23,7 +23,7 @@ const stripe = new Stripe(stripeSecretKey, {
 const DEFAULT_SITGURU_FEE_PERCENT = 15;
 const MIN_SITGURU_FEE_PERCENT = 15;
 const MAX_SITGURU_FEE_PERCENT = 20;
-const TIP_PRESET_PERCENTAGES = [0, 10, 15, 20] as const;
+const TIP_PRESET_PERCENTAGES = [0, 10, 15, 18, 20] as const;
 const MAX_TIP_CENTS = 50_000;
 const SITGURU_STRIPE_TAX_CODE = "txcd_20030000";
 

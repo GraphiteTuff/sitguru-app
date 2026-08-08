@@ -10,7 +10,6 @@ import {
   MessageCircle,
   PawPrint,
   Search,
-  Settings2,
   ShieldCheck,
   Star,
   UserRound,
@@ -31,17 +30,20 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
 
+import StickyActionBar from '@/components/mobile/StickyActionBar';
+import NotificationPreferencePanel from '@/components/mobile/NotificationPreferencePanel';
+import SitGuruButton from '@/components/SitGuruButton';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import { scheduleDemoBookingRequestNotification } from '@/lib/notifications/push';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
+import { StickyFooterClearance } from '@/constants/mobile-layout';
 import { getAppTheme } from '@/constants/theme';
 import {
   setThemePreference,
@@ -81,23 +83,6 @@ type NotificationItem = {
   table: string;
 };
 
-type NotificationPreferenceKey =
-  | 'booking_alerts'
-  | 'message_alerts'
-  | 'pawreport_alerts'
-  | 'payment_alerts'
-  | 'referral_alerts';
-
-type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
-
-const DEFAULT_PREFERENCES: NotificationPreferences = {
-  booking_alerts: true,
-  message_alerts: true,
-  pawreport_alerts: true,
-  payment_alerts: true,
-  referral_alerts: true,
-};
-
 const THEME_OPTIONS: {
   icon: 'sun' | 'moon';
   label: string;
@@ -122,10 +107,6 @@ const FILTERS: {
 ];
 
 const NOTIFICATION_TABLES = ['notifications', 'user_notifications'] as const;
-const PREFERENCE_TABLES = [
-  'notification_preferences',
-  'user_notification_preferences',
-] as const;
 
 function asText(value: unknown) {
   if (typeof value === 'string') return value.trim();
@@ -432,65 +413,6 @@ async function updateNotification(
   return !compatibilityResult.error;
 }
 
-async function loadPreferences(
-  userId: string,
-): Promise<{
-  preferences: NotificationPreferences;
-  table: string | null;
-}> {
-  for (const table of PREFERENCE_TABLES) {
-    for (const field of ['user_id', 'profile_id', 'recipient_id']) {
-      const result = await supabase
-        .from(table)
-        .select('*')
-        .eq(field, userId)
-        .maybeSingle();
-
-      if (result.error) continue;
-
-      if (!result.data) {
-        return {
-          preferences: DEFAULT_PREFERENCES,
-          table,
-        };
-      }
-
-      const row = result.data as RecordRow;
-
-      return {
-        preferences: {
-          booking_alerts:
-            row.booking_alerts === undefined
-              ? true
-              : firstBoolean(row, ['booking_alerts']),
-          message_alerts:
-            row.message_alerts === undefined
-              ? true
-              : firstBoolean(row, ['message_alerts']),
-          pawreport_alerts:
-            row.pawreport_alerts === undefined
-              ? true
-              : firstBoolean(row, ['pawreport_alerts']),
-          payment_alerts:
-            row.payment_alerts === undefined
-              ? true
-              : firstBoolean(row, ['payment_alerts']),
-          referral_alerts:
-            row.referral_alerts === undefined
-              ? true
-              : firstBoolean(row, ['referral_alerts']),
-        },
-        table,
-      };
-    }
-  }
-
-  return {
-    preferences: DEFAULT_PREFERENCES,
-    table: null,
-  };
-}
-
 export default function NotificationsScreen() {
   const colorScheme = useColorScheme();
   const themePreference = useThemePreference();
@@ -512,14 +434,9 @@ export default function NotificationsScreen() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [selectedFilter, setSelectedFilter] =
     useState<NotificationCategory>('all');
-  const [preferences, setPreferences] =
-    useState<NotificationPreferences>(DEFAULT_PREFERENCES);
-  const [preferenceTable, setPreferenceTable] = useState<string | null>(null);
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [savingPreference, setSavingPreference] =
-    useState<NotificationPreferenceKey | null>(null);
   const [message, setMessage] = useState('');
 
   const displayName =
@@ -568,14 +485,9 @@ export default function NotificationsScreen() {
       }
 
       try {
-        const [nextItems, preferenceResult] = await Promise.all([
-          loadNotifications(user.id),
-          loadPreferences(user.id),
-        ]);
+        const nextItems = await loadNotifications(user.id);
 
         setItems(nextItems);
-        setPreferences(preferenceResult.preferences);
-        setPreferenceTable(preferenceResult.table);
         setMessage('');
       } catch (error) {
         setMessage(
@@ -720,71 +632,6 @@ export default function NotificationsScreen() {
     );
   }
 
-  async function togglePreference(key: NotificationPreferenceKey) {
-    if (!user?.id || !isSupabaseConfigured) return;
-
-    const nextValue = !preferences[key];
-    const nextPreferences = {
-      ...preferences,
-      [key]: nextValue,
-    };
-
-    setSavingPreference(key);
-
-    let saved = false;
-
-    if (preferenceTable) {
-      const update = await supabase
-        .from(preferenceTable)
-        .update({
-          [key]: nextValue,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id);
-
-      saved = !update.error;
-
-      if (!saved) {
-        const fallback = await supabase
-          .from(preferenceTable)
-          .upsert({
-            user_id: user.id,
-            ...nextPreferences,
-            updated_at: new Date().toISOString(),
-          });
-
-        saved = !fallback.error;
-      }
-    } else {
-      for (const table of PREFERENCE_TABLES) {
-        const insert = await supabase.from(table).upsert({
-          user_id: user.id,
-          ...nextPreferences,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-
-        if (!insert.error) {
-          saved = true;
-          setPreferenceTable(table);
-          break;
-        }
-      }
-    }
-
-    setSavingPreference(null);
-
-    if (!saved) {
-      setMessage(
-        'Notification preference was not saved. Please try again.',
-      );
-      return;
-    }
-
-    setPreferences(nextPreferences);
-    setMessage('Notification preference saved.');
-  }
-
   function openNotification(item: NotificationItem) {
     if (item.unread) {
       void markRead(item);
@@ -835,7 +682,10 @@ export default function NotificationsScreen() {
                 ) : null}
 
                 <ScrollView
-                  contentContainerStyle={styles.scrollContent}
+                  contentContainerStyle={[
+                    styles.scrollContent,
+                    { paddingBottom: StickyFooterClearance.actionPlusNav },
+                  ]}
                   refreshControl={
                     <RefreshControl
                       colors={[theme.colors.primary]}
@@ -1111,22 +961,6 @@ export default function NotificationsScreen() {
                   )}
 
                   <View style={styles.preferencesCard}>
-                    <View style={styles.sectionHeader}>
-                      <View>
-                        <Text style={styles.sectionEyebrow}>
-                          YOUR PREFERENCES
-                        </Text>
-                        <Text style={styles.sectionTitle}>
-                          Notification settings
-                        </Text>
-                      </View>
-                      <Settings2
-                        color={theme.colors.primary}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    </View>
-
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel="Try Accept Booking lock screen alert"
@@ -1151,53 +985,7 @@ export default function NotificationsScreen() {
                       </Text>
                     </Pressable>
 
-                    {[
-                      ['booking_alerts', 'Booking alerts'],
-                      ['message_alerts', 'Message alerts'],
-                      ['pawreport_alerts', 'PawReport Live alerts'],
-                      ['payment_alerts', 'Payment and payout alerts'],
-                      ['referral_alerts', 'PawPerks and referral alerts'],
-                    ].map(([key, label]) => {
-                      const preferenceKey =
-                        key as NotificationPreferenceKey;
-
-                      return (
-                        <View key={key} style={styles.preferenceRow}>
-                          <View style={styles.preferenceCopy}>
-                            <Text style={styles.preferenceLabel}>
-                              {label}
-                            </Text>
-                            <Text style={styles.preferenceHelp}>
-                              Manage alerts for this activity.
-                            </Text>
-                          </View>
-
-                          {savingPreference === preferenceKey ? (
-                            <ActivityIndicator
-                              color={theme.colors.primary}
-                              size="small"
-                            />
-                          ) : (
-                            <Switch
-                              accessibilityLabel={label}
-                              onValueChange={() =>
-                                void togglePreference(preferenceKey)
-                              }
-                              trackColor={{
-                                false: theme.colors.border,
-                                true: theme.colors.primarySoft,
-                              }}
-                              thumbColor={
-                                preferences[preferenceKey]
-                                  ? theme.colors.primary
-                                  : '#FFFFFF'
-                              }
-                              value={preferences[preferenceKey]}
-                            />
-                          )}
-                        </View>
-                      );
-                    })}
+                    <NotificationPreferencePanel />
                   </View>
 
                   <View style={styles.privacyCard}>
@@ -1219,6 +1007,15 @@ export default function NotificationsScreen() {
 
                   <View style={styles.scrollBottomSpace} />
                 </ScrollView>
+
+                <StickyActionBar embedded aboveBottomNav>
+                  <SitGuruButton
+                    label="Back to account"
+                    variant="secondary"
+                    onPress={() => router.push('/account')}
+                    accessibilityLabel="Return to account settings"
+                  />
+                </StickyActionBar>
 
                 <View style={styles.bottomNav}>
                   <BottomNavItem

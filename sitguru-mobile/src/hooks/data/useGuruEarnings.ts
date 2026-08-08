@@ -29,6 +29,7 @@ export type GuruEarningsItem = {
   petName: string;
   parentName: string;
   netAmount: number;
+  tipAmount?: number;
   status: string;
   completedAt: Date | null;
   isWalk: boolean;
@@ -131,6 +132,8 @@ function itemFromPayment(row: RecordRow, index: number): GuruEarningsItem | null
     row.status || row.payment_status || row.payout_status,
   );
   const net = readMoneyDollars(row, [
+    'guru_payout_amount',
+    'guru_payout_cents',
     'guru_net_amount',
     'net_amount',
     'payee_amount',
@@ -138,8 +141,14 @@ function itemFromPayment(row: RecordRow, index: number): GuruEarningsItem | null
     'amount_cents',
     'subtotal_cents',
   ]);
+  const tip = readMoneyDollars(row, [
+    'tip_cents',
+    'tip_amount',
+    'guru_tip_amount',
+    'guru_tip_cents',
+  ]);
 
-  if (!net && !status) return null;
+  if (!net && !tip && !status) return null;
 
   const serviceLabel =
     firstString(row, ['service_type', 'service_name', 'service', 'label'], 'Care') ||
@@ -155,7 +164,8 @@ function itemFromPayment(row: RecordRow, index: number): GuruEarningsItem | null
       ['customer_name', 'pet_parent_name', 'parent_name'],
       'Pet Parent',
     ),
-    netAmount: net,
+    netAmount: net > 0 ? net : tip,
+    tipAmount: tip,
     status: status || 'recorded',
     completedAt: parseDate(
       row.paid_at || row.completed_at || row.updated_at || row.created_at,

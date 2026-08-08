@@ -46,12 +46,21 @@ import {
   View,
 } from 'react-native';
 
+import StickyActionBar from '@/components/mobile/StickyActionBar';
+import TipSelector from '@/components/mobile/TipSelector';
+import SitGuruButton from '@/components/SitGuruButton';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
+import { StickyFooterClearance } from '@/constants/mobile-layout';
 import { getAppTheme } from '@/constants/theme';
+import {
+  computeProjectedTotalCents,
+  computeTipCents,
+  type TipChoice,
+} from '@/lib/payments/tipping';
 import {
   setThemePreference,
   useColorScheme,
@@ -1115,6 +1124,8 @@ export default function PaymentsScreen() {
 
   const [promoCode, setPromoCode] = useState('');
   const [applyCredits, setApplyCredits] = useState(true);
+  const [tipChoice, setTipChoice] = useState<TipChoice>(18);
+  const [customTipDollars, setCustomTipDollars] = useState('');
   const [loading, setLoading] = useState(true);
   const [startingCheckout, setStartingCheckout] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -1156,6 +1167,31 @@ export default function PaymentsScreen() {
     accepted &&
     !alreadyPaid &&
     (booking?.totalCents ?? 0) > 0;
+
+  const selectedTipCents = useMemo(
+    () =>
+      computeTipCents(
+        booking?.totalCents ?? booking?.subtotalCents ?? 0,
+        tipChoice,
+        customTipDollars,
+      ),
+    [booking?.subtotalCents, booking?.totalCents, customTipDollars, tipChoice],
+  );
+
+  const projectedTotalCents = useMemo(
+    () =>
+      computeProjectedTotalCents(
+        booking?.totalCents ?? 0,
+        selectedTipCents,
+        applyCredits ? credits.availableCents : 0,
+      ),
+    [
+      applyCredits,
+      booking?.totalCents,
+      credits.availableCents,
+      selectedTipCents,
+    ],
+  );
 
   const refresh = useCallback(async () => {
     if (authLoading) return;
@@ -1299,7 +1335,7 @@ export default function PaymentsScreen() {
     }
   }
 
-  async function startCheckout() {
+  async function startCheckout(options?: { tipCentsOverride?: number }) {
     setFeedback(null);
 
     if (!isAuthenticated || !user?.id) {
@@ -1364,6 +1400,11 @@ export default function PaymentsScreen() {
       return;
     }
 
+    const tipCentsForCheckout =
+      typeof options?.tipCentsOverride === 'number'
+        ? Math.max(0, Math.round(options.tipCentsOverride))
+        : selectedTipCents;
+
     setStartingCheckout(true);
 
     try {
@@ -1382,6 +1423,13 @@ export default function PaymentsScreen() {
         },
       });
 
+      const tipPercentForCheckout =
+        tipCentsForCheckout <= 0
+          ? 0
+          : tipChoice === 'custom' || tipChoice === 'none'
+            ? undefined
+            : tipChoice;
+
       const response = await fetch(
         `${apiBaseUrl}/api/mobile/payments/checkout`,
         {
@@ -1394,6 +1442,10 @@ export default function PaymentsScreen() {
             bookingId: booking.id,
             promoCode: promoCode.trim() || undefined,
             applyCredits,
+            tipCents: tipCentsForCheckout,
+            tip_cents: tipCentsForCheckout,
+            tipAmount: Number((tipCentsForCheckout / 100).toFixed(2)),
+            tipPercent: tipPercentForCheckout,
             returnUrl,
             cancelUrl: Linking.createURL('/payments', {
               queryParams: {
@@ -1503,6 +1555,9 @@ export default function PaymentsScreen() {
       (applyCredits ? credits.availableCents : 0),
   );
 
+  const showCheckoutSticky =
+    effectiveRole === 'pet_parent' && Boolean(booking?.id) && !alreadyPaid;
+
   return (
     <>
       <SitGuruScreen center={isWebPreview} maxWidth={620}>
@@ -1549,7 +1604,12 @@ export default function PaymentsScreen() {
                 ) : null}
 
                 <ScrollView
-                  contentContainerStyle={styles.scrollContent}
+                  contentContainerStyle={[
+                    styles.scrollContent,
+                    showCheckoutSticky
+                      ? { paddingBottom: StickyFooterClearance.actionPlusNav }
+                      : null,
+                  ]}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}>
                   <View style={styles.page}>
@@ -2005,18 +2065,29 @@ export default function PaymentsScreen() {
                 }
                 styles={styles}
               />
-              <InfoRow
-                label="Optional tip"
-                value={
-                  booking
-                    ? formatCurrency(
-                        booking.tipCents,
-                        booking.currency,
-                      )
-                    : 'Not available'
-                }
-                styles={styles}
-              />
+
+              {booking && !alreadyPaid ? (
+                <TipSelector
+                  serviceCents={booking.totalCents || booking.subtotalCents}
+                  choice={tipChoice}
+                  customDollars={customTipDollars}
+                  onChoiceChange={(next) => {
+                    setTipChoice(next);
+                    if (next !== 'custom') setCustomTipDollars('');
+                  }}
+                  onCustomDollarsChange={setCustomTipDollars}
+                />
+              ) : (
+                <InfoRow
+                  label="Optional tip"
+                  value={
+                    booking
+                      ? formatCurrency(booking.tipCents, booking.currency)
+                      : 'Not available'
+                  }
+                  styles={styles}
+                />
+              )}
 
               <View style={styles.creditToggleCard}>
                 <Pressable
@@ -2067,42 +2138,44 @@ export default function PaymentsScreen() {
               </View>
 
               <InfoRow
-                label="Estimated amount remaining"
+                label="Service cost"
                 value={
                   booking
-                    ? formatCurrency(
-                        amountAfterAvailableCredits,
+                    ? formatCurrency(booking.totalCents, booking.currency)
+                    : 'Not available'
+                }
+                styles={styles}
+              />
+              <InfoRow
+                label="Selected tip"
+                value={
+                  booking
+                    ? formatCurrency(selectedTipCents, booking.currency)
+                    : 'Not available'
+                }
+                styles={styles}
+              />
+              <InfoRow
+                label="Credits applied"
+                value={
+                  booking
+                    ? `-${formatCurrency(
+                        applyCredits ? credits.availableCents : 0,
                         booking.currency,
-                      )
+                      )}`
+                    : 'Not available'
+                }
+                styles={styles}
+              />
+              <InfoRow
+                label="Projected total"
+                value={
+                  booking
+                    ? formatCurrency(projectedTotalCents, booking.currency)
                     : 'Not available'
                 }
                 styles={styles}
                 emphasize
-              />
-
-              <Button
-                label={
-                  startingCheckout
-                    ? 'Opening secure checkout…'
-                    : alreadyPaid
-                      ? 'Payment confirmed'
-                      : 'Continue to SitGuru Checkout'
-                }
-                onPress={() => void startCheckout()}
-                styles={styles}
-                primary
-                disabled={startingCheckout || !canOpenCheckout}
-                icon={
-                  startingCheckout ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
-                  ) : (
-                    <CreditCard
-                      color="#FFFFFF"
-                      size={18}
-                      strokeWidth={2.4}
-                    />
-                  )
-                }
               />
 
               {!accepted && booking ? (
@@ -2117,9 +2190,8 @@ export default function PaymentsScreen() {
                 </Text>
               ) : (
                 <Text style={styles.footnote}>
-                  The checkout shows only payment methods eligible for the
-                  device, account, currency, and transaction. SitGuru does not
-                  label a payment Paid until server confirmation is recorded.
+                  Service cost + tip = projected total before Stripe opens.
+                  Tips go 100% to your Guru on the earnings ledger.
                 </Text>
               )}
             </SectionCard>
@@ -2440,6 +2512,35 @@ export default function PaymentsScreen() {
 
                   </View>
                 </ScrollView>
+
+                {showCheckoutSticky ? (
+                  <StickyActionBar embedded aboveBottomNav>
+                    <SitGuruButton
+                      label={
+                        startingCheckout
+                          ? 'Opening checkout…'
+                          : `Pay ${formatCurrency(
+                              projectedTotalCents,
+                              booking?.currency || 'usd',
+                            )}`
+                      }
+                      disabled={startingCheckout || !canOpenCheckout}
+                      onPress={() => void startCheckout()}
+                      accessibilityLabel="Continue to SitGuru Checkout with selected tip"
+                    />
+                    <SitGuruButton
+                      label="Skip tip & checkout"
+                      variant="secondary"
+                      disabled={startingCheckout || !canOpenCheckout}
+                      onPress={() => {
+                        setTipChoice('none');
+                        setCustomTipDollars('');
+                        void startCheckout({ tipCentsOverride: 0 });
+                      }}
+                      accessibilityLabel="Continue to checkout without a tip"
+                    />
+                  </StickyActionBar>
+                ) : null}
 
                 <View style={styles.bottomNav}>
                   <BottomNavItem

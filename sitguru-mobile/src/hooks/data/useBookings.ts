@@ -260,34 +260,56 @@ export function useBookings(options?: {
     [refresh, user?.email],
   );
 
-  const startCheckout = useCallback(async (bookingId: string) => {
-    setMutating(true);
-    const result = await sitguruApiFetch<{
-      checkoutUrl?: string;
-      url?: string;
-      error?: string;
-    }>(API_PATHS.mobileCheckout, {
-      body: {
-        bookingId,
-        booking_id: bookingId,
-        client: 'sitguru-mobile',
-        platform: 'mobile',
+  const startCheckout = useCallback(
+    async (
+      bookingId: string,
+      options?: {
+        tipCents?: number;
+        tipPercent?: number;
+        tipAmount?: number;
+        promoCode?: string;
+        applyCredits?: boolean;
+        returnUrl?: string;
+        cancelUrl?: string;
       },
-    });
-    setMutating(false);
+    ) => {
+      setMutating(true);
+      const result = await sitguruApiFetch<{
+        checkoutUrl?: string;
+        url?: string;
+        error?: string;
+      }>(API_PATHS.mobileCheckout, {
+        body: {
+          bookingId,
+          booking_id: bookingId,
+          client: 'sitguru-mobile',
+          platform: 'mobile',
+          tipCents: options?.tipCents,
+          tip_cents: options?.tipCents,
+          tipPercent: options?.tipPercent,
+          tipAmount: options?.tipAmount,
+          promoCode: options?.promoCode,
+          applyCredits: options?.applyCredits,
+          returnUrl: options?.returnUrl,
+          cancelUrl: options?.cancelUrl,
+        },
+      });
+      setMutating(false);
 
-    if (result.error) {
-      return { checkoutUrl: null as string | null, error: result.error };
-    }
+      if (result.error) {
+        return { checkoutUrl: null as string | null, error: result.error };
+      }
 
-    return {
-      checkoutUrl:
-        asString(result.data?.checkoutUrl) ||
-        asString(result.data?.url) ||
-        null,
-      error: null as string | null,
-    };
-  }, []);
+      return {
+        checkoutUrl:
+          asString(result.data?.checkoutUrl) ||
+          asString(result.data?.url) ||
+          null,
+        error: null as string | null,
+      };
+    },
+    [],
+  );
 
   const getBookingAccess = useCallback(
     (booking: SitGuruBooking) => {
