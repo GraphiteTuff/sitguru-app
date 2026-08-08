@@ -1,3 +1,4 @@
+import { NativePermissionCopy } from '@/constants/native-permissions';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -89,7 +90,13 @@ export async function registerForPushNotificationsAsync(): Promise<
   let status = existing.status;
 
   if (status !== 'granted') {
-    const asked = await Notifications.requestPermissionsAsync();
+    const asked = await Notifications.requestPermissionsAsync({
+      ios: {
+        allowAlert: true,
+        allowBadge: true,
+        allowSound: true,
+      },
+    });
     status = asked.status;
   }
 
@@ -109,6 +116,11 @@ export async function registerForPushNotificationsAsync(): Promise<
   } catch {
     return null;
   }
+}
+
+/** Product copy used for in-app permission education (Info.plist owns the OS dialog). */
+export function getPushPermissionRationale() {
+  return NativePermissionCopy.notifications;
 }
 
 /**

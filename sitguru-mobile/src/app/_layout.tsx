@@ -7,6 +7,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { router, Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
@@ -26,6 +27,10 @@ import {
 // Ensure TaskManager.defineTask runs before any walk screen mounts.
 import '@/lib/location/background-walk-task';
 
+void SplashScreen.preventAutoHideAsync().catch(() => {
+  // Native splash may already be hidden in web / Expo Go.
+});
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const appTheme = getAppTheme(
@@ -39,6 +44,11 @@ export default function RootLayout() {
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
   });
+
+  useEffect(() => {
+    if (!fontsLoaded) return;
+    void SplashScreen.hideAsync().catch(() => undefined);
+  }, [fontsLoaded]);
 
   useEffect(() => {
     const subscription = subscribeToNotificationResponses(

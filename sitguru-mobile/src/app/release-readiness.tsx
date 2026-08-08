@@ -6,6 +6,7 @@ import { SitGuruColors } from '@/constants/colors';
 
 type StatusTone =
   | 'complete'
+  | 'ready'
   | 'visual'
   | 'wiring'
   | 'missing'
@@ -346,30 +347,31 @@ const privacyRows: SimpleRow[] = [
   { label: 'Privacy policy', value: 'Needed', tone: 'needed' },
   { label: 'Terms of service', value: 'Needed', tone: 'needed' },
   { label: 'Data Safety / app privacy labels', value: 'Review', tone: 'review' },
-  { label: 'Location permission wording', value: 'Needed', tone: 'needed' },
-  { label: 'Camera/photo permission wording', value: 'Needed', tone: 'needed' },
-  { label: 'Notification permission wording', value: 'Needed', tone: 'needed' },
+  { label: 'Location permission wording', value: 'Configured in Expo', tone: 'ready' },
+  { label: 'Camera/photo permission wording', value: 'Configured in Expo', tone: 'ready' },
+  { label: 'Microphone / voice-note wording', value: 'Configured in Expo', tone: 'ready' },
+  { label: 'Notification permission wording', value: 'Configured in Expo', tone: 'ready' },
   { label: 'Payment security copy', value: 'Draft', tone: 'review' },
   { label: 'Support/safety reporting', value: 'Visual-only', tone: 'visual' },
-  { label: 'Live tracking only during active booked care', value: 'Required', tone: 'needed' },
+  { label: 'Live tracking only during active booked care', value: 'Configured', tone: 'ready' },
   { label: 'Off-platform payment warning', value: 'Required', tone: 'needed' },
   { label: 'Account deletion / data request', value: 'Future', tone: 'future' },
   { label: 'Child safety / age policy review', value: 'Review', tone: 'review' },
 ];
 
 const assetRows: SimpleRow[] = [
-  { label: 'App icon', value: 'Not started', tone: 'missing' },
-  { label: 'Splash screen', value: 'Not started', tone: 'missing' },
-  { label: 'App name', value: 'Draft', tone: 'review' },
+  { label: 'App icon', value: 'Configured', tone: 'ready' },
+  { label: 'Splash screen', value: 'Configured', tone: 'ready' },
+  { label: 'App name', value: 'SitGuru', tone: 'ready' },
   { label: 'Subtitle / tagline', value: 'Draft', tone: 'review' },
   { label: 'Short description', value: 'Needed', tone: 'needed' },
   { label: 'Long description', value: 'Needed', tone: 'needed' },
   { label: 'Keywords', value: 'Needed', tone: 'needed' },
   { label: 'Screenshots', value: 'Not started', tone: 'missing' },
   { label: 'Preview video', value: 'Optional', tone: 'future' },
-  { label: 'Support URL', value: 'Needed', tone: 'needed' },
-  { label: 'Marketing URL', value: 'Needed', tone: 'needed' },
-  { label: 'Privacy policy URL', value: 'Needed', tone: 'needed' },
+  { label: 'Support URL', value: 'sitguru.com/support', tone: 'ready' },
+  { label: 'Marketing URL', value: 'sitguru.com', tone: 'ready' },
+  { label: 'Privacy policy URL', value: 'sitguru.com/privacy', tone: 'ready' },
   { label: 'Contact email', value: 'Needed', tone: 'needed' },
   { label: 'Category', value: 'Review', tone: 'review' },
   { label: 'Age rating', value: 'Review', tone: 'review' },
@@ -707,6 +709,7 @@ function StatusBadge({ label, tone }: { label: string; tone: StatusTone }) {
 function getStatusBadgeStyle(tone: StatusTone) {
   switch (tone) {
     case 'complete':
+    case 'ready':
       return styles.statusComplete;
     case 'visual':
       return styles.statusVisual;
