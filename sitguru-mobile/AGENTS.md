@@ -23,20 +23,25 @@ NativeWind/Tailwind is **not** installed. Use StyleSheet + shared primitives:
 | Potty / Water care actions | `src/components/mobile/CareQuickActions.tsx` |
 | Chat photo + voice composer | `src/components/mobile/ChatComposerBar.tsx` |
 | Vaccine paper camera scan | `src/components/mobile/VaccineScanStep.tsx` |
+| Service core grid (Pet Parent) | `src/components/mobile/ServiceCoreGrid.tsx` |
+| Cached live photo loader | `src/components/mobile/CachedRemoteImage.tsx` |
 
 ## SitGuru Mobile UX rules
 
 1. **One-handed thumb zone** — Keep bottom tab nav locked. Primary actions (`Request Booking`, `Start Walk`, Accept/Decline) are large full-width sticky buttons in the footer (lower ~30%), never desktop-style top/left chrome.
-2. **Gestures over tiny taps** — List approve/decline uses swipe: **right = accept**, **left = decline** (`guru-requests`).
-3. **Card progressive disclosure** — Dashboards show a `PriorityCarousel` of highest-priority cards only; tap opens deep-dive routes instead of dumping analytics/history on one screen.
+2. **Gestures over tiny taps** — List approve/decline uses swipe: **right = accept**, **left = decline** (`guru-requests`). Hint text must remain: `Swipe right to accept · Swipe left to decline`.
+3. **Card progressive disclosure** — Dashboards show a `PriorityCarousel` of highest-priority cards only; tap opens deep-dive routes instead of dumping analytics/history on one screen. AI Companions (Rogue / Taco / Scout) use the same carousel pattern.
 4. No core-flow horizontal scroll except the intentional priority carousel. All interactive targets ≥ **48dp**.
 5. **High-fidelity native surfaces** (desktop → mobile):
+   - **Service core** — Thumb grid for Dog Walking / Pet Sitting / Boarding / Drop-In / Day Care / Training Support + sticky footer CTA.
+   - **Live PawReport** — Walk snapshot via Bearer `GET /api/walk/stream/[bookingId]?format=json` (`usePawReportLive`).
+   - **Live photo pipeline** — Guru camera capture uploads to `pawreport-photos` (fallback `provider-media` / `pet-media`) via `uploadSitGuruMedia`; Pet Parent feed uses `CachedRemoteImage` + dynamic `N new photos` badges. StickyActionBar owns capture on `guru-live-walk`.
    - **Live route** — Floating compact map (`LiveRouteHeader` + `expo-location`); oversized Potty / Water (`CareQuickActions`).
    - **Chat** — Photo bar + voice notes (`ChatComposerBar` + `expo-image-picker` / `expo-av`) with `KeyboardAvoidingView`.
    - **Pet Passports** — Step wizard (`MobileWizard`) + vaccine camera scan (`VaccineScanStep` + `expo-camera`).
    - **Notifications** — Native push + lock-screen Accept Booking (`expo-notifications`, `src/lib/notifications/push.ts`).
 
-Reference screens: `guru-requests.tsx`, `guru-live-walk.tsx`, `conversation.tsx`, `pet-passports.tsx`, `notifications.tsx`, dashboards.
+Reference screens: `guru-requests.tsx`, `pet-parent-dashboard.tsx`, `pawreport-live.tsx`, `ai-companion.tsx`, `guru-live-walk.tsx`, `conversation.tsx`, `pet-passports.tsx`, `notifications.tsx`.
 
 ---
 
@@ -84,7 +89,7 @@ Product note: web creates `bookings` as `pending`/`unpaid` and starts Stripe che
 - **Data layer:** Shared hooks/helpers live under `src/hooks/data` and `src/lib/data`. Migrate screens off duplicated table-fallback helpers onto these hooks.
 - **Supabase:** Shared backend via `@/lib/supabase` (anon key only). Mobile repo migrations today cover support tickets and verified booking reviews; marketplace tables come from the shared website project.
 - **Already partially live:** login/signup, role selection, pet-parent/guru dashboards, find-care, guru profile/pricing/requests, request-booking, booking-details, conversation/messages, notifications, payments, reviews, support, care map / live walk screens.
-- **Still visual / incomplete:** Pet Passport wizard is native UX (camera scan) but still local draft until Supabase `pets` CRUD wires fully; `SitGuruBottomNav` (non-navigating preview), several setup screens, ambassador/admin polish, and internal readiness/planning routes mixed into the same flat app tree.
+- **Still visual / incomplete:** `SitGuruBottomNav` (non-navigating preview), several setup screens, ambassador/admin polish, and internal readiness/planning routes mixed into the same flat app tree. Pet Passports wizard persists via `usePets` + vaccine scan upload.
 
 Core finish line for this checklist: **clean Expo Router groups + complete Pet Parent and Guru happy paths** (auth → setup → discovery/booking → care → pay/review). Ambassador, admin, and internal tooling stay deferred unless they block those two flows.
 
@@ -204,6 +209,7 @@ End-to-end: **sign up → choose Guru → setup → profile/pricing/area → req
 - [ ] Verify RLS for: `profiles`, `user_roles`, `pets`, `gurus`, bookings/status events, conversations/messages, visit sessions/locations/updates, notifications, payments, reviews, support.
 - [ ] Align remaining screen queries with canonical column names from `@/lib/data/schema` and `@/lib/data/booking-access`.
 - [ ] Ensure booking participant checks stay identical for parent and guru clients (select/update policies + access helpers).
+- [x] PawReport live photo pipeline (`uploadSitGuruMedia` → `booking_visit_updates.photo_url`) with cached Pet Parent feed rendering.
 - [ ] Storage buckets (avatars, passport photos, PawReport photos) only after RLS + signed URL plan; until then keep photo actions disabled with clear UI copy.
 - [ ] Realtime channels: prefer filtered `useRealtimeSubscription` / `REALTIME_CHANNELS`; remove whole-table dashboard listeners as screens migrate.
 

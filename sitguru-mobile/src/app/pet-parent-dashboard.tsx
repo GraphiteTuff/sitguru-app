@@ -37,6 +37,10 @@ import MobileScreen from '@/components/mobile/MobileScreen';
 import PriorityCarousel, {
   type PriorityCard,
 } from '@/components/mobile/PriorityCarousel';
+import ServiceCoreGrid, {
+  CARE_SERVICES,
+  type CareServiceKey,
+} from '@/components/mobile/ServiceCoreGrid';
 import StickyActionBar from '@/components/mobile/StickyActionBar';
 import TouchTarget from '@/components/mobile/TouchTarget';
 import SitGuruButton from '@/components/SitGuruButton';
@@ -44,6 +48,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { AI_COMPANIONS } from '@/constants/companions';
 import { AppFonts } from '@/constants/fonts';
 import {
   StickyFooterClearance,
@@ -109,6 +114,7 @@ type LiveCare = {
   latestUpdate: string;
   latestUpdateAt: Date | null;
   routePointCount: number;
+  photoCount: number;
 };
 
 type DashboardData = {
@@ -218,6 +224,8 @@ export default function PetParentDashboardScreen() {
   const [loadMessage, setLoadMessage] = useState('');
   const [now, setNow] = useState(Date.now());
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
+  const [selectedServiceKey, setSelectedServiceKey] =
+    useState<CareServiceKey | null>(null);
 
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -427,7 +435,10 @@ export default function PetParentDashboardScreen() {
         title: activeCare.petName
           ? `${activeCare.petName} is with ${activeCare.guruName || 'your Guru'}`
           : 'Care in progress',
-        helper: activeCare.latestUpdate || 'Open PawReport Live for updates.',
+        helper:
+          activeCare.photoCount > 0
+            ? `${activeCare.photoCount} new photo${activeCare.photoCount === 1 ? '' : 's'} · ${activeCare.latestUpdate || 'Open PawReport Live'}`
+            : activeCare.latestUpdate || 'Open PawReport Live for updates.',
         tone: 'primary',
         ctaLabel: 'Open PawReport Live',
         onPress: () => router.push('/pawreport-live'),
@@ -531,6 +542,39 @@ export default function PetParentDashboardScreen() {
     pawPoints,
   ]);
 
+  const companionCards = useMemo<PriorityCard[]>(
+    () =>
+      AI_COMPANIONS.map((companion) => ({
+        id: companion.id,
+        eyebrow: 'AI Companion',
+        title: `${companion.name} · ${companion.title}`,
+        helper: companion.helper,
+        tone: companion.id === 'rogue' ? 'primary' : 'surface',
+        ctaLabel: companion.ctaLabel,
+        onPress: () =>
+          router.push({
+            pathname: '/ai-companion',
+            params: { id: companion.id },
+          } as never),
+        icon: (
+          <Sparkles
+            color={companion.id === 'rogue' ? '#FFFFFF' : palette.primary}
+            size={22}
+            strokeWidth={2.4}
+          />
+        ),
+      })),
+    [palette.primary],
+  );
+
+  const selectedService = CARE_SERVICES.find(
+    (service) => service.key === selectedServiceKey,
+  );
+
+  const requestCareLabel = selectedService
+    ? `Request ${selectedService.label}`
+    : primaryAction.title;
+
   return (
     <SitGuruScreen center={false} maxWidth={620} scroll={false}>
       <RoleGate requiredRole="pet_parent">
@@ -543,9 +587,18 @@ export default function PetParentDashboardScreen() {
             <View>
               <StickyActionBar embedded>
                 <SitGuruButton
-                  label={primaryAction.title}
-                  onPress={() => router.push(primaryAction.route)}
-                  accessibilityLabel={`${primaryAction.title}. ${primaryAction.helper}`}
+                  label={requestCareLabel}
+                  onPress={() => {
+                    if (selectedService) {
+                      router.push({
+                        pathname: '/request-booking',
+                        params: { serviceType: selectedService.serviceType },
+                      });
+                      return;
+                    }
+                    router.push(primaryAction.route);
+                  }}
+                  accessibilityLabel={`${requestCareLabel}. ${selectedService?.helper || primaryAction.helper}`}
                 />
               </StickyActionBar>
 
@@ -721,6 +774,18 @@ export default function PetParentDashboardScreen() {
             ) : (
               <PriorityCarousel label="Priority" cards={priorityCards} />
             )}
+
+            <ServiceCoreGrid
+              selectedKey={selectedServiceKey}
+              onSelect={(service) => {
+                setSelectedServiceKey(service.key);
+              }}
+            />
+
+            <PriorityCarousel
+              label="AI Companions"
+              cards={companionCards}
+            />
 
             <View style={styles.sectionHeader}>
               <View>
@@ -1626,9 +1691,11 @@ async function loadPetParentDashboard(
       ),
     ]);
 
-    const latestUpdate = updateRows
-      .map(mapCareUpdate)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    const mappedUpdates = updateRows.map(mapCareUpdate);
+    const latestUpdate = mappedUpdates.sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    )[0];
+    const photoCount = mappedUpdates.filter((item) => item.isPhoto).length;
 
     selectedCareWithUpdates = {
       ...selectedCare,
@@ -1641,6 +1708,7 @@ async function loadPetParentDashboard(
       latestUpdateAt:
         latestUpdate?.createdAt ?? selectedCare.latestUpdateAt,
       routePointCount: locationRows.length,
+      photoCount,
     };
   }
 
@@ -1985,6 +2053,7 @@ function mapLiveCareRow(
         ]) ?? 0,
       ),
     ),
+    photoCount: 0,
   };
 }
 
@@ -2005,8 +2074,22 @@ function mapCareUpdate(row: RecordRow) {
     'body',
   ]);
 
+  const photoUrl = getFirstString(row, [
+    'photo_url',
+    'image_url',
+    'media_url',
+    'attachment_url',
+  ]);
+
+  const isPhoto =
+    Boolean(photoUrl) ||
+    type.toLowerCase().includes('photo') ||
+    type.toLowerCase().includes('image') ||
+    /^https?:\/\//i.test(copy);
+
   return {
     label: copy || formatCareUpdateType(type),
+    isPhoto,
     createdAt:
       getFirstDate(row, ['created_at', 'recorded_at', 'updated_at']) ??
       new Date(0),

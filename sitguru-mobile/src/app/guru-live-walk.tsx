@@ -30,15 +30,20 @@ import {
 } from 'react-native';
 
 import CareQuickActions from '@/components/mobile/CareQuickActions';
+import CachedRemoteImage from '@/components/mobile/CachedRemoteImage';
 import LiveRouteHeader from '@/components/mobile/LiveRouteHeader';
+import StickyActionBar from '@/components/mobile/StickyActionBar';
 import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
+import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { uploadSitGuruMedia } from '@/lib/data/media-upload';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import * as ImagePicker from 'expo-image-picker';
 
 type RecordRow = Record<string, unknown>;
 type CareStatus = 'not_started' | 'active' | 'paused' | 'completed';
@@ -70,6 +75,7 @@ type CareUpdate = {
   type: UpdateType | 'status';
   label: string;
   note: string;
+  photoUrl: string | null;
   createdAt: Date;
 };
 
@@ -107,6 +113,7 @@ export default function GuruLiveWalkScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [message, setMessage] = useState('');
   const [now, setNow] = useState(Date.now());
   const [trail, setTrail] = useState<
@@ -259,6 +266,7 @@ export default function GuruLiveWalkScreen() {
           type: 'status',
           label: 'Care started',
           note: `PawReport Live started for ${booking.petName}.`,
+          photoUrl: null,
           createdAt: new Date(),
         },
         ...current,
@@ -337,6 +345,7 @@ export default function GuruLiveWalkScreen() {
                   nextStatus === 'completed'
                     ? 'Final PawReport is ready for review.'
                     : `PawReport status changed to ${nextStatus}.`,
+                photoUrl: null,
                 createdAt: nowDate,
               },
               ...current,
@@ -354,6 +363,108 @@ export default function GuruLiveWalkScreen() {
     ]);
   }
 
+  async function captureCarePhoto() {
+    if (!user?.id || !booking?.id || !session) {
+      Alert.alert(
+        'Start care first',
+        'Start the PawReport session before adding care photos.',
+      );
+      return;
+    }
+
+    if (uploadingPhoto) return;
+
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Camera needed',
+        'Allow camera access to upload live care photos during the walk.',
+      );
+      return;
+    }
+
+    const picked = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.82,
+      allowsEditing: true,
+      aspect: [4, 3],
+    });
+
+    if (picked.canceled || !picked.assets?.[0]?.uri) return;
+
+    const asset = picked.assets[0];
+    const optimisticId = `photo-local-${Date.now()}`;
+
+    // Optimistic UI — never block distance/timer loops with setSaving.
+    setUploadingPhoto(true);
+    setUpdates((current) => [
+      {
+        id: optimisticId,
+        type: 'photo',
+        label: 'Photo uploading…',
+        note: 'Uploading care photo to SitGuru storage.',
+        photoUrl: asset.uri,
+        createdAt: new Date(),
+      },
+      ...current,
+    ]);
+
+    try {
+      const uploaded = await uploadSitGuruMedia({
+        localUri: asset.uri,
+        userId: user.id,
+        scopeId: booking.id,
+        kind: 'pawreport',
+        mimeType: asset.mimeType,
+        fileName: asset.fileName,
+      });
+
+      const note = uploaded.publicUrl;
+      const saved = await createUpdate(
+        user.id,
+        booking.id,
+        session.id,
+        'photo',
+        note,
+        uploaded.publicUrl,
+      );
+
+      if (!saved) {
+        throw new Error('No compatible update table found.');
+      }
+
+      setUpdates((current) =>
+        current.map((item) =>
+          item.id === optimisticId
+            ? {
+                id:
+                  firstString(saved, ['id', 'update_id']) ||
+                  `photo-${Date.now()}`,
+                type: 'photo',
+                label: 'Photo update',
+                note: uploaded.publicUrl,
+                photoUrl: uploaded.publicUrl,
+                createdAt:
+                  firstDate(saved, ['created_at', 'updated_at']) || new Date(),
+              }
+            : item,
+        ),
+      );
+    } catch (error) {
+      setUpdates((current) =>
+        current.filter((item) => item.id !== optimisticId),
+      );
+      Alert.alert(
+        'Photo upload failed',
+        error instanceof Error
+          ? error.message
+          : 'SitGuru could not upload this care photo.',
+      );
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
   async function addUpdate(type: UpdateType) {
     if (!user?.id || !booking?.id || !session) {
       Alert.alert(
@@ -364,10 +475,7 @@ export default function GuruLiveWalkScreen() {
     }
 
     if (type === 'photo') {
-      Alert.alert(
-        'Photo upload',
-        'The modern PawReport layout is ready for photo uploads. Connect the app’s existing media picker and storage upload to this button.',
-      );
+      void captureCarePhoto();
       return;
     }
 
@@ -409,6 +517,7 @@ export default function GuruLiveWalkScreen() {
           type,
           label,
           note,
+          photoUrl: null,
           createdAt: firstDate(saved, ['created_at', 'updated_at']) || new Date(),
         },
         ...current,
@@ -809,6 +918,21 @@ export default function GuruLiveWalkScreen() {
                   )}
                 </ScrollView>
 
+                {status === 'active' || status === 'paused' ? (
+                  <StickyActionBar embedded>
+                    <SitGuruButton
+                      label={
+                        uploadingPhoto
+                          ? 'Uploading photo…'
+                          : 'Capture care photo'
+                      }
+                      disabled={uploadingPhoto}
+                      onPress={() => void captureCarePhoto()}
+                      accessibilityLabel="Capture care photo for PawReport Live"
+                    />
+                  </StickyActionBar>
+                ) : null}
+
                 <View style={styles.bottomNav}>
                   <BottomNavItem
                     icon={
@@ -983,7 +1107,15 @@ function UpdateRow({
 
       <View style={styles.updateCopy}>
         <Text style={styles.updateTitle}>{update.label}</Text>
-        <Text style={styles.updateNote}>{update.note}</Text>
+        {update.photoUrl ? (
+          <CachedRemoteImage
+            uri={update.photoUrl}
+            accessibilityLabel={update.label}
+            style={{ height: 88, width: 120, borderRadius: 12, marginTop: 6 }}
+          />
+        ) : (
+          <Text style={styles.updateNote}>{update.note}</Text>
+        )}
       </View>
 
       <Text style={styles.updateTime}>{formatTime(update.createdAt)}</Text>
@@ -1247,6 +1379,7 @@ async function createUpdate(
   sessionId: string,
   type: UpdateType,
   note: string,
+  photoUrl?: string | null,
 ) {
   const now = new Date().toISOString();
 
@@ -1257,6 +1390,7 @@ async function createUpdate(
       guru_id: userId,
       update_type: type,
       note,
+      photo_url: photoUrl || null,
       created_at: now,
     },
     {
@@ -1265,6 +1399,8 @@ async function createUpdate(
       user_id: userId,
       type,
       message: note,
+      photo_url: photoUrl || null,
+      image_url: photoUrl || null,
       created_at: now,
     },
     {
@@ -1272,6 +1408,7 @@ async function createUpdate(
       booking_id: bookingId,
       type,
       note,
+      photo_url: photoUrl || null,
       created_at: now,
     },
   ];
@@ -1396,7 +1533,15 @@ function mapUpdate(row: RecordRow, index: number): CareUpdate {
       ? 'water'
       : rawType.includes('food')
         ? 'food'
-        : rawType.includes('photo')
+        : rawType.includes('photo') ||
+            Boolean(
+              firstString(row, [
+                'photo_url',
+                'image_url',
+                'media_url',
+                'attachment_url',
+              ]),
+            )
           ? 'photo'
           : rawType.includes('status')
             ? 'status'
@@ -1423,6 +1568,13 @@ function mapUpdate(row: RecordRow, index: number): CareUpdate {
     note:
       firstString(row, ['note', 'message', 'description', 'text']) ||
       'PawReport update recorded.',
+    photoUrl:
+      firstString(row, [
+        'photo_url',
+        'image_url',
+        'media_url',
+        'attachment_url',
+      ]) || null,
     createdAt:
       firstDate(row, ['created_at', 'updated_at', 'recorded_at']) ||
       new Date(),

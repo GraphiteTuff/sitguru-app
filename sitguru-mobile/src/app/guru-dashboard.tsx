@@ -90,6 +90,7 @@ type LiveCare = {
   isWalk: boolean;
   petName: string;
   startedAt: Date | null;
+  distanceMiles: number | null;
 };
 
 type PayoutSummary = {
@@ -554,12 +555,15 @@ export default function GuruDashboardScreen() {
             data.liveCare.isWalk
               ? 'Continue Live Walk'
               : 'Continue PawReport',
-          helper: `${
-            data.liveCare.petName
-          } • ${elapsed(
-            data.liveCare.startedAt,
-            now,
-          )}`,
+          helper: [
+            data.liveCare.petName,
+            elapsed(data.liveCare.startedAt, now),
+            typeof data.liveCare.distanceMiles === 'number'
+              ? `${data.liveCare.distanceMiles.toFixed(1)} mi`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' • '),
           route: '/guru-live-walk',
           icon: 'paw',
         };
@@ -701,7 +705,14 @@ export default function GuruDashboardScreen() {
         id: 'live',
         eyebrow: data.liveCare.isWalk ? 'Live walk' : 'Live care',
         title: data.liveCare.petName || 'Care in progress',
-        helper: 'Open PawReport tools for this visit.',
+        helper: [
+          'Open PawReport tools for this visit',
+          typeof data.liveCare.distanceMiles === 'number'
+            ? `${data.liveCare.distanceMiles.toFixed(1)} mi tracked`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
         onPress: () => router.push('/guru-live-walk'),
       });
     }
@@ -3249,6 +3260,7 @@ function mapLiveCare(
       'checked_in_at',
       'created_at',
     ]),
+    distanceMiles: distanceMiles(row),
   };
 }
 

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   StyleSheet,
@@ -22,6 +23,13 @@ import {
   MobileType,
   TOUCH_MIN,
 } from '@/constants/mobile-layout';
+import { usePets } from '@/hooks/data/usePets';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  EMPTY_CANONICAL_PET_FORM,
+  type CanonicalPetForm,
+} from '@/lib/data/pets';
+import { uploadSitGuruMedia } from '@/lib/data/media-upload';
 
 const WIZARD_STEPS: WizardStep[] = [
   {
@@ -91,13 +99,14 @@ function ScreenHeader({
 }
 
 /**
- * Native step-by-step Pet Passport onboarding (replaces long desktop forms).
+ * Native Pet Passport wizard — persists to Supabase `pets` via usePets.
  */
 export default function PetPassportsScreen() {
+  const { user } = useAuth();
+  const { pets, loading, saving, error, savePet, refresh } = usePets();
   const [mode, setMode] = useState<'hub' | 'wizard'>('hub');
   const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<Draft>(EMPTY);
-  const [saved, setSaved] = useState<Draft[]>([]);
 
   const canContinue = useMemo(() => {
     if (stepIndex === 0) return draft.name.trim().length > 1 && !!draft.type;
@@ -113,12 +122,53 @@ export default function PetPassportsScreen() {
     setMode('wizard');
   }
 
-  function finishWizard() {
-    setSaved((current) => [draft, ...current]);
+  async function finishWizard() {
+    if (!user?.id || !draft.type || !draft.size || !draft.vaccineUri) return;
+
+    let photoUrl = '';
+    try {
+      const uploaded = await uploadSitGuruMedia({
+        localUri: draft.vaccineUri,
+        userId: user.id,
+        scopeId: 'passport',
+        kind: 'passport',
+      });
+      photoUrl = uploaded.publicUrl;
+    } catch (uploadError) {
+      Alert.alert(
+        'Vaccine scan upload failed',
+        uploadError instanceof Error
+          ? uploadError.message
+          : 'SitGuru could not upload vaccine papers.',
+      );
+      return;
+    }
+
+    const form: CanonicalPetForm = {
+      ...EMPTY_CANONICAL_PET_FORM,
+      name: draft.name.trim(),
+      species: draft.type,
+      size: draft.size,
+      breed: draft.breed.trim(),
+      photo_url: photoUrl,
+      care_instructions: draft.careNote.trim(),
+      notes: draft.careNote.trim(),
+      medical_notes: 'Vaccine papers attached via Pet Passport scan.',
+    };
+
+    const result = await savePet(form);
+    if (result.error || !result.pet) {
+      Alert.alert(
+        'Could not save passport',
+        result.error || 'SitGuru could not save this pet.',
+      );
+      return;
+    }
+
     setMode('hub');
     Alert.alert(
-      'Passport started',
-      `${draft.name}'s passport is ready for Gurus. Vaccine scan attached.`,
+      'Passport saved',
+      `${result.pet.name}'s passport is live for Gurus.`,
     );
   }
 
@@ -129,17 +179,24 @@ export default function PetPassportsScreen() {
         <MobileWizard
           steps={WIZARD_STEPS}
           stepIndex={stepIndex}
-          nextDisabled={!canContinue}
+          nextDisabled={!canContinue || saving}
           nextLabel={
-            stepIndex === WIZARD_STEPS.length - 1 ? 'Save passport' : 'Continue'
+            stepIndex === WIZARD_STEPS.length - 1
+              ? saving
+                ? 'Saving…'
+                : 'Save passport'
+              : 'Continue'
           }
           onBack={() => {
             if (stepIndex === 0) setMode('hub');
             else setStepIndex((i) => i - 1);
           }}
           onNext={() => {
-            if (stepIndex >= WIZARD_STEPS.length - 1) finishWizard();
-            else setStepIndex((i) => i + 1);
+            if (stepIndex >= WIZARD_STEPS.length - 1) {
+              void finishWizard();
+            } else {
+              setStepIndex((i) => i + 1);
+            }
           }}
         >
           {stepIndex === 0 ? (
@@ -247,6 +304,8 @@ export default function PetPassportsScreen() {
 
   return (
     <MobileScreen
+      refreshing={loading}
+      onRefresh={() => void refresh()}
       footer={
         <TouchTarget
           accessibilityRole="button"
@@ -263,11 +322,22 @@ export default function PetPassportsScreen() {
         onBack={() => router.push('/pet-parent-dashboard')}
       />
       <Text style={styles.subtitle}>
-        Step-by-step passports with camera vaccine scans — built for one-handed
-        setup, not desktop forms.
+        Passports save to your SitGuru account — Gurus see routines and vaccine
+        scans before care starts.
       </Text>
 
-      {saved.length === 0 ? (
+      {error ? (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
+      {loading && pets.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <ActivityIndicator color={SitGuruColors.primary} />
+          <Text style={styles.emptyText}>Loading passports…</Text>
+        </View>
+      ) : pets.length === 0 ? (
         <View style={styles.emptyCard}>
           <SitGuruProfilePhotoFrame
             fallbackEmoji="🐾"
@@ -282,12 +352,16 @@ export default function PetPassportsScreen() {
           </Text>
         </View>
       ) : (
-        saved.map((pet) => (
-          <View key={`${pet.name}-${pet.vaccineUri}`} style={styles.petCard}>
+        pets.map((pet) => (
+          <View key={pet.id} style={styles.petCard}>
             <View style={styles.petTop}>
               <SitGuruProfilePhotoFrame
-                fallbackEmoji={pet.type === 'Cat' ? '🐱' : '🐶'}
-                imageUrl={pet.vaccineUri}
+                fallbackEmoji={
+                  (pet.species || '').toLowerCase().includes('cat')
+                    ? '🐱'
+                    : '🐶'
+                }
+                imageUrl={pet.photo_url}
                 name={pet.name}
                 shape="square"
                 size="md"
@@ -295,20 +369,24 @@ export default function PetPassportsScreen() {
               <View style={styles.petCopy}>
                 <Text style={styles.petName}>{pet.name}</Text>
                 <Text style={styles.petMeta}>
-                  {pet.type} · {pet.size}
-                  {pet.breed ? ` · ${pet.breed}` : ''}
+                  {[pet.species, pet.size, pet.breed].filter(Boolean).join(' · ')}
                 </Text>
                 <Text style={styles.petMeta} numberOfLines={2}>
-                  {pet.careNote}
+                  {pet.care_instructions || pet.notes || 'Care notes ready'}
                 </Text>
-                {pet.vaccineUri ? (
+                {pet.photo_url ? (
                   <Text style={styles.badge}>Vaccine scan attached</Text>
                 ) : null}
               </View>
             </View>
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.push('/request-booking')}
+              onPress={() =>
+                router.push({
+                  pathname: '/request-booking',
+                  params: { petId: pet.id, petName: pet.name },
+                })
+              }
               style={styles.secondaryLink}
             >
               <Text style={styles.secondaryLinkText}>Request Care</Text>
@@ -382,6 +460,17 @@ const styles = StyleSheet.create({
     fontSize: MobileType.body,
     lineHeight: 22,
     textAlign: 'center',
+  },
+  errorCard: {
+    backgroundColor: '#FEF3F2',
+    borderRadius: 14,
+    marginBottom: MobileSpace.md,
+    padding: MobileSpace.md,
+  },
+  errorText: {
+    color: '#B42318',
+    fontFamily: AppFonts.medium,
+    fontSize: MobileType.caption,
   },
   petCard: {
     backgroundColor: SitGuruColors.surface,

@@ -44,6 +44,10 @@ import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import {
+  mediaMessageBody,
+  uploadSitGuruMedia,
+} from '@/lib/data/media-upload';
 import { normalizeRole, type AppRole } from '@/types/auth';
 
 type RecordRow = Record<string, unknown>;
@@ -1093,19 +1097,22 @@ export default function ConversationScreen() {
   }) {
     const attachment = payload?.attachment ?? null;
     const cleanMessage = (payload?.text ?? draftMessage).trim();
-    const attachmentLabel = attachment
-      ? attachment.kind === 'photo'
-        ? '[Photo attached]'
-        : `[Voice note ${formatAttachmentDuration(attachment.durationMs)}]`
-      : '';
-    const body = [cleanMessage, attachmentLabel].filter(Boolean).join('\n');
 
-    if (!body) {
+    if (!cleanMessage && !attachment) {
       setNotice({ tone: 'warning', text: 'Add a message, photo, or voice note.' });
       return;
     }
 
     if (previewMode || !currentUserId || !conversation?.id) {
+      const body = mediaMessageBody({
+        text: cleanMessage,
+        photoUrl: attachment?.kind === 'photo' ? attachment.uri : null,
+        voiceNote:
+          attachment?.kind === 'voice'
+            ? { url: attachment.uri, durationMs: attachment.durationMs }
+            : null,
+      });
+
       const localMessage: UiMessage = {
         id: `preview-local-${Date.now()}`,
         conversationId: conversation?.id ?? null,
@@ -1120,9 +1127,7 @@ export default function ConversationScreen() {
       setDraftMessage('');
       setNotice({
         tone: 'warning',
-        text: attachment
-          ? 'Preview message saved locally with media. Upload to SitGuru storage comes next.'
-          : 'Message added to this preview only. It was not saved or sent to another user.',
+        text: 'Message added to this preview only. It was not saved or sent to another user.',
       });
       return;
     }
@@ -1131,6 +1136,36 @@ export default function ConversationScreen() {
     setNotice(null);
 
     try {
+      let photoUrl: string | null = null;
+      let voiceUrl: string | null = null;
+
+      if (attachment?.kind === 'photo') {
+        const uploaded = await uploadSitGuruMedia({
+          localUri: attachment.uri,
+          userId: currentUserId,
+          scopeId: conversation.id,
+          kind: 'chat',
+          mimeType: attachment.mimeType,
+          fileName: attachment.fileName,
+        });
+        photoUrl = uploaded.publicUrl;
+      } else if (attachment?.kind === 'voice') {
+        // Voice binary upload uses the same storage helper once audio buckets are ready.
+        voiceUrl = attachment.uri;
+      }
+
+      const body = mediaMessageBody({
+        text: cleanMessage,
+        photoUrl,
+        voiceNote: voiceUrl
+          ? { url: voiceUrl, durationMs: attachment?.durationMs }
+          : null,
+      });
+
+      if (!body) {
+        throw new Error('Nothing to send after media processing.');
+      }
+
       const insertedRow = await insertMessageWithFallback({
         conversationId: conversation.id,
         senderId: currentUserId,
@@ -1147,9 +1182,7 @@ export default function ConversationScreen() {
       setDraftMessage('');
       setNotice({
         tone: 'success',
-        text: attachment
-          ? 'Message sent. Media upload to cloud storage is next.'
-          : 'Message sent.',
+        text: photoUrl ? 'Photo message sent.' : 'Message sent.',
       });
     } catch (error) {
       setNotice({
