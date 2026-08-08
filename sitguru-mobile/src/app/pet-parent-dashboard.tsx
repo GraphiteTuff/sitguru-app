@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   Bell,
   CalendarDays,
@@ -213,6 +213,16 @@ const REALTIME_TABLES = [
 
 export default function PetParentDashboardScreen() {
   const { user, profile } = useAuth();
+  const params = useLocalSearchParams<{
+    welcomePet?: string;
+    welcomePetId?: string;
+  }>();
+  const welcomePetName = Array.isArray(params.welcomePet)
+    ? params.welcomePet[0]
+    : params.welcomePet;
+  const welcomePetId = Array.isArray(params.welcomePetId)
+    ? params.welcomePetId[0]
+    : params.welcomePetId;
 
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
@@ -462,6 +472,26 @@ export default function PetParentDashboardScreen() {
   const priorityCards = useMemo<PriorityCard[]>(() => {
     const cards: PriorityCard[] = [];
 
+    if (welcomePetName) {
+      cards.push({
+        id: 'welcome-passport',
+        eyebrow: 'Welcome summary',
+        title: `${welcomePetName} joined your pack`,
+        helper:
+          'Passport saved — open Find Care when you are ready, or edit details anytime.',
+        tone: 'primary',
+        ctaLabel: 'Open passport',
+        onPress: () =>
+          router.push({
+            pathname: '/pet-passports',
+            params: welcomePetId
+              ? { mode: 'wizard', petId: welcomePetId }
+              : { mode: 'wizard' },
+          }),
+        icon: <PawPrint color="#FFFFFF" size={22} strokeWidth={2.4} />,
+      });
+    }
+
     if (needsVisitReview && recentCompletedCare) {
       const reviewBookingId =
         recentCompletedCare.bookingId || recentCompletedCare.id;
@@ -628,6 +658,8 @@ export default function PetParentDashboardScreen() {
     palette.primary,
     pawPoints,
     recentCompletedCare,
+    welcomePetId,
+    welcomePetName,
   ]);
 
   const companionCards = useMemo<PriorityCard[]>(

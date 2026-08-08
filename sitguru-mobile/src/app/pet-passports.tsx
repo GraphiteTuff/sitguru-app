@@ -15,6 +15,7 @@ import MobileScreen from '@/components/mobile/MobileScreen';
 import MobileWizard, { type WizardStep } from '@/components/mobile/MobileWizard';
 import TouchTarget from '@/components/mobile/TouchTarget';
 import VaccineScanStep from '@/components/mobile/VaccineScanStep';
+import WelcomeSummaryCard from '@/components/mobile/WelcomeSummaryCard';
 import SitGuruProfilePhotoFrame from '@/components/SitGuruProfilePhotoFrame';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
@@ -164,9 +165,16 @@ export default function PetPassportsScreen() {
   const { user } = useAuth();
   const { pets, loading, saving, error, savePet, deletePet, refresh } =
     usePets();
-  const [mode, setMode] = useState<'hub' | 'wizard'>('hub');
+  const [mode, setMode] = useState<'hub' | 'wizard' | 'summary'>('hub');
   const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [welcomePet, setWelcomePet] = useState<{
+    id: string;
+    name: string;
+    type: string | null;
+    breed: string;
+    size: string | null;
+  } | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
 
   const editing = Boolean(draft.petId);
@@ -287,7 +295,14 @@ export default function PetPassportsScreen() {
       return;
     }
 
-    setMode('hub');
+    setWelcomePet({
+      id: result.pet.id,
+      name: result.pet.name || draft.name.trim(),
+      type: draft.type,
+      breed: draft.breed.trim(),
+      size: draft.size,
+    });
+    setMode('summary');
     setDraft(EMPTY);
     setStepIndex(0);
   }
@@ -311,6 +326,39 @@ export default function PetPassportsScreen() {
           },
         },
       ],
+    );
+  }
+
+  if (mode === 'summary' && welcomePet) {
+    return (
+      <MobileScreen>
+        <ScreenHeader
+          title="Passport ready"
+          onBack={() => {
+            setWelcomePet(null);
+            setMode('hub');
+          }}
+        />
+        <WelcomeSummaryCard
+          petName={welcomePet.name}
+          petType={welcomePet.type}
+          breed={welcomePet.breed}
+          size={welcomePet.size}
+          onOpenDashboard={() => {
+            router.push({
+              pathname: '/pet-parent-dashboard',
+              params: {
+                welcomePet: welcomePet.name,
+                welcomePetId: welcomePet.id,
+              },
+            });
+          }}
+          onStayHere={() => {
+            setWelcomePet(null);
+            setMode('hub');
+          }}
+        />
+      </MobileScreen>
     );
   }
 
@@ -353,6 +401,7 @@ export default function PetPassportsScreen() {
                 editable={!saving}
                 onChangeText={(name) => setDraft((d) => ({ ...d, name }))}
                 placeholder="Pet name"
+                valid={draft.name.trim().length > 1}
                 value={draft.name}
               />
               <Text style={styles.fieldLabel}>Pet type</Text>
@@ -413,6 +462,7 @@ export default function PetPassportsScreen() {
                 editable={!saving}
                 onChangeText={(breed) => setDraft((d) => ({ ...d, breed }))}
                 placeholder="Breed"
+                valid={draft.breed.trim().length > 1}
                 value={draft.breed}
               />
               <FocusTextInput
@@ -421,6 +471,7 @@ export default function PetPassportsScreen() {
                 keyboardType="decimal-pad"
                 onChangeText={(weight) => setDraft((d) => ({ ...d, weight }))}
                 placeholder="Weight (lbs)"
+                valid={draft.weight.trim().length > 0}
                 value={draft.weight}
               />
               <FocusTextInput
@@ -428,6 +479,7 @@ export default function PetPassportsScreen() {
                 editable={!saving}
                 onChangeText={(age) => setDraft((d) => ({ ...d, age }))}
                 placeholder="Age (e.g. 3 years)"
+                valid={draft.age.trim().length > 0}
                 value={draft.age}
               />
             </View>
@@ -520,6 +572,7 @@ export default function PetPassportsScreen() {
                   setDraft((d) => ({ ...d, dietaryNotes }))
                 }
                 placeholder="Feeding schedule, food brand, allergies…"
+                valid={draft.dietaryNotes.trim().length > 2}
                 value={draft.dietaryNotes}
               />
               <Text style={styles.fieldLabel}>Care snapshot</Text>
@@ -532,6 +585,7 @@ export default function PetPassportsScreen() {
                   setDraft((d) => ({ ...d, careNote }))
                 }
                 placeholder="Routines, comfort tips, handoff notes…"
+                valid={draft.careNote.trim().length > 3}
                 value={draft.careNote}
               />
             </View>

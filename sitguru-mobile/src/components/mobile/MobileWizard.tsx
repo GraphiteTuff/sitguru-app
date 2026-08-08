@@ -1,5 +1,12 @@
 import type { ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import TouchTarget from '@/components/mobile/TouchTarget';
 import {
@@ -30,7 +37,7 @@ type MobileWizardProps = {
 };
 
 /**
- * One job per step — replace multi-field forms with sequential steps.
+ * One job per step — horizontal slide between steps (no abrupt jumps).
  */
 export default function MobileWizard({
   steps,
@@ -46,6 +53,41 @@ export default function MobileWizard({
   const step = steps[stepIndex];
   const isFirst = stepIndex <= 0;
   const isLast = stepIndex >= steps.length - 1;
+  const prevIndexRef = useRef(stepIndex);
+  const translateX = useSharedValue(0);
+  const opacity = useSharedValue(1);
+  const nextGlow = useSharedValue(nextDisabled ? 0 : 1);
+
+  useEffect(() => {
+    const previous = prevIndexRef.current;
+    const direction = stepIndex >= previous ? 1 : -1;
+    prevIndexRef.current = stepIndex;
+
+    translateX.value = direction * 56;
+    opacity.value = 0.55;
+    translateX.value = withTiming(0, {
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+    });
+    opacity.value = withTiming(1, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [opacity, stepIndex, translateX]);
+
+  useEffect(() => {
+    nextGlow.value = withTiming(nextDisabled ? 0 : 1, { duration: 220 });
+  }, [nextDisabled, nextGlow]);
+
+  const bodyStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const nextStyle = useAnimatedStyle(() => ({
+    opacity: 0.55 + nextGlow.value * 0.45,
+    transform: [{ scale: 0.985 + nextGlow.value * 0.015 }],
+  }));
 
   return (
     <View style={styles.wrap}>
@@ -64,7 +106,7 @@ export default function MobileWizard({
       ) : null}
 
       {!compact && step ? (
-        <View style={styles.header}>
+        <Animated.View style={[styles.header, bodyStyle]}>
           <Text style={styles.stepMeta}>
             Step {stepIndex + 1} of {steps.length}
           </Text>
@@ -72,10 +114,10 @@ export default function MobileWizard({
           {step.helper ? (
             <Text style={styles.helper}>{step.helper}</Text>
           ) : null}
-        </View>
+        </Animated.View>
       ) : null}
 
-      <View style={styles.body}>{children}</View>
+      <Animated.View style={[styles.body, bodyStyle]}>{children}</Animated.View>
 
       {(onBack || onNext) && !compact ? (
         <View style={styles.actions}>
@@ -91,21 +133,28 @@ export default function MobileWizard({
           ) : null}
 
           {onNext ? (
-            <TouchTarget
-              accessibilityRole="button"
-              accessibilityLabel={nextLabel}
-              disabled={nextDisabled}
-              onPress={onNext}
+            <Animated.View
               style={[
-                styles.primary,
-                nextDisabled ? styles.primaryDisabled : null,
+                styles.primaryShell,
                 isFirst ? styles.primaryAlone : null,
+                nextStyle,
               ]}
             >
-              <Text style={styles.primaryText}>
-                {isLast ? nextLabel : nextLabel}
-              </Text>
-            </TouchTarget>
+              <TouchTarget
+                accessibilityRole="button"
+                accessibilityLabel={nextLabel}
+                disabled={nextDisabled}
+                onPress={onNext}
+                style={[
+                  styles.primary,
+                  nextDisabled ? styles.primaryDisabled : null,
+                ]}
+              >
+                <Text style={styles.primaryText}>
+                  {isLast ? nextLabel : nextLabel}
+                </Text>
+              </TouchTarget>
+            </Animated.View>
           ) : null}
         </View>
       ) : null}
@@ -117,6 +166,7 @@ const styles = StyleSheet.create({
   wrap: {
     gap: MobileSpace.md,
     maxWidth: '100%',
+    overflow: 'hidden',
     width: '100%',
   },
   progressRow: {
@@ -184,19 +234,22 @@ const styles = StyleSheet.create({
     fontFamily: AppFonts.extraBold,
     fontSize: MobileType.label,
   },
+  primaryShell: {
+    flexGrow: 1,
+    minWidth: '40%',
+  },
   primary: {
     backgroundColor: SitGuruColors.primary,
     borderRadius: 16,
-    flexGrow: 1,
     minHeight: TOUCH_MIN,
-    minWidth: '40%',
     paddingHorizontal: MobileSpace.lg,
+    width: '100%',
   },
   primaryAlone: {
     minWidth: '100%',
   },
   primaryDisabled: {
-    opacity: 0.55,
+    opacity: 0.72,
   },
   primaryText: {
     color: '#FFFFFF',

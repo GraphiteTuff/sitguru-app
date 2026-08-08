@@ -21,6 +21,7 @@ type StickyActionBarProps = {
 /**
  * One-handed thumb zone: full-width primary CTAs locked to the bottom
  * (with bottom tabs). Prefer this over top/left desktop-style actions.
+ * pointerEvents="box-none" keeps scroll content interactive above the bar.
  */
 export default function StickyActionBar({
   children,
@@ -39,13 +40,14 @@ export default function StickyActionBar({
   return (
     <View
       pointerEvents="box-none"
+      collapsable={false}
       style={[
         embedded ? styles.wrapEmbedded : styles.wrapAbsolute,
         { paddingBottom: bottomPad },
         style,
       ]}
     >
-      <View style={styles.bar}>
+      <View pointerEvents="auto" style={styles.bar}>
         {secondary ? <View style={styles.secondary}>{secondary}</View> : null}
         <View style={styles.primary}>{children}</View>
       </View>
@@ -64,7 +66,9 @@ const styles = StyleSheet.create({
   },
   wrapEmbedded: {
     backgroundColor: 'transparent',
+    elevation: 14,
     width: '100%',
+    zIndex: 20,
   },
   bar: {
     backgroundColor: SitGuruColors.surface,

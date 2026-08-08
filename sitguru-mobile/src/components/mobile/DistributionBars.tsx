@@ -1,4 +1,18 @@
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
@@ -18,8 +32,43 @@ type DistributionBarsProps = {
   style?: StyleProp<ViewStyle>;
 };
 
+function AnimatedFill({
+  widthPct,
+  delayMs,
+}: {
+  widthPct: number;
+  delayMs: number;
+}) {
+  const [trackWidth, setTrackWidth] = useState(0);
+  const width = useSharedValue(0);
+
+  useEffect(() => {
+    if (trackWidth <= 0) return;
+    const target = Math.max(4, (widthPct / 100) * trackWidth);
+    width.value = 0;
+    width.value = withTiming(target, {
+      duration: 480 + delayMs,
+      easing: Easing.linear,
+    });
+  }, [delayMs, trackWidth, width, widthPct]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: width.value,
+  }));
+
+  function onTrackLayout(event: LayoutChangeEvent) {
+    setTrackWidth(event.nativeEvent.layout.width);
+  }
+
+  return (
+    <View style={styles.track} onLayout={onTrackLayout}>
+      <Animated.View style={[styles.fill, fillStyle]} />
+    </View>
+  );
+}
+
 /**
- * Horizontal StyleSheet distribution bars for Guru service volume / peaks.
+ * Horizontal StyleSheet distribution bars — width opens via linear interpolation.
  */
 export default function DistributionBars({
   items,
@@ -43,7 +92,7 @@ export default function DistributionBars({
 
   return (
     <View style={[styles.wrap, style]}>
-      {items.map((item) => {
+      {items.map((item, index) => {
         const widthPct = Math.max(6, Math.round((item.value / peak) * 100));
 
         return (
@@ -54,9 +103,7 @@ export default function DistributionBars({
                 <Text style={styles.helper}>{item.helper}</Text>
               ) : null}
             </View>
-            <View style={styles.track}>
-              <View style={[styles.fill, { width: `${widthPct}%` }]} />
-            </View>
+            <AnimatedFill widthPct={widthPct} delayMs={index * 40} />
             <Text style={styles.value}>{item.value}</Text>
           </View>
         );

@@ -39,6 +39,7 @@ import PriorityCarousel, {
   type PriorityCard,
 } from '@/components/mobile/PriorityCarousel';
 import { DashboardSkeletonStack } from '@/components/mobile/SkeletonPanel';
+import LiveUpdateHighlight from '@/components/mobile/LiveUpdateHighlight';
 import StickyActionBar from '@/components/mobile/StickyActionBar';
 import SitGuruButton from '@/components/SitGuruButton';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
@@ -1161,17 +1162,19 @@ export default function GuruDashboardScreen() {
                     />
                   ) : (
                     <>
-                      <Pressable
-                        accessibilityRole="button"
-                        onPress={() =>
-                          router.push(
-                            '/payments',
-                          )
-                        }
-                        style={
-                          styles.earningsCard
-                        }
+                      <LiveUpdateHighlight
+                        watchKey={`${data.earningsMonth}-${data.earningsWeek}-${data.requests.length}-${data.payout.available}-${data.payout.pending}`}
+                        style={styles.earningsCard}
                       >
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() =>
+                            router.push(
+                              '/payments',
+                            )
+                          }
+                          style={styles.earningsCardInner}
+                        >
                         <View
                           style={
                             styles.earningsTopRow
@@ -1265,12 +1268,12 @@ export default function GuruDashboardScreen() {
                             }
                           />
                         </View>
-                      </Pressable>
+                        </Pressable>
+                      </LiveUpdateHighlight>
 
-                      <View
-                        style={
-                          styles.todayCard
-                        }
+                      <LiveUpdateHighlight
+                        watchKey={`${todayBookings.length}-${pendingRequest?.id || 'none'}-${data.completedBookings}-${data.requests.length}`}
+                        style={styles.todayCard}
                       >
                         <View
                           style={
@@ -1425,7 +1428,7 @@ export default function GuruDashboardScreen() {
                             styles
                           }
                         />
-                      </View>
+                      </LiveUpdateHighlight>
                     </>
                   )}
 
@@ -4342,8 +4345,11 @@ function createStyles(
         palette.border,
       borderRadius: 20,
       borderWidth: 1,
+    },
+    earningsCardInner: {
       gap: 12,
       padding: 13,
+      width: '100%',
     },
     earningsTopRow: {
       alignItems: 'flex-end',

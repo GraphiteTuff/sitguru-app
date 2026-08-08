@@ -1,13 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   StyleSheet,
   TextInput,
-  View,
   type StyleProp,
   type TextInputProps,
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
@@ -16,10 +23,12 @@ import { MobileSpace, MobileType } from '@/constants/mobile-layout';
 type FocusTextInputProps = TextInputProps & {
   containerStyle?: StyleProp<ViewStyle>;
   inputStyle?: StyleProp<TextStyle>;
+  /** Soft green pulse when the field meets step criteria. */
+  valid?: boolean;
 };
 
 /**
- * Form field with clear SitGuru-green focus ring for passport / review inputs.
+ * Form field with SitGuru-green focus ring + optional valid-state pulse.
  */
 export default function FocusTextInput({
   containerStyle,
@@ -28,15 +37,52 @@ export default function FocusTextInput({
   onFocus,
   onBlur,
   editable = true,
+  valid = false,
   ...rest
 }: FocusTextInputProps) {
   const [focused, setFocused] = useState(false);
+  const pulse = useSharedValue(0);
+
+  useEffect(() => {
+    if (!valid || !editable) {
+      pulse.value = withTiming(0, { duration: 160 });
+      return;
+    }
+
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 520 }),
+        withTiming(0.28, { duration: 520 }),
+      ),
+      3,
+      false,
+    );
+  }, [editable, pulse, valid]);
+
+  const wrapStyle = useAnimatedStyle(() => {
+    const borderColor = interpolateColor(
+      pulse.value,
+      [0, 1],
+      [
+        focused && editable ? SitGuruColors.primary : SitGuruColors.border,
+        SitGuruColors.primary,
+      ],
+    );
+
+    return {
+      borderColor,
+      shadowColor: SitGuruColors.primary,
+      shadowOpacity: focused || valid ? 0.12 + pulse.value * 0.14 : 0,
+      shadowRadius: 4 + pulse.value * 4,
+      transform: [{ scale: 1 + pulse.value * 0.008 }],
+    };
+  });
 
   return (
-    <View
+    <Animated.View
       style={[
         styles.wrap,
-        focused && editable ? styles.wrapFocused : null,
+        wrapStyle,
         !editable ? styles.wrapDisabled : null,
         containerStyle,
       ]}
@@ -55,25 +101,18 @@ export default function FocusTextInput({
         }}
         style={[styles.input, inputStyle, style]}
       />
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
     backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
     borderRadius: 16,
     borderWidth: 1.5,
     overflow: 'hidden',
-    width: '100%',
-  },
-  wrapFocused: {
-    borderColor: SitGuruColors.primary,
-    shadowColor: SitGuruColors.primary,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
+    width: '100%',
   },
   wrapDisabled: {
     backgroundColor: SitGuruColors.surfaceSoft,
