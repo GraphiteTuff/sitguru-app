@@ -12,6 +12,7 @@ import {
 } from '@/lib/data/fields';
 import { API_PATHS, REALTIME_CHANNELS, TABLES } from '@/lib/data/schema';
 import { useAuth } from '@/hooks/useAuth';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 export type LiveCareBadge = {
   id: string;
@@ -41,8 +42,23 @@ export type PawReportLiveSnapshot = {
   message: string;
   badges: LiveCareBadge[];
   logs: LiveCareLog[];
-  photos: Array<{ id: string; url: string; createdAt: Date | null }>;
+  photos: Array<{
+    id: string;
+    url: string;
+    createdAt: Date | null;
+    latitude: number | null;
+    longitude: number | null;
+  }>;
   photoCount: number;
+  /** Walked path for map Polyline rendering. */
+  trail: Array<{ latitude: number; longitude: number }>;
+  /** Photo event pins for map Markers. */
+  photoPins: Array<{
+    id: string;
+    latitude: number;
+    longitude: number;
+    label?: string;
+  }>;
 };
 
 type LiveStreamPayload = {
@@ -149,6 +165,9 @@ export function usePawReportLive(bookingIdParam?: string | null) {
   const [stream, setStream] = useState<LiveStreamPayload | null>(null);
   const [updates, setUpdates] = useState<RecordRow[]>([]);
   const [session, setSession] = useState<RecordRow | null>(null);
+  const [trackPoints, setTrackPoints] = useState<
+    Array<{ latitude: number; longitude: number }>
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -159,19 +178,32 @@ export function usePawReportLive(bookingIdParam?: string | null) {
       setStream(null);
       setUpdates([]);
       setSession(null);
+      setTrackPoints([]);
       return;
     }
 
     if (!silent) setLoading(true);
 
-    const [snapshotResult, updatesResult, sessionResult] = await Promise.all([
-      sitguruApiFetch<LiveStreamPayload>(
-        `${API_PATHS.walkStream(preferredBookingId)}?format=json`,
-        { method: 'GET' },
-      ),
-      loadVisitUpdates(),
-      loadVisitSession(),
-    ]);
+    const trackQuery =
+      isSupabaseConfigured && preferredBookingId
+        ? supabase
+            .from(TABLES.bookingWalkTrackPoints)
+            .select('lat,lng,recorded_at')
+            .eq('booking_id', preferredBookingId)
+            .order('recorded_at', { ascending: true })
+            .limit(500)
+        : Promise.resolve({ data: null, error: null });
+
+    const [snapshotResult, updatesResult, sessionResult, trackResult] =
+      await Promise.all([
+        sitguruApiFetch<LiveStreamPayload>(
+          `${API_PATHS.walkStream(preferredBookingId)}?format=json`,
+          { method: 'GET' },
+        ),
+        loadVisitUpdates(),
+        loadVisitSession(),
+        trackQuery,
+      ]);
 
     if (snapshotResult.data) {
       setStream(snapshotResult.data);
@@ -182,6 +214,25 @@ export function usePawReportLive(bookingIdParam?: string | null) {
 
     setUpdates(updatesResult.updates);
     setSession(sessionResult.session);
+
+    if (!trackResult.error && trackResult.data) {
+      setTrackPoints(
+        trackResult.data
+          .map((row) => {
+            const latitude = asNumber(row.lat);
+            const longitude = asNumber(row.lng);
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+              return null;
+            }
+            return { latitude, longitude };
+          })
+          .filter(
+            (point): point is { latitude: number; longitude: number } =>
+              Boolean(point),
+          ),
+      );
+    }
+
     setLoading(false);
   }, [loadVisitSession, loadVisitUpdates, preferredBookingId]);
 
@@ -276,13 +327,57 @@ export function usePawReportLive(bookingIdParam?: string | null) {
     () =>
       logs
         .filter((log) => Boolean(log.photoUrl))
-        .map((log) => ({
-          id: log.id,
-          url: log.photoUrl as string,
-          createdAt: log.createdAt,
-        })),
-    [logs],
+        .map((log) => {
+          const source = updates.find((row) => asString(row.id) === log.id);
+          const latitude = asNumber(
+            source?.latitude ?? source?.lat ?? source?.geo_lat,
+          );
+          const longitude = asNumber(
+            source?.longitude ?? source?.lng ?? source?.geo_lng,
+          );
+          return {
+            id: log.id,
+            url: log.photoUrl as string,
+            createdAt: log.createdAt,
+            latitude: Number.isFinite(latitude) ? latitude : null,
+            longitude: Number.isFinite(longitude) ? longitude : null,
+          };
+        }),
+    [logs, updates],
   );
+
+  const photoPins = useMemo(
+    () =>
+      photos
+        .filter(
+          (photo) =>
+            typeof photo.latitude === 'number' &&
+            typeof photo.longitude === 'number',
+        )
+        .map((photo) => ({
+          id: photo.id,
+          latitude: photo.latitude as number,
+          longitude: photo.longitude as number,
+          label: 'Care photo',
+        })),
+    [photos],
+  );
+
+  const trail = useMemo(() => {
+    if (trackPoints.length > 1) return trackPoints;
+    if (
+      typeof stream?.data?.latitude === 'number' &&
+      typeof stream?.data?.longitude === 'number'
+    ) {
+      return [
+        {
+          latitude: stream.data.latitude,
+          longitude: stream.data.longitude,
+        },
+      ];
+    }
+    return [] as Array<{ latitude: number; longitude: number }>;
+  }, [stream?.data?.latitude, stream?.data?.longitude, trackPoints]);
 
   const snapshot = useMemo<PawReportLiveSnapshot>(() => {
     const metrics = stream?.data?.currentMetrics;
@@ -324,6 +419,8 @@ export function usePawReportLive(bookingIdParam?: string | null) {
         stream.eventType !== 'WALK_END',
     );
 
+    const latestTrail = trail[trail.length - 1];
+
     return {
       bookingId: preferredBookingId,
       petName:
@@ -341,11 +438,11 @@ export function usePawReportLive(bookingIdParam?: string | null) {
       latitude:
         typeof stream?.data?.latitude === 'number'
           ? stream.data.latitude
-          : null,
+          : latestTrail?.latitude ?? null,
       longitude:
         typeof stream?.data?.longitude === 'number'
           ? stream.data.longitude
-          : null,
+          : latestTrail?.longitude ?? null,
       message:
         stream?.data?.message ||
         logs[0]?.detail ||
@@ -354,8 +451,20 @@ export function usePawReportLive(bookingIdParam?: string | null) {
       logs,
       photos,
       photoCount: photos.length,
+      trail,
+      photoPins,
     };
-  }, [booking, logs, now, photos, preferredBookingId, session, stream]);
+  }, [
+    booking,
+    logs,
+    now,
+    photoPins,
+    photos,
+    preferredBookingId,
+    session,
+    stream,
+    trail,
+  ]);
 
   return {
     snapshot,

@@ -77,6 +77,8 @@ type CareUpdate = {
   note: string;
   photoUrl: string | null;
   createdAt: Date;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 const BOOKING_TABLES = ['bookings', 'booking_requests', 'service_requests'];
@@ -239,6 +241,25 @@ export default function GuruLiveWalkScreen() {
       setMessage(feedback);
     },
   });
+
+  const photoPins = useMemo(
+    () =>
+      updates
+        .filter(
+          (item) =>
+            item.type === 'photo' &&
+            typeof item.latitude === 'number' &&
+            typeof item.longitude === 'number',
+        )
+        .map((item) => ({
+          id: item.id,
+          latitude: item.latitude as number,
+          longitude: item.longitude as number,
+          label: item.label || 'Care photo',
+        })),
+    [updates],
+  );
+
   const elapsedTime = useMemo(
     () => formatElapsed(session?.startedAt ?? null, now),
     [now, session?.startedAt],
@@ -398,6 +419,8 @@ export default function GuruLiveWalkScreen() {
 
     const asset = picked.assets[0];
     const optimisticId = `photo-local-${Date.now()}`;
+    const pinLat = locationTracking.coords?.latitude ?? null;
+    const pinLng = locationTracking.coords?.longitude ?? null;
 
     // Optimistic UI — never block distance/timer loops with setSaving.
     setUploadingPhoto(true);
@@ -409,6 +432,8 @@ export default function GuruLiveWalkScreen() {
         note: 'Uploading care photo to SitGuru storage.',
         photoUrl: asset.uri,
         createdAt: new Date(),
+        latitude: pinLat,
+        longitude: pinLng,
       },
       ...current,
     ]);
@@ -431,6 +456,8 @@ export default function GuruLiveWalkScreen() {
         'photo',
         note,
         uploaded.publicUrl,
+        pinLat,
+        pinLng,
       );
 
       if (!saved) {
@@ -450,6 +477,8 @@ export default function GuruLiveWalkScreen() {
                 photoUrl: uploaded.publicUrl,
                 createdAt:
                   firstDate(saved, ['created_at', 'updated_at']) || new Date(),
+                latitude: pinLat,
+                longitude: pinLng,
               }
             : item,
         ),
@@ -666,8 +695,10 @@ export default function GuruLiveWalkScreen() {
                         live={status === 'active' && locationTracking.tracking}
                         coords={locationTracking.coords}
                         trail={trail}
+                        photoPins={photoPins}
                         distanceMiles={session?.distanceMiles}
                         error={locationTracking.error}
+                        autoCenter
                       />
 
                       <Text style={styles.privacyText}>
@@ -1393,6 +1424,8 @@ async function createUpdate(
   type: UpdateType,
   note: string,
   photoUrl?: string | null,
+  latitude?: number | null,
+  longitude?: number | null,
 ) {
   const now = new Date().toISOString();
 
@@ -1404,6 +1437,10 @@ async function createUpdate(
       update_type: type,
       note,
       photo_url: photoUrl || null,
+      latitude: latitude ?? null,
+      longitude: longitude ?? null,
+      lat: latitude ?? null,
+      lng: longitude ?? null,
       created_at: now,
     },
     {
@@ -1414,6 +1451,8 @@ async function createUpdate(
       message: note,
       photo_url: photoUrl || null,
       image_url: photoUrl || null,
+      latitude: latitude ?? null,
+      longitude: longitude ?? null,
       created_at: now,
     },
     {
@@ -1591,6 +1630,8 @@ function mapUpdate(row: RecordRow, index: number): CareUpdate {
     createdAt:
       firstDate(row, ['created_at', 'updated_at', 'recorded_at']) ||
       new Date(),
+    latitude: firstNumber(row, ['latitude', 'lat', 'geo_lat']),
+    longitude: firstNumber(row, ['longitude', 'lng', 'geo_lng']),
   };
 }
 

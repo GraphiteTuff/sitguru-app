@@ -160,7 +160,11 @@ export default function PawReportLiveScreen() {
               locationLabel={`${snapshot.petName} with ${snapshot.guruName}`}
               live={snapshot.isLive}
               coords={coords}
+              trail={snapshot.trail}
+              photoPins={snapshot.photoPins}
               distanceMiles={snapshot.distanceMiles}
+              expanded
+              autoCenter
             />
 
             {snapshot.badges.length ? (
