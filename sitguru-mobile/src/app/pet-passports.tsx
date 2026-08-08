@@ -7,10 +7,10 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 
+import FocusTextInput from '@/components/mobile/FocusTextInput';
 import MobileScreen from '@/components/mobile/MobileScreen';
 import MobileWizard, { type WizardStep } from '@/components/mobile/MobileWizard';
 import TouchTarget from '@/components/mobile/TouchTarget';
@@ -348,12 +348,11 @@ export default function PetPassportsScreen() {
         >
           {stepIndex === 0 ? (
             <View style={styles.stepBody}>
-              <TextInput
+              <FocusTextInput
                 accessibilityLabel="Pet name"
+                editable={!saving}
                 onChangeText={(name) => setDraft((d) => ({ ...d, name }))}
                 placeholder="Pet name"
-                placeholderTextColor={SitGuruColors.textSoft}
-                style={styles.input}
                 value={draft.name}
               />
               <Text style={styles.fieldLabel}>Pet type</Text>
@@ -409,29 +408,26 @@ export default function PetPassportsScreen() {
                   );
                 })}
               </View>
-              <TextInput
+              <FocusTextInput
                 accessibilityLabel="Breed"
+                editable={!saving}
                 onChangeText={(breed) => setDraft((d) => ({ ...d, breed }))}
                 placeholder="Breed"
-                placeholderTextColor={SitGuruColors.textSoft}
-                style={styles.input}
                 value={draft.breed}
               />
-              <TextInput
+              <FocusTextInput
                 accessibilityLabel="Weight"
+                editable={!saving}
                 keyboardType="decimal-pad"
                 onChangeText={(weight) => setDraft((d) => ({ ...d, weight }))}
                 placeholder="Weight (lbs)"
-                placeholderTextColor={SitGuruColors.textSoft}
-                style={styles.input}
                 value={draft.weight}
               />
-              <TextInput
+              <FocusTextInput
                 accessibilityLabel="Age"
+                editable={!saving}
                 onChangeText={(age) => setDraft((d) => ({ ...d, age }))}
                 placeholder="Age (e.g. 3 years)"
-                placeholderTextColor={SitGuruColors.textSoft}
-                style={styles.input}
                 value={draft.age}
               />
             </View>
@@ -484,14 +480,13 @@ export default function PetPassportsScreen() {
                       </Text>
                     </TouchTarget>
                     {record.enabled ? (
-                      <TextInput
+                      <FocusTextInput
                         accessibilityLabel={`${option.label} date`}
+                        editable={!saving}
                         onChangeText={(date) =>
                           updateVaccine(option.key, { date })
                         }
                         placeholder="Date given (YYYY-MM-DD)"
-                        placeholderTextColor={SitGuruColors.textSoft}
-                        style={styles.input}
                         value={record.date}
                       />
                     ) : null}
@@ -516,27 +511,27 @@ export default function PetPassportsScreen() {
           {stepIndex === 3 ? (
             <View style={styles.stepBody}>
               <Text style={styles.fieldLabel}>Dietary notes</Text>
-              <TextInput
+              <FocusTextInput
                 accessibilityLabel="Dietary notes"
+                editable={!saving}
+                inputStyle={styles.noteInput}
                 multiline
                 onChangeText={(dietaryNotes) =>
                   setDraft((d) => ({ ...d, dietaryNotes }))
                 }
                 placeholder="Feeding schedule, food brand, allergies…"
-                placeholderTextColor={SitGuruColors.textSoft}
-                style={[styles.input, styles.noteInput]}
                 value={draft.dietaryNotes}
               />
               <Text style={styles.fieldLabel}>Care snapshot</Text>
-              <TextInput
+              <FocusTextInput
                 accessibilityLabel="Care note"
+                editable={!saving}
+                inputStyle={styles.noteInput}
                 multiline
                 onChangeText={(careNote) =>
                   setDraft((d) => ({ ...d, careNote }))
                 }
                 placeholder="Routines, comfort tips, handoff notes…"
-                placeholderTextColor={SitGuruColors.textSoft}
-                style={[styles.input, styles.noteInput]}
                 value={draft.careNote}
               />
             </View>
@@ -866,17 +861,6 @@ const styles = StyleSheet.create({
   stepBody: {
     gap: MobileSpace.md,
     width: '100%',
-  },
-  input: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    color: SitGuruColors.text,
-    fontFamily: AppFonts.medium,
-    fontSize: MobileType.body,
-    minHeight: TOUCH_MIN + 6,
-    paddingHorizontal: MobileSpace.md,
   },
   noteInput: {
     minHeight: 120,

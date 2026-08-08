@@ -42,6 +42,7 @@ import ServiceCoreGrid, {
   CARE_SERVICES,
   type CareServiceKey,
 } from '@/components/mobile/ServiceCoreGrid';
+import { DashboardSkeletonStack } from '@/components/mobile/SkeletonPanel';
 import StickyActionBar from '@/components/mobile/StickyActionBar';
 import TouchTarget from '@/components/mobile/TouchTarget';
 import SitGuruButton from '@/components/SitGuruButton';
@@ -865,11 +866,7 @@ export default function PetParentDashboardScreen() {
             ) : null}
 
             {isLoading ? (
-              <View style={styles.loadingCard}>
-                <View style={styles.loadingBarLarge} />
-                <View style={styles.loadingBarMedium} />
-                <View style={styles.loadingBarSmall} />
-              </View>
+              <DashboardSkeletonStack />
             ) : (
               <PriorityCarousel label="Priority" cards={priorityCards} />
             )}

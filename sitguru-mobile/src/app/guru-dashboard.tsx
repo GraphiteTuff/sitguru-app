@@ -38,6 +38,7 @@ import RoleGate from '@/components/RoleGate';
 import PriorityCarousel, {
   type PriorityCard,
 } from '@/components/mobile/PriorityCarousel';
+import { DashboardSkeletonStack } from '@/components/mobile/SkeletonPanel';
 import StickyActionBar from '@/components/mobile/StickyActionBar';
 import SitGuruButton from '@/components/SitGuruButton';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
@@ -1980,31 +1981,13 @@ function PrimaryIcon({
 }
 
 function LoadingCard({
-  styles,
+  styles: _styles,
 }: {
   styles: ReturnType<
     typeof createStyles
   >;
 }) {
-  return (
-    <View style={styles.loadingCard}>
-      <View
-        style={
-          styles.loadingBarLarge
-        }
-      />
-      <View
-        style={
-          styles.loadingBarMedium
-        }
-      />
-      <View
-        style={
-          styles.loadingBarSmall
-        }
-      />
-    </View>
-  );
+  return <DashboardSkeletonStack />;
 }
 
 function Metric({

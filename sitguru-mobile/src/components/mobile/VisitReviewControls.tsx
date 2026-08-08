@@ -3,12 +3,12 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 
+import FocusTextInput from '@/components/mobile/FocusTextInput';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import { MobileSpace, MobileType, TOUCH_MIN } from '@/constants/mobile-layout';
@@ -25,6 +25,7 @@ type VisitReviewControlsProps = {
   onTogglePraise: (tag: string) => void;
   reviewText: string;
   onReviewTextChange: (text: string) => void;
+  disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -38,6 +39,7 @@ export default function VisitReviewControls({
   onTogglePraise,
   reviewText,
   onReviewTextChange,
+  disabled = false,
   style,
 }: VisitReviewControlsProps) {
   const length = reviewText.trim().length;
@@ -54,11 +56,13 @@ export default function VisitReviewControls({
               accessibilityLabel={`${star} star rating`}
               accessibilityRole="button"
               accessibilityState={{ selected: star === rating }}
+              disabled={disabled}
               hitSlop={8}
               onPress={() => onRatingChange(star)}
               style={({ pressed }) => [
                 styles.starButton,
-                pressed ? styles.pressed : null,
+                pressed && !disabled ? styles.pressed : null,
+                disabled ? styles.disabledControl : null,
               ]}
             >
               <Star
@@ -72,7 +76,9 @@ export default function VisitReviewControls({
         })}
       </View>
 
-      <Text style={styles.ratingLabel}>{RATING_LABELS[rating] || 'Rate this visit'}</Text>
+      <Text style={styles.ratingLabel}>
+        {RATING_LABELS[rating] || 'Rate this visit'}
+      </Text>
 
       <Text style={styles.fieldLabel}>What stood out</Text>
       <View style={styles.praiseGrid}>
@@ -84,8 +90,14 @@ export default function VisitReviewControls({
               key={tag}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
+              disabled={disabled}
               onPress={() => onTogglePraise(tag)}
-              style={[styles.praiseChip, active ? styles.praiseChipActive : null]}
+              style={({ pressed }) => [
+                styles.praiseChip,
+                active ? styles.praiseChipActive : null,
+                pressed && !disabled ? styles.pressed : null,
+                disabled ? styles.disabledControl : null,
+              ]}
             >
               <Heart
                 color={active ? '#FFFFFF' : SitGuruColors.textMuted}
@@ -107,15 +119,15 @@ export default function VisitReviewControls({
       </View>
 
       <Text style={styles.fieldLabel}>Your review</Text>
-      <TextInput
+      <FocusTextInput
         multiline
         value={reviewText}
         onChangeText={onReviewTextChange}
         placeholder="Share what went well and what future Pet Parents should know."
-        placeholderTextColor={SitGuruColors.textSoft}
-        style={styles.reviewInput}
+        editable={!disabled}
         textAlignVertical="top"
         maxLength={REVIEW_TEXT_MAX}
+        inputStyle={styles.reviewInput}
       />
       <Text
         style={[
@@ -148,6 +160,10 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+    transform: [{ scale: 0.97 }],
+  },
+  disabledControl: {
+    opacity: 0.55,
   },
   ratingLabel: {
     color: SitGuruColors.text,
@@ -192,15 +208,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   reviewInput: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
-    borderRadius: 18,
-    borderWidth: 1,
-    color: SitGuruColors.text,
-    fontFamily: AppFonts.regular,
-    fontSize: MobileType.body,
     minHeight: 128,
-    paddingHorizontal: MobileSpace.md,
     paddingVertical: MobileSpace.md,
   },
   characterCount: {

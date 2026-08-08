@@ -99,16 +99,19 @@ const styles = StyleSheet.create({
   ghostButton: {
     backgroundColor: 'transparent',
   },
-  disabledButton: {
-    opacity: 0.55,
-  },
   pressedButton: {
-    opacity: 0.86,
+    opacity: 0.9,
     transform: [
+      {
+        scale: 0.985,
+      },
       {
         translateY: 1,
       },
     ],
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   buttonText: {
     fontSize: 16,

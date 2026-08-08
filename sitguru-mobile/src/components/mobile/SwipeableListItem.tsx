@@ -7,7 +7,9 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 
 import { MobileSpace, TOUCH_MIN } from '@/constants/mobile-layout';
@@ -43,6 +45,8 @@ export default function SwipeableListItem({
   disabled = false,
 }: SwipeableListItemProps) {
   const translateX = useSharedValue(0);
+  const flash = useSharedValue(0);
+  const flashTone = useSharedValue(1); // 1 accept, 0 decline
   const canAccept = Boolean(onSwipeRight) && enabled && !disabled;
   const canDecline = Boolean(onSwipeLeft) && enabled && !disabled;
 
@@ -50,15 +54,28 @@ export default function SwipeableListItem({
     translateX.value = withSpring(0, { damping: 18, stiffness: 220 });
   }, [translateX]);
 
+  const pulseSuccess = useCallback(
+    (accepted: boolean) => {
+      flashTone.value = accepted ? 1 : 0;
+      flash.value = withSequence(
+        withTiming(0.28, { duration: 90 }),
+        withTiming(0, { duration: 260 }),
+      );
+    },
+    [flash, flashTone],
+  );
+
   const fireAccept = useCallback(() => {
+    pulseSuccess(true);
     onSwipeRight?.();
     reset();
-  }, [onSwipeRight, reset]);
+  }, [onSwipeRight, pulseSuccess, reset]);
 
   const fireDecline = useCallback(() => {
+    pulseSuccess(false);
     onSwipeLeft?.();
     reset();
-  }, [onSwipeLeft, reset]);
+  }, [onSwipeLeft, pulseSuccess, reset]);
 
   const pan = Gesture.Pan()
     .enabled(canAccept || canDecline)
@@ -88,15 +105,28 @@ export default function SwipeableListItem({
     });
 
   const cardStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
+    transform: [
+      { translateX: translateX.value },
+      {
+        scale: 1 - Math.min(Math.abs(translateX.value) / 900, 0.02),
+      },
+    ],
   }));
 
   const acceptStyle = useAnimatedStyle(() => ({
-    opacity: translateX.value > 8 ? Math.min(translateX.value / THRESHOLD, 1) : 0,
+    opacity:
+      translateX.value > 8 ? Math.min(translateX.value / THRESHOLD, 1) : 0,
   }));
 
   const declineStyle = useAnimatedStyle(() => ({
-    opacity: translateX.value < -8 ? Math.min(-translateX.value / THRESHOLD, 1) : 0,
+    opacity:
+      translateX.value < -8 ? Math.min(-translateX.value / THRESHOLD, 1) : 0,
+  }));
+
+  const flashStyle = useAnimatedStyle(() => ({
+    opacity: flash.value,
+    backgroundColor:
+      flashTone.value > 0.5 ? SitGuruColors.primary : SitGuruColors.danger,
   }));
 
   return (
@@ -112,7 +142,13 @@ export default function SwipeableListItem({
       </Animated.View>
 
       <GestureDetector gesture={pan}>
-        <Animated.View style={[styles.card, cardStyle]}>{children}</Animated.View>
+        <Animated.View style={[styles.card, cardStyle]}>
+          {children}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.flashOverlay, flashStyle]}
+          />
+        </Animated.View>
       </GestureDetector>
     </View>
   );
@@ -127,8 +163,14 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: 'transparent',
+    overflow: 'hidden',
     width: '100%',
     zIndex: 2,
+  },
+  flashOverlay: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 20,
+    zIndex: 3,
   },
   actionAccept: {
     alignItems: 'center',

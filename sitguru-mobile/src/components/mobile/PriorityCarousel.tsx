@@ -1,6 +1,6 @@
 import { ChevronRight } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -10,6 +10,11 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import TouchTarget from '@/components/mobile/TouchTarget';
 import {
@@ -38,6 +43,33 @@ type PriorityCarouselProps = {
   label?: string;
 };
 
+function CarouselCardShell({
+  focused,
+  children,
+  width,
+}: {
+  focused: boolean;
+  children: ReactNode;
+  width: number;
+}) {
+  const scale = useSharedValue(focused ? 1 : 0.96);
+  const opacity = useSharedValue(focused ? 1 : 0.88);
+
+  useEffect(() => {
+    scale.value = withTiming(focused ? 1 : 0.96, { duration: 200 });
+    opacity.value = withTiming(focused ? 1 : 0.88, { duration: 200 });
+  }, [focused, opacity, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Animated.View style={[{ width }, animatedStyle]}>{children}</Animated.View>
+  );
+}
+
 /**
  * Progressive disclosure: one high-priority card in focus at a time.
  * Swipe horizontally between cards; tap to open the deep-dive screen.
@@ -58,7 +90,7 @@ export default function PriorityCarousel({
     event: NativeSyntheticEvent<NativeScrollEvent>,
   ) => {
     const next = Math.round(
-      event.nativeEvent.contentOffset.x / Math.max(pageWidth, 1),
+      event.nativeEvent.contentOffset.x / Math.max(pageWidth + MobileSpace.sm, 1),
     );
     setIndex(Math.max(0, Math.min(next, cards.length - 1)));
     scrolling.current = false;
@@ -87,76 +119,82 @@ export default function PriorityCarousel({
         }}
         onMomentumScrollEnd={onMomentumEnd}
       >
-        {cards.map((card) => (
-          <TouchTarget
+        {cards.map((card, cardIndex) => (
+          <CarouselCardShell
             key={card.id}
-            accessibilityRole="button"
-            accessibilityLabel={`${card.title}. ${card.helper}`}
-            onPress={card.onPress}
-            style={[
-              styles.card,
-              { width: pageWidth },
-              card.tone === 'primary' && styles.cardPrimary,
-              card.tone === 'warning' && styles.cardWarning,
-            ]}
+            focused={cardIndex === index}
+            width={pageWidth}
           >
-            <View style={styles.cardTop}>
-              <View style={styles.copy}>
-                <Text
-                  style={[
-                    styles.eyebrow,
-                    card.tone === 'primary' && styles.textOnPrimary,
-                  ]}
-                >
-                  {card.eyebrow}
-                </Text>
-                <Text
-                  style={[
-                    styles.title,
-                    card.tone === 'primary' && styles.textOnPrimary,
-                  ]}
-                  numberOfLines={2}
-                >
-                  {card.title}
-                </Text>
-                <Text
-                  style={[
-                    styles.helper,
-                    card.tone === 'primary' && styles.helperOnPrimary,
-                  ]}
-                  numberOfLines={2}
-                >
-                  {card.helper}
-                </Text>
-              </View>
-              {card.icon ? (
-                <View
-                  style={[
-                    styles.iconWrap,
-                    card.tone === 'primary' && styles.iconOnPrimary,
-                  ]}
-                >
-                  {card.icon}
+            <TouchTarget
+              accessibilityRole="button"
+              accessibilityLabel={`${card.title}. ${card.helper}`}
+              onPress={card.onPress}
+              style={[
+                styles.card,
+                card.tone === 'primary' && styles.cardPrimary,
+                card.tone === 'warning' && styles.cardWarning,
+              ]}
+            >
+              <View style={styles.cardTop}>
+                <View style={styles.copy}>
+                  <Text
+                    style={[
+                      styles.eyebrow,
+                      card.tone === 'primary' && styles.textOnPrimary,
+                    ]}
+                  >
+                    {card.eyebrow}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.title,
+                      card.tone === 'primary' && styles.textOnPrimary,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {card.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.helper,
+                      card.tone === 'primary' && styles.helperOnPrimary,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {card.helper}
+                  </Text>
                 </View>
-              ) : null}
-            </View>
+                {card.icon ? (
+                  <View
+                    style={[
+                      styles.iconWrap,
+                      card.tone === 'primary' && styles.iconOnPrimary,
+                    ]}
+                  >
+                    {card.icon}
+                  </View>
+                ) : null}
+              </View>
 
-            <View style={styles.ctaRow}>
-              <Text
-                style={[
-                  styles.cta,
-                  card.tone === 'primary' && styles.textOnPrimary,
-                ]}
-              >
-                {card.ctaLabel ?? 'Open details'}
-              </Text>
-              <ChevronRight
-                color={card.tone === 'primary' ? '#FFFFFF' : SitGuruColors.primary}
-                size={18}
-                strokeWidth={2.4}
-              />
-            </View>
-          </TouchTarget>
+              <View style={styles.ctaRow}>
+                <Text
+                  style={[
+                    styles.cta,
+                    card.tone === 'primary' && styles.textOnPrimary,
+                  ]}
+                >
+                  {card.ctaLabel ?? 'Open details'}
+                </Text>
+                <ChevronRight
+                  color={
+                    card.tone === 'primary' ? '#FFFFFF' : SitGuruColors.primary
+                  }
+                  size={18}
+                  strokeWidth={2.4}
+                />
+              </View>
+            </TouchTarget>
+          </CarouselCardShell>
         ))}
       </ScrollView>
 
@@ -210,6 +248,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 148,
     padding: MobileSpace.lg,
+    width: '100%',
   },
   cardPrimary: {
     backgroundColor: SitGuruColors.primary,

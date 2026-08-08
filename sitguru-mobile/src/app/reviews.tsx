@@ -1522,6 +1522,7 @@ export default function ReviewsScreen() {
               onTogglePraise={togglePraise}
               reviewText={reviewText}
               onReviewTextChange={setReviewText}
+              disabled={submitting}
             />
 
             <Text style={styles.fieldLabel}>Care categories</Text>
