@@ -1,206 +1,482 @@
 import { router } from 'expo-router';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ChevronLeft } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
-import SitGuruButton from '@/components/SitGuruButton';
+import MobileScreen from '@/components/mobile/MobileScreen';
+import MobileWizard, { type WizardStep } from '@/components/mobile/MobileWizard';
+import TouchTarget from '@/components/mobile/TouchTarget';
+import VaccineScanStep from '@/components/mobile/VaccineScanStep';
 import SitGuruProfilePhotoFrame from '@/components/SitGuruProfilePhotoFrame';
-import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
+import { AppFonts } from '@/constants/fonts';
+import {
+  MobileSpace,
+  MobileType,
+  TOUCH_MIN,
+} from '@/constants/mobile-layout';
 
-const pets = [
+const WIZARD_STEPS: WizardStep[] = [
   {
-    name: 'Scout',
-    emoji: '🐶',
-    type: 'Dog',
-    size: 'Medium',
-    age: '5 years old',
-    breed: 'German Shorthaired Pointer placeholder',
-    photo_url: null,
-    care_note: 'Energetic, affectionate, and happiest with a predictable walk routine.',
-    complete: 100,
+    id: 'basics',
+    title: 'Who is this pet?',
+    helper: 'Name and type first — we keep each step short.',
   },
   {
-    name: 'Luna',
-    emoji: '🐱',
-    type: 'Cat',
-    size: 'Small',
-    age: '4 years old',
-    breed: 'Indoor cat placeholder',
-    photo_url: null,
-    care_note: 'Prefers quiet greetings, fresh water, and a cozy sunny window.',
-    complete: 80,
+    id: 'size',
+    title: 'Size & breed',
+    helper: 'Helps Gurus prepare the right gear and energy.',
+  },
+  {
+    id: 'vaccines',
+    title: 'Scan vaccine papers',
+    helper: 'Use the camera — no long text forms for records.',
+  },
+  {
+    id: 'care',
+    title: 'Care snapshot',
+    helper: 'One comfort note Gurus will see before arrival.',
   },
 ];
 
-const careSections = [
-  ['Feeding & water', 'Meal timing, portions, refill notes, and water preferences.'],
-  ['Walk/potty', 'Leash routine, potty cues, route preferences, and cleanup reminders.'],
-  ['Medication/allergies', 'Safe placeholder area for future medication and allergy details.'],
-  ['Behavior/comfort', 'Personality, triggers, favorite toys, and calming routines.'],
-  ['Emergency/vet note', 'Vet and emergency notes stay ready for future secure profile wiring.'],
-  ['Access/handoff notes', 'Door, crate, parking, and handoff reminders for booked care.'],
-];
+const TYPE_OPTIONS = ['Dog', 'Cat', 'Other'] as const;
+const SIZE_OPTIONS = ['Teacup', 'Small', 'Medium', 'Large', 'Extra Large'] as const;
 
-const typeOptions = ['Dog', 'Cat', 'Other'];
-const sizeOptions = ['Teacup', 'Small', 'Medium', 'Large', 'Extra Large'];
+type Draft = {
+  name: string;
+  type: (typeof TYPE_OPTIONS)[number] | null;
+  size: (typeof SIZE_OPTIONS)[number] | null;
+  breed: string;
+  vaccineUri: string | null;
+  careNote: string;
+};
 
-function showPlaceholder(action: string) {
-  Alert.alert('Visual-only preview', `${action} will connect to real Pet Passport tools later.`);
-}
+const EMPTY: Draft = {
+  name: '',
+  type: null,
+  size: null,
+  breed: '',
+  vaccineUri: null,
+  careNote: '',
+};
 
-function RouteButton({ label, to, variant = 'primary' }: { label: string; to: Parameters<typeof router.push>[0]; variant?: 'primary' | 'secondary' | 'ghost' }) {
-  return <SitGuruButton label={label} onPress={() => router.push(to)} variant={variant} />;
-}
-
-export default function PetPassportsScreen() {
+function ScreenHeader({
+  title,
+  onBack,
+}: {
+  title: string;
+  onBack: () => void;
+}) {
   return (
-    <SitGuruScreen scroll center={false} maxWidth={760}>
-      <View style={styles.page}>
-        <View style={styles.header}>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/pet-parent-dashboard')} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back to Pet Parent Dashboard</Text>
-          </Pressable>
-          <Text style={styles.eyebrow}>Pet profile hub</Text>
-          <Text style={styles.title}>Pet Passports</Text>
-          <Text style={styles.subtitle}>Pet Passports help Gurus understand pets before care begins, so bookings and PawReport updates feel prepared, safe, and personal.</Text>
-        </View>
+    <View style={styles.header}>
+      <TouchTarget
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+        onPress={onBack}
+        style={styles.backButton}
+      >
+        <ChevronLeft color={SitGuruColors.text} size={22} strokeWidth={2.4} />
+      </TouchTarget>
+      <Text style={styles.headerTitle}>{title}</Text>
+      <View style={styles.headerSpacer} />
+    </View>
+  );
+}
 
-        <View style={styles.heroCard}>
-          <View style={styles.photoPlaceholder}>
-            <Text style={styles.photoEmoji}>🐾</Text>
-            <Text style={styles.photoTitle}>Photo/avatar upload area</Text>
-            <Text style={styles.photoText}>Ready for future real pet photos.</Text>
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.heroTitle}>Pet profiles your Gurus can understand</Text>
-            <Text style={styles.heroText}>Keep routines, comfort notes, care needs, and handoff details organized before every request.</Text>
-            <SitGuruButton label="Add Pet Passport" onPress={() => showPlaceholder('Add Pet Passport')} />
-          </View>
-        </View>
+/**
+ * Native step-by-step Pet Passport onboarding (replaces long desktop forms).
+ */
+export default function PetPassportsScreen() {
+  const [mode, setMode] = useState<'hub' | 'wizard'>('hub');
+  const [stepIndex, setStepIndex] = useState(0);
+  const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [saved, setSaved] = useState<Draft[]>([]);
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Your pets</Text>
-          <Text style={styles.sectionMeta}>Visual data</Text>
-        </View>
+  const canContinue = useMemo(() => {
+    if (stepIndex === 0) return draft.name.trim().length > 1 && !!draft.type;
+    if (stepIndex === 1) return !!draft.size;
+    if (stepIndex === 2) return !!draft.vaccineUri;
+    if (stepIndex === 3) return draft.careNote.trim().length > 3;
+    return false;
+  }, [draft, stepIndex]);
 
-        {pets.map((pet) => (
-          <View key={pet.name} style={styles.petCard}>
-            <View style={styles.petTopRow}>
-              <SitGuruProfilePhotoFrame fallbackEmoji={pet.emoji} imageUrl={pet.photo_url} name={pet.name} shape="square" size="md" />
-              <View style={styles.petCopy}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.petName}>{pet.name}</Text>
-                  <Text style={styles.typeBadge}>{pet.type}</Text>
-                </View>
-                <Text style={styles.petMeta}>{pet.breed}</Text>
-                <Text style={styles.petMeta}>{pet.age} • {pet.size}</Text>
-                <Text style={styles.petMeta}>{pet.care_note}</Text>
+  function startWizard() {
+    setDraft(EMPTY);
+    setStepIndex(0);
+    setMode('wizard');
+  }
+
+  function finishWizard() {
+    setSaved((current) => [draft, ...current]);
+    setMode('hub');
+    Alert.alert(
+      'Passport started',
+      `${draft.name}'s passport is ready for Gurus. Vaccine scan attached.`,
+    );
+  }
+
+  if (mode === 'wizard') {
+    return (
+      <MobileScreen>
+        <ScreenHeader title="Add Pet Passport" onBack={() => setMode('hub')} />
+        <MobileWizard
+          steps={WIZARD_STEPS}
+          stepIndex={stepIndex}
+          nextDisabled={!canContinue}
+          nextLabel={
+            stepIndex === WIZARD_STEPS.length - 1 ? 'Save passport' : 'Continue'
+          }
+          onBack={() => {
+            if (stepIndex === 0) setMode('hub');
+            else setStepIndex((i) => i - 1);
+          }}
+          onNext={() => {
+            if (stepIndex >= WIZARD_STEPS.length - 1) finishWizard();
+            else setStepIndex((i) => i + 1);
+          }}
+        >
+          {stepIndex === 0 ? (
+            <View style={styles.stepBody}>
+              <TextInput
+                accessibilityLabel="Pet name"
+                onChangeText={(name) => setDraft((d) => ({ ...d, name }))}
+                placeholder="Pet name"
+                placeholderTextColor={SitGuruColors.textSoft}
+                style={styles.input}
+                value={draft.name}
+              />
+              <Text style={styles.fieldLabel}>Pet type</Text>
+              <View style={styles.pillRow}>
+                {TYPE_OPTIONS.map((option) => {
+                  const active = draft.type === option;
+                  return (
+                    <TouchTarget
+                      key={option}
+                      accessibilityRole="button"
+                      accessibilityLabel={option}
+                      onPress={() => setDraft((d) => ({ ...d, type: option }))}
+                      style={[styles.pill, active && styles.pillActive]}
+                    >
+                      <Text
+                        style={[
+                          styles.pillText,
+                          active && styles.pillTextActive,
+                        ]}
+                      >
+                        {option}
+                      </Text>
+                    </TouchTarget>
+                  );
+                })}
               </View>
             </View>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Passport completion</Text>
-              <Text style={styles.progressValue}>{pet.complete}% complete</Text>
+          ) : null}
+
+          {stepIndex === 1 ? (
+            <View style={styles.stepBody}>
+              <Text style={styles.fieldLabel}>Size</Text>
+              <View style={styles.pillRow}>
+                {SIZE_OPTIONS.map((option) => {
+                  const active = draft.size === option;
+                  return (
+                    <TouchTarget
+                      key={option}
+                      accessibilityRole="button"
+                      accessibilityLabel={option}
+                      onPress={() => setDraft((d) => ({ ...d, size: option }))}
+                      style={[styles.pill, active && styles.pillActive]}
+                    >
+                      <Text
+                        style={[
+                          styles.pillText,
+                          active && styles.pillTextActive,
+                        ]}
+                      >
+                        {option}
+                      </Text>
+                    </TouchTarget>
+                  );
+                })}
+              </View>
+              <TextInput
+                accessibilityLabel="Breed"
+                onChangeText={(breed) => setDraft((d) => ({ ...d, breed }))}
+                placeholder="Breed (optional)"
+                placeholderTextColor={SitGuruColors.textSoft}
+                style={styles.input}
+                value={draft.breed}
+              />
             </View>
-            <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${pet.complete}%` }]} /></View>
-            <View style={styles.buttonStack}>
-              <SitGuruButton label="Edit Passport" onPress={() => showPlaceholder(`Edit ${pet.name}'s Passport`)} variant="secondary" />
-              <RouteButton label="Request Care" to="/request-booking" />
-              <RouteButton label="View Booking Details" to="/booking-details" variant="ghost" />
+          ) : null}
+
+          {stepIndex === 2 ? (
+            <VaccineScanStep
+              uri={draft.vaccineUri}
+              onCapture={(uri) =>
+                setDraft((d) => ({ ...d, vaccineUri: uri || null }))
+              }
+            />
+          ) : null}
+
+          {stepIndex === 3 ? (
+            <View style={styles.stepBody}>
+              <TextInput
+                accessibilityLabel="Care note"
+                multiline
+                onChangeText={(careNote) =>
+                  setDraft((d) => ({ ...d, careNote }))
+                }
+                placeholder="Routines, comfort tips, handoff notes…"
+                placeholderTextColor={SitGuruColors.textSoft}
+                style={[styles.input, styles.noteInput]}
+                value={draft.careNote}
+              />
             </View>
-          </View>
-        ))}
+          ) : null}
+        </MobileWizard>
+      </MobileScreen>
+    );
+  }
 
-        <View style={styles.formCard}>
-          <Text style={styles.cardTitle}>Add Pet Passport</Text>
-          <TextInput editable={false} placeholder="Pet name" placeholderTextColor={SitGuruColors.textSoft} style={styles.input} />
-          <Text style={styles.fieldLabel}>Pet type</Text>
-          <View style={styles.pillRow}>{typeOptions.map((option) => <Pressable key={option} onPress={() => showPlaceholder(option)} style={styles.pill}><Text style={styles.pillText}>{option}</Text></Pressable>)}</View>
-          <Text style={styles.fieldLabel}>Size</Text>
-          <View style={styles.pillRow}>{sizeOptions.map((option) => <Pressable key={option} onPress={() => showPlaceholder(option)} style={styles.pill}><Text style={styles.pillText}>{option}</Text></Pressable>)}</View>
-          <TextInput editable={false} placeholder="Breed dropdown placeholder" placeholderTextColor={SitGuruColors.textSoft} style={styles.input} />
-          <TextInput editable={false} placeholder="Age" placeholderTextColor={SitGuruColors.textSoft} style={styles.input} />
-          <View style={styles.uploadBox}><SitGuruProfilePhotoFrame fallbackEmoji="🐾" name="New pet" shape="square" size="md" /><Text style={styles.uploadText}>Premium pet photo upload placeholder</Text></View>
-          <SitGuruButton label="Save Passport" onPress={() => showPlaceholder('Save Passport')} />
+  return (
+    <MobileScreen
+      footer={
+        <TouchTarget
+          accessibilityRole="button"
+          accessibilityLabel="Add Pet Passport"
+          onPress={startWizard}
+          style={styles.stickyCta}
+        >
+          <Text style={styles.stickyCtaText}>Add Pet Passport</Text>
+        </TouchTarget>
+      }
+    >
+      <ScreenHeader
+        title="Pet Passports"
+        onBack={() => router.push('/pet-parent-dashboard')}
+      />
+      <Text style={styles.subtitle}>
+        Step-by-step passports with camera vaccine scans — built for one-handed
+        setup, not desktop forms.
+      </Text>
+
+      {saved.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <SitGuruProfilePhotoFrame
+            fallbackEmoji="🐾"
+            name="New pet"
+            shape="square"
+            size="md"
+          />
+          <Text style={styles.emptyTitle}>No passports yet</Text>
+          <Text style={styles.emptyText}>
+            Start the wizard to add name, size, vaccine scan, and a short care
+            note.
+          </Text>
         </View>
-
-        <View style={styles.detailsGrid}>{careSections.map(([title, detail]) => <View key={title} style={styles.detailCard}><Text style={styles.detailTitle}>{title}</Text><Text style={styles.detailText}>{detail}</Text></View>)}</View>
-
-        <View style={styles.pawReportCard}>
-          <Text style={styles.pawReportTitle}>These details help your Guru send better PawReport updates.</Text>
-          <RouteButton label="PawReport Live" to="/pawreport-live" />
-        </View>
-
-        <View style={styles.safetyNote}><Text style={styles.safetyText}>Keep pet care details inside SitGuru so Gurus, Pet Parents, and support stay aligned.</Text></View>
-
-        <View style={styles.bottomDock}>
-          {[
-            ['Dashboard', '/pet-parent-dashboard'],
-            ['Find Care', '/find-care'],
-            ['Messages', '/conversation'],
-            ['Booking', '/booking-details'],
-          ].map(([label, href]) => (
-            <Pressable key={label} accessibilityRole="button" onPress={() => router.push(href as Parameters<typeof router.push>[0])} style={styles.dockItem}>
-              <Text style={styles.dockText}>{label}</Text>
+      ) : (
+        saved.map((pet) => (
+          <View key={`${pet.name}-${pet.vaccineUri}`} style={styles.petCard}>
+            <View style={styles.petTop}>
+              <SitGuruProfilePhotoFrame
+                fallbackEmoji={pet.type === 'Cat' ? '🐱' : '🐶'}
+                imageUrl={pet.vaccineUri}
+                name={pet.name}
+                shape="square"
+                size="md"
+              />
+              <View style={styles.petCopy}>
+                <Text style={styles.petName}>{pet.name}</Text>
+                <Text style={styles.petMeta}>
+                  {pet.type} · {pet.size}
+                  {pet.breed ? ` · ${pet.breed}` : ''}
+                </Text>
+                <Text style={styles.petMeta} numberOfLines={2}>
+                  {pet.careNote}
+                </Text>
+                {pet.vaccineUri ? (
+                  <Text style={styles.badge}>Vaccine scan attached</Text>
+                ) : null}
+              </View>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/request-booking')}
+              style={styles.secondaryLink}
+            >
+              <Text style={styles.secondaryLinkText}>Request Care</Text>
             </Pressable>
-          ))}
-        </View>
-      </View>
-    </SitGuruScreen>
+          </View>
+        ))
+      )}
+    </MobileScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { gap: 16, paddingBottom: 18 },
-  header: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 28, borderWidth: 1, gap: 8, padding: 20 },
-  backButton: { alignSelf: 'flex-start', backgroundColor: SitGuruColors.surfaceSoft, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
-  backButtonText: { color: SitGuruColors.primary, fontSize: 13, fontWeight: '900' },
-  eyebrow: { color: SitGuruColors.primary, fontSize: 12, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase' },
-  title: { color: SitGuruColors.text, fontSize: 34, fontWeight: '900', lineHeight: 39 },
-  subtitle: { color: SitGuruColors.textMuted, fontSize: 16, fontWeight: '700', lineHeight: 23 },
-  heroCard: { backgroundColor: SitGuruColors.primaryDark, borderRadius: 30, gap: 14, padding: 18 },
-  photoPlaceholder: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderColor: 'rgba(255,255,255,0.18)', borderRadius: 24, borderWidth: 1, gap: 8, minHeight: 180, justifyContent: 'center', padding: 18 },
-  photoEmoji: { fontSize: 46 },
-  photoTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
-  photoText: { color: '#DCEFE2', fontSize: 14, fontWeight: '700' },
-  heroCopy: { gap: 10 },
-  heroTitle: { color: '#FFFFFF', fontSize: 27, fontWeight: '900', lineHeight: 32 },
-  heroText: { color: '#DCEFE2', fontSize: 15, fontWeight: '700', lineHeight: 22 },
-  sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  sectionTitle: { color: SitGuruColors.text, fontSize: 22, fontWeight: '900' },
-  sectionMeta: { color: SitGuruColors.primary, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
-  petCard: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 26, borderWidth: 1, gap: 14, padding: 16 },
-  petTopRow: { alignItems: 'center', flexDirection: 'row', gap: 14 },
-  petAvatar: { alignItems: 'center', backgroundColor: SitGuruColors.surfaceSoft, borderColor: SitGuruColors.primaryLight, borderRadius: 24, borderWidth: 1, height: 76, justifyContent: 'center', width: 76 },
-  petAvatarText: { fontSize: 36 },
-  petCopy: { flex: 1, gap: 4 },
-  nameRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
-  petName: { color: SitGuruColors.text, fontSize: 22, fontWeight: '900' },
-  typeBadge: { backgroundColor: SitGuruColors.surfaceSoft, borderRadius: 999, color: SitGuruColors.primary, fontSize: 12, fontWeight: '900', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 6 },
-  petMeta: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '800', lineHeight: 20 },
-  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  progressLabel: { color: SitGuruColors.textMuted, fontSize: 13, fontWeight: '900' },
-  progressValue: { color: SitGuruColors.primary, fontSize: 13, fontWeight: '900' },
-  progressTrack: { backgroundColor: SitGuruColors.surfaceSoft, borderRadius: 999, height: 10, overflow: 'hidden' },
-  progressFill: { backgroundColor: SitGuruColors.primary, borderRadius: 999, height: '100%' },
-  buttonStack: { gap: 10 },
-  formCard: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.primaryLight, borderRadius: 28, borderWidth: 1, gap: 12, padding: 18 },
-  cardTitle: { color: SitGuruColors.text, fontSize: 22, fontWeight: '900' },
-  input: { backgroundColor: SitGuruColors.background, borderColor: SitGuruColors.border, borderRadius: 16, borderWidth: 1, color: SitGuruColors.text, fontSize: 15, fontWeight: '800', minHeight: 54, paddingHorizontal: 14 },
-  fieldLabel: { color: SitGuruColors.text, fontSize: 14, fontWeight: '900' },
-  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pill: { backgroundColor: SitGuruColors.surfaceSoft, borderColor: SitGuruColors.primaryLight, borderRadius: 999, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 10 },
-  pillText: { color: SitGuruColors.primary, fontSize: 13, fontWeight: '900' },
-  uploadBox: { alignItems: 'center', backgroundColor: SitGuruColors.background, borderColor: SitGuruColors.border, borderRadius: 20, borderStyle: 'dashed', borderWidth: 1, gap: 6, minHeight: 130, justifyContent: 'center', padding: 16 },
-  uploadIcon: { color: SitGuruColors.primary, fontSize: 30, fontWeight: '900' },
-  uploadText: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '900' },
-  detailsGrid: { gap: 10 },
-  detailCard: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 20, borderWidth: 1, gap: 5, padding: 14 },
-  detailTitle: { color: SitGuruColors.text, fontSize: 16, fontWeight: '900' },
-  detailText: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '700', lineHeight: 20 },
-  pawReportCard: { backgroundColor: SitGuruColors.surfaceSoft, borderColor: SitGuruColors.primaryLight, borderRadius: 24, borderWidth: 1, gap: 12, padding: 16 },
-  pawReportTitle: { color: SitGuruColors.text, fontSize: 18, fontWeight: '900', lineHeight: 24 },
-  safetyNote: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 20, borderWidth: 1, padding: 14 },
-  safetyText: { color: SitGuruColors.textMuted, fontSize: 14, fontWeight: '800', lineHeight: 20 },
-  bottomDock: { backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.border, borderRadius: 24, borderWidth: 1, flexDirection: 'row', gap: 6, padding: 8 },
-  dockItem: { alignItems: 'center', backgroundColor: SitGuruColors.surfaceSoft, borderRadius: 16, flex: 1, minHeight: 52, justifyContent: 'center', padding: 6 },
-  dockText: { color: SitGuruColors.primary, fontSize: 11, fontWeight: '900', textAlign: 'center' },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: MobileSpace.sm,
+    marginBottom: MobileSpace.md,
+    minHeight: TOUCH_MIN,
+  },
+  backButton: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderRadius: 14,
+    height: TOUCH_MIN,
+    width: TOUCH_MIN,
+  },
+  headerTitle: {
+    color: SitGuruColors.text,
+    flex: 1,
+    fontFamily: AppFonts.extraBold,
+    fontSize: MobileType.title,
+    letterSpacing: -0.4,
+  },
+  headerSpacer: {
+    width: TOUCH_MIN,
+  },
+  subtitle: {
+    color: SitGuruColors.textMuted,
+    fontFamily: AppFonts.medium,
+    fontSize: MobileType.body,
+    lineHeight: 22,
+    marginBottom: MobileSpace.md,
+  },
+  stickyCta: {
+    backgroundColor: SitGuruColors.primary,
+    borderRadius: 16,
+    minHeight: TOUCH_MIN + 8,
+    width: '100%',
+  },
+  stickyCtaText: {
+    color: '#FFFFFF',
+    fontFamily: AppFonts.extraBold,
+    fontSize: MobileType.section,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.border,
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: MobileSpace.md,
+    padding: MobileSpace.xl,
+  },
+  emptyTitle: {
+    color: SitGuruColors.text,
+    fontFamily: AppFonts.extraBold,
+    fontSize: MobileType.section,
+  },
+  emptyText: {
+    color: SitGuruColors.textMuted,
+    fontFamily: AppFonts.medium,
+    fontSize: MobileType.body,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  petCard: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: MobileSpace.md,
+    marginBottom: MobileSpace.md,
+    padding: MobileSpace.lg,
+  },
+  petTop: {
+    flexDirection: 'row',
+    gap: MobileSpace.md,
+  },
+  petCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  petName: {
+    color: SitGuruColors.text,
+    fontFamily: AppFonts.extraBold,
+    fontSize: MobileType.section,
+  },
+  petMeta: {
+    color: SitGuruColors.textMuted,
+    fontFamily: AppFonts.medium,
+    fontSize: MobileType.label,
+    lineHeight: 20,
+  },
+  badge: {
+    color: SitGuruColors.primary,
+    fontFamily: AppFonts.bold,
+    fontSize: MobileType.caption,
+    marginTop: 4,
+  },
+  secondaryLink: {
+    alignItems: 'center',
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderRadius: 14,
+    justifyContent: 'center',
+    minHeight: TOUCH_MIN,
+  },
+  secondaryLinkText: {
+    color: SitGuruColors.primary,
+    fontFamily: AppFonts.extraBold,
+    fontSize: MobileType.label,
+  },
+  stepBody: {
+    gap: MobileSpace.md,
+    width: '100%',
+  },
+  input: {
+    backgroundColor: SitGuruColors.background,
+    borderColor: SitGuruColors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    color: SitGuruColors.text,
+    fontFamily: AppFonts.medium,
+    fontSize: MobileType.body,
+    minHeight: TOUCH_MIN + 6,
+    paddingHorizontal: MobileSpace.md,
+  },
+  noteInput: {
+    minHeight: 140,
+    paddingTop: MobileSpace.md,
+    textAlignVertical: 'top',
+  },
+  fieldLabel: {
+    color: SitGuruColors.text,
+    fontFamily: AppFonts.bold,
+    fontSize: MobileType.label,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: MobileSpace.sm,
+  },
+  pill: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderColor: SitGuruColors.primaryLight,
+    borderRadius: 999,
+    borderWidth: 1,
+    minHeight: TOUCH_MIN - 4,
+    paddingHorizontal: 14,
+  },
+  pillActive: {
+    backgroundColor: SitGuruColors.primary,
+    borderColor: SitGuruColors.primary,
+  },
+  pillText: {
+    color: SitGuruColors.primary,
+    fontFamily: AppFonts.bold,
+    fontSize: MobileType.label,
+  },
+  pillTextActive: {
+    color: '#FFFFFF',
+  },
 });

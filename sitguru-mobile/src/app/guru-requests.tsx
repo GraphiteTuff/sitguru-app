@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import {
   CalendarDays,
-  Check,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -17,10 +16,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -28,8 +23,19 @@ import {
 } from 'react-native';
 
 import { GuruHeaderActions } from '@/components/GuruHeaderActions';
+import MobileScreen from '@/components/mobile/MobileScreen';
+import StickyActionBar from '@/components/mobile/StickyActionBar';
+import SwipeableListItem, {
+  SWIPE_HINT,
+} from '@/components/mobile/SwipeableListItem';
+import TouchTarget from '@/components/mobile/TouchTarget';
 import RoleGate from '@/components/RoleGate';
+import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import {
+  StickyFooterClearance,
+  TOUCH_MIN,
+} from '@/constants/mobile-layout';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -72,7 +78,6 @@ export default function GuruRequestsScreen() {
   const { user } = useAuth();
   const themeMode = useThemeMode();
   const isDark = themeMode === 'dark';
-  const isWebPreview = Platform.OS === 'web';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
 
@@ -83,6 +88,9 @@ export default function GuruRequestsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [focusedRequestId, setFocusedRequestId] = useState<string | null>(
+    null,
+  );
 
   const loadRequests = useCallback(
     async (showRefresh = false) => {
@@ -184,6 +192,31 @@ export default function GuruRequestsScreen() {
     });
   }, [query, requests, tab]);
 
+  const focusedRequest = useMemo(() => {
+    if (!visibleRequests.length) return null;
+
+    return (
+      visibleRequests.find((item) => item.id === focusedRequestId) ??
+      visibleRequests[0]
+    );
+  }, [focusedRequestId, visibleRequests]);
+
+  useEffect(() => {
+    if (!focusedRequest) {
+      setFocusedRequestId(null);
+      return;
+    }
+
+    if (focusedRequestId !== focusedRequest.id) {
+      setFocusedRequestId(focusedRequest.id);
+    }
+  }, [focusedRequest, focusedRequestId]);
+
+  const stickyPending = tab === 'pending' && focusedRequest?.pending;
+  const stickyUpcoming = tab === 'upcoming' && focusedRequest?.upcoming;
+  const showStickyActions = Boolean(stickyPending || stickyUpcoming);
+  const scrollBottomInset = StickyFooterClearance.navOnly;
+
   async function updateRequestStatus(
     request: CareRequest,
     nextStatus: 'accepted' | 'declined',
@@ -259,326 +292,355 @@ export default function GuruRequestsScreen() {
   }
 
   return (
-    <SitGuruScreen center={isWebPreview} maxWidth={620}>
+    <SitGuruScreen center={false} maxWidth={620} scroll={false}>
       <RoleGate requiredRole="guru">
-        <View
-          style={[
-            styles.previewCanvas,
-            !isWebPreview && styles.previewCanvasNative,
-          ]}
-        >
-          <View
-            style={[
-              styles.deviceFrame,
-              !isWebPreview && styles.deviceFrameNative,
-            ]}
-          >
-            {isWebPreview ? <View style={styles.deviceTopSpeaker} /> : null}
-
-            <View
-              style={[
-                styles.phoneShell,
-                !isWebPreview && styles.phoneShellNative,
-              ]}
-            >
-              <View style={styles.screen}>
-                {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
-
-                <ScrollView
-                  contentContainerStyle={styles.scrollContent}
-                  keyboardShouldPersistTaps="handled"
-                  refreshControl={
-                    <RefreshControl
-                      refreshing={refreshing}
-                      onRefresh={() => void loadRequests(true)}
-                      tintColor={palette.primary}
-                      colors={[palette.primary]}
-                    />
-                  }
-                  showsVerticalScrollIndicator={false}
-                >
-                  <View style={styles.header}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Back to Guru Dashboard"
-                      onPress={() => router.push('/guru-dashboard')}
-                      style={styles.headerIconButton}
-                    >
-                      <ChevronLeft
-                        color={palette.title}
-                        size={20}
-                        strokeWidth={2.4}
+        <MobileScreen
+          scrollBottomInset={scrollBottomInset}
+          refreshing={refreshing}
+          onRefresh={() => void loadRequests(true)}
+          refreshColor={palette.primary}
+          footer={
+            <View>
+              {showStickyActions && focusedRequest ? (
+                <StickyActionBar embedded>
+                  {stickyPending ? (
+                    <>
+                      <SitGuruButton
+                        label="Decline request"
+                        variant="danger"
+                        disabled={updatingId === focusedRequest.id}
+                        onPress={() =>
+                          void updateRequestStatus(
+                            focusedRequest,
+                            'declined',
+                          )
+                        }
                       />
-                    </Pressable>
-
-                    <View style={styles.headerCopy}>
-                      <Text style={styles.title}>Bookings & Requests</Text>
-                      <Text style={styles.subtitle}>
-                        Review, accept, and prepare for care.
-                      </Text>
-                    </View>
-
-                    <GuruHeaderActions />
-                  </View>
-
-                  {message ? (
-                    <View style={styles.notice}>
-                      <Text style={styles.noticeText}>{message}</Text>
-                    </View>
-                  ) : null}
-
-                  <View style={styles.tabRow}>
-                    {(
-                      [
-                        ['pending', 'Pending', counts.pending],
-                        ['upcoming', 'Upcoming', counts.upcoming],
-                        ['past', 'Past', counts.past],
-                      ] as const
-                    ).map(([value, label, count]) => {
-                      const active = tab === value;
-
-                      return (
-                        <Pressable
-                          key={value}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: active }}
-                          onPress={() => setTab(value)}
-                          style={[
-                            styles.tabButton,
-                            active && styles.tabButtonActive,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.tabLabel,
-                              active && styles.tabLabelActive,
-                            ]}
-                          >
-                            {label}
-                          </Text>
-
-                          <View
-                            style={[
-                              styles.tabBadge,
-                              active && styles.tabBadgeActive,
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.tabBadgeText,
-                                active && styles.tabBadgeTextActive,
-                              ]}
-                            >
-                              {count}
-                            </Text>
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-
-                  <View style={styles.searchBar}>
-                    <Search
-                      color={palette.muted}
-                      size={18}
-                      strokeWidth={2.2}
-                    />
-                    <TextInput
-                      accessibilityLabel="Search care requests"
-                      onChangeText={setQuery}
-                      placeholder="Search pets, services, or Pet Parents"
-                      placeholderTextColor={palette.muted}
-                      style={styles.searchInput}
-                      value={query}
-                    />
-                    {query ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Clear search"
-                        onPress={() => setQuery('')}
-                      >
-                        <X
-                          color={palette.muted}
-                          size={18}
-                          strokeWidth={2.2}
-                        />
-                      </Pressable>
-                    ) : null}
-                  </View>
-
-                  {loading ? (
-                    <LoadingCards styles={styles} />
-                  ) : visibleRequests.length === 0 ? (
-                    <View style={styles.emptyCard}>
-                      <View style={styles.emptyIcon}>
-                        <CalendarDays
-                          color={palette.primary}
-                          size={28}
-                          strokeWidth={2.2}
-                        />
-                      </View>
-                      <Text style={styles.emptyTitle}>
-                        {tab === 'pending'
-                          ? 'No requests waiting'
-                          : tab === 'upcoming'
-                            ? 'No upcoming care'
-                            : 'No past bookings yet'}
-                      </Text>
-                      <Text style={styles.emptyText}>
-                        {tab === 'pending'
-                          ? 'New Pet Parent requests will appear here.'
-                          : tab === 'upcoming'
-                            ? 'Accepted bookings will appear here with preparation details.'
-                            : 'Completed and declined requests will be saved here.'}
-                      </Text>
-                    </View>
+                      <SitGuruButton
+                        label={
+                          updatingId === focusedRequest.id
+                            ? 'Saving…'
+                            : `Accept ${focusedRequest.petName}`
+                        }
+                        disabled={updatingId === focusedRequest.id}
+                        onPress={() =>
+                          void updateRequestStatus(
+                            focusedRequest,
+                            'accepted',
+                          )
+                        }
+                      />
+                    </>
                   ) : (
-                    <View style={styles.requestStack}>
-                      {visibleRequests.map((request) => (
-                        <RequestCard
-                          key={`${request.sourceTable}-${request.id}`}
-                          request={request}
-                          updating={updatingId === request.id}
-                          onAccept={() =>
-                            void updateRequestStatus(request, 'accepted')
-                          }
-                          onDecline={() =>
-                            void updateRequestStatus(request, 'declined')
-                          }
-                          palette={palette}
-                          styles={styles}
-                        />
-                      ))}
-                    </View>
+                    <SitGuruButton
+                      label={`Prepare care for ${focusedRequest.petName}`}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/guru-live-walk',
+                          params: { bookingId: focusedRequest.id },
+                        })
+                      }
+                    />
                   )}
+                </StickyActionBar>
+              ) : null}
 
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => router.push('/guru-pricing')}
-                    style={styles.infoCard}
-                  >
-                    <View style={styles.infoIcon}>
-                      <Clock3
-                        color={palette.primary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    </View>
-
-                    <View style={styles.infoCopy}>
-                      <Text style={styles.infoTitle}>
-                        Keep pricing and availability current
-                      </Text>
-                      <Text style={styles.infoText}>
-                        Accurate rates and calendar rules help avoid declined
-                        requests.
-                      </Text>
-                    </View>
-
-                    <ChevronRight
-                      color={palette.primary}
-                      size={18}
+              <View style={styles.bottomNav}>
+                <BottomNavItem
+                  icon={
+                    <Home
+                      color={palette.navMuted}
+                      size={22}
                       strokeWidth={2.3}
                     />
-                  </Pressable>
-                </ScrollView>
-
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    icon={
-                      <Home
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Dashboard"
-                    onPress={() => router.push('/guru-dashboard')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <MapPin
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Care Map"
-                    onPress={() => router.push('/guru-care-map')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    active
-                    icon={
-                      <CalendarDays
-                        color={palette.primary}
-                        size={21}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    label="Bookings"
-                    onPress={() => undefined}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <MessageCircle
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Messages"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/messages',
-                        params: { role: 'guru' },
-                      })
-                    }
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <UserRound
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Profile"
-                    onPress={() => router.push('/guru-profile')}
-                    styles={styles}
-                  />
-                </View>
+                  }
+                  label="Dashboard"
+                  onPress={() => router.push('/guru-dashboard')}
+                  styles={styles}
+                />
+                <BottomNavItem
+                  icon={
+                    <MapPin
+                      color={palette.navMuted}
+                      size={22}
+                      strokeWidth={2.3}
+                    />
+                  }
+                  label="Care Map"
+                  onPress={() => router.push('/guru-care-map')}
+                  styles={styles}
+                />
+                <BottomNavItem
+                  active
+                  icon={
+                    <CalendarDays
+                      color={palette.primary}
+                      size={22}
+                      strokeWidth={2.4}
+                    />
+                  }
+                  label="Bookings"
+                  onPress={() => undefined}
+                  styles={styles}
+                />
+                <BottomNavItem
+                  icon={
+                    <MessageCircle
+                      color={palette.navMuted}
+                      size={22}
+                      strokeWidth={2.3}
+                    />
+                  }
+                  label="Messages"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/messages',
+                      params: { role: 'guru' },
+                    })
+                  }
+                  styles={styles}
+                />
+                <BottomNavItem
+                  icon={
+                    <UserRound
+                      color={palette.navMuted}
+                      size={22}
+                      strokeWidth={2.3}
+                    />
+                  }
+                  label="Profile"
+                  onPress={() => router.push('/guru-profile')}
+                  styles={styles}
+                />
               </View>
             </View>
+          }
+        >
+          <View style={styles.header}>
+            <TouchTarget
+              accessibilityRole="button"
+              accessibilityLabel="Back to Guru Dashboard"
+              onPress={() => router.push('/guru-dashboard')}
+              style={styles.headerIconButton}
+            >
+              <ChevronLeft
+                color={palette.title}
+                size={22}
+                strokeWidth={2.4}
+              />
+            </TouchTarget>
 
-            {isWebPreview ? <View style={styles.homeIndicator} /> : null}
+            <View style={styles.headerCopy}>
+              <Text style={styles.title}>Bookings & Requests</Text>
+              <Text style={styles.subtitle}>
+                {showStickyActions
+                  ? 'Step 1: select a request · Step 2: act below'
+                  : 'Review, accept, and prepare for care.'}
+              </Text>
+            </View>
+
+            <GuruHeaderActions />
           </View>
-        </View>
+
+          {message ? (
+            <View style={styles.notice}>
+              <Text style={styles.noticeText}>{message}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.tabRow}>
+            {(
+              [
+                ['pending', 'Pending', counts.pending],
+                ['upcoming', 'Upcoming', counts.upcoming],
+                ['past', 'Past', counts.past],
+              ] as const
+            ).map(([value, label, count]) => {
+              const active = tab === value;
+
+              return (
+                <TouchTarget
+                  key={value}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => setTab(value)}
+                  style={[
+                    styles.tabButton,
+                    active && styles.tabButtonActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      active && styles.tabLabelActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {label}
+                  </Text>
+
+                  <View
+                    style={[
+                      styles.tabBadge,
+                      active && styles.tabBadgeActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.tabBadgeText,
+                        active && styles.tabBadgeTextActive,
+                      ]}
+                    >
+                      {count}
+                    </Text>
+                  </View>
+                </TouchTarget>
+              );
+            })}
+          </View>
+
+          <View style={styles.searchBar}>
+            <Search color={palette.muted} size={18} strokeWidth={2.2} />
+            <TextInput
+              accessibilityLabel="Search care requests"
+              onChangeText={setQuery}
+              placeholder="Search pets, services, or parents"
+              placeholderTextColor={palette.muted}
+              style={styles.searchInput}
+              value={query}
+            />
+            {query ? (
+              <TouchTarget
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                onPress={() => setQuery('')}
+                style={styles.clearSearchButton}
+              >
+                <X color={palette.muted} size={18} strokeWidth={2.2} />
+              </TouchTarget>
+            ) : null}
+          </View>
+
+          {loading ? (
+            <LoadingCards styles={styles} />
+          ) : visibleRequests.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIcon}>
+                <CalendarDays
+                  color={palette.primary}
+                  size={28}
+                  strokeWidth={2.2}
+                />
+              </View>
+              <Text style={styles.emptyTitle}>
+                {tab === 'pending'
+                  ? 'No requests waiting'
+                  : tab === 'upcoming'
+                    ? 'No upcoming care'
+                    : 'No past bookings yet'}
+              </Text>
+              <Text style={styles.emptyText}>
+                {tab === 'pending'
+                  ? 'New Pet Parent requests will appear here.'
+                  : tab === 'upcoming'
+                    ? 'Accepted bookings will appear here with preparation details.'
+                    : 'Completed and declined requests will be saved here.'}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.requestStack}>
+              {tab === 'pending' ? (
+                <Text style={styles.swipeHint}>{SWIPE_HINT}</Text>
+              ) : null}
+              {visibleRequests.map((request) => (
+                <SwipeableListItem
+                  key={`${request.sourceTable}-${request.id}`}
+                  enabled={request.pending}
+                  disabled={updatingId === request.id}
+                  onSwipeRight={
+                    request.pending
+                      ? () =>
+                          void updateRequestStatus(request, 'accepted')
+                      : undefined
+                  }
+                  onSwipeLeft={
+                    request.pending
+                      ? () =>
+                          void updateRequestStatus(request, 'declined')
+                      : undefined
+                  }
+                >
+                  <RequestCard
+                    focused={focusedRequest?.id === request.id}
+                    request={request}
+                    updating={updatingId === request.id}
+                    onFocus={() => setFocusedRequestId(request.id)}
+                    palette={palette}
+                    styles={styles}
+                  />
+                </SwipeableListItem>
+              ))}
+            </View>
+          )}
+
+          <TouchTarget
+            accessibilityRole="button"
+            onPress={() => router.push('/guru-pricing')}
+            style={styles.infoCard}
+          >
+            <View style={styles.infoIcon}>
+              <Clock3
+                color={palette.primary}
+                size={20}
+                strokeWidth={2.3}
+              />
+            </View>
+
+            <View style={styles.infoCopy}>
+              <Text style={styles.infoTitle}>
+                Keep pricing and availability current
+              </Text>
+              <Text style={styles.infoText}>
+                Accurate rates and calendar rules help avoid declined
+                requests.
+              </Text>
+            </View>
+
+            <ChevronRight
+              color={palette.primary}
+              size={18}
+              strokeWidth={2.3}
+            />
+          </TouchTarget>
+        </MobileScreen>
       </RoleGate>
     </SitGuruScreen>
   );
 }
 
 function RequestCard({
-  onAccept,
-  onDecline,
+  focused,
+  onFocus,
   palette,
   request,
   styles,
   updating,
 }: {
-  onAccept: () => void;
-  onDecline: () => void;
+  focused: boolean;
+  onFocus: () => void;
   palette: ReturnType<typeof getPalette>;
   request: CareRequest;
   styles: ReturnType<typeof createStyles>;
   updating: boolean;
 }) {
   return (
-    <View style={styles.requestCard}>
+    <TouchTarget
+      accessibilityRole="button"
+      accessibilityState={{ selected: focused }}
+      accessibilityLabel={`${request.petName} request. Tap to focus actions.`}
+      onPress={onFocus}
+      style={[styles.requestCard, focused && styles.requestCardFocused]}
+    >
       <View style={styles.requestHeader}>
         <Avatar
           emojiFallback
@@ -594,6 +656,15 @@ function RequestCard({
           <Text style={styles.dateLine}>
             {formatDateTime(request.startAt)}
           </Text>
+          {focused && (request.pending || request.upcoming) ? (
+            <Text style={styles.focusHint}>
+              {updating
+                ? 'Saving…'
+                : request.pending
+                  ? 'Selected · use Accept / Decline below'
+                  : 'Selected · Prepare Care below'}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.earningsBox}>
@@ -609,7 +680,7 @@ function RequestCard({
           icon={
             <UserRound
               color={palette.primary}
-              size={15}
+              size={16}
               strokeWidth={2.2}
             />
           }
@@ -620,14 +691,14 @@ function RequestCard({
           icon={
             <MapPin
               color={palette.primary}
-              size={15}
+              size={16}
               strokeWidth={2.2}
             />
           }
           label={
             request.distanceMiles !== null
               ? `${request.distanceMiles.toFixed(1)} miles away`
-              : request.location || 'Location available in details'
+              : request.location || 'Location in details'
           }
           styles={styles}
         />
@@ -640,7 +711,7 @@ function RequestCard({
       ) : null}
 
       <View style={styles.cardActions}>
-        <Pressable
+        <TouchTarget
           accessibilityRole="button"
           onPress={() =>
             router.push({
@@ -650,11 +721,12 @@ function RequestCard({
           }
           style={styles.secondaryButton}
         >
-          <Text style={styles.secondaryButtonText}>View Details</Text>
-        </Pressable>
+          <Text style={styles.secondaryButtonText}>View details</Text>
+        </TouchTarget>
 
-        <Pressable
+        <TouchTarget
           accessibilityRole="button"
+          accessibilityLabel="Message Pet Parent"
           onPress={() =>
             router.push({
               pathname: '/conversation',
@@ -665,54 +737,12 @@ function RequestCard({
         >
           <MessageCircle
             color={palette.primary}
-            size={18}
+            size={20}
             strokeWidth={2.3}
           />
-        </Pressable>
-
-        {request.pending ? (
-          <>
-            <Pressable
-              accessibilityRole="button"
-              disabled={updating}
-              onPress={onDecline}
-              style={styles.declineButton}
-            >
-              <X
-                color={palette.orange}
-                size={17}
-                strokeWidth={2.5}
-              />
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={updating}
-              onPress={onAccept}
-              style={styles.acceptButton}
-            >
-              <Check color="#FFFFFF" size={17} strokeWidth={2.5} />
-              <Text style={styles.acceptButtonText}>
-                {updating ? 'Saving...' : 'Accept'}
-              </Text>
-            </Pressable>
-          </>
-        ) : request.upcoming ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() =>
-              router.push({
-                pathname: '/guru-live-walk',
-                params: { bookingId: request.id },
-              })
-            }
-            style={styles.acceptButton}
-          >
-            <Text style={styles.acceptButtonText}>Prepare Care</Text>
-          </Pressable>
-        ) : null}
+        </TouchTarget>
       </View>
-    </View>
+    </TouchTarget>
   );
 }
 
@@ -749,17 +779,20 @@ function BottomNavItem({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <TouchTarget
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
       style={styles.navItem}
     >
       {icon}
-      <Text style={active ? styles.navLabelActive : styles.navLabel}>
+      <Text
+        style={active ? styles.navLabelActive : styles.navLabel}
+        numberOfLines={1}
+      >
         {label}
       </Text>
-    </Pressable>
+    </TouchTarget>
   );
 }
 
@@ -1253,7 +1286,8 @@ function createStyles(isDark: boolean) {
     subtitle: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 9,
+      fontSize: 13,
+      lineHeight: 18,
       marginTop: 2,
     },
     headerActions: {
@@ -1267,9 +1301,9 @@ function createStyles(isDark: boolean) {
       borderColor: palette.border,
       borderRadius: 999,
       borderWidth: 1,
-      height: 38,
+      height: TOUCH_MIN,
       justifyContent: 'center',
-      width: 38,
+      width: TOUCH_MIN,
     },
     modeToggle: {
       alignItems: 'center',
@@ -1283,10 +1317,11 @@ function createStyles(isDark: boolean) {
     },
     modeButton: {
       alignItems: 'center',
-      borderRadius: 10,
-      height: 28,
+      borderRadius: 12,
+      height: TOUCH_MIN,
       justifyContent: 'center',
-      width: 31,
+      minWidth: TOUCH_MIN,
+      width: TOUCH_MIN,
     },
     modeButtonActive: {
       backgroundColor: isDark
@@ -1318,17 +1353,19 @@ function createStyles(isDark: boolean) {
     tabButton: {
       alignItems: 'center',
       borderRadius: 12,
-      flex: 1,
+      flexGrow: 1,
       flexDirection: 'row',
-      gap: 5,
+      gap: 6,
       justifyContent: 'center',
-      minHeight: 38,
+      minHeight: TOUCH_MIN,
+      minWidth: '30%',
+      paddingHorizontal: 8,
     },
     tabButtonActive: { backgroundColor: palette.primary },
     tabLabel: {
       color: palette.muted,
       fontFamily: AppFonts.bold,
-      fontSize: 9,
+      fontSize: 13,
     },
     tabLabelActive: { color: '#FFFFFF' },
     tabBadge: {
@@ -1336,15 +1373,15 @@ function createStyles(isDark: boolean) {
       backgroundColor: palette.surfaceSoft,
       borderRadius: 999,
       justifyContent: 'center',
-      minHeight: 19,
-      minWidth: 19,
-      paddingHorizontal: 5,
+      minHeight: 22,
+      minWidth: 22,
+      paddingHorizontal: 6,
     },
     tabBadgeActive: { backgroundColor: 'rgba(255,255,255,0.18)' },
     tabBadgeText: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 8,
+      fontSize: 11,
     },
     tabBadgeTextActive: { color: '#FFFFFF' },
     searchBar: {
@@ -1355,24 +1392,50 @@ function createStyles(isDark: boolean) {
       borderWidth: 1,
       flexDirection: 'row',
       gap: 8,
-      minHeight: 47,
+      minHeight: TOUCH_MIN,
       paddingHorizontal: 12,
+      width: '100%',
     },
     searchInput: {
       color: palette.title,
       flex: 1,
       fontFamily: AppFonts.medium,
-      fontSize: 10,
+      fontSize: 15,
+      minWidth: 0,
       paddingVertical: 0,
     },
-    requestStack: { gap: 10 },
+    clearSearchButton: {
+      borderRadius: 999,
+      minHeight: TOUCH_MIN,
+      minWidth: TOUCH_MIN,
+    },
+    requestStack: { gap: 10, width: '100%' },
+    swipeHint: {
+      color: palette.muted,
+      fontFamily: AppFonts.bold,
+      fontSize: 12,
+      marginBottom: 2,
+      textAlign: 'center',
+    },
     requestCard: {
+      alignItems: 'stretch',
       backgroundColor: palette.surface,
       borderColor: palette.border,
       borderRadius: 20,
       borderWidth: 1,
       gap: 11,
-      padding: 13,
+      padding: 14,
+      width: '100%',
+    },
+    requestCardFocused: {
+      borderColor: palette.primary,
+      borderWidth: 2,
+    },
+    focusHint: {
+      color: palette.primary,
+      fontFamily: AppFonts.bold,
+      fontSize: 12,
+      marginTop: 4,
     },
     requestHeader: {
       alignItems: 'center',
@@ -1415,76 +1478,88 @@ function createStyles(isDark: boolean) {
       fontSize: 15,
       marginTop: 1,
     },
-    detailGrid: { flexDirection: 'row', gap: 8 },
+    detailGrid: {
+      flexDirection: 'column',
+      gap: 8,
+      width: '100%',
+    },
     detailItem: {
       alignItems: 'center',
       backgroundColor: palette.surfaceSoft,
-      borderRadius: 11,
-      flex: 1,
+      borderRadius: 12,
       flexDirection: 'row',
-      gap: 5,
-      minHeight: 33,
-      paddingHorizontal: 8,
+      gap: 8,
+      minHeight: TOUCH_MIN,
+      paddingHorizontal: 12,
+      width: '100%',
     },
     detailText: {
       color: palette.text,
       flex: 1,
+      flexShrink: 1,
       fontFamily: AppFonts.medium,
-      fontSize: 8,
+      fontSize: 13,
+      minWidth: 0,
     },
     notes: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 9,
-      lineHeight: 13,
+      fontSize: 13,
+      lineHeight: 18,
     },
-    cardActions: { flexDirection: 'row', gap: 7 },
+    cardActions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      width: '100%',
+    },
     secondaryButton: {
       alignItems: 'center',
       borderColor: palette.primary,
-      borderRadius: 999,
+      borderRadius: 14,
       borderWidth: 1,
-      flex: 1,
+      flexGrow: 1,
       justifyContent: 'center',
-      minHeight: 38,
-      paddingHorizontal: 9,
+      minHeight: TOUCH_MIN,
+      minWidth: '55%',
+      paddingHorizontal: 14,
     },
     secondaryButtonText: {
       color: palette.primary,
       fontFamily: AppFonts.extraBold,
-      fontSize: 8,
+      fontSize: 14,
     },
     iconButton: {
       alignItems: 'center',
       borderColor: palette.border,
-      borderRadius: 999,
+      borderRadius: 14,
       borderWidth: 1,
-      height: 38,
+      height: TOUCH_MIN,
       justifyContent: 'center',
-      width: 38,
+      width: TOUCH_MIN,
     },
     declineButton: {
       alignItems: 'center',
       backgroundColor: isDark ? '#3A251D' : '#FFF0E7',
-      borderRadius: 999,
-      height: 38,
+      borderRadius: 14,
+      height: TOUCH_MIN,
       justifyContent: 'center',
-      width: 38,
+      width: TOUCH_MIN,
     },
     acceptButton: {
       alignItems: 'center',
       backgroundColor: palette.primary,
-      borderRadius: 999,
+      borderRadius: 14,
       flexDirection: 'row',
-      gap: 5,
+      gap: 6,
       justifyContent: 'center',
-      minHeight: 38,
-      paddingHorizontal: 14,
+      minHeight: TOUCH_MIN,
+      paddingHorizontal: 16,
     },
     acceptButtonText: {
       color: '#FFFFFF',
       fontFamily: AppFonts.extraBold,
-      fontSize: 8,
+      fontSize: 14,
     },
     emptyCard: {
       alignItems: 'center',
@@ -1513,8 +1588,8 @@ function createStyles(isDark: boolean) {
     emptyText: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 9,
-      lineHeight: 14,
+      fontSize: 14,
+      lineHeight: 20,
       textAlign: 'center',
     },
     loadingCard: {
@@ -1559,8 +1634,11 @@ function createStyles(isDark: boolean) {
       borderRadius: 18,
       borderWidth: 1,
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 10,
-      padding: 12,
+      minHeight: TOUCH_MIN,
+      padding: 14,
+      width: '100%',
     },
     infoIcon: {
       alignItems: 'center',
@@ -1605,8 +1683,11 @@ function createStyles(isDark: boolean) {
     navItem: {
       alignItems: 'center',
       flex: 1,
-      gap: 3,
+      gap: 2,
       justifyContent: 'center',
+      minHeight: TOUCH_MIN,
+      minWidth: 0,
+      paddingHorizontal: 2,
     },
     navLabelActive: {
       color: palette.primary,

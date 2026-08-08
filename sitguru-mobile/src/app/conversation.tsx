@@ -7,11 +7,9 @@ import {
   ChevronLeft,
   ChevronUp,
   CircleDollarSign,
-  ImagePlus,
   MapPin,
   MessageCircle,
   PawPrint,
-  Send,
   Sparkles,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -24,10 +22,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import ChatComposerBar, {
+  type ChatAttachment,
+} from '@/components/mobile/ChatComposerBar';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
@@ -684,6 +685,7 @@ export default function ConversationScreen() {
   const isDark = themeMode === 'dark';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
+  const insets = useSafeAreaInsets();
   const threadRef = useRef<ScrollView | null>(null);
 
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
@@ -1085,11 +1087,21 @@ export default function ConversationScreen() {
     return () => clearTimeout(timeout);
   }, [messages.length]);
 
-  async function sendMessage() {
-    const cleanMessage = draftMessage.trim();
+  async function sendMessage(payload?: {
+    text: string;
+    attachment: ChatAttachment | null;
+  }) {
+    const attachment = payload?.attachment ?? null;
+    const cleanMessage = (payload?.text ?? draftMessage).trim();
+    const attachmentLabel = attachment
+      ? attachment.kind === 'photo'
+        ? '[Photo attached]'
+        : `[Voice note ${formatAttachmentDuration(attachment.durationMs)}]`
+      : '';
+    const body = [cleanMessage, attachmentLabel].filter(Boolean).join('\n');
 
-    if (!cleanMessage) {
-      setNotice({ tone: 'warning', text: 'Type a message before sending.' });
+    if (!body) {
+      setNotice({ tone: 'warning', text: 'Add a message, photo, or voice note.' });
       return;
     }
 
@@ -1099,7 +1111,7 @@ export default function ConversationScreen() {
         conversationId: conversation?.id ?? null,
         senderId: currentUserId || 'preview-parent',
         recipientId: otherUserId || 'preview-guru',
-        body: cleanMessage,
+        body,
         createdAt: new Date().toISOString(),
         delivery: 'preview',
       };
@@ -1108,7 +1120,9 @@ export default function ConversationScreen() {
       setDraftMessage('');
       setNotice({
         tone: 'warning',
-        text: 'Message added to this preview only. It was not saved or sent to another user.',
+        text: attachment
+          ? 'Preview message saved locally with media. Upload to SitGuru storage comes next.'
+          : 'Message added to this preview only. It was not saved or sent to another user.',
       });
       return;
     }
@@ -1121,7 +1135,7 @@ export default function ConversationScreen() {
         conversationId: conversation.id,
         senderId: currentUserId,
         recipientId: otherUserId,
-        body: cleanMessage,
+        body,
       });
       const insertedMessage = normalizeMessage(insertedRow);
 
@@ -1129,9 +1143,14 @@ export default function ConversationScreen() {
         setMessages((current) => mergeMessages(current, [insertedMessage]));
       }
 
-      await updateConversationPreview(conversation.id, cleanMessage);
+      await updateConversationPreview(conversation.id, body);
       setDraftMessage('');
-      setNotice({ tone: 'success', text: 'Message sent.' });
+      setNotice({
+        tone: 'success',
+        text: attachment
+          ? 'Message sent. Media upload to cloud storage is next.'
+          : 'Message sent.',
+      });
     } catch (error) {
       setNotice({
         tone: 'error',
@@ -1150,11 +1169,11 @@ export default function ConversationScreen() {
     setNotice(null);
   }
 
-  function handleAttachment() {
-    setNotice({
-      tone: 'warning',
-      text: 'Attachment upload is not connected yet. No file was selected or sent.',
-    });
+  function formatAttachmentDuration(ms?: number) {
+    const total = Math.max(0, Math.floor((ms ?? 0) / 1000));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
   }
 
   function openRequestCare() {
@@ -1243,8 +1262,10 @@ export default function ConversationScreen() {
 
           <View style={[styles.phoneShell, !isWebPreview && styles.phoneShellNative]}>
             <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 4 : 0}
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={
+                Platform.OS === 'ios' ? Math.max(insets.top, 8) : 0
+              }
               style={styles.keyboardView}
             >
               {isWebPreview ? <PhoneStatusBar palette={palette} styles={styles} /> : null}
@@ -1568,56 +1589,22 @@ export default function ConversationScreen() {
                   </ScrollView>
                 </View>
 
-                <View style={styles.composer}>
-                  <Pressable
-                    accessibilityLabel="Add attachment"
-                    accessibilityRole="button"
-                    onPress={handleAttachment}
-                    style={({ pressed }) => [styles.composerIconButton, pressed && styles.pressed]}
-                  >
-                    <ImagePlus color={palette.primary} size={20} strokeWidth={2.4} />
-                  </Pressable>
-
-                  <View style={styles.composerInputWrap}>
-                    <TextInput
-                      accessibilityLabel="Message"
-                      editable={!sending}
-                      maxLength={4000}
-                      multiline
-                      onChangeText={(value) => {
-                        setDraftMessage(value);
-                        if (notice?.tone !== 'success') setNotice(null);
-                      }}
-                      onFocus={() =>
-                        setTimeout(() => threadRef.current?.scrollToEnd({ animated: true }), 120)
-                      }
-                      placeholder={`Message ${otherName}`}
-                      placeholderTextColor={palette.placeholder}
-                      style={styles.composerInput}
-                      value={draftMessage}
-                    />
-                    <Text style={styles.characterCount}>{draftMessage.length}/4000</Text>
-                  </View>
-
-                  <Pressable
-                    accessibilityLabel="Send message"
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: sending || !draftMessage.trim() }}
-                    disabled={sending || !draftMessage.trim()}
-                    onPress={() => void sendMessage()}
-                    style={({ pressed }) => [
-                      styles.sendButton,
-                      (sending || !draftMessage.trim()) && styles.sendButtonDisabled,
-                      pressed && !sending && draftMessage.trim() && styles.pressed,
-                    ]}
-                  >
-                    {sending ? (
-                      <ActivityIndicator color="#FFFFFF" size="small" />
-                    ) : (
-                      <Send color="#FFFFFF" size={20} strokeWidth={2.6} />
-                    )}
-                  </Pressable>
-                </View>
+                <ChatComposerBar
+                  value={draftMessage}
+                  sending={sending}
+                  placeholder={`Message ${otherName}`}
+                  onChangeText={(value) => {
+                    setDraftMessage(value);
+                    if (notice?.tone !== 'success') setNotice(null);
+                  }}
+                  onFocus={() =>
+                    setTimeout(
+                      () => threadRef.current?.scrollToEnd({ animated: true }),
+                      120,
+                    )
+                  }
+                  onSend={(payload) => void sendMessage(payload)}
+                />
               </View>
 
               <View style={styles.bottomNav}>

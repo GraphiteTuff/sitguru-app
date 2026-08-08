@@ -370,8 +370,30 @@ export const supabase =
         flowType: 'pkce',
         lock: processLock,
       },
+      realtime: {
+        // Keep cross-device sync resilient when the app resumes.
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
     },
   );
+
+/** Current access token for SitGuru web API Bearer auth (never service role). */
+export async function getSupabaseAccessToken() {
+  if (!isSupabaseConfigured) {
+    return null;
+  }
+
+  const { data, error } =
+    await supabase.auth.getSession();
+
+  if (error) {
+    return null;
+  }
+
+  return data.session?.access_token ?? null;
+}
 
 type SitGuruGlobal =
   typeof globalThis & {

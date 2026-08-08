@@ -38,6 +38,7 @@ import {
 
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
+import { scheduleDemoBookingRequestNotification } from '@/lib/notifications/push';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
@@ -1126,6 +1127,30 @@ export default function NotificationsScreen() {
                       />
                     </View>
 
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Try Accept Booking lock screen alert"
+                      onPress={() => {
+                        void scheduleDemoBookingRequestNotification({
+                          petName: firstName || 'Scout',
+                        }).then(() => {
+                          setMessage(
+                            'Demo booking alert scheduled — check lock screen in ~2s for Accept Booking.',
+                          );
+                        });
+                      }}
+                      style={styles.pushDemoButton}
+                    >
+                      <Bell
+                        color="#FFFFFF"
+                        size={18}
+                        strokeWidth={2.3}
+                      />
+                      <Text style={styles.pushDemoButtonText}>
+                        Try Accept Booking push
+                      </Text>
+                    </Pressable>
+
                     {[
                       ['booking_alerts', 'Booking alerts'],
                       ['message_alerts', 'Message alerts'],
@@ -1820,6 +1845,21 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
       borderWidth: 1,
       gap: 10,
       padding: 14,
+    },
+    pushDemoButton: {
+      alignItems: 'center',
+      backgroundColor: theme.colors.primary,
+      borderRadius: 16,
+      flexDirection: 'row',
+      gap: 8,
+      justifyContent: 'center',
+      minHeight: 48,
+      paddingHorizontal: 14,
+    },
+    pushDemoButtonText: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 13,
     },
     sectionHeader: {
       alignItems: 'center',

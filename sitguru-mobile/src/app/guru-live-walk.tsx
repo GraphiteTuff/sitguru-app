@@ -29,10 +29,13 @@ import {
   View,
 } from 'react-native';
 
+import CareQuickActions from '@/components/mobile/CareQuickActions';
+import LiveRouteHeader from '@/components/mobile/LiveRouteHeader';
 import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
+import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -106,6 +109,9 @@ export default function GuruLiveWalkScreen() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [now, setNow] = useState(Date.now());
+  const [trail, setTrail] = useState<
+    Array<{ latitude: number; longitude: number }>
+  >([]);
 
   const bookingId = Array.isArray(params.bookingId)
     ? params.bookingId[0]
@@ -210,6 +216,18 @@ export default function GuruLiveWalkScreen() {
   }, [loadCare, user?.id]);
 
   const status: CareStatus = session?.status ?? 'not_started';
+  const locationTracking = useLiveLocation({
+    enabled: status === 'active',
+    onUpdate: (coords) => {
+      setTrail((current) => {
+        const next = [
+          ...current,
+          { latitude: coords.latitude, longitude: coords.longitude },
+        ];
+        return next.length > 120 ? next.slice(next.length - 120) : next;
+      });
+    },
+  });
   const elapsedTime = useMemo(
     () => formatElapsed(session?.startedAt ?? null, now),
     [now, session?.startedAt],
@@ -528,38 +546,29 @@ export default function GuruLiveWalkScreen() {
                         </View>
                       </View>
 
-                      <View style={styles.mapCard}>
-                        <View style={styles.mapHeader}>
-                          <View>
-                            <Text style={styles.cardEyebrow}>
-                              LIVE CARE LOCATION
-                            </Text>
-                            <Text style={styles.cardTitle}>
-                              {booking.location || 'Booking service area'}
-                            </Text>
-                          </View>
+                      <LiveRouteHeader
+                        locationLabel={
+                          booking.location || 'Booking service area'
+                        }
+                        live={status === 'active' && locationTracking.tracking}
+                        coords={locationTracking.coords}
+                        trail={trail}
+                        distanceMiles={session?.distanceMiles}
+                        error={locationTracking.error}
+                      />
 
-                          <View style={styles.mapStatusPill}>
-                            <View
-                              style={[
-                                styles.liveDot,
-                                status !== 'active' && styles.liveDotInactive,
-                              ]}
-                            />
-                            <Text style={styles.mapStatusText}>
-                              {status === 'active' ? 'Live' : statusLabel(status)}
-                            </Text>
-                          </View>
-                        </View>
+                      <Text style={styles.privacyText}>
+                        Map stays compact so Potty and Water stay in the thumb
+                        zone. GPS runs only during active booked care.
+                      </Text>
 
-                        <RoutePreview styles={styles} />
-
-                        <Text style={styles.privacyText}>
-                          Location should only be tracked during active booked
-                          care. Exact routes are visible only to authorized
-                          booking participants.
-                        </Text>
-                      </View>
+                      {status === 'active' || status === 'paused' ? (
+                        <CareQuickActions
+                          disabled={saving}
+                          onPotty={() => void addUpdate('potty')}
+                          onWater={() => void addUpdate('water')}
+                        />
+                      ) : null}
 
                       <View style={styles.controlCard}>
                         <Text style={styles.cardEyebrow}>CARE CONTROLS</Text>
@@ -652,36 +661,12 @@ export default function GuruLiveWalkScreen() {
                       </View>
 
                       <View style={styles.quickCard}>
-                        <Text style={styles.cardEyebrow}>QUICK UPDATES</Text>
+                        <Text style={styles.cardEyebrow}>MORE UPDATES</Text>
                         <Text style={styles.cardTitle}>
-                          Keep the Pet Parent informed
+                          Food, photo, or a quick note
                         </Text>
 
                         <View style={styles.quickGrid}>
-                          <QuickUpdate
-                            icon={
-                              <Footprints
-                                color={palette.primary}
-                                size={20}
-                                strokeWidth={2.3}
-                              />
-                            }
-                            label="Potty"
-                            onPress={() => void addUpdate('potty')}
-                            styles={styles}
-                          />
-                          <QuickUpdate
-                            icon={
-                              <Droplets
-                                color={palette.primary}
-                                size={20}
-                                strokeWidth={2.3}
-                              />
-                            }
-                            label="Water"
-                            onPress={() => void addUpdate('water')}
-                            styles={styles}
-                          />
                           <QuickUpdate
                             icon={
                               <Utensils
@@ -916,26 +901,6 @@ function HeroStat({
     <View style={styles.heroStat}>
       <Text style={styles.heroStatValue}>{value}</Text>
       <Text style={styles.heroStatLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function RoutePreview({
-  styles,
-}: {
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <View style={styles.mapCanvas}>
-      <View style={styles.mapRoadOne} />
-      <View style={styles.mapRoadTwo} />
-      <View style={styles.mapPark} />
-      <View style={styles.routeOne} />
-      <View style={styles.routeTwo} />
-      <View style={styles.startMarker} />
-      <View style={styles.endMarker}>
-        <PawPrint color="#FFFFFF" size={15} strokeWidth={2.4} />
-      </View>
     </View>
   );
 }

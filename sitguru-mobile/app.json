@@ -61,7 +61,38 @@
           "enableGooglePay": true
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow SitGuru to track live care routes only during active booked visits.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow SitGuru to attach photos in chat and Pet Passports.",
+          "cameraPermission": "Allow SitGuru to take care photos and scan vaccine papers.",
+          "microphonePermission": "Allow SitGuru to record voice notes for Pet Parents and Gurus."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SitGuru to scan vaccine papers for Pet Passports.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0D5C3A",
+          "defaultChannel": "sitguru-bookings"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

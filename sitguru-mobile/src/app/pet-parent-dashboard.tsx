@@ -26,22 +26,29 @@ import {
 } from 'react';
 import {
   Image,
-  Platform,
   Pressable,
-  RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from 'react-native';
 
 import RoleGate from '@/components/RoleGate';
+import MobileScreen from '@/components/mobile/MobileScreen';
+import PriorityCarousel, {
+  type PriorityCard,
+} from '@/components/mobile/PriorityCarousel';
+import StickyActionBar from '@/components/mobile/StickyActionBar';
+import TouchTarget from '@/components/mobile/TouchTarget';
+import SitGuruButton from '@/components/SitGuruButton';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
+import {
+  StickyFooterClearance,
+  TOUCH_MIN,
+} from '@/constants/mobile-layout';
 import {
   setThemePreference,
   type SitGuruThemePreference,
@@ -196,9 +203,7 @@ const REALTIME_TABLES = [
 ];
 
 export default function PetParentDashboardScreen() {
-  const { width } = useWindowDimensions();
   const { user, profile } = useAuth();
-  const isWebPreview = Platform.OS === 'web';
 
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
@@ -256,8 +261,6 @@ export default function PetParentDashboardScreen() {
       'referral_credit',
     ]) ?? 0,
   );
-
-  const compactPhone = width < 390;
 
   const refreshDashboard = useCallback(
     async (showRefresh = false) => {
@@ -412,84 +415,205 @@ export default function PetParentDashboardScreen() {
     isUpcomingStatus(booking.status),
   ).length;
 
-  const careSection = activeCare ? (
-    <LiveCareCard
-      care={activeCare}
-      elapsedMinutes={getElapsedMinutes(activeCare, now)}
-      palette={palette}
-      styles={styles}
-    />
-  ) : currentBooking ? (
-    <UpcomingCareCard
-      booking={currentBooking}
-      palette={palette}
-      styles={styles}
-    />
-  ) : recentCompletedCare ? (
-    <CompletedCareCard care={recentCompletedCare} styles={styles} />
-  ) : (
-    <EmptyCareCard styles={styles} />
-  );
+  const scrollBottomInset = StickyFooterClearance.navOnly;
+
+  const priorityCards = useMemo<PriorityCard[]>(() => {
+    const cards: PriorityCard[] = [];
+
+    if (activeCare) {
+      cards.push({
+        id: 'live-care',
+        eyebrow: activeCare.isWalk ? 'Live walk' : 'Live care',
+        title: activeCare.petName
+          ? `${activeCare.petName} is with ${activeCare.guruName || 'your Guru'}`
+          : 'Care in progress',
+        helper: activeCare.latestUpdate || 'Open PawReport Live for updates.',
+        tone: 'primary',
+        ctaLabel: 'Open PawReport Live',
+        onPress: () => router.push('/pawreport-live'),
+        icon: <PawPrint color="#FFFFFF" size={22} strokeWidth={2.4} />,
+      });
+    } else if (currentBooking) {
+      cards.push({
+        id: 'next-booking',
+        eyebrow: 'Next booking',
+        title: currentBooking.serviceLabel || 'Upcoming care',
+        helper: [
+          currentBooking.petName,
+          currentBooking.guruName,
+          formatBookingDay(currentBooking.startAt),
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        tone: 'primary',
+        ctaLabel: 'View booking',
+        onPress: () => router.push('/booking-details'),
+        icon: <CalendarDays color="#FFFFFF" size={22} strokeWidth={2.4} />,
+      });
+    } else {
+      cards.push({
+        id: 'find-care',
+        eyebrow: 'Ready when you are',
+        title: 'Find a trusted Guru',
+        helper: 'Browse local sitters and request care in a few taps.',
+        tone: 'primary',
+        ctaLabel: 'Find Care',
+        onPress: () => router.push('/find-care'),
+        icon: <Search color="#FFFFFF" size={22} strokeWidth={2.4} />,
+      });
+    }
+
+    const incompletePets = dashboardData.pets.filter((pet) => !pet.complete);
+    cards.push({
+      id: 'pets',
+      eyebrow: 'Pet Passports',
+      title:
+        dashboardData.pets.length === 0
+          ? 'Add your first pet'
+          : incompletePets.length
+            ? `${incompletePets.length} passport${incompletePets.length === 1 ? '' : 's'} need details`
+            : `${dashboardData.pets.length} pet${dashboardData.pets.length === 1 ? '' : 's'} ready`,
+      helper:
+        dashboardData.pets.length === 0
+          ? 'Save routines, meds, and handoff notes before booking.'
+          : 'Tap to manage passports and care notes.',
+      onPress: () => router.push('/pet-passports'),
+      icon: <PawPrint color={palette.primary} size={22} strokeWidth={2.4} />,
+    });
+
+    if (dashboardData.unreadMessages > 0 || dashboardData.unreadNotifications > 0) {
+      cards.push({
+        id: 'inbox',
+        eyebrow: 'Needs attention',
+        title: 'Messages & alerts',
+        helper: [
+          dashboardData.unreadMessages
+            ? `${dashboardData.unreadMessages} unread message${dashboardData.unreadMessages === 1 ? '' : 's'}`
+            : null,
+          dashboardData.unreadNotifications
+            ? `${dashboardData.unreadNotifications} notification${dashboardData.unreadNotifications === 1 ? '' : 's'}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        tone: 'warning',
+        ctaLabel: 'Open inbox',
+        onPress: () =>
+          router.push(
+            dashboardData.unreadMessages > 0 ? '/messages' : '/notifications',
+          ),
+        icon: <Bell color={palette.orange} size={22} strokeWidth={2.4} />,
+      });
+    }
+
+    cards.push({
+      id: 'rewards',
+      eyebrow: 'PawPoints',
+      title: `${pawPoints.toLocaleString()} points`,
+      helper:
+        availableCredit > 0
+          ? `$${availableCredit.toFixed(2)} credit ready`
+          : 'Earn rewards through bookings and referrals.',
+      onPress: () => router.push('/payments'),
+      icon: <Gift color={palette.primary} size={22} strokeWidth={2.4} />,
+    });
+
+    return cards;
+  }, [
+    activeCare,
+    availableCredit,
+    currentBooking,
+    dashboardData.pets,
+    dashboardData.unreadMessages,
+    dashboardData.unreadNotifications,
+    palette.orange,
+    palette.primary,
+    pawPoints,
+  ]);
 
   return (
-    <SitGuruScreen center={isWebPreview} maxWidth={620}>
+    <SitGuruScreen center={false} maxWidth={620} scroll={false}>
       <RoleGate requiredRole="pet_parent">
-        <View
-          style={[
-            styles.previewCanvas,
-            !isWebPreview && styles.previewCanvasNative,
-          ]}
-        >
-          <View
-            style={[
-              styles.deviceFrame,
-              !isWebPreview && styles.deviceFrameNative,
-            ]}
-          >
-            {isWebPreview ? <View style={styles.deviceTopSpeaker} /> : null}
+        <MobileScreen
+          scrollBottomInset={scrollBottomInset}
+          refreshing={isRefreshing}
+          onRefresh={() => void refreshDashboard(true)}
+          refreshColor={palette.primary}
+          footer={
+            <View>
+              <StickyActionBar embedded>
+                <SitGuruButton
+                  label={primaryAction.title}
+                  onPress={() => router.push(primaryAction.route)}
+                  accessibilityLabel={`${primaryAction.title}. ${primaryAction.helper}`}
+                />
+              </StickyActionBar>
 
-            <View
-              style={[
-                styles.phoneShell,
-                !isWebPreview && styles.phoneShellNative,
-              ]}
-            >
-              <View style={styles.screen}>
-                {isWebPreview ? (
-                  <View style={styles.statusBar}>
-                    <Text style={styles.statusTime}>9:41</Text>
+              <View style={styles.bottomNav}>
+                <BottomNavItem
+                  active
+                  icon={
+                    <Home color={palette.primary} size={22} strokeWidth={2.4} />
+                  }
+                  label="Home"
+                  onPress={() => undefined}
+                  styles={styles}
+                />
+                <BottomNavItem
+                  icon={
+                    <Search color={palette.navMuted} size={22} strokeWidth={2.3} />
+                  }
+                  label="Explore"
+                  onPress={() => router.push('/find-care')}
+                  styles={styles}
+                />
+                <BottomNavItem
+                  icon={
+                    <CalendarDays
+                      color={palette.navMuted}
+                      size={22}
+                      strokeWidth={2.3}
+                    />
+                  }
+                  label="Bookings"
+                  onPress={() => router.push('/booking-details')}
+                  styles={styles}
+                />
+                <BottomNavItem
+                  badge={dashboardData.unreadMessages}
+                  icon={
+                    <MessageCircle
+                      color={palette.navMuted}
+                      size={22}
+                      strokeWidth={2.3}
+                    />
+                  }
+                  label="Messages"
+                  onPress={() => router.push('/messages')}
+                  styles={styles}
+                />
+                <BottomNavItem
+                  icon={
+                    <UserRound
+                      color={palette.navMuted}
+                      size={22}
+                      strokeWidth={2.3}
+                    />
+                  }
+                  label="Profile"
+                  onPress={() => setWorkspaceSwitcherOpen(true)}
+                  styles={styles}
+                />
+              </View>
 
-                    <View style={styles.statusIcons}>
-                      <View style={styles.signalBars}>
-                        <View style={[styles.signalBar, { height: 5 }]} />
-                        <View style={[styles.signalBar, { height: 7 }]} />
-                        <View style={[styles.signalBar, { height: 9 }]} />
-                      </View>
-
-                      <Text style={styles.wifiText}>⌁</Text>
-
-                      <View style={styles.batteryWrap}>
-                        <View style={styles.batteryBody}>
-                          <View style={styles.batteryFill} />
-                        </View>
-                        <View style={styles.batteryCap} />
-                      </View>
-                    </View>
-                  </View>
-                ) : null}
-
-                <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={() => void refreshDashboard(true)}
-                tintColor={palette.primary}
-                colors={[palette.primary]}
+              <SitGuruWorkspaceSwitcher
+                currentRole="pet_parent"
+                onClose={() => setWorkspaceSwitcherOpen(false)}
+                visible={workspaceSwitcherOpen}
               />
-            }
-            showsVerticalScrollIndicator={false}
-          >
+            </View>
+          }
+        >
             <View style={styles.header}>
               <View style={styles.headerCopy}>
                 <Text style={styles.dashboardTitle}>
@@ -514,7 +638,7 @@ export default function PetParentDashboardScreen() {
               </View>
 
               <View style={styles.headerActions}>
-                <Pressable
+                <TouchTarget
                   accessibilityRole="button"
                   accessibilityLabel="Open notifications"
                   onPress={() => router.push('/notifications')}
@@ -529,14 +653,14 @@ export default function PetParentDashboardScreen() {
                       </Text>
                     </View>
                   ) : null}
-                </Pressable>
+                </TouchTarget>
 
                 <View style={styles.modeToggle}>
                   {themeOptions.map((option) => {
                     const active = themePreference === option.value;
 
                     return (
-                      <Pressable
+                      <TouchTarget
                         key={option.value}
                         accessibilityRole="button"
                         accessibilityLabel={`Switch to ${option.label} mode`}
@@ -561,12 +685,12 @@ export default function PetParentDashboardScreen() {
                           }
                           strokeWidth={2.4}
                         />
-                      </Pressable>
+                      </TouchTarget>
                     );
                   })}
                 </View>
 
-                <Pressable
+                <TouchTarget
                   accessibilityRole="button"
                   accessibilityLabel="Switch workspace"
                   onPress={() => setWorkspaceSwitcherOpen(true)}
@@ -578,7 +702,7 @@ export default function PetParentDashboardScreen() {
                     palette={palette}
                     size={42}
                   />
-                </Pressable>
+                </TouchTarget>
               </View>
             </View>
 
@@ -588,63 +712,6 @@ export default function PetParentDashboardScreen() {
               </View>
             ) : null}
 
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push(primaryAction.route)}
-              style={styles.primaryActionCard}
-            >
-              <View style={styles.primaryActionIcon}>
-                {activeCare ? (
-                  <PawPrint color="#FFFFFF" size={22} strokeWidth={2.5} />
-                ) : currentBooking || recentCompletedCare ? (
-                  <CalendarDays color="#FFFFFF" size={22} strokeWidth={2.4} />
-                ) : (
-                  <Search color="#FFFFFF" size={22} strokeWidth={2.4} />
-                )}
-              </View>
-
-              <View style={styles.primaryActionCopy}>
-                <Text style={styles.primaryActionEyebrow}>
-                  {primaryAction.eyebrow}
-                </Text>
-                <Text style={styles.primaryActionTitle}>
-                  {primaryAction.title}
-                </Text>
-                <Text style={styles.primaryActionText}>
-                  {primaryAction.helper}
-                </Text>
-              </View>
-
-              <ChevronRight color="#FFFFFF" size={21} strokeWidth={2.5} />
-            </Pressable>
-
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionEyebrow}>CARE OVERVIEW</Text>
-                <Text style={styles.sectionTitle}>
-                  {activeCare
-                    ? activeCare.isWalk
-                      ? 'Live walk'
-                      : 'Live care'
-                    : recentCompletedCare && !currentBooking
-                      ? 'Recent care'
-                      : 'Upcoming care'}
-                </Text>
-              </View>
-
-              {activeCare || currentBooking || recentCompletedCare ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() =>
-                    router.push(activeCare ? '/pawreport-live' : '/booking-details')
-                  }
-                  hitSlop={8}
-                >
-                  <Text style={styles.sectionLink}>View details</Text>
-                </Pressable>
-              ) : null}
-            </View>
-
             {isLoading ? (
               <View style={styles.loadingCard}>
                 <View style={styles.loadingBarLarge} />
@@ -652,15 +719,17 @@ export default function PetParentDashboardScreen() {
                 <View style={styles.loadingBarSmall} />
               </View>
             ) : (
-              careSection
+              <PriorityCarousel label="Priority" cards={priorityCards} />
             )}
 
-            <View
-              style={[
-                styles.quickActions,
-                compactPhone && styles.quickActionsCompact,
-              ]}
-            >
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionEyebrow}>QUICK ACTIONS</Text>
+                <Text style={styles.sectionTitle}>Jump in</Text>
+              </View>
+            </View>
+
+            <View style={styles.quickActions}>
               <QuickAction
                 icon={
                   <Search
@@ -798,14 +867,14 @@ export default function PetParentDashboardScreen() {
                 <Text style={styles.sectionTitle}>Your pets</Text>
               </View>
 
-              <Pressable
+              <TouchTarget
                 accessibilityRole="button"
                 accessibilityLabel="Add a pet"
                 onPress={() => router.push('/pet-passports')}
                 style={styles.addPetButton}
               >
                 <Plus color={palette.primary} size={18} strokeWidth={2.7} />
-              </Pressable>
+              </TouchTarget>
             </View>
 
             <View style={styles.petsCard}>
@@ -882,7 +951,7 @@ export default function PetParentDashboardScreen() {
                 </View>
               )}
 
-              <Pressable
+              <TouchTarget
                 accessibilityRole="button"
                 onPress={() => router.push('/pet-passports')}
                 style={styles.managePetsButton}
@@ -890,7 +959,7 @@ export default function PetParentDashboardScreen() {
                 <Text style={styles.managePetsButtonText}>
                   Manage Pet Passports
                 </Text>
-              </Pressable>
+              </TouchTarget>
             </View>
 
             <Pressable
@@ -951,80 +1020,7 @@ export default function PetParentDashboardScreen() {
                 last
               />
             </View>
-          </ScrollView>
-
-          <View style={styles.bottomNav}>
-            <BottomNavItem
-              active
-              icon={
-                <Home color={palette.primary} size={21} strokeWidth={2.4} />
-              }
-              label="Home"
-              onPress={() => undefined}
-              styles={styles}
-            />
-
-            <BottomNavItem
-              icon={
-                <Search color={palette.navMuted} size={21} strokeWidth={2.3} />
-              }
-              label="Explore"
-              onPress={() => router.push('/find-care')}
-              styles={styles}
-            />
-
-            <BottomNavItem
-              icon={
-                <CalendarDays
-                  color={palette.navMuted}
-                  size={21}
-                  strokeWidth={2.3}
-                />
-              }
-              label="Bookings"
-              onPress={() => router.push('/booking-details')}
-              styles={styles}
-            />
-
-            <BottomNavItem
-              badge={dashboardData.unreadMessages}
-              icon={
-                <MessageCircle
-                  color={palette.navMuted}
-                  size={21}
-                  strokeWidth={2.3}
-                />
-              }
-              label="Messages"
-              onPress={() => router.push('/messages')}
-              styles={styles}
-            />
-
-            <BottomNavItem
-              icon={
-                <UserRound
-                  color={palette.navMuted}
-                  size={21}
-                  strokeWidth={2.3}
-                />
-              }
-              label="Profile"
-              onPress={() => setWorkspaceSwitcherOpen(true)}
-              styles={styles}
-            />
-                </View>
-
-                <SitGuruWorkspaceSwitcher
-                  currentRole="pet_parent"
-                  onClose={() => setWorkspaceSwitcherOpen(false)}
-                  visible={workspaceSwitcherOpen}
-                />
-              </View>
-            </View>
-
-            {isWebPreview ? <View style={styles.homeIndicator} /> : null}
-          </View>
-        </View>
+        </MobileScreen>
       </RoleGate>
     </SitGuruScreen>
   );
@@ -1048,13 +1044,13 @@ function EmptyCareCard({
         </Text>
       </View>
 
-      <Pressable
+      <TouchTarget
         accessibilityRole="button"
         onPress={() => router.push('/find-care')}
         style={styles.emptyCareButton}
       >
         <Text style={styles.emptyCareButtonText}>Find Care</Text>
-      </Pressable>
+      </TouchTarget>
     </View>
   );
 }
@@ -1136,26 +1132,26 @@ function UpcomingCareCard({
       </View>
 
       <View style={styles.twoButtonRow}>
-        <Pressable
+        <TouchTarget
           accessibilityRole="button"
           onPress={() => router.push('/conversation')}
           style={styles.outlineButton}
         >
           <MessageCircle
             color={palette.primary}
-            size={16}
+            size={18}
             strokeWidth={2.3}
           />
           <Text style={styles.outlineButtonText}>Message Guru</Text>
-        </Pressable>
+        </TouchTarget>
 
-        <Pressable
+        <TouchTarget
           accessibilityRole="button"
           onPress={() => router.push('/booking-details')}
           style={styles.filledButton}
         >
           <Text style={styles.filledButtonText}>View Details</Text>
-        </Pressable>
+        </TouchTarget>
       </View>
 
       <View style={styles.bookingFooter}>
@@ -1358,7 +1354,7 @@ function QuickAction({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <TouchTarget
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
@@ -1379,7 +1375,7 @@ function QuickAction({
       </View>
 
       <Text style={styles.quickActionLabel}>{label}</Text>
-    </Pressable>
+    </TouchTarget>
   );
 }
 
@@ -1401,7 +1397,7 @@ function ActivityRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <TouchTarget
       accessibilityRole="button"
       onPress={onPress}
       style={[styles.activityRow, last && styles.activityRowLast]}
@@ -1420,7 +1416,7 @@ function ActivityRow({
         size={18}
         strokeWidth={2.3}
       />
-    </Pressable>
+    </TouchTarget>
   );
 }
 
@@ -1440,7 +1436,7 @@ function ToolRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <TouchTarget
       accessibilityRole="button"
       onPress={onPress}
       style={[styles.toolRow, last && styles.toolRowLast]}
@@ -1452,7 +1448,7 @@ function ToolRow({
         size={18}
         strokeWidth={2.3}
       />
-    </Pressable>
+    </TouchTarget>
   );
 }
 
@@ -1472,7 +1468,7 @@ function BottomNavItem({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <TouchTarget
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
@@ -1483,10 +1479,13 @@ function BottomNavItem({
         {badge > 0 ? <View style={styles.navBadge} /> : null}
       </View>
 
-      <Text style={active ? styles.navLabelActive : styles.navLabel}>
+      <Text
+        style={active ? styles.navLabelActive : styles.navLabel}
+        numberOfLines={1}
+      >
         {label}
       </Text>
-    </Pressable>
+    </TouchTarget>
   );
 }
 
@@ -2531,10 +2530,10 @@ function createStyles(isDark: boolean) {
       borderColor: palette.border,
       borderRadius: 999,
       borderWidth: 1,
-      height: 38,
+      height: TOUCH_MIN,
       justifyContent: 'center',
       position: 'relative',
-      width: 38,
+      width: TOUCH_MIN,
     },
     headerBadge: {
       alignItems: 'center',
@@ -2567,10 +2566,11 @@ function createStyles(isDark: boolean) {
     },
     modeButton: {
       alignItems: 'center',
-      borderRadius: 10,
-      height: 28,
+      borderRadius: 12,
+      height: TOUCH_MIN,
       justifyContent: 'center',
-      width: 31,
+      minWidth: TOUCH_MIN,
+      width: TOUCH_MIN,
     },
     modeButtonActive: {
       backgroundColor: isDark ? 'rgba(226,170,45,0.18)' : '#FFF4D8',
@@ -2665,7 +2665,14 @@ function createStyles(isDark: boolean) {
     sectionLink: {
       color: palette.primary,
       fontFamily: AppFonts.bold,
-      fontSize: 10,
+      fontSize: 13,
+    },
+    sectionLinkButton: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: TOUCH_MIN,
+      minWidth: TOUCH_MIN,
+      paddingHorizontal: 8,
     },
 
     loadingCard: {
@@ -2729,15 +2736,18 @@ function createStyles(isDark: boolean) {
       lineHeight: 13,
     },
     emptyCareButton: {
+      alignItems: 'center',
       backgroundColor: palette.primary,
-      borderRadius: 999,
-      paddingHorizontal: 12,
-      paddingVertical: 9,
+      borderRadius: 14,
+      justifyContent: 'center',
+      minHeight: TOUCH_MIN,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
     },
     emptyCareButtonText: {
       color: '#FFFFFF',
       fontFamily: AppFonts.bold,
-      fontSize: 9,
+      fontSize: 14,
     },
 
     bookingCard: {
@@ -3035,40 +3045,41 @@ function createStyles(isDark: boolean) {
     },
 
     twoButtonRow: {
-      flexDirection: 'row',
+      flexDirection: 'column',
       gap: 8,
+      width: '100%',
     },
     filledButton: {
       alignItems: 'center',
       backgroundColor: palette.primary,
-      borderRadius: 999,
-      flex: 1,
+      borderRadius: 14,
       justifyContent: 'center',
-      minHeight: 38,
-      paddingHorizontal: 10,
+      minHeight: TOUCH_MIN,
+      paddingHorizontal: 14,
+      width: '100%',
     },
     filledButtonText: {
       color: '#FFFFFF',
       fontFamily: AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
     },
     outlineButton: {
       alignItems: 'center',
       backgroundColor: palette.surface,
       borderColor: palette.primary,
-      borderRadius: 999,
+      borderRadius: 14,
       borderWidth: 1,
-      flex: 1,
       flexDirection: 'row',
-      gap: 5,
+      gap: 8,
       justifyContent: 'center',
-      minHeight: 38,
-      paddingHorizontal: 10,
+      minHeight: TOUCH_MIN,
+      paddingHorizontal: 14,
+      width: '100%',
     },
     outlineButtonText: {
       color: palette.primary,
       fontFamily: AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
     },
 
     completedCard: {
@@ -3111,20 +3122,25 @@ function createStyles(isDark: boolean) {
       lineHeight: 12,
     },
     completedButton: {
+      alignItems: 'center',
       backgroundColor: palette.primary,
-      borderRadius: 999,
-      paddingHorizontal: 11,
-      paddingVertical: 9,
+      borderRadius: 14,
+      justifyContent: 'center',
+      minHeight: TOUCH_MIN,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
     },
     completedButtonText: {
       color: '#FFFFFF',
       fontFamily: AppFonts.extraBold,
-      fontSize: 8,
+      fontSize: 14,
     },
 
     quickActions: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 8,
+      width: '100%',
     },
     quickActionsCompact: {
       flexWrap: 'wrap',
@@ -3133,24 +3149,24 @@ function createStyles(isDark: boolean) {
       alignItems: 'center',
       backgroundColor: palette.surface,
       borderColor: palette.border,
-      borderRadius: 17,
+      borderRadius: 16,
       borderWidth: 1,
-      flex: 1,
+      flexGrow: 1,
       gap: 6,
       justifyContent: 'center',
-      minHeight: 74,
-      minWidth: 70,
-      paddingHorizontal: 5,
-      paddingVertical: 9,
+      minHeight: 88,
+      minWidth: '46%',
+      paddingHorizontal: 10,
+      paddingVertical: 12,
     },
     quickActionIcon: {
       alignItems: 'center',
       backgroundColor: palette.primarySoft,
       borderRadius: 999,
-      height: 37,
+      height: TOUCH_MIN,
       justifyContent: 'center',
       position: 'relative',
-      width: 37,
+      width: TOUCH_MIN,
     },
     quickActionBadge: {
       alignItems: 'center',
@@ -3159,22 +3175,22 @@ function createStyles(isDark: boolean) {
       borderRadius: 999,
       borderWidth: 1.5,
       justifyContent: 'center',
-      minHeight: 17,
-      minWidth: 17,
+      minHeight: 20,
+      minWidth: 20,
       paddingHorizontal: 4,
       position: 'absolute',
-      right: -5,
-      top: -5,
+      right: -4,
+      top: -4,
     },
     quickActionBadgeText: {
       color: '#FFFFFF',
       fontFamily: AppFonts.extraBold,
-      fontSize: 7,
+      fontSize: 10,
     },
     quickActionLabel: {
       color: palette.title,
       fontFamily: AppFonts.bold,
-      fontSize: 9,
+      fontSize: 13,
       textAlign: 'center',
     },
     pressed: {
@@ -3195,9 +3211,10 @@ function createStyles(isDark: boolean) {
       borderBottomWidth: 1,
       flexDirection: 'row',
       gap: 10,
-      minHeight: 52,
+      minHeight: TOUCH_MIN,
       paddingHorizontal: 13,
-      paddingVertical: 9,
+      paddingVertical: 10,
+      width: '100%',
     },
     activityRowLast: {
       borderBottomWidth: 0,
@@ -3205,16 +3222,18 @@ function createStyles(isDark: boolean) {
     activityIcon: {
       alignItems: 'center',
       backgroundColor: palette.primarySoft,
-      borderRadius: 11,
-      height: 32,
+      borderRadius: 12,
+      height: TOUCH_MIN,
       justifyContent: 'center',
-      width: 32,
+      width: TOUCH_MIN,
     },
     activityLabel: {
       color: palette.title,
       flex: 1,
+      flexShrink: 1,
       fontFamily: AppFonts.bold,
-      fontSize: 12,
+      fontSize: 14,
+      minWidth: 0,
     },
     activityBadge: {
       alignItems: 'center',
@@ -3233,11 +3252,13 @@ function createStyles(isDark: boolean) {
 
     addPetButton: {
       alignItems: 'center',
-      backgroundColor: palette.primarySoft,
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
       borderRadius: 999,
-      height: 34,
+      borderWidth: 1,
+      height: TOUCH_MIN,
       justifyContent: 'center',
-      width: 34,
+      width: TOUCH_MIN,
     },
     petsCard: {
       backgroundColor: palette.surface,
@@ -3327,15 +3348,16 @@ function createStyles(isDark: boolean) {
     managePetsButton: {
       alignItems: 'center',
       backgroundColor: palette.primary,
-      borderRadius: 999,
+      borderRadius: 14,
       justifyContent: 'center',
-      minHeight: 40,
-      paddingHorizontal: 13,
+      minHeight: TOUCH_MIN,
+      paddingHorizontal: 16,
+      width: '100%',
     },
     managePetsButtonText: {
       color: '#FFFFFF',
       fontFamily: AppFonts.extraBold,
-      fontSize: 10,
+      fontSize: 14,
     },
 
     rewardsCard: {
@@ -3391,9 +3413,10 @@ function createStyles(isDark: boolean) {
       borderBottomColor: palette.border,
       borderBottomWidth: 1,
       flexDirection: 'row',
-      gap: 9,
-      minHeight: 48,
+      gap: 10,
+      minHeight: TOUCH_MIN,
       paddingHorizontal: 12,
+      width: '100%',
     },
     toolRowLast: {
       borderBottomWidth: 0,
@@ -3401,44 +3424,40 @@ function createStyles(isDark: boolean) {
     toolIcon: {
       alignItems: 'center',
       backgroundColor: palette.primarySoft,
-      borderRadius: 10,
-      height: 30,
+      borderRadius: 12,
+      height: TOUCH_MIN,
       justifyContent: 'center',
-      width: 30,
+      width: TOUCH_MIN,
     },
     toolLabel: {
       color: palette.title,
       flex: 1,
+      flexShrink: 1,
       fontFamily: AppFonts.bold,
-      fontSize: 11,
+      fontSize: 14,
+      minWidth: 0,
     },
 
     bottomNav: {
-      alignItems: 'center',
+      alignItems: 'stretch',
       backgroundColor: palette.surface,
       borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
+      borderTopWidth: 1,
       flexDirection: 'row',
-      height: 72,
-      justifyContent: 'space-around',
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: -7 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
+      justifyContent: 'space-between',
+      paddingBottom: 6,
+      paddingHorizontal: 4,
+      paddingTop: 6,
+      width: '100%',
     },
     navItem: {
       alignItems: 'center',
       flex: 1,
-      gap: 3,
+      gap: 2,
       justifyContent: 'center',
+      minHeight: TOUCH_MIN,
+      minWidth: 0,
+      paddingHorizontal: 2,
     },
     navIconWrap: {
       position: 'relative',

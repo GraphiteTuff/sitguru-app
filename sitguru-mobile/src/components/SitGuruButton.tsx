@@ -75,10 +75,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   compactButton: {
-    minHeight: 44,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
+    minHeight: 48,
+    minWidth: 48,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
   },
   primaryButton: {
     backgroundColor: SitGuruColors.primary,

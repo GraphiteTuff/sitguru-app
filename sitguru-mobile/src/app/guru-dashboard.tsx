@@ -34,6 +34,11 @@ import {
 } from 'react-native';
 
 import RoleGate from '@/components/RoleGate';
+import PriorityCarousel, {
+  type PriorityCard,
+} from '@/components/mobile/PriorityCarousel';
+import StickyActionBar from '@/components/mobile/StickyActionBar';
+import SitGuruButton from '@/components/SitGuruButton';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
@@ -678,6 +683,76 @@ export default function GuruDashboardScreen() {
       Boolean(pendingRequest),
     );
 
+  const priorityCards = useMemo<PriorityCard[]>(() => {
+    const cards: PriorityCard[] = [
+      {
+        id: 'primary',
+        eyebrow: primaryAction.eyebrow,
+        title: primaryAction.title,
+        helper: primaryAction.helper,
+        tone: 'primary',
+        ctaLabel: 'Continue',
+        onPress: () => router.push(primaryAction.route),
+      },
+    ];
+
+    if (data.liveCare) {
+      cards.push({
+        id: 'live',
+        eyebrow: data.liveCare.isWalk ? 'Live walk' : 'Live care',
+        title: data.liveCare.petName || 'Care in progress',
+        helper: 'Open PawReport tools for this visit.',
+        onPress: () => router.push('/guru-live-walk'),
+      });
+    }
+
+    if (data.requests[0]) {
+      const request = data.requests[0];
+      cards.push({
+        id: 'request',
+        eyebrow: 'New request',
+        title: request.petName || request.serviceLabel,
+        helper: `${request.serviceLabel} · Review in Bookings`,
+        tone: 'warning',
+        ctaLabel: 'Review requests',
+        onPress: () => router.push('/guru-requests'),
+      });
+    }
+
+    if (nextBooking) {
+      cards.push({
+        id: 'next',
+        eyebrow: 'Next booking',
+        title: nextBooking.serviceLabel,
+        helper: `${nextBooking.petName} · ${formatDay(nextBooking.startAt)}`,
+        onPress: () => router.push('/booking-details'),
+      });
+    }
+
+    cards.push({
+      id: 'earnings',
+      eyebrow: 'This month',
+      title: `$${data.earningsMonth.toFixed(0)} earned`,
+      helper: data.payout.actionRequired
+        ? 'Payout setup needs attention'
+        : `$${data.payout.available.toFixed(0)} available to payout`,
+      onPress: () => router.push('/guru-earnings'),
+    });
+
+    return cards;
+  }, [
+    data.earningsMonth,
+    data.liveCare,
+    data.payout.actionRequired,
+    data.payout.available,
+    data.requests,
+    nextBooking,
+    primaryAction.eyebrow,
+    primaryAction.helper,
+    primaryAction.route,
+    primaryAction.title,
+  ]);
+
   return (
     <SitGuruScreen
       center={isWebPreview}
@@ -969,71 +1044,10 @@ export default function GuruDashboardScreen() {
                     </View>
                   ) : null}
 
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() =>
-                      router.push(
-                        primaryAction.route,
-                      )
-                    }
-                    style={
-                      styles.primaryActionCard
-                    }
-                  >
-                    <View
-                      style={
-                        styles.primaryActionCopy
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.primaryActionEyebrow
-                        }
-                      >
-                        {
-                          primaryAction.eyebrow
-                        }
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.primaryActionTitle
-                        }
-                      >
-                        {
-                          primaryAction.title
-                        }
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.primaryActionText
-                        }
-                      >
-                        {
-                          primaryAction.helper
-                        }
-                      </Text>
-                    </View>
-
-                    <View
-                      style={
-                        styles.primaryActionIcon
-                      }
-                    >
-                      <PrimaryIcon
-                        icon={
-                          primaryAction.icon
-                        }
-                      />
-                    </View>
-
-                    <ChevronRight
-                      color="#FFFFFF"
-                      size={21}
-                      strokeWidth={2.5}
-                    />
-                  </Pressable>
+                  <PriorityCarousel
+                    label="Priority"
+                    cards={priorityCards}
+                  />
 
                   {loading ? (
                     <LoadingCard
@@ -1656,6 +1670,14 @@ export default function GuruDashboardScreen() {
                     </View>
                   </View>
                 </ScrollView>
+
+                <StickyActionBar embedded>
+                  <SitGuruButton
+                    label={primaryAction.title}
+                    onPress={() => router.push(primaryAction.route)}
+                    accessibilityLabel={`${primaryAction.title}. ${primaryAction.helper}`}
+                  />
+                </StickyActionBar>
 
                 <View
                   style={
