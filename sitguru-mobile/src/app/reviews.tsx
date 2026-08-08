@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Clock3,
   Flag,
-  Heart,
   Home,
   MessageCircle,
   PawPrint,
@@ -40,11 +39,15 @@ import {
   View,
 } from 'react-native';
 
+import StickyActionBar from '@/components/mobile/StickyActionBar';
+import VisitReviewControls from '@/components/mobile/VisitReviewControls';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
+import { StickyFooterClearance } from '@/constants/mobile-layout';
 import { getAppTheme } from '@/constants/theme';
 import {
   setThemePreference,
@@ -53,6 +56,7 @@ import {
   type SitGuruThemePreference,
 } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubmitBookingReview } from '@/hooks/data/useSubmitBookingReview';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { roleLabel, type AppRole } from '@/types/auth';
@@ -144,14 +148,6 @@ const THEME_OPTIONS: {
   { icon: 'moon', label: 'Dark', value: 'dark' },
 ];
 
-const ratingLabels: Record<number, string> = {
-  5: 'Excellent care',
-  4: 'Great care',
-  3: 'Good care',
-  2: 'Needs improvement',
-  1: 'Poor experience',
-};
-
 const categories: CategoryDefinition[] = [
   { key: 'Communication', icon: MessageCircle },
   { key: 'Reliability', icon: Clock3 },
@@ -164,15 +160,6 @@ const categoryOptions: CategoryRating[] = [
   'Excellent',
   'Good',
   'Needs work',
-];
-
-const praiseChips = [
-  'Great communication',
-  'On time',
-  'Sent helpful updates',
-  'My pet was happy',
-  'Followed care notes',
-  'Would book again',
 ];
 
 const COMPLETED_BOOKING_STATUSES = new Set([
@@ -944,7 +931,12 @@ export default function ReviewsScreen() {
   const [reviewText, setReviewText] = useState('');
   const [feedback, setFeedback] =
     useState<ReviewFeedback | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+
+  const {
+    submitting,
+    submitReview: submitReviewRequest,
+    skipReview: skipReviewRequest,
+  } = useSubmitBookingReview();
 
   const [responseReviewId, setResponseReviewId] = useState('');
   const [responseText, setResponseText] = useState('');
@@ -1110,16 +1102,6 @@ export default function ReviewsScreen() {
   async function submitReview() {
     setFeedback(null);
 
-    if (!isSupabaseConfigured) {
-      setFeedback({
-        tone: 'error',
-        title: 'Review not submitted',
-        message:
-          'The mobile app is not connected to Supabase in this environment.',
-      });
-      return;
-    }
-
     if (!isAuthenticated || !user?.id) {
       setFeedback({
         tone: 'warning',
@@ -1173,153 +1155,59 @@ export default function ReviewsScreen() {
       return;
     }
 
-    if (!booking.guruUserId && !requestedGuruId) {
-      setFeedback({
-        tone: 'error',
-        title: 'Guru could not be verified',
-        message:
-          'SitGuru could not identify the Guru connected to this booking.',
-      });
-      return;
-    }
+    const result = await submitReviewRequest({
+      bookingId: booking.id,
+      rating,
+      reviewText,
+      praiseTags: selectedPraise,
+      categoryRatings: selectedCategories,
+    });
 
-    const cleanReview = reviewText.trim();
-
-    if (cleanReview.length < 10) {
-      setFeedback({
-        tone: 'warning',
-        title: 'Add a little more detail',
-        message:
-          'Please enter at least 10 characters about the completed care.',
-      });
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const existing = await findExistingReview({
-        bookingId: booking.id,
-        reviewerUserId: user.id,
-      });
-
-      if (existing) {
-        setFeedback({
-          tone: 'warning',
-          title: 'Review already submitted',
-          message:
-            'Only one verified Pet Parent review is allowed for each completed booking.',
-        });
-        setSubmitting(false);
-        return;
-      }
-
-      const now = new Date().toISOString();
-      const nextGuruUserId =
-        booking.guruUserId || requestedGuruId;
-
-      const payload: RecordRow = {
-        booking_id: booking.id,
-        care_booking_id: booking.id,
-
-        reviewer_user_id: user.id,
-        reviewer_id: user.id,
-        customer_id: user.id,
-        pet_parent_id: user.id,
-        author_id: user.id,
-        user_id: user.id,
-
-        guru_user_id: nextGuruUserId,
-        guru_id: nextGuruUserId,
-        provider_id: nextGuruUserId,
-        reviewee_id: nextGuruUserId,
-        subject_user_id: nextGuruUserId,
-
-        reviewer_name: currentUserName,
-        customer_name: currentUserName,
-        pet_parent_name: currentUserName,
-        author_name: currentUserName,
-
-        guru_name: guruName,
-        provider_name: guruName,
-        reviewee_name: guruName,
-
-        rating,
-        overall_rating: rating,
-        stars: rating,
-        score: rating,
-
-        review_text: cleanReview,
-        review: cleanReview,
-        comment: cleanReview,
-        body: cleanReview,
-        message: cleanReview,
-        content: cleanReview,
-
-        category_ratings: selectedCategories,
-        category_scores: selectedCategories,
-        ratings_breakdown: selectedCategories,
-
-        praise_tags: selectedPraise,
-        praise: selectedPraise,
-        highlights: selectedPraise,
-        tags: selectedPraise,
-
-        verified_booking: true,
-        is_verified: true,
-        verified: true,
-
-        status: 'published',
-        review_status: 'published',
-        moderation_status: 'published',
-
-        source: 'sitguru_mobile_app',
-        submitted_at: now,
-        published_at: now,
-        created_at: now,
-        updated_at: now,
-      };
-
-      const result = await insertReview(payload);
-
-      if (!result.ok) {
-        setFeedback({
-          tone: 'error',
-          title: 'Review not submitted',
-          message:
-            result.error ||
-            'SitGuru could not save this review. Please try again.',
-        });
-        setSubmitting(false);
-        return;
-      }
-
-      setReviewTable(result.table);
-      setReviewText('');
-      setSelectedCategories({});
-      setSelectedPraise([]);
-      setRating(5);
-
-      setFeedback({
-        tone: 'success',
-        title: 'Review submitted',
-        message:
-          'SitGuru saved this as a verified-booking review. Thank you for helping local Pet Parents.',
-      });
-
-      await refresh();
-    } catch (error) {
+    if (!result.ok) {
       setFeedback({
         tone: 'error',
         title: 'Review not submitted',
         message:
-          error instanceof Error
-            ? error.message
-            : 'SitGuru could not save this review.',
+          result.error ||
+          'SitGuru could not save this review. Please try again.',
       });
-    } finally {
-      setSubmitting(false);
+      return;
     }
+
+    setReviewText('');
+    setSelectedCategories({});
+    setSelectedPraise([]);
+    setRating(5);
+
+    const metricNote =
+      result.metrics?.ratingAvg != null && result.metrics?.reviewCount != null
+        ? ` Guru public rating is now ${result.metrics.ratingAvg.toFixed(1)} across ${result.metrics.reviewCount} review${result.metrics.reviewCount === 1 ? '' : 's'}.`
+        : '';
+
+    setFeedback({
+      tone: 'success',
+      title: 'Review submitted',
+      message: `Thanks — your verified visit review is live.${metricNote}`,
+    });
+
+    await refresh();
+  }
+
+  async function skipReview() {
+    setFeedback(null);
+
+    if (!booking?.id) {
+      router.push('/pet-parent-dashboard');
+      return;
+    }
+
+    await skipReviewRequest(booking.id);
+    setFeedback({
+      tone: 'success',
+      title: 'Review skipped',
+      message: 'You can leave feedback later from Bookings anytime.',
+    });
+    router.push('/pet-parent-dashboard');
   }
 
   async function submitGuruResponse(review: ReviewView) {
@@ -1446,7 +1334,12 @@ export default function ReviewsScreen() {
                 ) : null}
 
                 <ScrollView
-                  contentContainerStyle={styles.scrollContent}
+                  contentContainerStyle={[
+                    styles.scrollContent,
+                    canSubmitReview
+                      ? { paddingBottom: StickyFooterClearance.actionPlusNav }
+                      : null,
+                  ]}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}>
                   <View style={styles.page}>
@@ -1622,40 +1515,14 @@ export default function ReviewsScreen() {
               </View>
             ) : null}
 
-            <View style={styles.stars}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Pressable
-                  key={star}
-                  accessibilityLabel={`${star} star rating`}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: star === rating }}
-                  hitSlop={7}
-                  onPress={() => setRating(star)}
-                  style={({ pressed }) => [
-                    styles.starButton,
-                    pressed ? styles.pressed : null,
-                  ]}>
-                  <Star
-                    color={
-                      star <= rating
-                        ? theme.colors.highlight
-                        : theme.colors.borderStrong
-                    }
-                    fill={
-                      star <= rating
-                        ? theme.colors.highlight
-                        : 'transparent'
-                    }
-                    size={39}
-                    strokeWidth={2}
-                  />
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.ratingLabel}>
-              {ratingLabels[rating]}
-            </Text>
+            <VisitReviewControls
+              rating={rating}
+              onRatingChange={setRating}
+              selectedPraise={selectedPraise}
+              onTogglePraise={togglePraise}
+              reviewText={reviewText}
+              onReviewTextChange={setReviewText}
+            />
 
             <Text style={styles.fieldLabel}>Care categories</Text>
             <View style={styles.categoryList}>
@@ -1713,58 +1580,6 @@ export default function ReviewsScreen() {
               })}
             </View>
 
-            <Text style={styles.fieldLabel}>Written review</Text>
-            <TextInput
-              multiline
-              value={reviewText}
-              onChangeText={setReviewText}
-              placeholder="Share what went well, how your pet did, and what future Pet Parents should know."
-              placeholderTextColor={theme.colors.inputPlaceholder}
-              style={styles.reviewInput}
-              textAlignVertical="top"
-              maxLength={3000}
-            />
-            <Text style={styles.characterCount}>
-              {reviewText.trim().length}/3000
-            </Text>
-
-            <Text style={styles.fieldLabel}>Quick praise</Text>
-            <View style={styles.chipRow}>
-              {praiseChips.map((chip) => {
-                const active = selectedPraise.includes(chip);
-
-                return (
-                  <Pressable
-                    key={chip}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    onPress={() => togglePraise(chip)}
-                    style={[
-                      styles.chip,
-                      active ? styles.chipActive : null,
-                    ]}>
-                    <Heart
-                      color={
-                        active
-                          ? theme.colors.chipActiveText
-                          : theme.colors.textSecondary
-                      }
-                      fill={active ? theme.colors.chipActiveText : 'transparent'}
-                      size={14}
-                      strokeWidth={2.2}
-                    />
-                    <Text
-                      style={[
-                        styles.chipText,
-                        active ? styles.chipTextActive : null,
-                      ]}>
-                      {chip}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
             {feedback ? (
               <View
                 style={[
@@ -1803,21 +1618,6 @@ export default function ReviewsScreen() {
               </View>
             ) : null}
 
-            <Button
-              label={submitting ? 'Submitting review…' : 'Submit verified review'}
-              onPress={() => void submitReview()}
-              icon={
-                submitting ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Send color="#FFFFFF" size={18} strokeWidth={2.4} />
-                )
-              }
-              primary
-              disabled={submitting || !canSubmitReview}
-              styles={styles}
-            />
-
             {!canSubmitReview && isAuthenticated ? (
               <Text style={styles.formFootnote}>
                 A verified review requires a completed booking connected to the
@@ -1826,8 +1626,7 @@ export default function ReviewsScreen() {
             ) : (
               <Text style={styles.formFootnote}>
                 Only one verified Pet Parent review is allowed per completed
-                booking. A review is labeled submitted only after Supabase
-                confirms the save.
+                booking. Skip keeps your carousel moving without a popup.
               </Text>
             )}
           </View>
@@ -2193,6 +1992,24 @@ export default function ReviewsScreen() {
 
                   </View>
                 </ScrollView>
+
+                {canSubmitReview ? (
+                  <StickyActionBar embedded aboveBottomNav>
+                    <SitGuruButton
+                      label={submitting ? 'Submitting…' : 'Submit Review'}
+                      disabled={submitting}
+                      onPress={() => void submitReview()}
+                      accessibilityLabel="Submit verified visit review"
+                    />
+                    <SitGuruButton
+                      label="Skip"
+                      variant="secondary"
+                      disabled={submitting}
+                      onPress={() => void skipReview()}
+                      accessibilityLabel="Skip review for now"
+                    />
+                  </StickyActionBar>
+                ) : null}
 
                 <View style={styles.bottomNav}>
                   <BottomNavItem

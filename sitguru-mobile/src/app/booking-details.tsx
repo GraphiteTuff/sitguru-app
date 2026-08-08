@@ -328,6 +328,18 @@ export default function BookingDetailsScreen() {
       return;
     }
 
+    if (primaryAction.route === '/reviews') {
+      router.push({
+        pathname: '/reviews',
+        params: {
+          ...(typeof bookingId === 'string' && bookingId
+            ? { bookingId }
+            : {}),
+        },
+      });
+      return;
+    }
+
     router.push(primaryAction.route);
   }
 
@@ -929,7 +941,16 @@ export default function BookingDetailsScreen() {
                     />
                     <ActionButton
                       label="Reviews"
-                      onPress={() => router.push('/reviews')}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/reviews',
+                          params: {
+                            ...(typeof bookingId === 'string' && bookingId
+                              ? { bookingId }
+                              : {}),
+                          },
+                        })
+                      }
                       styles={styles}
                       variant="secondary"
                     />

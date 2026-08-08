@@ -14,6 +14,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Star,
   UserRound
 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
@@ -48,6 +49,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { isVisitReviewClosed } from '@/lib/reviews/visit-review';
 import { AI_COMPANIONS } from '@/constants/companions';
 import { AppFonts } from '@/constants/fonts';
 import {
@@ -226,6 +228,7 @@ export default function PetParentDashboardScreen() {
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
   const [selectedServiceKey, setSelectedServiceKey] =
     useState<CareServiceKey | null>(null);
+  const [needsVisitReview, setNeedsVisitReview] = useState(false);
 
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -383,6 +386,24 @@ export default function PetParentDashboardScreen() {
   const activeCare = dashboardData.activeCare;
   const recentCompletedCare = dashboardData.recentCompletedCare;
 
+  useEffect(() => {
+    let cancelled = false;
+    const bookingId = recentCompletedCare?.bookingId || recentCompletedCare?.id;
+
+    if (!bookingId || activeCare) {
+      setNeedsVisitReview(false);
+      return;
+    }
+
+    void isVisitReviewClosed(bookingId).then((closed) => {
+      if (!cancelled) setNeedsVisitReview(!closed);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCare, recentCompletedCare]);
+
   const primaryAction = useMemo(() => {
     if (activeCare) {
       return {
@@ -390,6 +411,18 @@ export default function PetParentDashboardScreen() {
         title: activeCare.isWalk ? 'View Live Walk' : 'View Live Care',
         helper: 'Follow updates from your Guru in real time.',
         route: '/pawreport-live' as const,
+      };
+    }
+
+    if (needsVisitReview && recentCompletedCare) {
+      return {
+        eyebrow: 'RATE YOUR GURU',
+        title: 'Submit Visit Review',
+        helper: 'Share stars and praise while the visit is fresh.',
+        route: '/reviews' as const,
+        params: {
+          bookingId: recentCompletedCare.bookingId || recentCompletedCare.id,
+        },
       };
     }
 
@@ -417,7 +450,7 @@ export default function PetParentDashboardScreen() {
       helper: 'Browse trusted local pet care near you.',
       route: '/find-care' as const,
     };
-  }, [activeCare, currentBooking, recentCompletedCare]);
+  }, [activeCare, currentBooking, needsVisitReview, recentCompletedCare]);
 
   const upcomingCount = dashboardData.bookings.filter((booking) =>
     isUpcomingStatus(booking.status),
@@ -427,6 +460,29 @@ export default function PetParentDashboardScreen() {
 
   const priorityCards = useMemo<PriorityCard[]>(() => {
     const cards: PriorityCard[] = [];
+
+    if (needsVisitReview && recentCompletedCare) {
+      const reviewBookingId =
+        recentCompletedCare.bookingId || recentCompletedCare.id;
+
+      cards.push({
+        id: 'visit-review',
+        eyebrow: 'Visit complete',
+        title: recentCompletedCare.petName
+          ? `Rate ${recentCompletedCare.guruName || 'your Guru'} for ${recentCompletedCare.petName}`
+          : 'Rate your Guru',
+        helper:
+          'Stars, praise tags, and a short note — the last step after care wraps.',
+        tone: 'primary',
+        ctaLabel: 'Open review',
+        onPress: () =>
+          router.push({
+            pathname: '/reviews',
+            params: { bookingId: reviewBookingId },
+          }),
+        icon: <Star color="#FFFFFF" size={22} strokeWidth={2.4} />,
+      });
+    }
 
     if (activeCare) {
       cards.push({
@@ -439,10 +495,10 @@ export default function PetParentDashboardScreen() {
           activeCare.photoCount > 0
             ? `${activeCare.photoCount} new photo${activeCare.photoCount === 1 ? '' : 's'} · ${activeCare.latestUpdate || 'Open PawReport Live'}`
             : activeCare.latestUpdate || 'Open PawReport Live for updates.',
-        tone: 'primary',
+        tone: needsVisitReview ? 'surface' : 'primary',
         ctaLabel: 'Open PawReport Live',
         onPress: () => router.push('/pawreport-live'),
-        icon: <PawPrint color="#FFFFFF" size={22} strokeWidth={2.4} />,
+        icon: <PawPrint color={needsVisitReview ? palette.primary : '#FFFFFF'} size={22} strokeWidth={2.4} />,
       });
     } else if (currentBooking) {
       cards.push({
@@ -456,12 +512,18 @@ export default function PetParentDashboardScreen() {
         ]
           .filter(Boolean)
           .join(' · '),
-        tone: 'primary',
+        tone: needsVisitReview ? 'surface' : 'primary',
         ctaLabel: 'View booking',
         onPress: () => router.push('/booking-details'),
-        icon: <CalendarDays color="#FFFFFF" size={22} strokeWidth={2.4} />,
+        icon: (
+          <CalendarDays
+            color={needsVisitReview ? palette.primary : '#FFFFFF'}
+            size={22}
+            strokeWidth={2.4}
+          />
+        ),
       });
-    } else {
+    } else if (!needsVisitReview) {
       cards.push({
         id: 'find-care',
         eyebrow: 'Ready when you are',
@@ -560,9 +622,11 @@ export default function PetParentDashboardScreen() {
     dashboardData.pets,
     dashboardData.unreadMessages,
     dashboardData.unreadNotifications,
+    needsVisitReview,
     palette.orange,
     palette.primary,
     pawPoints,
+    recentCompletedCare,
   ]);
 
   const companionCards = useMemo<PriorityCard[]>(
@@ -619,6 +683,18 @@ export default function PetParentDashboardScreen() {
                       });
                       return;
                     }
+
+                    if (
+                      'params' in primaryAction &&
+                      primaryAction.params
+                    ) {
+                      router.push({
+                        pathname: primaryAction.route,
+                        params: primaryAction.params,
+                      } as never);
+                      return;
+                    }
+
                     router.push(primaryAction.route);
                   }}
                   accessibilityLabel={`${requestCareLabel}. ${selectedService?.helper || primaryAction.helper}`}
@@ -1401,6 +1477,8 @@ function CompletedCareCard({
   care: LiveCare;
   styles: ReturnType<typeof createStyles>;
 }) {
+  const bookingId = care.bookingId || care.id;
+
   return (
     <View style={styles.completedCard}>
       <View style={styles.completedIcon}>
@@ -1413,16 +1491,21 @@ function CompletedCareCard({
           {care.petName ? `${care.petName}'s care is complete` : 'Care complete'}
         </Text>
         <Text style={styles.completedText}>
-          Review photos, updates, walk details, and the final summary.
+          Review photos, then rate your Guru — the carousel will focus the review loop next.
         </Text>
       </View>
 
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.push('/pawreport-live')}
+        onPress={() =>
+          router.push({
+            pathname: '/reviews',
+            params: { bookingId },
+          })
+        }
         style={styles.completedButton}
       >
-        <Text style={styles.completedButtonText}>View Report</Text>
+        <Text style={styles.completedButtonText}>Rate Guru</Text>
       </Pressable>
     </View>
   );

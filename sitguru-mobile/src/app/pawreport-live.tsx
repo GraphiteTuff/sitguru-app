@@ -79,21 +79,39 @@ export default function PawReportLiveScreen() {
         onRefresh={() => void refresh()}
         footer={
           <StickyActionBar embedded>
-            <SitGuruButton
-              label={
-                snapshot.isLive ? 'Message Guru' : 'Request more care'
-              }
-              onPress={() =>
-                router.push(
-                  snapshot.isLive ? '/messages' : '/request-booking',
-                )
-              }
-            />
-            <SitGuruButton
-              label="Back to dashboard"
-              variant="secondary"
-              onPress={() => router.push('/pet-parent-dashboard')}
-            />
+            {snapshot.isLive ? (
+              <>
+                <SitGuruButton
+                  label="Message Guru"
+                  onPress={() => router.push('/messages')}
+                />
+                <SitGuruButton
+                  label="Back to dashboard"
+                  variant="secondary"
+                  onPress={() => router.push('/pet-parent-dashboard')}
+                />
+              </>
+            ) : (
+              <>
+                <SitGuruButton
+                  label="Submit Visit Review"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/reviews',
+                      params: {
+                        bookingId: activeId || bookingId || '',
+                      },
+                    })
+                  }
+                  accessibilityLabel="Open end-of-visit review"
+                />
+                <SitGuruButton
+                  label="Skip for now"
+                  variant="secondary"
+                  onPress={() => router.push('/pet-parent-dashboard')}
+                />
+              </>
+            )}
           </StickyActionBar>
         }
       >
