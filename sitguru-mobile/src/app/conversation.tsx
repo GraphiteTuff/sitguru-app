@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   Bell,
@@ -9,7 +10,10 @@ import {
   CircleDollarSign,
   MapPin,
   MessageCircle,
+  Mic,
+  Pause,
   PawPrint,
+  Play,
   Sparkles,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -46,6 +50,7 @@ import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import {
   mediaMessageBody,
+  parseMessageMediaParts,
   uploadSitGuruMedia,
 } from '@/lib/data/media-upload';
 import { normalizeRole, type AppRole } from '@/types/auth';
@@ -1150,8 +1155,15 @@ export default function ConversationScreen() {
         });
         photoUrl = uploaded.publicUrl;
       } else if (attachment?.kind === 'voice') {
-        // Voice binary upload uses the same storage helper once audio buckets are ready.
-        voiceUrl = attachment.uri;
+        const uploaded = await uploadSitGuruMedia({
+          localUri: attachment.uri,
+          userId: currentUserId,
+          scopeId: conversation.id,
+          kind: 'chat',
+          mimeType: attachment.mimeType ?? 'audio/mp4',
+          fileName: attachment.fileName ?? `voice-note-${Date.now()}.m4a`,
+        });
+        voiceUrl = uploaded.publicUrl;
       }
 
       const body = mediaMessageBody({
@@ -1182,7 +1194,11 @@ export default function ConversationScreen() {
       setDraftMessage('');
       setNotice({
         tone: 'success',
-        text: photoUrl ? 'Photo message sent.' : 'Message sent.',
+        text: photoUrl
+          ? 'Photo message sent.'
+          : voiceUrl
+            ? 'Voice note sent.'
+            : 'Message sent.',
       });
     } catch (error) {
       setNotice({
@@ -1566,14 +1582,11 @@ export default function ConversationScreen() {
                                   isOwn ? styles.messageBubbleOwn : styles.messageBubbleOther,
                                 ]}
                               >
-                                <Text
-                                  style={[
-                                    styles.messageBody,
-                                    isOwn && styles.messageBodyOwn,
-                                  ]}
-                                >
-                                  {message.body}
-                                </Text>
+                                <MessageBodyContent
+                                  body={message.body}
+                                  isOwn={isOwn}
+                                  styles={styles}
+                                />
                               </View>
 
                               <View
@@ -1700,6 +1713,142 @@ export default function ConversationScreen() {
         visible={workspaceSwitcherOpen}
       />
     </SitGuruScreen>
+  );
+}
+
+function MessageBodyContent({
+  body,
+  isOwn,
+  styles,
+}: {
+  body: string;
+  isOwn: boolean;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const parts = parseMessageMediaParts(body);
+
+  return (
+    <View style={styles.messageBodyStack}>
+      {parts.map((part, index) => {
+        if (part.type === 'voice') {
+          return (
+            <VoiceNotePlayer
+              key={`voice-${index}-${part.url}`}
+              isOwn={isOwn}
+              label={part.label}
+              styles={styles}
+              url={part.url}
+            />
+          );
+        }
+
+        return (
+          <Text
+            key={`text-${index}`}
+            style={[styles.messageBody, isOwn && styles.messageBodyOwn]}
+          >
+            {part.value}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
+function VoiceNotePlayer({
+  isOwn,
+  label,
+  styles,
+  url,
+}: {
+  isOwn: boolean;
+  label: string;
+  styles: ReturnType<typeof createStyles>;
+  url: string;
+}) {
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      void soundRef.current?.unloadAsync().catch(() => undefined);
+      soundRef.current = null;
+    };
+  }, []);
+
+  async function togglePlayback() {
+    if (loading) return;
+
+    try {
+      if (playing && soundRef.current) {
+        await soundRef.current.pauseAsync();
+        setPlaying(false);
+        return;
+      }
+
+      setLoading(true);
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      });
+
+      if (!soundRef.current) {
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: url },
+          { shouldPlay: true },
+        );
+        soundRef.current = sound;
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (!status.isLoaded) return;
+          if (status.didJustFinish) {
+            setPlaying(false);
+            void sound.setPositionAsync(0).catch(() => undefined);
+          } else {
+            setPlaying(status.isPlaying);
+          }
+        });
+        setPlaying(true);
+      } else {
+        await soundRef.current.playAsync();
+        setPlaying(true);
+      }
+    } catch {
+      setPlaying(false);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const iconColor = isOwn ? '#FFFFFF' : '#0D5C3A';
+
+  return (
+    <Pressable
+      accessibilityLabel={`Play ${label}`}
+      accessibilityRole="button"
+      onPress={() => void togglePlayback()}
+      style={({ pressed }) => [
+        styles.voiceNoteRow,
+        isOwn ? styles.voiceNoteRowOwn : styles.voiceNoteRowOther,
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={[styles.voiceNoteIcon, isOwn && styles.voiceNoteIconOwn]}>
+        {loading ? (
+          <ActivityIndicator color={iconColor} size="small" />
+        ) : playing ? (
+          <Pause color={iconColor} size={14} fill={iconColor} />
+        ) : (
+          <Play color={iconColor} size={14} fill={iconColor} />
+        )}
+      </View>
+      <View style={styles.voiceNoteCopy}>
+        <Mic color={iconColor} size={12} strokeWidth={2.4} />
+        <Text style={[styles.voiceNoteLabel, isOwn && styles.voiceNoteLabelOwn]}>
+          {label}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -2431,6 +2580,49 @@ function createStyles(isDark: boolean) {
       lineHeight: 16,
     },
     messageBodyOwn: {
+      color: '#FFFFFF',
+    },
+    messageBodyStack: {
+      gap: 8,
+    },
+    voiceNoteRow: {
+      alignItems: 'center',
+      borderRadius: 14,
+      flexDirection: 'row',
+      gap: 10,
+      minHeight: 40,
+      paddingHorizontal: 4,
+      paddingVertical: 2,
+    },
+    voiceNoteRowOwn: {
+      backgroundColor: 'transparent',
+    },
+    voiceNoteRowOther: {
+      backgroundColor: 'transparent',
+    },
+    voiceNoteIcon: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(13, 92, 58, 0.12)',
+      borderRadius: 999,
+      height: 32,
+      justifyContent: 'center',
+      width: 32,
+    },
+    voiceNoteIconOwn: {
+      backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    },
+    voiceNoteCopy: {
+      alignItems: 'center',
+      flex: 1,
+      flexDirection: 'row',
+      gap: 6,
+    },
+    voiceNoteLabel: {
+      color: palette.text,
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+    },
+    voiceNoteLabelOwn: {
       color: '#FFFFFF',
     },
     messageMetaRow: {
