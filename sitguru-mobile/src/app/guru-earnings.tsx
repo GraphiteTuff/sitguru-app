@@ -34,8 +34,10 @@ import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
+import { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { formatUsd } from '@/lib/data/money';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 type RecordRow = Record<string, unknown>;
@@ -126,6 +128,14 @@ export default function GuruEarningsScreen() {
   const isWebPreview = Platform.OS === 'web';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
+  const {
+    summary,
+    items: ledgerItems,
+    payoutSetup,
+    loading: ledgerLoading,
+    error: ledgerError,
+    refresh: refreshLedger,
+  } = useGuruEarnings();
 
   const profileRecord = (profile ?? {}) as RecordRow;
   const [data, setData] = useState<EarningsData>(EMPTY_DATA);
@@ -152,6 +162,8 @@ export default function GuruEarningsScreen() {
           queryRows(TRANSACTION_TABLES, OWNER_FIELDS, user.id, 200),
         ]);
 
+        await refreshLedger();
+
         setData(
           mapEarningsData(payoutRows, transactionRows, profileRecord),
         );
@@ -165,8 +177,19 @@ export default function GuruEarningsScreen() {
         setRefreshing(false);
       }
     },
-    [profileRecord, user?.id],
+    [profileRecord, refreshLedger, user?.id],
   );
+
+  const weekNetTotal =
+    summary.weekNetTotal > 0 ? summary.weekNetTotal : data.earningsWeek;
+  const pendingClearedBalance =
+    summary.pendingClearedBalance > 0
+      ? summary.pendingClearedBalance
+      : payoutSetup.pending > 0
+        ? payoutSetup.pending
+        : data.pending;
+  const completedCareWalks = summary.completedCareWalks;
+  const displayLoading = loading || ledgerLoading;
 
   useEffect(() => {
     void loadEarnings(false);
@@ -450,7 +473,7 @@ export default function GuruEarningsScreen() {
                     </Pressable>
                   </View>
 
-                  {loading ? (
+                  {displayLoading ? (
                     <View style={styles.loadingCard}>
                       <View style={styles.loadingLineLarge} />
                       <View style={styles.loadingLineMedium} />
@@ -460,31 +483,41 @@ export default function GuruEarningsScreen() {
                     <>
                       <View style={styles.heroCard}>
                         <Text style={styles.heroEyebrow}>
-                          EARNINGS THIS MONTH
+                          THIS WEEK&apos;S NET TOTAL
                         </Text>
                         <Text style={styles.heroValue}>
-                          {currency(data.earningsMonth)}
+                          {formatUsd(weekNetTotal)}
                         </Text>
                         <Text style={styles.heroMeta}>
-                          {currency(data.earningsWeek)} earned this week
+                          {formatUsd(
+                            summary.monthNetTotal > 0
+                              ? summary.monthNetTotal
+                              : data.earningsMonth,
+                          )}{' '}
+                          earned this month
                         </Text>
 
                         <TrendChart values={trend} styles={styles} />
 
                         <View style={styles.heroMetricRow}>
                           <HeroMetric
-                            label="Available"
-                            value={currency(data.available)}
+                            label="Pending cleared"
+                            value={formatUsd(pendingClearedBalance)}
                             styles={styles}
                           />
                           <HeroMetric
-                            label="Pending"
-                            value={currency(data.pending)}
+                            label="Care walks"
+                            value={String(completedCareWalks)}
                             styles={styles}
                           />
                           <HeroMetric
-                            label="Next payout"
-                            value={shortDate(data.nextPayoutAt)}
+                            label="Completed care"
+                            value={String(
+                              summary.completedCareTotal ||
+                                data.transactions.filter(
+                                  (item) => item.type === 'booking',
+                                ).length,
+                            )}
                             styles={styles}
                           />
                         </View>
@@ -499,8 +532,8 @@ export default function GuruEarningsScreen() {
                               strokeWidth={2.3}
                             />
                           }
-                          label="Lifetime earnings"
-                          value={currency(data.earningsLifetime)}
+                          label="This week's net total"
+                          value={formatUsd(weekNetTotal)}
                           styles={styles}
                         />
                         <MetricCard
@@ -511,8 +544,8 @@ export default function GuruEarningsScreen() {
                               strokeWidth={2.3}
                             />
                           }
-                          label="Paid out"
-                          value={currency(data.paidOut)}
+                          label="Pending cleared balance"
+                          value={formatUsd(pendingClearedBalance)}
                           styles={styles}
                         />
                         <MetricCard
@@ -523,8 +556,8 @@ export default function GuruEarningsScreen() {
                               strokeWidth={2.3}
                             />
                           }
-                          label="Referral rewards"
-                          value={currency(data.referralRewards)}
+                          label="Total completed care walks"
+                          value={String(completedCareWalks)}
                           styles={styles}
                         />
                         <MetricCard
@@ -535,8 +568,12 @@ export default function GuruEarningsScreen() {
                               strokeWidth={2.3}
                             />
                           }
-                          label="Marketplace support"
-                          value={currency(data.marketplaceSupport)}
+                          label="Lifetime earnings"
+                          value={formatUsd(
+                            summary.lifetimeNetTotal > 0
+                              ? summary.lifetimeNetTotal
+                              : data.earningsLifetime,
+                          )}
                           styles={styles}
                         />
                       </View>
@@ -551,17 +588,21 @@ export default function GuruEarningsScreen() {
 
                         <BreakdownRow
                           label="Available for payout"
-                          value={currency(data.available)}
+                          value={formatUsd(
+                            payoutSetup.available > 0
+                              ? payoutSetup.available
+                              : data.available,
+                          )}
                           styles={styles}
                         />
                         <BreakdownRow
-                          label="Pending completion or processing"
-                          value={currency(data.pending)}
+                          label="Pending cleared balance"
+                          value={formatUsd(pendingClearedBalance)}
                           styles={styles}
                         />
                         <BreakdownRow
                           label="Referral rewards"
-                          value={currency(data.referralRewards)}
+                          value={formatUsd(data.referralRewards)}
                           styles={styles}
                         />
                         <BreakdownRow
@@ -576,7 +617,7 @@ export default function GuruEarningsScreen() {
                         <View style={styles.cardHeader}>
                           <View>
                             <Text style={styles.cardEyebrow}>
-                              RECENT ACTIVITY
+                              ITEMIZED CARE PAYOUTS
                             </Text>
                             <Text style={styles.cardTitle}>
                               Earnings history
@@ -584,11 +625,39 @@ export default function GuruEarningsScreen() {
                           </View>
 
                           <Text style={styles.activityCount}>
-                            {data.transactions.length} items
+                            {ledgerItems.length || data.transactions.length}{' '}
+                            items
                           </Text>
                         </View>
 
-                        {data.transactions.length ? (
+                        {ledgerItems.length ? (
+                          ledgerItems.slice(0, 12).map((item, index) => (
+                            <TransactionRow
+                              key={item.id}
+                              item={{
+                                id: item.id,
+                                type: 'booking',
+                                label: item.serviceLabel,
+                                detail: [
+                                  item.petName,
+                                  item.parentName,
+                                  item.status,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · '),
+                                amount: item.netAmount,
+                                createdAt: item.completedAt,
+                                status: item.status,
+                              }}
+                              last={
+                                index ===
+                                Math.min(ledgerItems.length, 12) - 1
+                              }
+                              palette={palette}
+                              styles={styles}
+                            />
+                          ))
+                        ) : data.transactions.length ? (
                           data.transactions.slice(0, 12).map((item, index) => (
                             <TransactionRow
                               key={item.id}
@@ -607,8 +676,8 @@ export default function GuruEarningsScreen() {
                               No earnings activity yet
                             </Text>
                             <Text style={styles.emptyActivityText}>
-                              Completed care, referral rewards, adjustments, and
-                              payouts will appear here.
+                              Completed care payouts will land here with net
+                              totals for each booking.
                             </Text>
                           </View>
                         )}
@@ -1296,11 +1365,7 @@ function weekStart(date: Date) {
 }
 
 function currency(value: number) {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: value % 1 === 0 ? 0 : 2,
-  }).format(value);
+  return formatUsd(value);
 }
 
 function shortDate(date: Date | null) {

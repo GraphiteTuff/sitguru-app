@@ -14,6 +14,7 @@ export { useNotifications } from '@/hooks/data/useNotifications';
 export { usePublicGurus, useGuruProfile } from '@/hooks/data/useGurus';
 export { useWalkSession } from '@/hooks/data/useWalkSession';
 export { usePawReportLive } from '@/hooks/data/usePawReportLive';
+export { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
 
 export type { CanonicalPet, CanonicalPetForm } from '@/lib/data/pets';
 export type { SitGuruBooking, CreateBookingInput } from '@/hooks/data/useBookings';
@@ -32,3 +33,8 @@ export type {
   LiveCareBadge,
   LiveCareLog,
 } from '@/hooks/data/usePawReportLive';
+export type {
+  GuruEarningsItem,
+  GuruEarningsSummary,
+  GuruPayoutSetup,
+} from '@/hooks/data/useGuruEarnings';

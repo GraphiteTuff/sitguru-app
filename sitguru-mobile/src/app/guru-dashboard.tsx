@@ -49,8 +49,10 @@ import {
   useThemePreference,
   type SitGuruThemePreference,
 } from '@/hooks/use-color-scheme';
+import { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { formatUsd } from '@/lib/data/money';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import {
   isSupabaseConfigured,
@@ -282,6 +284,7 @@ export default function GuruDashboardScreen() {
   const { user, profile } = useAuth();
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
+  const { summary: earningsSummary, payoutSetup } = useGuruEarnings();
 
   const isDark = themeMode === 'dark';
   const isWebPreview = Platform.OS === 'web';
@@ -742,22 +745,40 @@ export default function GuruDashboardScreen() {
 
     cards.push({
       id: 'earnings',
-      eyebrow: 'This month',
-      title: `$${data.earningsMonth.toFixed(0)} earned`,
-      helper: data.payout.actionRequired
-        ? 'Payout setup needs attention'
-        : `$${data.payout.available.toFixed(0)} available to payout`,
+      eyebrow: "This week's net",
+      title: formatUsd(
+        earningsSummary.weekNetTotal > 0
+          ? earningsSummary.weekNetTotal
+          : data.earningsWeek,
+      ),
+      helper: [
+        `${formatUsd(
+          earningsSummary.pendingClearedBalance > 0
+            ? earningsSummary.pendingClearedBalance
+            : payoutSetup.pending > 0
+              ? payoutSetup.pending
+              : data.payout.available,
+        )} pending cleared`,
+        `${
+          earningsSummary.completedCareWalks || data.completedBookings
+        } completed care walks`,
+      ].join(' · '),
+      ctaLabel: 'Open earnings',
       onPress: () => router.push('/guru-earnings'),
     });
 
     return cards;
   }, [
-    data.earningsMonth,
+    data.completedBookings,
+    data.earningsWeek,
     data.liveCare,
-    data.payout.actionRequired,
     data.payout.available,
     data.requests,
+    earningsSummary.completedCareWalks,
+    earningsSummary.pendingClearedBalance,
+    earningsSummary.weekNetTotal,
     nextBooking,
+    payoutSetup.pending,
     primaryAction.eyebrow,
     primaryAction.helper,
     primaryAction.route,

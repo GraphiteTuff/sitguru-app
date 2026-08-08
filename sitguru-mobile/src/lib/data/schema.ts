@@ -20,6 +20,9 @@ export const TABLES = {
   bookingWalkTracks: 'booking_walk_tracks',
   bookingWalkTrackPoints: 'booking_walk_track_points',
   reviews: 'reviews',
+  guruPayouts: 'guru_payouts',
+  userPayoutAccounts: 'user_payout_accounts',
+  userPayoutPreferences: 'user_payout_preferences',
 } as const;
 
 /** Parent ownership columns on bookings (web order). */
@@ -79,6 +82,7 @@ export const API_PATHS = {
   ensureBookingConversation: '/api/messaging/ensure-booking-conversation',
   mobileCheckout: '/api/mobile/payments/checkout',
   registerPushToken: '/api/mobile/push-token',
+  payoutSetup: '/api/payouts/setup',
   walkAction: (bookingId: string) =>
     `/api/walk/${encodeURIComponent(bookingId)}/actions`,
   walkStream: (bookingId: string) =>
