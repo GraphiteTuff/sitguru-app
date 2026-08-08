@@ -14,6 +14,11 @@ import {
   startOfWeek,
 } from '@/lib/data/money';
 import {
+  computeGuruPerformanceAnalytics,
+  EMPTY_ANALYTICS,
+  type GuruPerformanceAnalytics,
+} from '@/lib/data/guru-performance';
+import {
   API_PATHS,
   BOOKING_GURU_ID_FIELDS,
   PAID_PAYMENT_STATUSES,
@@ -28,10 +33,12 @@ export type GuruEarningsItem = {
   serviceLabel: string;
   petName: string;
   parentName: string;
+  parentId?: string;
   netAmount: number;
   tipAmount?: number;
   status: string;
   completedAt: Date | null;
+  startedAt?: Date | null;
   isWalk: boolean;
   source: 'booking_payment' | 'booking' | 'guru_payout';
 };
@@ -45,6 +52,8 @@ export type GuruEarningsSummary = {
   completedCareWalks: number;
   completedCareTotal: number;
 };
+
+export type { GuruPerformanceAnalytics };
 
 export type GuruPayoutSetup = {
   connected: boolean;
@@ -164,11 +173,25 @@ function itemFromPayment(row: RecordRow, index: number): GuruEarningsItem | null
       ['customer_name', 'pet_parent_name', 'parent_name'],
       'Pet Parent',
     ),
+    parentId: firstString(row, [
+      'pet_parent_id',
+      'customer_id',
+      'client_id',
+      'owner_id',
+      'payer_user_id',
+    ]),
     netAmount: net > 0 ? net : tip,
     tipAmount: tip,
     status: status || 'recorded',
     completedAt: parseDate(
       row.paid_at || row.completed_at || row.updated_at || row.created_at,
+    ),
+    startedAt: parseDate(
+      row.started_at ||
+        row.start_at ||
+        row.start_time ||
+        row.service_start_at ||
+        row.created_at,
     ),
     isWalk: isWalkService(serviceLabel),
     source: 'booking_payment',
@@ -209,10 +232,20 @@ function itemFromBooking(row: RecordRow, index: number): GuruEarningsItem | null
       ['customer_name', 'pet_parent_name', 'parent_name', 'owner_name'],
       'Pet Parent',
     ),
+    parentId: firstString(row, [
+      'pet_parent_id',
+      'customer_id',
+      'client_id',
+      'owner_id',
+      'user_id',
+    ]),
     netAmount: net,
     status: status || 'completed',
     completedAt: parseDate(
       row.completed_at || row.end_at || row.end_time || row.updated_at || row.created_at,
+    ),
+    startedAt: parseDate(
+      row.started_at || row.start_at || row.start_time || row.created_at,
     ),
     isWalk: isWalkService(serviceLabel),
     source: 'booking',
@@ -483,9 +516,15 @@ export function useGuruEarnings(options?: { enabled?: boolean }) {
     return base;
   }, [items, payoutSetup.pending]);
 
+  const analytics = useMemo(
+    () => (items.length ? computeGuruPerformanceAnalytics(items) : EMPTY_ANALYTICS),
+    [items],
+  );
+
   return {
     items,
     summary,
+    analytics,
     payoutSetup,
     loading,
     error,

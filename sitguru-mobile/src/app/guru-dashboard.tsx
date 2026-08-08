@@ -13,6 +13,7 @@ import {
   Search,
   Sparkles,
   UserRound,
+  Users,
   WalletCards,
 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
@@ -43,6 +44,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import {
   setThemePreference,
@@ -284,7 +286,7 @@ export default function GuruDashboardScreen() {
   const { user, profile } = useAuth();
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
-  const { summary: earningsSummary, payoutSetup } = useGuruEarnings();
+  const { summary: earningsSummary, analytics, payoutSetup } = useGuruEarnings();
 
   const isDark = themeMode === 'dark';
   const isWebPreview = Platform.OS === 'web';
@@ -767,8 +769,79 @@ export default function GuruDashboardScreen() {
       onPress: () => router.push('/guru-earnings'),
     });
 
+    cards.push({
+      id: 'analytics-retention',
+      eyebrow: 'Performance',
+      title:
+        analytics.retentionRateWow != null
+          ? `${analytics.retentionRateWow}% retention`
+          : 'Retention building',
+      helper:
+        analytics.retentionPriorParents > 0
+          ? `${analytics.retentionRepeatParents} of ${analytics.retentionPriorParents} last-week parents booked again`
+          : 'Need two weeks of care history for a retention rate.',
+      ctaLabel: 'View retention',
+      onPress: () =>
+        router.push({
+          pathname: '/guru-earnings',
+          params: { focus: 'retention' },
+        }),
+      icon: <Users color={SitGuruColors.primary} size={22} strokeWidth={2.4} />,
+    });
+
+    cards.push({
+      id: 'analytics-avg-payout',
+      eyebrow: 'Avg service payout',
+      title: formatUsd(analytics.averageServicePayout),
+      helper: `${analytics.completedCareCount} completed care visits · deep dive metrics`,
+      ctaLabel: 'Open metrics',
+      onPress: () =>
+        router.push({
+          pathname: '/guru-earnings',
+          params: { focus: 'avg-payout' },
+        }),
+    });
+
+    if (analytics.topPeakWindow) {
+      cards.push({
+        id: 'analytics-peak',
+        eyebrow: 'Peak activity',
+        title: analytics.topPeakWindow.label,
+        helper: `${analytics.topPeakWindow.count} visits in this window · see all peaks`,
+        ctaLabel: 'Open peaks',
+        onPress: () =>
+          router.push({
+            pathname: '/guru-earnings',
+            params: { focus: 'peak' },
+          }),
+      });
+    }
+
+    if (analytics.activityDistribution30d.length > 0) {
+      const top = analytics.activityDistribution30d[0];
+      cards.push({
+        id: 'analytics-distribution',
+        eyebrow: '30-day mix',
+        title: top.category,
+        helper: `${Math.round(top.share * 100)}% of recent volume · ${top.count} visits`,
+        ctaLabel: 'Open distribution',
+        onPress: () =>
+          router.push({
+            pathname: '/guru-earnings',
+            params: { focus: 'distribution' },
+          }),
+      });
+    }
+
     return cards;
   }, [
+    analytics.activityDistribution30d,
+    analytics.averageServicePayout,
+    analytics.completedCareCount,
+    analytics.retentionPriorParents,
+    analytics.retentionRateWow,
+    analytics.retentionRepeatParents,
+    analytics.topPeakWindow,
     data.completedBookings,
     data.earningsWeek,
     data.liveCare,

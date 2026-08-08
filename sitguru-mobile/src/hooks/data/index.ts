@@ -37,4 +37,5 @@ export type {
   GuruEarningsItem,
   GuruEarningsSummary,
   GuruPayoutSetup,
+  GuruPerformanceAnalytics,
 } from '@/hooks/data/useGuruEarnings';

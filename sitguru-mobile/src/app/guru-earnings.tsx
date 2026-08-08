@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
     AlertCircle,
     Banknote,
@@ -7,6 +7,7 @@ import {
     ChevronLeft,
     ChevronRight,
     CircleDollarSign,
+    Clock3,
     ExternalLink,
     Home,
     MessageCircle,
@@ -14,10 +15,11 @@ import {
     ShieldCheck,
     TrendingUp,
     UserRound,
+    Users,
     WalletCards
 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
     Linking,
@@ -30,10 +32,14 @@ import {
     View,
 } from 'react-native';
 
+import DistributionBars from '@/components/mobile/DistributionBars';
+import StickyActionBar from '@/components/mobile/StickyActionBar';
 import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
+import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
+import { StickyFooterClearance } from '@/constants/mobile-layout';
 import { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -122,6 +128,10 @@ const SITE_URL =
   'https://www.sitguru.com';
 
 export default function GuruEarningsScreen() {
+  const params = useLocalSearchParams<{ focus?: string }>();
+  const focus =
+    typeof params.focus === 'string' ? params.focus : '';
+
   const { user, profile } = useAuth();
   const themeMode = useThemeMode();
   const isDark = themeMode === 'dark';
@@ -130,12 +140,16 @@ export default function GuruEarningsScreen() {
   const styles = createStyles(isDark);
   const {
     summary,
+    analytics,
     items: ledgerItems,
     payoutSetup,
     loading: ledgerLoading,
     error: ledgerError,
     refresh: refreshLedger,
   } = useGuruEarnings();
+
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionOffsets = useRef<Record<string, number>>({});
 
   const profileRecord = (profile ?? {}) as RecordRow;
   const [data, setData] = useState<EarningsData>(EMPTY_DATA);
@@ -191,9 +205,44 @@ export default function GuruEarningsScreen() {
   const completedCareWalks = summary.completedCareWalks;
   const displayLoading = loading || ledgerLoading;
 
+  const distributionBars = useMemo(
+    () =>
+      analytics.activityDistribution30d.map((bucket) => ({
+        id: bucket.id,
+        label: bucket.category,
+        value: bucket.count,
+        helper: `${formatUsd(bucket.netTotal)} · ${Math.round(bucket.share * 100)}%`,
+      })),
+    [analytics.activityDistribution30d],
+  );
+
+  const peakBars = useMemo(
+    () =>
+      analytics.peakActivityWindows.map((window) => ({
+        id: window.id,
+        label: window.label,
+        value: window.count,
+        helper: `${Math.round(window.share * 100)}% of visits`,
+      })),
+    [analytics.peakActivityWindows],
+  );
+
   useEffect(() => {
     void loadEarnings(false);
   }, [loadEarnings]);
+
+  useEffect(() => {
+    if (!focus || displayLoading) return;
+
+    const timer = setTimeout(() => {
+      const y = sectionOffsets.current[focus];
+      if (typeof y === 'number') {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [displayLoading, focus]);
 
   useEffect(() => {
     if (!user?.id || !isSupabaseConfigured) return;
@@ -365,7 +414,11 @@ export default function GuruEarningsScreen() {
                 {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
                 <ScrollView
-                  contentContainerStyle={styles.scrollContent}
+                  ref={scrollRef}
+                  contentContainerStyle={[
+                    styles.scrollContent,
+                    { paddingBottom: StickyFooterClearance.actionPlusNav },
+                  ]}
                   refreshControl={
                     <RefreshControl
                       refreshing={refreshing}
@@ -578,6 +631,140 @@ export default function GuruEarningsScreen() {
                         />
                       </View>
 
+                      <View
+                        style={styles.performanceCard}
+                        onLayout={(event) => {
+                          const y = event.nativeEvent.layout.y;
+                          sectionOffsets.current['retention'] = y;
+                          sectionOffsets.current['avg-payout'] = y;
+                          sectionOffsets.current['peak'] = y;
+                          sectionOffsets.current['distribution'] = y;
+                          sectionOffsets.current['analytics'] = y;
+                        }}
+                      >
+                        <Text style={styles.cardEyebrow}>
+                          PERFORMANCE ANALYTICS
+                        </Text>
+                        <Text style={styles.cardTitle}>
+                          Business metrics
+                        </Text>
+                        <Text style={styles.performanceHelper}>
+                          Retention, average payout, peak windows, and 30-day
+                          service mix from your completed care ledger.
+                        </Text>
+
+                        <View style={styles.performanceMetricRow}>
+                          <View
+                            style={[
+                              styles.performanceMetric,
+                              focus === 'retention'
+                                ? styles.performanceMetricActive
+                                : null,
+                            ]}
+                          >
+                            <Users
+                              color={palette.primary}
+                              size={18}
+                              strokeWidth={2.3}
+                            />
+                            <Text style={styles.performanceMetricLabel}>
+                              Customer retention
+                            </Text>
+                            <Text style={styles.performanceMetricValue}>
+                              {analytics.retentionRateWow != null
+                                ? `${analytics.retentionRateWow}%`
+                                : '—'}
+                            </Text>
+                            <Text style={styles.performanceMetricHelper}>
+                              {analytics.retentionPriorParents > 0
+                                ? `${analytics.retentionRepeatParents}/${analytics.retentionPriorParents} parents returned week over week`
+                                : 'Needs two weeks of parent history'}
+                            </Text>
+                          </View>
+
+                          <View
+                            style={[
+                              styles.performanceMetric,
+                              focus === 'avg-payout'
+                                ? styles.performanceMetricActive
+                                : null,
+                            ]}
+                          >
+                            <CircleDollarSign
+                              color={palette.primary}
+                              size={18}
+                              strokeWidth={2.3}
+                            />
+                            <Text style={styles.performanceMetricLabel}>
+                              Avg service payout
+                            </Text>
+                            <Text style={styles.performanceMetricValue}>
+                              {formatUsd(analytics.averageServicePayout)}
+                            </Text>
+                            <Text style={styles.performanceMetricHelper}>
+                              Across {analytics.completedCareCount} completed
+                              visits
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View
+                          style={[
+                            styles.performanceSection,
+                            focus === 'peak'
+                              ? styles.performanceMetricActive
+                              : null,
+                          ]}
+                        >
+                          <View style={styles.performanceSectionHeader}>
+                            <Clock3
+                              color={palette.primary}
+                              size={18}
+                              strokeWidth={2.3}
+                            />
+                            <Text style={styles.performanceSectionTitle}>
+                              Peak activity windows
+                            </Text>
+                          </View>
+                          <Text style={styles.performanceMetricHelper}>
+                            {analytics.topPeakWindow
+                              ? `Highest density: ${analytics.topPeakWindow.label}`
+                              : 'Peak windows appear after visit timestamps load.'}
+                          </Text>
+                          <DistributionBars
+                            items={peakBars}
+                            emptyLabel="No peak activity data yet."
+                          />
+                        </View>
+
+                        <View
+                          style={[
+                            styles.performanceSection,
+                            focus === 'distribution'
+                              ? styles.performanceMetricActive
+                              : null,
+                          ]}
+                        >
+                          <View style={styles.performanceSectionHeader}>
+                            <TrendingUp
+                              color={palette.primary}
+                              size={18}
+                              strokeWidth={2.3}
+                            />
+                            <Text style={styles.performanceSectionTitle}>
+                              30-day service mix
+                            </Text>
+                          </View>
+                          <Text style={styles.performanceMetricHelper}>
+                            Historical distribution by service category.
+                          </Text>
+                          <DistributionBars
+                            items={distributionBars}
+                            emptyLabel="No completed care in the last 30 days."
+                          />
+                        </View>
+                      </View>
+
                       <View style={styles.breakdownCard}>
                         <Text style={styles.cardEyebrow}>
                           PAYOUT BREAKDOWN
@@ -760,6 +947,29 @@ export default function GuruEarningsScreen() {
                     </Pressable>
                   </View>
                 </ScrollView>
+
+                <StickyActionBar embedded aboveBottomNav>
+                  <SitGuruButton
+                    label={
+                      openingStripe
+                        ? 'Opening Stripe…'
+                        : data.payoutsEnabled
+                          ? 'Open Stripe dashboard'
+                          : 'Set up payouts'
+                    }
+                    disabled={openingStripe}
+                    onPress={() =>
+                      void openStripeFlow(
+                        data.payoutsEnabled ? 'dashboard' : 'onboarding',
+                      )
+                    }
+                  />
+                  <SitGuruButton
+                    label="Back to dashboard"
+                    variant="secondary"
+                    onPress={() => router.push('/guru-dashboard')}
+                  />
+                </StickyActionBar>
 
                 <View style={styles.bottomNav}>
                   <BottomNavItem
@@ -1768,6 +1978,76 @@ function createStyles(isDark: boolean) {
       borderWidth: 1,
       gap: 4,
       padding: 13,
+    },
+    performanceCard: {
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 20,
+      borderWidth: 1,
+      gap: 14,
+      padding: 13,
+    },
+    performanceHelper: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 9,
+      lineHeight: 14,
+      marginTop: -4,
+    },
+    performanceMetricRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    performanceMetric: {
+      backgroundColor: palette.surfaceSoft,
+      borderColor: palette.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      flexBasis: '47%',
+      flexGrow: 1,
+      gap: 6,
+      minWidth: 140,
+      padding: 12,
+    },
+    performanceMetricActive: {
+      borderColor: palette.primary,
+      borderWidth: 1.5,
+    },
+    performanceMetricLabel: {
+      color: palette.muted,
+      fontFamily: AppFonts.bold,
+      fontSize: 8,
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+    },
+    performanceMetricValue: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 18,
+    },
+    performanceMetricHelper: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 8,
+      lineHeight: 12,
+    },
+    performanceSection: {
+      borderColor: palette.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      gap: 10,
+      padding: 12,
+    },
+    performanceSectionHeader: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: 8,
+    },
+    performanceSectionTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.bold,
+      fontSize: 12,
     },
     cardEyebrow: {
       color: palette.primary,
