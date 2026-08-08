@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import MobileAlertHosts from '@/components/mobile/MobileAlertHosts';
 import SitGuruPaymentsProvider from '@/components/SitGuruPaymentsProvider';
 import { getAppTheme } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
@@ -20,9 +21,10 @@ import {
   ACCEPT_BOOKING_ACTION,
   DECLINE_BOOKING_ACTION,
   OPEN_BOOKING_ACTION,
-  registerForPushNotificationsAsync,
   subscribeToNotificationResponses,
 } from '@/lib/notifications/push';
+// Ensure TaskManager.defineTask runs before any walk screen mounts.
+import '@/lib/location/background-walk-task';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -39,8 +41,6 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    void registerForPushNotificationsAsync();
-
     const subscription = subscribeToNotificationResponses(
       ({ actionId, bookingId, href }) => {
         const defaultHref = '/guru-requests';
@@ -87,6 +87,8 @@ export default function RootLayout() {
               },
             }}
           />
+
+          <MobileAlertHosts />
         </AuthProvider>
       </SitGuruPaymentsProvider>
     </GestureHandlerRootView>

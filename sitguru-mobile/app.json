@@ -65,9 +65,11 @@
       [
         "expo-location",
         {
+          "locationAlwaysAndWhenInUsePermission": "Allow SitGuru to share live care routes with Pet Parents during active booked visits, including when the app is in the background.",
+          "locationAlwaysPermission": "Allow SitGuru to continue sharing your care route in the background during an active visit.",
           "locationWhenInUsePermission": "Allow SitGuru to track live care routes only during active booked visits.",
-          "isIosBackgroundLocationEnabled": false,
-          "isAndroidBackgroundLocationEnabled": false
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
         }
       ],
       [

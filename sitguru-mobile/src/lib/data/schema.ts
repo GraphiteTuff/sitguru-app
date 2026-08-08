@@ -66,6 +66,7 @@ export const REALTIME_CHANNELS = {
   chat: (conversationId: string) => `chat:${conversationId}`,
   notifications: (userId: string, nonce = '') =>
     `notifications:${userId}${nonce ? `:${nonce}` : ''}`,
+  inboxToast: (userId: string) => `inbox-toast:${userId}`,
   bookingRoom: (bookingId: string) => `room-${bookingId}`,
   presence: 'sitguru-message-presence',
   guruLiveSearch: 'sitguru-guru-live-search',
@@ -77,6 +78,7 @@ export const API_PATHS = {
   sendMessage: '/api/messages/send',
   ensureBookingConversation: '/api/messaging/ensure-booking-conversation',
   mobileCheckout: '/api/mobile/payments/checkout',
+  registerPushToken: '/api/mobile/push-token',
   walkAction: (bookingId: string) =>
     `/api/walk/${encodeURIComponent(bookingId)}/actions`,
   walkStream: (bookingId: string) =>

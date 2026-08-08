@@ -38,7 +38,7 @@ import RoleGate from '@/components/RoleGate';
 import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
-import { useLiveLocation } from '@/hooks/useLiveLocation';
+import { useWalkLocationStream } from '@/hooks/useWalkLocationStream';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import { uploadSitGuruMedia } from '@/lib/data/media-upload';
@@ -223,7 +223,8 @@ export default function GuruLiveWalkScreen() {
   }, [loadCare, user?.id]);
 
   const status: CareStatus = session?.status ?? 'not_started';
-  const locationTracking = useLiveLocation({
+  const locationTracking = useWalkLocationStream({
+    bookingId: booking?.id || bookingId || null,
     enabled: status === 'active',
     onUpdate: (coords) => {
       setTrail((current) => {
@@ -233,6 +234,9 @@ export default function GuruLiveWalkScreen() {
         ];
         return next.length > 120 ? next.slice(next.length - 120) : next;
       });
+    },
+    onPermissionDenied: (feedback) => {
+      setMessage(feedback);
     },
   });
   const elapsedTime = useMemo(
@@ -668,8 +672,17 @@ export default function GuruLiveWalkScreen() {
 
                       <Text style={styles.privacyText}>
                         Map stays compact so Potty and Water stay in the thumb
-                        zone. GPS runs only during active booked care.
+                        zone. GPS streams to the Pet Parent during active booked
+                        care (throttled for battery).
                       </Text>
+
+                      {locationTracking.error ||
+                      (message &&
+                        /location|gps|permission|background/i.test(message)) ? (
+                        <Text style={styles.locationFeedback}>
+                          {locationTracking.error || message}
+                        </Text>
+                      ) : null}
 
                       {status === 'active' || status === 'paused' ? (
                         <CareQuickActions
@@ -2097,6 +2110,13 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.medium,
       fontSize: 7,
       lineHeight: 11,
+    },
+    locationFeedback: {
+      color: '#B45309',
+      fontFamily: AppFonts.medium,
+      fontSize: 11,
+      lineHeight: 15,
+      marginTop: 4,
     },
     controlCard: {
       backgroundColor: palette.surface,
