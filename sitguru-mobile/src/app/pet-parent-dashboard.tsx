@@ -487,8 +487,31 @@ export default function PetParentDashboardScreen() {
       helper:
         dashboardData.pets.length === 0
           ? 'Save routines, meds, and handoff notes before booking.'
-          : 'Tap to manage passports and care notes.',
-      onPress: () => router.push('/pet-passports'),
+          : incompletePets.length
+            ? 'Tap to continue the passport wizard — no alerts, just the next step.'
+            : 'Tap to manage passports and care notes.',
+      onPress: () => {
+        if (dashboardData.pets.length === 0) {
+          router.push({
+            pathname: '/pet-passports',
+            params: { mode: 'wizard' },
+          });
+          return;
+        }
+
+        if (incompletePets[0]) {
+          router.push({
+            pathname: '/pet-passports',
+            params: {
+              mode: 'wizard',
+              petId: incompletePets[0].id,
+            },
+          });
+          return;
+        }
+
+        router.push('/pet-passports');
+      },
       icon: <PawPrint color={palette.primary} size={22} strokeWidth={2.4} />,
     });
 
