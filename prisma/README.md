@@ -27,6 +27,20 @@ column probes against the public API.
 | `moderation_flags` | `support_intake_cases` (admin moderation queue) |
 | `fraud_flags` | `dispute_cases` (admin fraud / dispute queue) |
 | `financial_audit_logs` | may be missing — fall back to `admin_audit_logs` |
+| `admin_marketing_campaigns.title` | often missing — fall back to `name` |
+| `admin_marketing_signup_leads.status` | live column is `lead_status` |
+| `referral_codes.program` | live columns are `program_type` / `program_context` |
+
+## Accessory Prisma models
+
+| Model | `@@map` table | Notes |
+| --- | --- | --- |
+| `FinancialAuditLog` | `financial_audit_logs` | Access-layer fallback: `admin_audit_logs` |
+| `ModerationFlag` | `moderation_flags` | Access-layer routes natively via `support_intake_cases` |
+| `FraudFlag` | `fraud_flags` | Access-layer routes natively via `dispute_cases` |
+| `AdminMarketingCampaign` | `admin_marketing_campaigns` | Includes string `title` (+ live `name`) |
+| `AdminMarketingSignupLead` | `admin_marketing_signup_leads` | Includes string `status` (+ live `lead_status`) |
+| `ReferralCode` | `referral_codes` | Includes string `program` (+ live `program_type`) |
 
 To add Rogue compatibility tables/columns on top of production, apply:
 

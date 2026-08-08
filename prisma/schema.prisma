@@ -12,6 +12,11 @@
  * fraud_flags, financial_audit_logs) may be missing from live PostgREST until
  * supabase/migrations/20260802_structural_schema_alignment_rogue.sql is applied.
  * Rogue admin-reporting falls back to production aliases in those cases.
+ *
+ * Column aliases that commonly miss the PostgREST schema cache:
+ *   admin_marketing_campaigns.title        → name
+ *   admin_marketing_signup_leads.status    → lead_status
+ *   referral_codes.program                 → program_type / program_context
  */
 
 datasource db {
@@ -156,4 +161,63 @@ model BookingWalkTrackPoint {
   createdAt   DateTime? @map("created_at") @db.Timestamptz(6)
 
   @@map("booking_walk_track_points")
+}
+
+/// Sales & marketing campaigns. Live rows expose `name`; Rogue also binds `title`.
+model AdminMarketingCampaign {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String?
+  title          String?
+  status         String?
+  audience       String?
+  goal           String?
+  primaryCta     String?   @map("primary_cta")
+  landingPage    String?   @map("landing_page")
+  contentNeeded  String?   @map("content_needed")
+  outreachTieIn  String?   @map("outreach_tie_in")
+  proofNeeded    String?   @map("proof_needed")
+  ceoDecision    String?   @map("ceo_decision")
+  successSignal  String?   @map("success_signal")
+  ownerName      String?   @map("owner_name")
+  createdAt      DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime? @map("updated_at") @db.Timestamptz(6)
+
+  @@map("admin_marketing_campaigns")
+}
+
+/// Marketing signup leads. Live status column is often `lead_status`.
+model AdminMarketingSignupLead {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status           String?
+  leadStatus       String?   @map("lead_status")
+  leadType         String?   @map("lead_type")
+  firstName        String?   @map("first_name")
+  lastName         String?   @map("last_name")
+  fullName         String?   @map("full_name")
+  email            String?
+  phone            String?
+  priorityLevel    String?   @map("priority_level")
+  campaignSource   String?   @map("campaign_source")
+  ownerName        String?   @map("owner_name")
+  createdAt        DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime? @map("updated_at") @db.Timestamptz(6)
+
+  @@map("admin_marketing_signup_leads")
+}
+
+/// Referral inventory codes. Live program column is often `program_type`.
+model ReferralCode {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code          String?
+  status        String?
+  program       String?
+  programType   String?   @map("program_type")
+  programContext String?  @map("program_context")
+  ownerName     String?   @map("owner_name")
+  userId        String?   @map("user_id") @db.Uuid
+  ambassadorId  String?   @map("ambassador_id") @db.Uuid
+  createdAt     DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime? @map("updated_at") @db.Timestamptz(6)
+
+  @@map("referral_codes")
 }
