@@ -6,6 +6,16 @@
 
 import { createHash } from "node:crypto";
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import {
+  bumpHitMap,
+  defaultCompanionForChannel,
+  defaultPageForChannel,
+  normalizeCompanionKey,
+  normalizePagePath,
+  parseHitMap,
+  type CompanionHitMap,
+  type PageHitMap,
+} from "@/lib/chat/insight-provenance";
 
 export type ChatChannelSource =
   | "HOMEPAGE_LEAD"
@@ -36,6 +46,10 @@ export type GlobalChatInsightRow = {
   updated_at: string;
   created_at?: string;
   converted_article_slug?: string | null;
+  companion_hits?: CompanionHitMap | null;
+  page_hits?: PageHitMap | null;
+  last_companion_key?: string | null;
+  last_source_page_path?: string | null;
 };
 
 const QUESTION_HINT =
@@ -120,12 +134,28 @@ export function hashInsightText(text: string): string {
   return createHash("sha256").update(normalized).digest("hex").slice(0, 64);
 }
 
+function resolveProvenance(
+  channel: ChatChannelSource,
+  companion?: string | null,
+  pagePath?: string | null,
+) {
+  const companionKey =
+    normalizeCompanionKey(companion) === "unknown"
+      ? defaultCompanionForChannel(channel)
+      : normalizeCompanionKey(companion);
+  const sourcePage =
+    normalizePagePath(pagePath) || defaultPageForChannel(channel);
+  return { companionKey, sourcePage };
+}
+
 /**
  * Upsert into the global omnichannel ledger.
  */
 export async function recordGlobalChatInsight(params: {
   text: string;
   channel: ChatChannelSource;
+  companion?: string | null;
+  pagePath?: string | null;
 }): Promise<GlobalChatInsightRow | null> {
   const text = String(params.text || "").trim().slice(0, 2000);
   if (!looksLikeInsightQuestion(text)) return null;
@@ -133,6 +163,11 @@ export async function recordGlobalChatInsight(params: {
   const category = categorizeChatInsight(text);
   const friction = isFrictionMessage(text);
   const hash = hashInsightText(text);
+  const { companionKey, sourcePage } = resolveProvenance(
+    params.channel,
+    params.companion,
+    params.pagePath,
+  );
 
   try {
     const { data, error } = await supabaseAdmin.rpc(
@@ -143,6 +178,8 @@ export async function recordGlobalChatInsight(params: {
         p_category: category,
         p_channel: params.channel,
         p_is_friction: friction,
+        p_companion: companionKey,
+        p_page_path: sourcePage,
       },
     );
 
@@ -150,7 +187,7 @@ export async function recordGlobalChatInsight(params: {
       return (Array.isArray(data) ? data[0] : data) as GlobalChatInsightRow;
     }
 
-    // Fallback without RPC
+    // Fallback without RPC (or older RPC without provenance args)
     const existing = await supabaseAdmin
       .from("global_chat_insights")
       .select("*")
@@ -159,22 +196,25 @@ export async function recordGlobalChatInsight(params: {
       .maybeSingle();
 
     if (existing.data?.insight_id) {
-      const nextCount =
-        Number(
-          (existing.data as { frequency_tally_count?: number })
-            .frequency_tally_count || 1,
-        ) + 1;
+      const row = existing.data as GlobalChatInsightRow & Record<string, unknown>;
+      const nextCount = Number(row.frequency_tally_count || 1) + 1;
+      const companionHits = bumpHitMap(
+        parseHitMap(row.companion_hits),
+        companionKey,
+      );
+      const pageHits = bumpHitMap(parseHitMap(row.page_hits), sourcePage);
       const { data: updated } = await supabaseAdmin
         .from("global_chat_insights")
         .update({
           frequency_tally_count: nextCount,
           updated_at: new Date().toISOString(),
-          is_friction_flag:
-            Boolean(
-              (existing.data as { is_friction_flag?: boolean }).is_friction_flag,
-            ) || friction,
+          is_friction_flag: Boolean(row.is_friction_flag) || friction,
+          last_companion_key: companionKey,
+          last_source_page_path: sourcePage,
+          companion_hits: companionHits,
+          page_hits: pageHits,
         })
-        .eq("insight_id", existing.data.insight_id)
+        .eq("insight_id", row.insight_id)
         .select("*")
         .maybeSingle();
       return (updated as GlobalChatInsightRow) || null;
@@ -189,6 +229,10 @@ export async function recordGlobalChatInsight(params: {
         channel_source_enum: params.channel,
         frequency_tally_count: 1,
         is_friction_flag: friction,
+        last_companion_key: companionKey,
+        last_source_page_path: sourcePage,
+        companion_hits: { [companionKey]: 1 },
+        page_hits: { [sourcePage]: 1 },
         updated_at: new Date().toISOString(),
       })
       .select("*")
@@ -214,6 +258,8 @@ export async function recordGlobalChatInsight(params: {
 export function recordGlobalChatInsightAsync(params: {
   text: string;
   channel: ChatChannelSource;
+  companion?: string | null;
+  pagePath?: string | null;
 }): void {
   void recordGlobalChatInsight(params);
 }
@@ -223,6 +269,7 @@ export function recordGlobalChatInsightAsync(params: {
  */
 export async function recordHomepageChatInsight(
   rawQuestion: string,
+  meta?: { companion?: string | null; pagePath?: string | null },
 ): Promise<ChatInsightRow | null> {
   const text = String(rawQuestion || "").trim().slice(0, 2000);
   if (!looksLikeInsightQuestion(text)) return null;
@@ -230,7 +277,12 @@ export async function recordHomepageChatInsight(
   const topic = categorizeChatInsight(text);
 
   // Always fan-out to global ledger
-  void recordGlobalChatInsight({ text, channel: "HOMEPAGE_LEAD" });
+  void recordGlobalChatInsight({
+    text,
+    channel: "HOMEPAGE_LEAD",
+    companion: meta?.companion || "rogue",
+    pagePath: meta?.pagePath || "/",
+  });
 
   try {
     const { data, error } = await supabaseAdmin.rpc(
@@ -296,6 +348,9 @@ export async function recordHomepageChatInsight(
   }
 }
 
-export function recordHomepageChatInsightAsync(rawQuestion: string): void {
-  void recordHomepageChatInsight(rawQuestion);
+export function recordHomepageChatInsightAsync(
+  rawQuestion: string,
+  meta?: { companion?: string | null; pagePath?: string | null },
+): void {
+  void recordHomepageChatInsight(rawQuestion, meta);
 }

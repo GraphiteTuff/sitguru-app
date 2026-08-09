@@ -458,6 +458,8 @@ export async function POST(req: NextRequest) {
       recordGlobalChatInsightAsync({
         text: body,
         channel: "ADMIN_SUPPORT",
+        companion: "admin",
+        pagePath: "/admin/messages",
       });
     } catch {
       /* soft-fail */

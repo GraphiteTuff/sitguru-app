@@ -108,6 +108,7 @@ type ScoutShellProps = {
 };
 
 function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [activeCompanion] = useState<typeof ACTIVE_COMPANION>(ACTIVE_COMPANION);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -125,6 +126,8 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
 
   const requestBody = {
     officer: "scout" as const,
+    companion: "scout" as const,
+    pagePath: pathname || (isPublic ? "/become-a-guru" : "/guru/dashboard"),
     surface: isPublic ? ("public" as const) : ("dashboard" as const),
     ...(!isPublic && user?.accessToken
       ? { accessToken: user.accessToken }

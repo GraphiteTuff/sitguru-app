@@ -156,12 +156,15 @@ function formatLeadTranscript(
 function recordLeadTranscriptAsync(
   turns: AiChatTurn[],
   clientFirstName?: string,
+  meta?: { companion?: string | null; pagePath?: string | null },
 ) {
   const transcript = formatLeadTranscript(turns, clientFirstName);
   if (transcript.length < 12) return;
   recordGlobalChatInsightAsync({
     text: transcript,
     channel: "HOMEPAGE_LEAD",
+    companion: meta?.companion || "rogue",
+    pagePath: meta?.pagePath || "/",
   });
 }
 
@@ -401,6 +404,13 @@ async function handleHomepageLeadPost(req: NextRequest) {
     : clientFirstNameRaw;
   const history = parseHistory(body.history || body.messages);
   const auditOnly = body.auditTranscript === true;
+  const companionKey =
+    safeString(body.companion) || safeString(body.companionId) || "rogue";
+  const pagePath =
+    safeString(body.pagePath) ||
+    safeString(body.page_path) ||
+    "/";
+  const insightMeta = { companion: companionKey, pagePath };
 
   // Persist full visitor transcript for CRM audit (close / cancel / terminate)
   if (auditOnly || history.length > 0) {
@@ -414,7 +424,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
                 content: safeString(body.message) || "[session_closed]",
               },
             ] as AiChatTurn[]);
-      recordLeadTranscriptAsync(turns, clientFirstName || undefined);
+      recordLeadTranscriptAsync(turns, clientFirstName || undefined, insightMeta);
     } catch (error) {
       console.warn(
         "[homepage-lead] transcript audit soft-failed:",
@@ -437,7 +447,7 @@ async function handleHomepageLeadPost(req: NextRequest) {
 
   // Non-blocking Chat Insights tally (questions → Admin analytics)
   try {
-    recordHomepageChatInsightAsync(message);
+    recordHomepageChatInsightAsync(message, insightMeta);
   } catch {
     // never block the chat path on analytics
   }

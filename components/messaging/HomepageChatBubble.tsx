@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } 
 import Link from "next/link";
 import { X } from "lucide-react";
 import { useChat, type Message } from "ai/react";
+import { usePathname } from "next/navigation";
 import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
 import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
 import { SocialFollowPack } from "@/components/messaging/SocialFollowPack";
@@ -320,6 +321,11 @@ async function auditTranscriptToBackend(params: {
       body: JSON.stringify({
         auditTranscript: true,
         client_first_name: params.clientFirstName || undefined,
+        companion: "rogue",
+        pagePath:
+          typeof window !== "undefined"
+            ? `${window.location.pathname}${window.location.search}`
+            : "/",
         history: params.messages
           .filter((m) => m.role === "user" || m.role === "assistant")
           .map((m) => ({ role: m.role, content: m.content })),
@@ -333,6 +339,7 @@ async function auditTranscriptToBackend(params: {
 }
 
 export default function HomepageChatBubble() {
+  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
@@ -361,6 +368,8 @@ export default function HomepageChatBubble() {
     initialMessages: [buildGreetingPlaceholder()],
     body: {
       channel: "HOMEPAGE_LEAD",
+      companion: "rogue",
+      pagePath: pathname || "/",
     },
     onError: () => {
       // Never re-ask for a name when session already has one; prefer chip-aware sim.
@@ -407,9 +416,16 @@ export default function HomepageChatBubble() {
   function chatRequestOptions() {
     const name = clientFirstNameRef.current || clientFirstName;
     const role = userTypeRef.current || userType || "Guest Pet Parent";
+    const pagePath =
+      pathname ||
+      (typeof window !== "undefined"
+        ? `${window.location.pathname}${window.location.search}`
+        : "/");
     return {
       body: {
         channel: "HOMEPAGE_LEAD",
+        companion: "rogue",
+        pagePath,
         client_first_name: name || undefined,
         user_role: role,
         user_type: role,

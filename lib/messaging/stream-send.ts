@@ -126,6 +126,7 @@ async function recordChatInsight(
   text: string,
   channel: "ACTIVE_WALK" | "HOMEPAGE_LEAD",
   category = "General Inquiry",
+  meta?: { companion?: string | null; pagePath?: string | null },
 ) {
   const clean = String(text || "").trim().slice(0, 2000);
   if (clean.length < 8) return;
@@ -138,6 +139,10 @@ async function recordChatInsight(
       p_category: category,
       p_channel: channel,
       p_is_friction: false,
+      p_companion: meta?.companion || (channel === "ACTIVE_WALK" ? "rogue" : "rogue"),
+      p_page_path:
+        meta?.pagePath ||
+        (channel === "ACTIVE_WALK" ? "/pawreport" : "/"),
     });
   } catch (error) {
     console.error("[stream-send] insight soft-failed:", error);
@@ -183,11 +188,20 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       user_type?: string;
       userRole?: string;
       channel?: string;
+      companion?: string;
+      pagePath?: string;
+      page_path?: string;
     };
 
     const messages = Array.isArray(body?.messages) ? body.messages : [];
     const walkId = safeString(body?.walkId);
     const conversationId = safeString(body?.conversationId);
+    const companionKey = safeString(body?.companion) || "rogue";
+    const pagePath =
+      safeString(body?.pagePath) ||
+      safeString(body?.page_path) ||
+      (walkId ? "/pawreport" : "/");
+    const insightMeta = { companion: companionKey, pagePath };
     const clientFirstNameRaw = sanitizePreferredName(
       body?.client_first_name,
     ).slice(0, 40);
@@ -234,6 +248,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       formatTranscript(messages, clientFirstName),
       insightChannel,
       clientFirstName ? `Lead:${clientFirstName}` : "Homepage Chat Transcript",
+      insightMeta,
     );
 
     if (conversationId && userId && lastUserText) {
@@ -257,7 +272,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     }
 
     if (lastUserText) {
-      void recordChatInsight(lastUserText, insightChannel);
+      void recordChatInsight(lastUserText, insightChannel, "General Inquiry", insightMeta);
     }
 
     const systemPrompt = buildRogueSystemPrompt({
@@ -292,6 +307,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
               clientFirstName
                 ? `Lead:${clientFirstName}`
                 : "Homepage Chat Transcript",
+              insightMeta,
             );
 
             if (!assistantText) return;

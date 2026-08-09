@@ -286,6 +286,9 @@ export async function POST(req: Request) {
       guruEmail?: string | null;
       surface?: string;
       mode?: string;
+      companion?: string;
+      pagePath?: string;
+      page_path?: string;
     };
 
     const officerRaw = asString(body?.officer || body?.officerId).toLowerCase();
@@ -300,6 +303,11 @@ export async function POST(req: Request) {
     }
     const officer: GuestOfficerId = officerRaw;
     let surface = normalizeOfficerSurface(body?.surface || body?.mode);
+    const pagePath =
+      asString(body?.pagePath) ||
+      asString(body?.page_path) ||
+      (officer === "scout" ? "/become-a-guru" : "/ambassadors");
+    const companionKey = asString(body?.companion) || officer;
     const bodyGuruName = asString(body?.guruName);
     const bodyGuruEmail = asString(body?.guruEmail);
 
@@ -360,6 +368,22 @@ export async function POST(req: Request) {
 
     const lastUserText = messageContent(messages[messages.length - 1]);
     const preset = asString(body?.preset);
+
+    if (lastUserText) {
+      try {
+        const { recordGlobalChatInsightAsync } = await import(
+          "@/lib/chat/insights"
+        );
+        recordGlobalChatInsightAsync({
+          text: lastUserText,
+          channel: "HOMEPAGE_LEAD",
+          companion: companionKey,
+          pagePath,
+        });
+      } catch {
+        /* soft-fail */
+      }
+    }
 
     // Taco: always embed the Ambassador promo video + role description for
     // "what do Ambassadors do?" style asks (public marketing or dashboard).

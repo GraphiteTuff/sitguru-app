@@ -231,6 +231,8 @@ export default function AITacoCompanion({
 
   const requestBody = {
     officer: "taco" as const,
+    companion: "taco" as const,
+    pagePath: pathname || (isOnboarding ? "/ambassadors" : "/ambassador/dashboard"),
     surface: isOnboarding ? ("public" as const) : ("dashboard" as const),
     ...(!isOnboarding && accessToken ? { accessToken } : {}),
   };
