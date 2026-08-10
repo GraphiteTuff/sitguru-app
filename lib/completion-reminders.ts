@@ -798,8 +798,8 @@ async function buildCompletionSnapshot(
       (await hasAvailabilityRecord(userId, workspace));
     const hasPayout = hasPayoutReadySignal(profile, workspace);
 
-    if (!zipCode) missingFields.push("service ZIP code");
-    if (!city || !state) missingFields.push("service city and state");
+    if (!zipCode) missingFields.push("service area");
+    else if (!city || !state) missingFields.push("service area");
     if (!hasPhoto(profile) && !hasPhoto(workspace)) {
       missingFields.push("profile photo");
     }
@@ -811,12 +811,15 @@ async function buildCompletionSnapshot(
       missingFields.push("bio or about section");
     }
 
-    if (services.length === 0 && !hasServiceRows) {
-      missingFields.push("at least one service");
-    }
+    const needsServices = services.length === 0 && !hasServiceRows;
+    const needsRates = !hasRates;
 
-    if (!hasRates) {
-      missingFields.push("pricing for at least one service");
+    if (needsServices && needsRates) {
+      missingFields.push("services and pricing");
+    } else if (needsServices) {
+      missingFields.push("services");
+    } else if (needsRates) {
+      missingFields.push("pricing");
     }
 
     if (!hasAvailability) {
@@ -824,7 +827,7 @@ async function buildCompletionSnapshot(
     }
 
     if (!hasPayout) {
-      missingFields.push("connect Stripe or PayPal for payouts");
+      missingFields.push("payout setup");
     }
   }
 
@@ -927,8 +930,13 @@ async function isAutomationEnabled() {
 }
 
 function buildMessage(snapshot: CompletionSnapshot, stage: ReminderStage) {
-  const label = roleLabel(snapshot.role);
   const firstName = snapshot.firstName || "there";
+  const dashboardButtonLabel =
+    snapshot.role === "guru"
+      ? "Open my Guru dashboard"
+      : snapshot.role === "ambassador"
+        ? "Open my Ambassador dashboard"
+        : "Open my dashboard";
   const missing = snapshot.missingFields;
   const missingPreview = missing.slice(0, 4);
   const missingText = missingPreview.length
@@ -946,57 +954,59 @@ function buildMessage(snapshot: CompletionSnapshot, stage: ReminderStage) {
     }
   > = {
     account_ready: {
-      subject: `${firstName}, your SitGuru space is ready 🐾`,
+      subject: "Your SitGuru space is ready",
       headline: "Your SitGuru space is ready",
       intro:
-        `Hey ${firstName} — your SitGuru ${label} account is set up and your progress is saved. ` +
-        "Take your time, add the rest when it works for you, and know that we’re here whenever you need a hand.",
-      buttonLabel: "Keep building my profile",
+        `Welcome to SitGuru! Your account is ready, and your progress is saved. ` +
+        "You’re only a few quick steps away from finishing your profile. " +
+        "Finish whenever you’re ready — we’ll keep everything saved for you.",
+      buttonLabel: "Continue setting up my profile",
       smsLead: `Hey ${firstName} 👋 Your SitGuru account is ready`,
     },
     one_hour: {
-      subject: `Quick check-in, ${firstName} 👋`,
+      subject: "You’re off to a great start",
       headline: "You’re off to a great start",
       intro:
-        `Just a smooth little check-in, ${firstName}. Your SitGuru progress is saved, so there’s no rush. ` +
-        "Pick up where you left off whenever you have a minute.",
-      buttonLabel: "Pick up where I left off",
-      smsLead: `Hey ${firstName} — quick SitGuru check-in`,
+        `Your SitGuru progress is saved. You’re almost there! ` +
+        "A few details are still needed, and it should only take a few minutes to finish.",
+      buttonLabel: "Continue setting up my profile",
+      smsLead: `Hey ${firstName} 🐾 Your SitGuru profile is coming together`,
     },
     one_day: {
-      subject: `${firstName}, your SitGuru profile is coming together`,
+      subject: "Let’s keep the good momentum going",
       headline: "Let’s keep the good momentum going",
       intro:
-        `Hey ${firstName}, your profile is already taking shape. A few quick updates can help you get closer to being ready for bookings. ` +
-        "No pressure — we saved everything for you.",
+        `You’re almost there! A few details are still needed before your profile can be reviewed and made bookable. ` +
+        "Your progress is saved, and it should only take a few minutes to finish.",
       buttonLabel: "Continue my setup",
       smsLead: `Hey ${firstName} 🐾 Your SitGuru profile is coming together`,
     },
     three_days: {
-      subject: `Your SitGuru profile is waiting for you 🐾`,
+      subject: "Your progress is still right where you left it",
       headline: "Your progress is still right where you left it",
       intro:
-        `Hey ${firstName}, we kept your spot warm. Your progress is saved and you can jump back in anytime. ` +
-        "We’ll be right here if anything feels confusing or gets in your way.",
-      buttonLabel: "Jump back in",
-      smsLead: `Hey ${firstName} 👋 We saved your SitGuru progress`,
+        `Your progress is still saved and waiting for you. Jump back in anytime — ` +
+        "there’s no pressure, and we’re here if you need a hand.",
+      buttonLabel: "Continue my setup",
+      smsLead: `Hey ${firstName} — friendly SitGuru nudge`,
     },
     seven_days: {
-      subject: `${firstName}, your SitGuru profile is still here`,
+      subject: "No rush — your profile is still waiting",
       headline: "No rush — your profile is still waiting",
       intro:
-        `Hey ${firstName}, just your friendly SitGuru nudge. Your profile is safe, your progress is saved, and you can finish whenever the timing feels right. ` +
-        "These reminders stop automatically once your setup is complete.",
-      buttonLabel: "Finish when I’m ready",
+        `No rush — your profile is still waiting and your progress is saved. ` +
+        "Finish whenever the timing feels right. These reminders stop automatically once your setup is complete.",
+      buttonLabel: "Continue my setup",
       smsLead: `Hey ${firstName} — friendly SitGuru nudge`,
     },
     account_live: {
-      subject: `${firstName}, you’re live on SitGuru 🎉`,
+      subject: "You did it — you’re live",
       headline: "You did it — you’re live",
       intro:
-        `Big moment, ${firstName} — your SitGuru ${label} profile is live. Keep your services, pricing, and availability fresh, ` +
-        "and remember that the SitGuru team is here whenever you need support.",
-      buttonLabel: "Open my SitGuru dashboard",
+        `Your SitGuru profile is now live! Pet Parents can discover your profile and request care. ` +
+        "You can manage your services, availability, bookings, and earnings from your dashboard. " +
+        "Welcome to the SitGuru community!",
+      buttonLabel: dashboardButtonLabel,
       smsLead: `You did it, ${firstName} 🎉 Your SitGuru profile is live`,
     },
   };
@@ -1005,49 +1015,44 @@ function buildMessage(snapshot: CompletionSnapshot, stage: ReminderStage) {
   const isLiveNotice = stage === "account_live";
   const isComplete = missing.length === 0;
 
-  const friendlyMissingText = isComplete
-    ? "You’re all caught up — nice work."
-    : missing.length <= 4
-      ? `A few things to finish: ${missing.join(", ")}.`
-      : `A few things to finish: ${missingPreview.join(", ")}, and ${
-          missing.length - missingPreview.length
-        } more.`;
-
   const text = [
-    `Hey ${firstName},`,
+    `Hey ${firstName} 👋`,
     "",
     copy.intro,
     "",
-    friendlyMissingText,
+    isLiveNotice
+      ? ""
+      : isComplete
+        ? "You’re all caught up — nice work."
+        : missingPreview.map((field) => `• ${field}`).join("\n"),
     "",
-    `${isLiveNotice ? "Open your dashboard" : "Continue your setup"}: ${
+    `${isLiveNotice ? dashboardButtonLabel : "Continue my setup"}: ${
       isLiveNotice ? snapshot.dashboardLink : snapshot.completionLink
     }`,
-    snapshot.referralCode ? `Your referral code: ${snapshot.referralCode}` : "",
     "",
-    "Need a hand? We’re here for you. Reach us anytime at " + SUPPORT_EMAIL + ".",
-    "",
-    "Talk soon,",
+    "Need a hand? We’re here.",
     "The SitGuru Team",
   ]
-    .filter(Boolean)
-    .join("\n");
+    .filter((line) => line !== undefined)
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n");
 
-  const missingList = isComplete
-    ? `<div style="margin-top:18px;border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:18px;padding:16px 18px;font-weight:800;">You’re all caught up — nice work.</div>`
-    : `<div style="margin-top:20px;border:1px solid #dbe8d5;background:#f8fcf9;border-radius:20px;padding:18px;">
-        <div style="font-size:12px;font-weight:900;letter-spacing:1.3px;text-transform:uppercase;color:#087449;">Your next easy wins</div>
+  const missingList = isLiveNotice
+    ? ""
+    : isComplete
+      ? `<div style="margin-top:18px;border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:18px;padding:16px 18px;font-weight:800;">You’re all caught up — nice work.</div>`
+      : `<div style="margin-top:20px;border:1px solid #dbe8d5;background:#f8fcf9;border-radius:20px;padding:18px;">
+        <div style="font-size:12px;font-weight:900;letter-spacing:1.3px;text-transform:uppercase;color:#087449;">Still needed</div>
         <ul style="margin:12px 0 0 0;padding-left:22px;color:#334155;line-height:1.85;">
-          ${missing
-            .slice(0, 6)
+          ${missingPreview
             .map((field) => `<li>${escapeHtml(field)}</li>`)
             .join("")}
         </ul>
         ${
-          missing.length > 6
-            ? `<div style="margin-top:8px;font-size:13px;color:#64748b;">Plus ${missing.length - 6} more item${
-                missing.length - 6 === 1 ? "" : "s"
-              } inside your dashboard.</div>`
+          missing.length > missingPreview.length
+            ? `<div style="margin-top:8px;font-size:13px;color:#64748b;">Plus ${
+                missing.length - missingPreview.length
+              } more inside your dashboard.</div>`
             : ""
         }
       </div>`;
@@ -1066,7 +1071,7 @@ function buildMessage(snapshot: CompletionSnapshot, stage: ReminderStage) {
             <tr>
               <td style="background:linear-gradient(135deg,#087449 0%,#0d9360 58%,#18b77d 100%);padding:30px;color:#ffffff;">
                 <div style="font-size:12px;font-weight:900;letter-spacing:1.7px;text-transform:uppercase;opacity:.86;">SitGuru.com</div>
-                <h1 style="margin:11px 0 0 0;font-size:31px;line-height:1.16;">${escapeHtml(
+                <h1 style="margin:11px 0 0 0;font-size:31px;line-height:1.16;color:#ffffff !important;">${escapeHtml(
                   copy.headline,
                 )}</h1>
               </td>
@@ -1077,7 +1082,7 @@ function buildMessage(snapshot: CompletionSnapshot, stage: ReminderStage) {
                   firstName,
                 )} 👋</p>
                 <p style="margin:14px 0 0 0;font-size:16px;line-height:1.75;color:#475569;">${escapeHtml(
-                  copy.intro.replace(`Hey ${firstName} — `, "").replace(`Hey ${firstName}, `, ""),
+                  copy.intro,
                 )}</p>
 
                 ${missingList}
@@ -1090,28 +1095,11 @@ function buildMessage(snapshot: CompletionSnapshot, stage: ReminderStage) {
                   )}</a>
                 </div>
 
-                ${
-                  snapshot.referralCode
-                    ? `<div style="margin-top:18px;background:#f0f7ed;border:1px solid #dbe8d5;border-radius:18px;padding:16px;"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:#64748b;font-weight:900;">Your referral code</div><div style="margin-top:6px;font-size:18px;font-weight:900;color:#087449;word-break:break-word;">${escapeHtml(
-                        snapshot.referralCode,
-                      )}</div></div>`
-                    : ""
-                }
-
                 <div style="margin-top:24px;border-radius:18px;background:#f8fafc;padding:16px 18px;color:#64748b;font-size:14px;line-height:1.7;">
-                  Need a hand? We’re here for you — every step of the way. Reach us anytime at
-                  <a href="mailto:${escapeHtml(
-                    SUPPORT_EMAIL,
-                  )}" style="color:#087449;font-weight:800;text-decoration:none;">${escapeHtml(
-                    SUPPORT_EMAIL,
-                  )}</a>.
+                  Need a hand? We’re here.
                 </div>
 
-                ${
-                  stage === "seven_days"
-                    ? `<p style="margin:18px 0 0 0;font-size:13px;line-height:1.6;color:#94a3b8;text-align:center;">Your progress stays saved, and these reminders stop automatically once your setup is complete.</p>`
-                    : ""
-                }
+                <p style="margin:18px 0 0 0;font-size:14px;line-height:1.6;color:#475569;font-weight:700;">The SitGuru Team</p>
               </td>
             </tr>
             <tr>
@@ -1126,15 +1114,9 @@ function buildMessage(snapshot: CompletionSnapshot, stage: ReminderStage) {
   </body>
 </html>`;
 
-  const smsStatus = isLiveNotice
-    ? "Open your dashboard"
-    : isComplete
-      ? "You’re all caught up"
-      : `Next up: ${missingText}`;
-
-  const sms = `${copy.smsLead}. ${smsStatus}. ${
-    isLiveNotice ? snapshot.dashboardLink : snapshot.completionLink
-  } Need a hand? We’re here. Reply STOP to opt out.`;
+  const sms = isLiveNotice
+    ? `${copy.smsLead}. Open your dashboard: ${snapshot.dashboardLink} Need a hand? We’re here. Reply STOP to opt out.`
+    : `${copy.smsLead}. Next up: ${missingText}. Continue here: ${snapshot.completionLink} Need a hand? We’re here. Reply STOP to opt out.`;
 
   return {
     subject: copy.subject,
@@ -1515,12 +1497,14 @@ async function processQueueRow(row: ReminderQueueRow) {
 
   const message = buildMessage(snapshot, row.stage);
   const deliveries: DeliveryResult[] = [];
+  // Approved reminder rules: email when an email is available; SMS when phone
+  // + consent exist. Do not require both channels.
   const emailEnabled =
-    snapshot.emailVerified &&
+    isValidEmail(snapshot.email) &&
     preferences.email_enabled !== false &&
     !preferences.email_opted_out_at;
   const smsEnabled =
-    snapshot.phoneVerified &&
+    Boolean(snapshot.phone) &&
     (preferences.sms_enabled === true || snapshot.smsConsent) &&
     Boolean(preferences.sms_consent_at || snapshot.smsConsentAt || snapshot.smsConsent) &&
     !preferences.sms_opted_out_at;
