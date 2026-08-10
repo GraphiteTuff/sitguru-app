@@ -89,6 +89,13 @@ function formatUpdated(value: string) {
   });
 }
 
+function compactQuestion(text: string, max = 160) {
+  const value = String(text || "").replace(/\s+/g, " ").trim();
+  if (!value) return "—";
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 1)}…`;
+}
+
 function resolveRowProvenance(row: GlobalInsightRow) {
   const companionHits = parseHitMap(row.companion_hits);
   const pageHits = parseHitMap(row.page_hits);
@@ -155,20 +162,20 @@ function ProvenanceBlock({ row }: { row: GlobalInsightRow }) {
   );
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <div className="flex items-center gap-2.5">
-        <CompanionAvatar companionKey={provenance.companionKey} />
+        <CompanionAvatar companionKey={provenance.companionKey} size={32} />
         <div className="min-w-0">
-          <p className="text-sm font-bold text-slate-900">
+          <p className="truncate text-sm font-bold text-slate-900">
             {provenance.companionMeta.label}
           </p>
-          <p className="text-xs leading-5 text-slate-500">
+          <p className="truncate text-xs leading-5 text-slate-500">
             {provenance.companionMeta.title}
           </p>
         </div>
       </div>
       {extras.length > 0 ? (
-        <p className="text-xs leading-5 text-slate-500">
+        <p className="line-clamp-2 text-xs leading-5 text-slate-500">
           Also asked via{" "}
           {extras
             .map((hit) => {
@@ -178,23 +185,24 @@ function ProvenanceBlock({ row }: { row: GlobalInsightRow }) {
             .join(", ")}
         </p>
       ) : null}
-      <div className="space-y-1">
+      <div className="min-w-0 space-y-1">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
           Source page
         </p>
         <Link
           href={provenance.pagePath || "/"}
-          className="inline-flex max-w-full break-all text-sm font-semibold text-[#0D5C3A] underline-offset-2 hover:underline"
+          className="block truncate text-sm font-semibold text-[#0D5C3A] underline-offset-2 hover:underline"
           target="_blank"
           rel="noreferrer"
+          title={pageLabel(provenance.pagePath)}
         >
           {pageLabel(provenance.pagePath)}
         </Link>
         {provenance.pageHits.length > 1 ? (
-          <p className="text-xs leading-5 text-slate-500">
+          <p className="line-clamp-2 text-xs leading-5 text-slate-500">
             Also seen on{" "}
             {provenance.pageHits
-              .slice(1, 4)
+              .slice(1, 3)
               .map((hit) => `${hit.key} (${hit.count}×)`)
               .join(", ")}
           </p>
@@ -372,11 +380,11 @@ export default function ChatInsightsPanel({
   }
 
   return (
-    <section className="space-y-5">
-      <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-1">
-            <h2 className="text-xl font-black tracking-tight text-slate-950">
+    <section className="min-w-0 space-y-4 sm:space-y-5">
+      <div className="rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0 space-y-1">
+            <h2 className="text-lg font-black tracking-tight text-slate-950 sm:text-xl">
               Question ledger
             </h2>
             <p className="text-sm leading-6 text-slate-600">
@@ -395,21 +403,23 @@ export default function ChatInsightsPanel({
             </p>
           </div>
 
-          <label className="relative block w-full max-w-md">
+          <label className="relative block w-full max-w-none lg:max-w-md">
             <span className="sr-only">Search questions</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search questions, Rogue, Scout, Taco, or pages…"
+              placeholder="Search Rogue, Scout, Taco, pages…"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#0D5C3A] focus:bg-white focus:ring-2 focus:ring-emerald-100"
             />
           </label>
         </div>
 
         <div className="mt-4 space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-slate-500">Avatar</span>
+          <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <span className="shrink-0 text-sm font-medium text-slate-500">
+              Avatar
+            </span>
             {COMPANION_FILTERS.map((item) => {
               const active = companion === item.key;
               const meta =
@@ -419,7 +429,7 @@ export default function ChatInsightsPanel({
                   key={item.key}
                   type="button"
                   onClick={() => setCompanion(item.key)}
-                  className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+                  className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition ${
                     active
                       ? "bg-[#0D5C3A] text-white"
                       : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -443,55 +453,57 @@ export default function ChatInsightsPanel({
             })}
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                ["ALL", "All channels"],
-                ["HOMEPAGE_LEAD", "Homepage"],
-                ["ACTIVE_WALK", "Live walk"],
-                ["ADMIN_SUPPORT", "Admin support"],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setChannel(key)}
-                className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${
-                  channel === key
-                    ? "bg-[#0D5C3A] text-white"
-                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {(
+                [
+                  ["ALL", "All channels"],
+                  ["HOMEPAGE_LEAD", "Homepage"],
+                  ["ACTIVE_WALK", "Live walk"],
+                  ["ADMIN_SUPPORT", "Admin support"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setChannel(key)}
+                  className={`shrink-0 rounded-full px-3 py-2 text-sm font-semibold transition ${
+                    channel === key
+                      ? "bg-[#0D5C3A] text-white"
+                      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-slate-500">Sort by</span>
-            {(
-              [
-                ["tally", "Most asked"],
-                ["topic", "Topic"],
-                ["recent", "Recent"],
-                ["question", "A–Z"],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setSortKey(key)}
-                className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-                  sortKey === key
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+            <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <span className="shrink-0 text-sm font-medium text-slate-500">
+                Sort
+              </span>
+              {(
+                [
+                  ["tally", "Most asked"],
+                  ["topic", "Topic"],
+                  ["recent", "Recent"],
+                  ["question", "A–Z"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSortKey(key)}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+                    sortKey === key
+                      ? "bg-slate-900 text-white"
+                      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -509,8 +521,11 @@ export default function ChatInsightsPanel({
               className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
-                <p className="text-base font-semibold leading-7 text-slate-900">
-                  {row.core_question_summary}
+                <p
+                  className="min-w-0 text-[15px] font-semibold leading-6 text-slate-900 line-clamp-4"
+                  title={row.core_question_summary}
+                >
+                  {compactQuestion(row.core_question_summary, 220)}
                 </p>
                 <p className="shrink-0 rounded-xl bg-emerald-50 px-2.5 py-1 text-lg font-black tabular-nums text-[#0D5C3A]">
                   {row.frequency_tally_count}×
@@ -567,18 +582,18 @@ export default function ChatInsightsPanel({
       </div>
 
       {/* Desktop table */}
-      <div className="hidden overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm lg:block">
-        <div className="max-h-[70vh] overflow-auto">
-          <table className="min-w-full text-left">
+      <div className="hidden min-w-0 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm lg:block">
+        <div className="max-h-[min(70vh,52rem)] overflow-auto">
+          <table className="w-full min-w-[64rem] table-fixed text-left">
             <thead className="sticky top-0 z-10 border-b border-emerald-100 bg-[#f3faf6]">
               <tr className="text-sm font-semibold text-emerald-950">
-                <th className="px-5 py-3.5 font-semibold">Question</th>
-                <th className="px-4 py-3.5 font-semibold">Avatar & page</th>
-                <th className="px-4 py-3.5 font-semibold">Topic</th>
-                <th className="px-4 py-3.5 font-semibold">Channel</th>
-                <th className="px-4 py-3.5 font-semibold">Asked</th>
-                <th className="px-4 py-3.5 font-semibold">Updated</th>
-                <th className="px-5 py-3.5 font-semibold">Action</th>
+                <th className="w-[34%] px-5 py-3.5 font-semibold">Question</th>
+                <th className="w-[22%] px-4 py-3.5 font-semibold">Avatar & page</th>
+                <th className="w-[14%] px-4 py-3.5 font-semibold">Topic</th>
+                <th className="w-[10%] px-4 py-3.5 font-semibold">Channel</th>
+                <th className="w-[6%] px-4 py-3.5 font-semibold">Asked</th>
+                <th className="w-[8%] px-4 py-3.5 font-semibold">Updated</th>
+                <th className="w-[12%] px-5 py-3.5 font-semibold">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -599,9 +614,12 @@ export default function ChatInsightsPanel({
                       index % 2 === 0 ? "bg-white" : "bg-slate-50/60"
                     } hover:bg-emerald-50/50`}
                   >
-                    <td className="max-w-xl px-5 py-4">
-                      <p className="text-[15px] font-medium leading-7 text-slate-900">
-                        {row.core_question_summary}
+                    <td className="max-w-md px-5 py-4">
+                      <p
+                        className="text-[15px] font-medium leading-6 text-slate-900 line-clamp-3"
+                        title={row.core_question_summary}
+                      >
+                        {compactQuestion(row.core_question_summary, 180)}
                       </p>
                       {row.is_friction_flag ? (
                         <span className="mt-2 inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-700">
@@ -609,7 +627,7 @@ export default function ChatInsightsPanel({
                         </span>
                       ) : null}
                     </td>
-                    <td className="min-w-[14rem] px-4 py-4">
+                    <td className="w-[13.5rem] max-w-[13.5rem] px-4 py-4">
                       <ProvenanceBlock row={row} />
                     </td>
                     <td className="px-4 py-4">
