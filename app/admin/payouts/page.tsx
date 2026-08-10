@@ -20,6 +20,9 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
 import PayoutReleaseButton from "@/app/admin/payouts/PayoutReleaseButton";
+import CreateManualGuruPayoutForm, {
+  type ManualPayoutGuruOption,
+} from "@/app/admin/payouts/CreateManualGuruPayoutForm";
 
 export const dynamic = "force-dynamic";
 
@@ -342,6 +345,29 @@ function dedupeRows(rows: PayoutQueueRow[]) {
   return Array.from(map.values());
 }
 
+async function getManualPayoutGuruOptions(): Promise<ManualPayoutGuruOption[]> {
+  const guruRows = await safeSelect("gurus", "*", 2000);
+
+  return guruRows
+    .map((row) => {
+      const id = getFirst(row, ["id", "guru_id", "user_id"]);
+      if (!id) return null;
+
+      return {
+        id,
+        name: getFirst(row, ["display_name", "full_name", "name"], "Guru"),
+        email: getFirst(row, ["email"], ""),
+        stripeAccountId: getFirst(row, [
+          "stripe_account_id",
+          "stripe_connect_account_id",
+          "connected_account_id",
+        ]),
+      } satisfies ManualPayoutGuruOption;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a!.name.localeCompare(b!.name)) as ManualPayoutGuruOption[];
+}
+
 async function getPayoutRows() {
   const [
     bookingRows,
@@ -356,6 +382,7 @@ async function getPayoutRows() {
     referralRewardRows,
     stripeTransferRows,
     stripePayoutRows,
+    guruRows,
   ] = await Promise.all([
     safeSelect("bookings"),
     safeSelect("booking_payments", "*", 5000),
@@ -369,6 +396,7 @@ async function getPayoutRows() {
     safeSelect("admin_referral_reward_liability"),
     safeSelect("stripe_transfers"),
     safeSelect("stripe_payouts"),
+    safeSelect("gurus", "*", 2000),
   ]);
 
   const bookingPaymentsByBooking = new Map<string, SafeRow>();
@@ -379,10 +407,39 @@ async function getPayoutRows() {
     }
   }
 
+  const gurusById = new Map<string, SafeRow>();
+  for (const row of guruRows) {
+    const id = getFirst(row, ["id"]);
+    const userId = getFirst(row, ["user_id"]);
+    if (id) gurusById.set(id, row);
+    if (userId) gurusById.set(userId, row);
+  }
+
+  const enrichedGuruPayoutRows = guruPayoutRows.map((row) => {
+    const guruId = getFirst(row, ["guru_id", "user_id"]);
+    const guru = gurusById.get(guruId);
+    if (!guru) return row;
+
+    return {
+      ...row,
+      guru_name: getFirst(guru, ["display_name", "full_name", "name"], "Guru"),
+      guru_email: getFirst(guru, ["email"], ""),
+      recipient_name: getFirst(guru, ["display_name", "full_name", "name"], "Guru"),
+      recipient_email: getFirst(guru, ["email"], ""),
+      name: getFirst(guru, ["display_name", "full_name", "name"], "Guru"),
+      email: getFirst(guru, ["email"], ""),
+      notes: getFirst(
+        row,
+        ["notes", "memo", "description"],
+        "Manual or ledger Guru payout from guru_payouts.",
+      ),
+    };
+  });
+
   return {
     rows: dedupeRows([
       ...mapBookingRows(bookingRows, bookingPaymentsByBooking),
-      ...mapGenericRows(guruPayoutRows, "Guru", "Guru payouts", "guru_payouts", {
+      ...mapGenericRows(enrichedGuruPayoutRows, "Guru", "Guru payouts", "guru_payouts", {
         canRelease: true,
       }),
       ...mapGenericRows(partnerPayoutRows, "Partner", "Partner commissions", "partner_payouts"),
@@ -564,12 +621,17 @@ export default async function AdminPayoutsPage() {
   }
 
   const { rows, sourceCounts } = await getPayoutRows();
+  const manualPayoutGurus = await getManualPayoutGuruOptions();
   const summary = buildSummary(rows);
   const pendingRows = rows.filter((row) => ["ready", "pending", "processing", "scheduled"].includes(row.status));
   const reviewRows = rows.filter((row) => row.status === "review" || row.status === "failed");
   const referralRows = rows.filter((row) => row.source === "Referral" || row.source === "PawPerks");
   const releasableRows = pendingRows.filter((row) => row.canRelease);
   const recentRows = rows.slice(0, 12);
+  const crystalOption =
+    manualPayoutGurus.find((guru) =>
+      /crystal/i.test(`${guru.name} ${guru.email}`),
+    ) || null;
 
   return (
     <main className="min-h-screen bg-[#f7fbf8] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
@@ -684,6 +746,14 @@ export default async function AdminPayoutsPage() {
           <StatCard label="Failed" value={String(summary.failedCount)} helper="Exception queue" icon={<AlertTriangle className="h-6 w-6" />} tone="rose" />
           <StatCard label="Referral Rewards" value={formatCurrency(summary.referralRewardAmount)} helper={`${summary.referralRewardCount} reward row(s)`} icon={<Gift className="h-6 w-6" />} tone="purple" />
         </section>
+
+        <CreateManualGuruPayoutForm
+          gurus={manualPayoutGurus}
+          defaultGuruId={crystalOption?.id || ""}
+          defaultAmount={25}
+          defaultType="Welcome / Thank-You Bonus"
+          defaultReason="Thank you for joining SitGuru!"
+        />
 
         <section className="grid gap-5 xl:grid-cols-[1fr_0.85fr]">
           <div className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm lg:p-8">
