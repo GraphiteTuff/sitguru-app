@@ -45,12 +45,18 @@ function str(row: Row, keys: string[]) {
   for (const key of keys) {
     const value = row?.[key];
     if (typeof value === "string" && value.trim()) return value.trim();
+    // Numeric DB columns (e.g. hourly_rate) arrive as numbers from PostgREST.
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
   }
   return "";
 }
 
 function bool(row: Row, keys: string[]) {
   return keys.some((key) => row?.[key] === true || row?.[key] === "true");
+}
+
+function hasRate(row: Row) {
+  return Boolean(str(row, ["hourly_rate", "rate", "price", "base_rate", "daily_rate"]));
 }
 
 function truthyStatus(row: Row, keys: string[], accepted: string[]) {
@@ -112,8 +118,8 @@ export function validateGuruProfileForBookability({
   if (!realName(name)) missing.push("real display name");
   if (!realLocation(location)) missing.push("location or service area");
   if (!hasArray(guru, ["services", "service_types", "services_offered"]) && !str(guru, ["service", "service_name", "specialty"])) missing.push("services offered");
-  if (!str(guru, ["hourly_rate", "rate", "price", "base_rate", "daily_rate"])) missing.push("rates/pricing");
-  if (!bool(guru, ["has_availability", "availability_enabled", "is_accepting_bookings", "accepting_bookings"]) && !str(guru, ["availability", "availability_status", "schedule"])) missing.push("availability");
+  if (!hasRate(guru)) missing.push("rates/pricing");
+  if (!bool(guru, ["has_availability", "availability_enabled", "is_accepting_bookings", "accepting_bookings"]) && !str(guru, ["availability", "availability_status", "schedule", "availability_notes"])) missing.push("availability");
   if (!str(guru, ["bio", "about", "description"]) && !str(profile, ["bio", "about", "description"])) missing.push("bio/about");
   if (!str(guru, ["avatar_url", "profile_photo_url", "photo_url", "image_url", "headshot_url"]) && !str(profile, ["avatar_url", "profile_photo_url", "photo_url", "image_url"])) missing.push("profile photo");
   if (role && role !== "guru") missing.push("active Guru role");

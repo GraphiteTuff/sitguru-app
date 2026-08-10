@@ -436,14 +436,18 @@ function isBookableSearchGuru(guru: GuruRow) {
 
   if (!isPublicSearchGuru(guru)) return false;
   if (isPlaceholderSearchGuru(guru)) return false;
-  if (bookingStatus === "listed_only" || bookingStatus === "not_listed") return false;
   if (adminStatus === "placeholder" || qualityStatus === "placeholder") return false;
-  if (hasExplicitFalse(guru.is_bookable)) return false;
   if (hasExplicitFalse(guru.is_accepting_bookings)) return false;
   if (hasExplicitFalse(guru.accepting_bookings)) return false;
 
+  // Admin/is_bookable is authoritative. Do not let a stale listed_only status
+  // (or profiles-merge residue) block an explicitly bookable Guru.
+  if (guru.is_bookable === true) return true;
+
+  if (hasExplicitFalse(guru.is_bookable)) return false;
+  if (bookingStatus === "listed_only" || bookingStatus === "not_listed") return false;
+
   return (
-    guru.is_bookable === true ||
     hasPositiveValue(guru.is_accepting_bookings) ||
     hasPositiveValue(guru.accepting_bookings) ||
     bookingStatus === "bookable" ||
@@ -711,9 +715,26 @@ function chooseBookingSafetyBoolean(
   primary: unknown,
   secondary: unknown,
 ): boolean | null | undefined {
-  if (primary === false || secondary === false) return false;
+  // Prefer true when merging duplicate search sources. Profiles often default
+  // is_bookable=false and previously poisoned gurus.is_bookable=true.
   if (primary === true || secondary === true) return true;
+  if (primary === false && secondary === false) return false;
+  if (typeof primary === "boolean") return primary;
+  if (typeof secondary === "boolean") return secondary;
   return undefined;
+}
+
+function chooseBookingStatusValue(primary: unknown, secondary: unknown) {
+  const rank = (value: unknown) => {
+    const status = normalizeStatus(value);
+    if (status === "bookable") return 4;
+    if (status === "requestable") return 3;
+    if (status === "listed_only") return 2;
+    if (status === "not_listed") return 1;
+    return 0;
+  };
+
+  return rank(primary) >= rank(secondary) ? primary : secondary;
 }
 
 function mergeServices(primary?: string[] | null, secondary?: string[] | null) {
@@ -776,6 +797,27 @@ function mergeDuplicateGuruRows(current: GuruRow, incoming: GuruRow): GuruRow {
       primary.accepting_bookings,
       secondary.accepting_bookings,
     ),
+    booking_status: chooseBookingStatusValue(
+      primary.booking_status,
+      secondary.booking_status,
+    ) as string | null,
+    application_status: chooseTextValue(
+      primary.application_status,
+      secondary.application_status,
+    ) as string | null,
+    status: chooseTextValue(primary.status, secondary.status) as string | null,
+    admin_status: chooseTextValue(
+      primary.admin_status,
+      secondary.admin_status,
+    ) as string | null,
+    public_status: chooseTextValue(
+      primary.public_status,
+      secondary.public_status,
+    ) as string | null,
+    profile_quality_status: chooseTextValue(
+      primary.profile_quality_status,
+      secondary.profile_quality_status,
+    ) as string | null,
     services: mergeServices(primary.services, secondary.services),
   };
 }

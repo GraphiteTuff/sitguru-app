@@ -721,7 +721,18 @@ function buildStatusPayload({
       approved_at: now,
       bookable_at: now,
       admin_notes: note || null,
+      // Keep public/search/profile bookable gates in sync. Frontend treats
+      // booking_status=listed_only as a hard block even when is_bookable=true.
       is_bookable: true,
+      is_public: true,
+      is_public_visible: true,
+      is_active: true,
+      is_accepting_bookings: true,
+      accepting_bookings: true,
+      booking_status: "bookable",
+      admin_status: "approved",
+      public_status: "public",
+      profile_quality_status: "bookable",
     };
   }
 
@@ -1473,6 +1484,37 @@ async function updateGuruStatusAction(formData: FormData) {
         updateError.message || "Unable to update Guru status.",
       )}`,
     );
+  }
+
+  // Keep profiles in sync so public search merges cannot poison gurus.is_bookable.
+  const profileId =
+    asTrimmedString(profile?.id) ||
+    asTrimmedString(guru.user_id) ||
+    asTrimmedString(guru.profile_id);
+
+  if (profileId && action === "bookable") {
+    await updateWithColumnFallback({
+      table: "profiles",
+      idColumn: "id",
+      idValue: profileId,
+      payload: {
+        is_bookable: true,
+        is_public_visible: true,
+        updated_at: new Date().toISOString(),
+      },
+      requiredColumns: [],
+    });
+  } else if (profileId && ["rejected", "suspended", "needs_info"].includes(action)) {
+    await updateWithColumnFallback({
+      table: "profiles",
+      idColumn: "id",
+      idValue: profileId,
+      payload: {
+        is_bookable: false,
+        updated_at: new Date().toISOString(),
+      },
+      requiredColumns: [],
+    });
   }
 
   const emailSent = await sendGuruStatusEmail({

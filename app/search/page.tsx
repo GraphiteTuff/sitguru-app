@@ -695,14 +695,16 @@ function isBookableSearchGuru(guru: GuruRow) {
   if (!isPublicSearchGuru(guru)) return false;
   if (isPlaceholderSearchGuru(guru)) return false;
   if (guru.can_book === false) return false;
-  if (hasExplicitFalse(guru.is_bookable)) return false;
   if (hasExplicitFalse(guru.is_accepting_bookings)) return false;
   if (hasExplicitFalse(guru.accepting_bookings)) return false;
 
+  // Admin/is_bookable is authoritative over stale listed_only status.
+  if (guru.is_bookable === true) return true;
+
+  if (hasExplicitFalse(guru.is_bookable)) return false;
   if (["not_listed", "listed_only"].includes(bookingStatus)) return false;
 
   return (
-    guru.is_bookable === true ||
     hasPositiveValue(guru.is_accepting_bookings) ||
     hasPositiveValue(guru.accepting_bookings) ||
     bookingStatus === "bookable" ||
@@ -1537,9 +1539,28 @@ function chooseBookingSafetyBoolean(
   primary: unknown,
   secondary: unknown,
 ): boolean | null | undefined {
-  if (primary === false || secondary === false) return false;
+  // Prefer true when merging duplicate search sources. Profiles often default
+  // is_bookable=false and previously poisoned gurus.is_bookable=true.
   if (primary === true || secondary === true) return true;
+  if (primary === false && secondary === false) return false;
+  if (typeof primary === "boolean") return primary;
+  if (typeof secondary === "boolean") return secondary;
   return undefined;
+}
+
+function chooseBookingStatusValue(primary: unknown, secondary: unknown) {
+  const rank = (value: unknown) => {
+    const status = String(value || "")
+      .trim()
+      .toLowerCase();
+    if (status === "bookable") return 4;
+    if (status === "requestable") return 3;
+    if (status === "listed_only") return 2;
+    if (status === "not_listed") return 1;
+    return 0;
+  };
+
+  return rank(primary) >= rank(secondary) ? primary : secondary;
 }
 
 function mergeServices(primary?: string[] | null, secondary?: string[] | null) {
@@ -1615,6 +1636,10 @@ function mergeDuplicateGuruRows(current: GuruRow, incoming: GuruRow): GuruRow {
       primary.can_book,
       secondary.can_book,
     ),
+    booking_status: chooseBookingStatusValue(
+      primary.booking_status,
+      secondary.booking_status,
+    ) as string | null,
     is_placeholder: chooseSearchBoolean(
       primary.is_placeholder,
       secondary.is_placeholder,
