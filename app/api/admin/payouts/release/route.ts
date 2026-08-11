@@ -407,7 +407,9 @@ async function createStripeTransfer({
     );
   }
 
-  const idempotencyKey = `sitguru-guru-payout-${payoutId}-${amountCents}`;
+  // Include destination so a retry after fixing the Connect account does not
+  // collide with Stripe's 24h idempotency cache from a prior failed attempt.
+  const idempotencyKey = `sitguru-guru-payout-${payoutId}-${amountCents}-${destination}`;
 
   return stripe.transfers.create(
     {
