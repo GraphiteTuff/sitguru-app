@@ -21,7 +21,8 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
 import PayoutReleaseButton from "@/app/admin/payouts/PayoutReleaseButton";
 import CreateManualGuruPayoutForm, {
-  type ManualPayoutGuruOption,
+  type ManualPayoutRecipientOption,
+  type ManualPayoutType,
 } from "@/app/admin/payouts/CreateManualGuruPayoutForm";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +79,89 @@ function getFirst(row: SafeRow, keys: string[], fallback = "") {
   }
 
   return fallback;
+}
+
+function normalizeLookupId(value: string) {
+  return value.trim().toLowerCase();
+}
+
+type RecipientInfo = {
+  name: string;
+  email: string;
+};
+
+function buildRecipientDirectory(gurus: SafeRow[], profiles: SafeRow[]) {
+  const directory = new Map<string, RecipientInfo>();
+
+  const upsert = (rawId: string, name: string, email: string) => {
+    if (!rawId) return;
+
+    const id = normalizeLookupId(rawId);
+    const existing = directory.get(id);
+    const nextName = name || existing?.name || "";
+    const nextEmail = email || existing?.email || "";
+
+    if (!nextName && !nextEmail) return;
+    directory.set(id, { name: nextName, email: nextEmail });
+  };
+
+  for (const profile of profiles) {
+    upsert(
+      getFirst(profile, ["id", "user_id"]),
+      getFirst(profile, ["full_name", "display_name", "name"]),
+      getFirst(profile, ["email"]),
+    );
+  }
+
+  for (const guru of gurus) {
+    const name = getFirst(guru, ["display_name", "full_name", "name"]);
+    const email = getFirst(guru, ["email"]);
+    upsert(getFirst(guru, ["id"]), name, email);
+    upsert(getFirst(guru, ["user_id"]), name, email);
+    upsert(getFirst(guru, ["profile_id"]), name, email);
+  }
+
+  return directory;
+}
+
+function lookupRecipient(
+  directory: Map<string, RecipientInfo>,
+  row: SafeRow,
+  idKeys: string[],
+) {
+  for (const key of idKeys) {
+    const id = getFirst(row, [key]);
+    if (!id) continue;
+
+    const match = directory.get(normalizeLookupId(id));
+    if (match?.name || match?.email) return match;
+  }
+
+  return null;
+}
+
+function applyRecipientFields(
+  row: SafeRow,
+  directory: Map<string, RecipientInfo>,
+  idKeys: string[],
+): SafeRow {
+  const match = lookupRecipient(directory, row, idKeys);
+  if (!match) return row;
+
+  const name = match.name || "Unknown recipient";
+  const email = match.email || "";
+
+  return {
+    ...row,
+    recipient_name: name,
+    recipient_email: email,
+    guru_name: name,
+    guru_email: email,
+    name,
+    full_name: name,
+    display_name: name,
+    email: email || getFirst(row, ["email"]),
+  };
 }
 
 function getNumber(row: SafeRow, keys: string[], fallback = 0) {
@@ -232,8 +316,8 @@ function mapBookingRows(
         id,
         source: "Guru" as PayoutSource,
         ledgerSource: bookingPayment ? "booking_payments" : "bookings",
-        recipientName: getFirst(row, ["guru_name", "sitter_name", "provider_name"], "Guru payout"),
-        recipientEmail: getFirst(row, ["guru_email", "sitter_email", "provider_email"], "No email on file"),
+        recipientName: getFirst(row, ["recipient_name", "guru_name", "display_name", "full_name", "name", "sitter_name", "provider_name"], "Guru payout"),
+        recipientEmail: getFirst(row, ["recipient_email", "guru_email", "email", "sitter_email", "provider_email"], "No email on file"),
         amount,
         status,
         reference: getFirst(row, ["stripe_transfer_id", "transfer_id", "stripe_payout_id", "payment_intent_id", "stripe_session_id", "stripe_checkout_session_id", "uid", "id"], "No reference"),
@@ -294,7 +378,7 @@ function mapGenericRows(
       if (amount <= 0) return null;
 
       const source = normalizeSource(
-        getFirst(row, ["source", "type", "category", "reward_type", "financial_category", "program_type"], fallbackSource),
+        getFirst(row, ["source", "type", "category", "reward_type", "financial_category", "program_type", "payout_type"], fallbackSource),
         fallbackSource,
       );
       const status = normalizeStatus(getFirst(row, ["status", "payout_status", "reward_status", "normalized_status", "financial_treatment"], "pending"));
@@ -314,7 +398,7 @@ function mapGenericRows(
         id,
         source,
         ledgerSource,
-        recipientName: getFirst(row, ["recipient_name", "guru_name", "ambassador_name", "partner_name", "customer_name", "referrer_name", "name", "full_name"], `${source} payout`),
+        recipientName: getFirst(row, ["recipient_name", "guru_name", "ambassador_name", "partner_name", "customer_name", "referrer_name", "display_name", "full_name", "name"], `${source} payout`),
         recipientEmail: getFirst(row, ["recipient_email", "guru_email", "ambassador_email", "partner_email", "customer_email", "referrer_email", "email"], "No email on file"),
         amount,
         status,
@@ -345,27 +429,106 @@ function dedupeRows(rows: PayoutQueueRow[]) {
   return Array.from(map.values());
 }
 
-async function getManualPayoutGuruOptions(): Promise<ManualPayoutGuruOption[]> {
-  const guruRows = await safeSelect("gurus", "*", 2000);
+async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[]> {
+  const [guruRows, ambassadorRows, partnerRows] = await Promise.all([
+    safeSelect(
+      "gurus",
+      "id, user_id, profile_id, display_name, full_name, name, email, stripe_account_id, stripe_connect_account_id, connected_account_id",
+      5000,
+    ),
+    safeSelect(
+      "ambassadors",
+      "id, user_id, display_name, full_name, email, status",
+      5000,
+    ),
+    safeSelect(
+      "partners",
+      "id, owner_user_id, business_name, contact_name, email, status",
+      5000,
+    ),
+  ]);
 
-  return guruRows
-    .map((row) => {
-      const id = getFirst(row, ["id", "guru_id", "user_id"]);
-      if (!id) return null;
+  const mapRecipient = (
+    row: SafeRow,
+    type: ManualPayoutType,
+    nameKeys: string[],
+    idKeys: string[],
+    userIdKeys: string[],
+    stripeKeys: string[] = [],
+  ): ManualPayoutRecipientOption | null => {
+    const id = getFirst(row, idKeys);
+    if (!id) return null;
 
-      return {
-        id,
-        name: getFirst(row, ["display_name", "full_name", "name"], "Guru"),
-        email: getFirst(row, ["email"], ""),
-        stripeAccountId: getFirst(row, [
-          "stripe_account_id",
-          "stripe_connect_account_id",
-          "connected_account_id",
-        ]),
-      } satisfies ManualPayoutGuruOption;
-    })
-    .filter(Boolean)
-    .sort((a, b) => a!.name.localeCompare(b!.name)) as ManualPayoutGuruOption[];
+    return {
+      id,
+      type,
+      name: getFirst(row, nameKeys, type === "partner" ? "Partner" : "Recipient"),
+      email: getFirst(row, ["email"], ""),
+      userId: getFirst(row, userIdKeys) || undefined,
+      stripeAccountId: stripeKeys.length
+        ? getFirst(row, stripeKeys) || undefined
+        : undefined,
+    };
+  };
+
+  const gurus = guruRows
+    .map((row) =>
+      mapRecipient(
+        row,
+        "guru",
+        ["display_name", "full_name", "name"],
+        ["id"],
+        ["user_id"],
+        ["stripe_account_id", "stripe_connect_account_id", "connected_account_id"],
+      ),
+    )
+    .filter(Boolean) as ManualPayoutRecipientOption[];
+
+  const ambassadors = ambassadorRows
+    .map((row) =>
+      mapRecipient(
+        row,
+        "ambassador",
+        ["display_name", "full_name", "name"],
+        ["id"],
+        ["user_id"],
+      ),
+    )
+    .filter(Boolean) as ManualPayoutRecipientOption[];
+
+  const partners = partnerRows
+    .map((row) =>
+      mapRecipient(
+        row,
+        "partner",
+        ["business_name", "contact_name", "name"],
+        ["id"],
+        ["owner_user_id"],
+      ),
+    )
+    .filter(Boolean) as ManualPayoutRecipientOption[];
+
+  // PawPerks + Referrals can pay any of the network roles above.
+  const rewardPool = [...gurus, ...ambassadors, ...partners].flatMap(
+    (recipient) => {
+      const base = {
+        id: recipient.id,
+        name: recipient.name,
+        email: recipient.email,
+        userId: recipient.userId,
+        stripeAccountId: recipient.stripeAccountId,
+      };
+
+      return [
+        { ...base, type: "pawperks" as const },
+        { ...base, type: "referral" as const },
+      ];
+    },
+  );
+
+  return [...gurus, ...ambassadors, ...partners, ...rewardPool].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
 }
 
 async function getPayoutRows() {
@@ -383,6 +546,7 @@ async function getPayoutRows() {
     stripeTransferRows,
     stripePayoutRows,
     guruRows,
+    profileRows,
   ] = await Promise.all([
     safeSelect("bookings"),
     safeSelect("booking_payments", "*", 5000),
@@ -396,8 +560,15 @@ async function getPayoutRows() {
     safeSelect("admin_referral_reward_liability"),
     safeSelect("stripe_transfers"),
     safeSelect("stripe_payouts"),
-    safeSelect("gurus", "*", 2000),
+    safeSelect(
+      "gurus",
+      "id, user_id, profile_id, display_name, full_name, name, email",
+      5000,
+    ),
+    safeSelect("profiles", "id, full_name, display_name, name, email", 5000),
   ]);
+
+  const recipientDirectory = buildRecipientDirectory(guruRows, profileRows);
 
   const bookingPaymentsByBooking = new Map<string, SafeRow>();
   for (const row of bookingPaymentRows) {
@@ -407,62 +578,47 @@ async function getPayoutRows() {
     }
   }
 
-  const gurusById = new Map<string, SafeRow>();
-  for (const row of guruRows) {
-    const id = getFirst(row, ["id"]);
-    const userId = getFirst(row, ["user_id"]);
-    if (id) gurusById.set(id, row);
-    if (userId) gurusById.set(userId, row);
-  }
+  const recipientIdKeys = [
+    "guru_id",
+    "user_id",
+    "recipient_id",
+    "ambassador_id",
+    "partner_id",
+    "profile_id",
+    "sitter_id",
+    "provider_id",
+  ];
 
-  const enrichedGuruPayoutRows = guruPayoutRows.map((row) => {
-    const guruId = getFirst(row, ["guru_id", "user_id"]);
-    const guru = gurusById.get(guruId);
-    if (!guru) return row;
-
-    return {
-      ...row,
-      guru_name: getFirst(guru, ["display_name", "full_name", "name"], "Guru"),
-      guru_email: getFirst(guru, ["email"], ""),
-      recipient_name: getFirst(guru, ["display_name", "full_name", "name"], "Guru"),
-      recipient_email: getFirst(guru, ["email"], ""),
-      name: getFirst(guru, ["display_name", "full_name", "name"], "Guru"),
-      email: getFirst(guru, ["email"], ""),
-      notes: getFirst(
-        row,
-        ["notes", "memo", "description"],
-        "Manual or ledger Guru payout from guru_payouts.",
-      ),
-    };
-  });
+  const withRecipients = (rows: SafeRow[]) =>
+    rows.map((row) => applyRecipientFields(row, recipientDirectory, recipientIdKeys));
 
   return {
     rows: dedupeRows([
-      ...mapBookingRows(bookingRows, bookingPaymentsByBooking),
-      ...mapGenericRows(enrichedGuruPayoutRows, "Guru", "Guru payouts", "guru_payouts", {
+      ...mapBookingRows(withRecipients(bookingRows), bookingPaymentsByBooking),
+      ...mapGenericRows(withRecipients(guruPayoutRows), "Guru", "Guru payouts", "guru_payouts", {
         canRelease: true,
       }),
-      ...mapGenericRows(partnerPayoutRows, "Partner", "Partner commissions", "partner_payouts"),
-      ...mapGenericRows(payoutRows, "Platform", "Payout records", "payouts"),
-      ...mapGenericRows(commissionRows, "Partner", "Commission ledger", "commissions"),
+      ...mapGenericRows(withRecipients(partnerPayoutRows), "Partner", "Partner commissions", "partner_payouts"),
+      ...mapGenericRows(withRecipients(payoutRows), "Platform", "Payout records", "payouts"),
+      ...mapGenericRows(withRecipients(commissionRows), "Partner", "Commission ledger", "commissions"),
       ...mapGenericRows(
-        partnerCommissionRows,
+        withRecipients(partnerCommissionRows),
         "Partner",
         "Partner commission ledger",
         "partner_commissions",
       ),
-      ...mapGenericRows(financialPayoutRows, "Platform", "Financial payouts", "financial_payouts"),
-      ...mapGenericRows(adminPayoutRows, "Platform", "Admin payouts", "admin_payouts"),
+      ...mapGenericRows(withRecipients(financialPayoutRows), "Platform", "Financial payouts", "financial_payouts"),
+      ...mapGenericRows(withRecipients(adminPayoutRows), "Platform", "Admin payouts", "admin_payouts"),
       ...mapGenericRows(
-        referralRewardRows,
+        withRecipients(referralRewardRows),
         "Referral",
         "Referral Rewards / PawPerks",
         "admin_referral_reward_liability",
       ),
-      ...mapGenericRows(stripeTransferRows, "Platform", "Stripe transfers", "stripe_transfers", {
+      ...mapGenericRows(withRecipients(stripeTransferRows), "Platform", "Stripe transfers", "stripe_transfers", {
         amountInCents: true,
       }),
-      ...mapGenericRows(stripePayoutRows, "Platform", "Stripe payouts", "stripe_payouts", {
+      ...mapGenericRows(withRecipients(stripePayoutRows), "Platform", "Stripe payouts", "stripe_payouts", {
         amountInCents: true,
       }),
     ]).sort((a, b) => {
@@ -621,7 +777,7 @@ export default async function AdminPayoutsPage() {
   }
 
   const { rows, sourceCounts } = await getPayoutRows();
-  const manualPayoutGurus = await getManualPayoutGuruOptions();
+  const manualPayoutRecipients = await getManualPayoutRecipients();
   const summary = buildSummary(rows);
   const pendingRows = rows.filter((row) => ["ready", "pending", "processing", "scheduled"].includes(row.status));
   const reviewRows = rows.filter((row) => row.status === "review" || row.status === "failed");
@@ -629,8 +785,10 @@ export default async function AdminPayoutsPage() {
   const releasableRows = pendingRows.filter((row) => row.canRelease);
   const recentRows = rows.slice(0, 12);
   const crystalOption =
-    manualPayoutGurus.find((guru) =>
-      /crystal/i.test(`${guru.name} ${guru.email}`),
+    manualPayoutRecipients.find(
+      (recipient) =>
+        recipient.type === "guru" &&
+        /crystal/i.test(`${recipient.name} ${recipient.email}`),
     ) || null;
 
   return (
@@ -748,10 +906,11 @@ export default async function AdminPayoutsPage() {
         </section>
 
         <CreateManualGuruPayoutForm
-          gurus={manualPayoutGurus}
+          recipients={manualPayoutRecipients}
+          defaultRecipientId={crystalOption?.id || ""}
           defaultGuruId={crystalOption?.id || ""}
           defaultAmount={25}
-          defaultType="Welcome / Thank-You Bonus"
+          defaultPayoutType="guru"
           defaultReason="Thank you for joining SitGuru!"
         />
 
@@ -790,7 +949,11 @@ export default async function AdminPayoutsPage() {
                         <tr key={`${row.ledgerSource}-${row.source}-${row.id}`} className="border-t border-slate-100">
                           <td className="px-5 py-4">
                             <p className="font-black text-slate-950">{row.recipientName}</p>
-                            <p className="text-xs font-bold text-slate-500">{row.recipientEmail}</p>
+                            {row.recipientEmail && row.recipientEmail !== "No email on file" ? (
+                              <p className="text-xs font-bold text-slate-500">{row.recipientEmail}</p>
+                            ) : (
+                              <p className="text-xs font-bold text-slate-400">No email on file</p>
+                            )}
                             <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">{row.ledgerSource}</p>
                           </td>
                           <td className="px-5 py-4">

@@ -1,49 +1,95 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
-export type ManualPayoutGuruOption = {
+export const MANUAL_PAYOUT_TYPES = [
+  { value: "guru", label: "Guru" },
+  { value: "ambassador", label: "Ambassador" },
+  { value: "partner", label: "Partner" },
+  { value: "pawperks", label: "PawPerks" },
+  { value: "referral", label: "Referrals" },
+] as const;
+
+export type ManualPayoutType = (typeof MANUAL_PAYOUT_TYPES)[number]["value"];
+
+export type ManualPayoutRecipientOption = {
   id: string;
   name: string;
   email: string;
-  stripeAccountId: string;
+  stripeAccountId?: string;
+  userId?: string;
+  type: ManualPayoutType;
 };
 
+/** @deprecated Prefer ManualPayoutRecipientOption */
+export type ManualPayoutGuruOption = ManualPayoutRecipientOption;
+
 type CreateManualGuruPayoutFormProps = {
-  gurus: ManualPayoutGuruOption[];
+  recipients: ManualPayoutRecipientOption[];
+  /** @deprecated Use recipients */
+  gurus?: ManualPayoutRecipientOption[];
+  defaultRecipientId?: string;
   defaultGuruId?: string;
   defaultAmount?: number;
+  defaultPayoutType?: ManualPayoutType;
   defaultType?: string;
   defaultReason?: string;
 };
 
 export default function CreateManualGuruPayoutForm({
-  gurus,
+  recipients,
+  gurus = [],
+  defaultRecipientId = "",
   defaultGuruId = "",
   defaultAmount = 25,
-  defaultType = "Welcome / Thank-You Bonus",
+  defaultPayoutType = "guru",
   defaultReason = "Thank you for joining SitGuru!",
 }: CreateManualGuruPayoutFormProps) {
   const router = useRouter();
-  const [guruId, setGuruId] = useState(defaultGuruId || gurus[0]?.id || "");
+  const allRecipients = recipients.length > 0 ? recipients : gurus;
+  const [payoutType, setPayoutType] = useState<ManualPayoutType>(defaultPayoutType);
+  const [recipientId, setRecipientId] = useState(
+    defaultRecipientId || defaultGuruId || "",
+  );
   const [amount, setAmount] = useState(String(defaultAmount));
-  const [payoutType, setPayoutType] = useState(defaultType);
   const [reason, setReason] = useState(defaultReason);
   const [status, setStatus] = useState("ready");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<"slate" | "emerald" | "rose">("slate");
 
-  const selectedGuru = useMemo(
-    () => gurus.find((guru) => guru.id === guruId) || null,
-    [gurus, guruId],
+  const recipientsForType = useMemo(
+    () =>
+      allRecipients
+        .filter((recipient) => recipient.type === payoutType)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [allRecipients, payoutType],
   );
+
+  const selectedRecipient = useMemo(
+    () => recipientsForType.find((recipient) => recipient.id === recipientId) || null,
+    [recipientsForType, recipientId],
+  );
+
+  useEffect(() => {
+    if (recipientsForType.some((recipient) => recipient.id === recipientId)) {
+      return;
+    }
+
+    const preferred =
+      (payoutType === "guru" &&
+        recipientsForType.find((recipient) => recipient.id === defaultGuruId)) ||
+      recipientsForType[0] ||
+      null;
+
+    setRecipientId(preferred?.id || "");
+  }, [payoutType, recipientsForType, recipientId, defaultGuruId]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
-    setMessage("Creating manual Guru payout…");
+    setMessage("Creating manual payout…");
     setTone("slate");
 
     try {
@@ -51,9 +97,10 @@ export default function CreateManualGuruPayoutForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          guruId,
-          amount: Number(amount),
           payoutType,
+          recipientId,
+          guruId: payoutType === "guru" ? recipientId : undefined,
+          amount: Number(amount),
           reason,
           status,
         }),
@@ -65,10 +112,13 @@ export default function CreateManualGuruPayoutForm({
         details?: string;
         payout?: {
           id?: string;
+          recipientName?: string;
           guruName?: string;
           amount?: number;
           payoutStatus?: string;
+          payoutType?: string;
           warning?: string;
+          canRelease?: boolean;
         };
       };
 
@@ -77,20 +127,29 @@ export default function CreateManualGuruPayoutForm({
         setMessage(
           payload.error ||
             payload.details ||
-            "Unable to create manual Guru payout.",
+            "Unable to create manual payout.",
         );
         return;
       }
 
       const created = payload.payout;
+      const typeLabel =
+        MANUAL_PAYOUT_TYPES.find((entry) => entry.value === payoutType)?.label ||
+        payoutType;
+
       setTone("emerald");
       setMessage(
         [
-          `Created $${Number(created?.amount || amount).toFixed(2)} payout for ${
-            created?.guruName || selectedGuru?.name || "Guru"
+          `Created $${Number(created?.amount || amount).toFixed(2)} ${typeLabel} payout for ${
+            created?.recipientName ||
+            created?.guruName ||
+            selectedRecipient?.name ||
+            "recipient"
           }.`,
           `Status: ${created?.payoutStatus || status}.`,
-          "Stripe transfer/reference fields left empty until Release.",
+          created?.canRelease
+            ? "Stripe transfer/reference fields left empty until Release."
+            : "Queued for review. Stripe Release is available for Guru payouts only.",
           created?.warning || "",
         ]
           .filter(Boolean)
@@ -109,6 +168,10 @@ export default function CreateManualGuruPayoutForm({
     }
   }
 
+  const recipientLabel =
+    MANUAL_PAYOUT_TYPES.find((entry) => entry.value === payoutType)?.label ||
+    "Recipient";
+
   return (
     <form
       onSubmit={onSubmit}
@@ -117,16 +180,15 @@ export default function CreateManualGuruPayoutForm({
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
-            Manual Guru payout
+            Manual payout
           </p>
           <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-            Create Manual Guru Payout
+            Create Manual Payout
           </h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
-            Creates a `guru_payouts` row for Dry Run / Release. Leaves
-            `stripe_transfer_id` empty until Stripe Connect actually transfers
-            funds. Do not Release until SitGuru Stripe available balance covers
-            the amount.
+            Choose Guru, Ambassador, Partner, PawPerks, or Referrals, then pick
+            the recipient. Guru rows can Dry Run / Release through Stripe
+            Connect when balance covers the amount.
           </p>
         </div>
       </div>
@@ -134,25 +196,52 @@ export default function CreateManualGuruPayoutForm({
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <label className="grid gap-2">
           <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-            Guru
+            Payout Type
           </span>
           <select
-            value={guruId}
-            onChange={(event) => setGuruId(event.target.value)}
+            value={payoutType}
+            onChange={(event) =>
+              setPayoutType(event.target.value as ManualPayoutType)
+            }
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none ring-emerald-500 focus:ring-2"
+            required
+          >
+            {MANUAL_PAYOUT_TYPES.map((entry) => (
+              <option key={entry.value} value={entry.value}>
+                {entry.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="grid gap-2">
+          <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+            {recipientLabel}
+          </span>
+          <select
+            value={recipientId}
+            onChange={(event) => setRecipientId(event.target.value)}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none ring-emerald-500 focus:ring-2"
             required
           >
             <option value="" disabled>
-              Select a Guru
+              Select a {recipientLabel}
             </option>
-            {gurus.map((guru) => (
-              <option key={guru.id} value={guru.id}>
-                {guru.name}
-                {guru.email ? ` · ${guru.email}` : ""}
-                {guru.stripeAccountId ? "" : " · missing Stripe"}
+            {recipientsForType.map((recipient) => (
+              <option key={`${recipient.type}-${recipient.id}`} value={recipient.id}>
+                {recipient.name}
+                {recipient.email ? ` · ${recipient.email}` : ""}
+                {payoutType === "guru" && !recipient.stripeAccountId
+                  ? " · missing Stripe"
+                  : ""}
               </option>
             ))}
           </select>
+          {recipientsForType.length === 0 ? (
+            <span className="text-xs font-bold text-rose-700">
+              No {recipientLabel.toLowerCase()} recipients found.
+            </span>
+          ) : null}
         </label>
 
         <label className="grid gap-2">
@@ -165,19 +254,6 @@ export default function CreateManualGuruPayoutForm({
             step="0.01"
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none ring-emerald-500 focus:ring-2"
-            required
-          />
-        </label>
-
-        <label className="grid gap-2">
-          <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-            Type
-          </span>
-          <input
-            type="text"
-            value={payoutType}
-            onChange={(event) => setPayoutType(event.target.value)}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none ring-emerald-500 focus:ring-2"
             required
           />
@@ -212,11 +288,11 @@ export default function CreateManualGuruPayoutForm({
         </label>
       </div>
 
-      {selectedGuru ? (
+      {selectedRecipient && payoutType === "guru" ? (
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
           Stripe destination:{" "}
           <span className="font-black text-slate-950">
-            {selectedGuru.stripeAccountId || "Missing connected account"}
+            {selectedRecipient.stripeAccountId || "Missing connected account"}
           </span>
         </div>
       ) : null}
@@ -224,14 +300,15 @@ export default function CreateManualGuruPayoutForm({
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <button
           type="submit"
-          disabled={busy || !guruId}
+          disabled={busy || !recipientId || recipientsForType.length === 0}
           className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800 disabled:opacity-60"
         >
           {busy ? "Creating…" : "Create Payout"}
         </button>
         <p className="text-xs font-bold text-slate-500">
-          After create: Dry Run first, then Release only if platform Stripe
-          balance ≥ amount.
+          {payoutType === "guru"
+            ? "After create: Dry Run first, then Release only if platform Stripe balance ≥ amount."
+            : "Non-Guru payouts are queued for admin review (not Stripe Release)."}
         </p>
       </div>
 

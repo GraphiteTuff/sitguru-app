@@ -1,8 +1,10 @@
 UPDATE public.gurus
 SET
-  stripe_account_id = 'acct_1U21yjOY16FA8nZK',
+  stripe_account_id = 'acct_1U2jyMJii6PAEHCk',
   stripe_connect_status = 'enabled',
   stripe_onboarding_complete = true,
+  charges_enabled = true,
+  payouts_enabled = true,
   updated_at = now()
 WHERE id = 'caaca844-af3c-43cc-971e-c0cbe767db51';
 
