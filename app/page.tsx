@@ -990,6 +990,13 @@ function CompactPartnerSection({
       imageClassName: "h-auto max-h-20 w-full object-contain",
       imageWrapperClassName: "bg-white",
     },
+    {
+      name: "Crimson Cat Studios",
+      href: "https://www.crimsoncatstudios.com/",
+      image: "/images/partners/crimson-cat-studios.png",
+      imageClassName: "h-auto max-h-20 w-full object-contain",
+      imageWrapperClassName: "bg-black",
+    },
   ] as const;
 
   return (
@@ -1054,7 +1061,7 @@ function CompactPartnerSection({
           }
 
           .sitguru-partner-carousel-track {
-            animation: sitguru-partner-carousel-loop 30s linear infinite;
+            animation: sitguru-partner-carousel-loop 38s linear infinite;
           }
 
           @media (hover: hover) and (pointer: fine) {
