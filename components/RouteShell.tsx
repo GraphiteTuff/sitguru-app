@@ -133,15 +133,22 @@ export default function RouteShell({ children }: { children: ReactNode }) {
       isCustomerPetsPage ||
       isCustomerBookingsPage);
 
+  const isPetParentCompanionPage =
+    isCustomerPrivatePage ||
+    pathname === "/parent" ||
+    pathname.startsWith("/parent/");
+
   const shouldShowGlobalMessageNotifier = !isAuthPage;
 
-  const floatingControls =
-    isHomePage || isPublicPage ? (
-      <FloatingActionStack>
-        {/* Rogue chat + intro tip on public marketing surfaces (all viewports). */}
-        <HomepageChatBubble />
-      </FloatingActionStack>
-    ) : null;
+  const shouldShowRogueChat =
+    isHomePage || isPublicPage || isPetParentCompanionPage;
+
+  const floatingControls = shouldShowRogueChat ? (
+    <FloatingActionStack>
+      {/* Rogue: public surfaces + all Pet Parent account / quick-action pages */}
+      <HomepageChatBubble />
+    </FloatingActionStack>
+  ) : null;
 
   if (isAdminPage) {
     return (

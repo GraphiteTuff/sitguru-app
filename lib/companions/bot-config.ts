@@ -134,6 +134,32 @@ export function getBotConfig(options: {
     return { shouldRender: true, variant: "taco", surface: "workspace" };
   }
 
+  // Logged-in Pet Parent surfaces — Rogue is the Pet Parent AI Companion.
+  if (
+    currentPath === "/customer" ||
+    currentPath.startsWith("/customer/") ||
+    currentPath === "/messages" ||
+    currentPath.startsWith("/messages/") ||
+    currentPath === "/pets" ||
+    currentPath.startsWith("/pets/") ||
+    currentPath === "/bookings" ||
+    currentPath.startsWith("/bookings/") ||
+    currentPath === "/parent" ||
+    currentPath.startsWith("/parent/")
+  ) {
+    // Keep login/signup free of the floating chat bubble.
+    if (
+      currentPath === "/customer/login" ||
+      currentPath === "/customer/signup" ||
+      currentPath.startsWith("/customer/login/") ||
+      currentPath.startsWith("/customer/signup/")
+    ) {
+      return { shouldRender: false, variant: null, surface: null };
+    }
+
+    return { shouldRender: true, variant: "rogue", surface: "public-parent" };
+  }
+
   return { shouldRender: false, variant: null, surface: null };
 }
 
