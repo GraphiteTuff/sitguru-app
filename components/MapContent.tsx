@@ -594,6 +594,57 @@ function getViewportSignature(markers: NormalizedMarker[], center?: [number, num
 }
 
 /**
+ * ZIP-centroid fallbacks often place multiple Gurus on the exact same lat/lng.
+ * Spread those pins in a small circle so every avatar stays visible without hover.
+ */
+function spreadCoincidentMarkers(markers: NormalizedMarker[]): NormalizedMarker[] {
+  if (markers.length < 2) return markers;
+
+  const groups = new Map<string, number[]>();
+
+  markers.forEach((marker, index) => {
+    const key = `${marker.latitude.toFixed(4)},${marker.longitude.toFixed(4)}`;
+    const existing = groups.get(key);
+    if (existing) existing.push(index);
+    else groups.set(key, [index]);
+  });
+
+  const spread = markers.map((marker) => ({ ...marker }));
+
+  for (const indices of groups.values()) {
+    if (indices.length < 2) continue;
+
+    const count = indices.length;
+    // ~0.45–0.9 km ring so pins separate at city/search zoom levels
+    const radiusDeg = 0.0045 + 0.0018 * Math.max(0, count - 2);
+
+    indices.forEach((markerIndex, ringIndex) => {
+      const marker = spread[markerIndex];
+      const angle = (2 * Math.PI * ringIndex) / count - Math.PI / 2;
+      const cosLat = Math.cos((marker.latitude * Math.PI) / 180) || 1;
+
+      spread[markerIndex] = {
+        ...marker,
+        latitude: marker.latitude + radiusDeg * Math.sin(angle),
+        longitude: marker.longitude + (radiusDeg * Math.cos(angle)) / cosLat,
+      };
+    });
+  }
+
+  return spread;
+}
+
+/** Photo pins paint above initials when layers still nearly overlap. */
+function sortMarkersForPaintOrder(markers: NormalizedMarker[]) {
+  return [...markers].sort((a, b) => {
+    const aScore = a.avatarUrl ? 1 : 0;
+    const bScore = b.avatarUrl ? 1 : 0;
+    if (aScore !== bScore) return aScore - bScore;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+/**
  * Dynamic viewport updater (Leaflet mapRef equivalent of a react-leaflet MapViewUpdater).
  * Case A: fly to a focused Guru. Case B: fitBounds around all active markers.
  */
@@ -709,7 +760,12 @@ export default function MapContent({
   const [mapError, setMapError] = useState("");
 
   const normalizedMarkers = useMemo(
-    () => markers.map(normalizeMarker).filter(Boolean) as NormalizedMarker[],
+    () =>
+      sortMarkersForPaintOrder(
+        spreadCoincidentMarkers(
+          markers.map(normalizeMarker).filter(Boolean) as NormalizedMarker[],
+        ),
+      ),
     [markers],
   );
 
@@ -827,6 +883,7 @@ export default function MapContent({
     normalizedMarkers.forEach((marker) => {
       const highlighted = marker.id === highlightedMarkerId;
       const latLng: [number, number] = [marker.latitude, marker.longitude];
+      const hasPhoto = Boolean(marker.avatarUrl);
 
       L.circle(latLng, {
         radius: marker.serviceRadiusMiles * METERS_PER_MILE,
@@ -839,7 +896,8 @@ export default function MapContent({
 
       L.marker(latLng, {
         icon: createAvatarIcon(marker, highlighted),
-        zIndexOffset: highlighted ? 1000 : 500,
+        // Highlighted on top; photo pins above initials so bookable faces stay visible
+        zIndexOffset: highlighted ? 1200 : hasPhoto ? 750 : 400,
       })
         .bindTooltip(`${marker.serviceRadiusMiles}-mile radius`, {
           direction: "top",
