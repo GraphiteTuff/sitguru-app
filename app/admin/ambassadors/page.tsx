@@ -35,6 +35,9 @@ import {
 } from "@/lib/admin/ambassadors/purge-test-ambassadors";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import AmbassadorRecordsTable, {
+  type AmbassadorDisplayRow,
+} from "@/app/admin/ambassadors/AmbassadorRecordsTable";
 
 type AmbassadorSummaryRow = {
   ambassador_id: string;
@@ -343,7 +346,7 @@ function isMissingAmbassadorWorkspace(ambassador: AmbassadorSummaryRow) {
 
 function getAccountLifecycleHref(ambassador: AmbassadorSummaryRow) {
   const query = ambassador.user_id || ambassador.email || ambassador.ambassador_id;
-  return `/admin/account-lifecycle?query=${encodeURIComponent(query)}`;
+  return `/admin/account-lifecycle/${encodeURIComponent(query)}`;
 }
 
 function getPrimaryAdminHref(ambassador: AmbassadorSummaryRow) {
@@ -1700,6 +1703,182 @@ function getLocationLabel(ambassador: AmbassadorSummaryRow) {
     [ambassador.city, ambassador.state].filter(Boolean).join(", ") ||
     "Location not saved"
   );
+}
+
+function getAmbassadorContactMethod(email?: string | null, phone?: string | null) {
+  const emailReady = Boolean(asString(email).includes("@"));
+  const phoneReady = asString(phone).replace(/\D/g, "").length >= 7;
+
+  if (emailReady && phoneReady) return "Email + phone";
+  if (phoneReady) return "Phone only";
+  if (emailReady) return "Email only";
+  return "No usable contact";
+}
+
+function normalizeAmbassadorRoleLabel(value: string) {
+  const raw = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (["guru", "sitter", "provider", "walker"].includes(raw)) return "Guru";
+  if (
+    [
+      "customer",
+      "parent",
+      "petparent",
+      "pet_parent",
+      "client",
+      "pet parent",
+    ].includes(raw)
+  ) {
+    return "Pet Parent";
+  }
+  if (["ambassador", "partner", "community_ambassador"].includes(raw)) {
+    return "Ambassador";
+  }
+  return "";
+}
+
+function getAmbassadorRoleBadges(ambassador: AmbassadorSummaryRow) {
+  const roles = new Set<string>(["Ambassador"]);
+
+  for (const role of ambassador.assigned_roles || []) {
+    const label = normalizeAmbassadorRoleLabel(role);
+    if (label) roles.add(label);
+  }
+
+  const profileRole = normalizeAmbassadorRoleLabel(
+    asString(ambassador.profile_role),
+  );
+  if (profileRole) roles.add(profileRole);
+
+  const accountType = normalizeAmbassadorRoleLabel(
+    asString(ambassador.account_type),
+  );
+  if (accountType) roles.add(accountType);
+
+  const order = ["Ambassador", "Guru", "Pet Parent"];
+  return Array.from(roles).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+}
+
+function getAmbassadorCompletion(ambassador: AmbassadorSummaryRow) {
+  const training = numberValue(ambassador.training_percent);
+  const onboarding = numberValue(ambassador.onboarding_percent);
+  const blended = Math.max(training, onboarding);
+  if (blended > 0) return Math.max(0, Math.min(100, Math.round(blended)));
+
+  const missing = ambassador.attention_items?.length || 0;
+  if (missing >= 4) return 15;
+  if (missing >= 2) return 35;
+  if (missing >= 1) return 55;
+  if (isMissingAmbassadorWorkspace(ambassador)) return 20;
+  return 75;
+}
+
+function getAmbassadorNextAction(ambassador: AmbassadorSummaryRow) {
+  if (isMissingAmbassadorWorkspace(ambassador)) {
+    return "Provision Ambassador workspace";
+  }
+  if (isArchivedAmbassador(ambassador)) {
+    return "Review archived Ambassador record";
+  }
+  if (hasNeedsAttention(ambassador)) {
+    return ambassador.attention_items?.[0] || "Resolve attention items";
+  }
+  if (!ambassador.ambassador_photo_url) {
+    return "Request Ambassador photo";
+  }
+  if (ambassador.ambassador_photo_url && ambassador.photo_approved !== true) {
+    return "Approve Ambassador photo";
+  }
+  if (numberValue(ambassador.training_percent) < 100) {
+    return "Continue Ambassador training";
+  }
+  if (!ambassador.payout_ready) {
+    return "Finish payout setup";
+  }
+  return "Open Ambassador dashboard";
+}
+
+function getAmbassadorDuplicateKeys(ambassador: AmbassadorSummaryRow) {
+  const keys: string[] = [];
+  const email = asString(ambassador.email).toLowerCase();
+  const phone = asString(ambassador.phone).replace(/\D/g, "");
+  const name = getAmbassadorName(ambassador).toLowerCase().replace(/\s+/g, " ");
+
+  if (email.includes("@")) keys.push(`email:${email}`);
+  if (phone.length >= 7) keys.push(`phone:${phone}`);
+  if (name && name !== "unnamed ambassador") keys.push(`name:${name}`);
+
+  return keys;
+}
+
+function toAmbassadorDisplayRow(
+  ambassador: AmbassadorSummaryRow,
+  options?: { possibleDuplicate?: boolean },
+): AmbassadorDisplayRow {
+  const archived = isArchivedAmbassador(ambassador);
+  const missingWorkspace = isMissingAmbassadorWorkspace(ambassador);
+  const needsAttention = hasNeedsAttention(ambassador);
+  const possibleDuplicate = Boolean(options?.possibleDuplicate);
+  const email = asString(ambassador.email);
+  const phone = asString(ambassador.phone);
+  const activityRaw =
+    ambassador.last_activity_at ||
+    ambassador.profile_updated_at ||
+    ambassador.auth_created_at ||
+    ambassador.created_at ||
+    null;
+
+  return {
+    id: ambassador.ambassador_id,
+    userId: ambassador.user_id,
+    name: getAmbassadorName(ambassador),
+    email,
+    phone: phone || undefined,
+    avatarUrl: ambassador.ambassador_photo_url || undefined,
+    location: getLocationLabel(ambassador),
+    roles: getAmbassadorRoleBadges(ambassador),
+    contactMethod: getAmbassadorContactMethod(email, phone),
+    statusLabel: archived
+      ? "Archived"
+      : missingWorkspace
+        ? "Missing Workspace"
+        : prettyStatus(ambassador.status),
+    nextAction: possibleDuplicate
+      ? "Review possible duplicate Ambassador"
+      : getAmbassadorNextAction(ambassador),
+    lastActivity: formatDateTime(activityRaw),
+    lastActivityAt: activityRaw,
+    recordSourceLabel: missingWorkspace
+      ? "Signup intent / no workspace"
+      : getSourceLabel(ambassador),
+    completionPercentage: getAmbassadorCompletion(ambassador),
+    missingRequirements: ambassador.attention_items || [],
+    flaggedForReview: needsAttention || possibleDuplicate,
+    possibleDuplicate,
+    needsAttention: needsAttention || possibleDuplicate,
+    referralCode: ambassador.referral_code || undefined,
+    href: getPrimaryAdminHref(ambassador),
+    messageHref: buildAmbassadorDirectMessageHref(ambassador),
+    publicHref: ambassador.referral_link || undefined,
+  };
+}
+
+function toAmbassadorDisplayRows(
+  ambassadors: AmbassadorSummaryRow[],
+): AmbassadorDisplayRow[] {
+  const keyCounts = new Map<string, number>();
+
+  for (const ambassador of ambassadors) {
+    for (const key of getAmbassadorDuplicateKeys(ambassador)) {
+      keyCounts.set(key, (keyCounts.get(key) || 0) + 1);
+    }
+  }
+
+  return ambassadors.map((ambassador) => {
+    const possibleDuplicate = getAmbassadorDuplicateKeys(ambassador).some(
+      (key) => (keyCounts.get(key) || 0) > 1,
+    );
+    return toAmbassadorDisplayRow(ambassador, { possibleDuplicate });
+  });
 }
 
 function buildAdminCards(rows: AmbassadorSummaryRow[]) {
@@ -3063,263 +3242,19 @@ function AmbassadorRegistryTable({
         </form>
       </div>
 
-      {ambassadors.length === 0 ? (
-        <div className="p-6 text-sm font-semibold text-slate-600">
-          {allAmbassadors.length === 0
-            ? "No Ambassador records are available yet."
-            : "No Ambassador records match the current filters."}
-        </div>
-      ) : (
-        <div className="grid gap-4 p-4 sm:p-5">
-          {ambassadors.map((ambassador) => {
-            const ambassadorName = getAmbassadorName(ambassador);
-            const archived = isArchivedAmbassador(ambassador);
-            const hasPhoto = Boolean(ambassador.ambassador_photo_url);
-            const trainingPercent = numberValue(ambassador.training_percent);
-            const referralTotal =
-              numberValue(ambassador.pet_parent_signups) +
-              numberValue(ambassador.guru_signups) +
-              numberValue(ambassador.business_signups);
-            const rewardsTotal =
-              numberValue(ambassador.pending_rewards) +
-              numberValue(ambassador.approved_rewards) +
-              numberValue(ambassador.ready_for_payout_rewards) +
-              numberValue(ambassador.paid_rewards);
-            const missingWorkspace = isMissingAmbassadorWorkspace(ambassador);
-            const attentionItems = ambassador.attention_items || [];
-
-            return (
-              <article
-                key={ambassador.ambassador_id}
-                className={`rounded-[1.6rem] border bg-white p-4 shadow-sm transition hover:shadow-md sm:p-5 ${
-                  hasNeedsAttention(ambassador)
-                    ? "border-rose-200 hover:border-rose-300"
-                    : "border-[#e2ecd9] hover:border-[#b9d5b7]"
-                }`}
-              >
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.85fr)] xl:items-start">
-                  <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
-                    <AmbassadorPhoto ambassador={ambassador} />
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0">
-                          <p className="text-lg font-black leading-tight text-[#102819] sm:text-xl">
-                            {ambassadorName}
-                          </p>
-                          <p className="mt-1 break-words text-sm font-semibold text-slate-600">
-                            {ambassador.email || "No email saved"}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-slate-600">
-                            {ambassador.phone || "No phone saved"}
-                          </p>
-                          <p className="mt-1 text-sm font-bold text-[#2f6f3e]">
-                            {getLocationLabel(ambassador)}
-                          </p>
-                        </div>
-
-                        <span
-                          className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-black ring-1 ${statusClass(
-                            archived ? "archived" : ambassador.status,
-                          )}`}
-                        >
-                          {archived ? "Archived" : prettyStatus(ambassador.status)}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                        <Link
-                          href={getPrimaryAdminHref(ambassador)}
-                          className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#2f6f3e] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#255b33]"
-                        >
-                          {getPrimaryAdminLabel(ambassador)}
-                        </Link>
-                        <Link
-                          href={buildAmbassadorDirectMessageHref(ambassador)}
-                          className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe4c8] bg-white px-4 py-2 text-sm font-black text-[#2f6f3e] shadow-sm transition hover:bg-[#eef7ea]"
-                        >
-                          Message
-                        </Link>
-                        {!missingWorkspace ? (
-                          <Link
-                            href={getAccountLifecycleHref(ambassador)}
-                            className="inline-flex min-h-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-100 sm:col-span-2"
-                          >
-                            Account Lifecycle Diagnostics
-                          </Link>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                    <div className="rounded-2xl border border-[#edf3e8] bg-[#f8fbf6] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                        Ambassador Type
-                      </p>
-                      <p className="mt-2 text-sm font-black text-[#102819]">
-                        {getAmbassadorTypeLabel(ambassador)}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">
-                        {getSourceLabel(ambassador)}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">
-                        {ambassador.program || ambassador.internal_role || "Program not saved"}
-                      </p>
-                      <div className="mt-3 space-y-1 border-t border-[#e2ecd9] pt-3 text-[11px] font-bold text-slate-600">
-                        <p>Profile role: {ambassador.profile_role || "Not saved"}</p>
-                        <p>Account type: {ambassador.account_type || "Not saved"}</p>
-                        <p>
-                          Assigned roles: {ambassador.assigned_roles?.join(", ") || "None saved"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-[#edf3e8] bg-[#f8fbf6] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                        Referral Code
-                      </p>
-                      <p className="mt-2 break-words rounded-xl bg-[#f0f7ed] px-3 py-2 text-sm font-black text-[#2f6f3e] ring-1 ring-[#dbe8d5]">
-                        {ambassador.referral_code || "Not saved"}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ${photoStatusClass(
-                            hasPhoto,
-                            ambassador.photo_approved,
-                          )}`}
-                        >
-                          {getPhotoStatusLabel(hasPhoto, ambassador.photo_approved)}
-                        </span>
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ${
-                            missingWorkspace
-                              ? "bg-rose-100 text-rose-800 ring-rose-200"
-                              : "bg-emerald-100 text-emerald-800 ring-emerald-200"
-                          }`}
-                        >
-                          {missingWorkspace ? "Workspace Missing" : "Workspace Ready"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                    <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                          Training
-                        </p>
-                        <span className="text-xs font-black text-[#102819]">
-                          {trainingPercent}%
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs font-bold text-slate-500">
-                        {prettyStatus(ambassador.training_status)}
-                      </p>
-                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className={`h-full rounded-full ${trainingClass(trainingPercent)}`}
-                          style={{ width: `${trainingPercent}%` }}
-                        />
-                      </div>
-                      <div className="mt-3 border-t border-[#e2ecd9] pt-3 text-xs font-bold leading-5 text-slate-600">
-                        <p>Onboarding: {numberValue(ambassador.onboarding_percent)}%</p>
-                        <p>
-                          Rank: {ambassador.ambassador_rank || "Bronze"} ({numberValue(ambassador.ambassador_points)} pts)
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                        Referrals
-                      </p>
-                      <div className="mt-2 text-xs font-bold leading-5 text-slate-600">
-                        <p>{numberValue(ambassador.pet_parent_signups)} Pet Parents</p>
-                        <p>{numberValue(ambassador.guru_signups)} Gurus</p>
-                        <p>{numberValue(ambassador.business_signups)} Businesses</p>
-                        <p>{numberValue(ambassador.community_leads)} Community leads</p>
-                        <p>{numberValue(ambassador.referral_clicks)} Link clicks</p>
-                        <p>{numberValue(ambassador.qualified_referrals)} Qualified</p>
-                        <p>{numberValue(ambassador.social_signups)} Social signups</p>
-                        <p className="mt-1 text-[11px] font-bold text-slate-500">
-                          FB {numberValue(ambassador.facebook_signups)} · IG {numberValue(ambassador.instagram_signups)} · TikTok {numberValue(ambassador.tiktok_signups)} · X {numberValue(ambassador.x_signups)} · YouTube {numberValue(ambassador.youtube_signups)}
-                        </p>
-                        <p className="mt-1 font-black text-[#102819]">
-                          {referralTotal} signup records
-                        </p>
-                        <p className="mt-1 text-[11px] font-bold text-slate-500">
-                          Pipeline: {numberValue(ambassador.lead_new)} new · {numberValue(ambassador.lead_contacted)} contacted · {numberValue(ambassador.lead_interested)} interested · {numberValue(ambassador.lead_applied)} applied · {numberValue(ambassador.lead_active)} active
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-[#edf3e8] bg-[#fbfcf9] p-4 sm:col-span-2 xl:col-span-1">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                        Rewards
-                      </p>
-                      <div className="mt-2 text-xs font-bold leading-5 text-slate-600">
-                        <p>Pending: {currency(ambassador.pending_rewards)}</p>
-                        <p>Approved: {currency(ambassador.approved_rewards)}</p>
-                        <p>Ready: {currency(ambassador.ready_for_payout_rewards)}</p>
-                        <p>Paid: {currency(ambassador.paid_rewards)}</p>
-                        <p className="mt-1 font-black text-[#102819]">
-                          {currency(rewardsTotal)} total
-                        </p>
-                        <p
-                          className={`mt-2 text-[11px] font-black ${
-                            ambassador.payout_ready
-                              ? "text-emerald-700"
-                              : "text-amber-700"
-                          }`}
-                        >
-                          {ambassador.payout_ready
-                            ? "Payout setup ready"
-                            : `Payout blockers: ${
-                                ambassador.payout_blockers?.join(", ") ||
-                                "Setup incomplete"
-                              }`}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {hasNeedsAttention(ambassador) ? (
-                  <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-700" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-black text-rose-900">
-                          Admin attention required
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {attentionItems.map((item) => (
-                            <span
-                              key={item}
-                              className="rounded-full bg-white px-3 py-1 text-[10px] font-black text-rose-800 ring-1 ring-rose-200"
-                            >
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                        <p className="mt-3 text-xs font-semibold text-rose-800">
-                          Auth created: {formatDateTime(
-                            ambassador.auth_created_at || ambassador.created_at,
-                          )} · Last activity: {formatDateTime(
-                            ambassador.last_activity_at,
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-      )}
+      <div className="border-t border-[#e2ecd9] p-4 sm:p-5">
+        {ambassadors.length === 0 ? (
+          <div className="rounded-[24px] border border-dashed border-emerald-200 bg-emerald-50 p-6 text-sm font-bold leading-6 text-emerald-900">
+            {allAmbassadors.length === 0
+              ? "No Ambassador records are available yet."
+              : "No Ambassador records match the current filters."}
+          </div>
+        ) : (
+          <AmbassadorRecordsTable
+            ambassadors={toAmbassadorDisplayRows(ambassadors)}
+          />
+        )}
+      </div>
     </section>
   );
 }

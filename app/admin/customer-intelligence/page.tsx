@@ -189,6 +189,14 @@ type CustomerInsight = {
   adminStatusLabel: string;
   archivedAt: string | null;
   profileCompletion: number;
+  roles?: string[];
+  contactMethod?: string;
+  missingRequirements?: string[];
+  flaggedForReview?: boolean;
+  possibleDuplicate?: boolean;
+  nextAction?: string;
+  lastActivity?: string;
+  recordSourceLabel?: string;
 };
 
 
@@ -788,6 +796,173 @@ function isCustomerProfile(profile: ProfileRow) {
   ].includes(role);
 }
 
+function hasUsableCustomerEmail(value: string) {
+  return Boolean(value) && value !== "—" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function hasUsableCustomerPhone(value: string) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length >= 10 && !/^0+$/.test(digits) && !value.includes("XXX");
+}
+
+function getCustomerContactMethod(email: string, phone: string) {
+  const emailReady = hasUsableCustomerEmail(email);
+  const phoneReady = hasUsableCustomerPhone(phone);
+
+  if (emailReady && phoneReady) return "Email + phone";
+  if (phoneReady) return "Phone only";
+  if (emailReady) return "Email only";
+  return "No usable contact";
+}
+
+function normalizeCustomerDuplicateText(value: unknown) {
+  return asString(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const genericCustomerDuplicateNames = new Set([
+  "customer",
+  "pet parent",
+  "member",
+  "user",
+  "sitguru",
+  "sitguru member",
+  "test",
+  "demo",
+  "unknown",
+  "signup review needed",
+]);
+
+function isStrongCustomerDuplicateName(name: string) {
+  const normalized = normalizeCustomerDuplicateText(name);
+  if (!normalized || genericCustomerDuplicateNames.has(normalized)) return false;
+  if (normalized.startsWith("sitguru ")) return false;
+
+  const parts = normalized.split(" ").filter(Boolean);
+  return parts.length >= 2 && parts.every((part) => part.length >= 2);
+}
+
+function getNormalizedCustomerDuplicateKeys(
+  name: string,
+  email: string,
+  phone: string,
+) {
+  const keys: string[] = [];
+  const normalizedEmail = email.toLowerCase();
+  const normalizedPhone = phone.replace(/\D/g, "");
+
+  if (hasUsableCustomerEmail(email)) keys.push(`email:${normalizedEmail}`);
+  if (hasUsableCustomerPhone(phone)) keys.push(`phone:${normalizedPhone}`);
+  if (isStrongCustomerDuplicateName(name)) {
+    keys.push(`name:${normalizeCustomerDuplicateText(name)}`);
+  }
+
+  return keys;
+}
+
+function describeCustomerDuplicateMatch(keys: string[]) {
+  const reasons = Array.from(
+    new Set(
+      keys
+        .map((key) => {
+          if (key.startsWith("email:")) return "shared email";
+          if (key.startsWith("phone:")) return "shared phone";
+          if (key.startsWith("name:")) return "shared real name";
+          return "";
+        })
+        .filter(Boolean),
+    ),
+  );
+
+  if (!reasons.length) return "Review possible duplicate accounts";
+  return `Review possible duplicates (${reasons.join(", ")})`;
+}
+
+function getCustomerRoleBadges({
+  role,
+  hasGuruWorkspace,
+}: {
+  role: string;
+  hasGuruWorkspace: boolean;
+}) {
+  const roles = new Set<string>(["Pet Parent"]);
+  const normalized = role.toLowerCase().replace(/[\s-]+/g, "_");
+
+  if (
+    hasGuruWorkspace ||
+    ["guru", "sitter", "both", "guru_and_pet_parent", "dual"].includes(normalized)
+  ) {
+    roles.add("Guru");
+  }
+
+  if (
+    ["ambassador", "partner", "community_ambassador"].includes(normalized) ||
+    normalized.includes("ambassador")
+  ) {
+    roles.add("Ambassador");
+  }
+
+  return Array.from(roles);
+}
+
+function getCustomerMissingRequirements(customer: CustomerInsight) {
+  const missing: string[] = [];
+
+  if (!hasUsableCustomerName(customer)) missing.push("Full name");
+  if (!hasUsableCustomerEmail(customer.email)) missing.push("Email");
+  if (!hasCustomerLocation(customer)) missing.push("Location");
+  if (customer.petCount <= 0) missing.push("Pet profile");
+  if (customer.bookingCount <= 0) missing.push("First booking");
+
+  return missing;
+}
+
+function formatCustomerActivityDate(value?: string | null) {
+  if (!value) return "—";
+
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(value));
+  } catch {
+    return "—";
+  }
+}
+
+function getCustomerNextAction(customer: CustomerInsight) {
+  if (customer.possibleDuplicate) {
+    return customer.nextAction || "Review possible duplicate accounts";
+  }
+
+  const status = `${customer.signupQualityLabel || ""} ${customer.segment || ""}`.toLowerCase();
+  const completion = customer.profileCompletion || 0;
+
+  if (
+    customer.signupQuality === "likely_test_spam" ||
+    status.includes("spam") ||
+    status.includes("test")
+  ) {
+    return "Review for archive / cleanup";
+  }
+  if (
+    customer.flaggedForReview ||
+    customer.signupQuality === "needs_review" ||
+    status.includes("needs")
+  ) {
+    return "Complete profile details";
+  }
+  if (completion < 50) return "Complete profile details";
+  if (customer.bookingCount === 0) return "Encourage first booking";
+  if (customer.paidBookingCount === 0) return "Review unpaid booking activity";
+  if (customer.petCount === 0) return "Ask for pet profile setup";
+  return "Open Pet Parent review";
+}
+
 function getRowBoolean(row: AnyRow, keys: string[]) {
   for (const key of keys) {
     const value = row[key];
@@ -1358,6 +1533,7 @@ async function getCustomerIntelligenceData() {
     networkClicksResult,
     partnerCampaignsResult,
     registrationHealthResult,
+    gurusResult,
   ] = await Promise.all([
     safeAdminQuery(
       supabaseAdmin
@@ -1447,6 +1623,16 @@ async function getCustomerIntelligenceData() {
         .limit(1000),
       "admin_pet_parent_registration_health",
     ),
+    safeAdminQuery(
+      supabaseAdmin
+        .from("gurus")
+        .select(
+          "user_id, profile_id, city, state, service_city, service_state, zip_code, service_zip, service_zip_code, postal_code",
+        )
+        .order("created_at", { ascending: false })
+        .limit(2000),
+      "gurus",
+    ),
   ]);
 
   const rawProfiles = ((profilesResult.data || []) as ProfileRow[]).filter(Boolean);
@@ -1457,6 +1643,19 @@ async function getCustomerIntelligenceData() {
   const rawLaunchWaitlist = ((launchWaitlistResult.data || []) as AnyRow[]).filter(Boolean);
   const rawReferralClicks = ((referralClicksResult.data || []) as AnyRow[]).filter(Boolean);
   const rawReferralConversions = ((referralConversionsResult.data || []) as AnyRow[]).filter(Boolean);
+  const rawGurus = ((gurusResult.data || []) as AnyRow[]).filter(Boolean);
+  const guruLocationByUserId = new Map<string, AnyRow>();
+  for (const guru of rawGurus) {
+    const keys = [
+      asString(guru.user_id),
+      asString(guru.profile_id),
+    ].filter(Boolean);
+    for (const key of keys) {
+      if (!guruLocationByUserId.has(key)) {
+        guruLocationByUserId.set(key, guru);
+      }
+    }
+  }
   const rawNetworkClicks = ((networkClicksResult.data || []) as AnyRow[]).filter(Boolean);
   const rawPartnerCampaigns = ((partnerCampaignsResult.data || []) as AnyRow[]).filter(Boolean);
   const rawRegistrationHealth = (
@@ -1565,33 +1764,61 @@ async function getCustomerIntelligenceData() {
   const campaignRows = [...signupRows, ...clickRows, ...conversionRows, ...partnerCampaigns];
 
   const customerMap = new Map<string, CustomerInsight>();
+  const profileRoleById = new Map<string, string>();
 
   for (const profile of profiles) {
     if (!profile.id) continue;
 
     const source = normalizeSource(getSource(profile as AnyRow));
     const health = registrationHealthByProfileId.get(profile.id);
+    const guruLocation = guruLocationByUserId.get(profile.id);
+    const profileRole = getRole(profile as AnyRow) || asString(health?.role).toLowerCase();
+    profileRoleById.set(profile.id, profileRole);
     const displayRow = {
       ...(profile as AnyRow),
       profile_email: asString(health?.profile_email),
       auth_email: asString(health?.auth_email),
     };
 
+    const profileCity = getCity(profile as AnyRow);
+    const profileState = getState(profile as AnyRow);
+    const profileZip = getZipCode(profile as AnyRow);
+    const sharedCity = profileCity || (guruLocation ? getCity(guruLocation) : "");
+    const sharedState = profileState || (guruLocation ? getState(guruLocation) : "");
+    const sharedZip = profileZip || (guruLocation ? getZipCode(guruLocation) : "");
+    const usedGuruLocationFallback = Boolean(
+      guruLocation &&
+        ((!profileCity && sharedCity) ||
+          (!profileState && sharedState) ||
+          (!profileZip && sharedZip)),
+    );
+    const phone = getText(displayRow, [
+      "phone",
+      "phone_number",
+      "profile_phone",
+      "auth_phone",
+    ]);
+    const email = getAccountEmail(displayRow);
+    const roles = getCustomerRoleBadges({
+      role: profileRole,
+      hasGuruWorkspace: guruLocationByUserId.has(profile.id),
+    });
+
     customerMap.set(profile.id, {
       id: profile.id,
       name: getAccountDisplayName(displayRow, "Customer"),
-      email: getAccountEmail(displayRow),
-      phone: getText(displayRow, ["phone", "phone_number", "profile_phone", "auth_phone"]),
+      email,
+      phone,
       avatarUrl: getProfileAvatarUrl({
         ...(profile as AnyRow),
         auth_avatar_url: asString(health?.auth_avatar_url),
         auth_picture: asString(health?.auth_picture),
         raw_user_meta_data: health?.raw_user_meta_data || null,
       }),
-      city: getCity(profile as AnyRow),
-      state: getState(profile as AnyRow),
+      city: sharedCity,
+      state: sharedState,
       country: getCountry(profile as AnyRow),
-      zipCode: getZipCode(profile as AnyRow),
+      zipCode: sharedZip,
       nameSource: getAccountDisplaySource(displayRow),
       emailSource: getEmailSource(displayRow),
       photoSource: getPhotoSource({
@@ -1600,7 +1827,9 @@ async function getCustomerIntelligenceData() {
         auth_picture: asString(health?.auth_picture),
         raw_user_meta_data: health?.raw_user_meta_data || null,
       }),
-      locationSource: getLocationSource(profile as AnyRow),
+      locationSource: usedGuruLocationFallback
+        ? "Shared Guru workspace"
+        : getLocationSource(profile as AnyRow),
       source,
       campaign: getCampaign(profile as AnyRow),
       bookingCount: 0,
@@ -1622,6 +1851,9 @@ async function getCustomerIntelligenceData() {
       ),
       archivedAt: getArchivedAt(profile as AnyRow),
       profileCompletion: 0,
+      roles,
+      contactMethod: getCustomerContactMethod(email, phone),
+      recordSourceLabel: source,
     });
   }
 
@@ -1639,13 +1871,15 @@ async function getCustomerIntelligenceData() {
 
     const bookingSource = normalizeSource(getSource(booking as AnyRow));
 
+    const bookingEmail = booking.customer_email || "";
+    const bookingPhone = getText(booking as AnyRow, ["phone", "phone_number"]);
     const existing =
       customerMap.get(fallbackId) ||
       {
         id: fallbackId,
         name: getAccountDisplayName(booking as AnyRow, "Customer"),
-        email: booking.customer_email || "",
-        phone: "",
+        email: bookingEmail,
+        phone: bookingPhone,
         avatarUrl: "",
         city: "",
         state: "",
@@ -1673,6 +1907,9 @@ async function getCustomerIntelligenceData() {
         adminStatusLabel: "Active",
         archivedAt: null,
         profileCompletion: 0,
+        roles: ["Pet Parent"],
+        contactMethod: getCustomerContactMethod(bookingEmail, bookingPhone),
+        recordSourceLabel: bookingSource,
       };
 
     const bookingDate = getBookingDate(booking);
@@ -1807,16 +2044,81 @@ async function getCustomerIntelligenceData() {
         profileCompletion: 0,
       });
 
+      const roles =
+        enriched.roles?.length
+          ? enriched.roles
+          : getCustomerRoleBadges({
+              role: profileRoleById.get(customer.id) || "",
+              hasGuruWorkspace: guruLocationByUserId.has(customer.id),
+            });
+      const contactMethod =
+        enriched.contactMethod ||
+        getCustomerContactMethod(enriched.email, enriched.phone);
+      const flaggedForReview =
+        signupQuality.signupQuality === "likely_test_spam" ||
+        signupQuality.signupQuality === "needs_review" ||
+        ["needs_review", "incomplete_signup", "likely_spam"].includes(
+          enriched.adminStatus,
+        );
+
       return {
         ...enriched,
         segment,
         ...signupQuality,
         profileCompletion,
+        roles,
+        contactMethod,
+        flaggedForReview,
+        recordSourceLabel: enriched.recordSourceLabel || enriched.source || "Direct",
       };
     }),
   );
 
-  const sortedCustomers = customers.sort((a, b) => b.totalSpend - a.totalSpend);
+  const duplicateCounts = new Map<string, number>();
+  for (const customer of customers) {
+    for (const key of getNormalizedCustomerDuplicateKeys(
+      customer.name,
+      customer.email,
+      customer.phone,
+    )) {
+      duplicateCounts.set(key, (duplicateCounts.get(key) || 0) + 1);
+    }
+  }
+
+  const enrichedCustomers = customers.map((customer) => {
+    const duplicateKeys = getNormalizedCustomerDuplicateKeys(
+      customer.name,
+      customer.email,
+      customer.phone,
+    );
+    const matchedDuplicateKeys = duplicateKeys.filter(
+      (key) => (duplicateCounts.get(key) || 0) > 1,
+    );
+    const possibleDuplicate = matchedDuplicateKeys.length > 0;
+    const missingRequirements = getCustomerMissingRequirements(customer);
+    const lastActivity = formatCustomerActivityDate(
+      customer.lastBookingDate || customer.firstSeenDate,
+    );
+    const withDuplicate = {
+      ...customer,
+      possibleDuplicate,
+      flaggedForReview: Boolean(customer.flaggedForReview) || possibleDuplicate,
+      missingRequirements,
+      lastActivity,
+      nextAction: possibleDuplicate
+        ? describeCustomerDuplicateMatch(matchedDuplicateKeys)
+        : undefined,
+    };
+
+    return {
+      ...withDuplicate,
+      nextAction: getCustomerNextAction(withDuplicate),
+    };
+  });
+
+  const sortedCustomers = enrichedCustomers.sort(
+    (a, b) => b.totalSpend - a.totalSpend,
+  );
 
   const totalCustomers = customers.length;
   const totalRevenue = customers.reduce(

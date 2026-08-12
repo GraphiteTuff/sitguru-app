@@ -194,7 +194,32 @@ function getPriority(guru: GuruDisplayRow) {
   return 6;
 }
 
-function sortGurus(gurus: GuruDisplayRow[]) {
+type GuruSortKey =
+  | "priority"
+  | "name-asc"
+  | "name-desc"
+  | "completion-desc"
+  | "completion-asc"
+  | "activity-desc"
+  | "activity-asc"
+  | "status-bookable"
+  | "status-setup";
+
+function getActivityTime(guru: GuruDisplayRow) {
+  const raw = guru.lastActivity || guru.joined || "";
+  if (!raw || raw === "—") return 0;
+  const parsed = new Date(raw).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function compareNames(a: string, b: string) {
+  return a.localeCompare(b, undefined, {
+    sensitivity: "base",
+    numeric: true,
+  });
+}
+
+function sortGurusByPriority(gurus: GuruDisplayRow[]) {
   return [...gurus].sort((a, b) => {
     const priorityDifference = getPriority(a) - getPriority(b);
     if (priorityDifference) return priorityDifference;
@@ -202,10 +227,48 @@ function sortGurus(gurus: GuruDisplayRow[]) {
     const completionDifference = getCompletion(b) - getCompletion(a);
     if (completionDifference) return completionDifference;
 
-    return a.name.localeCompare(b.name, undefined, {
-      sensitivity: "base",
-      numeric: true,
-    });
+    return compareNames(a.name, b.name);
+  });
+}
+
+function sortGurus(gurus: GuruDisplayRow[], sortKey: GuruSortKey) {
+  if (sortKey === "priority") return sortGurusByPriority(gurus);
+
+  return [...gurus].sort((a, b) => {
+    switch (sortKey) {
+      case "name-asc":
+        return compareNames(a.name, b.name);
+      case "name-desc":
+        return compareNames(b.name, a.name);
+      case "completion-desc": {
+        const diff = getCompletion(b) - getCompletion(a);
+        return diff || compareNames(a.name, b.name);
+      }
+      case "completion-asc": {
+        const diff = getCompletion(a) - getCompletion(b);
+        return diff || compareNames(a.name, b.name);
+      }
+      case "activity-desc": {
+        const diff = getActivityTime(b) - getActivityTime(a);
+        return diff || compareNames(a.name, b.name);
+      }
+      case "activity-asc": {
+        const diff = getActivityTime(a) - getActivityTime(b);
+        return diff || compareNames(a.name, b.name);
+      }
+      case "status-bookable": {
+        const aRank = a.bookable ? 0 : 1;
+        const bRank = b.bookable ? 0 : 1;
+        return aRank - bRank || getPriority(a) - getPriority(b) || compareNames(a.name, b.name);
+      }
+      case "status-setup": {
+        const aRank = a.bookable ? 1 : 0;
+        const bRank = b.bookable ? 1 : 0;
+        return aRank - bRank || getPriority(a) - getPriority(b) || compareNames(a.name, b.name);
+      }
+      default:
+        return 0;
+    }
   });
 }
 
@@ -230,12 +293,14 @@ export default function GuruRecordsTable({
   exportHref,
 }: GuruRecordsTableProps) {
   const [query, setQuery] = useState("");
+  const [sortKey, setSortKey] = useState<GuruSortKey>("priority");
 
   const visibleGurus = useMemo(() => {
     return sortGurus(
       gurus.filter((guru) => searchMatches(guru, query.trim())),
+      sortKey,
     );
-  }, [gurus, query]);
+  }, [gurus, query, sortKey]);
 
   return (
     <div>
@@ -252,7 +317,7 @@ export default function GuruRecordsTable({
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <div className="relative">
             <Search
               size={17}
@@ -275,6 +340,23 @@ export default function GuruRecordsTable({
               </button>
             ) : null}
           </div>
+
+          <select
+            value={sortKey}
+            onChange={(event) => setSortKey(event.target.value as GuruSortKey)}
+            aria-label="Sort queue"
+            className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100"
+          >
+            <option value="priority">Priority (default)</option>
+            <option value="name-asc">Name A–Z</option>
+            <option value="name-desc">Name Z–A</option>
+            <option value="completion-desc">Profile progress High–Low</option>
+            <option value="completion-asc">Profile progress Low–High</option>
+            <option value="activity-desc">Last activity Newest–Oldest</option>
+            <option value="activity-asc">Last activity Oldest–Newest</option>
+            <option value="status-bookable">Status (Bookable first)</option>
+            <option value="status-setup">Status (Needs setup first)</option>
+          </select>
 
           <Link
             href={exportHref}
@@ -405,6 +487,34 @@ export default function GuruRecordsTable({
                         ? "Repair Account"
                         : "Review Guru"}
                     </Link>
+
+                    {(guru.roles || []).includes("Pet Parent") &&
+                    (guru.userId || guru.guruUserId) ? (
+                      <Link
+                        href={`/admin/customers/${encodeURIComponent(
+                          guru.userId || guru.guruUserId || "",
+                        )}`}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs font-black text-sky-800 transition hover:bg-sky-100"
+                      >
+                        <UserRoundCheck size={15} /> Review Pet Parent
+                      </Link>
+                    ) : null}
+
+                    {(guru.roles || []).includes("Ambassador") &&
+                    (guru.userId || guru.guruUserId) ? (
+                      <Link
+                        href={`/admin/ambassadors?q=${encodeURIComponent(
+                          guru.email ||
+                            guru.name ||
+                            guru.userId ||
+                            guru.guruUserId ||
+                            "",
+                        )}`}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-xs font-black text-violet-800 transition hover:bg-violet-100"
+                      >
+                        <UserRoundCheck size={15} /> Review Ambassador
+                      </Link>
+                    ) : null}
 
                     {canMessage ? (
                       <Link
