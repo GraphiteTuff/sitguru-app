@@ -41,6 +41,11 @@ const MAX_SERVICE_RADIUS_MILES = 100;
 const METERS_PER_MILE = 1609.344;
 
 const KNOWN_ZIP_COORDINATES: Record<string, [number, number]> = {
+  "11435": [40.7029, -73.8111],
+  "23323": [36.7634, -76.3397],
+  "23517": [36.8695, -76.2945],
+  "23602": [37.1132, -76.5179],
+  "23608": [37.1526, -76.542],
   "18901": [40.3101, -75.1299],
   "18902": [40.3368, -75.1113],
   "18938": [40.3637, -75.0607],
@@ -68,6 +73,14 @@ const CITY_COORDINATES: Record<string, [number, number]> = {
   "doylestown,pennsylvania": [40.3101, -75.1299],
   "jacksonville,fl": [30.3322, -81.6557],
   "jacksonville,florida": [30.3322, -81.6557],
+  "jamaica,ny": [40.7029, -73.8111],
+  "jamaica,newyork": [40.7029, -73.8111],
+  "newportnews,va": [37.0871, -76.473],
+  "newportnews,virginia": [37.0871, -76.473],
+  "norfolk,va": [36.8508, -76.2859],
+  "norfolk,virginia": [36.8508, -76.2859],
+  "chesapeake,va": [36.7682, -76.2875],
+  "chesapeake,virginia": [36.7682, -76.2875],
   "newhope,pa": [40.3643, -74.9513],
   "newhope,pennsylvania": [40.3643, -74.9513],
   "philadelphia,pa": [39.9526, -75.1652],
@@ -311,59 +324,72 @@ function getInitials(name: string) {
   return initials || "SG";
 }
 
-function isValidMainlandCoordinate(latitude: number | null, longitude: number | null) {
+function firstFiniteNumber(...values: unknown[]) {
+  for (const value of values) {
+    const parsed = asNumber(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
+/** Accept search-resolved coords (finite, reject 0,0 placeholders). */
+function isUsableMapCoordinate(latitude: number | null, longitude: number | null) {
   return (
     latitude !== null &&
     longitude !== null &&
     Number.isFinite(latitude) &&
     Number.isFinite(longitude) &&
-    latitude >= 24.3 &&
-    latitude <= 49.7 &&
-    longitude >= -125.25 &&
-    longitude <= -66.4 &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180 &&
     latitude !== 0 &&
     longitude !== 0
   );
 }
 
 function getServiceCoordinates(marker: RawMarker) {
-  const latitude =
-    asNumber(marker.service_latitude) ??
-    asNumber(marker.serviceLatitude) ??
-    asNumber(marker.service_area_latitude) ??
-    asNumber(marker.serviceAreaLatitude) ??
-    asNumber(marker.care_latitude) ??
-    asNumber(marker.careLatitude) ??
-    asNumber(marker.map_latitude) ??
-    asNumber(marker.mapLatitude);
+  const latitude = firstFiniteNumber(
+    marker.service_latitude,
+    marker.serviceLatitude,
+    marker.service_area_latitude,
+    marker.serviceAreaLatitude,
+    marker.care_latitude,
+    marker.careLatitude,
+    marker.map_latitude,
+    marker.mapLatitude,
+  );
 
-  const longitude =
-    asNumber(marker.service_longitude) ??
-    asNumber(marker.serviceLongitude) ??
-    asNumber(marker.service_area_longitude) ??
-    asNumber(marker.serviceAreaLongitude) ??
-    asNumber(marker.care_longitude) ??
-    asNumber(marker.careLongitude) ??
-    asNumber(marker.map_longitude) ??
-    asNumber(marker.mapLongitude);
+  const longitude = firstFiniteNumber(
+    marker.service_longitude,
+    marker.serviceLongitude,
+    marker.service_area_longitude,
+    marker.serviceAreaLongitude,
+    marker.care_longitude,
+    marker.careLongitude,
+    marker.map_longitude,
+    marker.mapLongitude,
+  );
 
   return { latitude, longitude };
 }
 
 function getGenericCoordinates(marker: RawMarker) {
-  const latitude =
-    asNumber(marker.latitude) ??
-    asNumber(marker.lat) ??
-    asNumber(marker.location_latitude) ??
-    asNumber(marker.locationLatitude);
+  const latitude = firstFiniteNumber(
+    marker.latitude,
+    marker.lat,
+    marker.location_latitude,
+    marker.locationLatitude,
+  );
 
-  const longitude =
-    asNumber(marker.longitude) ??
-    asNumber(marker.lng) ??
-    asNumber(marker.lon) ??
-    asNumber(marker.long) ??
-    asNumber(marker.location_longitude) ??
-    asNumber(marker.locationLongitude);
+  const longitude = firstFiniteNumber(
+    marker.longitude,
+    marker.lng,
+    marker.lon,
+    marker.long,
+    marker.location_longitude,
+    marker.locationLongitude,
+  );
 
   return { latitude, longitude };
 }
@@ -410,18 +436,18 @@ function normalizeMarker(marker: RawMarker): NormalizedMarker | null {
 
   // Real profile/service coordinates win over hardcoded ZIP/city tables so
   // Gurus in VA/NC/etc. are not pinned to Pennsylvania fallback cities.
-  if (isValidMainlandCoordinate(preNormalized.latitude, preNormalized.longitude)) {
+  if (isUsableMapCoordinate(preNormalized.latitude, preNormalized.longitude)) {
     latitude = preNormalized.latitude;
     longitude = preNormalized.longitude;
     source = "service_coordinates";
   } else if (
-    isValidMainlandCoordinate(serviceCoordinates.latitude, serviceCoordinates.longitude)
+    isUsableMapCoordinate(serviceCoordinates.latitude, serviceCoordinates.longitude)
   ) {
     latitude = serviceCoordinates.latitude;
     longitude = serviceCoordinates.longitude;
     source = "service_coordinates";
   } else if (
-    isValidMainlandCoordinate(genericCoordinates.latitude, genericCoordinates.longitude)
+    isUsableMapCoordinate(genericCoordinates.latitude, genericCoordinates.longitude)
   ) {
     latitude = genericCoordinates.latitude;
     longitude = genericCoordinates.longitude;
@@ -438,7 +464,7 @@ function normalizeMarker(marker: RawMarker): NormalizedMarker | null {
     !id ||
     latitude === null ||
     longitude === null ||
-    !isValidMainlandCoordinate(latitude, longitude)
+    !isUsableMapCoordinate(latitude, longitude)
   ) {
     return null;
   }
@@ -465,7 +491,7 @@ function isValidCenter(center?: [number, number]) {
   return (
     Array.isArray(center) &&
     center.length === 2 &&
-    isValidMainlandCoordinate(center[0], center[1])
+    isUsableMapCoordinate(center[0], center[1])
   );
 }
 
@@ -540,7 +566,8 @@ function createPopupHtml(marker: NormalizedMarker) {
 
       <a
         href="${escapeHtml(marker.profileHref)}"
-        class="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+        style="color:#ffffff !important;"
+        class="sitguru-map-profile-cta mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
       >
         View Guru Profile
       </a>
@@ -619,7 +646,7 @@ function updateMapViewport({
     }
 
     markers.forEach((marker) => {
-      if (isValidMainlandCoordinate(marker.latitude, marker.longitude)) {
+      if (isUsableMapCoordinate(marker.latitude, marker.longitude)) {
         bounds.extend([marker.latitude, marker.longitude]);
         validPointsFound = true;
       }
@@ -1121,6 +1148,15 @@ export default function MapContent({
         .sitguru-map-shell .leaflet-popup-content {
           margin: 0;
           min-width: 230px;
+        }
+
+        .sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta,
+        .sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:link,
+        .sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:visited,
+        .sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:hover,
+        .sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:active {
+          color: #ffffff !important;
+          text-decoration: none !important;
         }
 
         .sitguru-map-shell .leaflet-tooltip {

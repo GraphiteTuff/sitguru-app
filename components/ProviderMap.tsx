@@ -32,6 +32,11 @@ const MapWithNoSSR = dynamic(() => import("./MapContent"), {
 });
 
 const KNOWN_ZIP_COORDINATES: Record<string, [number, number]> = {
+  "11435": [40.7029, -73.8111],
+  "23323": [36.7634, -76.3397],
+  "23517": [36.8695, -76.2945],
+  "23602": [37.1132, -76.5179],
+  "23608": [37.1526, -76.542],
   "18901": [40.3101, -75.1299],
   "18902": [40.3368, -75.1113],
   "18938": [40.3637, -75.0607],
@@ -59,6 +64,14 @@ const CITY_COORDINATES: Record<string, [number, number]> = {
   "doylestown,pennsylvania": [40.3101, -75.1299],
   "jacksonville,fl": [30.3322, -81.6557],
   "jacksonville,florida": [30.3322, -81.6557],
+  "jamaica,ny": [40.7029, -73.8111],
+  "jamaica,newyork": [40.7029, -73.8111],
+  "newportnews,va": [37.0871, -76.473],
+  "newportnews,virginia": [37.0871, -76.473],
+  "norfolk,va": [36.8508, -76.2859],
+  "norfolk,virginia": [36.8508, -76.2859],
+  "chesapeake,va": [36.7682, -76.2875],
+  "chesapeake,virginia": [36.7682, -76.2875],
   "newhope,pa": [40.3643, -74.9513],
   "newhope,pennsylvania": [40.3643, -74.9513],
   "philadelphia,pa": [39.9526, -75.1652],
@@ -94,12 +107,15 @@ function cityKey(city: string, state: string) {
   return `${normalizeLocationText(city)},${normalizeLocationText(state)}`;
 }
 
-function isInsideMainlandUs(latitude: number, longitude: number) {
+/** Accept any finite map coordinate search already resolved (reject 0,0 placeholders). */
+function isUsableMapCoordinate(latitude: number, longitude: number) {
   return (
-    latitude >= 24.3 &&
-    latitude <= 49.7 &&
-    longitude >= -125.25 &&
-    longitude <= -66.4 &&
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180 &&
     latitude !== 0 &&
     longitude !== 0
   );
@@ -111,8 +127,16 @@ function isValidCenter(center?: [number, number]) {
     center.length === 2 &&
     Number.isFinite(center[0]) &&
     Number.isFinite(center[1]) &&
-    isInsideMainlandUs(center[0], center[1])
+    isUsableMapCoordinate(center[0], center[1])
   );
+}
+
+function firstFiniteNumber(...values: unknown[]) {
+  for (const value of values) {
+    const parsed = getNumber(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
 }
 
 function getMarkerId(marker: MapMarker) {
@@ -199,38 +223,42 @@ function getMarkerZipCode(marker: MapMarker) {
 }
 
 function getMarkerLatitude(marker: MapMarker) {
-  return getNumber(
-    marker.service_latitude ??
-      marker.serviceLatitude ??
-      marker.service_area_latitude ??
-      marker.serviceAreaLatitude ??
-      marker.care_latitude ??
-      marker.careLatitude ??
-      marker.map_latitude ??
-      marker.mapLatitude ??
-      marker.latitude ??
-      marker.lat ??
-      marker.location_latitude ??
-      marker.locationLatitude,
+  return firstFiniteNumber(
+    marker.__sitguruMapLatitude,
+    marker.__sitguru_map_latitude,
+    marker.service_latitude,
+    marker.serviceLatitude,
+    marker.service_area_latitude,
+    marker.serviceAreaLatitude,
+    marker.care_latitude,
+    marker.careLatitude,
+    marker.map_latitude,
+    marker.mapLatitude,
+    marker.latitude,
+    marker.lat,
+    marker.location_latitude,
+    marker.locationLatitude,
   );
 }
 
 function getMarkerLongitude(marker: MapMarker) {
-  return getNumber(
-    marker.service_longitude ??
-      marker.serviceLongitude ??
-      marker.service_area_longitude ??
-      marker.serviceAreaLongitude ??
-      marker.care_longitude ??
-      marker.careLongitude ??
-      marker.map_longitude ??
-      marker.mapLongitude ??
-      marker.longitude ??
-      marker.lng ??
-      marker.lon ??
-      marker.long ??
-      marker.location_longitude ??
-      marker.locationLongitude,
+  return firstFiniteNumber(
+    marker.__sitguruMapLongitude,
+    marker.__sitguru_map_longitude,
+    marker.service_longitude,
+    marker.serviceLongitude,
+    marker.service_area_longitude,
+    marker.serviceAreaLongitude,
+    marker.care_longitude,
+    marker.careLongitude,
+    marker.map_longitude,
+    marker.mapLongitude,
+    marker.longitude,
+    marker.lng,
+    marker.lon,
+    marker.long,
+    marker.location_longitude,
+    marker.locationLongitude,
   );
 }
 
@@ -253,24 +281,22 @@ function getMarkerRadiusMiles(marker: MapMarker) {
 }
 
 function getPreferredMarkerCoordinates(marker: MapMarker): [number, number] | null {
-  // 1. Check explicit coordinates FIRST
+  // Trust coordinates already stamped by search (ZIP/API/city fallbacks).
   const latitude = getMarkerLatitude(marker);
   const longitude = getMarkerLongitude(marker);
 
   if (
     latitude !== null &&
     longitude !== null &&
-    isInsideMainlandUs(latitude, longitude)
+    isUsableMapCoordinate(latitude, longitude)
   ) {
     return [latitude, longitude];
   }
 
-  // 2. Fall back to hardcoded ZIP codes if explicit database coords are null
   const zipCode = getMarkerZipCode(marker);
   const zipCoordinates = zipCode ? KNOWN_ZIP_COORDINATES[zipCode] : undefined;
   if (zipCoordinates) return zipCoordinates;
 
-  // 3. Fall back to hardcoded Cities
   const city = getMarkerCity(marker);
   const state = getMarkerState(marker);
   const cityCoordinates =

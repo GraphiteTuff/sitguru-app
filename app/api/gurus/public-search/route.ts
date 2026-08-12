@@ -151,6 +151,15 @@ const FALLBACK_LOCATION_COORDINATES: Record<
   string,
   { latitude: number; longitude: number }
 > = {
+  "zip:11435": { latitude: 40.7029, longitude: -73.8111 },
+  "city:jamaica:ny": { latitude: 40.7029, longitude: -73.8111 },
+  "zip:23608": { latitude: 37.1526, longitude: -76.542 },
+  "zip:23602": { latitude: 37.1132, longitude: -76.5179 },
+  "zip:23517": { latitude: 36.8695, longitude: -76.2945 },
+  "zip:23323": { latitude: 36.7634, longitude: -76.3397 },
+  "city:newportnews:va": { latitude: 37.0871, longitude: -76.473 },
+  "city:norfolk:va": { latitude: 36.8508, longitude: -76.2859 },
+  "city:chesapeake:va": { latitude: 36.7682, longitude: -76.2875 },
   "zip:18951": { latitude: 40.4418, longitude: -75.3416 },
   "city:quakertown:pa": { latitude: 40.4418, longitude: -75.3416 },
   "zip:19512": { latitude: 40.3337, longitude: -75.6374 },

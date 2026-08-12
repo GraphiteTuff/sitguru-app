@@ -1504,6 +1504,17 @@ async function updateGuruStatusAction(formData: FormData) {
       },
       requiredColumns: [],
     });
+  }
+
+  if (action === "bookable") {
+    // Bookable Gurus must have map coordinates so they appear on Find Care.
+    await enrichAndPersistLocationFromZip({
+      guruId: realGuruId,
+      profileId: profileId || null,
+      guru: guru as Record<string, string | null>,
+      profile: (profile || null) as Record<string, string | null> | null,
+      ensureMapCoordinates: true,
+    });
   } else if (profileId && ["rejected", "suspended", "needs_info"].includes(action)) {
     await updateWithColumnFallback({
       table: "profiles",

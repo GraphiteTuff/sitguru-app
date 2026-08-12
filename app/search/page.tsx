@@ -181,6 +181,14 @@ const CITY_COORDINATES: Record<string, [number, number]> = {
   "allentown,pennsylvania": [40.6023, -75.4714],
   "williamsport,pa": [41.2412, -77.0011],
   "williamsport,pennsylvania": [41.2412, -77.0011],
+  "jamaica,ny": [40.7029, -73.8111],
+  "jamaica,newyork": [40.7029, -73.8111],
+  "newportnews,va": [37.0871, -76.473],
+  "newportnews,virginia": [37.0871, -76.473],
+  "norfolk,va": [36.8508, -76.2859],
+  "norfolk,virginia": [36.8508, -76.2859],
+  "chesapeake,va": [36.7682, -76.2875],
+  "chesapeake,virginia": [36.7682, -76.2875],
   "kingofprussia,pa": [40.1013, -75.3836],
   "kingofprussia,pennsylvania": [40.1013, -75.3836],
   "levittown,pa": [40.1551, -74.8288],
@@ -1236,9 +1244,21 @@ function getProviderMapMarkerRows(
 
       if (!mapMarkerId) return null;
 
+      // Keep badge + overlay counts aligned: drop placeholder 0,0 coords.
+      if (
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude) ||
+        latitude === 0 ||
+        longitude === 0
+      ) {
+        return null;
+      }
+
       return {
         ...guru,
         __sitguruMapMarkerId: mapMarkerId,
+        __sitguruMapLatitude: latitude,
+        __sitguruMapLongitude: longitude,
         id: guru.id || mapMarkerId,
         name: guruName,
         full_name: guru.full_name || guruName,
@@ -1250,6 +1270,8 @@ function getProviderMapMarkerRows(
         lng: longitude,
         service_latitude: latitude,
         service_longitude: longitude,
+        map_latitude: latitude,
+        map_longitude: longitude,
         service_radius_miles: getGuruRadius(guru),
         service_radius_display: guru.service_radius_display || getGuruRadius(guru),
         profile_url: getGuruHref(guru),
