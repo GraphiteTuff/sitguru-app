@@ -22,6 +22,7 @@ import {
   LifeBuoy,
   LineChart,
   Link2,
+  Mail,
   Megaphone,
   MessageCircle,
   PawPrint,
@@ -80,6 +81,7 @@ const adminRoutes = {
   auditTrail: "/admin/audit-trail",
   referrals: "/admin/referrals",
   salesMarketing: "/admin/sales-marketing",
+  emailUpdates: "/admin/email-updates",
   programs: "/admin/programs",
   partners: "/admin/partners",
   analytics: "/admin/analytics",
@@ -128,6 +130,11 @@ const navSections = [
         label: "Sales & Marketing",
         href: adminRoutes.salesMarketing,
         icon: Megaphone,
+      },
+      {
+        label: "Email Updates",
+        href: adminRoutes.emailUpdates,
+        icon: Mail,
       },
       {
         label: "Growth & Referrals",
@@ -290,6 +297,11 @@ const mobileGrowthLinks = [
     label: "Sales & Marketing",
     href: adminRoutes.salesMarketing,
     icon: Megaphone,
+  },
+  {
+    label: "Email Updates",
+    href: adminRoutes.emailUpdates,
+    icon: Mail,
   },
   { label: "Growth & Referrals", href: adminRoutes.referrals, icon: Link2 },
   { label: "Programs", href: adminRoutes.programs, icon: ShieldCheck },
@@ -610,6 +622,7 @@ function AdminFooter() {
       links: [
         { label: "Growth & Referrals", href: adminRoutes.referrals },
         { label: "Sales & Marketing", href: adminRoutes.salesMarketing },
+        { label: "Email Updates", href: adminRoutes.emailUpdates },
         { label: "Programs", href: adminRoutes.programs },
         { label: "Partners", href: adminRoutes.partners },
         { label: "Analytics", href: adminRoutes.analytics },

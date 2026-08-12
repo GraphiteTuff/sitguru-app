@@ -43,6 +43,7 @@ const routes = {
   partners: "/admin/partners",
   analytics: "/admin/analytics",
   launchSignups: "/admin/launch-signups",
+  emailUpdates: "/admin/email-updates",
   ambassadors: "/admin/ambassadors",
   ambassadorLeads: "/admin/ambassador-leads",
   programs: "/admin/programs",
@@ -292,6 +293,15 @@ export default async function SalesMarketingAdminPage() {
       href: routes.campaigns,
       wiring: "live",
       value: number(data.metrics.campaigns),
+      icon: <Megaphone size={20} />,
+    },
+    {
+      eyebrow: "Audience",
+      title: "Email Updates",
+      description:
+        "Footer and site opt-ins for news, offers, and announcements — with CSV export.",
+      href: routes.emailUpdates,
+      wiring: "live",
       icon: <Megaphone size={20} />,
     },
     {

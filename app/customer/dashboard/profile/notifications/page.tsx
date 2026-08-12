@@ -225,6 +225,18 @@ async function saveNotifications(userId: string, form: NotificationsForm) {
   if (error) {
     throw new Error(`Notifications did not save: ${error.message}`);
   }
+
+  try {
+    await fetch("/api/email-updates/me", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subscribed: form.marketing_notifications,
+      }),
+    });
+  } catch {
+    // Preference list sync is best-effort; profile toggle already saved.
+  }
 }
 
 function SetupNavigation({ setupStatus }: { setupStatus: SetupStatus }) {
@@ -683,7 +695,7 @@ export default function CustomerNotificationsPage() {
                       ["Bookings", form.booking_reminders],
                       ["Care Updates", form.care_updates],
                       ["Messages", form.message_alerts],
-                      ["Marketplace", form.marketing_notifications],
+                      ["Email updates", form.marketing_notifications],
                     ].map(([label, complete]) => (
                       <div
                         key={String(label)}
@@ -838,8 +850,8 @@ export default function CustomerNotificationsPage() {
 
                       <ToggleCard
                         icon={<Megaphone className="h-5 w-5" />}
-                        title="Marketplace updates and promotions"
-                        description="Optional updates about promotions, referral campaigns, marketplace news, local offers, and new SitGuru features."
+                        title="Email updates, offers, and announcements"
+                        description="Don’t miss out on SitGuru news, exclusive offers, and special announcements. You can change this anytime here in My Account, or unsubscribe from any marketing email."
                         checked={form.marketing_notifications}
                         onChange={(checked) =>
                           setForm({

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import SiteLogo from "@/components/SiteLogo";
+import EmailUpdatesSignup from "@/components/EmailUpdatesSignup";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   FaFacebookF,
@@ -201,6 +202,10 @@ export default function Footer() {
                 >
                   Become a Guru
                 </Link>
+              </div>
+
+              <div className="mt-5">
+                <EmailUpdatesSignup source="footer" />
               </div>
 
               <SocialLinks />
