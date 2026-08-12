@@ -993,7 +993,7 @@ function CompactPartnerSection({
     {
       name: "Crimson Cat Studios",
       href: "https://www.crimsoncatstudios.com/",
-      image: "/images/partners/crimson-cat-studios.png",
+      image: "/images/partners/crimson-cat-studios-light.png",
       imageClassName: "h-auto max-h-20 w-full object-contain",
       imageWrapperClassName: "bg-white",
     },
