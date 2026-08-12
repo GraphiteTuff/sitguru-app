@@ -212,24 +212,24 @@ export default function SupportDashboardClient({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
             Live ticket queue
           </p>
-          <p className="mt-1 text-sm text-slate-400">
-            Click a row to open the in-line workspace. Quick actions update
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            Click a card to open the ticket workspace. Quick actions update
             without a full page reload.
           </p>
         </div>
         <span
-          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] ${
             liveState === "live"
-              ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-              : "border-amber-400/30 bg-amber-400/10 text-amber-100"
+              ? "bg-emerald-100 text-emerald-800"
+              : "bg-amber-100 text-amber-800"
           }`}
         >
           <span
             className={`h-2 w-2 rounded-full ${
-              liveState === "live" ? "bg-emerald-400" : "bg-amber-300"
+              liveState === "live" ? "bg-emerald-600" : "bg-amber-500"
             }`}
           />
           {liveState === "live" ? "Realtime live" : "Connecting…"}

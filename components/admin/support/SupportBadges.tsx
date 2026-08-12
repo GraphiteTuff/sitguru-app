@@ -10,14 +10,14 @@ export function PriorityBadge({ priority }: { priority: string }) {
 
   const classes =
     label === "urgent" || normalized === "high" || normalized === "urgent"
-      ? "border-rose-400/20 bg-rose-400/10 text-rose-200"
+      ? "bg-rose-100 text-rose-800"
       : label === "medium" || normalized === "normal" || normalized === "medium"
-        ? "border-amber-400/20 bg-amber-400/10 text-amber-200"
-        : "border-slate-400/20 bg-slate-400/10 text-slate-300";
+        ? "bg-amber-100 text-amber-800"
+        : "bg-slate-100 text-slate-700";
 
   return (
     <span
-      className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${classes}`}
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${classes}`}
     >
       {getPriorityLabel(priority)}
     </span>
@@ -29,16 +29,16 @@ export function StatusBadge({ status }: { status: string }) {
 
   const classes =
     display === "resolved"
-      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+      ? "bg-emerald-100 text-emerald-800"
       : display === "pending"
-        ? "border-amber-400/20 bg-amber-400/10 text-amber-200"
+        ? "bg-amber-100 text-amber-800"
         : display === "open"
-          ? "border-sky-400/20 bg-sky-400/10 text-sky-200"
-          : "border-rose-400/20 bg-rose-400/10 text-rose-200";
+          ? "bg-sky-100 text-sky-800"
+          : "bg-rose-100 text-rose-800";
 
   return (
     <span
-      className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${classes}`}
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${classes}`}
     >
       {getStatusLabel(status)}
     </span>
@@ -50,14 +50,14 @@ export function UserTypeBadge({ userType }: { userType: string }) {
 
   const classes =
     normalized === "guru"
-      ? "border-violet-400/20 bg-violet-400/10 text-violet-200"
+      ? "bg-emerald-100 text-emerald-800"
       : normalized === "ambassador"
-        ? "border-amber-400/20 bg-amber-400/10 text-amber-200"
-        : "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
+        ? "bg-violet-100 text-violet-800"
+        : "bg-sky-100 text-sky-800";
 
   return (
     <span
-      className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${classes}`}
+      className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${classes}`}
     >
       {getUserTypeLabel(normalized)}
     </span>
@@ -72,12 +72,12 @@ export function EmailCheckbox({
   label?: string;
 }) {
   return (
-    <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-slate-300">
+    <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
       <input
         type="checkbox"
         name="sendEmail"
         defaultChecked={defaultChecked}
-        className="h-4 w-4 rounded border-white/20 bg-slate-950 accent-emerald-500"
+        className="h-4 w-4 rounded border-slate-300 text-emerald-700 accent-emerald-700"
       />
       {label}
     </label>

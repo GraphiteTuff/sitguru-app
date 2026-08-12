@@ -4,7 +4,7 @@ import { SUPPORT_SORT_OPTIONS } from "@/lib/admin/support/types";
 import { buildSupportHref } from "@/lib/admin/support/utils";
 
 const fieldClass =
-  "mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-emerald-300/50";
+  "mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100";
 
 type SupportFilterBarProps = {
   filters: SupportFilters;
@@ -21,14 +21,14 @@ export default function SupportFilterBar({
     <form
       method="get"
       action="/admin/support"
-      className="rounded-[28px] border border-white/10 bg-white/5 p-5"
+      className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-4 sm:p-5"
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
             Filter & Sort
           </p>
-          <p className="mt-1 text-sm font-semibold text-slate-300">
+          <p className="mt-1 text-sm font-semibold text-slate-600">
             Showing {filteredTotal.toLocaleString()} of {total.toLocaleString()}{" "}
             cases
           </p>
@@ -36,15 +36,15 @@ export default function SupportFilterBar({
 
         <Link
           href="/admin/support"
-          className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
+          className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50"
         >
           Clear filters
         </Link>
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <label className="xl:col-span-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
             Search
           </span>
           <input
@@ -56,7 +56,7 @@ export default function SupportFilterBar({
         </label>
 
         <label>
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
             Queue
           </span>
           <select name="type" defaultValue={filters.type} className={fieldClass}>
@@ -69,7 +69,7 @@ export default function SupportFilterBar({
         </label>
 
         <label>
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
             User type
           </span>
           <select
@@ -85,7 +85,7 @@ export default function SupportFilterBar({
         </label>
 
         <label>
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
             Status
           </span>
           <select
@@ -102,7 +102,7 @@ export default function SupportFilterBar({
         </label>
 
         <label>
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
             Priority
           </span>
           <select
@@ -120,7 +120,7 @@ export default function SupportFilterBar({
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <label className="min-w-0 flex-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
             Sort by
           </span>
           <select name="sort" defaultValue={filters.sort} className={fieldClass}>
@@ -138,7 +138,7 @@ export default function SupportFilterBar({
 
         <button
           type="submit"
-          className="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+          className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-5 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800"
         >
           Apply filters
         </button>
@@ -149,7 +149,7 @@ export default function SupportFilterBar({
             status: "open",
             sort: "priority_desc",
           })}
-          className="inline-flex items-center justify-center rounded-2xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm font-bold text-rose-100 transition hover:bg-rose-400/20"
+          className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-black text-rose-800 transition hover:bg-rose-100"
         >
           Open + urgent first
         </Link>

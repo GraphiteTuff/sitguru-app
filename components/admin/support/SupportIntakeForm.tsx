@@ -1,7 +1,5 @@
 import Link from "next/link";
-import {
-  addSupportIntakeCase,
-} from "@/lib/admin/support/actions";
+import { addSupportIntakeCase } from "@/lib/admin/support/actions";
 import {
   CASE_TYPE_LABELS,
   FINANCIAL_ACTION_LABELS,
@@ -10,7 +8,7 @@ import { EmailCheckbox } from "@/components/admin/support/SupportBadges";
 import type { SupportAdminOption } from "@/lib/admin/support/data";
 
 const fieldClass =
-  "mt-2 w-full rounded-2xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-semibold text-white outline-none placeholder:text-slate-600 focus:border-emerald-300/50";
+  "mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-100";
 
 type SupportIntakeFormProps = {
   assignees: SupportAdminOption[];
@@ -18,22 +16,22 @@ type SupportIntakeFormProps = {
 
 export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps) {
   return (
-    <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_10px_40px_rgba(0,0,0,0.22)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-        Add Support Email
+    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+        Add support email
       </p>
-      <h2 className="mt-3 text-3xl font-black tracking-tight text-white">
-        Manually enter support@sitguru.com emails.
+      <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+        Manually log support@sitguru.com mail
       </h2>
-      <p className="mt-2 text-sm leading-6 text-slate-400">
-        Copy the email details into this form. Assign an admin, set user type,
-        and optionally send a confirmation to the sender.
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+        Paste the email details, assign an admin, set user type, and optionally
+        send a confirmation to the sender.
       </p>
 
-      <form action={addSupportIntakeCase} className="mt-6 grid gap-4">
+      <form action={addSupportIntakeCase} className="mt-5 grid gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               Sender Name
             </label>
             <input
@@ -44,7 +42,7 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
           </div>
 
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               Sender Email
             </label>
             <input
@@ -58,7 +56,7 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               Sender Phone
             </label>
             <input
@@ -69,7 +67,7 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
           </div>
 
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               Related Booking ID
             </label>
             <input
@@ -81,7 +79,7 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
         </div>
 
         <div>
-          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
             Subject
           </label>
           <input
@@ -93,19 +91,19 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
         </div>
 
         <div>
-          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
             Email / Message Body
           </label>
           <textarea
             name="messageBody"
             placeholder="Paste the support email message here..."
-            className={`min-h-32 ${fieldClass}`}
+            className={`min-h-32 ${fieldClass} h-auto py-3`}
           />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               User Type
             </label>
             <select name="userType" defaultValue="parent" className={fieldClass}>
@@ -116,7 +114,7 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
           </div>
 
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               Case Type
             </label>
             <select
@@ -133,7 +131,7 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
           </div>
 
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               Priority
             </label>
             <select name="priority" defaultValue="normal" className={fieldClass}>
@@ -144,7 +142,7 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
           </div>
 
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               Assign To
             </label>
             <select name="assignedTo" defaultValue="" className={fieldClass}>
@@ -159,24 +157,24 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
         </div>
 
         <div>
-          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
             Internal Notes
           </label>
           <input name="notes" placeholder="Optional" className={fieldClass} />
         </div>
 
-        <div className="rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
-            Financial Tracking
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
+            Financial tracking
           </p>
-          <p className="mt-2 text-sm leading-6 text-emerald-50/90">
-            Add a credit, debit, or refund amount now so it follows the case into
+          <p className="mt-2 text-sm font-semibold leading-6 text-emerald-950/80">
+            Add a credit, debit, or refund amount so it follows the case into
             disputes and financial reports.
           </p>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_0.55fr]">
             <div>
-              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
                 Financial Action
               </label>
               <select
@@ -193,7 +191,7 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
             </div>
 
             <div>
-              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
                 Amount
               </label>
               <input
@@ -208,7 +206,7 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
           </div>
 
           <div className="mt-4">
-            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <label className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
               Financial Note
             </label>
             <input
@@ -223,15 +221,15 @@ export default function SupportIntakeForm({ assignees }: SupportIntakeFormProps)
 
         <button
           type="submit"
-          className="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
         >
           Create Support Case
         </button>
       </form>
 
-      <p className="mt-4 text-xs leading-5 text-slate-500">
+      <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">
         Need disputes instead?{" "}
-        <Link href="/admin/disputes" className="font-bold text-emerald-300">
+        <Link href="/admin/disputes" className="font-black text-emerald-700">
           Open disputes queue →
         </Link>
       </p>

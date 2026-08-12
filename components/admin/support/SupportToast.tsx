@@ -42,10 +42,10 @@ export function SupportToastStack({
       {toasts.map((toast) => {
         const toneClass =
           toast.tone === "success"
-            ? "border-emerald-400/40 bg-emerald-950/95 text-emerald-50"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-950"
             : toast.tone === "error"
-              ? "border-rose-400/40 bg-rose-950/95 text-rose-50"
-              : "border-sky-400/40 bg-slate-950/95 text-sky-50";
+              ? "border-rose-200 bg-rose-50 text-rose-900"
+              : "border-sky-200 bg-sky-50 text-sky-950";
 
         return (
           <div
