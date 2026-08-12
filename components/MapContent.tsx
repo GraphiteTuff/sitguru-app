@@ -28,6 +28,7 @@ type NormalizedMarker = {
   avatarUrl: string;
   initials: string;
   serviceRadiusMiles: number;
+  canBook: boolean;
   source: "zip" | "city" | "service_coordinates" | "coordinates";
 };
 
@@ -265,6 +266,24 @@ function getAvatarUrl(marker: RawMarker) {
   );
 }
 
+function getMarkerCanBook(marker: RawMarker) {
+  if (marker.__sitguruCanBook === true || marker.can_book === true) return true;
+  if (marker.__sitguruCanBook === false || marker.can_book === false) return false;
+
+  const bookingStatus = asString(marker.booking_status).toLowerCase();
+  if (bookingStatus === "listed_only" || bookingStatus === "not_listed") {
+    return false;
+  }
+
+  if (marker.is_listed_only === true || marker.booking_button_disabled === true) {
+    return false;
+  }
+
+  // Default to showing as bookable only when explicitly true above.
+  // Opens-soon / listed Gurus still get map pins; canBook just changes styling.
+  return marker.is_bookable === true;
+}
+
 function getServices(marker: RawMarker) {
   const services = asStringArray(marker.services);
   if (services.length) return services;
@@ -483,6 +502,7 @@ function normalizeMarker(marker: RawMarker): NormalizedMarker | null {
     avatarUrl,
     initials: getInitials(name),
     serviceRadiusMiles: radius,
+    canBook: getMarkerCanBook(marker),
     source,
   };
 }
@@ -499,12 +519,17 @@ function createAvatarIcon(marker: NormalizedMarker, highlighted: boolean) {
   const imageMarkup = marker.avatarUrl
     ? `<img src="${escapeHtml(marker.avatarUrl)}" alt="" />`
     : `<span>${escapeHtml(marker.initials)}</span>`;
+  const shellClass = [
+    "sitguru-leaflet-avatar-shell",
+    highlighted ? "is-highlighted" : "",
+    marker.canBook ? "" : "is-opens-soon",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return L.divIcon({
     className: "sitguru-leaflet-avatar-icon",
-    html: `<div class="sitguru-leaflet-avatar-shell${
-      highlighted ? " is-highlighted" : ""
-    }">${imageMarkup}</div>`,
+    html: `<div class="${shellClass}">${imageMarkup}</div>`,
     iconSize: [58, 58],
     iconAnchor: [29, 29],
     popupAnchor: [0, -30],
@@ -557,6 +582,14 @@ function createPopupHtml(marker: NormalizedMarker) {
       <div class="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
         Accepts care within ${marker.serviceRadiusMiles} mi
       </div>
+
+      ${
+        marker.canBook
+          ? ""
+          : `<div class="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">
+              Booking opens soon
+            </div>`
+      }
 
       ${
         servicesHtml
@@ -884,11 +917,12 @@ export default function MapContent({
       const highlighted = marker.id === highlightedMarkerId;
       const latLng: [number, number] = [marker.latitude, marker.longitude];
       const hasPhoto = Boolean(marker.avatarUrl);
+      const opensSoon = !marker.canBook;
 
       L.circle(latLng, {
         radius: marker.serviceRadiusMiles * METERS_PER_MILE,
-        color: "#059669",
-        fillColor: "#10b981",
+        color: opensSoon ? "#d97706" : "#059669",
+        fillColor: opensSoon ? "#f59e0b" : "#10b981",
         fillOpacity: highlighted ? 0.18 : 0.08,
         opacity: highlighted ? 0.58 : 0.25,
         weight: highlighted ? 3 : 1,
@@ -896,14 +930,19 @@ export default function MapContent({
 
       L.marker(latLng, {
         icon: createAvatarIcon(marker, highlighted),
-        // Highlighted on top; photo pins above initials so bookable faces stay visible
+        // Highlighted on top; photo pins above initials so faces stay visible
         zIndexOffset: highlighted ? 1200 : hasPhoto ? 750 : 400,
       })
-        .bindTooltip(`${marker.serviceRadiusMiles}-mile radius`, {
-          direction: "top",
-          offset: [0, -24],
-          opacity: 0.96,
-        })
+        .bindTooltip(
+          opensSoon
+            ? `${marker.serviceRadiusMiles}-mile radius · Booking opens soon`
+            : `${marker.serviceRadiusMiles}-mile radius`,
+          {
+            direction: "top",
+            offset: [0, -24],
+            opacity: 0.96,
+          },
+        )
         .bindPopup(createPopupHtml(marker), {
           minWidth: 230,
           maxWidth: 290,
@@ -1192,9 +1231,20 @@ export default function MapContent({
           letter-spacing: -0.04em;
         }
 
+        .sitguru-leaflet-avatar-shell.is-opens-soon {
+          border-color: rgba(245, 158, 11, 0.72);
+          box-shadow: 0 14px 34px rgba(180, 83, 9, 0.22);
+        }
+
         .sitguru-leaflet-avatar-shell.is-highlighted {
           border-color: rgba(5, 150, 105, 0.95);
           box-shadow: 0 18px 42px rgba(5, 150, 105, 0.38);
+          transform: scale(1.16);
+        }
+
+        .sitguru-leaflet-avatar-shell.is-opens-soon.is-highlighted {
+          border-color: rgba(217, 119, 6, 0.95);
+          box-shadow: 0 18px 42px rgba(217, 119, 6, 0.36);
           transform: scale(1.16);
         }
 

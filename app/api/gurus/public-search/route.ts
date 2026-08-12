@@ -1193,9 +1193,9 @@ function normalizeGuruForPublicSearch(guru: GuruRow) {
         guru.service_radius_miles || guru.radius_miles,
         isPlaceholder ? 50 : 25,
       );
-  const coordinates = isApprovedLocationMissingPreview
-    ? null
-    : getGuruCoordinates(guru);
+  // Always resolve map pins for listed/"opens soon" Gurus when location exists.
+  // Location-missing preview accounts stay unmapped until they add a ZIP/city.
+  const coordinates = getGuruCoordinates(guru);
   const publicSlug = getGuruPublicSlug(guru);
   const profileUrl = getGuruProfileUrl(guru);
   const bookingUrl = getGuruBookingUrl(guru, canBook);

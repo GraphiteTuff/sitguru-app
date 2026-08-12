@@ -1231,6 +1231,8 @@ function getProviderMapMarkerRows(
   guruRows: GuruRow[],
   guruZipLookupsByZip: Record<string, ZipLookupResult> = {},
 ) {
+  // Include bookable AND "Booking opens soon" Gurus whenever we can resolve
+  // map coordinates — booking status only affects CTA state, not map presence.
   return guruRows
     .map((guru, markerIndex) => {
       const coordinates = getGuruSearchCoordinates(guru, guruZipLookupsByZip);
@@ -1239,8 +1241,15 @@ function getProviderMapMarkerRows(
 
       const [latitude, longitude] = coordinates;
       const guruName = getGuruName(guru);
-      const publicIdentifier = getGuruPublicIdentifier(guru);
       const mapMarkerId = getGuruMapMarkerId(guru, markerIndex);
+      const photoUrl = getGuruPhotoUrl(guru);
+      const canBook =
+        guru.can_book === true &&
+        guru.is_listed_only !== true &&
+        String(guru.booking_status || "")
+          .trim()
+          .toLowerCase() !== "listed_only" &&
+        !isDisplayOnlySearchGuru(guru);
 
       if (!mapMarkerId) return null;
 
@@ -1259,6 +1268,7 @@ function getProviderMapMarkerRows(
         __sitguruMapMarkerId: mapMarkerId,
         __sitguruMapLatitude: latitude,
         __sitguruMapLongitude: longitude,
+        __sitguruCanBook: canBook,
         id: guru.id || mapMarkerId,
         name: guruName,
         full_name: guru.full_name || guruName,
@@ -1274,6 +1284,11 @@ function getProviderMapMarkerRows(
         map_longitude: longitude,
         service_radius_miles: getGuruRadius(guru),
         service_radius_display: guru.service_radius_display || getGuruRadius(guru),
+        profile_photo_url: photoUrl || guru.profile_photo_url,
+        photo_url: photoUrl || guru.photo_url,
+        avatar_url: photoUrl || guru.avatar_url,
+        image_url: photoUrl || guru.image_url,
+        can_book: canBook,
         profile_url: getGuruHref(guru),
         booking_url: getBookGuruHref(guru),
         href: getGuruHref(guru),
