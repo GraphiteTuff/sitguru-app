@@ -1014,12 +1014,12 @@ export default function Header({ user = null }: HeaderProps) {
             </>
           ) : (
             <>
-              <Link
-                href="/login?mode=phone"
-                className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50"
-              >
-                Log In
-              </Link>
+                <Link
+                  href="/login?mode=phone"
+                  className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-slate-800 shadow-sm transition hover:bg-emerald-50"
+                >
+                  Sign in
+                </Link>
               <Link
                 href="/signup"
                 className="rounded-full bg-emerald-600 px-5 py-3 text-center text-sm font-semibold tracking-[-0.01em] text-white shadow-md transition hover:bg-emerald-700"
@@ -1030,19 +1030,30 @@ export default function Header({ user = null }: HeaderProps) {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setMobileOpen((value) => !value)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 xl:hidden"
-          aria-label="Toggle menu"
-          aria-expanded={mobileOpen}
-        >
-          {mobileOpen ? (
-            <X className="h-5 w-5" />
-          ) : (
-            <Menu className="h-5 w-5" />
-          )}
-        </button>
+        <div className="flex items-center gap-2 sm:gap-3">
+          {!loadingUser && !isLoggedIn ? (
+            <Link
+              href="/login?mode=phone"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold tracking-[-0.01em] text-emerald-900 shadow-sm transition hover:bg-emerald-50 xl:hidden"
+            >
+              Sign in
+            </Link>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => setMobileOpen((value) => !value)}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 xl:hidden"
+            aria-label="Toggle menu"
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
+          </button>
+        </div>
       </div>
 
       {mobileOpen ? (
@@ -1154,7 +1165,7 @@ export default function Header({ user = null }: HeaderProps) {
                   onClick={() => setMobileOpen(false)}
                   className="flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black tracking-[-0.01em] text-emerald-900 shadow-sm transition hover:bg-emerald-50"
                 >
-                  Log In
+                  Sign in
                 </Link>
 
                 <Link

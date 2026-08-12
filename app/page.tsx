@@ -138,7 +138,9 @@ const zipCodeFallbackMap: Record<
 };
 
 const petParentSignupHref = "/signup?role=pet_parent&next=/customer/dashboard";
+const petParentLoginHref = "/login?role=pet_parent&mode=phone&next=/customer/dashboard";
 const guruSignupHref = "/become-a-guru";
+const sitGuruLoginHref = "/login?mode=phone";
 
 type ZipLookupResult = {
   city: string;
@@ -1973,15 +1975,26 @@ export default function HomePage() {
                 <span>✓ PawReport updates</span>
               </div>
 
-              <Link
-                href={guruSignupHref}
-                onClick={() =>
-                  trackHomepageClick("Become a Guru Hero Link", guruSignupHref)
-                }
-                className="mt-5 inline-flex text-sm font-black text-emerald-300 hover:text-emerald-200 hover:underline"
-              >
-                Love caring for pets? Become a Guru →
-              </Link>
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-2">
+                <Link
+                  href={guruSignupHref}
+                  onClick={() =>
+                    trackHomepageClick("Become a Guru Hero Link", guruSignupHref)
+                  }
+                  className="inline-flex text-sm font-black text-emerald-300 hover:text-emerald-200 hover:underline"
+                >
+                  Love caring for pets? Become a Guru →
+                </Link>
+                <Link
+                  href={sitGuruLoginHref}
+                  onClick={() =>
+                    trackHomepageClick("Hero Sign In", sitGuruLoginHref)
+                  }
+                  className="inline-flex text-sm font-black text-white/90 hover:text-white hover:underline"
+                >
+                  Already have an account? Sign in →
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -2285,7 +2298,7 @@ export default function HomePage() {
               <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-emerald-50 sm:text-base">
                 Search local profiles and choose the right care for your pet.
               </p>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Link
                   href="/search"
                   onClick={() =>
@@ -2306,6 +2319,15 @@ export default function HomePage() {
                   className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/35 bg-white/10 px-6 py-3 text-sm font-black text-white transition hover:bg-white/15"
                 >
                   Join SitGuru
+                </Link>
+                <Link
+                  href={petParentLoginHref}
+                  onClick={() =>
+                    trackHomepageClick("Final Sign In", petParentLoginHref)
+                  }
+                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 bg-transparent px-6 py-3 text-sm font-black text-white transition hover:bg-white/10"
+                >
+                  Sign in
                 </Link>
               </div>
             </div>

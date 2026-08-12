@@ -1502,7 +1502,7 @@ function SignupPageContent() {
                         setReferralCode(normalizeReferralCode(event.target.value))
                       }
                       className={`${fieldWithIconClassName} uppercase`}
-                      placeholder="Enter referral code"
+                      placeholder="YOUR REFERRAL CODE"
                       autoComplete="off"
                       spellCheck={false}
                       maxLength={64}
@@ -1664,7 +1664,7 @@ function SignupPageContent() {
                         setReferralCode(normalizeReferralCode(event.target.value))
                       }
                       className={`${fieldWithIconClassName} uppercase`}
-                      placeholder="Enter referral code"
+                      placeholder="YOUR REFERRAL CODE"
                       autoComplete="off"
                       spellCheck={false}
                       maxLength={64}

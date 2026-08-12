@@ -837,7 +837,7 @@ export function ContactPartnerForm() {
                           type="text"
                           value={form.ambassadorCode}
                           onChange={handleInputChange}
-                          placeholder="e.g., JASONTEST"
+                          placeholder="YOUR REFERRAL CODE"
                           className={`${fieldClass} ${fieldOkClass}`}
                           tabIndex={showAmbassador ? 0 : -1}
                         />
