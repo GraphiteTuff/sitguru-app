@@ -4,6 +4,8 @@
  */
 
 import {
+  isGuruWorkspacePath,
+  isPublicGuruOnboardingPath,
   matchesRoutePrefix,
   SCOUT_PUBLIC_GURU_ROUTE_PREFIXES,
   SCOUT_WORKSPACE_ROUTE_PREFIXES,
@@ -21,11 +23,17 @@ export type CompanionBotConfig = {
 const AMBASSADOR_PUBLIC_PREFIXES = [
   "/ambassadors",
   "/programs/ambassadors",
+  "/ambassador/join",
 ] as const;
+
 const AMBASSADOR_WORKSPACE_PREFIXES = [
   "/ambassador/dashboard",
   "/ambassador/training",
+  "/ambassador/documents",
+  "/ambassador/onboarding-video",
 ] as const;
+
+const AMBASSADOR_AUTH_PREFIXES = ["/ambassador/login"] as const;
 
 export type CompanionLayoutMode =
   | "public-guru"
@@ -58,6 +66,7 @@ export function resolvePublicFormVariant(
   if (mode === "public-parent" || mode === "public-investor") return "rogue";
   return null;
 }
+
 export function getBotConfig(options: {
   mode?: CompanionLayoutMode | null;
   currentPath?: string | null;
@@ -102,16 +111,49 @@ export function getBotConfig(options: {
   // Path-first auto detection (public routes — no auth).
   if (
     currentPath === "/become-a-guru" ||
-    matchesRoutePrefix(currentPath, SCOUT_PUBLIC_GURU_ROUTE_PREFIXES)
+    currentPath.startsWith("/become-a-guru/") ||
+    isPublicGuruOnboardingPath(currentPath)
   ) {
     return { shouldRender: true, variant: "scout", surface: "public-guru" };
   }
+
+  if (isGuruWorkspacePath(currentPath)) {
+    return { shouldRender: true, variant: "scout", surface: "workspace" };
+  }
+
+  // Catch-all remaining private Guru tools under /guru/* that aren't public profiles.
+  if (
+    currentPath.startsWith("/guru/") &&
+    currentPath !== "/guru/login" &&
+    !matchesRoutePrefix(currentPath, SCOUT_PUBLIC_GURU_ROUTE_PREFIXES) &&
+    matchesRoutePrefix(currentPath, SCOUT_WORKSPACE_ROUTE_PREFIXES)
+  ) {
+    return { shouldRender: true, variant: "scout", surface: "workspace" };
+  }
+
+  if (matchesRoutePrefix(currentPath, AMBASSADOR_AUTH_PREFIXES)) {
+    return { shouldRender: false, variant: null, surface: null };
+  }
+
   if (
     currentPath === "/ambassadors" ||
     matchesRoutePrefix(currentPath, AMBASSADOR_PUBLIC_PREFIXES)
   ) {
     return { shouldRender: true, variant: "taco", surface: "onboarding" };
   }
+
+  if (matchesRoutePrefix(currentPath, AMBASSADOR_WORKSPACE_PREFIXES)) {
+    return { shouldRender: true, variant: "taco", surface: "workspace" };
+  }
+
+  // Any other /ambassador/* internal page (except login) gets Taco.
+  if (
+    currentPath === "/ambassador" ||
+    currentPath.startsWith("/ambassador/")
+  ) {
+    return { shouldRender: true, variant: "taco", surface: "workspace" };
+  }
+
   if (currentPath === "/contact" || currentPath.startsWith("/contact/")) {
     return { shouldRender: true, variant: "rogue", surface: "public-parent" };
   }
@@ -126,12 +168,6 @@ export function getBotConfig(options: {
   ) {
     // Public partners hub — Rogue by default; form pages override via mode prop.
     return { shouldRender: true, variant: "rogue", surface: "public-parent" };
-  }
-  if (matchesRoutePrefix(currentPath, SCOUT_WORKSPACE_ROUTE_PREFIXES)) {
-    return { shouldRender: true, variant: "scout", surface: "workspace" };
-  }
-  if (matchesRoutePrefix(currentPath, AMBASSADOR_WORKSPACE_PREFIXES)) {
-    return { shouldRender: true, variant: "taco", surface: "workspace" };
   }
 
   // Logged-in Pet Parent surfaces — Rogue is the Pet Parent AI Companion.

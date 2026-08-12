@@ -16,7 +16,6 @@ import {
   Users,
   WalletCards,
 } from "lucide-react";
-import AIScoutCompanion from "@/components/officers/AIScoutCompanion";
 
 type AmbassadorDashboardLayoutProps = {
   children: ReactNode;
@@ -219,7 +218,6 @@ export default function AmbassadorDashboardLayout({
       ) : null}
 
       {children}
-      <AIScoutCompanion mode="ambassador-workspace" />
     </div>
   );
 }

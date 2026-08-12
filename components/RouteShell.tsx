@@ -8,6 +8,13 @@ import GlobalMessageNotifier from "@/components/GlobalMessageNotifier";
 import FloatingActionStack from "@/components/FloatingActionStack";
 import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
 import GuruLiveUpdatesBridge from "@/components/gurus/GuruLiveUpdatesBridge";
+import AIScoutCompanion from "@/components/officers/AIScoutCompanion";
+import { getBotConfig } from "@/lib/companions/bot-config";
+import {
+  isGuruWorkspacePath,
+  isPublicGuruOnboardingPath,
+  isPublicGuruProfilePath,
+} from "@/lib/companions/scout-routes";
 
 export default function RouteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -44,17 +51,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     pathname === "/pet-gurus" ||
     pathname.startsWith("/pet-gurus/");
 
-  const isPublicGuruProfilePage =
-    pathname.startsWith("/guru/") &&
-    !pathname.startsWith("/guru/dashboard/") &&
-    pathname !== "/guru/dashboard" &&
-    pathname !== "/guru/login" &&
-    pathname !== "/guru/signup" &&
-    pathname !== "/guru/application" &&
-    pathname !== "/guru/bookings" &&
-    pathname !== "/guru/messages" &&
-    pathname !== "/guru/profile" &&
-    pathname !== "/guru/success-center";
+  const isPublicGuruProfilePage = isPublicGuruProfilePath(pathname);
 
   const isPublicShortGuruProfilePage =
     pathname.startsWith("/g/") ||
@@ -67,39 +64,22 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     isPublicGuruProfilePage ||
     isPublicShortGuruProfilePage;
 
-  const isGuruDashboardPage =
-    pathname === "/guru/dashboard" || pathname.startsWith("/guru/dashboard/");
-
-  const isGuruBookingsPage =
-    pathname === "/guru/bookings" || pathname.startsWith("/guru/bookings/");
-
-  const isGuruAvailabilityPage =
-    pathname === "/guru/availability" ||
-    pathname.startsWith("/guru/availability/");
-
-  const isGuruResourcesPage =
-    pathname === "/guru/resources" || pathname.startsWith("/guru/resources/");
-
-  const isGuruSuccessCenterPage =
-    pathname === "/guru/success-center" ||
-    pathname.startsWith("/guru/success-center/");
-
-  const isGuruPetFamiliesPage =
-    pathname === "/guru/pet-families" ||
-    pathname.startsWith("/guru/pet-families/");
-
-  const isGuruMessagesPage =
-    pathname === "/guru/messages" || pathname.startsWith("/guru/messages/");
-
   const isGuruPrivatePage =
     !isPublicPage &&
-    (isGuruDashboardPage ||
-      isGuruBookingsPage ||
-      isGuruAvailabilityPage ||
-      isGuruResourcesPage ||
-      isGuruSuccessCenterPage ||
-      isGuruPetFamiliesPage ||
-      isGuruMessagesPage);
+    !isAuthPage &&
+    (isGuruWorkspacePath(pathname) ||
+      (pathname.startsWith("/guru/") &&
+        !isPublicGuruOnboardingPath(pathname) &&
+        pathname !== "/guru/login" &&
+        pathname !== "/guru/signup"));
+
+  const isAmbassadorPage =
+    pathname === "/ambassadors" ||
+    pathname.startsWith("/ambassadors/") ||
+    pathname === "/ambassador" ||
+    (pathname.startsWith("/ambassador/") &&
+      pathname !== "/ambassador/login" &&
+      !pathname.startsWith("/ambassador/login/"));
 
   const isCustomerDashboardPage =
     pathname === "/customer/dashboard" ||
@@ -140,14 +120,33 @@ export default function RouteShell({ children }: { children: ReactNode }) {
 
   const shouldShowGlobalMessageNotifier = !isAuthPage;
 
+  const bot = getBotConfig({ mode: "auto", currentPath: pathname });
+
+  // Rogue = Pet Parent companion (home, public browse, customer account).
+  // Scout / Taco mount via AIScoutCompanion on Guru + Ambassador surfaces.
   const shouldShowRogueChat =
-    isHomePage || isPublicPage || isPetParentCompanionPage;
+    !isAuthPage &&
+    !isAdminPage &&
+    !isGuruPrivatePage &&
+    !isAmbassadorPage &&
+    !isPublicGuruOnboardingPath(pathname) &&
+    pathname !== "/become-a-guru" &&
+    !pathname.startsWith("/become-a-guru/") &&
+    (isHomePage || isPublicPage || isPetParentCompanionPage);
+
+  const shouldShowScoutOrTaco =
+    !isAuthPage &&
+    !isAdminPage &&
+    !shouldShowRogueChat &&
+    bot.shouldRender &&
+    (bot.variant === "scout" || bot.variant === "taco");
 
   const floatingControls = shouldShowRogueChat ? (
     <FloatingActionStack>
-      {/* Rogue: public surfaces + all Pet Parent account / quick-action pages */}
       <HomepageChatBubble />
     </FloatingActionStack>
+  ) : shouldShowScoutOrTaco ? (
+    <AIScoutCompanion mode="auto" currentPath={pathname} />
   ) : null;
 
   if (isAdminPage) {
@@ -169,7 +168,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (isGuruPrivatePage || isCustomerPrivatePage) {
+  if (isGuruPrivatePage || isCustomerPrivatePage || isAmbassadorPage) {
     return (
       <>
         <div className="site-main min-h-screen bg-white">{children}</div>
