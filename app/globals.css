@@ -1243,6 +1243,24 @@ p {
   color: #047857;
 }
 
+/* Leaflet defaults `.leaflet-container a` to blue — force white on green profile CTAs */
+.sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta,
+.sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:link,
+.sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:visited,
+.sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:hover,
+.sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:active,
+.sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta,
+.sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:link,
+.sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:visited,
+.sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:hover,
+.sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:active,
+.public-page .sitguru-map-shell a.sitguru-map-profile-cta,
+.public-page .sitguru-map-shell a.sitguru-map-profile-cta span {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-decoration: none !important;
+}
+
 .sitguru-leaflet-marker {
   background: transparent;
   border: 0;
@@ -1662,6 +1680,24 @@ p {
 
 .sitguru-map-popup a:hover {
   color: #047857;
+}
+
+/* Leaflet defaults `.leaflet-container a` to blue — force white on green profile CTAs */
+.sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta,
+.sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:link,
+.sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:visited,
+.sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:hover,
+.sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:active,
+.sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta,
+.sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:link,
+.sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:visited,
+.sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:hover,
+.sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:active,
+.public-page .sitguru-map-shell a.sitguru-map-profile-cta,
+.public-page .sitguru-map-shell a.sitguru-map-profile-cta span {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-decoration: none !important;
 }
 
 .sitguru-leaflet-marker {

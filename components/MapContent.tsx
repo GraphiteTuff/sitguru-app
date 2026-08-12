@@ -566,10 +566,10 @@ function createPopupHtml(marker: NormalizedMarker) {
 
       <a
         href="${escapeHtml(marker.profileHref)}"
-        style="color:#ffffff !important;"
+        style="color:#ffffff !important; -webkit-text-fill-color:#ffffff !important; text-decoration:none !important;"
         class="sitguru-map-profile-cta mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
       >
-        View Guru Profile
+        <span style="color:#ffffff !important; -webkit-text-fill-color:#ffffff !important;">View Guru Profile</span>
       </a>
     </div>
   `;
@@ -1150,12 +1150,20 @@ export default function MapContent({
           min-width: 230px;
         }
 
+        .sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta,
+        .sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:link,
+        .sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:visited,
+        .sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:hover,
+        .sitguru-map-shell .leaflet-container a.sitguru-map-profile-cta:active,
         .sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta,
         .sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:link,
         .sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:visited,
         .sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:hover,
-        .sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:active {
+        .sitguru-map-shell .leaflet-popup-content a.sitguru-map-profile-cta:active,
+        .sitguru-map-shell a.sitguru-map-profile-cta,
+        .sitguru-map-shell a.sitguru-map-profile-cta span {
           color: #ffffff !important;
+          -webkit-text-fill-color: #ffffff !important;
           text-decoration: none !important;
         }
 
