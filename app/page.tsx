@@ -997,6 +997,13 @@ function CompactPartnerSection({
       imageClassName: "h-auto max-h-20 w-full object-contain",
       imageWrapperClassName: "bg-white",
     },
+    {
+      name: "Acorn Valley Pet Boarding",
+      href: "https://acornvalleypetboarding.com/",
+      image: "/images/partners/acorn-valley-pet-boarding.png",
+      imageClassName: "h-auto max-h-20 w-full object-contain",
+      imageWrapperClassName: "bg-black",
+    },
   ] as const;
 
   return (
@@ -1061,7 +1068,7 @@ function CompactPartnerSection({
           }
 
           .sitguru-partner-carousel-track {
-            animation: sitguru-partner-carousel-loop 38s linear infinite;
+            animation: sitguru-partner-carousel-loop 45s linear infinite;
           }
 
           @media (hover: hover) and (pointer: fine) {
