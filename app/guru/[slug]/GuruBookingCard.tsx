@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { buildPetParentBookUrl } from "@/lib/booking/pet-parent-booking";
 
 type GuruBookingCardProps = {
   guruId: string;
@@ -264,25 +265,12 @@ export default function GuruBookingCard({
     pets.length > 0 ? Boolean(selectedPet) : Boolean(manualPetName.trim());
 
   const bookingHref = useMemo(() => {
-    const params = new URLSearchParams({
-      guru_slug: guruSlug,
-      guru_id: guruId,
+    return buildPetParentBookUrl({
+      slug: guruSlug,
+      petId: resolvedPetId || null,
+      express: true,
     });
-
-    if (resolvedPetId) {
-      params.set("pet_id", resolvedPetId);
-    }
-
-    if (resolvedPetName) {
-      params.set("pet_name", resolvedPetName);
-    }
-
-    if (resolvedPetPhotoUrl) {
-      params.set("pet_photo_url", resolvedPetPhotoUrl);
-    }
-
-    return `/bookings/new?${params.toString()}`;
-  }, [guruId, guruSlug, resolvedPetId, resolvedPetName, resolvedPetPhotoUrl]);
+  }, [guruSlug, resolvedPetId]);
 
   const messageGuruHref = useMemo(() => {
     const params = new URLSearchParams({

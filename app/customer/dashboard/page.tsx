@@ -45,6 +45,7 @@ import {
   bumpSharedLinkCounter,
   readStoredPetPerksRef,
 } from "@/lib/rewards/perks-broker";
+import { buildPetParentBookUrl } from "@/lib/booking/pet-parent-booking";
 
 type CustomerProfile = {
   first_name: string | null;
@@ -402,7 +403,7 @@ const routes = {
   dashboard: "/customer/dashboard",
   university: "/customer/dashboard/university",
   findGuru: "/search",
-  bookGuru: "/bookings/new",
+  bookGuru: "/search",
   bookings: "/customer/dashboard/bookings",
   allBookings: "/customer/dashboard/bookings",
   messages: "/customer/dashboard/messages",
@@ -699,7 +700,20 @@ function getGuruSearchHref(guru: NearbyGuru, careZip?: string | null) {
   return queryString ? `${routes.findGuru}?${queryString}` : routes.findGuru;
 }
 
+function getGuruBookHref(guru: NearbyGuru, careZip?: string | null) {
+  if (guru.slug) {
+    return buildPetParentBookUrl({
+      slug: guru.slug,
+      zip: careZip,
+      express: true,
+    });
+  }
+
+  return getGuruSearchHref(guru, careZip);
+}
+
 function getGuruHref(guru: RawGuruRow) {
+  if (guru.slug) return `/guru/${encodeURIComponent(String(guru.slug))}`;
   return routes.findGuru;
 }
 
@@ -2327,7 +2341,7 @@ function NearbyGurusCarousel({
                     </Link>
 
                     <Link
-                      href={`${routes.bookGuru}?guru=${encodeURIComponent(guru.id)}&zip=${encodeURIComponent(careZip)}`}
+                      href={getGuruBookHref(guru, careZip)}
                       className="inline-flex min-h-[42px] items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-800 transition hover:bg-emerald-100"
                     >
                       Book

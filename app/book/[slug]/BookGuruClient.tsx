@@ -26,6 +26,12 @@ import {
   Zap,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import {
+  bookingReturnPathWithParams,
+  clearPetParentBookingDraft,
+  loadPetParentBookingDraft,
+  savePetParentBookingDraft,
+} from "@/lib/booking/pet-parent-booking";
 
 type BookingStep = 1 | 2 | 3;
 
@@ -1295,8 +1301,18 @@ export default function BookGuruClient({
 }: BookGuruClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const expressMode = searchParams.get("express") === "1";
+  const expressMode =
+    searchParams.get("express") === "1" || searchParams.get("rebook") === "1";
+  const rebookMode = searchParams.get("rebook") === "1";
   const queryPetId = String(searchParams.get("pet_id") || "").trim();
+  const queryZip = String(searchParams.get("zip") || "")
+    .replace(/\D/g, "")
+    .slice(0, 5);
+  const queryService = String(searchParams.get("service") || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  const queryDate = String(searchParams.get("date") || "").trim();
 
   const resolvedCalendarUsername = calendarUsername || calUsername || "";
   const resolvedCalendarEventTypeSlug =
@@ -1308,6 +1324,8 @@ export default function BookGuruClient({
   const [petsLoading, setPetsLoading] = useState(true);
   const [customerUserId, setCustomerUserId] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [expressAdvanced, setExpressAdvanced] = useState(false);
 
   const [guruProfile, setGuruProfile] = useState<GuruProfileRow | null>(() =>
     mergeGuruProfileWithFallbacks({
@@ -1345,7 +1363,7 @@ export default function BookGuruClient({
   const [bookingType, setBookingType] = useState("Request Booking");
   const [selectedService, setSelectedService] =
     useState<ServiceKey>("drop_in_visit");
-  const [bookingDate, setBookingDate] = useState("");
+  const [bookingDate, setBookingDate] = useState(queryDate);
   const [bookingEndDate, setBookingEndDate] = useState("");
   const [dateSelectionMode, setDateSelectionMode] =
     useState<DateSelectionMode>("single");
@@ -1353,7 +1371,7 @@ export default function BookGuruClient({
   const [timeWindow, setTimeWindow] = useState("Flexible");
   const [customPreferredTime, setCustomPreferredTime] = useState("");
   const [visitLength, setVisitLength] = useState("15 minutes");
-  const [careZipCode, setCareZipCode] = useState("");
+  const [careZipCode, setCareZipCode] = useState(queryZip);
   const [careCity, setCareCity] = useState("");
   const [careState, setCareState] = useState("");
   const [careLatitude, setCareLatitude] = useState<number | null>(null);
@@ -1786,14 +1804,112 @@ export default function BookGuruClient({
   const allAcknowledgementsAccepted =
     detailsAccepted && paymentAccepted && payoutAccepted && termsAccepted;
 
+  useEffect(() => {
+    if (
+      expressAdvanced ||
+      !expressMode ||
+      !authChecked ||
+      petsLoading ||
+      step !== 1 ||
+      !canContinueStep1
+    ) {
+      return;
+    }
+
+    setStep(2);
+    setExpressAdvanced(true);
+  }, [
+    authChecked,
+    canContinueStep1,
+    expressAdvanced,
+    expressMode,
+    petsLoading,
+    step,
+  ]);
+
   const isPetParentLoggedIn = Boolean(customerUserId);
-  const bookingReturnPath = `/book/${guruSlug}`;
+  const bookingReturnPath = bookingReturnPathWithParams(
+    guruSlug,
+    searchParams.toString(),
+  );
   const signupHref = `/signup?redirect=${encodeURIComponent(
     bookingReturnPath,
   )}&role=customer`;
   const petParentLoginHref = `/customer/login?redirect=${encodeURIComponent(
     bookingReturnPath,
   )}`;
+
+  function persistBookingDraftForAuth() {
+    savePetParentBookingDraft({
+      guruSlug,
+      petId: selectedPetId || undefined,
+      petName: petName || undefined,
+      careZipCode: careZipCode || undefined,
+      careCity: careCity || undefined,
+      careState: careState || undefined,
+      selectedService,
+      bookingDate: bookingDate || undefined,
+      bookingEndDate: bookingEndDate || undefined,
+      timeWindow,
+      visitLength,
+      bookingType,
+      notes: notes || undefined,
+      express: expressMode,
+      savedAt: new Date().toISOString(),
+    });
+  }
+
+  useEffect(() => {
+    if (draftRestored) return;
+    const draft = loadPetParentBookingDraft(guruSlug);
+    if (!draft) {
+      setDraftRestored(true);
+      return;
+    }
+
+    if (draft.petId) setSelectedPetId(draft.petId);
+    if (draft.petName) setPetName(draft.petName);
+    if (draft.careZipCode) setCareZipCode(draft.careZipCode);
+    if (draft.careCity) setCareCity(draft.careCity);
+    if (draft.careState) setCareState(draft.careState);
+    if (draft.selectedService) {
+      const service = draft.selectedService as ServiceKey;
+      if (
+        ["drop_in_visit", "house_sitting", "doggy_day_care", "dog_walking"].includes(
+          service,
+        )
+      ) {
+        setSelectedService(service);
+      }
+    }
+    if (draft.bookingDate) setBookingDate(draft.bookingDate);
+    if (draft.bookingEndDate) setBookingEndDate(draft.bookingEndDate);
+    if (draft.timeWindow) setTimeWindow(draft.timeWindow);
+    if (draft.visitLength) setVisitLength(draft.visitLength);
+    if (draft.bookingType) setBookingType(draft.bookingType);
+    if (draft.notes) setNotes(draft.notes);
+    setDraftRestored(true);
+  }, [draftRestored, guruSlug]);
+
+  useEffect(() => {
+    if (!queryService) return;
+    const normalized = queryService as ServiceKey;
+    if (
+      ["drop_in_visit", "house_sitting", "doggy_day_care", "dog_walking"].includes(
+        normalized,
+      )
+    ) {
+      setSelectedService(normalized);
+      return;
+    }
+
+    if (queryService.includes("walk")) setSelectedService("dog_walking");
+    else if (queryService.includes("sit")) setSelectedService("house_sitting");
+    else if (queryService.includes("day")) setSelectedService("doggy_day_care");
+    else if (queryService.includes("drop") || queryService.includes("visit")) {
+      setSelectedService("drop_in_visit");
+    }
+  }, [queryService]);
 
   useEffect(() => {
     async function loadPetsAndCustomer() {
@@ -1822,9 +1938,19 @@ export default function BookGuruClient({
           .order("created_at", { ascending: false }),
         supabase
           .from("profiles")
-          .select("full_name,avatar_url,profile_photo_url,photo_url")
+          .select(
+            "full_name,avatar_url,profile_photo_url,photo_url,zip_code,service_zip,service_zip_code,city,service_city,state,service_state",
+          )
           .eq("id", user.id)
-          .maybeSingle<CustomerProfile>(),
+          .maybeSingle<CustomerProfile & {
+            zip_code?: string | null;
+            service_zip?: string | null;
+            service_zip_code?: string | null;
+            city?: string | null;
+            service_city?: string | null;
+            state?: string | null;
+            service_state?: string | null;
+          }>(),
       ]);
 
       setPets(petData || []);
@@ -1833,8 +1959,32 @@ export default function BookGuruClient({
 
       if (profileData?.full_name) setCustomerName(profileData.full_name);
 
+      if (!careZipCode) {
+        const profileZip = String(
+          profileData?.service_zip_code ||
+            profileData?.service_zip ||
+            profileData?.zip_code ||
+            "",
+        )
+          .replace(/\D/g, "")
+          .slice(0, 5);
+        if (profileZip.length === 5) setCareZipCode(profileZip);
+      }
+
+      if (!careCity && (profileData?.service_city || profileData?.city)) {
+        setCareCity(
+          String(profileData?.service_city || profileData?.city || "").trim(),
+        );
+      }
+      if (!careState && (profileData?.service_state || profileData?.state)) {
+        setCareState(
+          String(profileData?.service_state || profileData?.state || "").trim(),
+        );
+      }
+
       const preferredPetId =
         queryPetId ||
+        selectedPetId ||
         (petData && petData.length === 1 ? String(petData[0].id) : "");
       if (preferredPetId && (petData || []).some((pet) => pet.id === preferredPetId)) {
         setSelectedPetId(preferredPetId);
@@ -1845,6 +1995,11 @@ export default function BookGuruClient({
 
     loadPetsAndCustomer();
   }, [queryPetId]);
+
+  useEffect(() => {
+    if (!draftRestored || !customerUserId) return;
+    clearPetParentBookingDraft();
+  }, [customerUserId, draftRestored]);
 
   useEffect(() => {
     async function loadGuruAvailability() {
@@ -2334,12 +2489,17 @@ export default function BookGuruClient({
         return;
       }
 
+      if (!isPetParentLoggedIn) {
+        persistBookingDraftForAuth();
+      }
+
       setStep(2);
       return;
     }
 
     if (step === 2) {
       if (!isPetParentLoggedIn) {
+        persistBookingDraftForAuth();
         setSubmitError(
           "Please create a free Pet Parent account or log in before continuing to secure checkout.",
         );
@@ -2362,6 +2522,7 @@ export default function BookGuruClient({
       setSubmitError("");
 
       if (!isPetParentLoggedIn) {
+        persistBookingDraftForAuth();
         setSubmitError(
           "Please create a free Pet Parent account or log in before booking this Guru.",
         );
@@ -2676,7 +2837,9 @@ export default function BookGuruClient({
             <StepBadge step={step} />
 
             <h1 className="mt-5 max-w-4xl text-4xl font-black leading-[0.96] tracking-[-0.05em] text-slate-950 md:text-6xl">
-              {expressMode ? (
+              {rebookMode ? (
+                <>Book {guruName || "your Guru"} again</>
+              ) : expressMode ? (
                 <>Quick Book with {guruName || "your Guru"}</>
               ) : (
                 <>
@@ -2688,9 +2851,11 @@ export default function BookGuruClient({
             </h1>
 
             <p className="mt-4 max-w-2xl text-lg font-semibold leading-8 text-slate-700">
-              {expressMode
-                ? "Express checkout — confirm pet, date, and payment."
-                : "Request trusted care with secure checkout, organized booking details, optional tipping, and SitGuru support when needed."}
+              {rebookMode
+                ? "We prefilled your pet and care ZIP. Pick a date and continue to checkout."
+                : expressMode
+                  ? "Express checkout — confirm pet, date, and payment."
+                  : "Request trusted care with secure checkout, organized booking details, optional tipping, and SitGuru support when needed."}
             </p>
           </div>
 
@@ -2756,12 +2921,14 @@ export default function BookGuruClient({
                       <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
                         <Link
                           href={signupHref}
+                          onClick={persistBookingDraftForAuth}
                           className="inline-flex min-h-[44px] items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
                         >
                           Sign Up Free
                         </Link>
                         <Link
                           href={petParentLoginHref}
+                          onClick={persistBookingDraftForAuth}
                           className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
                         >
                           Log In
@@ -3532,12 +3699,14 @@ export default function BookGuruClient({
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                       <Link
                         href={signupHref}
+                        onClick={persistBookingDraftForAuth}
                         className="inline-flex min-h-[50px] items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
                       >
                         Sign Up Free
                       </Link>
                       <Link
                         href={petParentLoginHref}
+                        onClick={persistBookingDraftForAuth}
                         className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
                       >
                         Pet Parent Login

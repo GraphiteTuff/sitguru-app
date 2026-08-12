@@ -233,7 +233,7 @@ export default function ParentPerksPage() {
                 behavior — and stack more redeemable PawPerks.
               </p>
               <Link
-                href="/bookings/new"
+                href="/search"
                 className="mt-4 flex min-h-[56px] items-center justify-center rounded-2xl bg-[#065f46] px-4 text-sm font-black text-white shadow-lg shadow-emerald-900/20"
               >
                 Schedule an upcoming walk

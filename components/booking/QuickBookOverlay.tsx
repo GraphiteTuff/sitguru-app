@@ -88,14 +88,27 @@ export default function QuickBookOverlay({
   );
 }
 
-export function buildExpressBookUrl(bookHref: string, petId?: string | null) {
+export function buildExpressBookUrl(
+  bookHref: string,
+  petId?: string | null,
+  zip?: string | null,
+) {
   try {
     const url = new URL(bookHref, "https://www.sitguru.com");
     url.searchParams.set("express", "1");
     if (petId) url.searchParams.set("pet_id", petId);
+    const cleanZip = String(zip || "")
+      .replace(/\D/g, "")
+      .slice(0, 5);
+    if (cleanZip.length === 5) url.searchParams.set("zip", cleanZip);
     return `${url.pathname}${url.search}`;
   } catch {
     const joiner = bookHref.includes("?") ? "&" : "?";
-    return `${bookHref}${joiner}express=1${petId ? `&pet_id=${encodeURIComponent(petId)}` : ""}`;
+    const zipPart = String(zip || "")
+      .replace(/\D/g, "")
+      .slice(0, 5);
+    return `${bookHref}${joiner}express=1${petId ? `&pet_id=${encodeURIComponent(petId)}` : ""}${
+      zipPart.length === 5 ? `&zip=${encodeURIComponent(zipPart)}` : ""
+    }`;
   }
 }

@@ -635,7 +635,7 @@ export default function PetsPage() {
 
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
-                  href="/bookings/new"
+                  href="/search"
                   className="rounded-full bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700"
                 >
                   Start a Booking

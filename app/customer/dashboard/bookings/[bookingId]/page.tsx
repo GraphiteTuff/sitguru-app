@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import Header from "@/components/Header";
+import { buildPetParentBookUrl } from "@/lib/booking/pet-parent-booking";
 
 type PageProps = {
   params: Promise<{
@@ -613,6 +614,26 @@ export default async function CustomerBookingDetailsPage({ params }: PageProps) 
   const visitLength = firstString(booking, ["visit_length"], "");
   const timeWindow = firstString(booking, ["time_window"], "");
   const location = getLocation(booking, guru);
+  const careZip = firstString(
+    booking,
+    ["care_zip_code", "zip_code", "postal_code"],
+    "",
+  );
+  const guruSlug = firstString(
+    guru,
+    ["slug", "calendar_slug", "profile_slug", "username"],
+    "",
+  );
+  const rebookHref = guruSlug
+    ? buildPetParentBookUrl({
+        slug: guruSlug,
+        petId,
+        zip: careZip || null,
+        service: serviceType || null,
+        express: true,
+        rebook: true,
+      })
+    : "/search";
   const careHighlights = buildCareHighlights(booking);
   const completedBooking = isCompletedBookingStatus(bookingStatus);
   const { data: existingReviewData } = await supabase
@@ -956,7 +977,11 @@ export default async function CustomerBookingDetailsPage({ params }: PageProps) 
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <ActionLink href="/customer/dashboard/messages" label="Message Guru" />
-                <ActionLink href="/search" label="Book Similar Care" variant="soft" />
+                <ActionLink
+                  href={rebookHref}
+                  label={guruSlug ? "Book Again" : "Book Similar Care"}
+                  variant="soft"
+                />
                 <ActionLink href="/customer/dashboard/messages?support=admin" label="Get Support" variant="secondary" />
                 <ActionLink href="/customer/dashboard" label="Return to Dashboard" variant="secondary" />
               </div>

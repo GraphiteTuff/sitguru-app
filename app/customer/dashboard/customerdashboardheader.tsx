@@ -39,8 +39,8 @@ const navItems: CustomerNavItem[] = [
   },
   {
     label: "Find a Guru",
-    href: "/customer/find-guru",
-    activePaths: ["/customer/find-guru", "/find-guru", "/search"],
+    href: "/search",
+    activePaths: ["/customer/find-guru", "/find-guru", "/search", "/find-care"],
   },
   {
     label: "Bookings",

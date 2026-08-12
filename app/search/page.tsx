@@ -2823,6 +2823,7 @@ function SearchPageContent() {
                               url: buildExpressBookUrl(
                                 getBookGuruHref(guru),
                                 quickPetId,
+                                zipFilter,
                               ),
                               guruName: guruFirstName,
                             });
@@ -3021,6 +3022,7 @@ function SearchPageContent() {
                                 href={buildExpressBookUrl(
                                   getBookGuruHref(guru),
                                   quickPetId,
+                                  zipFilter,
                                 )}
                                 prefetch={true}
                                 onClick={() => {
