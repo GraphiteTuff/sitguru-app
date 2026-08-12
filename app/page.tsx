@@ -995,7 +995,7 @@ function CompactPartnerSection({
       href: "https://www.crimsoncatstudios.com/",
       image: "/images/partners/crimson-cat-studios.png",
       imageClassName: "h-auto max-h-20 w-full object-contain",
-      imageWrapperClassName: "bg-black",
+      imageWrapperClassName: "bg-white",
     },
   ] as const;
 
