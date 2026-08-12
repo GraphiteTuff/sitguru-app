@@ -205,7 +205,7 @@ export default function AdminShell({ children }: AdminShellProps) {
               <img
                 src="/images/sitguru-logo-cropped.png"
                 alt="SitGuru"
-                className="h-10 w-auto object-contain"
+                className="h-10 w-auto bg-transparent object-contain"
               />
             </Link>
 

@@ -21,8 +21,8 @@ export default function SiteLogo({
       <Image
         src="/images/sitguru-logo-cropped.png"
         alt="SitGuru logo"
-        width={1176}
-        height={444}
+        width={1003}
+        height={357}
         priority={priority}
         className={`h-full w-auto max-w-none object-contain ${imageClassName}`}
       />

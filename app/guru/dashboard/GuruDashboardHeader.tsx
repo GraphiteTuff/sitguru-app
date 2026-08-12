@@ -494,16 +494,17 @@ export default function GuruDashboardHeader({
       <div className="mx-auto flex h-[84px] w-full max-w-[1500px] items-center justify-between gap-4 px-5 sm:px-6 lg:px-8">
         <Link
           href="/guru/dashboard"
-          className="inline-flex h-14 w-[155px] shrink-0 items-center justify-start rounded-2xl transition hover:opacity-90 sm:w-[175px] lg:h-16 lg:w-[195px]"
+          className="inline-flex h-14 shrink-0 items-center justify-start bg-transparent transition hover:opacity-90 lg:h-16"
           aria-label="SitGuru Guru Dashboard"
         >
           <Image
             src="/images/sitguru-logo-cropped.png"
             alt="SitGuru"
             width={190}
-            height={70}
+            height={68}
             priority
-            className="h-auto max-h-11 w-auto object-contain lg:max-h-12"
+            className="h-auto max-h-11 w-auto bg-transparent object-contain lg:max-h-12"
+            style={{ background: "transparent" }}
           />
         </Link>
 

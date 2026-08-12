@@ -314,9 +314,9 @@ function AdminLogo() {
         src="/images/sitguru-logo-cropped.png"
         alt="SitGuru"
         width={320}
-        height={132}
+        height={114}
         priority
-        className="h-auto w-[118px]"
+        className="h-auto w-[118px] bg-transparent object-contain"
       />
     </Link>
   );

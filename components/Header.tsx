@@ -860,16 +860,17 @@ export default function Header({ user = null }: HeaderProps) {
       <div className="mx-auto flex h-[84px] max-w-[1500px] items-center justify-between gap-4 px-5 sm:px-6 lg:px-8">
         <Link
           href={logoHref}
-          className="inline-flex h-14 w-[200px] shrink-0 items-center justify-start rounded-2xl transition hover:opacity-90 sm:w-[230px] lg:h-16 lg:w-[260px]"
+          className="inline-flex h-14 shrink-0 items-center justify-start bg-transparent transition hover:opacity-90 lg:h-16"
           aria-label="Go to SitGuru homepage"
         >
           <Image
             src="/images/sitguru-logo-cropped.png"
             alt="SitGuru"
             width={260}
-            height={90}
+            height={93}
             priority
-            className="h-auto max-h-12 w-auto object-contain lg:max-h-14"
+            className="h-auto max-h-12 w-auto bg-transparent object-contain lg:max-h-14"
+            style={{ background: "transparent" }}
           />
         </Link>
 
