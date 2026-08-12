@@ -1000,9 +1000,9 @@ function CompactPartnerSection({
     {
       name: "Acorn Valley Pet Boarding",
       href: "https://acornvalleypetboarding.com/",
-      image: "/images/partners/acorn-valley-pet-boarding.png",
+      image: "/images/partners/acorn-valley-pet-boarding-light.png",
       imageClassName: "h-auto max-h-20 w-full object-contain",
-      imageWrapperClassName: "bg-black",
+      imageWrapperClassName: "bg-white",
     },
   ] as const;
 
