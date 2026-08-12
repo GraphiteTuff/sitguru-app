@@ -2995,20 +2995,19 @@ function AmbassadorRegistryTable({
   const typeOptions = uniqueSorted(allAmbassadors.map(getAmbassadorTypeLabel));
 
   return (
-    <section className="rounded-[2rem] border border-[#dbe8d5] bg-white shadow-sm">
-      <div className="border-b border-[#e2ecd9] p-4 sm:p-5">
+    <section className="rounded-[30px] border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-100 p-4 sm:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-extrabold uppercase tracking-[0.24em] text-[#2f6f3e]">
-              Super Admin Ambassador Registry
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+              Ambassador Work Queue
             </p>
-            <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-[#102819] sm:text-3xl">
-              Click into each Ambassador dashboard
+            <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+              Same review cards as Gurus — for Ambassadors
             </h2>
-            <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-600">
-              View every Ambassador profile, onboarding status, referral code,
-              Pet Parent and Guru referral activity, rewards, messages, and admin
-              controls from one mobile-friendly registry.
+            <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
+              Filter the cohort, then use Review Ambassador / Message / cross-role
+              actions on each person card — matching the Guru queue layout.
             </p>
           </div>
 
@@ -3588,7 +3587,11 @@ export default async function AdminAmbassadorsPage({
           </section>
         ) : null}
 
-        <SignupHealthSection ambassadors={ambassadors} />
+        <AmbassadorRegistryTable
+          ambassadors={registryAmbassadors}
+          allAmbassadors={ambassadors}
+          filters={registryFilters}
+        />
 
         <section className="grid gap-4 xl:grid-cols-3">
           <div className="rounded-[2rem] border border-[#dbe8d5] bg-white p-4 shadow-sm sm:p-5">
@@ -3651,12 +3654,6 @@ export default async function AdminAmbassadorsPage({
             </div>
           </div>
         </section>
-
-        <AmbassadorRegistryTable
-          ambassadors={registryAmbassadors}
-          allAmbassadors={ambassadors}
-          filters={registryFilters}
-        />
       </div>
     </main>
   );

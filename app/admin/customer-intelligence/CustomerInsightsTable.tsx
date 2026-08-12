@@ -470,7 +470,9 @@ export default function CustomerInsightsTable({
             Who needs attention next?
           </h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-            Each Pet Parent appears once. Role badges show whether they also use SitGuru as a Guru or Ambassador. The recommended next action keeps the review process simple.
+            Same Guru-style review cards for Pet Parents. Role badges show Guru or
+            Ambassador when they also use those paths. Sort and search keep the
+            next action obvious.
           </p>
         </div>
 

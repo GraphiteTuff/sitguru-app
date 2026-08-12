@@ -6,9 +6,7 @@ import {
   CalendarDays,
   CircleDollarSign,
   Download,
-  Eye,
   Globe2,
-  LayoutDashboard,
   Mail,
   MapPin,
   Megaphone,
@@ -16,14 +14,13 @@ import {
   PawPrint,
   Repeat2,
   Search,
-  Settings,
   Share2,
   TrendingUp,
   UserRound,
   Users,
 } from "lucide-react";
 import { supabaseAdmin } from "@/utils/supabase/admin";
-import { avatarImageFallback, fallbackInitials } from "@/lib/sitguru/display";
+import { avatarImageFallback } from "@/lib/sitguru/display";
 import { resolveLocationParts } from "@/lib/location/zip-lookup";
 import {
   filterCustomersForMetric,
@@ -535,46 +532,6 @@ function getProfileAvatarUrl(row: AnyRow) {
       ]) || getAuthMetadataPhoto(row),
       "",
     ),
-  );
-}
-
-function CustomerAvatar({
-  name,
-  email,
-  src,
-  size = "md",
-}: {
-  name: string;
-  email?: string;
-  src?: string;
-  size?: "sm" | "md" | "lg";
-}) {
-  const sizeClass =
-    size === "lg"
-      ? "h-14 w-14 text-sm sm:h-16 sm:w-16"
-      : size === "sm"
-        ? "h-10 w-10 text-xs"
-        : "h-11 w-11 text-sm";
-
-  return (
-    <div
-      className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-emerald-100 bg-white font-black text-[#0D5C3A] shadow-sm`}
-    >
-      <div className="absolute inset-0 bg-white" aria-hidden />
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={src}
-          alt=""
-          referrerPolicy="no-referrer"
-          className="relative z-[1] h-full w-full object-cover object-center"
-        />
-      ) : (
-        <span className="relative z-[1]">
-          {fallbackInitials(name, email, "PP")}
-        </span>
-      )}
-    </div>
   );
 }
 
@@ -2257,229 +2214,6 @@ async function getCustomerIntelligenceData() {
   };
 }
 
-function getCustomerProfileHref(customerId: string) {
-  return `/admin/customers/${encodeURIComponent(customerId)}`;
-}
-
-function getCustomerDashboardPreviewHref(customerId: string) {
-  return `/admin/customers/${encodeURIComponent(customerId)}/dashboard-preview`;
-}
-
-function getCustomerPublicProfilePreviewHref(customerId: string) {
-  return `/admin/customers/${encodeURIComponent(customerId)}/public-profile-preview`;
-}
-
-function getCustomerStatus(customer: CustomerInsight) {
-  return customer.signupQualityLabel || customer.segment || "Registered";
-}
-
-function getCustomerStatusClasses(customer: CustomerInsight) {
-  if (customer.signupQuality === "active") return "bg-green-100 text-green-800";
-  if (customer.signupQuality === "likely_test_spam") {
-    return "bg-rose-100 text-rose-800";
-  }
-  if (customer.signupQuality === "needs_review") {
-    return "bg-amber-100 text-amber-800";
-  }
-
-  return "bg-slate-100 text-slate-700";
-}
-
-function getCompletionClasses(percentage: number) {
-  if (percentage >= 80) return "bg-green-100 text-green-800";
-  if (percentage >= 50) return "bg-amber-100 text-amber-800";
-
-  return "bg-rose-100 text-rose-800";
-}
-
-function getCustomerLocationLabel(customer: CustomerInsight) {
-  const cityState = [customer.city, customer.state].filter(Boolean).join(", ");
-
-  if (cityState && customer.zipCode) {
-    return `${cityState} ${customer.zipCode}`;
-  }
-
-  return cityState || customer.zipCode || "Location not added yet";
-}
-
-function CustomerRegistryPanel({
-  customers,
-  activeMetric,
-}: {
-  customers: CustomerInsight[];
-  activeMetric: CustomerIntelligenceMetricId | null;
-}) {
-  const recentCustomers = [...customers]
-    .sort((a, b) => {
-      const aTime = a.firstSeenDate ? new Date(a.firstSeenDate).getTime() : 0;
-      const bTime = b.firstSeenDate ? new Date(b.firstSeenDate).getTime() : 0;
-
-      return bTime - aTime;
-    })
-    .slice(0, activeMetric ? 40 : 12);
-
-  const metricMeta = activeMetric
-    ? getCustomerIntelligenceMetricMeta(activeMetric)
-    : null;
-
-  return (
-    <DashboardCard>
-      <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
-            Super Admin Pet Parent Registry
-          </p>
-          <h2 className="mt-1 text-2xl font-black text-slate-950">
-            {metricMeta
-              ? `${metricMeta.label} drill-down`
-              : "Click into each Pet Parent view"}
-          </h2>
-          <p className="mt-1 max-w-4xl text-sm font-semibold leading-6 text-slate-500">
-            {metricMeta
-              ? metricMeta.description
-              : "View each Pet Parent through their dashboard preview, public profile preview, or admin cleanup controls. Dashboard and public profile previews are read-only. Admin cleanup controls are updatable."}
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row">
-          {activeMetric ? (
-            <Link
-              href="/admin/customers"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              Clear drill-down
-            </Link>
-          ) : null}
-          <Link
-            href={adminRoutes.customers}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-          >
-            <Users size={17} />
-            Open Customers
-          </Link>
-        </div>
-      </div>
-
-      {recentCustomers.length ? (
-        <div className="overflow-hidden rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9]">
-          <div className="hidden grid-cols-[1.3fr_0.95fr_0.72fr_0.62fr_0.55fr_0.55fr_1.45fr] gap-3 border-b border-[#e3ece5] bg-white px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400 xl:grid">
-            <span>Pet Parent</span>
-            <span>Location</span>
-            <span>Status</span>
-            <span>Completion</span>
-            <span>Bookings</span>
-            <span>Spend</span>
-            <span className="text-right">Views / Controls</span>
-          </div>
-
-          <div className="divide-y divide-[#e3ece5]">
-            {recentCustomers.map((customer) => (
-              <div
-                key={customer.id}
-                className="grid gap-4 bg-white px-4 py-4 transition hover:bg-emerald-50/60 sm:px-5 xl:grid-cols-[1.3fr_0.95fr_0.72fr_0.62fr_0.55fr_0.55fr_1.45fr] xl:items-center"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-3">
-                    <CustomerAvatar
-                      name={customer.name}
-                      email={customer.email}
-                      src={customer.avatarUrl}
-                      size="lg"
-                    />
-
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-black text-slate-950">
-                        {customer.name}
-                      </p>
-                      <p className="truncate text-xs font-bold text-slate-500">
-                        {customer.email || "No email on profile yet"}
-                      </p>
-                      {customer.phone ? (
-                        <p className="truncate text-xs font-semibold text-slate-400">
-                          {customer.phone}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-sm font-bold text-slate-600">
-                  {getCustomerLocationLabel(customer)}
-                </p>
-
-                <div>
-                  <span
-                    className={[
-                      "inline-flex rounded-full px-3 py-1 text-xs font-black",
-                      getCustomerStatusClasses(customer),
-                    ].join(" ")}
-                  >
-                    {getCustomerStatus(customer)}
-                  </span>
-                </div>
-
-                <div>
-                  <span
-                    className={[
-                      "inline-flex rounded-full px-3 py-1 text-xs font-black",
-                      getCompletionClasses(customer.profileCompletion),
-                    ].join(" ")}
-                  >
-                    {customer.profileCompletion}%
-                  </span>
-                </div>
-
-                <p className="text-sm font-black text-slate-950">
-                  {number(customer.bookingCount)}
-                  <span className="ml-1 text-xs font-bold text-slate-400">
-                    total
-                  </span>
-                </p>
-
-                <p className="text-sm font-black text-green-800">
-                  {money(customer.totalSpend)}
-                </p>
-
-                <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:justify-end">
-                  <Link
-                    href={getCustomerDashboardPreviewHref(customer.id)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-800 shadow-sm transition hover:bg-sky-100"
-                  >
-                    <LayoutDashboard size={14} />
-                    Dashboard View
-                  </Link>
-
-                  <Link
-                    href={getCustomerPublicProfilePreviewHref(customer.id)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100"
-                  >
-                    <Eye size={14} />
-                    Public Profile
-                  </Link>
-
-                  <Link
-                    href={getCustomerProfileHref(customer.id)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-green-800 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-green-900"
-                  >
-                    <Settings size={14} />
-                    Admin Cleanup
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-[24px] border border-dashed border-green-200 bg-green-50/60 p-6 text-sm font-bold leading-6 text-green-900">
-          No visible Pet Parent profiles were found yet. New Google/email/phone
-          signups should appear here once their `profiles` row is created with
-          the customer/Pet Parent role.
-        </div>
-      )}
-    </DashboardCard>
-  );
-}
-
 export default async function AdminCustomerIntelligencePage({
   searchParams,
 }: {
@@ -2724,8 +2458,8 @@ export default async function AdminCustomerIntelligencePage({
           </section>
         ) : null}
 
-        <section>
-          <CustomerRegistryPanel
+        <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
+          <CustomerInsightsTable
             customers={
               activeMetric &&
               activeMetric !== "social_signups" &&
@@ -2734,7 +2468,8 @@ export default async function AdminCustomerIntelligencePage({
                 ? drilledCustomers
                 : data.customers
             }
-            activeMetric={activeMetric}
+            exportHref={adminRoutes.customerExport}
+            usersHref={adminRoutes.users}
           />
         </section>
 
@@ -2939,23 +2674,6 @@ export default async function AdminCustomerIntelligencePage({
             title="Partner Campaigns"
             description="Review partner, affiliate, and campaign activity connected to growth reporting."
           />
-        </section>
-
-        <section>
-          <DashboardCard>
-            <CustomerInsightsTable
-              customers={
-                activeMetric &&
-                activeMetric !== "social_signups" &&
-                activeMetric !== "social_clicks" &&
-                activeMetric !== "rows_excluded"
-                  ? drilledCustomers
-                  : data.customers
-              }
-              exportHref={adminRoutes.customerExport}
-              usersHref={adminRoutes.users}
-            />
-          </DashboardCard>
         </section>
 
         <section className="grid gap-5 lg:grid-cols-3">
