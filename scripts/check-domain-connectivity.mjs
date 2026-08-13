@@ -2,9 +2,9 @@
 /**
  * SitGuru production connectivity probe.
  *
- * Diagnoses the home-WiFi vs cellular “Safari can’t establish a secure
- * connection” failure mode: DNS shape, AAAA conflicts, TLS chain depth/size,
- * and cert expiry for sitguru.com / www.sitguru.com.
+ * Diagnoses “works on cellular, fails on Xfinity/Comcast WiFi” Safari secure-
+ * connection errors: DNS shape, AAAA conflicts, TLS chain depth/size, cert
+ * expiry, and ISP Advanced Security / reputation notes for sitguru.com.
  *
  * Usage: node scripts/check-domain-connectivity.mjs
  *    or: npm run check:domain-connectivity
@@ -184,14 +184,16 @@ function inspectDns() {
 }
 
 function printRemediation() {
-  printSection("Remediation (WiFi + cellular)");
+  printSection("Remediation (Xfinity/Comcast + cellular)");
   const steps = [
     ...new Set([
+      "Primary: Xfinity Advanced Security (xFi) is blocking sitguru.com for many Comcast homes. Safari then shows “couldn’t establish a secure connection.” Cellular bypasses xFi, so it still works.",
+      "Owner fix: report https://www.sitguru.com and https://sitguru.com as wrongly blocked at https://spa.xfinity.com/help/advanced-security?faq=report-website-blocked (Report an issue → I can’t reach a website).",
+      "Upstream fix: submit a Bitdefender Labs false positive for both URLs at https://www.bitdefender.com/submit/ (Xfinity threat feeds include Bitdefender; Gridinsoft already shows Bitdefender + phishing-database warnings on this young domain).",
+      "User workaround while waiting: Xfinity app → Security → Advanced Security → Allow Access for sitguru.com (or temporarily turn Advanced Security off).",
       ...remediations,
-      "Keep Outlook MX (sitguru-com.mail.protection.outlook.com) and existing SPF/verification TXT records when moving DNS.",
-      "After Cloudflare proxy is on, re-test Safari on the failing home WiFi (not only cellular).",
-      "Ask affected users to temporarily disable ISP Advanced Security (xFi / Secure Home) if Cloudflare is not ready yet.",
-      "File a Vercel support ticket if SSL Labs still reports edge handshake failures after DNS is clean.",
+      "Optional hardening: Cloudflare proxied DNS in front of Vercel (SSL/TLS Full strict) so browsers hit well-known Cloudflare IPs; keep Outlook MX + existing TXT records.",
+      "File a Vercel support ticket only if SSL Labs still reports edge handshake failures after the Xfinity/Bitdefender false-positive clears.",
     ]),
   ];
   for (const [index, step] of steps.entries()) {
