@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "check:domain-connectivity": "node scripts/check-domain-connectivity.mjs",
     "simulate-walk": "tsx --env-file=.env.local scripts/simulateWalk.ts",
     "test-full-journey": "tsx --env-file=.env.local scripts/testFullJourney.ts",
     "seed-social-baseline": "tsx scripts/seed-social-baseline.ts"
