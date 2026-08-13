@@ -306,74 +306,149 @@ export async function POST(request: Request) {
     }
 
     const submittedAt = new Date().toISOString();
+    const locationLabel = [city, state, zipCode].filter(Boolean).join(", ");
+    const referralSource =
+      referredByCode ||
+      referralCode ||
+      cleanString(body.utmSource) ||
+      "public_ambassador_application";
 
+    const notes = [
+      `Ambassador type: ${ambassadorType}`,
+      profession ? `Profession: ${profession}` : "",
+      organizationName ? `Organization: ${organizationName}` : "",
+      `Referral focus: ${referralFocus}`,
+      communityReach ? `Community reach: ${communityReach}` : "",
+      `Why interested: ${whyInterested}`,
+      referralCode ? `Referral code: ${referralCode}` : "",
+      referredByCode ? `Referred by: ${referredByCode}` : "",
+      `Consent to feature: ${consentToFeature ? "yes" : "no"}`,
+      `Consent to contact: ${consentToContact ? "yes" : "no"}`,
+      cleanString(body.sourceUrl)
+        ? `Source URL: ${cleanString(body.sourceUrl)}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    // Match the live program_applications schema used by /api/program-applications.
+    // The previous payload used incompatible columns (program_type, first_name,
+    // zipcode, why_sitguru, metadata, etc.) which caused insert failures.
     const applicationRecord = {
-      program_type: "ambassador",
-      applicant_type: "ambassador",
-      first_name: firstName,
-      last_name: lastName,
+      program: "ambassador-program",
+      full_name: fullName,
       email,
-      phone,
-      zipcode: zipCode,
+      phone: phone || null,
+      zip_code: zipCode,
       city,
       state,
-      profession,
-      organization: organizationName,
-      referral_source: referralFocus,
-      experience: communityReach,
-      why_sitguru: whyInterested,
-      consent_to_highlight: consentToFeature,
-      status: "submitted",
+      availability: communityReach || "Ambassador program interest",
+      services_interested: [
+        `Ambassador type: ${ambassadorType}`,
+        `Referral focus: ${referralFocus}`,
+        profession ? `Profession: ${profession}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | "),
+      experience: whyInterested,
+      military_connected_background:
+        ambassadorType === "veteran-military"
+          ? "Veteran / military-connected ambassador applicant"
+          : null,
+      referral_source: referralSource,
+      resume_link: null,
+      resume_file_url: null,
+      resume_file_name: null,
+      resume_file_type: null,
+      resume_file_size_bytes: null,
+      additional_documents: [],
+      background_check_consent: true,
+      notes,
+      status: "new",
       source: "public_ambassador_application",
-      submitted_at: submittedAt,
-      metadata: {
-        program: "Ambassador Program",
-        publicFacingProgram: true,
-        fullName,
-        firstName,
-        lastName,
-        email,
-        phone,
-        city,
-        state,
-        zipCode,
-        ambassadorType,
-        profession,
-        organizationName,
-        referralFocus,
-        communityReach,
-        whyInterested,
-        referralCode,
-        referredByCode,
-        consentToFeature,
-        consentToContact,
-        sourceUrl: cleanString(body.sourceUrl),
-        utm: {
-          source: cleanString(body.utmSource),
-          medium: cleanString(body.utmMedium),
-          campaign: cleanString(body.utmCampaign),
-          content: cleanString(body.utmContent),
-          term: cleanString(body.utmTerm),
-        },
-      },
     };
 
-    const { data, error } = await supabaseAdmin
+    let data: { id?: string } | null = null;
+
+    const primaryInsert = await supabaseAdmin
       .from("program_applications")
       .insert(applicationRecord)
       .select("id")
       .single();
 
-    if (error) {
-      console.error("Ambassador application insert failed:", error);
+    if (primaryInsert.error) {
+      console.warn(
+        "Ambassador application primary insert failed, retrying with lean payload:",
+        primaryInsert.error,
+      );
 
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "We could not submit your Ambassador application right now. Please try again.",
-        },
-        { status: 500 },
+      // Lean fallback for older/partial program_applications schemas.
+      const leanInsert = await supabaseAdmin
+        .from("program_applications")
+        .insert({
+          program: "ambassador-program",
+          full_name: fullName,
+          email,
+          phone: phone || null,
+          zip_code: zipCode,
+          city,
+          state,
+          availability: communityReach || "Ambassador program interest",
+          services_interested: referralFocus,
+          experience: whyInterested,
+          referral_source: referralSource,
+          background_check_consent: true,
+          notes,
+          status: "new",
+          source: "public_ambassador_application",
+        })
+        .select("id")
+        .single();
+
+      if (leanInsert.error) {
+        console.error(
+          "Ambassador application insert failed:",
+          leanInsert.error,
+        );
+
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "We could not submit your Ambassador application right now. Please try again.",
+          },
+          { status: 500 },
+        );
+      }
+
+      data = leanInsert.data;
+    } else {
+      data = primaryInsert.data;
+    }
+
+    // Best-effort dual write so HR / Ambassador Leads also sees the applicant.
+    const { error: leadError } = await supabaseAdmin
+      .from("ambassador_leads")
+      .insert({
+        full_name: fullName,
+        email,
+        phone: phone || null,
+        program: "Ambassador Program",
+        source: "public_ambassador_application",
+        status: "new",
+        location: locationLabel || null,
+        zip_code: zipCode,
+        city,
+        state,
+        notes,
+        created_at: submittedAt,
+        updated_at: submittedAt,
+      });
+
+    if (leadError) {
+      console.warn(
+        "Ambassador application saved, but ambassador_leads dual-write failed:",
+        leadError,
       );
     }
 
