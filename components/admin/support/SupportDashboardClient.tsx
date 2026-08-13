@@ -165,46 +165,64 @@ export default function SupportDashboardClient({
 
   useEffect(() => {
     let active = true;
-    const supabase = createClient();
+    let channel: ReturnType<
+      ReturnType<typeof createClient>["channel"]
+    > | null = null;
+    let client: ReturnType<typeof createClient> | null = null;
 
-    const channel = supabase
-      .channel("admin-support-intake")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "support_intake_cases",
-        },
-        (payload) => {
-          if (!active) return;
+    try {
+      client = createClient();
+      channel = client
+        .channel("admin-support-intake")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "support_intake_cases",
+          },
+          (payload) => {
+            if (!active) return;
 
-          if (payload.eventType === "DELETE") {
-            const deletedId = String(
-              (payload.old as { id?: string } | null)?.id || ""
-            );
-            if (!deletedId) return;
-            setCases((current) =>
-              current.filter((item) => item.id !== deletedId)
-            );
-            return;
+            if (payload.eventType === "DELETE") {
+              const deletedId = String(
+                (payload.old as { id?: string } | null)?.id || ""
+              );
+              if (!deletedId) return;
+              setCases((current) =>
+                current.filter((item) => item.id !== deletedId)
+              );
+              return;
+            }
+
+            const row = payload.new as Record<string, unknown> | null;
+            if (!row) return;
+            const next = normalizeSupportCase(row, 0);
+            upsertCase({
+              ...next,
+              messageBody:
+                next.messageBody.length > 280
+                  ? `${next.messageBody.slice(0, 280)}…`
+                  : next.messageBody,
+              replyThread: [],
+            });
           }
-
-          const row = payload.new as Record<string, unknown> | null;
-          if (!row) return;
-          const next = normalizeSupportCase(row, 0);
-          upsertCase(next);
-        }
-      )
-      .subscribe((status) => {
-        if (!active) return;
-        setLiveState(status === "SUBSCRIBED" ? "live" : "connecting");
-      });
+        )
+        .subscribe((status) => {
+          if (!active) return;
+          setLiveState(status === "SUBSCRIBED" ? "live" : "connecting");
+        });
+    } catch (error) {
+      console.warn("Support realtime unavailable:", error);
+      if (active) setLiveState("idle");
+    }
 
     return () => {
       active = false;
       setLiveState("idle");
-      void supabase.removeChannel(channel);
+      if (client && channel) {
+        void client.removeChannel(channel);
+      }
     };
   }, [upsertCase]);
 

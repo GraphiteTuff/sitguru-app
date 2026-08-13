@@ -93,8 +93,20 @@ export async function getSupportData(filters: SupportFilters) {
     "support_intake_cases"
   );
 
-  const cases = rows.map(normalizeSupportCase);
+  const cases = rows.map((row, index) => normalizeSupportCase(row, index));
   const filteredCases = filterAndSortCases(cases, filters);
+
+  // Keep the live queue light — full threads load when a ticket is opened.
+  const queueCases = filteredCases.map((item) => ({
+    ...item,
+    messageBody:
+      item.messageBody.length > 280
+        ? `${item.messageBody.slice(0, 280)}…`
+        : item.messageBody,
+    replyThread: [],
+    notes:
+      item.notes.length > 180 ? `${item.notes.slice(0, 180)}…` : item.notes,
+  }));
 
   const openCases = cases.filter(
     (item) => !["closed", "converted"].includes(item.status.toLowerCase())
@@ -133,8 +145,8 @@ export async function getSupportData(filters: SupportFilters) {
   const assignees = await getSupportAdminAssignees();
 
   return {
-    cases,
-    filteredCases,
+    cases: queueCases,
+    filteredCases: queueCases,
     openCases,
     urgentCases,
     resolvedToday,

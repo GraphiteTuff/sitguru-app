@@ -37,10 +37,41 @@ export default async function AdminSupportPage({
   const action = getSearchValue(resolvedSearchParams, "action");
   const emailStatus = getSearchValue(resolvedSearchParams, "emailStatus");
 
-  const data = await getSupportData(filters);
+  const data = await getSupportData(filters).catch((error) => {
+    console.warn("Support dashboard data failed:", error);
+    return null;
+  });
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-[#f8fbf6] px-4 py-5 text-slate-900 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl rounded-[30px] border border-rose-100 bg-white p-8 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-rose-700">
+            Support desk
+          </p>
+          <h1 className="mt-2 text-3xl font-black text-slate-950">
+            Couldn’t load support tickets
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            The intake query failed. Confirm the{" "}
+            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+              support_intake_cases
+            </code>{" "}
+            table is available, then reload this page.
+          </p>
+          <a
+            href="/admin/support"
+            className="mt-6 inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-5 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800"
+          >
+            Reload support desk
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-[#f8fbf6] px-4 py-5 text-slate-900 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#f8fbf6] px-4 py-5 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-5">
         <SupportNotice
           updated={updated}
@@ -219,7 +250,7 @@ export default async function AdminSupportPage({
           </div>
 
           <SupportDashboardClient
-            initialCases={data.cases}
+            initialCases={data.filteredCases}
             assignees={data.assignees}
             filters={filters}
             filteredTotal={data.totals.filtered}
@@ -227,6 +258,6 @@ export default async function AdminSupportPage({
           />
         </section>
       </div>
-    </main>
+    </div>
   );
 }
