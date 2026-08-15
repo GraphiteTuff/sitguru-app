@@ -32,6 +32,7 @@ type SearchParams = Record<string, string | string[] | undefined>;
 
 type ProgramKey =
   | "student-hire"
+  | "community-hire"
   | "veterans-hire"
   | "ambassador-program"
   | "skillbridge-interest";
@@ -112,6 +113,8 @@ const adminRoutes = {
   ambassadorLeads: "/admin/ambassador-leads",
   ambassadors: "/admin/ambassadors",
   studentApplications: "/admin/program-applications?program=student-hire",
+  communityApplications:
+    "/admin/program-applications?program=community-hire",
   veteransApplications: "/admin/program-applications?program=veterans-hire",
   ambassadorApplications:
     "/admin/program-applications?program=ambassador-program",
@@ -140,6 +143,14 @@ const programOptions: {
     icon: <GraduationCap size={18} />,
     description:
       "Students, recent grads, summer workers, and school-break applicants.",
+  },
+  {
+    key: "community-hire",
+    label: "Community Hire Program",
+    shortLabel: "Community",
+    icon: <UsersRound size={18} />,
+    description:
+      "Workforce, nonprofit, and community-partner referred applicants.",
   },
   {
     key: "veterans-hire",
@@ -448,6 +459,7 @@ function normalizeProgram(value: string): ProgramKey | "" {
 
   if (
     normalized === "student-hire" ||
+    normalized === "community-hire" ||
     normalized === "veterans-hire" ||
     normalized === "ambassador-program" ||
     normalized === "skillbridge-interest"
@@ -459,13 +471,16 @@ function normalizeProgram(value: string): ProgramKey | "" {
     return "veterans-hire";
   }
 
+  if (normalized.includes("ambassador")) {
+    return "ambassador-program";
+  }
+
   if (
-    normalized === "community-hire" ||
     normalized.includes("community") ||
     normalized.includes("workforce") ||
-    normalized.includes("ambassador")
+    normalized.includes("nonprofit")
   ) {
-    return "ambassador-program";
+    return "community-hire";
   }
 
   if (normalized.includes("student")) return "student-hire";
@@ -2081,6 +2096,9 @@ export default async function AdminProgramApplicationsPage({
     student: applications.filter(
       (item) => normalizeProgram(item.program) === "student-hire",
     ).length,
+    community: applications.filter(
+      (item) => normalizeProgram(item.program) === "community-hire",
+    ).length,
     veterans: applications.filter(
       (item) => normalizeProgram(item.program) === "veterans-hire",
     ).length,
@@ -2234,13 +2252,21 @@ export default async function AdminProgramApplicationsPage({
           />
         </section>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
             icon={<GraduationCap size={22} />}
             label="Student Hire"
             value={number(counts.student)}
             detail="Student and summer applicants"
             href={adminRoutes.studentApplications}
+          />
+
+          <StatCard
+            icon={<UsersRound size={22} />}
+            label="Community Hire"
+            value={number(counts.community)}
+            detail="Workforce and community referrals"
+            href={adminRoutes.communityApplications}
           />
 
           <StatCard

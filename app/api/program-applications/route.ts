@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 type ProgramKey =
   | "veterans-hire"
   | "student-hire"
+  | "community-hire"
   | "ambassador-program"
   | "skillbridge-interest";
 
@@ -76,6 +77,7 @@ const allowedAdditionalDocumentTypes = [
 
 const allowedPrograms: ProgramKey[] = [
   "student-hire",
+  "community-hire",
   "veterans-hire",
   "ambassador-program",
   "skillbridge-interest",
@@ -83,6 +85,7 @@ const allowedPrograms: ProgramKey[] = [
 
 const programLabels: Record<ProgramKey, string> = {
   "student-hire": "Student Hire Program",
+  "community-hire": "Community Hire Program",
   "veterans-hire": VETERANS_MILITARY_FAMILIES_PROGRAM.displayName,
   "ambassador-program": "Ambassador Program",
   "skillbridge-interest":
@@ -644,6 +647,10 @@ function getApplicationSource(program: ProgramKey) {
     return "student_hire_application_page";
   }
 
+  if (program === "community-hire") {
+    return "community_hire_application_page";
+  }
+
   return "program_application_page";
 }
 
@@ -763,7 +770,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       throw new Error(
-        `Application could not be saved. Please confirm the program_applications table accepts the current program values: student-hire, veterans-hire, ambassador-program, and skillbridge-interest. ${error.message}`,
+        `Application could not be saved. Please confirm the program_applications table accepts the current program values: student-hire, community-hire, veterans-hire, ambassador-program, and skillbridge-interest. ${error.message}`,
       );
     }
 

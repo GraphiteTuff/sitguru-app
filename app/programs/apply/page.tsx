@@ -14,6 +14,7 @@ import {
 import {
   ArrowRight,
   BadgeCheck,
+  Building2,
   CheckCircle2,
   FileText,
   GraduationCap,
@@ -39,6 +40,7 @@ const openSans = {
 type ProgramKey =
   | "veterans-hire"
   | "student-hire"
+  | "community-hire"
   | "ambassador-program"
   | "skillbridge-interest";
 
@@ -90,6 +92,8 @@ type ApplicationFormState = {
   studentStatus: string;
   graduationYearOrAvailability: string;
   studentBackground: string;
+  communityBackground: string;
+  workforceBackground: string;
   referralSource: string;
   resumeLink: string;
   backgroundCheckConsent: boolean;
@@ -179,6 +183,33 @@ const programOptions: ProgramOption[] = [
       "Upload a resume, profile link, or supporting docs if you have them",
       "Complete onboarding and SitGuru trust and safety steps when eligible",
       "Earn, build experience, tell friends, and grow toward full Guru status",
+    ],
+  },
+  {
+    key: "community-hire",
+    title: "Community Hire Program",
+    shortTitle: "Community Hire",
+    eyebrow: "Workforce & community pathway",
+    icon: <Building2 size={28} />,
+    description:
+      "For qualified people referred by city, state, federal, nonprofit, workforce, and community organizations who want flexible pet care opportunities and a supported path toward Guru status.",
+    earningMessage:
+      "Ready to work, learn, and grow? Community Hire helps partner-referred applicants take the next step toward trusted local pet care with SitGuru.",
+    idealFor: [
+      "Workforce program participants",
+      "Nonprofit and community referrals",
+      "Job-readiness and re-entry pathways",
+      "Local partner-supported applicants",
+      "People seeking flexible pet care opportunities",
+      "Applicants ready for guided onboarding",
+    ],
+    growthPath: [
+      "Apply through Community Hire",
+      "Share your partner or workforce referral source",
+      "Tell us your availability and pet care interests",
+      "Upload a resume and optional supporting docs",
+      "Complete onboarding and SitGuru trust and safety steps when eligible",
+      "Grow toward full Guru status with reliable care",
     ],
   },
   {
@@ -327,6 +358,8 @@ const initialFormState: ApplicationFormState = {
   studentStatus: "",
   graduationYearOrAvailability: "",
   studentBackground: "",
+  communityBackground: "",
+  workforceBackground: "",
   referralSource: "",
   resumeLink: "",
   backgroundCheckConsent: false,
@@ -343,6 +376,7 @@ function isProgramKey(value: string | null): value is ProgramKey {
   return (
     value === "veterans-hire" ||
     value === "student-hire" ||
+    value === "community-hire" ||
     value === "ambassador-program" ||
     value === "skillbridge-interest"
   );
@@ -444,6 +478,7 @@ function ProgramApplyContent() {
 
   const isVeteransProgram = formState.program === "veterans-hire";
   const isStudentProgram = formState.program === "student-hire";
+  const isCommunityProgram = formState.program === "community-hire";
   const isAmbassadorProgram = formState.program === "ambassador-program";
   const isSkillBridgeProgram = formState.program === "skillbridge-interest";
   const programImpliesVeteransOptIn =
@@ -954,6 +989,24 @@ function ProgramApplyContent() {
           : "",
         notes: [
           formState.notes.trim(),
+          formState.schoolName.trim()
+            ? `School: ${formState.schoolName.trim()}`
+            : "",
+          formState.studentStatus.trim()
+            ? `Student status: ${formState.studentStatus.trim()}`
+            : "",
+          formState.graduationYearOrAvailability.trim()
+            ? `Graduation / availability window: ${formState.graduationYearOrAvailability.trim()}`
+            : "",
+          formState.studentBackground.trim()
+            ? `Student background: ${formState.studentBackground.trim()}`
+            : "",
+          formState.communityBackground.trim()
+            ? `Community background: ${formState.communityBackground.trim()}`
+            : "",
+          formState.workforceBackground.trim()
+            ? `Workforce / partner background: ${formState.workforceBackground.trim()}`
+            : "",
           optedIn
             ? `Opted into ${VETERANS_MILITARY_FAMILIES_PROGRAM.displayName}.`
             : "",
@@ -1111,22 +1164,26 @@ function ProgramApplyContent() {
                 <WalletCards size={15} />
                 {isStudentProgram
                   ? "Extra cash around school"
-                  : isAmbassadorProgram
-                    ? "Together, we grow together"
-                    : isSkillBridgeProgram
-                      ? "SkillBridge interest"
-                      : "Flexible pet care opportunities"}
+                  : isCommunityProgram
+                    ? "Workforce & community pathway"
+                    : isAmbassadorProgram
+                      ? "Together, we grow together"
+                      : isSkillBridgeProgram
+                        ? "SkillBridge interest"
+                        : "Flexible pet care opportunities"}
               </div>
 
               <h1 className="mt-5 max-w-4xl text-4xl font-black leading-tight tracking-tight text-green-950 sm:text-5xl lg:text-6xl">
                 {selectedProgram
                   ? isStudentProgram
                     ? "Broke between classes? Earn extra cash with SitGuru."
-                    : isAmbassadorProgram
-                      ? "Help SitGuru grow in the pet community."
-                      : isSkillBridgeProgram
-                        ? `Join the ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}.`
-                        : `Apply for the ${selectedProgram.title}.`
+                    : isCommunityProgram
+                      ? "Start your SitGuru path through Community Hire."
+                      : isAmbassadorProgram
+                        ? "Help SitGuru grow in the pet community."
+                        : isSkillBridgeProgram
+                          ? `Join the ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}.`
+                          : `Apply for the ${selectedProgram.title}.`
                   : "Choose your SitGuru program."}
               </h1>
 
@@ -1134,31 +1191,39 @@ function ProgramApplyContent() {
                 {selectedProgram
                   ? isStudentProgram
                     ? "Walk dogs, do drop-ins, pet sit, or help local pet parents when your schedule allows. Great for after class, between classes, weekends, school breaks, and summer money."
-                    : isAmbassadorProgram
-                      ? "Ambassadors help refer Gurus and Pet Parents, support local pet-care awareness, and grow with SitGuru through community trust, referral rewards, and recognition opportunities."
-                      : isSkillBridgeProgram
-                        ? "SitGuru is exploring a future SkillBridge-style training pathway. Join the interest list to share your background, transition goals, and areas of interest."
-                        : `You are applying for the ${selectedProgram.title}. Qualified applicants complete onboarding, SitGuru trust and safety review steps when required, and may grow into full Guru status with greater commissions and future benefits over time.`
-                  : `Select Student Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, Ambassador Program, or ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName} before submitting. This keeps your application routed correctly.`}
+                    : isCommunityProgram
+                      ? "Community Hire is a guided application path for people referred by workforce programs, nonprofits, and local organizations who want flexible pet care opportunities and a path toward Guru status."
+                      : isAmbassadorProgram
+                        ? "Ambassadors help refer Gurus and Pet Parents, support local pet-care awareness, and grow with SitGuru through community trust, referral rewards, and recognition opportunities."
+                        : isSkillBridgeProgram
+                          ? "SitGuru is exploring a future SkillBridge-style training pathway. Join the interest list to share your background, transition goals, and areas of interest."
+                          : `You are applying for the ${selectedProgram.title}. Qualified applicants complete onboarding, SitGuru trust and safety review steps when required, and may grow into full Guru status with greater commissions and future benefits over time.`
+                  : `Select Student Hire, Community Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, Ambassador Program, or ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName} before submitting. This keeps your application routed correctly.`}
               </p>
 
               <div className="mt-7 grid gap-3 sm:grid-cols-3">
                 {[
                   isStudentProgram
                     ? "Easy extra cash"
-                    : isAmbassadorProgram
-                      ? "Refer Gurus"
-                      : "Resume upload",
+                    : isCommunityProgram
+                      ? "Partner referrals"
+                      : isAmbassadorProgram
+                        ? "Refer Gurus"
+                        : "Resume upload",
                   isStudentProgram
                     ? "Summer + breaks"
-                    : isAmbassadorProgram
-                      ? "Refer Pet Parents"
-                      : "Additional documents",
+                    : isCommunityProgram
+                      ? "Guided onboarding"
+                      : isAmbassadorProgram
+                        ? "Refer Pet Parents"
+                        : "Additional documents",
                   isStudentProgram
                     ? "Tell your friends"
-                    : isAmbassadorProgram
-                      ? "Community growth"
-                      : "Exact program routing",
+                    : isCommunityProgram
+                      ? "Path to Guru"
+                      : isAmbassadorProgram
+                        ? "Community growth"
+                        : "Exact program routing",
                 ].map((item) => (
                   <div
                     key={item}
@@ -1336,7 +1401,7 @@ function ProgramApplyContent() {
                       choose first.
                     </p>
 
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                       {programOptions.map((program) => (
                         <button
                           key={program.key}
@@ -1544,20 +1609,24 @@ function ProgramApplyContent() {
                           ? "Interest list"
                           : isStudentProgram
                             ? "Start earning"
-                            : isAmbassadorProgram
-                              ? "Ambassador application"
-                              : "Apply today"}
+                            : isCommunityProgram
+                              ? "Community pathway"
+                              : isAmbassadorProgram
+                                ? "Ambassador application"
+                                : "Apply today"}
                       </div>
 
                       <h2 className="mt-4 text-2xl font-black text-green-950 sm:text-3xl">
                         {selectedProgram
                           ? isStudentProgram
                             ? "Apply to start earning extra cash"
-                            : isAmbassadorProgram
-                              ? "Apply to become a SitGuru Ambassador"
-                              : isSkillBridgeProgram
-                                ? `Join the ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}`
-                                : `Apply for ${selectedProgram.title}`
+                            : isCommunityProgram
+                              ? "Apply through Community Hire"
+                              : isAmbassadorProgram
+                                ? "Apply to become a SitGuru Ambassador"
+                                : isSkillBridgeProgram
+                                  ? `Join the ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}`
+                                  : `Apply for ${selectedProgram.title}`
                           : "Choose a program to start"}
                       </h2>
 
@@ -1565,12 +1634,14 @@ function ProgramApplyContent() {
                         {selectedProgram
                           ? isStudentProgram
                             ? "This application will be submitted as Student Hire. Pick your services, schedule, and school details so SitGuru can review your fit."
-                            : isAmbassadorProgram
-                              ? "This application will be submitted as Ambassador Program. Tell us your pet-care background, referral network, and how you want to help SitGuru grow."
-                              : isSkillBridgeProgram
-                                ? `This will be submitted as ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}.`
-                                : `This application will be submitted as ${selectedProgram.title}.`
-                          : `Pick Student Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, Ambassador Program, or ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName} before submitting.`}
+                            : isCommunityProgram
+                              ? "This application will be submitted as Community Hire. Share your partner or workforce referral, availability, and how you want to grow with SitGuru."
+                              : isAmbassadorProgram
+                                ? "This application will be submitted as Ambassador Program. Tell us your pet-care background, referral network, and how you want to help SitGuru grow."
+                                : isSkillBridgeProgram
+                                  ? `This will be submitted as ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}.`
+                                  : `This application will be submitted as ${selectedProgram.title}.`
+                          : `Pick Student Hire, Community Hire, ${VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, Ambassador Program, or ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName} before submitting.`}
                       </p>
                     </div>
 
@@ -1898,6 +1969,62 @@ function ProgramApplyContent() {
                       </div>
                     ) : null}
 
+                    {isCommunityProgram ? (
+                      <div className="rounded-[28px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-green-50 p-4">
+                        <div className="mb-4">
+                          <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                            Community details
+                          </p>
+                          <h3 className="mt-1 text-lg font-black text-green-950">
+                            Tell us about your partner pathway.
+                          </h3>
+                          <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
+                            Optional, but helpful. Share your workforce program,
+                            nonprofit, or local organization context so SitGuru
+                            can route your application correctly.
+                          </p>
+                        </div>
+
+                        <div className="grid gap-4">
+                          <div>
+                            <label className="mb-2 block text-sm font-black text-green-950">
+                              Community or workforce background
+                            </label>
+                            <textarea
+                              value={formState.communityBackground}
+                              onChange={(event) =>
+                                updateField(
+                                  "communityBackground",
+                                  event.target.value,
+                                )
+                              }
+                              rows={3}
+                              className="min-h-[90px] w-full resize-y rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                              placeholder="Optional: Share job readiness, community program experience, volunteering, customer service, caregiving, or why this pathway fits you."
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-black text-green-950">
+                              Workforce / partner organization details
+                            </label>
+                            <textarea
+                              value={formState.workforceBackground}
+                              onChange={(event) =>
+                                updateField(
+                                  "workforceBackground",
+                                  event.target.value,
+                                )
+                              }
+                              rows={3}
+                              className="min-h-[90px] w-full resize-y rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+                              placeholder="Optional: Name the workforce program, nonprofit, city/state program, case manager, or local partner that referred you."
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
                     {isAmbassadorProgram ? (
                       <div className="rounded-[28px] border border-green-100 bg-green-50 p-4">
                         <div>
@@ -2075,9 +2202,11 @@ function ProgramApplyContent() {
                         placeholder={
                           isStudentProgram
                             ? "School, friend, teammate, roommate, club, campus group, social media, etc."
-                            : isAmbassadorProgram
-                              ? "Vet clinic, trainer network, rescue, shelter, grooming shop, social media, community group, etc."
-                              : "School, military org, workforce partner, nonprofit, social media, etc."
+                            : isCommunityProgram
+                              ? "Workforce program, nonprofit, city/state partner, case manager, community org, etc."
+                              : isAmbassadorProgram
+                                ? "Vet clinic, trainer network, rescue, shelter, grooming shop, social media, community group, etc."
+                                : "School, military org, workforce partner, nonprofit, social media, etc."
                         }
                       />
                     </div>
@@ -2236,9 +2365,11 @@ function ProgramApplyContent() {
                           ? "Why are you interested in a future SitGuru SkillBridge pathway?"
                           : isStudentProgram
                             ? "Why is SitGuru a good way for you to make extra cash?"
-                            : isAmbassadorProgram
-                              ? "Why would you be a strong SitGuru Ambassador?"
-                              : "Why would SitGuru be a good way for you to earn extra money?"}
+                            : isCommunityProgram
+                              ? "Why is Community Hire a good next step for you?"
+                              : isAmbassadorProgram
+                                ? "Why would you be a strong SitGuru Ambassador?"
+                                : "Why would SitGuru be a good way for you to earn extra money?"}
                       </label>
                       <textarea
                         value={formState.experience}
@@ -2252,9 +2383,11 @@ function ProgramApplyContent() {
                             ? "Tell us about your transition goals, pet care interest, customer service, operations, leadership, or local service experience."
                             : isStudentProgram
                               ? "Tell us why this fits your schedule — after class, between classes, weekends, breaks, summer, pets, extra cash, friends, goals, whatever makes sense."
-                              : isAmbassadorProgram
-                                ? "Tell us about your pet-care background, local network, referral reach, community involvement, or why Pet Parents and Gurus would trust your recommendation."
-                                : "Tell us about your pet care, work, school, military, or community experience."
+                              : isCommunityProgram
+                                ? "Tell us about your goals, partner referral, schedule flexibility, pet care interest, or how you want to grow with SitGuru."
+                                : isAmbassadorProgram
+                                  ? "Tell us about your pet-care background, local network, referral reach, community involvement, or why Pet Parents and Gurus would trust your recommendation."
+                                  : "Tell us about your pet care, work, school, military, or community experience."
                         }
                         required
                       />
@@ -2319,9 +2452,11 @@ function ProgramApplyContent() {
                         placeholder={
                           isStudentProgram
                             ? "Optional: Drop your goals, questions, friend referrals, campus groups, clubs, or anything else."
-                            : isAmbassadorProgram
-                              ? "Optional: Share goals, referral ideas, pet community connections, social media reach, or questions."
-                              : "Optional notes, goals, questions, or details."
+                            : isCommunityProgram
+                              ? "Optional: Share case manager contacts, partner notes, goals, questions, or anything else."
+                              : isAmbassadorProgram
+                                ? "Optional: Share goals, referral ideas, pet community connections, social media reach, or questions."
+                                : "Optional notes, goals, questions, or details."
                         }
                       />
                     </div>
@@ -2336,11 +2471,13 @@ function ProgramApplyContent() {
                         : formState.program
                           ? isStudentProgram
                             ? "Apply to Start Earning"
-                            : isAmbassadorProgram
-                              ? "Apply to Become an Ambassador"
-                              : isSkillBridgeProgram
-                                ? `Join ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}`
-                                : `Apply to ${getProgramLabel(formState.program)}`
+                            : isCommunityProgram
+                              ? "Apply to Community Hire"
+                              : isAmbassadorProgram
+                                ? "Apply to Become an Ambassador"
+                                : isSkillBridgeProgram
+                                  ? `Join ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}`
+                                  : `Apply to ${getProgramLabel(formState.program)}`
                           : "Choose Program to Apply"}
                       {!isSubmitting ? <ArrowRight size={18} /> : null}
                     </button>
