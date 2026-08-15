@@ -691,17 +691,17 @@ export default function ProgramsPage() {
             Start with the pathway that fits you best. SitGuru will route your
             application to the appropriate review and next steps.
           </p>
-          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <div className="mt-6 flex w-full flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
             <Link
               href="#pet-care-pathways"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-6 py-3 text-sm font-black text-white transition hover:bg-[#09462C]"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-6 py-3 text-sm font-black text-white transition hover:bg-[#09462C] sm:w-auto"
             >
               View programs
               <ArrowRight size={17} />
             </Link>
             <Link
               href="/become-a-guru"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-900 transition hover:bg-emerald-50"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-900 transition hover:bg-emerald-50 sm:w-auto"
             >
               Become a Guru
             </Link>

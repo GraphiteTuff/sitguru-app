@@ -1,10 +1,12 @@
 import {
   Dog,
   Footprints,
+  HeartPulse,
   Home,
   Moon,
   Sparkles,
   Sun,
+  Wrench,
 } from 'lucide-react-native';
 import type { ComponentType } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -14,13 +16,17 @@ import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import { MobileSpace, MobileType, TOUCH_MIN } from '@/constants/mobile-layout';
 
+/** Keep labels / serviceType aligned with web SEARCH_SERVICE_OPTIONS. */
 export type CareServiceKey =
   | 'dog_walking'
   | 'pet_sitting'
   | 'boarding'
   | 'drop_in'
   | 'day_care'
-  | 'training_support';
+  | 'house_sitting'
+  | 'training_support'
+  | 'medication_help'
+  | 'custom_care';
 
 export type CareServiceOption = {
   key: CareServiceKey;
@@ -49,22 +55,40 @@ export const CARE_SERVICES: CareServiceOption[] = [
     serviceType: 'Boarding',
   },
   {
-    key: 'drop_in',
-    label: 'Drop-In',
-    helper: 'Quick visits for food & potty',
-    serviceType: 'Drop-In Visit',
+    key: 'day_care',
+    label: 'Doggy Day Care',
+    helper: 'Daytime play and supervision',
+    serviceType: 'Doggy Day Care',
   },
   {
-    key: 'day_care',
-    label: 'Day Care',
-    helper: 'Daytime play and supervision',
-    serviceType: 'Day Care',
+    key: 'drop_in',
+    label: 'Drop-In Visits',
+    helper: 'Quick visits for food & potty',
+    serviceType: 'Drop-In Visits',
+  },
+  {
+    key: 'house_sitting',
+    label: 'House Sitting',
+    helper: 'Overnight care in your home',
+    serviceType: 'House Sitting',
   },
   {
     key: 'training_support',
     label: 'Training Support',
     helper: 'Coaching alongside booked care',
     serviceType: 'Training Support',
+  },
+  {
+    key: 'medication_help',
+    label: 'Medication Help',
+    helper: 'Meds and special-care support',
+    serviceType: 'Medication Help',
+  },
+  {
+    key: 'custom_care',
+    label: 'Custom Care',
+    helper: 'Flexible care tailored to you',
+    serviceType: 'Custom Care',
   },
 ];
 
@@ -77,7 +101,10 @@ const ICONS: Record<
   boarding: Moon,
   drop_in: Footprints,
   day_care: Sun,
+  house_sitting: Home,
   training_support: Sparkles,
+  medication_help: HeartPulse,
+  custom_care: Wrench,
 };
 
 type ServiceCoreGridProps = {

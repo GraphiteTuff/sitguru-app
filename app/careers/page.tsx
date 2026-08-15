@@ -292,8 +292,8 @@ function InfoList({ title, items }: { title: string; items: string[] }) {
 
 export default function CareersPage() {
   return (
-    <main className="min-h-screen bg-[#f9faf5] pb-24 text-slate-950 sm:pb-0">
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden">
+    <main className="min-h-screen bg-[#f9faf5] pb-[calc(6rem+env(safe-area-inset-bottom))] text-slate-950 sm:pb-0">
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <Link
           href="/become-a-guru"
           className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-green-800 px-6 py-4 text-base font-black text-white shadow-lg shadow-emerald-900/20 transition hover:bg-green-900"

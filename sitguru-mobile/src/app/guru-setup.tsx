@@ -90,12 +90,14 @@ const zipLookup: Record<string, { city: string; state: string }> = {
 
 const serviceOptions = [
   'Dog Walking',
-  'Drop-In Visits',
   'Pet Sitting',
-  'House Sitting',
   'Boarding',
   'Doggy Day Care',
+  'Drop-In Visits',
+  'House Sitting',
   'Training Support',
+  'Medication Help',
+  'Custom Care',
 ];
 
 const petTypeOptions = ['Dogs', 'Cats', 'Other Pets'];

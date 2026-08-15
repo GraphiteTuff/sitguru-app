@@ -169,14 +169,14 @@ export default function PetPerksPage() {
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/signup"
-                  className="inline-flex items-center justify-center rounded-full bg-[#0D5C3A] px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/20 transition hover:bg-[#09462C]"
+                  className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#0D5C3A] px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/20 transition hover:bg-[#09462C] sm:w-auto"
                 >
                   Sign Up Free
                 </Link>
 
                 <Link
                   href="/customer/dashboard/pawperks"
-                  className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
+                  className="inline-flex min-h-12 w-full items-center justify-center rounded-full border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50 sm:w-auto"
                 >
                   Open PawPerks Rewards
                 </Link>

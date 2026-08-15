@@ -19,6 +19,7 @@ import QuickBookOverlay, {
 } from "@/components/booking/QuickBookOverlay";
 import GuruSearchMatchBadge from "@/components/search/GuruSearchCard";
 import { trackEvent } from "@/lib/analytics/track";
+import { SEARCH_SERVICE_OPTIONS } from "@/lib/search/service-options";
 import { supabase } from "@/lib/supabase";
 import { useGuruSearchLivePatches } from "@/hooks/useGuruSearchLivePatches";
 
@@ -142,17 +143,7 @@ type AcademyCertificationRow = {
   issued_at?: string | null;
 };
 
-const SERVICE_OPTIONS = [
-  "Dog Walking",
-  "Pet Sitting",
-  "Boarding",
-  "Doggy Day Care",
-  "Drop-In Visits",
-  "House Sitting",
-  "Training Support",
-  "Medication Help",
-  "Custom Care",
-];
+const SERVICE_OPTIONS = SEARCH_SERVICE_OPTIONS;
 
 const DEFAULT_MAP_CENTER: [number, number] = [39.8283, -98.5795];
 
@@ -2574,7 +2565,7 @@ function SearchPageContent() {
                 <select
                   value={serviceFilter}
                   onChange={(event) => setServiceFilter(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  className="min-h-12 w-full appearance-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
                 >
                   <option value="">All services</option>
                   {SERVICE_OPTIONS.map((service) => (
@@ -2589,14 +2580,15 @@ function SearchPageContent() {
                 <label className="mb-2 block text-sm font-semibold text-slate-800">
                   ZIP Code
                 </label>
-                <input
+                  <input
                   type="text"
                   inputMode="numeric"
                   maxLength={5}
                   value={zipFilter}
                   onChange={(event) => handleZipChange(event.target.value)}
                   placeholder="18951"
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  autoComplete="postal-code"
+                  className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
                 />
               </div>
 

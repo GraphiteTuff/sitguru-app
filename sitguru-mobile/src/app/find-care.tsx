@@ -1,5 +1,5 @@
 import { Asset } from "expo-asset";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import {
   ChevronLeft,
   Heart,
@@ -292,31 +292,49 @@ const themeOptions: ThemeOption[] = [
 const services: ServiceOption[] = [
   { label: "All", value: "all", keywords: [] },
   {
-    label: "Walks",
-    value: "walks",
-    keywords: ["walk", "walks", "walking", "trail"],
+    label: "Dog Walking",
+    value: "dog_walking",
+    keywords: ["walk", "walks", "walking", "dog walking", "trail"],
   },
   {
-    label: "Drop-ins",
-    value: "drop_ins",
-    keywords: ["drop", "drop-in", "drop-ins", "visit", "visits", "puppy"],
-  },
-  {
-    label: "Sitting",
-    value: "sitting",
-    keywords: [
-      "sit",
-      "sitting",
-      "house sitting",
-      "cats",
-      "senior",
-      "medication",
-    ],
+    label: "Pet Sitting",
+    value: "pet_sitting",
+    keywords: ["pet sitting", "sitting", "sit", "sitter"],
   },
   {
     label: "Boarding",
     value: "boarding",
-    keywords: ["board", "boarding", "day care", "doggy day care"],
+    keywords: ["board", "boarding"],
+  },
+  {
+    label: "Doggy Day Care",
+    value: "day_care",
+    keywords: ["day care", "daycare", "doggy day care", "daycare"],
+  },
+  {
+    label: "Drop-In Visits",
+    value: "drop_ins",
+    keywords: ["drop", "drop-in", "drop-ins", "drop in", "visit", "visits"],
+  },
+  {
+    label: "House Sitting",
+    value: "house_sitting",
+    keywords: ["house sitting", "overnight", "house sit"],
+  },
+  {
+    label: "Training Support",
+    value: "training_support",
+    keywords: ["training", "trainer", "training support"],
+  },
+  {
+    label: "Medication Help",
+    value: "medication_help",
+    keywords: ["medication", "meds", "medicine"],
+  },
+  {
+    label: "Custom Care",
+    value: "custom_care",
+    keywords: ["custom", "custom care", "special"],
   },
 ];
 
@@ -645,13 +663,39 @@ export default function FindCareScreen() {
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
   const scrollRef = useRef<ScrollView | null>(null);
+  const routeParams = useLocalSearchParams<{
+    service?: string | string[];
+    zip?: string | string[];
+  }>();
+
+  const initialServiceParam = Array.isArray(routeParams.service)
+    ? routeParams.service[0]
+    : routeParams.service;
+  const initialZipParam = Array.isArray(routeParams.zip)
+    ? routeParams.zip[0]
+    : routeParams.zip;
+
+  const matchedInitialService = useMemo(() => {
+    const raw = String(initialServiceParam || "").trim().toLowerCase();
+    if (!raw || raw === "all" || raw === "all services") return services[0];
+
+    return (
+      services.find(
+        (service) =>
+          service.value === raw ||
+          service.label.toLowerCase() === raw ||
+          service.keywords.some((keyword) => raw.includes(keyword)),
+      ) || services[0]
+    );
+  }, [initialServiceParam]);
 
   const [activeView, setActiveView] = useState<ExploreView>("list");
   const [discoveryScope, setDiscoveryScope] = useState<DiscoveryScope>("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedService, setSelectedService] = useState<ServiceOption>(
-    services[0],
+  const [searchQuery, setSearchQuery] = useState(
+    String(initialZipParam || "").replace(/\D/g, "").slice(0, 5),
   );
+  const [selectedService, setSelectedService] =
+    useState<ServiceOption>(matchedInitialService);
   const [noticeMessage, setNoticeMessage] = useState("");
   const [dynamicGurus, setDynamicGurus] = useState<PublicGuruProfile[]>([]);
   const [isLoadingGurus, setIsLoadingGurus] = useState(true);
@@ -1274,7 +1318,11 @@ export default function FindCareScreen() {
                   </Pressable>
                 </View>
 
-                <View style={styles.serviceChips}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.serviceChips}
+                >
                   {services.map((service) => {
                     const selected = selectedService.value === service.value;
 
@@ -1282,6 +1330,7 @@ export default function FindCareScreen() {
                       <Pressable
                         key={service.value}
                         accessibilityRole="button"
+                        accessibilityLabel={`Filter by ${service.label}`}
                         onPress={() => {
                           setSelectedService(service);
                           setNoticeMessage("");
@@ -1302,7 +1351,7 @@ export default function FindCareScreen() {
                       </Pressable>
                     );
                   })}
-                </View>
+                </ScrollView>
               </View>
 
               {noticeMessage && activeView === "list" ? (
@@ -3893,8 +3942,9 @@ function createStyles(isDark: boolean) {
     },
     serviceChips: {
       flexDirection: "row",
-      flexWrap: "wrap",
+      alignItems: "center",
       gap: 8,
+      paddingRight: 4,
     },
     serviceChip: {
       alignItems: "center",
@@ -3903,9 +3953,9 @@ function createStyles(isDark: boolean) {
       borderRadius: 999,
       borderWidth: 1,
       justifyContent: "center",
-      minHeight: 30,
-      paddingHorizontal: 12,
-      paddingVertical: 7,
+      minHeight: 44,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
     },
     serviceChipSelected: {
       backgroundColor: isDark ? "#13452E" : "#0B6B45",
@@ -3914,7 +3964,7 @@ function createStyles(isDark: boolean) {
     serviceChipText: {
       color: palette.muted,
       fontFamily: AppFonts.bold,
-      fontSize: 11,
+      fontSize: 12,
     },
     serviceChipTextSelected: {
       color: isDark ? "#DFFFEA" : "#FFFFFF",

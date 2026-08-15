@@ -10,6 +10,7 @@ import {
   getGuruProfilePhotoUrl,
   hasGuruProfilePhoto,
 } from "@/lib/gurus/profile-photo";
+import { SEARCH_SERVICE_OPTIONS } from "@/lib/search/service-options";
 import { supabase } from "@/lib/supabase";
 
 const heroVideoPaths = [
@@ -29,14 +30,7 @@ const heroVideoPlaybackRates = [1, 1, 0.9] as const;
 const heroVideoTransitionMs = 420;
 const defaultGuruAvatarPath = "/images/sitguru-message-avatar.jpg";
 
-const heroServiceOptions = [
-  "Dog Walking",
-  "Pet Sitting",
-  "Boarding",
-  "Drop-In Visits",
-  "Doggy Day Care",
-  "Training Support",
-];
+const heroServiceOptions = SEARCH_SERVICE_OPTIONS;
 
 const popularServices = [
   { title: "Dog Walking", icon: "🐕", href: "/search?service=Dog%20Walking" },
@@ -696,7 +690,7 @@ function SearchPanel({
       <input type="hidden" name="state" value={searchForm.state} />
 
       <div className="grid gap-3 md:grid-cols-[1.35fr_0.85fr_auto] md:items-end">
-        <label className="block">
+        <label className="block min-w-0">
           <span className="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-slate-500">
             Service
           </span>
@@ -704,7 +698,7 @@ function SearchPanel({
             name="service"
             value={searchForm.service}
             onChange={(event) => onChange("service", event.target.value)}
-            className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+            className="min-h-12 h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 text-base font-bold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
           >
             <option value="">All services</option>
             {heroServiceOptions.map((service) => (
@@ -715,7 +709,7 @@ function SearchPanel({
           </select>
         </label>
 
-        <label className="block">
+        <label className="block min-w-0">
           <span className="mb-1.5 block text-[11px] font-black uppercase tracking-wide text-slate-500">
             ZIP code
           </span>
@@ -723,16 +717,17 @@ function SearchPanel({
             name="zip"
             value={searchForm.zipCode}
             onChange={(event) => onChange("zipCode", event.target.value)}
-            className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+            className="min-h-12 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-base font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
             inputMode="numeric"
             maxLength={5}
+            autoComplete="postal-code"
             placeholder="Enter ZIP"
           />
         </label>
 
         <button
           type="submit"
-          className="h-12 rounded-xl bg-emerald-700 px-6 text-sm font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800"
+          className="min-h-12 h-12 w-full rounded-xl bg-emerald-700 px-6 text-base font-black text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-800 sm:text-sm md:w-auto"
         >
           See Gurus Near Me
         </button>

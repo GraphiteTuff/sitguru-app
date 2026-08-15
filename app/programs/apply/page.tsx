@@ -1140,9 +1140,35 @@ function ProgramApplyContent() {
 
   return (
     <main
-      className={`${openSans.className} min-h-screen bg-[#f9faf5] text-slate-950`}
+      className={`${openSans.className} min-h-screen bg-[#f9faf5] pb-[calc(7rem+env(safe-area-inset-bottom))] text-slate-950 sm:pb-0`}
       style={{ fontWeight: 300 }}
     >
+      {!applicationConfirmation ? (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <button
+            type="submit"
+            form="program-application-form"
+            disabled={isSubmitting}
+            className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-green-800 px-6 py-4 text-base font-black text-white shadow-lg shadow-emerald-900/20 transition hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting
+              ? "Submitting..."
+              : formState.program
+                ? isStudentProgram
+                  ? "Apply to Start Earning"
+                  : isCommunityProgram
+                    ? "Apply to Community Hire"
+                    : isAmbassadorProgram
+                      ? "Apply to Become an Ambassador"
+                      : isSkillBridgeProgram
+                        ? `Join ${VETERANS_MILITARY_FAMILIES_PROGRAM.skillbridge.displayName}`
+                        : `Apply to ${getProgramLabel(formState.program)}`
+                : "Choose Program to Apply"}
+            {!isSubmitting ? <ArrowRight size={18} /> : null}
+          </button>
+        </div>
+      ) : null}
+
       <section className="relative overflow-hidden border-b border-green-100 bg-gradient-to-br from-white via-[#f9faf5] to-emerald-50">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-[-120px] top-[-120px] h-80 w-80 rounded-full bg-emerald-200/45 blur-3xl" />
@@ -1401,7 +1427,7 @@ function ProgramApplyContent() {
                       choose first.
                     </p>
 
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                    <div className="mt-5 grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-5">
                       {programOptions.map((program) => (
                         <button
                           key={program.key}
@@ -1667,7 +1693,7 @@ function ProgramApplyContent() {
                             event.target.value as ProgramSelection,
                           )
                         }
-                        className={`w-full rounded-2xl border bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100 ${
+                        className={`min-h-12 w-full rounded-2xl border bg-white px-4 py-3 text-base font-bold text-slate-900 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100 sm:text-sm ${
                           formState.program
                             ? "border-slate-200"
                             : "border-amber-300 ring-4 ring-amber-100"
@@ -2464,7 +2490,7 @@ function ProgramApplyContent() {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-800 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="hidden min-h-14 w-full items-center justify-center gap-2 rounded-full bg-green-800 px-5 py-4 text-base font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-60 sm:inline-flex"
                     >
                       {isSubmitting
                         ? "Submitting..."

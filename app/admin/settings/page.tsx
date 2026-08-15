@@ -930,14 +930,14 @@ function StatCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50 p-5">
-      <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">
+    <div className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50 p-4 sm:p-5">
+      <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-700 sm:text-xs">
         {label}
       </p>
-      <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+      <p className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:mt-3 sm:text-3xl">
         {value}
       </p>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+      <p className="mt-2 text-xs font-semibold leading-5 text-slate-600 sm:text-sm sm:leading-6">
         {detail}
       </p>
     </div>
@@ -1029,7 +1029,7 @@ function AssignAccessForm({
         name="roleKey"
         defaultValue={user.hqRoleKey || ""}
         disabled={disabled}
-        className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
+        className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100"
       >
         <option value="">Choose admin role...</option>
         {grantableRoles.map((role) => (
@@ -1043,17 +1043,196 @@ function AssignAccessForm({
         name="notes"
         placeholder="Optional access note"
         disabled={disabled}
-        className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
+        className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100"
       />
 
       <button
         type="submit"
         disabled={disabled}
-        className="inline-flex w-full items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
       >
         Assign / Update Access
       </button>
     </form>
+  );
+}
+
+function UserAccessCard({
+  user,
+  roles,
+  canManageUsers,
+  canResetPasswords,
+  allowSuperUserRoles,
+}: {
+  user: UserAccessRow;
+  roles: RoleRow[];
+  canManageUsers: boolean;
+  canResetPasswords: boolean;
+  allowSuperUserRoles: boolean;
+}) {
+  return (
+    <article className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-base font-black text-slate-950 sm:text-lg">
+              {user.displayName}
+            </p>
+            <p className="mt-1 break-all text-sm font-semibold text-slate-600">
+              {user.email}
+            </p>
+            <p className="mt-1 break-all text-[11px] font-semibold text-slate-400">
+              {user.id}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              Last sign in: {formatDate(user.lastSignInAt)}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Pill className={getStatusClass(user.accountStatus)}>
+              {user.accountStatus}
+            </Pill>
+            <Pill
+              className={
+                user.mfaEnabled
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-amber-200 bg-amber-50 text-amber-700"
+              }
+            >
+              {user.mfaEnabled ? "MFA Enabled" : "MFA Not Seen"}
+            </Pill>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="rounded-2xl border border-slate-100 bg-[#fbfefd] p-3">
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+              Admin department
+            </p>
+            <div className="mt-2">
+              <Pill className={getDepartmentClass(user.departmentKey)}>
+                {user.departmentName}
+              </Pill>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-[#fbfefd] p-3">
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+              Admin role
+            </p>
+            <div className="mt-2 flex flex-col gap-2">
+              <Pill className={getRoleBadgeClass(user.hqRoleKey || user.role)}>
+                {user.hqRoleName}
+              </Pill>
+              <p className="text-xs font-semibold text-slate-500">
+                Legacy role: {user.role}
+              </p>
+              {user.adminRole !== "—" ? (
+                <p className="text-xs font-semibold text-slate-500">
+                  Admin: {user.adminRole}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-[#fbfefd] p-3 sm:col-span-2 xl:col-span-1">
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+              Access & security
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Pill
+                className={
+                  user.accessLevel === "super_user"
+                    ? "border-purple-200 bg-purple-50 text-purple-700"
+                    : "border-slate-200 bg-slate-50 text-slate-700"
+                }
+              >
+                {getAccessLabel(user.accessLevel)}
+              </Pill>
+              <Pill
+                className={
+                  user.canAccessAdmin
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200 bg-slate-50 text-slate-600"
+                }
+              >
+                {user.canAccessAdmin ? "Admin Access" : "No Admin"}
+              </Pill>
+              <Pill
+                className={
+                  user.canAccessFinancials
+                    ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                    : "border-slate-200 bg-slate-50 text-slate-600"
+                }
+              >
+                {user.canAccessFinancials ? "Finance Access" : "No Finance"}
+              </Pill>
+            </div>
+            <p className="mt-2 text-xs font-semibold text-slate-500">
+              Confirmed: {formatDate(user.confirmedAt)}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 border-t border-slate-100 pt-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+          <div>
+            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+              Assign role
+            </p>
+            <AssignAccessForm
+              user={user}
+              roles={roles}
+              disabled={!canManageUsers}
+              allowSuperUserRoles={allowSuperUserRoles}
+            />
+          </div>
+
+          <div>
+            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+              Actions
+            </p>
+            <div className="grid gap-2">
+              <form action={sendPasswordReset}>
+                <input type="hidden" name="email" value={user.email} />
+                <button
+                  type="submit"
+                  disabled={!canResetPasswords}
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  Send Password Reset
+                </button>
+              </form>
+
+              {user.assignmentId ? (
+                <form action={deactivateHqAccess}>
+                  <input
+                    type="hidden"
+                    name="accessId"
+                    value={user.assignmentId}
+                  />
+                  <input type="hidden" name="email" value={user.email} />
+                  <button
+                    type="submit"
+                    disabled={!canManageUsers}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-black text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                  >
+                    Deactivate Admin Access
+                  </button>
+                </form>
+              ) : null}
+
+              <Link
+                href={`/admin/users?email=${encodeURIComponent(user.email)}`}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              >
+                Review User
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -1070,187 +1249,26 @@ function UserAccessTable({
   canResetPasswords: boolean;
   allowSuperUserRoles: boolean;
 }) {
-  return (
-    <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
-      <div className="overflow-x-auto">
-        <table className="min-w-[1460px] text-left text-sm">
-          <thead className="bg-slate-50 text-slate-600">
-            <tr>
-              <th className="px-4 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                User
-              </th>
-              <th className="px-4 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                Admin Department
-              </th>
-              <th className="px-4 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                Admin Role
-              </th>
-              <th className="px-4 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                Access
-              </th>
-              <th className="px-4 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                Security
-              </th>
-              <th className="px-4 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                Assign Role
-              </th>
-              <th className="px-4 py-4 text-xs font-black uppercase tracking-[0.18em]">
-                Actions
-              </th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-slate-100">
-            {users.length ? (
-              users.map((user) => (
-                <tr key={user.id} className="transition hover:bg-slate-50">
-                  <td className="px-4 py-4">
-                    <p className="font-black text-slate-950">{user.displayName}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">
-                      {user.email}
-                    </p>
-                    <p className="mt-1 break-all text-[11px] font-semibold text-slate-400">
-                      {user.id}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Last sign in: {formatDate(user.lastSignInAt)}
-                    </p>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <Pill className={getDepartmentClass(user.departmentKey)}>
-                      {user.departmentName}
-                    </Pill>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="flex flex-col gap-2">
-                      <Pill className={getRoleBadgeClass(user.hqRoleKey || user.role)}>
-                        {user.hqRoleName}
-                      </Pill>
-                      <p className="text-xs font-semibold text-slate-500">
-                        Legacy role: {user.role}
-                      </p>
-                      {user.adminRole !== "—" ? (
-                        <p className="text-xs font-semibold text-slate-500">
-                          Admin: {user.adminRole}
-                        </p>
-                      ) : null}
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="flex flex-col gap-2">
-                      <Pill
-                        className={
-                          user.accessLevel === "super_user"
-                            ? "border-purple-200 bg-purple-50 text-purple-700"
-                            : "border-slate-200 bg-slate-50 text-slate-700"
-                        }
-                      >
-                        {getAccessLabel(user.accessLevel)}
-                      </Pill>
-                      <Pill
-                        className={
-                          user.canAccessAdmin
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-slate-200 bg-slate-50 text-slate-600"
-                        }
-                      >
-                        {user.canAccessAdmin ? "Admin Access" : "No Admin"}
-                      </Pill>
-                      <Pill
-                        className={
-                          user.canAccessFinancials
-                            ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-                            : "border-slate-200 bg-slate-50 text-slate-600"
-                        }
-                      >
-                        {user.canAccessFinancials ? "Finance Access" : "No Finance"}
-                      </Pill>
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="flex flex-col gap-2">
-                      <Pill className={getStatusClass(user.accountStatus)}>
-                        {user.accountStatus}
-                      </Pill>
-                      <Pill
-                        className={
-                          user.mfaEnabled
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-amber-200 bg-amber-50 text-amber-700"
-                        }
-                      >
-                        {user.mfaEnabled ? "MFA Enabled" : "MFA Not Seen"}
-                      </Pill>
-                      <p className="text-xs font-semibold text-slate-500">
-                        Confirmed: {formatDate(user.confirmedAt)}
-                      </p>
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <AssignAccessForm
-                      user={user}
-                      roles={roles}
-                      disabled={!canManageUsers}
-                      allowSuperUserRoles={allowSuperUserRoles}
-                    />
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="grid gap-2">
-                      <form action={sendPasswordReset}>
-                        <input type="hidden" name="email" value={user.email} />
-                        <button
-                          type="submit"
-                          disabled={!canResetPasswords}
-                          className="inline-flex w-full items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                        >
-                          Send Password Reset
-                        </button>
-                      </form>
-
-                      {user.assignmentId ? (
-                        <form action={deactivateHqAccess}>
-                          <input
-                            type="hidden"
-                            name="accessId"
-                            value={user.assignmentId}
-                          />
-                          <input type="hidden" name="email" value={user.email} />
-                          <button
-                            type="submit"
-                            disabled={!canManageUsers}
-                            className="inline-flex w-full items-center justify-center rounded-2xl border border-rose-200 bg-white px-4 py-2.5 text-xs font-black text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
-                          >
-                            Deactivate Admin Access
-                          </button>
-                        </form>
-                      ) : null}
-
-                      <Link
-                        href={`/admin/users?email=${encodeURIComponent(user.email)}`}
-                        className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-50"
-                      >
-                        Review User
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
-                  No users found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+  if (!users.length) {
+    return (
+      <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-[#fbfefd] px-4 py-12 text-center text-sm font-semibold text-slate-500">
+        No users found.
       </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4">
+      {users.map((user) => (
+        <UserAccessCard
+          key={user.id}
+          user={user}
+          roles={roles}
+          canManageUsers={canManageUsers}
+          canResetPasswords={canResetPasswords}
+          allowSuperUserRoles={allowSuperUserRoles}
+        />
+      ))}
     </div>
   );
 }
@@ -1656,19 +1674,24 @@ async function getAdminSettingsData() {
 export default async function AdminSettingsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ status?: string; message?: string }>;
+  searchParams?: Promise<{
+    status?: string;
+    message?: string;
+    q?: string;
+    access?: string;
+  }>;
 }) {
   const params = (await searchParams) || {};
   const actor = await getAdminIdentity();
 
   if (!actor?.canAccessAdmin) {
     return (
-      <div className="min-h-screen bg-[#f9faf5] px-6 py-10 text-slate-950">
-        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
+      <div className="min-h-screen bg-[#f9faf5] px-4 py-6 text-slate-950 sm:px-6 sm:py-10">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-6 shadow-sm sm:p-8">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
             Access Restricted
           </p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+          <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
             Admin access required.
           </h1>
           <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
@@ -1683,21 +1706,56 @@ export default async function AdminSettingsPage({
   const settingsData = await getAdminSettingsData();
   const flashStatus = asTrimmedString(params.status);
   const flashMessage = asTrimmedString(params.message);
+  const accessQuery = asTrimmedString(params.q).toLowerCase();
+  const accessFilter = asTrimmedString(params.access).toLowerCase() || "all";
+  const filteredUsers = settingsData.users.filter((user) => {
+    const matchesQuery =
+      !accessQuery ||
+      [
+        user.displayName,
+        user.email,
+        user.id,
+        user.departmentName,
+        user.hqRoleName,
+        user.role,
+        user.adminRole,
+        user.accountStatus,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(accessQuery);
+
+    if (!matchesQuery) return false;
+
+    if (accessFilter === "unconfirmed") {
+      return user.accountStatus.toLowerCase().includes("unconfirmed");
+    }
+    if (accessFilter === "admin") return user.canAccessAdmin;
+    if (accessFilter === "finance") return user.canAccessFinancials;
+    if (accessFilter === "super") {
+      return (
+        user.accessLevel === "super_user" ||
+        isSuperUserRole(user.hqRoleKey || user.role)
+      );
+    }
+
+    return true;
+  });
   const visibleSystemChecks = actor.isSuperUser
     ? settingsData.systemChecks
     : settingsData.systemChecks.filter((check) => !check.sensitive);
 
   return (
-    <main className="min-h-screen bg-[#f9faf5] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1640px] space-y-6">
-        <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.13),transparent_30%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_58%,#f8fafc_100%)] p-6 shadow-sm sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <main className="min-h-screen bg-[#f9faf5] px-3 py-4 text-slate-950 sm:px-6 sm:py-6 lg:px-8">
+      <div className="mx-auto max-w-[1200px] space-y-5 sm:space-y-6">
+        <section className="overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.13),transparent_30%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_58%,#f8fafc_100%)] p-4 shadow-sm sm:rounded-[2rem] sm:p-6 lg:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
                 Admin / Settings / Admin Access
               </p>
 
-              <h1 className="mt-3 max-w-5xl text-4xl font-black leading-[0.96] tracking-tight text-slate-950 sm:text-5xl">
+              <h1 className="mt-3 max-w-5xl text-3xl font-black leading-[0.96] tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
                 SitGuru Admin Access Control.
               </h1>
 
@@ -1713,7 +1771,7 @@ export default async function AdminSettingsPage({
               <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
                 Signed in Admin
               </p>
-              <p className="mt-2 text-sm font-black text-slate-950">
+              <p className="mt-2 break-all text-sm font-black text-slate-950">
                 {actor.email}
               </p>
               <p className="mt-1 text-xs font-semibold text-slate-500">
@@ -1756,7 +1814,7 @@ export default async function AdminSettingsPage({
             </div>
           ) : null}
 
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="mt-8 grid gap-3 grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             <StatCard
               label="Total Users"
               value={settingsData.totals.allUsers.toLocaleString()}
@@ -1790,7 +1848,7 @@ export default async function AdminSettingsPage({
           </div>
         </section>
 
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           <SettingsCard
             href="/admin/users"
             title="User Directory"
@@ -1856,13 +1914,13 @@ export default async function AdminSettingsPage({
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+        <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-4 shadow-sm sm:rounded-[2rem] sm:p-6 lg:p-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
                 Password & Role Access Support
               </p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+              <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
                 User access management.
               </h2>
               <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
@@ -1878,9 +1936,64 @@ export default async function AdminSettingsPage({
             </div>
           </div>
 
-          <div className="mt-6">
+          <form
+            method="get"
+            className="mt-5 grid gap-3 rounded-[1.5rem] border border-slate-200 bg-[#fbfefd] p-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_auto] sm:p-4"
+          >
+            {flashStatus ? (
+              <input type="hidden" name="status" value={flashStatus} />
+            ) : null}
+            {flashMessage ? (
+              <input type="hidden" name="message" value={flashMessage} />
+            ) : null}
+
+            <label className="block min-w-0">
+              <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                Search users
+              </span>
+              <input
+                name="q"
+                defaultValue={asTrimmedString(params.q)}
+                placeholder="Name, email, role, department..."
+                className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-base font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+              />
+            </label>
+
+            <label className="block min-w-0">
+              <span className="mb-1.5 block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                Filter
+              </span>
+              <select
+                name="access"
+                defaultValue={accessFilter}
+                className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-base font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+              >
+                <option value="all">All users</option>
+                <option value="unconfirmed">Unconfirmed</option>
+                <option value="admin">Admin access</option>
+                <option value="finance">Finance access</option>
+                <option value="super">Super users</option>
+              </select>
+            </label>
+
+            <div className="flex items-end">
+              <button
+                type="submit"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800 sm:w-auto"
+              >
+                Apply
+              </button>
+            </div>
+          </form>
+
+          <p className="mt-3 text-xs font-bold text-slate-500">
+            Showing {filteredUsers.length.toLocaleString()} of{" "}
+            {settingsData.users.length.toLocaleString()} users
+          </p>
+
+          <div className="mt-4">
             <UserAccessTable
-              users={settingsData.users}
+              users={filteredUsers}
               roles={settingsData.roles}
               canManageUsers={actor.canManageUsers}
               canResetPasswords={actor.canResetPasswords}

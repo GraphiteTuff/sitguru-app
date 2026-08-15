@@ -132,27 +132,31 @@ const socialLinks: SocialLink[] = [
 
 const serviceOptions = [
   'All services',
-  'Dog walking',
-  'Drop-in visits',
-  'Pet sitting',
+  'Dog Walking',
+  'Pet Sitting',
   'Boarding',
-  'Training',
+  'Doggy Day Care',
+  'Drop-In Visits',
+  'House Sitting',
+  'Training Support',
+  'Medication Help',
+  'Custom Care',
 ];
 
 const services: ServiceCard[] = [
   {
     title: 'Walks',
-    value: 'Dog walking',
+    value: 'Dog Walking',
     icon: 'walks',
   },
   {
     title: 'Drop-ins',
-    value: 'Drop-in visits',
+    value: 'Drop-In Visits',
     icon: 'dropIns',
   },
   {
     title: 'Sitting',
-    value: 'Pet sitting',
+    value: 'Pet Sitting',
     icon: 'sitting',
   },
   {
@@ -603,7 +607,11 @@ export default function HomeScreen() {
             </Pressable>
 
             {serviceMenuOpen ? (
-              <View style={styles.serviceMenu}>
+              <ScrollView
+                style={styles.serviceMenu}
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+              >
                 {serviceOptions.map((service, index) => {
                   const selected = selectedService === service;
 
@@ -633,7 +641,7 @@ export default function HomeScreen() {
                     </Pressable>
                   );
                 })}
-              </View>
+              </ScrollView>
             ) : null}
 
             <View style={styles.searchBottomRow}>
@@ -1567,13 +1575,14 @@ function createStyles(
       borderColor: border,
       borderRadius: 13,
       borderWidth: 1,
+      maxHeight: 280,
       overflow: 'hidden',
     },
     serviceMenuItem: {
       borderBottomColor: border,
       borderBottomWidth: 1,
       justifyContent: 'center',
-      minHeight: 45,
+      minHeight: 48,
       paddingHorizontal: 13,
     },
     serviceMenuItemLast: {
