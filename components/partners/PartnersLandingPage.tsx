@@ -2,6 +2,7 @@
 
 /**
  * SitGuru Partners landing — B2B partnership explainer + validated inquiry form.
+ * Tracks: local pet business, wellness/care, community, corporate, investor.
  * Track selection switches Scout / Taco / Rogue via AIScoutCompanion modes.
  */
 
@@ -24,6 +25,7 @@ import {
   Network,
   ShieldCheck,
   Sparkles,
+  Store,
   UsersRound,
 } from "lucide-react";
 import { AIScoutCompanion } from "@/components/officers/AIScoutCompanion";
@@ -33,13 +35,19 @@ import { submitPartnershipInquiry } from "@/lib/contact/partner-api";
 const BRAND = "#0D5C3A";
 const BRAND_DEEP = "#09462C";
 
-export type PartnerTrack = "wellness" | "community" | "corporate" | "investor";
+export type PartnerTrack =
+  | "local"
+  | "wellness"
+  | "community"
+  | "corporate"
+  | "investor";
 
 interface PartnerFields {
   companyName: string;
   contactName: string;
   email: string;
   trackDetails: string;
+  localFocus: string;
   wellnessFocus: string;
   hasAppIntegration: boolean;
 }
@@ -58,21 +66,27 @@ const TRACKS: Array<{
   icon: ReactNode;
 }> = [
   {
+    id: "local",
+    label: "Local Pet Business",
+    hint: "Stores, groomers, daycares, cafés, apartments",
+    icon: <Store className="h-5 w-5" aria-hidden />,
+  },
+  {
     id: "wellness",
-    label: "Pet Wellness Provider",
-    hint: "Vets, trainers, groomers, care clinics",
+    label: "Pet Wellness & Care",
+    hint: "Vets, trainers, clinics, therapists",
     icon: <HeartPulse className="h-5 w-5" aria-hidden />,
   },
   {
     id: "community",
-    label: "Local Community Group",
-    hint: "Neighborhoods, rescues, campuses",
+    label: "Community & Nonprofits",
+    hint: "Rescues, campuses, neighborhood groups",
     icon: <UsersRound className="h-5 w-5" aria-hidden />,
   },
   {
     id: "corporate",
-    label: "Corporate Sponsor",
-    hint: "Brands, retail, multi-location teams",
+    label: "Brand / Corporate",
+    hint: "National brands, retail, multi-location",
     icon: <Building2 className="h-5 w-5" aria-hidden />,
   },
   {
@@ -83,37 +97,66 @@ const TRACKS: Array<{
   },
 ];
 
+const LOCAL_FOCUS_OPTIONS = [
+  "Pet store / retail",
+  "Grooming / spa",
+  "Dog daycare or boarding",
+  "Pet-friendly café or hospitality",
+  "Apartment / property management",
+  "Other local pet business",
+] as const;
+
 const WELLNESS_FOCUS_OPTIONS = [
-  "Preventative Health Operations",
-  "Nutritional Science Alignment",
-  "Behavioral Therapy & Coaching",
-  "Veterinary Clinical Logistics",
+  "Veterinary clinic or hospital",
+  "Training / behavior",
+  "Preventative wellness",
+  "Nutrition / supplements",
+  "Other pet care professional",
 ] as const;
 
 const BENEFITS = [
   {
-    title: "Preventative Wellness Engine",
+    title: "Reach local pet families",
     description:
-      "Promote preventative wellness checkups, veterinary tracking sync, and activity logs through partner tools built for pet care teams.",
+      "Connect your storefront, service, or organization with Pet Parents and Gurus already looking for trusted local care on SitGuru.",
     icon: <ShieldCheck className="h-6 w-6" aria-hidden />,
   },
   {
-    title: "Synchronized Cross-App Reach",
+    title: "Co-marketing that converts",
     description:
-      "Connect services with SitGuru dashboards, web surfaces, and native mobile workflows so partners meet pet families where they already are.",
+      "Use QR signage, referral links, and partner pathways so walk-ins and followers can discover SitGuru — and you earn when qualified bookings happen.",
     icon: <Activity className="h-6 w-6" aria-hidden />,
   },
   {
-    title: "Localized Community Reach",
+    title: "Built for many partner types",
     description:
-      "Deploy tailored updates to neighborhood pet networks, campus chapters, and authorized corporate audiences with clear partner pathways.",
+      "Local businesses, wellness pros, community groups, brands, and growth partners each get a clear track — pet wellness is one option, not the only one.",
     icon: <Handshake className="h-6 w-6" aria-hidden />,
+  },
+] as const;
+
+const PATHWAYS = [
+  {
+    href: "/partners/local",
+    title: "Local Partner Program",
+    description:
+      "Pet stores, groomers, trainers, rescues, vets, apartments, and neighborhood businesses.",
+  },
+  {
+    href: "/partners/national",
+    title: "National & brand partners",
+    description: "Multi-market brands and larger sponsorship or co-marketing plays.",
+  },
+  {
+    href: "/partners/apply",
+    title: "Full partner application",
+    description: "Longer form if you already know your partner, affiliate, or ambassador path.",
   },
 ] as const;
 
 function companionModeForTrack(track: PartnerTrack): CompanionLayoutMode {
   if (track === "investor") return "public-investor";
-  if (track === "corporate" || track === "community") {
+  if (track === "corporate" || track === "community" || track === "local") {
     return "public-ambassador";
   }
   return "public-guru";
@@ -190,7 +233,7 @@ function PartnerReveal({
 }
 
 export default function PartnersLandingPage() {
-  const [track, setTrack] = useState<PartnerTrack>("wellness");
+  const [track, setTrack] = useState<PartnerTrack>("local");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -199,6 +242,7 @@ export default function PartnersLandingPage() {
     contactName: "",
     email: "",
     trackDetails: "",
+    localFocus: LOCAL_FOCUS_OPTIONS[0],
     wellnessFocus: WELLNESS_FOCUS_OPTIONS[0],
     hasAppIntegration: false,
   });
@@ -254,7 +298,8 @@ export default function PartnersLandingPage() {
       const details = [
         fields.trackDetails.trim(),
         `Partnership track: ${trackLabel}`,
-        track === "wellness" ? `Wellness focus: ${fields.wellnessFocus}` : null,
+        track === "local" ? `Local business focus: ${fields.localFocus}` : null,
+        track === "wellness" ? `Wellness / care focus: ${fields.wellnessFocus}` : null,
         `API / webhook integration intent: ${
           fields.hasAppIntegration ? "Yes" : "No"
         }`,
@@ -303,21 +348,20 @@ export default function PartnersLandingPage() {
             Partner with SitGuru
           </p>
           <h1 className="mt-4 text-balance text-4xl font-black tracking-tight text-slate-950 sm:text-5xl md:text-6xl md:leading-[1.05]">
-            The platform for{" "}
+            Partner with SitGuru —{" "}
             <span
               className="bg-clip-text text-transparent"
               style={{
                 backgroundImage: `linear-gradient(90deg, ${BRAND} 0%, #0f766e 100%)`,
               }}
             >
-              pet wellness
-            </span>{" "}
-            partnerships
+              local businesses welcome
+            </span>
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-pretty text-base font-semibold leading-relaxed text-slate-500 sm:text-lg">
-            SitGuru unifies pet logistics, preventative care pathways, and
-            community engagement into one interactive partner framework — built
-            for wellness providers, local groups, sponsors, and growth partners.
+            Pet stores, groomers, daycares, cafés, apartments, wellness pros,
+            rescues, campuses, brands, and growth partners can all apply. Pet
+            wellness is one track — not the only way to partner.
           </p>
           <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <a
@@ -328,12 +372,31 @@ export default function PartnersLandingPage() {
               <ArrowRight className="h-4 w-4" aria-hidden />
             </a>
             <Link
-              href="/partners/apply"
+              href="/partners/local"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-6 py-3 text-sm font-black text-emerald-900 transition hover:bg-emerald-50"
             >
-              Full partner application
+              Local Partner Program
             </Link>
           </div>
+        </PartnerReveal>
+
+        <PartnerReveal className="mb-10 grid grid-cols-1 gap-3 sm:grid-cols-3 md:mb-14">
+          {PATHWAYS.map((pathway) => (
+            <Link
+              key={pathway.href}
+              href={pathway.href}
+              className="rounded-2xl border border-emerald-100/80 bg-white/90 p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md"
+            >
+              <p className="text-sm font-black text-slate-950">{pathway.title}</p>
+              <p className="mt-1.5 text-xs font-semibold leading-relaxed text-slate-500">
+                {pathway.description}
+              </p>
+              <span className="mt-3 inline-flex items-center gap-1 text-xs font-black text-[#0D5C3A]">
+                Learn more
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+              </span>
+            </Link>
+          ))}
         </PartnerReveal>
 
         <PartnerReveal className="mb-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 md:mb-20">
@@ -375,8 +438,8 @@ export default function PartnersLandingPage() {
               Partner perks
             </h2>
             <p className="mt-1 text-sm font-semibold text-emerald-50/95">
-              Operational utility out of the box — coordinated care, companion
-              hand-offs, and shared growth.
+              Referrals, QR tools, companion support, and shared growth for
+              businesses and organizations of many kinds.
             </p>
 
             <div className="mt-8 space-y-6">
@@ -389,11 +452,11 @@ export default function PartnersLandingPage() {
                     className="text-sm font-black !text-white"
                     style={{ color: "#ffffff" }}
                   >
-                    Coordinated care operations
+                    Local referral pathways
                   </h3>
                   <p className="mt-0.5 text-xs font-semibold leading-relaxed text-emerald-100/90">
-                    Align scheduling, referrals, and trusted care pathways with
-                    SitGuru pet families and Gurus.
+                    Send pet families to SitGuru with trackable links and QR
+                    tools — earn when qualified bookings complete.
                   </p>
                 </div>
               </div>
@@ -489,9 +552,13 @@ export default function PartnersLandingPage() {
               >
                 <div>
                   <label className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-                    Select your synergy track
+                    What kind of partner are you?
                   </label>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <p className="mb-3 text-xs font-semibold text-slate-500">
+                    Choose the closest fit — local businesses and pet service
+                    shops belong here too, not only wellness clinics.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                     {TRACKS.map((item) => {
                       const selected = track === item.id;
                       return (
@@ -546,7 +613,7 @@ export default function PartnersLandingPage() {
                       autoComplete="organization"
                       value={fields.companyName}
                       onChange={handleInputChange}
-                      placeholder="e.g., Healthy Paws Network"
+                      placeholder="e.g., Neighborhood Pet Supply, Happy Trails Daycare"
                       className={fieldClass(Boolean(errors.companyName))}
                       aria-invalid={Boolean(errors.companyName)}
                     />
@@ -608,13 +675,37 @@ export default function PartnersLandingPage() {
                   ) : null}
                 </div>
 
+                {track === "local" ? (
+                  <div className="animate-fadeIn">
+                    <label
+                      htmlFor="localFocus"
+                      className="mb-1.5 block text-xs font-black uppercase tracking-[0.12em] text-slate-600"
+                    >
+                      Business type
+                    </label>
+                    <select
+                      id="localFocus"
+                      name="localFocus"
+                      value={fields.localFocus}
+                      onChange={handleInputChange}
+                      className={fieldClass(false)}
+                    >
+                      {LOCAL_FOCUS_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+
                 {track === "wellness" ? (
                   <div className="animate-fadeIn">
                     <label
                       htmlFor="wellnessFocus"
                       className="mb-1.5 block text-xs font-black uppercase tracking-[0.12em] text-slate-600"
                     >
-                      Primary wellness discipline
+                      Care / wellness focus
                     </label>
                     <select
                       id="wellnessFocus"
@@ -656,7 +747,7 @@ export default function PartnersLandingPage() {
                     rows={4}
                     value={fields.trackDetails}
                     onChange={handleInputChange}
-                    placeholder="Tell us how we can collaborate to elevate wellness and expand our communities together..."
+                    placeholder="Tell us about your business or organization and how you’d like to partner — referrals, QR at checkout, events, co-marketing, or something else…"
                     className={fieldClass(Boolean(errors.trackDetails))}
                     aria-invalid={Boolean(errors.trackDetails)}
                   />
