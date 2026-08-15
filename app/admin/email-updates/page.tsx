@@ -84,6 +84,18 @@ export default async function AdminEmailUpdatesPage({
 
   const { data, error } = await query;
 
+  const [{ count: totalSubscribed }, { count: totalUnsubscribed }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("email_update_subscribers")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "subscribed"),
+      supabaseAdmin
+        .from("email_update_subscribers")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "unsubscribed"),
+    ]);
+
   const rows = ((data || []) as EmailUpdateSubscriber[]).filter((row) => {
     if (!search) return true;
     return (
@@ -97,10 +109,14 @@ export default async function AdminEmailUpdatesPage({
     );
   });
 
-  const subscribedCount = rows.filter((row) => row.status === "subscribed").length;
-  const unsubscribedCount = rows.filter(
-    (row) => row.status === "unsubscribed",
-  ).length;
+  const subscribedCount =
+    typeof totalSubscribed === "number"
+      ? totalSubscribed
+      : rows.filter((row) => row.status === "subscribed").length;
+  const unsubscribedCount =
+    typeof totalUnsubscribed === "number"
+      ? totalUnsubscribed
+      : rows.filter((row) => row.status === "unsubscribed").length;
 
   const csv = [
     ["email", "full_name", "status", "source", "subscribed_at", "unsubscribed_at"].join(
@@ -170,13 +186,13 @@ export default async function AdminEmailUpdatesPage({
           </div>
           <div className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-              Subscribed in view
+              Subscribed total
             </p>
             <p className="mt-2 text-3xl font-black">{number(subscribedCount)}</p>
           </div>
           <div className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-              Unsubscribed in view
+              Unsubscribed total
             </p>
             <p className="mt-2 text-3xl font-black">{number(unsubscribedCount)}</p>
           </div>
