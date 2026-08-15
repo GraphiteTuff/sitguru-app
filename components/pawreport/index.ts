@@ -6,6 +6,7 @@ export { default as GuruLiveActionPanel } from "@/components/pawreport/GuruLiveA
 export { default as PetParentLiveWalkViewer } from "@/components/pawreport/PetParentLiveWalkViewer";
 export { default as WalkTracker } from "@/components/pawreport/WalkTracker";
 export { default as MediaGalleryCarousel } from "@/components/pawreport/MediaGalleryCarousel";
+export { SCOUT_DEMO_PHOTOS } from "@/components/pawreport/MediaGalleryCarousel";
 export { default as StatusUpdates } from "@/components/pawreport/StatusUpdates";
 export type {
   CareStatusItem,

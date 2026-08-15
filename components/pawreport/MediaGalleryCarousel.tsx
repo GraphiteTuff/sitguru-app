@@ -19,11 +19,26 @@ type MediaGalleryCarouselProps = {
   className?: string;
 };
 
-const DEFAULT_PHOTOS: GalleryPhoto[] = [
-  { id: "1", alt: "Scout at the park entrance" },
-  { id: "2", alt: "Scout on the trail" },
-  { id: "3", alt: "Scout resting after walk" },
+/** Demo Scout visit photos for /pawreport-live marketing preview. */
+export const SCOUT_DEMO_PHOTOS: GalleryPhoto[] = [
+  {
+    id: "scout-park-entrance",
+    alt: "Scout at the park entrance",
+    src: "/images/pawreport/scout-park-entrance.jpg",
+  },
+  {
+    id: "scout-on-trail",
+    alt: "Scout on the trail",
+    src: "/images/pawreport/scout-on-trail.jpg",
+  },
+  {
+    id: "scout-resting-after-walk",
+    alt: "Scout resting after walk",
+    src: "/images/pawreport/scout-resting-after-walk.jpg",
+  },
 ];
+
+const DEFAULT_PHOTOS: GalleryPhoto[] = SCOUT_DEMO_PHOTOS;
 
 const PLACEHOLDER_WASHES = [
   "from-emerald-200 via-emerald-100 to-sky-100",
@@ -80,23 +95,28 @@ export default function MediaGalleryCarousel({
 
       <div className="relative mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
         <div
-          className={`flex h-40 items-end bg-gradient-to-br p-4 sm:h-44 ${
-            PLACEHOLDER_WASHES[activeIndex % PLACEHOLDER_WASHES.length]
+          className={`relative flex h-44 items-end bg-gradient-to-br p-4 sm:h-52 ${
+            active.src
+              ? "from-slate-900/10 via-transparent to-slate-900/40"
+              : PLACEHOLDER_WASHES[activeIndex % PLACEHOLDER_WASHES.length]
           }`}
           role="img"
           aria-label={active.alt}
         >
           {active.src ? (
+            // eslint-disable-next-line @next/next/no-img-element -- demo marketing URLs + remote visit uploads
             <img
               src={active.src}
               alt={active.alt}
               className="absolute inset-0 h-full w-full object-cover"
             />
-          ) : (
-            <p className="relative z-[1] text-sm font-bold text-slate-700">
+          ) : null}
+
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 via-black/25 to-transparent px-4 pb-3 pt-10">
+            <p className="relative z-[1] text-sm font-bold text-white drop-shadow-sm">
               📸 {active.alt}
             </p>
-          )}
+          </div>
         </div>
 
         {safePhotos.length > 1 ? (
@@ -104,7 +124,7 @@ export default function MediaGalleryCarousel({
             <button
               type="button"
               onClick={goPrev}
-              className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/70 bg-white/90 text-sm font-black text-slate-800 shadow-sm backdrop-blur"
+              className="absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/70 bg-white/90 text-sm font-black text-slate-800 shadow-sm backdrop-blur"
               aria-label="Previous photo"
             >
               ‹
@@ -112,7 +132,7 @@ export default function MediaGalleryCarousel({
             <button
               type="button"
               onClick={goNext}
-              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/70 bg-white/90 text-sm font-black text-slate-800 shadow-sm backdrop-blur"
+              className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/70 bg-white/90 text-sm font-black text-slate-800 shadow-sm backdrop-blur"
               aria-label="Next photo"
             >
               ›
