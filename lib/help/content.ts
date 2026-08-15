@@ -399,6 +399,34 @@ export const programFaqs: HelpFaqItem[] = [
   },
 ];
 
+export const homeWifiAccessFaqs: HelpFaqItem[] = [
+  {
+    question: "Why might SitGuru open on cellular but not on home Wi‑Fi?",
+    answer:
+      "Many home internet routers include an optional Advanced Security or Safe Browsing feature. Those tools sometimes pause access to legitimate websites for technical reasons — not because of the site’s content, subject matter, or ownership. Trying cellular (or another network) is a quick way to tell whether the issue is your home Wi‑Fi security filter.",
+  },
+  {
+    question: "Does a Wi‑Fi security warning mean something is wrong with SitGuru?",
+    answer:
+      "Not necessarily. Automated filters can flag brand-new domains, recent DNS changes, or incomplete reputation data even when a site is a normal business website. SitGuru is a pet-care marketplace. If something looks wrong on your network only, follow the approve/allow steps below and email support@sitguru.com so we can help.",
+  },
+  {
+    question: "What should I send to SitGuru Support?",
+    answer:
+      "Email support@sitguru.com with: (1) a screenshot of any block or warning page, (2) your internet provider name if you know it (for example Xfinity, Cox, Spectrum, Frontier, Verizon, or Quantum Fiber), (3) whether the site works on cellular, and (4) the device and browser you used. That helps us guide you quickly.",
+  },
+];
+
+export const homeWifiApproveSteps: string[] = [
+  "Confirm the page opens on cellular data or another network. If it does, the pause is almost always on your home Wi‑Fi security feature.",
+  "Open your internet provider’s Wi‑Fi or home app (examples: Xfinity/xFi, Cox Panoramic WiFi, Spectrum, Frontier Secure, Verizon Home, Quantum Fiber).",
+  "Find Security, Advanced Security, Threats, Security Threats, or Safe Browsing — wording varies by provider.",
+  "Open the recent threat or blocked-site entry related to the page you tried to visit.",
+  "Choose Allow Access, Allow, or Add to approved sites (labels differ by app).",
+  "Close the app, wait a minute, then try SitGuru again. If it still fails, restart your browser or toggle Wi‑Fi off and on.",
+  "Email support@sitguru.com with a screenshot of the block page and your provider name so we can help from there.",
+];
+
 export const findingGuruFaqs: HelpFaqItem[] = [
   {
     question: "How do I find the right Guru?",

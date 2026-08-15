@@ -3,7 +3,8 @@ import HelpCategoryHub from "@/components/help/HelpCategoryHub";
 
 export const metadata: Metadata = {
   title: "Pet Parent Support",
-  description: "Help articles for SitGuru Pet Parents and PawReport Live.",
+  description:
+    "Help articles for SitGuru Pet Parents, PawReport Live, and home Wi‑Fi access.",
 };
 
 export default function ParentHelpHubPage() {
@@ -11,7 +12,7 @@ export default function ParentHelpHubPage() {
     <HelpCategoryHub
       category="Pet Parent Support"
       title="Pet Parent Support"
-      description="Live tracking, push alerts, PawReport emails, finding a Guru, and visit history."
+      description="Live tracking, push alerts, PawReport emails, finding a Guru, visit history, and home Wi‑Fi access help."
     />
   );
 }

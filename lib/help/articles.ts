@@ -63,6 +63,39 @@ export const HELP_ARTICLES: HelpArticle[] = [
     tags: ["search", "guru profile", "reviews", "pet care"],
     keywords: ["service area", "pricing", "care style", "local guru", "match"],
   },
+  {
+    slug: "home-wifi-access",
+    href: "/help/parents/home-wifi-access",
+    title: "Can’t Open SitGuru on Home Wi‑Fi?",
+    summary:
+      "If SitGuru opens on cellular but not at home, your internet provider’s Wi‑Fi security may be pausing access. Here’s how to allow the site and contact support.",
+    audience: "all",
+    category: "Pet Parent Support",
+    tags: [
+      "wifi",
+      "network",
+      "access",
+      "advanced security",
+      "blocked site",
+      "support",
+    ],
+    keywords: [
+      "xfinity",
+      "cox",
+      "spectrum",
+      "frontier",
+      "verizon",
+      "quantum",
+      "allow access",
+      "approved sites",
+      "safe browsing",
+      "cellular",
+      "support@sitguru.com",
+      "can't open",
+      "cannot open",
+      "home wifi",
+    ],
+  },
 
   /* —— Guru Success & Training Hub —— */
   {
@@ -329,7 +362,7 @@ export const HELP_CATEGORIES = [
     id: "parents",
     title: "Pet Parent Support",
     description:
-      "Live tracking, push alerts, PawReport emails, and visit history for Pet Parents.",
+      "Live tracking, push alerts, PawReport emails, visit history, and home Wi‑Fi access help for Pet Parents.",
     href: "/help/parents/pawreport-guide",
     hubHref: "/help/parents",
     category: "Pet Parent Support" as HelpCategory,
