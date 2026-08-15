@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
@@ -8,14 +9,25 @@ import {
   GraduationCap,
   Handshake,
   HeartHandshake,
+  HelpCircle,
   Medal,
   PawPrint,
-  ShieldCheck,
   Sparkles,
   Trophy,
   UsersRound,
 } from "lucide-react";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
+
+export const metadata: Metadata = {
+  title: "Careers & Opportunities | SitGuru",
+  description:
+    "Grow with SitGuru as a Guru, through Student Hire, Community Hire, or Veterans & Military Families pathways — or explore future company roles as we scale.",
+  openGraph: {
+    title: "Careers & Opportunities | SitGuru",
+    description:
+      "Most SitGuru opportunities today start with becoming a Guru. Explore marketplace paths, guided programs, and future team roles.",
+  },
+};
 
 type OpportunityCard = {
   title: string;
@@ -31,40 +43,40 @@ type OpportunityCard = {
 const guruOpportunities: OpportunityCard[] = [
   {
     title: "Become a SitGuru Guru",
-    eyebrow: "Expert pet care provider pathway",
+    eyebrow: "Primary path · Marketplace",
     description:
-      "Join SitGuru as a Guru — an expert pet care provider who connects with Pet Parents looking for trusted local care.",
+      "Join SitGuru as a Guru — an independent pet care provider who connects with Pet Parents looking for trusted local care.",
     icon: <PawPrint size={28} />,
     href: "/become-a-guru",
     cta: "Become a Guru",
     featured: true,
     highlights: [
-      "Connect with Pet Parents",
+      "Connect with Pet Parents nearby",
       "Build a trusted local profile",
       "Offer services you already provide",
-      "Grow through reliable pet care",
+      "Grow through reliable care",
     ],
   },
   {
     title: "Student Hire Program",
-    eyebrow: "Students, recent grads, summer work",
+    eyebrow: "Guided pathway · Students",
     description:
-      "For current students, recent graduates, and students looking for summer work who want flexible pet care opportunities and a path toward Guru status.",
+      "For current students, recent graduates, and summer workers who want flexible pet care opportunities and a supported path toward Guru status — not a traditional campus job board listing.",
     icon: <GraduationCap size={28} />,
     href: "/programs/apply?program=student-hire",
     cta: "Apply Today",
     highlights: [
       "Current students welcome",
       "Recent grads welcome",
-      "Summer work opportunities",
+      "Summer-friendly flexibility",
       "Supportive Guru pathway",
     ],
   },
   {
     title: "Community Hire Program",
-    eyebrow: "Community workforce Guru pathway",
+    eyebrow: "Guided pathway · Community",
     description:
-      "For qualified people connected through city, state, federal, nonprofit, and community workforce programs who are ready to work, learn, and grow with SitGuru.",
+      "For qualified people connected through city, state, federal, nonprofit, and community workforce programs who are ready to learn and grow into SitGuru Gurus.",
     icon: <Building2 size={28} />,
     href: "/programs/apply?program=community-hire",
     cta: "Apply Today",
@@ -89,6 +101,24 @@ const guruOpportunities: OpportunityCard[] = [
       "Trust and safety check required",
       "Pathway to Guru status",
     ],
+  },
+];
+
+const opportunityTypes = [
+  {
+    title: "Marketplace Guru",
+    description:
+      "Independent pet care providers who build a profile, complete trust steps, and connect with Pet Parents on SitGuru.",
+  },
+  {
+    title: "Guided programs",
+    description:
+      "Student Hire, Community Hire, and Veterans & Military Families — structured on-ramps toward Guru status.",
+  },
+  {
+    title: "Future company roles",
+    description:
+      "As SitGuru scales, we may open operations, support, partnerships, marketing, and technology roles. Those are separate from Guru work.",
   },
 ];
 
@@ -133,6 +163,29 @@ const applicationSupport = [
   "Applicant review",
   "Onboarding progress",
   "Guru pathway support",
+];
+
+const faqs = [
+  {
+    q: "Is this a traditional job board?",
+    a: "Not primarily. Most opportunities today are marketplace Guru paths and guided programs that lead toward becoming a Guru. Future SitGuru company roles may open as we grow — those are separate from Guru work.",
+  },
+  {
+    q: "What’s the difference between Careers and Programs?",
+    a: "Careers is the overview of how people grow with SitGuru. Programs are the specific guided pathways (Student Hire, Community Hire, Veterans & Military Families) with their own applications and partner on-ramps.",
+  },
+  {
+    q: "Does “Hire” mean SitGuru employs me?",
+    a: "Program names like Student Hire and Community Hire describe pathways into SitGuru — typically toward independent Guru marketplace work, not a guarantee of W-2 employment. Review each program page for details.",
+  },
+  {
+    q: "How do I apply for a future company role?",
+    a: "We are not listing open corporate positions on this page yet. The fastest way to grow with us today is Become a Guru or Apply to a Program. Partners and applicants can also reach us through Partners or Support.",
+  },
+  {
+    q: "I’m a career center or workforce partner. Where do I go?",
+    a: "Visit Partners to explore referral and collaboration options, or Programs to see how Student Hire, Community Hire, and Veterans & Military Families fit your community.",
+  },
 ];
 
 function OpportunityCard({ opportunity }: { opportunity: OpportunityCard }) {
@@ -260,7 +313,7 @@ export default function CareersPage() {
           <div>
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] !text-white">
               <BriefcaseBusiness size={15} />
-              SitGuru Careers
+              Careers &amp; Opportunities
             </div>
 
             <h1 className="max-w-5xl text-4xl font-black leading-[1.05] tracking-tight !text-white drop-shadow-sm sm:text-5xl lg:text-6xl">
@@ -269,16 +322,16 @@ export default function CareersPage() {
             </h1>
 
             <p className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-white/90 sm:text-lg">
-              SitGuru is building a trusted pet care marketplace where Pet
-              Parents connect with local Gurus — expert pet care providers who
-              lead with care, reliability, and communication.
+              SitGuru is a trusted pet care marketplace where Pet Parents
+              connect with local Gurus. Most opportunities today start with
+              becoming a Guru — not a traditional corporate job listing.
             </p>
 
             <p className="mt-4 max-w-3xl text-base font-semibold leading-8 !text-white/80">
-              Most opportunities today start with becoming a Guru. You can also
-              apply through Student Hire, Community Hire, or{" "}
-              {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}
-              pathways as SitGuru grows.
+              You can also apply through Student Hire, Community Hire, or{" "}
+              {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName} pathways. As we
+              grow, future company roles may open in operations, support, and
+              more.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -369,6 +422,38 @@ export default function CareersPage() {
       </section>
 
       <div className="mx-auto max-w-[1600px] space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="rounded-[32px] border border-green-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="mb-5 max-w-3xl">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
+              Three ways to grow
+            </p>
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
+              Careers here means marketplace paths, programs, and future roles.
+            </h2>
+            <p className="mt-3 text-base font-semibold leading-7 text-slate-600">
+              We keep naming clear so visitors and partners know what they are
+              applying for — Guru work today, guided pathways when you need
+              support, and company roles when those listings open.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {opportunityTypes.map((item) => (
+              <div
+                key={item.title}
+                className="rounded-[26px] border border-[#e3ece5] bg-[#fbfcf9] p-5"
+              >
+                <h3 className="text-lg font-black text-green-950">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  {item.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StepCard
             numberLabel="01"
@@ -412,7 +497,7 @@ export default function CareersPage() {
                 trusted Gurus who help Pet Parents find reliable care. As
                 SitGuru grows, future company roles may include operations,
                 support, partnerships, marketing, technology, trust and safety,
-                and customer experience.
+                and customer experience — listed separately when available.
               </p>
 
               <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -454,9 +539,9 @@ export default function CareersPage() {
             </h2>
 
             <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-slate-600">
-              Whether you already provide pet care or you are looking for a
-              guided program pathway, SitGuru helps qualified people take the
-              next step toward connecting with Pet Parents.
+              Whether you already provide pet care or you want a guided program
+              pathway, SitGuru helps qualified people take the next step toward
+              connecting with Pet Parents.
             </p>
           </div>
 
@@ -516,6 +601,36 @@ export default function CareersPage() {
           </div>
         </section>
 
+        <section className="rounded-[32px] border border-[#e3ece5] bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-green-800">
+              <HelpCircle size={22} />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
+                FAQ
+              </p>
+              <h2 className="text-2xl font-black tracking-tight text-green-950 sm:text-3xl">
+                Common questions about SitGuru careers
+              </h2>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {faqs.map((item) => (
+              <div
+                key={item.q}
+                className="rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] p-5"
+              >
+                <h3 className="text-base font-black text-green-950">{item.q}</h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  {item.a}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="rounded-[32px] border border-green-100 bg-green-950 p-6 text-white shadow-sm sm:p-8">
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
@@ -528,9 +643,9 @@ export default function CareersPage() {
               </h2>
 
               <p className="mt-3 max-w-4xl text-sm font-semibold leading-6 !text-white/85 sm:text-base sm:leading-7">
-                Become a Guru, apply through Student Hire, Community Hire, or
-                {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, or help someone you know discover a SitGuru
-                opportunity.
+                Become a Guru, apply through Student Hire, Community Hire, or{" "}
+                {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, or help someone
+                you know discover a SitGuru opportunity.
               </p>
             </div>
 
