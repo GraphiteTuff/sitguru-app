@@ -2691,8 +2691,8 @@ function SearchPageContent() {
             <p className="text-slate-600">Finding local Gurus for you...</p>
           </Card>
         ) : (
-          <div className="space-y-6">
-            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_460px]">
+            <div className="order-1 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)] xl:order-2 xl:sticky xl:top-28 xl:self-start">
               <div className="border-b border-slate-200 px-5 py-4">
                 <h2 className="text-lg font-bold text-slate-900">
                   Care is closer with SitGuru
@@ -2711,7 +2711,7 @@ function SearchPageContent() {
                 ) : null}
               </div>
 
-              <div className="h-[420px] sm:h-[520px] lg:h-[560px]">
+              <div className="h-[420px] sm:h-[520px] xl:h-[calc(100vh-9rem)] xl:min-h-[520px] xl:max-h-[720px]">
                 <ProviderMap
                   markers={providerMapMarkers as unknown as Record<string, unknown>[]}
                   center={
@@ -2727,7 +2727,7 @@ function SearchPageContent() {
               </div>
             </div>
 
-            <div className="space-y-5">
+            <div className="order-2 space-y-5 xl:order-1">
               {filteredGurus.length === 0 ? (
                 <Card className="p-7">
                   <h2 className="text-xl font-bold text-slate-900">
@@ -3145,8 +3145,8 @@ function SearchPageFallback() {
       </section>
 
       <section className="mx-auto max-w-[1500px] px-5 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <div className="space-y-6">
-          <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_460px]">
+          <div className="order-1 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)] xl:order-2 xl:sticky xl:top-28 xl:self-start">
             <div className="border-b border-slate-200 px-5 py-4">
               <h2 className="text-lg font-bold text-slate-900">Map view</h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -3154,10 +3154,10 @@ function SearchPageFallback() {
               </p>
             </div>
 
-            <div className="h-[420px] bg-slate-100 sm:h-[520px] lg:h-[560px]" />
+            <div className="h-[420px] bg-slate-100 sm:h-[520px] xl:h-[calc(100vh-9rem)] xl:min-h-[520px] xl:max-h-[720px]" />
           </div>
 
-          <div className="space-y-5">
+          <div className="order-2 space-y-5 xl:order-1">
             <Card className="p-7">
               <p className="text-slate-600">Finding local Gurus for you...</p>
             </Card>
