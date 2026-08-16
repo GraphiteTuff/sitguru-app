@@ -1,11 +1,22 @@
-// app/customer/dashboard/pawperks/page.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  CheckCircle2,
+  Copy,
+  Gift,
+  Info,
+  Link2,
+  Share2,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+  Users,
+} from "lucide-react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
 import {
   buildPawPerksDashboardState,
   bumpSharedLinkCounter,
@@ -49,11 +60,6 @@ type RawReferralRow = {
 const routes = {
   login: "/login",
 };
-
-const heroPetImages = [
-  "/images/pawperks-hero-pets.png",
-  "/images/booking-hero-pets.png",
-];
 
 const pawPerksRulesPath = "/customer/dashboard/pawperks/rules";
 
@@ -175,238 +181,41 @@ async function fetchReferralStats(
   };
 }
 
-function LinkIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M10.5 13.5 13.5 10.5m-7 6.5-1.2 1.2a4 4 0 0 1-5.7-5.7l3.5-3.5a4 4 0 0 1 5.7 0m6.4 6.4a4 4 0 0 0 5.7 0l3.5-3.5a4 4 0 0 0-5.7-5.7L17.5 7.5m-6.9.1a4 4 0 0 1 5.7 0"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
+const rewardTiers = [
+  {
+    referrals: "2 referrals",
+    credit: "$10",
+    text: "Unlock your first future booking credit once two referrals qualify.",
+  },
+  {
+    referrals: "5 referrals",
+    credit: "$25",
+    text: "Build momentum and earn a larger credit toward eligible SitGuru care.",
+  },
+  {
+    referrals: "10 referrals",
+    credit: "$60",
+    text: "Reach the top tier and earn your strongest PawPerks reward.",
+  },
+] as const;
 
-function CopyIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M8 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3M6 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M18 8a3 3 0 1 0-2.8-4M6 14a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm12 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8.6 13.1l6.8 3.8M15.4 7.1 8.6 10.9"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function InfoIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M12 17v-6m0-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function GiftIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-      <path
-        d="M20 12v8H4v-8m17-5H3v5h18V7ZM12 20V7m0 0H8.5A2.5 2.5 0 1 1 11 4.5L12 7Zm0 0h3.5A2.5 2.5 0 1 0 13 4.5L12 7Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
-      <path
-        d="M12 3 5 6v5c0 4.4 2.8 8.4 7 10 4.2-1.6 7-5.6 7-10V6l-7-3Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <path
-        d="m9 12 2 2 4-5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function HeroMiniStat({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-emerald-100 bg-white/86 px-4 py-3 shadow-sm backdrop-blur-sm">
-      <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
-        {label}
-      </p>
-      <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
-    </div>
-  );
-}
-
-function HeroPill({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-emerald-100 bg-white/86 px-4 py-2 text-sm font-bold text-slate-700 shadow-sm backdrop-blur-sm">
-      {children}
-    </span>
-  );
-}
-
-function RewardTierCard({
-  icon,
-  referrals,
-  credit,
-  text,
-}: {
-  icon: string;
-  referrals: string;
-  credit: string;
-  text: string;
-}) {
-  return (
-    <div className="group rounded-[1.4rem] border border-emerald-100 bg-white p-5 shadow-[0_16px_45px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_22px_60px_rgba(16,185,129,0.12)]">
-      <div className="flex items-center gap-4">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-3xl ring-1 ring-emerald-100 transition group-hover:bg-emerald-100">
-          {icon}
-        </span>
-
-        <div>
-          <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-700">
-            {referrals}
-          </p>
-          <p className="mt-1 text-3xl font-black tracking-tight text-slate-950">
-            {credit}
-          </p>
-        </div>
-      </div>
-
-      <p className="mt-4 text-sm font-semibold leading-6 text-slate-500">
-        {text}
-      </p>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  helper,
-  icon,
-}: {
-  label: string;
-  value: string;
-  helper: string;
-  icon: string;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white p-5">
-      <div className="absolute right-5 top-5 text-xs text-emerald-400">✦</div>
-
-      <div className="flex items-center gap-4">
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-3xl ring-1 ring-emerald-100">
-          {icon}
-        </span>
-
-        <div className="min-w-0">
-          <p className="text-3xl font-black tracking-tight text-slate-950">
-            {value}
-          </p>
-          <p className="mt-1 text-sm font-black text-emerald-700">{label}</p>
-          <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">
-            {helper}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BenefitRow({
-  icon,
-  title,
-  text,
-}: {
-  icon: string;
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className="flex items-start gap-4">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100">
-        {icon}
-      </span>
-      <div>
-        <p className="text-sm font-black text-slate-950">{title}</p>
-        <p className="mt-1 text-sm font-semibold leading-5 text-slate-500">
-          {text}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function HowItWorksStep({
-  step,
-  icon,
-  title,
-  text,
-}: {
-  step: string;
-  icon: string;
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className="relative text-center">
-      <span className="absolute left-3 top-0 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-sm font-black text-white shadow-sm shadow-emerald-900/20">
-        {step}
-      </span>
-
-      <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-emerald-50 text-5xl ring-1 ring-emerald-100">
-        {icon}
-      </div>
-
-      <h3 className="mt-4 text-base font-black text-slate-950">{title}</h3>
-      <p className="mx-auto mt-2 max-w-[190px] text-sm font-semibold leading-6 text-slate-500">
-        {text}
-      </p>
-    </div>
-  );
-}
+const howSteps = [
+  {
+    step: "1",
+    title: "Share your link",
+    text: "Send your unique PawPerks link to friends and family.",
+  },
+  {
+    step: "2",
+    title: "They join & book",
+    text: "They sign up and complete their first eligible paid booking.",
+  },
+  {
+    step: "3",
+    title: "Earn rewards",
+    text: "When that booking qualifies, you earn future SitGuru care credits.",
+  },
+] as const;
 
 export default function CustomerPawPerksPage() {
   const router = useRouter();
@@ -416,10 +225,6 @@ export default function CustomerPawPerksPage() {
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [message, setMessage] = useState("");
   const [copyError, setCopyError] = useState("");
-  const [heroImageIndex, setHeroImageIndex] = useState(0);
-  const [heroImageFailed, setHeroImageFailed] = useState(false);
-
-  const currentHeroImage = heroPetImages[heroImageIndex];
 
   const displayName = useMemo(() => {
     return (
@@ -488,17 +293,6 @@ export default function CustomerPawPerksPage() {
     };
   }, [loadPawPerks, router]);
 
-  function handleHeroImageError() {
-    const nextIndex = heroImageIndex + 1;
-
-    if (nextIndex < heroPetImages.length) {
-      setHeroImageIndex(nextIndex);
-      return;
-    }
-
-    setHeroImageFailed(true);
-  }
-
   async function copyReferralLink() {
     if (!stats?.referral_link) return;
 
@@ -510,7 +304,9 @@ export default function CustomerPawPerksPage() {
       bumpSharedLinkCounter(stats.referral_code);
       setMessage("Referral link copied.");
     } catch {
-      setCopyError("Could not copy automatically. Highlight the link and copy it.");
+      setCopyError(
+        "Could not copy automatically. Highlight the link and copy it.",
+      );
     }
   }
 
@@ -542,13 +338,12 @@ export default function CustomerPawPerksPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_45%,#ecfdf5_100%)]">
+      <main className="min-h-screen bg-[#f7faf7]">
         <Header />
-
-        <div className="mx-auto flex max-w-3xl items-center justify-center px-4 py-16">
-          <div className="rounded-[2rem] border border-emerald-100 bg-white px-8 py-6 text-center shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-2xl ring-1 ring-emerald-100">
-              🎁
+        <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-16">
+          <div className="w-full rounded-[28px] border border-emerald-100 bg-white px-6 py-8 text-center shadow-sm">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-800">
+              <Gift size={22} />
             </div>
             <p className="text-base font-bold text-slate-700">
               Loading your PawPerks Rewards...
@@ -560,616 +355,343 @@ export default function CustomerPawPerksPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_42%,#ecfdf5_100%)] text-slate-950">
+    <main className="min-h-screen overflow-x-hidden bg-[#f7faf7] pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-slate-950 sm:pb-10">
       <Header />
 
-      <section className="mx-auto max-w-[1500px] px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:py-10">
-        <div className="grid gap-6">
-          <div className="relative overflow-hidden rounded-[2.6rem] border border-emerald-100 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,255,0.86),transparent_18%),radial-gradient(circle_at_68%_44%,rgba(167,243,208,0.55),transparent_28%),linear-gradient(120deg,#f3fdf7_0%,#ddfaea_45%,#a7f3d0_100%)] px-6 py-8 shadow-[0_28px_95px_rgba(6,95,70,0.14)] sm:px-8 lg:px-10 lg:py-10">
-            <div className="pointer-events-none absolute inset-0">
-              <div className="absolute left-[48%] top-10 text-xl text-yellow-500/70">
-                ✦
-              </div>
-              <div className="absolute left-[61%] top-20 text-sm text-emerald-500/60">
-                ◆
-              </div>
-              <div className="absolute right-[12%] top-10 text-xl text-yellow-500/70">
-                ✧
-              </div>
-              <div className="absolute right-[6%] top-24 text-sm text-pink-400/60">
-                ■
-              </div>
-              <div className="absolute bottom-16 left-[56%] text-sm text-cyan-500/70">
-                ◆
-              </div>
-              <div className="absolute bottom-14 right-[8%] text-base text-yellow-500/70">
-                ✦
-              </div>
-              <div className="absolute left-[8%] top-[24%] h-24 w-24 rounded-full bg-white/70 blur-2xl" />
-              <div className="absolute right-[18%] bottom-[16%] h-28 w-28 rounded-full bg-emerald-300/25 blur-2xl" />
-            </div>
-
-            <div className="relative grid gap-8 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
-              <div className="max-w-3xl">
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/82 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-emerald-800 shadow-sm backdrop-blur-sm">
-                    🐾 SitGuru PawPerks
-                  </span>
-
-                  <span className="inline-flex items-center rounded-full bg-yellow-300 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-slate-950 shadow-sm">
-                    Friends & Family Rewards
-                  </span>
-                </div>
-
-                <h1 className="mt-5 max-w-4xl text-5xl font-black leading-[0.95] tracking-[-0.06em] text-slate-950 md:text-6xl xl:text-7xl">
-                  Share SitGuru with
-                  <br />
-                  friends & family.
-                  <span className="mt-2 block bg-[linear-gradient(90deg,#059669_0%,#10b981_42%,#65a30d_100%)] bg-clip-text text-transparent">
-                    Earn PawPerks Rewards.
-                  </span>
-                </h1>
-
-                <p className="mt-5 max-w-2xl text-base font-semibold leading-8 text-slate-700 md:text-lg">
-                  Invite friends and family to SitGuru. When they book and
-                  complete Pet Care, you can earn future credits for more tail
-                  wags, smoother bookings, and happy stays ahead.
-                </p>
-
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <HeroPill>🔗 Share your invite link</HeroPill>
-                  <HeroPill>🐶 Friends & family book care</HeroPill>
-                  <HeroPill>🎁 Earn PawPerks Rewards</HeroPill>
-                </div>
-
-                <div className="mt-7 grid max-w-2xl gap-3 sm:grid-cols-3">
-                  <HeroMiniStat
-                    label="Your Code"
-                    value={pawPerksState.referralCode}
-                  />
-                  <HeroMiniStat
-                    label="Redeemed Cash Credits"
-                    value={formatCurrency(pawPerksState.redeemedCashCredits)}
-                  />
-                  <HeroMiniStat
-                    label="Pending Referrals"
-                    value={formatCurrency(pawPerksState.pendingReferrals)}
-                  />
-                </div>
-
-                {pawPerksState.attributedFromPetPerks ? (
-                  <div className="mt-4 max-w-2xl rounded-2xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-sm font-bold text-emerald-900">
-                    PetPerks invite{" "}
-                    <span className="font-black">{pawPerksState.attributedRefCode}</span>{" "}
-                    is linked to this account
-                    {pawPerksState.welcomeCreditHintUsd > 0
-                      ? ` — welcome credit up to $${pawPerksState.welcomeCreditHintUsd} after your first eligible booking.`
-                      : "."}
-                  </div>
-                ) : null}
-
-                <div className="mt-6 rounded-2xl border border-emerald-100 bg-white/84 px-4 py-4 shadow-sm backdrop-blur-sm">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
-                        Next PawPerks Reward
-                      </p>
-                      <p className="mt-1 text-lg font-black text-slate-950">
-                        {remainingToFirstReward} more qualified referral
-                        {remainingToFirstReward === 1 ? "" : "s"} to unlock
-                        your first{" "}
-                        <span className="text-emerald-700">
-                          $10 future credit
-                        </span>
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={copyReferralLink}
-                      className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700"
-                    >
-                      <CopyIcon />
-                      Copy Invite Link
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative min-h-[500px]">
-                <div className="absolute inset-0 rounded-[2.3rem] bg-[linear-gradient(160deg,rgba(255,255,255,0.58)_0%,rgba(255,255,255,0.2)_100%)] shadow-[0_22px_70px_rgba(6,95,70,0.12)] ring-1 ring-white/60 backdrop-blur-md" />
-
-                <div className="absolute -left-2 top-5 z-20 rounded-[1.35rem] border border-white/80 bg-white/88 px-4 py-3 shadow-[0_12px_24px_rgba(15,23,42,0.08)] backdrop-blur-sm">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                    Welcome back
-                  </p>
-                  <p className="mt-1 text-lg font-black text-slate-950">
-                    {displayName}
-                  </p>
-                </div>
-
-                <div className="absolute right-4 top-5 z-20 flex h-16 w-16 items-center justify-center rounded-full bg-yellow-300 text-3xl shadow-lg shadow-yellow-950/15 ring-4 ring-white/45">
-                  🐾
-                </div>
-
-                <div className="absolute bottom-4 left-4 right-4 top-24 overflow-hidden rounded-[2rem] border border-white/75 bg-white/62 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
-                  {!heroImageFailed ? (
-                    <div className="relative h-full w-full p-4">
-                      <div className="grid h-full gap-4 md:grid-cols-[0.78fr_1.22fr]">
-                        <div className="relative flex min-h-0 flex-col overflow-hidden rounded-[1.7rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(247,255,251,0.96)_100%)] p-4 shadow-[0_14px_40px_rgba(15,23,42,0.08)]">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-[11px] font-black uppercase leading-4 tracking-[0.18em] text-emerald-700">
-                                PawPerks
-                                <br />
-                                Preview
-                              </p>
-
-                              <h3 className="mt-2 text-[1.65rem] font-black leading-[1.02] tracking-[-0.04em] text-slate-950">
-                                Share.
-                                <br />
-                                Book.
-                                <br />
-                                Earn.
-                              </h3>
-                            </div>
-
-                            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xl ring-1 ring-emerald-100">
-                              🏅
-                            </span>
-                          </div>
-
-                          <p className="mt-3 text-sm font-semibold leading-5 text-slate-600">
-                            Friends and family book through your link. You earn
-                            credits when they qualify.
-                          </p>
-
-                          <div className="mt-3 grid gap-2">
-                            <div className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/90 px-3 py-2">
-                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-black text-emerald-700 ring-1 ring-emerald-100">
-                                1
-                              </span>
-                              <p className="text-sm font-black text-slate-800">
-                                Share link
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white px-3 py-2">
-                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">
-                                2
-                              </span>
-                              <p className="text-sm font-black text-slate-800">
-                                They book care
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white px-3 py-2">
-                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-xs font-black text-emerald-700 ring-1 ring-emerald-100">
-                                3
-                              </span>
-                              <p className="text-sm font-black text-slate-800">
-                                Earn rewards
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="mt-auto pt-3">
-                            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/90 px-3 py-3">
-                              <div className="flex items-end justify-between gap-3">
-                                <div>
-                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
-                                    Progress
-                                  </p>
-                                  <p className="mt-1 text-xl font-black text-slate-950">
-                                    {stats?.completed_referrals || 0} / 2
-                                  </p>
-                                </div>
-
-                                <div className="text-right">
-                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                                    Next
-                                  </p>
-                                  <p className="mt-1 text-sm font-black text-slate-950">
-                                    {remainingToFirstReward} more
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
-                                <div
-                                  className="h-full rounded-full bg-emerald-600 transition-all"
-                                  style={{ width: `${progressPercent}%` }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="relative overflow-hidden rounded-[1.7rem] border border-white/70 bg-emerald-50">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={currentHeroImage}
-                            alt="Happy dog and cat representing SitGuru PawPerks Rewards"
-                            onError={handleHeroImageError}
-                            className="h-full w-full object-cover object-center"
-                          />
-
-                          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.01)_52%,rgba(15,23,42,0.14)_100%)]" />
-
-                          <div className="absolute left-[16%] top-[19%] flex h-20 w-20 items-center justify-center rounded-full bg-white/85 text-5xl shadow-[0_18px_40px_rgba(15,23,42,0.16)] ring-4 ring-white/70 backdrop-blur-sm md:h-24 md:w-24 md:text-6xl">
-                            ❤️
-                          </div>
-
-                          <div className="absolute bottom-4 left-4 right-4 rounded-[1.25rem] border border-white/75 bg-white/90 px-4 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.12)] backdrop-blur-sm">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                                  Friends & Family
-                                </p>
-                                <p className="mt-1 text-base font-black leading-5 text-slate-950">
-                                  Rewards for sharing trusted Pet Care.
-                                </p>
-                              </div>
-
-                              <span className="hidden shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-100 sm:inline-flex">
-                                $10 first reward
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex h-full min-h-[300px] w-full items-center justify-center bg-amber-50 px-6 text-center">
-                      <div>
-                        <p className="text-lg font-black text-amber-800">
-                          Hero image not found
-                        </p>
-                        <p className="mt-2 text-sm font-bold leading-6 text-amber-700">
-                          Add the image at{" "}
-                          <span className="font-black">
-                            public/images/pawperks-hero-pets.png
-                          </span>
-                          , then refresh this page.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[2rem] border border-emerald-100 bg-[linear-gradient(120deg,#ffffff_0%,#f0fdf4_58%,#ecfeff_100%)] p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
-                  PawPerks Reward Tiers
-                </p>
-                <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-                  The more friends & family you share with, the more you earn.
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
-                  Keep inviting trusted friends and family and unlock larger
-                  future booking credits as referrals qualify.
-                </p>
-              </div>
-
-              <a
-                href={pawPerksRulesPath}
-                className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 text-sm font-black text-emerald-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-50"
-              >
-                <InfoIcon />
-                View Reward Details
-              </a>
-            </div>
-
-            <div className="mt-5 grid gap-4 lg:grid-cols-3">
-              <RewardTierCard
-                icon="🏅"
-                referrals="2 referrals"
-                credit="$10 credit"
-                text="Unlock your first future booking credit once two referrals qualify."
-              />
-              <RewardTierCard
-                icon="🎁"
-                referrals="5 referrals"
-                credit="$25 credit"
-                text="Build momentum and earn a larger credit toward eligible SitGuru care."
-              />
-              <RewardTierCard
-                icon="🏆"
-                referrals="10 referrals"
-                credit="$60 credit"
-                text="Reach the top tier and earn your strongest PawPerks Reward."
-              />
-            </div>
-          </div>
-
-          {message || copyError ? (
-            <div
-              className={`rounded-2xl border px-4 py-3 text-sm font-black ${
-                copyError
-                  ? "border-red-200 bg-red-50 text-red-700"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
-              }`}
-            >
-              {copyError || message}
-            </div>
-          ) : null}
-
-          <div className="grid gap-6 lg:grid-cols-[1.45fr_0.85fr]">
-            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.07)] lg:p-7">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                <div className="flex items-start gap-4">
-                  <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
-                    <LinkIcon />
-                  </span>
-
-                  <div>
-                    <h2 className="text-2xl font-black tracking-tight text-slate-950">
-                      Share your PawPerks link
-                    </h2>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">
-                      Invite friends and family. Earn future SitGuru care credits after eligible first paid bookings qualify.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-emerald-50 px-5 py-4 text-center ring-1 ring-emerald-100">
-                  <p className="text-xs font-black text-slate-500">
-                    Your referral code
-                  </p>
-                  <p className="mt-1 text-3xl font-black tracking-wide text-emerald-700">
-                    {stats?.referral_code}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 ring-1 ring-slate-50">
-                <span className="text-slate-500">
-                  <LinkIcon />
-                </span>
-                <p className="min-w-0 flex-1 break-all text-sm font-bold text-slate-600">
-                  {stats?.referral_link}
-                </p>
-                <button
-                  type="button"
-                  onClick={copyReferralLink}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-700"
-                  aria-label="Copy referral link"
-                >
-                  <CopyIcon />
-                </button>
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                <button
-                  type="button"
-                  onClick={copyReferralLink}
-                  className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white shadow-sm shadow-emerald-900/10 transition hover:-translate-y-0.5 hover:bg-emerald-700"
-                >
-                  <CopyIcon />
-                  Copy Link
-                </button>
-
-                <button
-                  type="button"
-                  onClick={shareReferralLink}
-                  className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50"
-                >
-                  <ShareIcon />
-                  Share PawPerks Link
-                </button>
-
-                <a
-                  href={pawPerksRulesPath}
-                  className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50"
-                >
-                  <InfoIcon />
-                  View Reward Details
-                </a>
-              </div>
-
-              <p className="mt-5 flex items-center justify-center gap-2 text-sm font-bold text-slate-500">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-                  ✓
-                </span>
-                Friends & family referrals are tracked automatically.
-              </p>
-            </div>
-
-            <div
-              id="reward-details"
-              className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.07)] lg:p-7"
-            >
-              <div className="flex items-center gap-4">
-                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
-                  <GiftIcon />
-                </span>
-                <h2 className="text-2xl font-black tracking-tight text-slate-950">
-                  Your next PawPerks Reward
-                </h2>
-              </div>
-
-              <div className="mt-7 flex items-center gap-5">
-                <span className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#fde68a_0%,#f59e0b_100%)] text-5xl shadow-lg shadow-yellow-900/10 ring-4 ring-yellow-100">
-                  🐾
-                </span>
-
-                <div>
-                  <p className="text-6xl font-black tracking-tight text-emerald-700">
-                    {remainingToFirstReward}
-                    <span className="ml-2 text-2xl">more</span>
-                  </p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-                    qualified referral to unlock your first{" "}
-                    <span className="font-black text-slate-950">
-                      $10 future credit
-                    </span>
-                    .
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-7 h-4 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
-                <div
-                  className="h-full rounded-full bg-emerald-600 transition-all"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-
-              <p className="mt-3 text-sm font-bold text-slate-500">
-                {stats?.completed_referrals || 0} of 2 qualified referrals
-              </p>
-
-              <a
-                href={pawPerksRulesPath}
-                className="mt-5 inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 text-sm font-black text-emerald-700 transition hover:bg-emerald-50"
-              >
-                View Reward Details →
-              </a>
-            </div>
-          </div>
-
-          <div className="grid gap-4 rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)] lg:grid-cols-4">
-            <StatCard
-              icon="👥"
-              value={`${stats?.invited_count || 0}`}
-              label="Friends & Family Invited"
-              helper="Thanks for spreading the word!"
-            />
-            <StatCard
-              icon="⏳"
-              value={formatCurrency(pawPerksState.pendingReferrals)}
-              label="Pending Referrals"
-              helper="Waiting on first eligible paid booking."
-            />
-            <StatCard
-              icon="💳"
-              value={formatCurrency(pawPerksState.redeemedCashCredits)}
-              label="Redeemed Cash Credits"
-              helper="Ready to apply at checkout."
-            />
-            <StatCard
-              icon="🏅"
-              value={`${pawPerksState.completedReferrals}`}
-              label="Qualified Referrals"
-              helper="They’ve completed care. Nice work!"
-            />
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)] lg:p-7">
-              <h2 className="text-2xl font-black tracking-tight text-slate-950">
-                How PawPerks Rewards work
-              </h2>
-
-              <div className="mt-7 grid gap-6 md:grid-cols-3">
-                <HowItWorksStep
-                  step="1"
-                  icon="✉️"
-                  title="Share your link"
-                  text="Send your unique PawPerks link to friends and family who would love SitGuru."
-                />
-                <HowItWorksStep
-                  step="2"
-                  icon="🐶"
-                  title="They join SitGuru"
-                  text="Your friend or family member signs up and completes their first eligible paid booking with SitGuru."
-                />
-                <HowItWorksStep
-                  step="3"
-                  icon="🎁"
-                  title="Earn rewards"
-                  text="When their eligible first paid booking is completed and verified, you earn future SitGuru care credits."
-                />
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)] lg:p-7">
-              <div className="flex items-start justify-between gap-4">
-                <h2 className="text-2xl font-black tracking-tight text-slate-950">
-                  Why Pet Parents love PawPerks
-                </h2>
-                <span className="text-emerald-500">✦</span>
-              </div>
-
-              <div className="mt-6 grid gap-5">
-                <BenefitRow
-                  icon="🛡️"
-                  title="Trusted care they can count on"
-                  text="Share a service you already trust with the people who matter."
-                />
-                <BenefitRow
-                  icon="🎁"
-                  title="Help friends and family find great Pet Care"
-                  text="Make it easier for people close to you to find loving, reliable sitters."
-                />
-                <BenefitRow
-                  icon="🔗"
-                  title="Easy to share"
-                  text="One link. Text, email, or social — your choice."
-                />
-                <BenefitRow
-                  icon="🐾"
-                  title="Earn PawPerks Rewards"
-                  text="Qualified referrals earn you future credits to use on your next booking."
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[1.75rem] border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
-            <div className="grid gap-5 lg:grid-cols-[0.22fr_0.78fr_auto] lg:items-center">
-              <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100">
-                <ShieldIcon />
-              </span>
-
-              <div>
-                <h2 className="text-xl font-black text-slate-950">
-                  Safe. Simple. Rewarding.
-                </h2>
-                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
-                  Friends and family referrals are verified to ensure quality
-                  care. Future credits can be used on eligible SitGuru bookings
-                  once rewards qualify.
-                </p>
-              </div>
-
-              <span className="hidden text-4xl text-emerald-600 lg:block">
-                🐾
-              </span>
-            </div>
-          </div>
-
-          <div className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.06)]">
-            <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
-                  Official Rules
-                </p>
-                <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
-                  Review the full PawPerks program details.
-                </h2>
-                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-                  Learn how PawPerks Rewards qualify, when credits are
-                  issued, how future SitGuru care credits can be used, and what
-                  activity may not qualify.
-                </p>
-              </div>
-
-              <a
-                href={pawPerksRulesPath}
-                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700"
-              >
-                <InfoIcon />
-                View Official Rules
-              </a>
-            </div>
-          </div>
+      {/* Mobile sticky share bar */}
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-3 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-lg gap-2">
+          <button
+            type="button"
+            onClick={copyReferralLink}
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-[#0D5C3A] px-3 text-sm font-black !text-white shadow-lg shadow-emerald-900/20 active:bg-[#09462C]"
+          >
+            <Copy size={16} />
+            Copy link
+          </button>
+          <button
+            type="button"
+            onClick={shareReferralLink}
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border border-emerald-200 bg-white px-3 text-sm font-black text-emerald-950 active:bg-emerald-50"
+          >
+            <Share2 size={16} />
+            Share
+          </button>
         </div>
-      </section>
+      </div>
+
+      <div className="mx-auto max-w-5xl space-y-4 px-3 py-4 sm:space-y-5 sm:px-6 sm:py-8 lg:px-8">
+        {/* Compact hero */}
+        <section className="overflow-hidden rounded-[28px] bg-[#0D5C3A] p-4 text-white shadow-sm sm:rounded-[32px] sm:p-6">
+          <div data-brand-green className="public-dark-section">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] !text-white">
+                <Sparkles size={12} />
+                PawPerks Rewards
+              </span>
+              <span className="rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] !text-emerald-50">
+                Hi, {firstName}
+              </span>
+            </div>
+
+            <h1 className="mt-4 text-[1.75rem] font-black leading-[1.05] tracking-[-0.04em] !text-white sm:text-4xl">
+              Share SitGuru. Earn future care credits.
+            </h1>
+
+            <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 !text-emerald-50 sm:text-base sm:leading-7">
+              Invite friends and family. When they book and complete eligible
+              Pet Care, you can earn credits for your next SitGuru booking.
+            </p>
+
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              {[
+                ["Code", pawPerksState.referralCode],
+                ["Credits", formatCurrency(pawPerksState.redeemedCashCredits)],
+                ["Pending", formatCurrency(pawPerksState.pendingReferrals)],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-2xl border border-white/15 bg-white/10 px-2 py-3 text-center backdrop-blur"
+                >
+                  <p className="text-[9px] font-black uppercase tracking-[0.12em] !text-emerald-100">
+                    {label}
+                  </p>
+                  <p className="mt-1 truncate text-sm font-black !text-white sm:text-base">
+                    {value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {pawPerksState.attributedFromPetPerks ? (
+              <div className="mt-4 rounded-2xl border border-white/20 bg-white/10 px-3 py-3 text-xs font-bold leading-5 !text-emerald-50 sm:text-sm">
+                PetPerks invite{" "}
+                <span className="font-black !text-white">
+                  {pawPerksState.attributedRefCode}
+                </span>{" "}
+                is linked
+                {pawPerksState.welcomeCreditHintUsd > 0
+                  ? ` — welcome credit up to $${pawPerksState.welcomeCreditHintUsd} after your first eligible booking.`
+                  : "."}
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        {message || copyError ? (
+          <div
+            className={`rounded-2xl border px-4 py-3 text-sm font-black ${
+              copyError
+                ? "border-red-200 bg-red-50 text-red-700"
+                : "border-emerald-200 bg-emerald-50 text-emerald-800"
+            }`}
+          >
+            {copyError || message}
+          </div>
+        ) : null}
+
+        {/* Progress + share */}
+        <section className="rounded-[28px] border border-emerald-100 bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                Next reward
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-tight text-emerald-950 sm:text-2xl">
+                {remainingToFirstReward === 0
+                  ? "First $10 credit unlocked path"
+                  : `${remainingToFirstReward} more qualified referral${
+                      remainingToFirstReward === 1 ? "" : "s"
+                    }`}
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-slate-600">
+                {remainingToFirstReward === 0
+                  ? "Keep sharing to climb reward tiers."
+                  : "to unlock your first $10 future credit."}
+              </p>
+            </div>
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
+              <Trophy size={22} />
+            </span>
+          </div>
+
+          <div className="mt-4 h-3 overflow-hidden rounded-full bg-emerald-50">
+            <div
+              className="h-full rounded-full bg-[#0D5C3A] transition-all"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs font-bold text-slate-500">
+            {stats?.completed_referrals || 0} of 2 qualified referrals
+          </p>
+
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+              Your invite link
+            </p>
+            <p className="mt-1 break-all text-xs font-bold leading-5 text-slate-700 sm:text-sm">
+              {stats?.referral_link}
+            </p>
+          </div>
+
+          <div className="mt-3 hidden gap-2 sm:grid sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={copyReferralLink}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white transition hover:bg-[#09462C]"
+            >
+              <Copy size={16} />
+              Copy link
+            </button>
+            <button
+              type="button"
+              onClick={shareReferralLink}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black text-emerald-950 transition hover:bg-emerald-50"
+            >
+              <Share2 size={16} />
+              Share
+            </button>
+            <Link
+              href={pawPerksRulesPath}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black text-emerald-950 transition hover:bg-emerald-50"
+            >
+              <Info size={16} />
+              Rules
+            </Link>
+          </div>
+
+          <Link
+            href={pawPerksRulesPath}
+            className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-[#f7faf4] text-sm font-black text-emerald-900 sm:hidden"
+          >
+            <Info size={16} />
+            View reward details
+          </Link>
+        </section>
+
+        {/* Stats */}
+        <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {[
+            {
+              icon: <Users size={18} />,
+              value: `${stats?.invited_count || 0}`,
+              label: "Invited",
+              helper: "Friends & family",
+            },
+            {
+              icon: <Link2 size={18} />,
+              value: formatCurrency(pawPerksState.pendingReferrals),
+              label: "Pending",
+              helper: "Awaiting first booking",
+            },
+            {
+              icon: <Gift size={18} />,
+              value: formatCurrency(pawPerksState.redeemedCashCredits),
+              label: "Credits",
+              helper: "Ready at checkout",
+            },
+            {
+              icon: <CheckCircle2 size={18} />,
+              value: `${pawPerksState.completedReferrals}`,
+              label: "Qualified",
+              helper: "Completed care",
+            },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="rounded-[22px] border border-emerald-100 bg-white p-3.5 shadow-sm sm:p-4"
+            >
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800">
+                {stat.icon}
+              </span>
+              <p className="mt-3 text-2xl font-black tracking-tight text-emerald-950 sm:text-3xl">
+                {stat.value}
+              </p>
+              <p className="mt-0.5 text-xs font-black text-emerald-800 sm:text-sm">
+                {stat.label}
+              </p>
+              <p className="mt-0.5 text-[11px] font-semibold text-slate-500 sm:text-xs">
+                {stat.helper}
+              </p>
+            </div>
+          ))}
+        </section>
+
+        {/* Tiers */}
+        <section className="rounded-[28px] border border-emerald-100 bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                Reward tiers
+              </p>
+              <h2 className="mt-1 text-xl font-black tracking-tight text-emerald-950 sm:text-2xl">
+                Share more. Earn more.
+              </h2>
+            </div>
+            <Link
+              href={pawPerksRulesPath}
+              className="hidden text-sm font-black text-emerald-800 underline sm:inline"
+            >
+              Full details
+            </Link>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {rewardTiers.map((tier) => (
+              <div
+                key={tier.referrals}
+                className="rounded-[22px] border border-emerald-100 bg-[#f7faf4] p-4"
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                  {tier.referrals}
+                </p>
+                <p className="mt-1 text-3xl font-black tracking-tight text-emerald-950">
+                  {tier.credit}
+                </p>
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-600 sm:text-sm sm:leading-6">
+                  {tier.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* How it works */}
+        <section className="rounded-[28px] border border-emerald-100 bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-6">
+          <h2 className="text-xl font-black tracking-tight text-emerald-950 sm:text-2xl">
+            How PawPerks works
+          </h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {howSteps.map((item) => (
+              <div
+                key={item.step}
+                className="flex gap-3 rounded-[20px] border border-emerald-100 bg-[#f7faf4] p-4 sm:flex-col sm:text-center"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0D5C3A] text-sm font-black !text-white sm:mx-auto">
+                  {item.step}
+                </span>
+                <div>
+                  <p className="text-sm font-black text-emerald-950 sm:mt-2">
+                    {item.title}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-slate-600 sm:text-sm">
+                    {item.text}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Trust + rules */}
+        <section className="rounded-[28px] border border-emerald-100 bg-emerald-50 p-4 sm:rounded-[32px] sm:p-5">
+          <div className="flex gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-800 shadow-sm">
+              <ShieldCheck size={20} />
+            </span>
+            <div>
+              <h2 className="text-base font-black text-emerald-950 sm:text-lg">
+                Safe. Simple. Rewarding.
+              </h2>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-600 sm:text-sm sm:leading-6">
+                Referrals are verified for quality care. Credits apply on
+                eligible SitGuru bookings once rewards qualify — not for
+                Venmo, cash, or off-platform payments.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-emerald-100 bg-white p-4 shadow-sm sm:rounded-[32px] sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+                Official rules
+              </p>
+              <h2 className="mt-1 text-lg font-black text-emerald-950 sm:text-xl">
+                Review full PawPerks program details
+              </h2>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-600 sm:text-sm">
+                Qualification, issuance, checkout use, and ineligible activity.
+              </p>
+            </div>
+            <Link
+              href={pawPerksRulesPath}
+              className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black !text-white transition hover:bg-[#09462C]"
+            >
+              <Info size={16} />
+              View rules
+            </Link>
+          </div>
+        </section>
+
+        <p className="px-1 pb-2 text-center text-xs font-semibold text-slate-500">
+          Public share-and-earn overview:{" "}
+          <Link href="/petperks" className="font-black text-emerald-800 underline">
+            PetPerks
+          </Link>
+        </p>
+      </div>
     </main>
   );
 }
