@@ -322,7 +322,8 @@ export function formatGuruLookupForPrompt(result: LookupGurusResult): string {
     "# LIVE GURU LOOKUP RESULT (authoritative for this turn)",
     `Query: ${JSON.stringify(result.query)}`,
     `Browse more: ${result.searchUrl}`,
-    "Recommend 1–3 matches. Keep under 3 sentences, stress they book through SitGuru and can find/rebook their favorite Guru anytime, then append one [[guru_card:...]] marker per recommended Guru (use the exact marker strings below) plus [[cta:parent]] when they want to book.",
+    "Recommend 1–3 matches in under 3 sentences. Stress they book through SitGuru and can rebook their favorite Guru anytime.",
+    "REQUIRED: After your short prose, append EVERY marker line below EXACTLY (copy-paste) — one [[guru_card:...]] per Guru — then [[cta:parent]]. Never invent markers.",
     ...result.gurus.map((guru, index) => {
       const marker = encodeGuruCardMarker(guru);
       return [
@@ -331,7 +332,7 @@ export function formatGuruLookupForPrompt(result: LookupGurusResult): string {
         `   rate: ${guru.rate != null ? `$${guru.rate}` : "see profile"}`,
         `   rating: ${guru.rating != null ? `${guru.rating} (${guru.reviewCount} reviews)` : "new"}`,
         `   profile: ${guru.profileUrl}`,
-        `   marker: ${marker}`,
+        `   COPY THIS MARKER EXACTLY: ${marker}`,
       ].join("\n");
     }),
   ].join("\n");

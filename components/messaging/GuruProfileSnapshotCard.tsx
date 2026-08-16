@@ -6,64 +6,70 @@ import type { GuruChatSnapshot } from "@/lib/gurus/guru-chat-snapshot";
 export function GuruProfileSnapshotCard({ guru }: { guru: GuruChatSnapshot }) {
   const rateLabel =
     guru.rate != null && Number.isFinite(guru.rate)
-      ? `$${Math.round(guru.rate)}`
+      ? `From $${Math.round(guru.rate)}`
       : null;
   const ratingLabel =
-    guru.rating != null
-      ? `${guru.rating.toFixed(1)}${guru.reviewCount ? ` · ${guru.reviewCount} reviews` : ""}`
-      : null;
+    guru.rating != null ? `${guru.rating.toFixed(1)}` : null;
   const rebookHref =
     guru.bookingUrl || guru.profileUrl || `/guru/${guru.slug}`;
+  const servicesLabel =
+    guru.services.slice(0, 3).join(" · ") || "Pet care";
 
   return (
-    <div className="mt-2 overflow-hidden rounded-2xl border border-[#0D5C3A]/20 bg-white shadow-sm">
+    <article className="overflow-hidden rounded-2xl border border-[#0D5C3A]/18 bg-white shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
       <div className="flex gap-3 p-3">
-        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-[#E8F3EC]">
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-[#E8F3EC] ring-1 ring-[#0D5C3A]/12">
+          <span className="absolute inset-0 bg-white" aria-hidden />
           {guru.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={guru.photoUrl}
               alt=""
-              className="h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full object-cover"
               style={{ objectPosition: "50% 28%" }}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-lg font-bold text-[#0D5C3A]">
+            <div className="absolute inset-0 flex items-center justify-center text-lg font-black text-[#0D5C3A]">
               {guru.name.slice(0, 1).toUpperCase()}
             </div>
           )}
         </div>
+
         <div className="min-w-0 flex-1">
-          <p className="m-0 truncate text-sm font-semibold text-slate-900">
-            {guru.name}
-          </p>
-          <p className="m-0 mt-0.5 truncate text-xs text-slate-600">
+          <div className="flex items-start justify-between gap-2">
+            <p className="m-0 truncate text-sm font-black text-slate-950">
+              {guru.name}
+            </p>
+            {ratingLabel ? (
+              <span className="shrink-0 text-[11px] font-black text-amber-600">
+                ★ {ratingLabel}
+              </span>
+            ) : null}
+          </div>
+          <p className="m-0 mt-0.5 truncate text-[11px] font-semibold text-slate-500">
             {guru.location}
           </p>
-          <p className="m-0 mt-1 line-clamp-2 text-xs text-slate-700">
-            {guru.services.slice(0, 3).join(" · ") || "Pet care"}
-            {rateLabel ? ` · from ${rateLabel}` : ""}
-            {ratingLabel ? ` · ★ ${ratingLabel}` : ""}
+          <p className="m-0 mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-slate-700">
+            {servicesLabel}
+            {rateLabel ? ` · ${rateLabel}` : ""}
           </p>
         </div>
       </div>
-      <p className="m-0 border-t border-slate-100 px-3 pt-2 text-[10px] font-medium uppercase tracking-wide text-slate-500">
-        Book through SitGuru
-      </p>
-      <div className="flex gap-2 px-3 pb-2 pt-1.5">
+
+      <div className="flex gap-2 border-t border-slate-100 bg-[#f7fbf8] px-3 py-2">
         <Link
           href={guru.profileUrl || `/guru/${guru.slug}`}
-          className="inline-flex flex-1 items-center justify-center rounded-full border border-[#0D5C3A] px-3 py-1.5 text-center text-xs font-semibold text-[#0D5C3A]"
+          className="inline-flex min-h-9 flex-1 items-center justify-center rounded-full border border-[#0D5C3A]/30 bg-white px-3 text-center text-[11px] font-black text-[#0D5C3A] transition hover:bg-emerald-50"
         >
           View profile
         </Link>
         <Link
           href={rebookHref}
-          className="inline-flex flex-1 items-center justify-center rounded-full bg-[#0D5C3A] px-3 py-1.5 text-center text-xs font-semibold text-white"
+          className="inline-flex min-h-9 flex-1 items-center justify-center rounded-full bg-[#0D5C3A] px-3 text-center text-[11px] font-black text-white transition hover:bg-[#0a4a2e]"
         >
-          Rebook
+          {guru.canBook ? "Book" : "Open"}
         </Link>
       </div>
-    </div>
+    </article>
   );
 }

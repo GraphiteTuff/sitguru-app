@@ -5,7 +5,7 @@
  */
 
 import { anthropic } from "@ai-sdk/anthropic";
-import { streamText, type CoreMessage } from "ai";
+import { generateText, streamText, type CoreMessage } from "ai";
 import { createClient } from "@/utils/supabase/server";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
@@ -21,10 +21,68 @@ import {
   matchMarketingFaq,
   ROGUE_PUBLIC_MARKETING_FAQS,
 } from "@/lib/ai/officer-marketing-faqs";
+import {
+  extractGuruCardsFromText,
+  inferLookupParamsFromChat,
+} from "@/lib/gurus/guru-chat-snapshot";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+/** Pull exact [[guru_card:...]] markers from lookupGurus tool digests. */
+function collectGuruCardMarkersFromToolSteps(
+  steps: Array<{
+    toolResults?: Array<{ toolName?: string; result?: unknown }>;
+  }>,
+): string[] {
+  const markers: string[] = [];
+  const seen = new Set<string>();
+
+  for (const step of steps || []) {
+    for (const toolResult of step.toolResults || []) {
+      if (toolResult.toolName !== "lookupGurus") continue;
+      const raw =
+        typeof toolResult.result === "string"
+          ? toolResult.result
+          : JSON.stringify(toolResult.result ?? "");
+      const matches = raw.match(/\[\[\s*guru_card\s*:[^\]]+\]\]/gi) || [];
+      for (const marker of matches) {
+        if (seen.has(marker)) continue;
+        seen.add(marker);
+        markers.push(marker);
+      }
+    }
+  }
+
+  return markers;
+}
+
+/** If the model named Gurus but skipped markers, append the tool markers. */
+function ensureGuruCardsInAssistantText(
+  text: string,
+  markers: string[],
+): string {
+  let out = String(text || "").trim();
+  if (!markers.length) return out;
+
+  const existing = extractGuruCardsFromText(out).cards;
+  if (existing.length > 0) return out;
+
+  out = `${out} ${markers.join(" ")}`.trim();
+  if (!/\[\[\s*cta:parent\s*\]\]/i.test(out)) {
+    out = `${out} [[cta:parent]]`;
+  }
+  return out;
+}
+
+function shouldForceGuruLookup(lastUserText: string) {
+  const params = inferLookupParamsFromChat(lastUserText);
+  if (!params) return false;
+  return Boolean(
+    params.city || params.state || params.zip || params.name || params.service,
+  );
 }
 
 async function buildSimulationReply(opts: {
@@ -296,19 +354,101 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
     let result;
     try {
-      result = streamText({
+      const sharedModelConfig = {
         model: anthropic(getSitGuruAiModel()),
         messages,
         system: systemPrompt,
-        maxTokens: 500,
         tools: {
           lookupGurus: lookupGurusTool,
           fetchLiveSocialFollowers: fetchLiveSocialFollowersTool,
         },
-        maxSteps: 3,
-        onFinish: async ({ text }) => {
+        maxSteps: 3 as const,
+      };
+
+      // Care searches: generate fully so we can append exact [[guru_card:]]
+      // markers from the tool digest when the model omits/truncates them.
+      if (shouldForceGuruLookup(lastUserText)) {
+        const generated = await generateText({
+          ...sharedModelConfig,
+          maxTokens: 1400,
+        });
+
+        let assistantText = ensureGuruCardsInAssistantText(
+          String(generated.text || "").trim(),
+          collectGuruCardMarkersFromToolSteps([
+            {
+              toolResults: (generated.toolResults || []) as Array<{
+                toolName?: string;
+                result?: unknown;
+              }>,
+            },
+            ...((generated.steps || []) as Array<{
+              toolResults?: Array<{ toolName?: string; result?: unknown }>;
+            }>),
+          ]),
+        );
+
+        if (!assistantText) {
+          assistantText = await buildSimulationReply({
+            clientFirstName,
+            lastUserText,
+          });
+        }
+
+        void (async () => {
           try {
-            const assistantText = String(text || "").trim();
+            const withAssistant = [
+              ...messages,
+              { role: "assistant" as const, content: assistantText },
+            ];
+            await recordChatInsight(
+              formatTranscript(withAssistant, clientFirstName),
+              insightChannel,
+              clientFirstName
+                ? `Lead:${clientFirstName}`
+                : "Homepage Chat Transcript",
+              insightMeta,
+            );
+
+            if (conversationId && userId && assistantText) {
+              const { error } = await supabase.from("messages").insert({
+                conversation_id: conversationId,
+                sender_id: userId,
+                content: assistantText,
+                body: assistantText,
+                is_ai: true,
+                channel: "ai",
+                message_type: "ai_assist",
+                topic: walkId ? "active_walk" : "ai_assist",
+              });
+              if (error) {
+                console.error(
+                  "[stream-send] assistant message soft-failed:",
+                  error.message,
+                );
+              }
+            }
+          } catch (dbError) {
+            console.error("Failed to save data asynchronously:", dbError);
+          }
+        })();
+
+        return simulationDataStreamResponse(assistantText);
+      }
+
+      result = streamText({
+        ...sharedModelConfig,
+        maxTokens: 1200,
+        onFinish: async ({ text, steps }) => {
+          try {
+            const assistantText = ensureGuruCardsInAssistantText(
+              String(text || "").trim(),
+              collectGuruCardMarkersFromToolSteps(
+                (steps || []) as Array<{
+                  toolResults?: Array<{ toolName?: string; result?: unknown }>;
+                }>,
+              ),
+            );
             const withAssistant = [
               ...messages,
               { role: "assistant" as const, content: assistantText },

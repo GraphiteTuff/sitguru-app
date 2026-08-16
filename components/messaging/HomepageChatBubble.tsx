@@ -278,7 +278,7 @@ function AssistantBubbleBody({ content }: { content: string }) {
         </SafeAssistantBubble>
       ) : null}
       {guruCards.length > 0 ? (
-        <div className="flex flex-col gap-2 pt-1">
+        <div className="grid grid-cols-1 gap-2 pt-1.5">
           {guruCards.map((guru) => (
             <SafeAssistantBubble key={guru.slug} contentHint={guru.slug}>
               <GuruProfileSnapshotCard guru={guru} />
