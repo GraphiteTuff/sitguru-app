@@ -73,9 +73,15 @@ export default function RouteShell({ children }: { children: ReactNode }) {
         pathname !== "/guru/login" &&
         pathname !== "/guru/signup"));
 
-  const isAmbassadorPage =
+  // Public marketing Ambassadors pages use the global SitGuru Header.
+  // Private /ambassador/* workspace keeps its own dashboard chrome (no public Header).
+  const isPublicAmbassadorMarketingPage =
     pathname === "/ambassadors" ||
     pathname.startsWith("/ambassadors/") ||
+    pathname === "/programs/ambassadors" ||
+    pathname.startsWith("/programs/ambassadors/");
+
+  const isAmbassadorPrivatePage =
     pathname === "/ambassador" ||
     (pathname.startsWith("/ambassador/") &&
       pathname !== "/ambassador/login" &&
@@ -128,7 +134,8 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     !isAuthPage &&
     !isAdminPage &&
     !isGuruPrivatePage &&
-    !isAmbassadorPage &&
+    !isAmbassadorPrivatePage &&
+    !isPublicAmbassadorMarketingPage &&
     !isPublicGuruOnboardingPath(pathname) &&
     pathname !== "/become-a-guru" &&
     !pathname.startsWith("/become-a-guru/") &&
@@ -168,7 +175,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (isGuruPrivatePage || isCustomerPrivatePage || isAmbassadorPage) {
+  if (isGuruPrivatePage || isCustomerPrivatePage || isAmbassadorPrivatePage) {
     return (
       <>
         <div className="site-main min-h-screen bg-white">{children}</div>
