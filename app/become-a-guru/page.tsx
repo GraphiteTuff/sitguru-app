@@ -1,6 +1,51 @@
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Banknote,
+  CalendarDays,
+  CheckCircle2,
+  Gift,
+  GraduationCap,
+  Handshake,
+  HeartHandshake,
+  HelpCircle,
+  MapPinned,
+  MessageSquare,
+  PawPrint,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  UsersRound,
+} from "lucide-react";
 import { SCOUT_AVATAR } from "@/lib/companions/avatar-assets";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
+
+export const metadata: Metadata = {
+  title: "Become a Guru | Earn Caring for Pets on SitGuru",
+  description:
+    "Become a SitGuru Guru — build a trusted local profile, set your services and rates, share PawReports, get discovered by Pet Parents, and earn on your schedule.",
+  alternates: {
+    canonical: "/become-a-guru",
+  },
+  openGraph: {
+    title: "Become a Guru | Earn Caring for Pets on SitGuru",
+    description:
+      "More than a sitter. Build your pet care business with SitGuru — local discovery, schedule control, PawReports, and payouts.",
+    url: "/become-a-guru",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Become a Guru | Earn Caring for Pets on SitGuru",
+    description:
+      "More than a sitter. Build your pet care business with SitGuru — local discovery, schedule control, PawReports, and payouts.",
+  },
+};
+
 const guruLoginLink = "/login?role=guru&next=/guru/dashboard";
 
 function buildGuruApplyLink(refCode?: string | null) {
@@ -18,99 +63,113 @@ function buildGuruApplyLink(refCode?: string | null) {
   return `/signup?${params.toString()}`;
 }
 
-const coreBenefits = [
+const promisePoints = [
   {
-    icon: "📍",
     title: "Get discovered locally",
     description:
-      "Create a public Guru profile that helps nearby Pet Parents find your approved pet care services.",
+      "A professional Guru profile helps nearby Pet Parents find the care you already love providing.",
+    icon: <MapPinned size={22} />,
   },
   {
-    icon: "📅",
-    title: "Stay in control",
+    title: "Stay in full control",
     description:
-      "Choose the services, availability, rates, and local service areas that work for you.",
+      "You choose services, rates, availability, service area, and which booking requests to accept.",
+    icon: <CalendarDays size={22} />,
   },
   {
-    icon: "💚",
-    title: "Build repeat relationships",
+    title: "Win trust with PawReports",
     description:
-      "Keep care details, messages, PawReports, reviews, and rebooking activity connected through SitGuru.",
+      "Share photos, notes, walk progress, and live visit updates that turn one booking into repeat care.",
+    icon: <PawPrint size={22} />,
+  },
+  {
+    title: "Earn your way",
+    description:
+      "Track earnings, complete payout setup, and grow through reliable care — not a rigid 9-to-5.",
+    icon: <Banknote size={22} />,
   },
 ];
 
-const guruTools = [
+const toolkit = [
   {
-    icon: "👤",
-    title: "Professional Guru profile",
-    description: "Show your experience, photos, care style, and service details.",
+    title: "Public Guru profile",
+    description:
+      "Show experience, photos, care style, services, and the neighborhoods you serve.",
+    icon: <BadgeCheck size={20} />,
   },
   {
-    icon: "🐾",
-    title: "Services and pricing",
-    description: "Choose the care services you offer and enter your rates.",
+    title: "Services, rates & availability",
+    description:
+      "Offer walking, sitting, boarding, drop-ins, and more — on the days and times that work for you.",
+    icon: <CalendarDays size={20} />,
   },
   {
-    icon: "📍",
-    title: "Service area",
-    description: "Focus on the neighborhoods and communities you want to serve.",
+    title: "Messaging & bookings",
+    description:
+      "Keep Pet Parent conversations, booking details, and care notes organized in one workspace.",
+    icon: <MessageSquare size={20} />,
   },
   {
-    icon: "🗓️",
-    title: "Availability",
-    description: "Share the days and times that fit your schedule.",
+    title: "PawReport Live",
+    description:
+      "Send live walk updates, GPS progress, photos, and completed care reports Pet Parents love.",
+    icon: <Sparkles size={20} />,
   },
   {
-    icon: "💬",
-    title: "Pet Parent messaging",
-    description: "Keep booking conversations and care details in one place.",
+    title: "Reviews & rebooking",
+    description:
+      "Build a reputation through completed care so local Pet Parents come back to you.",
+    icon: <Star size={20} />,
   },
   {
-    icon: "📋",
-    title: "PawReport updates",
-    description: "Share walk progress, photos, notes, and completed care reports.",
+    title: "Earnings & payouts",
+    description:
+      "Review booking earnings and complete required Stripe or PayPal payout setup.",
+    icon: <Banknote size={20} />,
   },
   {
-    icon: "⭐",
-    title: "Reviews and rebooking",
-    description: "Build trust through completed care and repeat relationships.",
+    title: "Guru Academy",
+    description:
+      "Level up with onboarding guidance, readiness steps, and SitGuru learning tools.",
+    icon: <GraduationCap size={20} />,
   },
   {
-    icon: "💵",
-    title: "Earnings and payouts",
-    description: "Review booking earnings and complete required payout setup.",
+    title: "Success Center",
+    description:
+      "Practical guides for profile, bookings, PawReports, payments, safety, and referrals.",
+    icon: <Handshake size={20} />,
   },
 ];
 
 const steps = [
   {
-    step: "1",
+    step: "01",
     title: "Create your account",
     description: "Tell us who you are and where you plan to provide care.",
   },
   {
-    step: "2",
+    step: "02",
     title: "Build your profile",
     description:
-      "Add your services, rates, availability, experience, photos, and local area.",
+      "Add services, rates, availability, experience, photos, and your local area.",
   },
   {
-    step: "3",
+    step: "03",
     title: "Complete trust steps",
     description:
-      "Finish the required identity, safety, account, and payout setup.",
+      "Finish required identity, safety, account, and payout setup.",
   },
   {
-    step: "4",
+    step: "04",
     title: "Start accepting bookings",
     description:
-      "Review requests and accept the care opportunities that work for you.",
+      "Review requests and accept the care opportunities that fit your life.",
   },
 ];
 
 const controlPoints = [
   "Choose which services you offer",
-  "Set your rates",
+  "Set your own rates",
   "Select your availability",
   "Choose your local service area",
   "Review requests before accepting",
@@ -128,6 +187,28 @@ const serviceTypes = [
   "Training Support",
 ];
 
+const pawReportMoments = [
+  {
+    src: "/images/pawreport/scout-park-entrance.jpg",
+    alt: "Scout at the park entrance during a PawReport visit",
+    label: "Arrive with confidence",
+    caption: "Start the visit strong — Pet Parents see you show up.",
+  },
+  {
+    src: "/images/pawreport/scout-on-trail.jpg",
+    alt: "Scout on the trail during a live PawReport walk",
+    label: "Share the journey",
+    caption: "Live updates and photos turn ordinary walks into trust.",
+  },
+  {
+    src: "/images/pawreport/scout-resting-after-walk.jpg",
+    alt: "Scout resting after a walk in a PawReport update",
+    label: "Close the loop",
+    caption: "Finish with notes and care details that invite rebooking.",
+  },
+];
+
+/** Keep in sync with `SCOUT_PUBLIC_MARKETING_FAQS` in lib/ai/officer-marketing-faqs.ts */
 const faqs = [
   {
     question: "Is it free to apply?",
@@ -166,6 +247,27 @@ const faqs = [
   },
 ];
 
+function SectionLabel({
+  children,
+  icon,
+}: {
+  children: ReactNode;
+  icon?: ReactNode;
+}) {
+  return (
+    <div className="mb-2 flex items-center gap-2">
+      {icon ? (
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
+          {icon}
+        </span>
+      ) : null}
+      <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-800">
+        {children}
+      </p>
+    </div>
+  );
+}
+
 function PrimaryButton({
   href,
   label = "Start Free Guru Profile",
@@ -178,125 +280,78 @@ function PrimaryButton({
   return (
     <Link
       href={href}
-      className={`inline-flex min-h-14 items-center justify-center rounded-full bg-emerald-600 px-7 py-4 text-base font-black !text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200 ${className}`}
+      className={`inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-7 py-4 text-base font-black !text-white shadow-lg shadow-emerald-900/20 transition hover:bg-[#09462C] focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 ${className}`}
     >
       {label}
+      <ArrowRight size={18} />
     </Link>
   );
 }
 
-function GuruLoginButton({ className = "" }: { className?: string }) {
+function HeroVisual() {
   return (
-    <Link
-      href={guruLoginLink}
-      className={`inline-flex min-h-14 items-center justify-center rounded-full border border-slate-300 bg-white px-7 py-4 text-base font-black !text-slate-800 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100 ${className}`}
-    >
-      Guru Login
-    </Link>
-  );
-}
+    <div className="relative mx-auto w-full max-w-[540px]">
+      <div className="absolute -left-6 -top-8 h-40 w-40 rounded-full bg-emerald-300/25 blur-3xl" />
+      <div className="absolute -bottom-10 -right-4 h-48 w-48 rounded-full bg-white/15 blur-3xl" />
 
-function GuruProfilePreview() {
-  return (
-    <div className="relative mx-auto w-full max-w-[520px]">
-      <div className="absolute -left-8 -top-8 h-40 w-40 rounded-full bg-emerald-300/25 blur-3xl" />
-      <div className="absolute -bottom-8 -right-8 h-44 w-44 rounded-full bg-sky-300/20 blur-3xl" />
-
-      <div className="relative overflow-hidden rounded-[34px] border border-white/15 bg-white shadow-[0_30px_90px_rgba(2,44,34,0.32)]">
-        <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-700 p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-200">
-                Your Guru profile
-              </p>
-              <p className="mt-1 text-sm font-semibold !text-white/80">
-                What Pet Parents can discover
-              </p>
-            </div>
-
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] !text-white">
-              Profile Preview
-            </span>
+      <div className="relative overflow-hidden rounded-[32px] border border-white/25 bg-white shadow-[0_30px_90px_rgba(2,44,34,0.35)]">
+        <div className="relative aspect-[5/4] w-full">
+          <Image
+            src="/images/pawreport/scout-on-trail.jpg"
+            alt="A SitGuru walk moment Pet Parents can follow through PawReport Live"
+            fill
+            priority
+            className="object-cover object-[center_35%]"
+            sizes="(max-width: 1024px) 100vw, 42vw"
+          />
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent p-5 pt-16">
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] !text-emerald-200">
+              PawReport Live
+            </p>
+            <p className="mt-1 text-lg font-black !text-white">
+              Care they can see. Trust that sticks.
+            </p>
           </div>
         </div>
 
-        <div className="p-5 sm:p-6">
-          <div className="flex items-start gap-4">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[24px] bg-gradient-to-br from-emerald-100 to-sky-100 text-4xl shadow-inner">
-              🐕
+        <div className="space-y-3 bg-white p-5 sm:p-6">
+          <div className="flex items-center gap-3">
+            <div className="relative h-12 w-12 overflow-hidden rounded-full bg-white ring-2 ring-emerald-100">
+              <Image
+                src={SCOUT_AVATAR.src}
+                alt=""
+                fill
+                className="object-cover"
+                style={{ objectPosition: SCOUT_AVATAR.objectPosition }}
+                sizes="48px"
+              />
             </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-2xl font-black tracking-[-0.04em] !text-slate-950">
-                  Your Name
-                </h2>
-                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] !text-emerald-800">
-                  Guru
-                </span>
-              </div>
-
-              <p className="mt-1 text-sm font-black !text-emerald-700">
-                Dog Walking · Drop-Ins
+            <div>
+              <p className="text-sm font-black text-emerald-950">
+                Scout is with you from day one
               </p>
-              <p className="mt-1 text-sm font-semibold !text-slate-500">
-                Your local area
+              <p className="text-xs font-semibold text-slate-600">
+                Your Guru Matching Officer guides setup and local matching.
               </p>
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {[
-              ["$25", "Starting rate"],
-              ["4.9", "Example rating"],
-              ["Open", "Availability"],
+              ["Free", "to apply"],
+              ["Yours", "schedule"],
+              ["Local", "Pet Parents"],
             ].map(([value, label]) => (
               <div
                 key={label}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center"
+                className="rounded-2xl border border-emerald-100 bg-[#f7faf4] px-2 py-3 text-center"
               >
-                <p className="text-lg font-black !text-slate-950">{value}</p>
-                <p className="mt-1 text-[9px] font-black uppercase tracking-[0.08em] !text-slate-500">
+                <p className="text-sm font-black text-emerald-950">{value}</p>
+                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">
                   {label}
                 </p>
               </div>
             ))}
-          </div>
-
-          <div className="mt-5 rounded-[24px] border border-emerald-100 bg-emerald-50 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.14em] !text-emerald-800">
-              Profile highlights
-            </p>
-
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {[
-                "Services and rates",
-                "Availability",
-                "Experience and photos",
-                "Care area and reviews",
-              ].map((item) => (
-                <div key={item} className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black !text-emerald-700 shadow-sm">
-                    ✓
-                  </span>
-                  <span className="text-xs font-bold !text-slate-700">
-                    {item}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-slate-950 px-4 py-3">
-            <div>
-              <p className="text-xs font-black !text-white">
-                Ready for local bookings
-              </p>
-              <p className="mt-0.5 text-[10px] font-semibold !text-slate-300">
-                After profile approval and required setup
-              </p>
-            </div>
-            <span className="text-xl">→</span>
           </div>
         </div>
       </div>
@@ -310,247 +365,320 @@ export function BecomeAGuruPageContent({
   guruApplyLink: string;
 }) {
   return (
-    <main className="public-page min-h-screen bg-white pb-24 !text-slate-950 sm:pb-0">
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden">
-        <PrimaryButton href={guruApplyLink} className="w-full" />
+    <main className="public-page min-h-screen overflow-x-hidden bg-[#f7faf7] pb-[calc(6rem+env(safe-area-inset-bottom))] text-slate-950 sm:pb-0">
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-lg gap-2">
+          <Link
+            href={guruApplyLink}
+            className="flex min-h-12 flex-1 items-center justify-center rounded-full bg-[#0D5C3A] px-4 py-3 text-base font-black !text-white shadow-lg shadow-emerald-900/20 transition hover:bg-[#09462C]"
+          >
+            Start Free
+          </Link>
+          <Link
+            href={guruLoginLink}
+            className="flex min-h-12 flex-1 items-center justify-center rounded-full border border-emerald-200 bg-white px-4 py-3 text-base font-black text-emerald-900 transition hover:bg-emerald-50"
+          >
+            Guru Login
+          </Link>
+        </div>
       </div>
 
-      <section className="relative overflow-hidden border-b border-emerald-100 bg-gradient-to-br from-white via-emerald-50/45 to-sky-50">
+      <section className="relative overflow-hidden bg-[#0D5C3A]">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -left-20 top-10 h-80 w-80 rounded-full bg-emerald-200/30 blur-3xl" />
-          <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-sky-200/25 blur-3xl" />
+          <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
+          <div className="absolute -bottom-32 right-0 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
+          <PawPrint className="absolute right-[8%] top-16 h-16 w-16 rotate-12 text-white/10" />
         </div>
 
-        <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-20">
-          <div className="grid items-center gap-10 lg:grid-cols-[1.02fr_0.98fr] lg:gap-14">
-            <div>
-              <div className="inline-flex items-center rounded-full border border-emerald-200 bg-white px-4 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] !text-emerald-800 shadow-sm sm:text-xs">
-                Flexible local pet care
-              </div>
-
-              <h1 className="mt-5 max-w-3xl text-4xl font-black leading-[1.02] tracking-[-0.055em] !text-slate-950 sm:text-5xl lg:text-6xl">
-                Earn on your schedule caring for pets.
-              </h1>
-
-              <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 !text-slate-700 sm:text-xl">
-                Choose your services, rates, availability, and local area.
-                SitGuru helps nearby Pet Parents discover, book, and rebook you.
-              </p>
-
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <PrimaryButton href={guruApplyLink} className="w-full sm:w-auto" />
-                <GuruLoginButton className="w-full sm:w-auto" />
-              </div>
-
-              <div className="mt-6 grid gap-2 sm:grid-cols-2">
-                {[
-                  "Free to apply",
-                  "Choose your schedule",
-                  "Set your services and rates",
-                  "Keep bookings organized",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="flex items-center gap-2 rounded-2xl border border-white bg-white/80 px-4 py-3 text-sm font-black !text-slate-700 shadow-sm"
-                  >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs !text-emerald-700">
-                      ✓
-                    </span>
-                    {item}
-                  </div>
-                ))}
-              </div>
-
-              <p className="mt-5 max-w-2xl text-xs font-semibold leading-5 !text-slate-500 sm:text-sm">
-                Pet Gurus are independent providers who choose the services they
-                offer and the booking requests they accept.
-              </p>
+        <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-14 lg:px-8 lg:py-20">
+          <div data-brand-green className="public-dark-section">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] !text-white backdrop-blur">
+              <Image
+                src="/images/sitguru-logo-cropped.png"
+                alt=""
+                width={22}
+                height={22}
+                className="h-5 w-5 object-contain mix-blend-multiply brightness-0 invert"
+              />
+              SitGuru — Trusted Pet Care. Simplified.
             </div>
 
-            <GuruProfilePreview />
-          </div>
-        </div>
-      </section>
+            <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.02] tracking-[-0.045em] !text-white sm:text-5xl lg:text-6xl">
+              More than a sitter. Become a SitGuru Guru.
+            </h1>
 
-      <section
-        aria-label="Meet Scout, your AI Pet Companion"
-        className="border-b border-emerald-100 bg-gradient-to-b from-white via-[#f4faf7] to-white py-12 sm:py-16"
-      >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="overflow-hidden rounded-[32px] border border-emerald-100 bg-white shadow-[0_18px_50px_rgba(13,92,58,0.08)]">
-            <div className="grid items-center gap-8 p-7 sm:p-10 lg:grid-cols-[auto_1fr] lg:gap-12">
-              <div className="mx-auto flex flex-col items-center text-center lg:mx-0">
-                <div className="relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 sm:h-32 sm:w-32">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={SCOUT_AVATAR.src}
-                    alt={SCOUT_AVATAR.alt}
-                    width={128}
-                    height={128}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    style={{
-                      backgroundColor: "#fff",
-                      objectPosition: SCOUT_AVATAR.objectPosition,
-                    }}
-                  />
-                </div>
-                <p className="mt-4 text-xl font-black tracking-tight !text-slate-950">
-                  Scout
-                </p>
-                <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] !text-[#0D5C3A]">
-                  Guru Matching Officer
-                </p>
-              </div>
-
-              <div className="text-center lg:text-left">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
-                  AI Pet Companion
-                </p>
-                <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
-                  Your personalized guide from day one.
-                </h2>
-                <p className="mt-4 max-w-3xl text-base font-semibold leading-7 !text-slate-700 sm:text-lg sm:leading-8">
-                  Every Pet Guru receives their own personalized AI Pet
-                  Companion to guide them along the way! Meet Scout, your
-                  dedicated Guru Matching Officer, who is ready to seamlessly
-                  help pair you up with local Pet Parents.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white py-12 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
-              Built around your goals
+            <p className="mt-5 max-w-2xl text-base font-semibold leading-7 !text-emerald-50 sm:text-lg">
+              Earn on your schedule caring for pets — with a trusted local
+              profile, PawReports that win Pet Parents, and tools built to grow
+              repeat relationships.
             </p>
-            <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
-              Grow your pet care business your way.
-            </h2>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Link
+                href={guruApplyLink}
+                className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-base font-black text-emerald-950 shadow-xl shadow-black/15 transition hover:bg-emerald-50 sm:w-auto"
+              >
+                Start Free Guru Profile
+                <ArrowRight size={18} />
+              </Link>
+              <Link
+                href={guruLoginLink}
+                className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/10 px-6 py-4 text-base font-black !text-white backdrop-blur transition hover:bg-white/15 sm:w-auto"
+              >
+                Guru Login
+              </Link>
+            </div>
+
+            <p className="mt-5 max-w-2xl text-xs font-semibold leading-5 !text-emerald-100/90 sm:text-sm">
+              Gurus are independent providers who choose the services they offer
+              and the booking requests they accept.
+            </p>
           </div>
 
-          <div className="mt-9 grid gap-5 lg:grid-cols-3">
-            {coreBenefits.map((benefit) => (
+          <HeroVisual />
+        </div>
+      </section>
+
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+        <section className="rounded-[32px] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <SectionLabel icon={<Sparkles size={16} />}>
+              Why Gurus choose SitGuru
+            </SectionLabel>
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-emerald-950 sm:text-4xl">
+              Built to help great caregivers get found — and stay booked.
+            </h2>
+            <p className="mt-3 text-base font-semibold leading-7 text-slate-600">
+              SitGuru is more than a listing. It is a workspace for discovery,
+              communication, live care updates, and trusted local growth.
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {promisePoints.map((item) => (
               <article
-                key={benefit.title}
-                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_35px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:border-emerald-200 hover:shadow-[0_20px_45px_rgba(15,23,42,0.10)]"
+                key={item.title}
+                className="rounded-[24px] border border-emerald-100 bg-[#f7faf4] p-5"
               >
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-2xl">
-                  {benefit.icon}
-                </div>
-                <h3 className="mt-5 text-xl font-black tracking-[-0.03em] !text-slate-950">
-                  {benefit.title}
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-emerald-800 shadow-sm">
+                  {item.icon}
+                </span>
+                <h3 className="mt-4 text-lg font-black text-emerald-950">
+                  {item.title}
                 </h3>
-                <p className="mt-3 text-sm font-semibold leading-6 !text-slate-600">
-                  {benefit.description}
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  {item.description}
                 </p>
               </article>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="bg-slate-50 py-12 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
-            <div className="lg:sticky lg:top-28">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
-                Your Guru workspace
-              </p>
-              <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
-                Everything you need in one place.
+        <section className="overflow-hidden rounded-[32px] border border-emerald-100 bg-white shadow-sm">
+          <div className="grid lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="p-5 sm:p-6 lg:p-8">
+              <SectionLabel icon={<PawPrint size={16} />}>
+                PawReport Live
+              </SectionLabel>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-emerald-950 sm:text-4xl">
+                Show Pet Parents the care they can feel.
               </h2>
-              <p className="mt-4 max-w-xl text-base font-semibold leading-7 !text-slate-700">
-                Build your profile, organize care details, communicate with Pet
-                Parents, complete PawReports, and follow your Guru activity
-                through SitGuru.
+              <p className="mt-4 text-base font-semibold leading-7 text-slate-600">
+                PawReports turn every visit into proof — photos, notes, walk
+                progress, and live updates that build confidence and invite
+                rebooking. That is how SitGuru helps Gurus grow beyond one-off
+                gigs.
               </p>
-
-              <div className="mt-6">
-                <PrimaryButton href={guruApplyLink} className="w-full sm:w-auto" />
+              <ul className="mt-6 space-y-3">
+                {[
+                  "Live walk updates Pet Parents can follow",
+                  "Photos and notes that feel personal",
+                  "Completed care reports that support reviews",
+                ].map((line) => (
+                  <li
+                    key={line}
+                    className="flex items-start gap-3 text-sm font-bold text-slate-700"
+                  >
+                    <CheckCircle2
+                      size={18}
+                      className="mt-0.5 shrink-0 text-emerald-700"
+                    />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-7">
+                <PrimaryButton href={guruApplyLink} />
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {guruTools.map((tool) => (
+            <div className="grid gap-3 bg-[#0D5C3A]/5 p-4 sm:p-5 lg:grid-cols-3 lg:p-6">
+              {pawReportMoments.map((moment) => (
+                <article
+                  key={moment.src}
+                  className="overflow-hidden rounded-[24px] bg-white shadow-sm"
+                >
+                  <div className="relative aspect-[4/5] w-full">
+                    <Image
+                      src={moment.src}
+                      alt={moment.alt}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 1024px) 100vw, 18vw"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
+                      {moment.label}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold leading-5 text-slate-600">
+                      {moment.caption}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section
+          aria-label="Meet Scout, your AI Pet Companion"
+          className="rounded-[32px] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8"
+        >
+          <div className="grid items-center gap-8 lg:grid-cols-[auto_1fr] lg:gap-12">
+            <div className="mx-auto flex flex-col items-center text-center lg:mx-0">
+              <div className="relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 sm:h-32 sm:w-32">
+                <Image
+                  src={SCOUT_AVATAR.src}
+                  alt={SCOUT_AVATAR.alt}
+                  fill
+                  className="object-cover"
+                  style={{
+                    backgroundColor: "#fff",
+                    objectPosition: SCOUT_AVATAR.objectPosition,
+                  }}
+                  sizes="128px"
+                />
+              </div>
+              <p className="mt-4 text-xl font-black tracking-tight text-emerald-950">
+                Scout
+              </p>
+              <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#0D5C3A]">
+                Guru Matching Officer
+              </p>
+            </div>
+
+            <div className="text-center lg:text-left">
+              <SectionLabel icon={<HeartHandshake size={16} />}>
+                AI Pet Companion
+              </SectionLabel>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-emerald-950 sm:text-4xl">
+                Your personalized guide from day one.
+              </h2>
+              <p className="mt-4 max-w-3xl text-base font-semibold leading-7 text-slate-600 sm:text-lg sm:leading-8">
+                Every Pet Guru receives their own personalized AI Pet Companion
+                to guide them along the way. Meet Scout, your dedicated Guru
+                Matching Officer, ready to help pair you with local Pet Parents.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[32px] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+            <div className="lg:sticky lg:top-28">
+              <SectionLabel icon={<UsersRound size={16} />}>
+                Your Guru workspace
+              </SectionLabel>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-emerald-950 sm:text-4xl">
+                Everything you need to run trusted local care.
+              </h2>
+              <p className="mt-4 text-base font-semibold leading-7 text-slate-600">
+                From profile to payouts, SitGuru keeps discovery, messaging,
+                bookings, PawReports, learning, and earnings in one place.
+              </p>
+              <div className="mt-6">
+                <PrimaryButton href={guruApplyLink} />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {toolkit.map((tool) => (
                 <article
                   key={tool.title}
-                  className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm"
+                  className="rounded-[22px] border border-emerald-100 bg-[#f7faf4] p-5"
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-xl">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-800 shadow-sm">
                     {tool.icon}
-                  </div>
-                  <h3 className="mt-4 text-lg font-black !text-slate-950">
+                  </span>
+                  <h3 className="mt-3 text-base font-black text-emerald-950">
                     {tool.title}
                   </h3>
-                  <p className="mt-2 text-sm font-semibold leading-6 !text-slate-600">
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                     {tool.description}
                   </p>
                 </article>
               ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="bg-white py-12 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section className="rounded-[32px] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
+            <SectionLabel icon={<CheckCircle2 size={16} />}>
               Simple from the start
-            </p>
-            <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
-              Start in four steps.
+            </SectionLabel>
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-emerald-950 sm:text-4xl">
+              Start in four clear steps.
             </h2>
           </div>
 
-          <div className="relative mt-10 grid gap-4 lg:grid-cols-4">
+          <div className="relative mt-9 grid gap-4 lg:grid-cols-4">
             <div className="pointer-events-none absolute left-[12%] right-[12%] top-7 hidden h-px bg-emerald-200 lg:block" />
-
             {steps.map((item) => (
               <article
                 key={item.step}
-                className="relative rounded-[26px] border border-slate-200 bg-white p-5 text-center shadow-sm"
+                className="relative rounded-[24px] border border-emerald-100 bg-[#f7faf4] p-5 text-center"
               >
-                <div className="relative z-10 mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-lg font-black !text-white shadow-lg shadow-emerald-700/20">
+                <div className="relative z-10 mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#0D5C3A] text-sm font-black !text-white shadow-lg shadow-emerald-900/20">
                   {item.step}
                 </div>
-                <h3 className="mt-5 text-lg font-black !text-slate-950">
+                <h3 className="mt-5 text-lg font-black text-emerald-950">
                   {item.title}
                 </h3>
-                <p className="mt-2 text-sm font-semibold leading-6 !text-slate-600">
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                   {item.description}
                 </p>
               </article>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="public-dark-section bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 py-12 !text-white sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section
+          data-brand-green
+          className="public-dark-section rounded-[32px] bg-[#0D5C3A] p-6 !text-white shadow-sm sm:p-8"
+        >
           <div className="grid gap-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-200 sm:text-xs">
+              <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-100">
                 Independent provider control
               </p>
-              <h2
-                className="mt-3 text-3xl font-black tracking-[-0.045em] !text-white sm:text-4xl"
-                style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }}
-              >
+              <h2 className="mt-3 text-3xl font-black tracking-tight !text-white sm:text-4xl">
                 You decide how you work.
               </h2>
               <p className="mt-4 max-w-xl text-base font-semibold leading-7 !text-emerald-50">
                 SitGuru gives you a structured way to present your services and
-                review local booking opportunities without giving up control of
-                your schedule.
+                review local booking opportunities — without giving up control
+                of your schedule.
               </p>
-
               <div className="mt-6">
-                <PrimaryButton href={guruApplyLink} className="w-full bg-emerald-400 !text-emerald-950 hover:bg-emerald-300 sm:w-auto" />
+                <Link
+                  href={guruApplyLink}
+                  className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-white px-7 py-4 text-base font-black text-emerald-950 transition hover:bg-emerald-50"
+                >
+                  Start Free Guru Profile
+                  <ArrowRight size={18} />
+                </Link>
               </div>
             </div>
 
@@ -560,131 +688,153 @@ export function BecomeAGuruPageContent({
                   key={point}
                   className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-4 backdrop-blur"
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-black !text-emerald-800">
-                    ✓
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-emerald-800">
+                    <CheckCircle2 size={16} />
                   </span>
                   <span className="text-sm font-black !text-white">{point}</span>
                 </div>
               ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="bg-white py-12 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="overflow-hidden rounded-[34px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-6 shadow-[0_18px_45px_rgba(15,23,42,0.07)] sm:p-8">
-            <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-center">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
-                  Who can become a Guru?
-                </p>
-                <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
-                  Pet experience comes in many forms.
-                </h2>
-                <p className="mt-4 text-base font-semibold leading-7 !text-slate-700">
-                  SitGuru welcomes experienced pet care providers and
-                  responsible local pet lovers who are prepared to describe
-                  their experience honestly and complete the required profile
-                  and trust steps.
-                </p>
-
+        <section className="rounded-[32px] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+            <div>
+              <SectionLabel icon={<ShieldCheck size={16} />}>
+                Who can become a Guru?
+              </SectionLabel>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-emerald-950 sm:text-4xl">
+                Pet experience comes in many forms.
+              </h2>
+              <p className="mt-4 text-base font-semibold leading-7 text-slate-600">
+                SitGuru welcomes experienced pet care providers and responsible
+                local pet lovers who are prepared to describe their experience
+                honestly and complete required profile and trust steps.
+              </p>
+              <Link
+                href="/programs"
+                className="mt-6 inline-flex items-center gap-2 text-sm font-black text-emerald-800 transition hover:text-emerald-950 hover:underline"
+              >
+                Looking for a specialized pathway? Explore SitGuru Programs
+                <ArrowRight size={16} />
+              </Link>
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                Includes student, community, and optional{" "}
                 <Link
-                  href="/programs"
-                  className="mt-6 inline-flex items-center gap-2 text-sm font-black !text-emerald-700 transition hover:!text-emerald-800 hover:underline"
+                  href={VETERANS_MILITARY_FAMILIES_PROGRAM.programsAnchorHref}
+                  className="font-black text-emerald-800 hover:underline"
                 >
-                  Looking for a specialized pathway? Explore SitGuru Programs →
+                  {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}
                 </Link>
-                <p className="mt-2 text-xs font-semibold text-slate-500">
-                  Includes student, community, and optional{" "}
-                  <Link
-                    href={VETERANS_MILITARY_FAMILIES_PROGRAM.programsAnchorHref}
-                    className="font-black text-emerald-700 hover:underline"
-                  >
-                    {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}
-                  </Link>
-                  .
-                </p>
-              </div>
+                .
+              </p>
+            </div>
 
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] !text-slate-500">
-                  Common Guru services
-                </p>
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {serviceTypes.map((service) => (
-                    <div
-                      key={service}
-                      className="flex min-h-20 items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-4 text-center text-sm font-black !text-slate-800 shadow-sm"
-                    >
-                      {service}
-                    </div>
-                  ))}
-                </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                Common Guru services
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {serviceTypes.map((service) => (
+                  <div
+                    key={service}
+                    className="flex min-h-20 items-center justify-center rounded-2xl border border-emerald-100 bg-[#f7faf4] px-3 py-4 text-center text-sm font-black text-emerald-950"
+                  >
+                    {service}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="bg-slate-50 py-12 sm:py-16">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-700 sm:text-xs">
+        <section className="rounded-[32px] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-[#f7faf4] p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <SectionLabel icon={<Gift size={16} />}>PetPerks</SectionLabel>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-emerald-950 sm:text-3xl">
+                Grow the pack — and earn when great Gurus join.
+              </h2>
+              <p className="mt-3 max-w-2xl text-base font-semibold leading-7 text-slate-600">
+                Share SitGuru with friends and future caregivers. Eligible Guru
+                referrals can earn rewards after approval and a first eligible
+                paid booking.
+              </p>
+            </div>
+            <Link
+              href="/petperks"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-950 transition hover:bg-emerald-50"
+            >
+              See PetPerks
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+        </section>
+
+        <section className="rounded-[32px] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <SectionLabel icon={<HelpCircle size={16} />}>
               Guru questions
-            </p>
-            <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] !text-slate-950 sm:text-4xl">
+            </SectionLabel>
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-emerald-950 sm:text-4xl">
               Know what to expect before you start.
             </h2>
           </div>
 
-          <div className="mt-9 space-y-3">
+          <div className="mx-auto mt-8 max-w-4xl space-y-3">
             {faqs.map((faq) => (
               <details
                 key={faq.question}
-                className="group rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm open:border-emerald-200 open:shadow-md"
+                className="group rounded-[24px] border border-emerald-100 bg-[#f7faf4] p-5 open:border-emerald-200 open:bg-white open:shadow-sm"
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left">
-                  <span className="text-base font-black !text-slate-950 sm:text-lg">
+                  <span className="text-base font-black text-emerald-950 sm:text-lg">
                     {faq.question}
                   </span>
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-lg font-black !text-emerald-800 transition group-open:rotate-45">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-lg font-black text-emerald-800 transition group-open:rotate-45">
                     +
                   </span>
                 </summary>
-                <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 !text-slate-600 sm:text-base">
+                <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-slate-600 sm:text-base">
                   {faq.answer}
                 </p>
               </details>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="bg-white py-12 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="overflow-hidden rounded-[34px] bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 px-6 py-10 text-center shadow-[0_24px_70px_rgba(6,78,59,0.24)] sm:px-10 sm:py-14">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] !text-emerald-200 sm:text-xs">
-              Ready to get started?
-            </p>
-            <h2
-              className="mx-auto mt-3 max-w-3xl text-3xl font-black tracking-[-0.045em] !text-white sm:text-4xl"
-              style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }}
+        <section
+          data-brand-green
+          className="public-dark-section rounded-[32px] bg-[#0D5C3A] p-6 text-center !text-white shadow-sm sm:p-10"
+        >
+          <p className="text-xs font-black uppercase tracking-[0.16em] !text-emerald-100">
+            Ready to get started?
+          </p>
+          <h2 className="mx-auto mt-3 max-w-3xl text-3xl font-black tracking-tight !text-white sm:text-4xl">
+            Earn caring for pets and build trusted local relationships.
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-7 !text-emerald-50">
+            Create your free Guru profile, choose how you want to provide care,
+            and complete the steps required to become bookable.
+          </p>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link
+              href={guruApplyLink}
+              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-white px-7 py-4 text-base font-black text-emerald-950 transition hover:bg-emerald-50"
             >
-              Earn caring for pets and build trusted local relationships.
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base font-semibold leading-7 !text-emerald-50">
-              Create your free Guru profile, choose how you want to provide
-              care, and complete the steps required to become bookable.
-            </p>
-
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <PrimaryButton href={guruApplyLink} className="w-full bg-emerald-400 !text-emerald-950 hover:bg-emerald-300 sm:w-auto" />
-              <GuruLoginButton className="w-full border-white/30 bg-white/10 !text-white hover:bg-white/15 sm:w-auto" />
-            </div>
+              Start Free Guru Profile
+              <ArrowRight size={18} />
+            </Link>
+            <Link
+              href={guruLoginLink}
+              className="inline-flex min-h-14 items-center justify-center rounded-2xl border border-white/30 bg-white/10 px-7 py-4 text-base font-black !text-white backdrop-blur transition hover:bg-white/15"
+            >
+              Guru Login
+            </Link>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   );
 }

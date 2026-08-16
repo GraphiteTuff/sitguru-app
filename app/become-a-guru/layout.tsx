@@ -1,4 +1,3 @@
-import "@/app/platform-dark.css";
 import type { ReactNode } from "react";
 
 /**
@@ -10,9 +9,5 @@ export default function BecomeAGuruLayout({
 }: {
   children: ReactNode;
 }) {
-  return (
-    <div className="platform-dark-surface min-h-screen bg-slate-950 text-white">
-      {children}
-    </div>
-  );
+  return <div className="min-h-screen bg-[#f7faf7] text-slate-950">{children}</div>;
 }
