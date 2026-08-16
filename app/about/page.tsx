@@ -306,14 +306,16 @@ export default function AboutPage() {
             data-brand-green
             className="public-dark-section"
           >
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] !text-white backdrop-blur">
-              <Image
-                src="/images/sitguru-logo-cropped.png"
-                alt=""
-                width={22}
-                height={22}
-                className="h-5 w-5 object-contain mix-blend-multiply brightness-0 invert"
-              />
+            <div className="inline-flex items-center gap-2.5 rounded-full border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-black uppercase tracking-[0.16em] !text-white backdrop-blur">
+              <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-white/50">
+                <Image
+                  src="/images/sitguru-logo-mark.png"
+                  alt=""
+                  fill
+                  className="object-cover object-center"
+                  sizes="28px"
+                />
+              </span>
               SitGuru — Trusted Pet Care. Simplified.
             </div>
 
