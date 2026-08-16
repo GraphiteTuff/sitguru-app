@@ -124,6 +124,22 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
     ? "Hi! I'm Scout — tap to chat. I'll guide your Guru setup, checks, and earnings path!"
     : `Hi ${firstName}! I'm Scout — tap to chat about your schedule, trails, and payouts.`;
 
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const chat = params.get("chat")?.trim().toLowerCase();
+      if (chat !== "scout") return;
+      setIsOpen(true);
+      params.delete("chat");
+      const next = `${window.location.pathname}${
+        params.toString() ? `?${params}` : ""
+      }${window.location.hash || ""}`;
+      window.history.replaceState({}, "", next);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const requestBody = {
     officer: "scout" as const,
     companion: "scout" as const,

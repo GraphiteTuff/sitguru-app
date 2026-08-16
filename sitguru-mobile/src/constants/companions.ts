@@ -31,13 +31,13 @@ export const AI_COMPANIONS: AiCompanionProfile[] = [
   {
     id: 'taco',
     name: 'Taco',
-    title: 'Ambassador Hype Officer',
+    title: 'Ambassador Advocate',
     audience: 'Ambassadors',
     helper:
       'Community growth, creator perks, and Ambassador onboarding with main-character energy.',
     benefitsLabel: 'Ambassador Benefits',
     deepDiveRoute: '/ai-companion',
-    ctaLabel: 'Meet Taco',
+    ctaLabel: 'Chat with Taco',
     setupRoute: '/ambassador-setup',
   },
   {
@@ -49,10 +49,16 @@ export const AI_COMPANIONS: AiCompanionProfile[] = [
       'Profile setup, background checks, earnings windows, and schedule coaching for Gurus.',
     benefitsLabel: 'Guru Benefits',
     deepDiveRoute: '/ai-companion',
-    ctaLabel: 'Ask Scout',
+    ctaLabel: 'Chat with Scout',
     setupRoute: '/guru-setup',
   },
 ];
+
+export function getCompanionWebChatUrl(id: CompanionId) {
+  if (id === 'scout') return 'https://www.sitguru.com/become-a-guru?chat=scout';
+  if (id === 'taco') return 'https://www.sitguru.com/ambassadors?chat=taco';
+  return 'https://www.sitguru.com/?chat=rogue#ai-companions';
+}
 
 export function getCompanion(id: string | null | undefined) {
   const key = String(id || '').toLowerCase();

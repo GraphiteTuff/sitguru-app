@@ -49,6 +49,10 @@ import {
   COMPANION_BENEFITS_USER_PROMPT,
   getCompanionBenefitsChip,
 } from "@/lib/companions/companion-benefits";
+import {
+  OPEN_COMPANION_CHAT_EVENT,
+  type OpenCompanionChatDetail,
+} from "@/lib/companions/open-companion-chat";
 
 const BRAND_GREEN = "#0D5C3A";
 const STORAGE_KEY = "sitguru-homepage-lead-chat";
@@ -577,6 +581,36 @@ export default function HomepageChatBubble() {
       setAwaitingName(!name);
     }
   }
+
+  useEffect(() => {
+    function onOpenCompanionChat(event: Event) {
+      const detail = (event as CustomEvent<OpenCompanionChatDetail>).detail;
+      if (detail?.companion && detail.companion !== "rogue") return;
+      openPanel();
+    }
+
+    window.addEventListener(OPEN_COMPANION_CHAT_EVENT, onOpenCompanionChat);
+
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const chat = params.get("chat")?.trim().toLowerCase();
+      if (chat === "rogue") {
+        openPanel();
+        params.delete("chat");
+        const next = `${window.location.pathname}${
+          params.toString() ? `?${params}` : ""
+        }${window.location.hash || ""}`;
+        window.history.replaceState({}, "", next);
+      }
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      window.removeEventListener(OPEN_COMPANION_CHAT_EVENT, onOpenCompanionChat);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once on mount / event
+  }, []);
 
   function handleCloseChat() {
     const confirmClose = window.confirm(

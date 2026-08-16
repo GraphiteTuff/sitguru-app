@@ -6,6 +6,10 @@
 import { HOMEPAGE_CTO_VOICE_RULES } from "@/lib/chat/homepage-cta";
 import { buildRogueKnowledgeBlock } from "@/lib/chat/rogue-knowledge";
 import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
+import {
+  buildMarketingFaqSnapshot,
+  ROGUE_PUBLIC_MARKETING_FAQS,
+} from "@/lib/ai/officer-marketing-faqs";
 
 /** Core Rogue behavior rules (mascot + conversion engine). */
 export const ROGUE_CORE_SYSTEM_PROMPT = `
@@ -79,6 +83,11 @@ If they say "Hi Rogue", they greeted YOU — reply warmly, then ask what to call
   }
 
   systemPrompt += `\n\n${HOMEPAGE_CTO_VOICE_RULES}`;
+  systemPrompt += `\n\n${buildMarketingFaqSnapshot({
+    officerLabel: "Rogue · Chief Treat Officer",
+    faqs: ROGUE_PUBLIC_MARKETING_FAQS,
+    signupPath: "/signup?role=pet_parent",
+  })}`;
   systemPrompt += `\n\n${buildRogueKnowledgeBlock({
     lastUserText: opts.lastUserText,
     maxChars: 18000,

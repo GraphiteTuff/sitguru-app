@@ -172,6 +172,22 @@ export default function AITacoCompanion({
   }, []);
 
   useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const chat = params.get("chat")?.trim().toLowerCase();
+      if (chat !== "taco") return;
+      setIsOpen(true);
+      params.delete("chat");
+      const next = `${window.location.pathname}${
+        params.toString() ? `?${params}` : ""
+      }${window.location.hash || ""}`;
+      window.history.replaceState({}, "", next);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
     if (isOnboarding) return;
     let cancelled = false;
 

@@ -83,6 +83,43 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   },
 ] as const;
 
+/**
+ * Pet Parent / homepage Rogue FAQs — grounded in Help Center booking, finding,
+ * live care, and Trust & Safety copy (keep answers factual; do not invent policy).
+ */
+export const ROGUE_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
+  {
+    question: "How do I find a Guru?",
+    answer:
+      "Search by service and location, review Guru profiles, services, service area, pricing, photos, care style, and any available reviews. Choose the Guru who feels like the best match for your pet’s routine, personality, and care needs. [[cta:parent]]",
+  },
+  {
+    question: "How do bookings work on SitGuru?",
+    answer:
+      "Bookings organize the service, date, time, location, pet, Guru, payment status, messages, PawReport activity, and support context. Pet Parents use bookings to follow care, and Gurus use bookings as their work queue. All care is booked through SitGuru. [[cta:parent]]",
+  },
+  {
+    question: "What is PawReport Live?",
+    answer:
+      "PawReport Live is the automated care update system connected to a booking. It shows when care starts, live walk activity, distance and duration, photos, potty updates, food and water confirmations, medication, play, mood, notes, and a final summary — so you are not waiting on a manual “I’ll text you later.”",
+  },
+  {
+    question: "How does SitGuru support trust and safety?",
+    answer:
+      "SitGuru may use profile reviews, trust and safety / compliance steps, communication tools, support records, user reports, PawReport history (including GPS and automated visit timelines), and platform rules to help protect pets, Pet Parents, Gurus, Ambassadors, and the community.",
+  },
+  {
+    question: "Is SitGuru free to join as a Pet Parent?",
+    answer:
+      "Creating a Pet Parent account is free. You only pay when you book care through SitGuru checkout — review the price before you confirm. [[cta:parent]]",
+  },
+  {
+    question: "Can I message my Guru?",
+    answer:
+      "Use SitGuru messaging when available so booking questions, care details, timing, access notes, and support context stay organized in one place.",
+  },
+] as const;
+
 /** Ambassador growth FAQs — exact copy from ambassadors marketing page. */
 export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
@@ -168,10 +205,15 @@ export function buildMarketingFaqSnapshot(opts: {
     `_Exact page copy — use these answer strings verbatim when the visitor asks the matching question._`,
     `Signup / apply path: ${opts.signupPath}`,
     "",
-    "AMBASSADOR VIDEO RULE:",
-    `- When visitors ask what Ambassadors do / what the role is / to watch the Ambassador video, answer with the exact "What do Ambassadors do?" copy and ALWAYS append ${AMBASSADOR_VIDEO_CARD_MARKER} so the in-chat promo video renders.`,
-    "",
   ];
+
+  if (opts.faqs.some((faq) => faq.answer.includes(AMBASSADOR_VIDEO_CARD_MARKER))) {
+    lines.push("AMBASSADOR VIDEO RULE:");
+    lines.push(
+      `- When visitors ask what Ambassadors do / what the role is / to watch the Ambassador video, answer with the exact "What do Ambassadors do?" copy and ALWAYS append ${AMBASSADOR_VIDEO_CARD_MARKER} so the in-chat promo video renders.`,
+    );
+    lines.push("");
+  }
 
   for (const faq of opts.faqs) {
     lines.push(`## Q: ${faq.question}`);

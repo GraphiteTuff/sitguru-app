@@ -39,7 +39,7 @@ As your official AI Companion and hype-pet, I am legally required to tell you th
 * 🔒 **The Vault Security** – Bulletproof, automated milestones. The money is locked in safe and secure before you even lift a finger.
 * 🚀 **The Creator Lab Access** – Free entry into elite masterclasses, advanced digital toolkits, and private community networking drops.
 
-You're already built for this. Smash that **'Start Free Guru Profile'** button below and let's go build an empire together! 🐺💼`;
+You're already built for this. Smash that **'Sign Up & Claim Your Tools'** button below — or head to Ambassador apply — and let's go build an empire together! 🐺💼`;
 
 export const ROGUE_PET_PARENT_BENEFITS_RESPONSE = `Alright, let’s talk real benefits. 🐾 Security and top-tier care aren't optional for your pack—they’re mandatory. Tapping **Pet Parent Benefits** means you are unlocking a fortress of perks designed to give your pet a luxury lifestyle and give you absolute peace of mind. 
 

@@ -12,6 +12,10 @@ import {
 } from "@/lib/gurus/profile-photo";
 import { SEARCH_SERVICE_OPTIONS } from "@/lib/search/service-options";
 import { supabase } from "@/lib/supabase";
+import {
+  companionChatHref,
+  openCompanionChat,
+} from "@/lib/companions/open-companion-chat";
 
 const heroVideoPaths = [
   "/videos/sitguru-homepage-hero.mp4",
@@ -53,31 +57,37 @@ const popularServices = [
   },
 ];
 
-/** Homepage AI Pet Companions — avatar + statement only (no CTA buttons). */
+/** Homepage AI Pet Companions — avatar, statement, and open-chat actions. */
 const aiPetCompanions = [
   {
+    id: "rogue" as const,
     name: "Rogue",
     role: "Chief Treat Officer",
     avatarSrc: "/images/rogue-avatar.png",
     objectPosition: "50% 28%",
     statement:
       "Just like zoomies, I'm quick to find you the local pet care you deserve. I've got your pack's back 24/7!",
+    ctaLabel: "Chat with Rogue",
   },
   {
+    id: "taco" as const,
     name: "Taco",
     role: "Ambassador Advocate",
     avatarSrc: "/images/taco-avatar.png",
     objectPosition: "center 22%",
     statement:
       "I'm here to cheer on our Ambassadors. I'll fetch your links and track your work!",
+    ctaLabel: "Chat with Taco",
   },
   {
+    id: "scout" as const,
     name: "Scout",
     role: "Guru Matching Officer",
     avatarSrc: "/images/scout-avatar.png",
     objectPosition: "center 22%",
     statement:
       "Scout reporting for duty. I'm here to help seamlessly match our local Pet Gurus to the perfect Pet Parents.",
+    ctaLabel: "Chat with Scout",
   },
 ] as const;
 
@@ -2207,6 +2217,7 @@ export default function HomePage() {
       </section>
 
       <section
+        id="ai-companions"
         aria-label="AI Pet Companions"
         className="bg-gradient-to-b from-white via-[#f4faf7] to-white py-12 sm:py-16"
       >
@@ -2218,6 +2229,10 @@ export default function HomePage() {
             <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-4xl">
               AI Pet Companions
             </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-600 sm:text-base">
+              Tap a companion to chat — Rogue for Pet Parents, Taco for
+              Ambassadors, Scout for Gurus.
+            </p>
           </div>
 
           <div className="mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
@@ -2226,17 +2241,32 @@ export default function HomePage() {
                 key={companion.name}
                 className="flex flex-col items-center text-center"
               >
-                <div className="relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 sm:h-32 sm:w-32">
+                <button
+                  type="button"
+                  onClick={() => {
+                    trackHomepageClick(
+                      `AI companion ${companion.name}`,
+                      companionChatHref(companion.id),
+                    );
+                    if (companion.id === "rogue") {
+                      openCompanionChat("rogue");
+                      return;
+                    }
+                    window.location.assign(companionChatHref(companion.id));
+                  }}
+                  className="group relative h-28 w-28 overflow-hidden rounded-full bg-white shadow-[0_10px_28px_rgba(13,92,58,0.12)] ring-2 ring-[#0D5C3A]/15 transition hover:-translate-y-1 hover:ring-[#0D5C3A]/35 sm:h-32 sm:w-32"
+                  aria-label={companion.ctaLabel}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={companion.avatarSrc}
                     alt={companion.name}
                     width={128}
                     height={128}
-                    className="absolute inset-0 h-full w-full object-cover"
+                    className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     style={{ objectPosition: companion.objectPosition }}
                   />
-                </div>
+                </button>
                 <h3 className="mt-5 text-xl font-black tracking-tight text-slate-950">
                   {companion.name}
                 </h3>
@@ -2246,6 +2276,23 @@ export default function HomePage() {
                 <p className="mt-4 max-w-sm text-sm font-semibold leading-6 tracking-wide text-slate-600 sm:text-[15px] sm:leading-7">
                   &ldquo;{companion.statement}&rdquo;
                 </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    trackHomepageClick(
+                      `AI companion CTA ${companion.name}`,
+                      companionChatHref(companion.id),
+                    );
+                    if (companion.id === "rogue") {
+                      openCompanionChat("rogue");
+                      return;
+                    }
+                    window.location.assign(companionChatHref(companion.id));
+                  }}
+                  className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-[#0D5C3A] px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-[#0a4a2e]"
+                >
+                  {companion.ctaLabel}
+                </button>
               </div>
             ))}
           </div>

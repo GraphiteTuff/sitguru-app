@@ -17,6 +17,10 @@ import {
 import { buildHomepageSimulationReplyWithGurus } from "@/lib/chat/homepage-simulation-gurus";
 import { buildRogueSystemPrompt } from "@/lib/chat/rogue-system-prompt";
 import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
+import {
+  matchMarketingFaq,
+  ROGUE_PUBLIC_MARKETING_FAQS,
+} from "@/lib/ai/officer-marketing-faqs";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
 
 function safeString(value: unknown) {
@@ -273,6 +277,14 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
     if (lastUserText) {
       void recordChatInsight(lastUserText, insightChannel, "General Inquiry", insightMeta);
+    }
+
+    const exactParentFaq = matchMarketingFaq(
+      ROGUE_PUBLIC_MARKETING_FAQS,
+      lastUserText,
+    );
+    if (exactParentFaq?.answer) {
+      return simulationDataStreamResponse(exactParentFaq.answer);
     }
 
     const systemPrompt = buildRogueSystemPrompt({
