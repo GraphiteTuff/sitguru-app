@@ -887,7 +887,7 @@ function buildHtmlReport(payload: ExportPayload, mode: "word" | "excel" | "html"
           body {
             margin: 0;
             padding: 32px;
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif;
             color: #0f172a;
             background: #f7fbf8;
           }

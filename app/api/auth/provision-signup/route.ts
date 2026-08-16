@@ -1015,6 +1015,63 @@ function getTrackingValues(
   };
 }
 
+async function ensureAmbassadorPetParentTrack(
+  userId: string,
+  existingMetadata: GenericRow,
+) {
+  try {
+    const { data: existingRoles, error: rolesError } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+
+    if (rolesError) {
+      console.warn(
+        "Ambassador Pet Parent role lookup skipped:",
+        rolesError.message,
+      );
+    }
+
+    const hasCustomerRole = (existingRoles || []).some(
+      (row) => cleanText(row.role).toLowerCase() === "customer",
+    );
+
+    if (!hasCustomerRole) {
+      const { error: insertError } = await supabaseAdmin
+        .from("user_roles")
+        .insert({ user_id: userId, role: "customer" });
+
+      if (insertError) {
+        console.warn(
+          "Ambassador Pet Parent role insert skipped:",
+          insertError.message,
+        );
+      }
+    }
+
+    const authorizedRoles = ["parent", "ambassador"];
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+      userId,
+      {
+        user_metadata: {
+          ...existingMetadata,
+          authorizedRoles,
+          authorized_roles: authorizedRoles,
+        },
+      },
+    );
+
+    if (authError) {
+      console.warn(
+        "Ambassador authorizedRoles update skipped:",
+        authError.message,
+      );
+    }
+  } catch (error) {
+    console.warn("Ambassador Pet Parent track setup skipped:", error);
+  }
+}
+
 async function callProvisioningRpc(
   body: Required<Pick<ProvisionSignupBody, "userId" | "intent">> &
     ProvisionSignupBody,
@@ -1917,6 +1974,11 @@ export async function POST(request: NextRequest) {
         500,
         result,
       );
+    }
+
+    // Ambassadors also receive Pet Parent so the multi-role portal switcher works.
+    if (requestedIntent === "ambassador") {
+      await ensureAmbassadorPetParentTrack(userId, metadata);
     }
 
     const referredEmail =

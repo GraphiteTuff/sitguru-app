@@ -66,7 +66,7 @@ function getEmailHtml(payload: NotifyPayload) {
           : `Your support case <strong>${intakeNumber}</strong> has been updated.`;
 
   return `
-    <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6;">
+    <div style="font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; color: #0f172a; line-height: 1.6;">
       <div style="max-width: 640px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 18px; overflow: hidden;">
         <div style="background: #020617; color: white; padding: 24px;">
           <h1 style="margin: 0; font-size: 28px;">SitGuru Support</h1>

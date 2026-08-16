@@ -300,7 +300,7 @@ async function sendAdminEmail(params: {
         reply_to: params.email || getReplyToEmail(),
         subject: `New SitGuru Homepage Messenger: ${topicLabel}`,
         html: `
-          <div style="font-family: Arial, sans-serif; background: #f6fbf7; padding: 24px;">
+          <div style="font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; background: #f6fbf7; padding: 24px;">
             <div style="max-width: 680px; margin: 0 auto; background: #ffffff; border: 1px solid #dcefe2; border-radius: 18px; overflow: hidden;">
               <div style="background: #0f5132; color: #ffffff; padding: 24px;">
                 <h1 style="margin: 0; font-size: 24px;">New Homepage Messenger Reply</h1>

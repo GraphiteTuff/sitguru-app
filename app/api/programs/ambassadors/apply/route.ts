@@ -113,7 +113,7 @@ async function sendConfirmationEmail(payload: {
       to: payload.email,
       subject: "We received your SitGuru Ambassador application",
       html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #12382b;">
+        <div style="font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; line-height: 1.6; color: #12382b;">
           <h2 style="color:#14532d;">Thank you for your interest in joining the SitGuru pack!</h2>
           <p>Hi ${escapeHtml(payload.firstName || payload.fullName || "there")},</p>
           <p>We received your Ambassador application and our team will review it soon.</p>
@@ -172,7 +172,7 @@ async function sendAdminNotificationEmail(payload: {
       to: adminEmail,
       subject: "New SitGuru Ambassador application",
       html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #12382b;">
+        <div style="font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; line-height: 1.6; color: #12382b;">
           <h2 style="color:#14532d;">New Ambassador Application</h2>
           <p><strong>Name:</strong> ${escapeHtml(payload.fullName)}</p>
           <p><strong>Email:</strong> ${escapeHtml(payload.email)}</p>

@@ -120,7 +120,7 @@ function getEmailHtml(payload: SupportNotificationPayload) {
   const siteUrl = getSiteUrl();
 
   return `
-    <div style="margin:0; padding:0; background:#f6f8fb; font-family: Arial, Helvetica, sans-serif; color:#111827;">
+    <div style="margin:0; padding:0; background:#f6f8fb; font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; color:#111827;">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f8fb; padding:32px 12px;">
         <tr>
           <td align="center">

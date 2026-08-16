@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 const SITE_FONT_STYLE = {
   fontFamily:
-    '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    '"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   fontWeight: 300,
 };
 

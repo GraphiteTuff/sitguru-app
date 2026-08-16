@@ -1058,7 +1058,7 @@ function buildMessage(snapshot: CompletionSnapshot, stage: ReminderStage) {
 
   const html = `<!doctype html>
 <html>
-  <body style="margin:0;background:#f7f3ec;font-family:Arial,Helvetica,sans-serif;color:#17351f;">
+  <body style="margin:0;background:#f7f3ec;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;color:#17351f;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f7f3ec;padding:28px 12px;">
       <tr>
         <td align="center">
@@ -1388,10 +1388,10 @@ async function sendTechnicalIssueAlert(
     `User ID: ${snapshot.userId}`,
     `Issue: ${snapshot.technicalIssues.join(", ")}`,
     `Missing user details: ${snapshot.missingFields.join(", ") || "None"}`,
-    `Review: ${SITE_URL}/admin/account-lifecycle?query=${encodeURIComponent(snapshot.userId)}`,
+    `Review: ${SITE_URL}/admin/account-lifecycle/${encodeURIComponent(snapshot.userId)}`,
   ].join("\n");
 
-  const html = `<div style="font-family:Arial,sans-serif;line-height:1.7;color:#17351f"><h2>${escapeHtml(
+  const html = `<div style="font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;line-height:1.7;color:#17351f"><h2>${escapeHtml(
     subject,
   )}</h2><pre style="white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:16px">${escapeHtml(
     body,

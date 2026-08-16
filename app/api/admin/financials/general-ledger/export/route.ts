@@ -577,7 +577,7 @@ function buildHtml(
   <meta charset="utf-8" />
   <title>SitGuru General Ledger</title>
   <style>
-    body { font-family: Arial, sans-serif; color: #163127; padding: 24px; }
+    body { font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; color: #163127; padding: 24px; }
     h1 { color: #0D5C3A; margin-bottom: 4px; }
     table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 12px; }
     th, td { border: 1px solid #d7e5dc; padding: 8px; text-align: left; vertical-align: top; }

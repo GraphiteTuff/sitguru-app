@@ -191,7 +191,7 @@ function buildReminderHtml(body: Required<ReminderRequestBody>) {
         : "#047857";
 
   return `
-    <div style="font-family: Arial, sans-serif; background:#f7fbf8; padding:24px;">
+    <div style="font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; background:#f7fbf8; padding:24px;">
       <div style="max-width:640px; margin:0 auto; background:#ffffff; border:1px solid #d1fae5; border-radius:24px; padding:24px;">
         <p style="margin:0 0 12px 0; font-size:12px; font-weight:800; letter-spacing:0.18em; text-transform:uppercase; color:#047857;">
           SitGuru CPA Handoff Reminder

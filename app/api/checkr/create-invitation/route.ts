@@ -497,7 +497,7 @@ function buildCheckrGuidanceEmailHtml(details: CheckrGuidanceEmailDetails) {
     : "";
 
   return `
-  <div style="margin:0;padding:0;background:#f3fbf8;font-family:Arial,Helvetica,sans-serif;color:#07132f;">
+  <div style="margin:0;padding:0;background:#f3fbf8;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;color:#07132f;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3fbf8;margin:0;padding:28px 12px;">
       <tr>
         <td align="center">

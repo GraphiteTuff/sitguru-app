@@ -785,7 +785,7 @@ async function sendProgramStatusEmail({
     <title>${escapeHtml(subject)}</title>
     <style>
       body, table, td, p, a, h1, h2 {
-        font-family: Arial, Helvetica, sans-serif !important;
+        font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif !important;
       }
       .email-force-white {
         color: #ffffff !important;
@@ -801,7 +801,7 @@ async function sendProgramStatusEmail({
       }
     </style>
   </head>
-  <body style="margin:0; padding:0; background:#f6faf7; font-family:Arial, Helvetica, sans-serif; color:#0f172a;">
+  <body style="margin:0; padding:0; background:#f6faf7; font-family:'Plus Jakarta Sans', Arial, Helvetica, sans-serif; color:#0f172a;">
     <div style="display:none; max-height:0; overflow:hidden; opacity:0;">
       ${escapeHtml(preheader)}
     </div>

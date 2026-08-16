@@ -714,9 +714,24 @@ export async function POST(request: NextRequest) {
   const statusLabel = signupState.replace(/_/g, " ");
   const issueLabel = likelyIssueType.replace(/_/g, " ");
 
-  const reviewUrl = `${baseUrl}/admin/account-lifecycle?query=${encodeURIComponent(
-    id || email || phone,
-  )}`;
+  const guruId = rowString(snapshot?.guru, "id");
+  const reviewLookup = id || email || phone;
+  // Prefer role-specific approve pages. Use path segments (no `?`) so email/SMS
+  // clients cannot mangle `?query=` into a dead `@query=` path.
+  // Dual-role (both) and Ambassador multi-role go to account lifecycle so every
+  // portal approve path is available from one review screen.
+  const reviewUrl =
+    role === "both" && reviewLookup
+      ? `${baseUrl}/admin/account-lifecycle/${encodeURIComponent(reviewLookup)}`
+      : role === "ambassador" && reviewLookup
+        ? `${baseUrl}/admin/account-lifecycle/${encodeURIComponent(reviewLookup)}`
+        : role === "guru" && guruId
+          ? `${baseUrl}/admin/gurus/${encodeURIComponent(guruId)}`
+          : role === "pet_parent" && id
+            ? `${baseUrl}/admin/customers/${encodeURIComponent(id)}`
+            : reviewLookup
+              ? `${baseUrl}/admin/account-lifecycle/${encodeURIComponent(reviewLookup)}`
+              : `${baseUrl}/admin/account-lifecycle`;
 
   const subject = `${roleDisplay} signup ${statusLabel}${isPhoneOnly ? " by phone" : ""}: ${name}`;
   const smsMessage = [
@@ -750,7 +765,7 @@ export async function POST(request: NextRequest) {
   ].join("\n");
 
   const html = `
-    <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6;">
+    <div style="font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; color: #0f172a; line-height: 1.6;">
       <h2 style="margin: 0 0 12px;">New ${roleDisplay} basic account created</h2>
       <p><strong>Status:</strong> ${statusLabel}</p>
       <p><strong>Likely issue:</strong> ${issueLabel}</p>

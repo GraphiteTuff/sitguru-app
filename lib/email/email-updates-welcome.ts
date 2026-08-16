@@ -1,4 +1,8 @@
 import { sendSitGuruEmail } from "@/lib/email/resend";
+import {
+  SITGURU_EMAIL_FONT_FAMILY,
+  SITGURU_EMAIL_FONT_HEAD,
+} from "@/lib/email/brand-font";
 
 type WelcomeEmailParams = {
   to: string;
@@ -105,6 +109,7 @@ export function buildEmailUpdatesWelcome(params: WelcomeEmailParams) {
   <meta name="color-scheme" content="light" />
   <meta name="supported-color-schemes" content="light" />
   <title>Welcome to the SitGuru community</title>
+  ${SITGURU_EMAIL_FONT_HEAD}
   <!--[if mso]>
   <noscript>
     <xml>
@@ -115,12 +120,15 @@ export function buildEmailUpdatesWelcome(params: WelcomeEmailParams) {
   </noscript>
   <![endif]-->
   <style>
-    html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; font-family: ${SITGURU_EMAIL_FONT_FAMILY} !important; }
     * { -ms-text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
     table, td { mso-table-lspace: 0pt !important; mso-table-rspace: 0pt !important; }
     img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
     a { text-decoration: none; }
     .email-container { width: 100% !important; max-width: 640px !important; }
+    body, table, td, th, p, a, li, span, div, h1, h2, h3, h4, h5, h6 {
+      font-family: ${SITGURU_EMAIL_FONT_FAMILY} !important;
+    }
     @media only screen and (max-width: 620px) {
       .email-container { width: 100% !important; }
       .stack-column { display: block !important; width: 100% !important; max-width: 100% !important; }
@@ -135,7 +143,7 @@ export function buildEmailUpdatesWelcome(params: WelcomeEmailParams) {
     }
   </style>
 </head>
-<body style="margin:0;padding:0;background:#e8f4ec;width:100%;">
+<body style="margin:0;padding:0;background:#e8f4ec;width:100%;font-family:${SITGURU_EMAIL_FONT_FAMILY};">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">
     Welcome to the SitGuru community, ${safeName} — you’re signed up for email updates.
   </div>
@@ -158,13 +166,13 @@ export function buildEmailUpdatesWelcome(params: WelcomeEmailParams) {
                   </td>
                 </tr>
               </table>
-              <p style="margin:18px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#d9f7e5;font-weight:700;">
+              <p style="margin:18px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#d9f7e5;font-weight:700;">
                 Email updates
               </p>
-              <h1 class="hero-title" style="margin:10px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.22;color:#ffffff;font-weight:700;">
+              <h1 class="hero-title" style="margin:10px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:30px;line-height:1.22;color:#ffffff;font-weight:700;">
                 Welcome to the SitGuru community!
               </h1>
-              <p style="margin:12px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#e8fff3;">
+              <p style="margin:12px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#e8fff3;">
                 Hi ${safeName} — we’re happy to have you here.
               </p>
             </td>
@@ -172,14 +180,14 @@ export function buildEmailUpdatesWelcome(params: WelcomeEmailParams) {
 
           <!-- Body copy -->
           <tr>
-            <td class="body-pad" style="padding:28px 28px 8px;font-family:Arial,Helvetica,sans-serif;color:#123524;font-size:15px;line-height:1.7;">
+            <td class="body-pad" style="padding:28px 28px 8px;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;color:#123524;font-size:15px;line-height:1.7;">
               <p style="margin:0;">
                 You’re officially signed up to receive SitGuru email updates. We’ll keep you informed about:
               </p>
 
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 0;border:1px solid #d7eee0;border-radius:16px;background:#f7fbf8;">
                 <tr>
-                  <td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.65;color:#123524;">
+                  <td style="padding:16px 18px;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:14px;line-height:1.65;color:#123524;">
                     <p style="margin:0 0 8px;">• New SitGuru features and services</p>
                     <p style="margin:0 0 8px;">• Helpful pet-care news and tips</p>
                     <p style="margin:0 0 8px;">• Special offers and announcements</p>
@@ -299,7 +307,7 @@ export function buildEmailUpdatesWelcome(params: WelcomeEmailParams) {
 
           <!-- Footer -->
           <tr>
-            <td class="footer-pad" style="padding:16px 28px 26px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#6b7f74;border-top:1px solid #e6f3eb;">
+            <td class="footer-pad" style="padding:16px 28px 26px;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#6b7f74;border-top:1px solid #e6f3eb;">
               You’re receiving this because you signed up for SitGuru email updates.<br />
               <a href="${preferencesUrl}" style="color:#0D5C3A;font-weight:700;">Manage preferences</a>
               &nbsp;·&nbsp;

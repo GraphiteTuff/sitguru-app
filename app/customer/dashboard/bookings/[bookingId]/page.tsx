@@ -739,7 +739,7 @@ export default async function CustomerBookingDetailsPage({ params }: PageProps) 
       className="min-h-screen bg-[#eef7f2] pb-16 font-light text-slate-950"
       style={{
         fontFamily:
-          '"Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          '"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         fontWeight: 300,
       }}
     >

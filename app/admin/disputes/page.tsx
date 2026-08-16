@@ -331,7 +331,7 @@ function buildDisputeUpdateHtml({
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>SitGuru dispute update</title>
       </head>
-      <body style="margin:0; padding:0; background:#f8fafc; font-family:Arial, Helvetica, sans-serif; color:#111827;">
+      <body style="margin:0; padding:0; background:#f8fafc; font-family:'Plus Jakarta Sans', Arial, Helvetica, sans-serif; color:#111827;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc; margin:0; padding:28px 12px;">
           <tr>
             <td align="center">

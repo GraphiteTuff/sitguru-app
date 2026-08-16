@@ -251,7 +251,7 @@ The SitGuru Team
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${applicantFirstName}, thank you for applying to SitGuru</title>
   </head>
-  <body style="margin:0; padding:0; background:#f4faf5; font-family:Arial, Helvetica, sans-serif; color:#0f172a;">
+  <body style="margin:0; padding:0; background:#f4faf5; font-family:'Plus Jakarta Sans', Arial, Helvetica, sans-serif; color:#0f172a;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4faf5; margin:0; padding:32px 16px;">
       <tr>
         <td align="center">

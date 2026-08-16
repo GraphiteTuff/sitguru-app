@@ -863,7 +863,7 @@ function toHtmlEmail({ body, preview }: { body: string; preview: string }) {
 
   return `<!doctype html>
 <html>
-  <body style="margin:0;padding:0;background:#f6fbf7;font-family:Arial,Helvetica,sans-serif;color:#12312b;">
+  <body style="margin:0;padding:0;background:#f6fbf7;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;color:#12312b;">
     <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${preview}</span>
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6fbf7;padding:28px 12px;">
       <tr>

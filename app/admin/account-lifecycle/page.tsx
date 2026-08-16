@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   Activity,
   AlertTriangle,
@@ -32,6 +34,54 @@ type PageProps = {
     refresh?: string;
   }>;
 };
+
+type PetParentAdminStatus =
+  | "active"
+  | "needs_review"
+  | "incomplete_signup"
+  | "likely_spam"
+  | "archived";
+
+const petParentAdminStatusOptions: {
+  value: PetParentAdminStatus;
+  label: string;
+  description: string;
+  tone: string;
+}[] = [
+  {
+    value: "active",
+    label: "Approve / Mark Active",
+    description:
+      "Treat this as a real Pet Parent and keep them visible in Customer Intelligence.",
+    tone: "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100",
+  },
+  {
+    value: "needs_review",
+    label: "Needs Review",
+    description:
+      "Keep visible for Super Admin follow-up until name, contact, or pets look complete.",
+    tone: "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100",
+  },
+  {
+    value: "incomplete_signup",
+    label: "Incomplete Signup",
+    description:
+      "Signup started but is not ready to count as a completed Pet Parent.",
+    tone: "border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100",
+  },
+  {
+    value: "likely_spam",
+    label: "Likely Spam",
+    description: "Suspicious signup — hide from the main Pet Parent registry.",
+    tone: "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100",
+  },
+  {
+    value: "archived",
+    label: "Archive",
+    description: "Hide from the main Pet Parent registry without deleting Auth.",
+    tone: "border-slate-200 bg-slate-100 text-slate-900 hover:bg-slate-200",
+  },
+];
 
 type ActivityItem = {
   id: string;
@@ -282,6 +332,8 @@ async function findProfile(query: string) {
 
   if (isUuid) {
     request = request.eq("id", clean);
+  } else if (clean.includes("@")) {
+    request = request.ilike("email", clean);
   } else {
     request = request.or(
       `email.ilike.%${clean}%,full_name.ilike.%${clean}%,first_name.ilike.%${clean}%,last_name.ilike.%${clean}%,phone.ilike.%${clean}%`,
@@ -296,6 +348,90 @@ async function findProfile(query: string) {
   }
 
   return ((data || [])[0] || null) as AnyRow | null;
+}
+
+function normalizeAccountRole(value: unknown) {
+  return asString(value)
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function isPetParentRoleValue(value: unknown) {
+  const role = normalizeAccountRole(value);
+  return [
+    "customer",
+    "pet_parent",
+    "petparent",
+    "parent",
+    "client",
+    "both",
+    "customer_guru",
+    "pet_parent_and_guru",
+  ].includes(role);
+}
+
+async function updatePetParentAdminStatusFromLifecycle(formData: FormData) {
+  "use server";
+
+  const customerId = String(formData.get("customerId") || "").trim();
+  const requestedStatus = String(formData.get("adminStatus") || "").trim();
+  const adminNotes = String(formData.get("adminNotes") || "").trim();
+  const returnQuery = String(formData.get("returnQuery") || customerId).trim();
+
+  const allowedStatuses: PetParentAdminStatus[] = [
+    "active",
+    "needs_review",
+    "incomplete_signup",
+    "likely_spam",
+    "archived",
+  ];
+
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      customerId,
+    )
+  ) {
+    redirect("/admin/account-lifecycle?query=invalid-id");
+  }
+
+  if (!allowedStatuses.includes(requestedStatus as PetParentAdminStatus)) {
+    redirect(
+      `/admin/account-lifecycle?query=${encodeURIComponent(returnQuery)}&refresh=${Date.now()}`,
+    );
+  }
+
+  const now = new Date().toISOString();
+  const adminStatus = requestedStatus as PetParentAdminStatus;
+
+  const updatePayload: Record<string, unknown> = {
+    admin_status: adminStatus,
+    admin_notes: adminNotes || null,
+    archived_at: adminStatus === "archived" ? now : null,
+    updated_at: now,
+  };
+
+  if (adminStatus === "active") {
+    updatePayload.is_active = true;
+    updatePayload.is_public_visible = true;
+  } else if (adminStatus === "archived" || adminStatus === "likely_spam") {
+    updatePayload.is_public_visible = false;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("profiles")
+    .update(updatePayload)
+    .eq("id", customerId);
+
+  if (error) {
+    console.warn("Account lifecycle Pet Parent status update failed:", error);
+  }
+
+  revalidatePath("/admin/account-lifecycle");
+  revalidatePath("/admin/customers");
+  revalidatePath(`/admin/customers/${customerId}`);
+  redirect(
+    `/admin/account-lifecycle?query=${encodeURIComponent(returnQuery)}&refresh=${Date.now()}`,
+  );
 }
 
 function buildDerivedActivity({
@@ -776,12 +912,31 @@ export default async function AccountLifecyclePage({
     asString(profile?.role).toLowerCase() === "guru" ||
     asString(profile?.account_type).toLowerCase() === "guru";
 
+  const ambassadorRolePresent =
+    roles.includes("ambassador") ||
+    Boolean(ambassador) ||
+    ["ambassador", "partner", "community_ambassador"].includes(
+      asString(profile?.role).toLowerCase(),
+    ) ||
+    ["ambassador", "partner", "community_ambassador"].includes(
+      asString(profile?.account_type).toLowerCase(),
+    );
+
+  const petParentRolePresent =
+    roles.some((role) => isPetParentRoleValue(role)) ||
+    isPetParentRoleValue(profile?.role) ||
+    isPetParentRoleValue(profile?.account_type) ||
+    // Ambassadors also receive the Pet Parent portal switcher track.
+    ambassadorRolePresent;
+
   const likelyIssueType =
     guruRolePresent && !guru
       ? "role_profile_missing"
-      : guru && (completion?.completion_percentage || 0) < 100
-        ? "incomplete_setup"
-        : completion?.likely_issue_type || "unknown";
+      : ambassadorRolePresent && !ambassador
+        ? "role_profile_missing"
+        : guru && (completion?.completion_percentage || 0) < 100
+          ? "incomplete_setup"
+          : completion?.likely_issue_type || "unknown";
 
   const profileName =
     firstNonEmpty(
@@ -790,20 +945,38 @@ export default async function AccountLifecyclePage({
       guru?.display_name,
       guru?.full_name,
       guru?.name,
+      ambassador?.full_name,
+      ambassador?.display_name,
     ) || "Unnamed account";
 
-  const profileEmail = firstNonEmpty(profile?.email, guru?.email);
+  const profileEmail = firstNonEmpty(
+    profile?.email,
+    guru?.email,
+    ambassador?.email,
+  );
   const profilePhone = firstNonEmpty(
     profile?.phone,
     profile?.phone_number,
     guru?.phone,
     guru?.phone_number,
+    ambassador?.phone,
   );
 
   const guruId = asString(guru?.id);
   const guruHref = guruId
     ? `/admin/gurus/${encodeURIComponent(guruId)}`
     : "/admin/gurus";
+  const ambassadorHref = userId
+    ? `/admin/ambassadors?q=${encodeURIComponent(
+        profileEmail || userId,
+      )}`
+    : "/admin/ambassadors";
+  const customerHref = userId
+    ? `/admin/customers/${encodeURIComponent(userId)}`
+    : "/admin/customers";
+  const petParentAdminStatus = normalizeAccountRole(
+    profile?.admin_status || "needs_review",
+  );
 
   const refreshHref = query
     ? `/admin/account-lifecycle?query=${encodeURIComponent(
@@ -919,20 +1092,36 @@ export default async function AccountLifecyclePage({
             <div>
               <div className="grid gap-2 sm:flex sm:flex-wrap">
                 <Link
-                  href="/admin/gurus"
+                  href={
+                    petParentRolePresent && !guruRolePresent
+                      ? "/admin/customers"
+                      : "/admin/gurus"
+                  }
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                 >
                   <ArrowLeft size={16} />
-                  Back to Guru Management
+                  {petParentRolePresent && !guruRolePresent
+                    ? "Back to Pet Parents"
+                    : "Back to Guru Management"}
                 </Link>
 
-                {profile ? (
+                {profile && guru ? (
                   <Link
                     href={guruHref}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-800 transition hover:bg-emerald-100 sm:w-auto"
                   >
                     <UserRound size={16} />
-                    {guru ? "Open Guru Record" : "Open Guru Management"}
+                    Approve / Open Guru Record
+                  </Link>
+                ) : null}
+
+                {profile && petParentRolePresent ? (
+                  <Link
+                    href={customerHref}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-black text-sky-800 transition hover:bg-sky-100 sm:w-auto"
+                  >
+                    <ShieldCheck size={16} />
+                    Approve / Open Pet Parent
                   </Link>
                 ) : null}
 
@@ -1430,12 +1619,177 @@ export default async function AccountLifecyclePage({
                       className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-100 sm:w-auto"
                     >
                       <UserRound size={16} />
-                      Open Guru Record
+                      Approve / Open Guru Record
+                    </Link>
+                  ) : null}
+
+                  {petParentRolePresent ? (
+                    <Link
+                      href={customerHref}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-black text-sky-800 transition hover:bg-sky-100 sm:w-auto"
+                    >
+                      <ShieldCheck size={16} />
+                      Full Pet Parent Review
+                    </Link>
+                  ) : null}
+
+                  {ambassadorRolePresent ? (
+                    <Link
+                      href={ambassadorHref}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-black text-violet-800 transition hover:bg-violet-100 sm:w-auto"
+                    >
+                      <UserCog size={16} />
+                      Open Ambassador Review
                     </Link>
                   ) : null}
                 </div>
               </div>
             </section>
+
+            {petParentRolePresent ? (
+              <section className="rounded-[2rem] border border-sky-200 bg-sky-50/60 p-5 shadow-sm sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.15em] text-sky-700">
+                      Pet Parent approval
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black text-slate-950">
+                      Review and approve this Pet Parent
+                    </h2>
+                    <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+                      Same Super Admin controls as{" "}
+                      <Link
+                        href={customerHref}
+                        className="font-black text-sky-800 underline underline-offset-2"
+                      >
+                        /admin/customers
+                      </Link>
+                      . Mark Active when the signup is a real Pet Parent.
+                    </p>
+                    <p className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+                      Current admin status:{" "}
+                      <span className="text-slate-800">
+                        {petParentAdminStatus.replace(/_/g, " ") || "needs review"}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {petParentAdminStatusOptions.map((option) => (
+                    <form
+                      key={option.value}
+                      action={updatePetParentAdminStatusFromLifecycle}
+                    >
+                      <input type="hidden" name="customerId" value={userId} />
+                      <input
+                        type="hidden"
+                        name="adminStatus"
+                        value={option.value}
+                      />
+                      <input type="hidden" name="returnQuery" value={query} />
+                      <input
+                        type="hidden"
+                        name="adminNotes"
+                        value={
+                          option.value === "active"
+                            ? "Marked active by Super Admin from account lifecycle."
+                            : option.value === "needs_review"
+                              ? "Marked needs review by Super Admin from account lifecycle."
+                              : option.value === "incomplete_signup"
+                                ? "Marked incomplete signup by Super Admin from account lifecycle."
+                                : option.value === "likely_spam"
+                                  ? "Marked likely spam by Super Admin from account lifecycle."
+                                  : "Archived by Super Admin from account lifecycle."
+                        }
+                      />
+                      <button
+                        type="submit"
+                        className={[
+                          "flex w-full items-start justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-black shadow-sm transition",
+                          option.tone,
+                          petParentAdminStatus === option.value
+                            ? "ring-2 ring-offset-2 ring-slate-300"
+                            : "",
+                        ].join(" ")}
+                      >
+                        <span>
+                          <span className="block">{option.label}</span>
+                          <span className="mt-1 block text-xs font-semibold leading-5 opacity-80">
+                            {option.description}
+                          </span>
+                        </span>
+                        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                      </button>
+                    </form>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {guruRolePresent ? (
+              <section className="rounded-[2rem] border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm sm:p-6">
+                <p className="text-xs font-black uppercase tracking-[0.15em] text-emerald-700">
+                  Guru approval
+                </p>
+                <h2 className="mt-1 text-2xl font-black text-slate-950">
+                  This signup is a Guru account
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+                  Pet Parent Customer Intelligence will not list Guru-only
+                  accounts. Open the Guru record to pre-approve, verify, or make
+                  bookable — the same flow as{" "}
+                  <Link
+                    href="/admin/gurus?queue=pending-reviews"
+                    className="font-black text-emerald-800 underline underline-offset-2"
+                  >
+                    Guru pending reviews
+                  </Link>
+                  .
+                </p>
+                <div className="mt-4">
+                  <Link
+                    href={guruHref}
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white transition hover:bg-emerald-800"
+                  >
+                    <UserRound size={16} />
+                    {guru ? "Open Guru Approve Page" : "Open Guru Management"}
+                  </Link>
+                </div>
+              </section>
+            ) : null}
+
+            {ambassadorRolePresent ? (
+              <section className="rounded-[2rem] border border-violet-200 bg-violet-50/70 p-5 shadow-sm sm:p-6">
+                <p className="text-xs font-black uppercase tracking-[0.15em] text-violet-700">
+                  Ambassador approval
+                </p>
+                <h2 className="mt-1 text-2xl font-black text-slate-950">
+                  This signup includes Ambassador
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+                  Ambassadors also get the Pet Parent portal switcher. Review the
+                  Ambassador workspace here, and use Pet Parent approval above
+                  when that track should be active/public.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link
+                    href={ambassadorHref}
+                    className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-black text-white transition hover:bg-violet-800"
+                  >
+                    <UserCog size={16} />
+                    Open Ambassador Management
+                  </Link>
+                  <Link
+                    href={customerHref}
+                    className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-black text-sky-800 transition hover:bg-sky-100"
+                  >
+                    <ShieldCheck size={16} />
+                    Review Pet Parent Track
+                  </Link>
+                </div>
+              </section>
+            ) : null}
 
             <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <div className="mb-5 flex items-start gap-3">

@@ -8,6 +8,10 @@
  */
 
 import { Resend } from "resend";
+import {
+  SITGURU_EMAIL_FONT_FAMILY,
+  SITGURU_EMAIL_FONT_HEAD,
+} from "@/lib/email/brand-font";
 
 export type PawReportTimelineEvent = {
   /** Display time, e.g. "10:06 AM" */
@@ -209,8 +213,9 @@ export function generatePawReportEmailHtml(summaryData: FinalReportSummaryData |
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="x-ua-compatible" content="ie=edge" />
   <title>${petName}'s PawReport is Ready</title>
+  ${SITGURU_EMAIL_FONT_HEAD}
 </head>
-<body style="margin:0;padding:0;background:#f0fdf4;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<body style="margin:0;padding:0;background:#f0fdf4;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;font-family:${SITGURU_EMAIL_FONT_FAMILY};">
   <!-- Preheader -->
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">
     ${petName}'s walk is complete — ${miles} miles · ${minutes} minutes. View the interactive route map inside.
@@ -224,13 +229,13 @@ export function generatePawReportEmailHtml(summaryData: FinalReportSummaryData |
           <!-- 1. Branding header -->
           <tr>
             <td style="background:#0D5C3A;padding:28px 24px 26px;text-align:left;">
-              <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#ffffff;">
+              <p style="margin:0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:13px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#ffffff;">
                 SitGuru
               </p>
-              <h1 style="margin:14px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;font-weight:700;color:#ffffff;">
+              <h1 style="margin:14px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:28px;line-height:1.2;font-weight:700;color:#ffffff;">
                 ${petName}'s PawReport is Ready! &#128062;
               </h1>
-              <p style="margin:12px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:rgba(255,255,255,0.92);">
+              <p style="margin:12px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:rgba(255,255,255,0.92);">
                 Care by ${guruName} · Trusted pet care, simplified.
               </p>
             </td>
@@ -245,13 +250,13 @@ export function generatePawReportEmailHtml(summaryData: FinalReportSummaryData |
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:16px;">
                       <tr>
                         <td style="padding:18px 14px;text-align:center;">
-                          <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#0D5C3A;">
+                          <p style="margin:0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#0D5C3A;">
                             Miles Traveled
                           </p>
-                          <p style="margin:10px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:30px;line-height:1;font-weight:900;color:#0f172a;">
+                          <p style="margin:10px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:30px;line-height:1;font-weight:900;color:#0f172a;">
                             ${miles}
                           </p>
-                          <p style="margin:6px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;color:#64748b;">
+                          <p style="margin:6px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;color:#64748b;">
                             miles
                           </p>
                         </td>
@@ -262,13 +267,13 @@ export function generatePawReportEmailHtml(summaryData: FinalReportSummaryData |
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:16px;">
                       <tr>
                         <td style="padding:18px 14px;text-align:center;">
-                          <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#0D5C3A;">
+                          <p style="margin:0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#0D5C3A;">
                             Minutes Active
                           </p>
-                          <p style="margin:10px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:30px;line-height:1;font-weight:900;color:#0f172a;">
+                          <p style="margin:10px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:30px;line-height:1;font-weight:900;color:#0f172a;">
                             ${minutes}
                           </p>
-                          <p style="margin:6px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;color:#64748b;">
+                          <p style="margin:6px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;color:#64748b;">
                             minutes
                           </p>
                         </td>
@@ -283,7 +288,7 @@ export function generatePawReportEmailHtml(summaryData: FinalReportSummaryData |
           <!-- 3. Event timeline snapshot -->
           <tr>
             <td style="padding:8px 24px 8px;">
-              <p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:900;color:#0f172a;">
+              <p style="margin:0 0 14px;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:16px;font-weight:900;color:#0f172a;">
                 Walk timeline
               </p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -301,20 +306,20 @@ export function generatePawReportEmailHtml(summaryData: FinalReportSummaryData |
                     <!--[if mso]>
                     <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${ctaUrl}" style="height:52px;v-text-anchor:middle;width:280px;" arcsize="28%" stroke="f" fillcolor="#0D5C3A">
                       <w:anchorlock/>
-                      <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;">
+                      <center style="color:#ffffff;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;">
                         View Full Interactive Route Map
                       </center>
                     </v:roundrect>
                     <![endif]-->
                     <!--[if !mso]><!-- -->
-                    <a href="${ctaUrl}" style="display:inline-block;padding:16px 28px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;border-radius:14px;background:#0D5C3A;line-height:1.2;">
+                    <a href="${ctaUrl}" style="display:inline-block;padding:16px 28px;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:15px;font-weight:800;color:#ffffff;text-decoration:none;border-radius:14px;background:#0D5C3A;line-height:1.2;">
                       View Full Interactive Route Map
                     </a>
                     <!--<![endif]-->
                   </td>
                 </tr>
               </table>
-              <p style="margin:14px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#64748b;line-height:1.5;">
+              <p style="margin:14px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:12px;color:#64748b;line-height:1.5;">
                 Opens your live PawReport route for ${petName}.
               </p>
             </td>
@@ -323,21 +328,21 @@ export function generatePawReportEmailHtml(summaryData: FinalReportSummaryData |
           <!-- 5. Footer compliance -->
           <tr>
             <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:22px 24px 26px;text-align:center;">
-              <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;line-height:1.5;color:#0f172a;">
+              <p style="margin:0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#0f172a;">
                 Thank you for trusting SitGuru!
               </p>
-              <p style="margin:12px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#64748b;">
+              <p style="margin:12px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#64748b;">
                 Questions about this visit?
                 <a href="mailto:${supportEmail}" style="color:#0D5C3A;font-weight:700;text-decoration:none;">Contact support</a>
                 &nbsp;·&nbsp;
                 <a href="https://sitguru.com" style="color:#0D5C3A;font-weight:700;text-decoration:none;">sitguru.com</a>
               </p>
-              <p style="margin:14px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.55;color:#94a3b8;">
+              <p style="margin:14px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:11px;line-height:1.55;color:#94a3b8;">
                 This transactional message was sent because a walk was completed for your SitGuru booking.
                 SitGuru does not sell your personal information. If you received this in error, please contact
                 <a href="mailto:${supportEmail}" style="color:#64748b;">${supportEmail}</a>.
               </p>
-              <p style="margin:12px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#94a3b8;">
+              <p style="margin:12px 0 0;font-family:'Plus Jakarta Sans',Arial,Helvetica,sans-serif;font-size:11px;color:#94a3b8;">
                 © ${new Date().getFullYear()} SitGuru · Trusted pet care, simplified.
               </p>
             </td>

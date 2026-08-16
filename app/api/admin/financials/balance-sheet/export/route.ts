@@ -1047,7 +1047,7 @@ function buildHtml(payload: BalanceSheetExportPayload, mode: "excel" | "word" | 
   <meta charset="utf-8" />
   <title>${escapeHtml(title)}</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 32px; color: #0f172a; background: #f7fbf8; }
+    body { font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; margin: 32px; color: #0f172a; background: #f7fbf8; }
     .page { max-width: 1180px; margin: 0 auto; background: #fff; border: 1px solid #bbf7d0; border-radius: 24px; padding: 28px; }
     .eyebrow { color: #047857; font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
     h1 { margin: 10px 0 8px; font-size: 38px; line-height: 1; color: #16392b; }

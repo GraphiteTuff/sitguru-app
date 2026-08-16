@@ -229,7 +229,7 @@ export default async function AdminIncompleteProfilesPage({ searchParams }: Page
                   <td className="px-4 py-4 text-xs font-semibold text-slate-600">{row.lastContact ? `${asString(row.lastContact.channel)} ${new Date(asString(row.lastContact.created_at)).toLocaleString()}` : "Not contacted"}</td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-2">
-                      <Link href={`/admin/account-lifecycle?query=${encodeURIComponent(row.userId)}`} className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-black text-slate-700">Lifecycle</Link>
+                      <Link href={`/admin/account-lifecycle/${encodeURIComponent(row.userId)}`} className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-black text-slate-700">Lifecycle</Link>
                       <Link href={`/messages/new?to=${encodeURIComponent(row.userId)}`} className="rounded-lg border border-emerald-200 px-2 py-1 text-xs font-black text-emerald-700"><MessageCircle className="mr-1 inline h-3 w-3" />Message</Link>
                       {row.email ? <a href={`mailto:${row.email}?subject=${encodeURIComponent("Need help finishing your SitGuru profile?")}`} className="rounded-lg border border-sky-200 px-2 py-1 text-xs font-black text-sky-700"><Mail className="mr-1 inline h-3 w-3" />Email</a> : null}
                       {row.phone ? <a href={`tel:${row.phone}`} className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-black text-slate-700"><Phone className="mr-1 inline h-3 w-3" />Call</a> : null}

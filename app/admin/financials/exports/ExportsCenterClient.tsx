@@ -1215,7 +1215,7 @@ export default function FinancialExportCenterPage() {
         <head>
           <title>${target === "invoice" ? "SitGuru Invoice" : "SitGuru Purchase Order"}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
+            body { font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; padding: 32px; color: #0f172a; }
             img { max-height: 72px; width: auto; }
             .rounded-\\[1\\.75rem\\] { border-radius: 24px; }
             .border { border: 1px solid #dfe7df; }

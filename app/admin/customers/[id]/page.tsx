@@ -1186,6 +1186,13 @@ async function updatePetParentAdminStatusAction(formData: FormData) {
     updated_at: now,
   };
 
+  if (adminStatus === "active") {
+    updatePayload.is_active = true;
+    updatePayload.is_public_visible = true;
+  } else if (adminStatus === "archived" || adminStatus === "likely_spam") {
+    updatePayload.is_public_visible = false;
+  }
+
   const { error } = await supabaseAdmin
     .from("profiles")
     .update(updatePayload)
@@ -1343,6 +1350,11 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
     name || email || phone || relatedCustomerId || lookupKey,
   )}`;
   const role = getText(profile, ["role", "user_role", "account_type"], "customer");
+  const normalizedRole = role.toLowerCase().replace(/[\s-]+/g, "_");
+  const isGuruOnlyProfile =
+    ["guru", "sitter", "provider", "walker"].includes(normalizedRole);
+  const isDualRoleProfile =
+    ["both", "customer_guru", "pet_parent_and_guru"].includes(normalizedRole);
   const source = getText(
     profile,
     [
@@ -1532,6 +1544,60 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
               </Link>
             </div>
           </div>
+
+          {isDualRoleProfile ? (
+            <div className="mt-5 rounded-3xl border border-sky-200 bg-sky-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-sky-700">
+                Dual-role signup
+              </p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-sky-950">
+                This account has Pet Parent + Guru (role switcher). Approve the
+                Pet Parent track here, then open Guru Management for Guru
+                approve / bookable controls.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  href={`/admin/account-lifecycle/${encodeURIComponent(relatedCustomerId || lookupKey)}`}
+                  className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-white px-3 py-2 text-xs font-black text-sky-900 transition hover:bg-sky-100"
+                >
+                  Open Account Lifecycle
+                </Link>
+                <Link
+                  href={`/admin/gurus?q=${encodeURIComponent(email || name || relatedCustomerId || lookupKey)}`}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-800"
+                >
+                  Open Guru Management
+                </Link>
+              </div>
+            </div>
+          ) : null}
+
+          {isGuruOnlyProfile ? (
+            <div className="mt-5 rounded-3xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                Guru signup detected
+              </p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-emerald-950">
+                This account signed up as a Guru, so it will not appear in the Pet
+                Parent Customer Intelligence list. Approve bookable status from
+                Guru Management instead.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  href={`/admin/account-lifecycle/${encodeURIComponent(relatedCustomerId || lookupKey)}`}
+                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+                >
+                  Open Account Lifecycle
+                </Link>
+                <Link
+                  href={`/admin/gurus?q=${encodeURIComponent(email || name || relatedCustomerId || lookupKey)}`}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-800"
+                >
+                  Open Guru Management
+                </Link>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {!profile && authUser ? (

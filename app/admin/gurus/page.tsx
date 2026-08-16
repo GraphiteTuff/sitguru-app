@@ -672,8 +672,16 @@ function normalizeRoleLabel(value: unknown) {
   if (normalized === "ambassador") return "Ambassador";
   if (normalized === CANONICAL_ROLE.PET_PARENT) return PET_PARENT_DISPLAY_LABEL;
 
-  const raw = asTrimmedString(value).toLowerCase();
-  if (["customer", "parent", "petparent", "pet_parent"].includes(raw)) {
+  const raw = asTrimmedString(value).toLowerCase().replace(/[\s-]+/g, "_");
+  if (
+    [
+      "customer",
+      "parent",
+      "petparent",
+      "pet_parent",
+      "client",
+    ].includes(raw)
+  ) {
     return PET_PARENT_DISPLAY_LABEL;
   }
   if (["ambassador", "partner", "community_ambassador"].includes(raw)) {
@@ -681,6 +689,24 @@ function normalizeRoleLabel(value: unknown) {
   }
   if (["guru", "sitter", "provider", "walker"].includes(raw)) return "Guru";
   return "";
+}
+
+function isDualRoleProfileValue(value: unknown) {
+  const raw = asTrimmedString(value).toLowerCase().replace(/[\s-]+/g, "_");
+  return [
+    "both",
+    "customer_guru",
+    "customer-guru",
+    "pet_parent_and_guru",
+    "pet_parent_guru",
+    "parent_and_guru",
+    "ambassador_and_parent",
+    "pet_parent_and_ambassador",
+    "customer_ambassador",
+    "parent_ambassador",
+    "guru_ambassador",
+    "ambassador_guru",
+  ].includes(raw);
 }
 
 function getRoleBadges({
@@ -700,12 +726,24 @@ function getRoleBadges({
   if (hasGuruWorkspace) roles.add("Guru");
 
   for (const role of roleMap.get(userId) || []) {
+    if (isDualRoleProfileValue(role)) {
+      roles.add("Guru");
+      roles.add(PET_PARENT_DISPLAY_LABEL);
+      continue;
+    }
     const label = normalizeRoleLabel(role);
     if (label) roles.add(label);
   }
 
-  const profileRole = normalizeRoleLabel(profile?.role || profile?.account_type);
-  if (profileRole) roles.add(profileRole);
+  const profileRoleRaw = profile?.role || profile?.account_type;
+  if (isDualRoleProfileValue(profileRoleRaw)) {
+    roles.add("Guru");
+    roles.add(PET_PARENT_DISPLAY_LABEL);
+  } else {
+    const profileRole = normalizeRoleLabel(profileRoleRaw);
+    if (profileRole) roles.add(profileRole);
+  }
+
   if (ambassadorUserIds.has(userId)) roles.add("Ambassador");
 
   const order = ["Guru", PET_PARENT_DISPLAY_LABEL, "Ambassador"];
@@ -1373,7 +1411,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       lastActivity: formatDateShort(
         authUser?.last_sign_in_at || asTrimmedString(profile?.updated_at),
       ),
-      href: `/admin/account-lifecycle?query=${encodeURIComponent(userId)}`,
+      href: `/admin/account-lifecycle/${encodeURIComponent(userId)}`,
       publicHref: "/search",
       inferredFromFallback: true,
       recordSourceLabel: "Guru role without workspace",

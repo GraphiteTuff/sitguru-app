@@ -266,8 +266,18 @@ function getInitials(name: string) {
 }
 
 function getLocation(row: AnyRow | null | undefined) {
-  const city = getText(row, ["city", "customer_city", "location_city"]);
-  const state = getText(row, ["state", "state_code", "customer_state"]);
+  const city = getText(row, [
+    "city",
+    "service_city",
+    "customer_city",
+    "location_city",
+  ]);
+  const state = getText(row, [
+    "state",
+    "service_state",
+    "state_code",
+    "customer_state",
+  ]);
 
   return [city, state].filter(Boolean).join(", ");
 }

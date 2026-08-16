@@ -770,6 +770,8 @@ async function saveGuruPayload({
         .limit(1);
 
       if (!response.error && response.data?.[0]) {
+        // Multi-role accounts share city/state/ZIP across Guru + Pet Parent.
+        await syncSharedLocationToProfile(userId, attempt);
         return response.data[0] as GuruProfile;
       }
 
@@ -790,6 +792,7 @@ async function saveGuruPayload({
       .limit(1);
 
     if (!response.error && response.data?.[0]) {
+      await syncSharedLocationToProfile(userId, attempt);
       return response.data[0] as GuruProfile;
     }
 
@@ -797,6 +800,63 @@ async function saveGuruPayload({
   }
 
   throw new Error(lastError);
+}
+
+async function syncSharedLocationToProfile(
+  userId: string,
+  payload: Record<string, unknown>,
+) {
+  const city = String(payload.service_city || payload.city || "").trim();
+  const state = String(payload.service_state || payload.state || "").trim();
+  const zip = String(
+    payload.service_zip_code ||
+      payload.service_zip ||
+      payload.zip_code ||
+      payload.postal_code ||
+      "",
+  ).trim();
+  const guruIsPublic =
+    payload.is_public === true || payload.is_public_visible === true;
+
+  if (!city && !state && !zip && !guruIsPublic) return;
+
+  const label = [city, state].filter(Boolean).join(", ");
+  const locationUpdate: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (city) {
+    locationUpdate.city = city;
+    locationUpdate.service_city = city;
+  }
+  if (state) {
+    locationUpdate.state = state;
+    locationUpdate.service_state = state;
+  }
+  if (zip) {
+    locationUpdate.zip_code = zip;
+    locationUpdate.service_zip = zip;
+    locationUpdate.service_zip_code = zip;
+  }
+  if (label) {
+    locationUpdate.service_area = label;
+    locationUpdate.service_location_label = label;
+  }
+  // Multi-role: if the Guru workspace is public, keep the shared Pet Parent
+  // profile publicly visible too.
+  if (guruIsPublic) {
+    locationUpdate.is_public_visible = true;
+    locationUpdate.is_active = true;
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update(locationUpdate)
+    .eq("id", userId);
+
+  if (error) {
+    console.warn("Shared location sync to profiles skipped:", error.message);
+  }
 }
 
 function GuruProfileLoadingFallback() {

@@ -164,7 +164,7 @@ async function sendAdminNewMessageEmail(params: {
       replyTo: getSupportReplyToEmail(),
       subject: `New SitGuru message: ${params.customerDisplayName || "Pet Parent"}`,
       html: `
-        <div style="font-family: Arial, sans-serif; background: #f6fbf7; padding: 24px;">
+        <div style="font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; background: #f6fbf7; padding: 24px;">
           <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 18px; overflow: hidden; border: 1px solid #dcefe2;">
             <div style="background: #0f5132; color: #ffffff; padding: 22px 24px;">
               <h1 style="margin: 0; font-size: 22px;">New SitGuru Message</h1>
