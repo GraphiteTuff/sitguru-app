@@ -383,15 +383,9 @@ export default function ProviderMap({
 
       <div className="border-t border-slate-100 bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-sm font-black text-slate-950">
-              Your next Guru is closer than you think.
-            </p>
-            <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
-              {usableMarkers.length} Guru
-              {usableMarkers.length === 1 ? "" : "s"} on the map.
-            </p>
-          </div>
+          <p className="text-sm font-black text-slate-950">
+            Your next Guru is closer than you think.
+          </p>
 
           <div className="shrink-0 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-black text-emerald-800">
             Ready when you are

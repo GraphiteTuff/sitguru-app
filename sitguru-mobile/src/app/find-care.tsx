@@ -1362,6 +1362,39 @@ export default function FindCareScreen() {
 
               {activeView === "list" ? (
                 <>
+                  <View style={styles.listMapStage}>
+                    <CoverageMap
+                      highlightedGuruId={highlightedGuruId}
+                      isDark={isDark}
+                      mapPoints={mapPoints}
+                      mapRegion={mapRegion}
+                      onMarkerLeave={() => setHighlightedGuruId(null)}
+                      onMarkerOpen={(guru) => {
+                        handleSelectGuru(guru);
+                        setIsMapPreviewExpanded(true);
+                        setActiveView("map");
+                      }}
+                      onMarkerPress={(guru) => {
+                        handleSelectGuru(guru);
+                        setIsMapPreviewExpanded(false);
+                      }}
+                      onRegionChange={setMapRegion}
+                      palette={palette}
+                      styles={styles}
+                      userCoordinate={
+                        homeLocation?.latitude !== null &&
+                        homeLocation?.latitude !== undefined &&
+                        homeLocation?.longitude !== null &&
+                        homeLocation?.longitude !== undefined
+                          ? {
+                              latitude: homeLocation.latitude,
+                              longitude: homeLocation.longitude,
+                            }
+                          : null
+                      }
+                    />
+                  </View>
+
                   <View style={styles.recommendedSection}>
                     <View style={styles.recommendedTop}>
                       <View style={styles.recommendedCopy}>
@@ -1587,16 +1620,6 @@ export default function FindCareScreen() {
                       </Text>
                     </Pressable>
                   ) : null}
-
-                  <View style={styles.mapGuruCountBadge}>
-                    <View style={styles.mapGuruCountPaw}>
-                      <Text style={styles.mapGuruCountPawText}>🐾</Text>
-                    </View>
-                    <Text style={styles.mapGuruCountNumber}>
-                      {mapPoints.length}
-                    </Text>
-                    <Text style={styles.mapGuruCountLabel}>Gurus</Text>
-                  </View>
 
                   <View style={styles.mapUtilityStack}>
                     <Pressable
@@ -5303,6 +5326,16 @@ function createStyles(isDark: boolean) {
       backgroundColor: palette.mapWater,
       height: 566,
       marginHorizontal: -18,
+      overflow: "hidden",
+      position: "relative",
+    },
+    listMapStage: {
+      backgroundColor: palette.mapWater,
+      borderColor: palette.cardBorder,
+      borderRadius: 28,
+      borderWidth: 1,
+      height: 300,
+      marginBottom: 18,
       overflow: "hidden",
       position: "relative",
     },

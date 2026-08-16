@@ -2325,8 +2325,6 @@ function SearchPageContent() {
 
   const mapReadyGuruCount = providerMapMarkers.length;
 
-  const mapMissingLocationCount = filteredGurus.length - mapReadyGuruCount;
-
   useEffect(() => {
     if (loading) return;
 
@@ -2655,10 +2653,6 @@ function SearchPageContent() {
               ) : null}
 
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
-                {mapReadyGuruCount} on the map
-              </span>
-
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
                 {activeFilterCount} active filter
                 {activeFilterCount === 1 ? "" : "s"}
               </span>
@@ -2697,7 +2691,42 @@ function SearchPageContent() {
             <p className="text-slate-600">Finding local Gurus for you...</p>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_460px]">
+          <div className="space-y-6">
+            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <h2 className="text-lg font-bold text-slate-900">
+                  Care is closer with SitGuru
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-600">
+                  Friendly Pet Gurus are ready when you are.
+                </p>
+
+                {zipLookupStatus === "found" && zipLookup ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
+                      Centered on {zipLookup.zip}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="h-[420px] sm:h-[520px] lg:h-[560px]">
+                <ProviderMap
+                  markers={providerMapMarkers as unknown as Record<string, unknown>[]}
+                  center={
+                    cleanZip(zipFilter) ||
+                    cityFilter.trim() ||
+                    stateFilter.trim()
+                      ? mapCenter
+                      : undefined
+                  }
+                  highlightedMarkerId={highlightedGuruId}
+                  highlightedMarkerPosition={highlightedGuruPosition}
+                />
+              </div>
+            </div>
+
             <div className="space-y-5">
               {filteredGurus.length === 0 ? (
                 <Card className="p-7">
@@ -3033,54 +3062,6 @@ function SearchPageContent() {
                 })
               )}
             </div>
-
-            <div className="xl:sticky xl:top-28 xl:self-start">
-              <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
-                <div className="border-b border-slate-200 px-5 py-4">
-                  <h2 className="text-lg font-bold text-slate-900">
-                    Care is closer with SitGuru
-                  </h2>
-
-                  <p className="mt-1 text-sm text-slate-600">
-                    Friendly Pet Gurus are ready when you are.
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                      {mapReadyGuruCount} on the map
-                    </span>
-
-                    {zipLookupStatus === "found" && zipLookup ? (
-                      <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
-                        Centered on {zipLookup.zip}
-                      </span>
-                    ) : null}
-
-                    {mapMissingLocationCount > 0 ? (
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
-                        {mapMissingLocationCount} missing location
-                        {mapMissingLocationCount === 1 ? "" : "s"}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="h-[420px] sm:h-[520px] xl:h-[calc(100vh-9rem)] xl:min-h-[520px] xl:max-h-[720px]">
-                  <ProviderMap
-                    markers={providerMapMarkers as unknown as Record<string, unknown>[]}
-                    center={
-                      cleanZip(zipFilter) ||
-                      cityFilter.trim() ||
-                      stateFilter.trim()
-                        ? mapCenter
-                        : undefined
-                    }
-                    highlightedMarkerId={highlightedGuruId}
-                    highlightedMarkerPosition={highlightedGuruPosition}
-                  />
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </section>
@@ -3164,24 +3145,22 @@ function SearchPageFallback() {
       </section>
 
       <section className="mx-auto max-w-[1500px] px-5 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_460px]">
+        <div className="space-y-6">
+          <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h2 className="text-lg font-bold text-slate-900">Map view</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Loading locations...
+              </p>
+            </div>
+
+            <div className="h-[420px] bg-slate-100 sm:h-[520px] lg:h-[560px]" />
+          </div>
+
           <div className="space-y-5">
             <Card className="p-7">
               <p className="text-slate-600">Finding local Gurus for you...</p>
             </Card>
-          </div>
-
-          <div className="xl:sticky xl:top-28 xl:self-start">
-            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
-              <div className="border-b border-slate-200 px-5 py-4">
-                <h2 className="text-lg font-bold text-slate-900">Map view</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Loading locations...
-                </p>
-              </div>
-
-              <div className="h-[420px] bg-slate-100 sm:h-[520px] xl:h-[calc(100vh-9rem)] xl:min-h-[520px] xl:max-h-[720px]" />
-            </div>
           </div>
         </div>
       </section>
