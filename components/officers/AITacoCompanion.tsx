@@ -63,27 +63,34 @@ const ONBOARDING_CHIPS = [
     prompt: TACO_BENEFITS_CHIP.prompt,
   },
   {
+    id: "what_ambassadors_do",
+    label: "What you do",
+    prompt: "What do Ambassadors do?",
+  },
+  {
     id: "petperks_rewards",
-    label: "$10–$20 PetPerks",
-    prompt:
-      "Tell me about the $10 to $20 PetPerks rewards Ambassadors can claim and how to earn them.",
+    label: "PetPerks",
+    prompt: "What is PetPerks for Ambassadors?",
   },
   {
     id: "referral_link",
     label: "Referral Link",
-    prompt:
-      "How do I get my personalized referral link and QR code after I sign up?",
+    prompt: "How do I get my referral link and QR code?",
+  },
+  {
+    id: "who_can_apply",
+    label: "Who can apply?",
+    prompt: "Who can become a SitGuru Ambassador?",
+  },
+  {
+    id: "followers",
+    label: "Need followers?",
+    prompt: "Do I need a huge social following?",
   },
   {
     id: "track_metrics",
     label: "Track Metrics",
-    prompt:
-      "What metrics can I track from my Ambassador workspace dashboard once I'm in?",
-  },
-  {
-    id: "what_ambassadors_do",
-    label: "What you do",
-    prompt: "What do Ambassadors do?",
+    prompt: "What metrics can I track as an Ambassador?",
   },
 ] as const;
 
@@ -91,8 +98,7 @@ const WORKSPACE_CHIPS = [
   {
     id: "referrals",
     label: "My Referrals",
-    prompt:
-      "Summarize my referral activity and what I should focus on to grow the pack this week.",
+    prompt: "Where do I see my referrals?",
   },
   {
     id: TACO_BENEFITS_CHIP.id,
@@ -102,19 +108,22 @@ const WORKSPACE_CHIPS = [
   {
     id: "petperks_rewards",
     label: "PetPerks",
-    prompt:
-      "How am I doing on PetPerks rewards, and how do I claim $10 to $20 rewards?",
+    prompt: "How do PetPerks rewards work for me?",
   },
   {
     id: "link_clicks",
     label: "Link Clicks",
-    prompt:
-      "Check my referral link performance and give me one tip to get more clicks.",
+    prompt: "How do I share my referral link?",
   },
   {
     id: "what_ambassadors_do",
     label: "Role refresh",
     prompt: "What do Ambassadors do?",
+  },
+  {
+    id: "track_metrics",
+    label: "Metrics",
+    prompt: "What metrics can I track as an Ambassador?",
   },
 ] as const;
 

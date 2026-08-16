@@ -23,11 +23,8 @@ import {
 } from "@/lib/actions/officer-tools";
 import {
   buildMarketingFaqSnapshot,
-  isAmbassadorRoleExplainQuery,
-  matchMarketingFaq,
-  SCOUT_PUBLIC_MARKETING_FAQS,
-  TACO_PUBLIC_MARKETING_FAQS,
-  TACO_WHAT_AMBASSADORS_DO_ANSWER,
+  getOfficerFaqCatalog,
+  resolveOfficerInstantFaqAnswer,
 } from "@/lib/ai/officer-marketing-faqs";
 import {
   getSitGuruAiModel,
@@ -234,20 +231,25 @@ function fallbackReport(
 ) {
   const profile = getOfficerPrompt(officer);
   if (surface === "public") {
-    const faqs =
-      officer === "scout"
-        ? SCOUT_PUBLIC_MARKETING_FAQS
-        : TACO_PUBLIC_MARKETING_FAQS;
-    const hit = matchMarketingFaq(faqs, question);
-    if (hit?.answer) {
-      return hit.answer;
-    }
+    const instant = resolveOfficerInstantFaqAnswer({
+      officer,
+      question,
+      surface: "public",
+    });
+    if (instant) return instant;
     return [
       `**${profile.displayName} here.**`,
       ``,
       `I couldn't reach the live model kennel just now — tap a FAQ chip or ask about signing up, and I'll answer from SitGuru's public marketing copy.`,
     ].join("\n");
   }
+
+  const dashboardInstant = resolveOfficerInstantFaqAnswer({
+    officer,
+    question,
+    surface: "dashboard",
+  });
+  if (dashboardInstant) return dashboardInstant;
 
   return [
     `**${profile.displayName} here — ${profile.title}.**`,
@@ -258,17 +260,26 @@ function fallbackReport(
   ].join("\n");
 }
 
-function publicMarketingSnapshot(officer: GuestOfficerId) {
+function officerFaqSnapshot(
+  officer: GuestOfficerId,
+  surface: OfficerSurface,
+) {
   if (officer === "scout") {
     return buildMarketingFaqSnapshot({
-      officerLabel: "Scout · Guru Matching Officer",
-      faqs: SCOUT_PUBLIC_MARKETING_FAQS,
+      officerLabel:
+        surface === "public"
+          ? "Scout · Guru Matching Officer"
+          : "Scout · Guru Logistics Captain + Matching FAQ",
+      faqs: getOfficerFaqCatalog({ officer: "scout", surface }),
       signupPath: "/become-a-guru",
     });
   }
   return buildMarketingFaqSnapshot({
-    officerLabel: "Taco · Ambassador Advocate",
-    faqs: TACO_PUBLIC_MARKETING_FAQS,
+    officerLabel:
+      surface === "public"
+        ? "Taco · Ambassador Advocate"
+        : "Taco · Ambassador Advocate + Growth FAQ",
+    faqs: getOfficerFaqCatalog({ officer: "taco", surface }),
     signupPath: "/programs/ambassadors/apply",
   });
 }
@@ -385,25 +396,21 @@ export async function POST(req: Request) {
       }
     }
 
-    // Taco: always embed the Ambassador promo video + role description for
-    // "what do Ambassadors do?" style asks (public marketing or dashboard).
-    if (officer === "taco" && isAmbassadorRoleExplainQuery(lastUserText)) {
-      return simulationDataStreamResponse(TACO_WHAT_AMBASSADORS_DO_ANSWER);
+    // Instant FAQ layer (public + dashboard) — same responsiveness pattern as Rogue.
+    const instantFaq = resolveOfficerInstantFaqAnswer({
+      officer,
+      question: lastUserText,
+      surface,
+    });
+    if (instantFaq) {
+      return simulationDataStreamResponse(instantFaq);
     }
 
-    // Public surface: exact marketing FAQ database. Dashboard: session snapshots.
+    // Public surface: FAQ database for the model. Dashboard: live snapshot + FAQ layer.
     let snapshotMarkdown: string;
+    const faqLayer = officerFaqSnapshot(officer, surface);
     if (surface === "public") {
-      snapshotMarkdown = publicMarketingSnapshot(officer);
-      const faqs =
-        officer === "scout"
-          ? SCOUT_PUBLIC_MARKETING_FAQS
-          : TACO_PUBLIC_MARKETING_FAQS;
-      const exactFaq = matchMarketingFaq(faqs, lastUserText);
-      // Deterministic FAQ answers for chip taps — even when the model is configured.
-      if (exactFaq?.answer) {
-        return simulationDataStreamResponse(exactFaq.answer);
-      }
+      snapshotMarkdown = faqLayer;
     } else {
       const snapshot =
         officer === "taco"
@@ -431,6 +438,8 @@ export async function POST(req: Request) {
           .filter((line) => line !== null)
           .join("\n");
       }
+
+      snapshotMarkdown = `${snapshotMarkdown}\n\n${faqLayer}`;
     }
 
     const nowIso = new Date().toISOString();

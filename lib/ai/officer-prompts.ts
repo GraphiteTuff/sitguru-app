@@ -225,7 +225,7 @@ PUBLIC MARKETING MODE (unauthenticated guests allowed):
 - You are helping visitors on /become-a-guru and Guru onboarding pages sign up and understand Guru basics.
 - Title vibe: Guru Matching Officer — mature, knowledgeable, empathetic trust/care tone.
 - When the visitor asks a question that matches the MARKETING FAQ DATABASE, reply with the exact answer string provided — do not paraphrase FAQ answers.
-- For "Is it free to apply?" and "How do payments work?" / "How do payments and payouts work?" always use the exact FAQ answer text.
+- For free-to-apply, payments/payouts, services, rates, schedule, experience, after-apply, and start-profile asks, prefer the exact FAQ answer text.
 - Never invent rates, payout amounts, or unpublished policies.
 - Never require a session token. Never mention missing auth/session errors to the guest.
 - Soft CTA: guide them to Start Free Guru Profile at /become-a-guru or /guru/signup when ready.
@@ -237,10 +237,17 @@ PUBLIC MARKETING MODE (unauthenticated guests allowed):
 - You are helping visitors on /ambassadors, affiliate, and Ambassador program pages understand growth roles.
 - When the visitor asks a question that matches the MARKETING FAQ DATABASE, reply with the exact answer string provided — do not paraphrase FAQ answers.
 - WHAT DO AMBASSADORS DO / ROLE / VIDEO ASKS: use the exact "What do Ambassadors do?" FAQ answer and ALWAYS append [[ambassador_video_card]] so the in-chat promo video + description card renders. Never skip the marker.
+- For PetPerks, referral link/QR, eligibility, followers, apply steps, and metrics asks, prefer the exact FAQ answer text.
 - Never invent earnings, commissions, or guaranteed rewards.
 - Never require a session token. Never mention missing auth/session errors to the guest.
 - Soft CTA: guide them to /programs/ambassadors/apply when they are ready to join.
 - Keep casual replies under 3 sentences unless they ask for a digest. Cute/trendy Ambassador hype is welcome.
+`.trim();
+
+const DASHBOARD_FAQ_ADDENDUM = `
+DASHBOARD FAQ LAYER:
+- A FAQ DATABASE is injected alongside the live snapshot. When the user asks a matching FAQ (profile, availability, PawReport, payouts, referrals, PetPerks, role refresh), use the exact FAQ answer string.
+- For live schedule / referral digests that need personal numbers, use the live snapshot — do not invent counts.
 `.trim();
 
 /**
@@ -256,18 +263,20 @@ export function buildOfficerSystemPrompt(opts: {
 }) {
   const profile = getOfficerPrompt(opts.officerId);
   const surface = opts.surface === "public" ? "public" : "dashboard";
-  const publicAddendum =
+  const surfaceAddendum =
     surface === "public"
       ? opts.officerId === "scout"
         ? PUBLIC_SCOUT_SYSTEM_ADDENDUM
         : opts.officerId === "taco"
           ? PUBLIC_TACO_SYSTEM_ADDENDUM
           : ""
-      : "";
+      : opts.officerId === "scout" || opts.officerId === "taco"
+        ? DASHBOARD_FAQ_ADDENDUM
+        : "";
 
   return [
     profile.systemPrompt,
-    publicAddendum,
+    surfaceAddendum,
     "",
     "TEMPORAL CONTEXT:",
     `- Current UTC datetime: ${opts.nowIso}`,
@@ -277,7 +286,7 @@ export function buildOfficerSystemPrompt(opts: {
     "",
     surface === "public"
       ? "MARKETING FAQ DATABASE (exact page copy — prefer verbatim answers):"
-      : "DATA SNAPSHOT (read-only, session-scoped, defensive):",
+      : "LIVE SNAPSHOT + FAQ DATABASE (prefer exact FAQ strings when matched; else use snapshot):",
     opts.snapshotMarkdown || "_No live snapshot rows available._",
   ]
     .filter(Boolean)

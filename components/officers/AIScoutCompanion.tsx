@@ -60,6 +60,16 @@ const WORKSPACE_CHIPS = [
     prompt:
       "Check my provider payout cache — is Stripe/PayPal ready, and are any recent visit payouts still pending?",
   },
+  {
+    id: "update_profile",
+    label: "Update Profile",
+    prompt: "How do I update my Guru profile?",
+  },
+  {
+    id: "pawreport",
+    label: "PawReport",
+    prompt: "What is PawReport Live?",
+  },
 ] as const;
 
 const PUBLIC_CHIPS = [
@@ -83,6 +93,21 @@ const PUBLIC_CHIPS = [
     id: "payments_work",
     label: "Payments",
     prompt: "How do payments work?",
+  },
+  {
+    id: "services_offer",
+    label: "Services",
+    prompt: "What services can I offer?",
+  },
+  {
+    id: "set_rates",
+    label: "My rates",
+    prompt: "Can I set my own rates?",
+  },
+  {
+    id: "after_apply",
+    label: "After I apply",
+    prompt: "What happens after I apply?",
   },
 ] as const;
 
