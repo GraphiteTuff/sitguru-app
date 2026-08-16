@@ -8,7 +8,7 @@ import {
   SupportToastStack,
   useSupportToasts,
 } from "@/components/admin/support/SupportToast";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/utils/supabase/client";
 import type { SupportAdminOption } from "@/lib/admin/support/data";
 import type {
   SupportCase,

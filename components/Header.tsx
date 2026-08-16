@@ -767,7 +767,7 @@ export default function Header({ user = null }: HeaderProps) {
       : isAdmin
         ? [
             { label: "Dashboard", href: "/admin" },
-            { label: "Update Profile", href: "/admin/profile" },
+            { label: "Update Profile", href: "/admin/settings" },
             { label: "Messages", href: "/admin/messages" },
             { label: "Pet Parents", href: "/admin/customers" },
             { label: "Gurus", href: "/admin/gurus" },

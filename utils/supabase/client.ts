@@ -22,4 +22,18 @@ export function createClient() {
   return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
 
-export const supabase = createClient();
+/** Lazy singleton — avoid eager createClient() throwing on import. */
+let browserClient: ReturnType<typeof createClient> | null = null;
+
+export function getSupabaseBrowserClient() {
+  if (!browserClient) browserClient = createClient();
+  return browserClient;
+}
+
+export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+  get(_target, prop, receiver) {
+    const client = getSupabaseBrowserClient();
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
