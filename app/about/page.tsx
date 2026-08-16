@@ -293,10 +293,7 @@ export default function AboutPage() {
         </div>
       </div>
 
-      <section
-        data-brand-green
-        className="public-dark-section relative overflow-hidden bg-[#0D5C3A]"
-      >
+      <section className="relative overflow-hidden bg-[#0D5C3A]">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl" />
           <div className="absolute -bottom-32 right-0 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
@@ -305,7 +302,10 @@ export default function AboutPage() {
         </div>
 
         <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:px-8 lg:py-20">
-          <div>
+          <div
+            data-brand-green
+            className="public-dark-section"
+          >
             <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] !text-white backdrop-blur">
               <Image
                 src="/images/sitguru-logo-cropped.png"
@@ -356,7 +356,7 @@ export default function AboutPage() {
                   sizes="(max-width: 1024px) 100vw, 40vw"
                 />
               </div>
-              <div className="p-5 sm:p-6">
+              <div className="bg-white p-5 sm:p-6">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
                   Meet Rogue
                 </p>
