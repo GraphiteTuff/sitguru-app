@@ -12,6 +12,10 @@ import {
 } from "@/lib/config/trust-safety";
 import { isPubliclyVisibleGuruProfile, asOptionalBoolean } from "@/lib/gurus/public-visibility";
 import { enrichAndPersistLocationFromZip } from "@/lib/location/enrich-from-zip";
+import {
+  findAuthMetadataAvatarUrl,
+  persistGuruAvatarFromAuth,
+} from "@/lib/gurus/enrich-avatar-from-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -1592,6 +1596,37 @@ async function hydrateGuruProfilePhotoFields(
     return mergeGuruProfilePhoto(
       guruProfileWithAccountNames,
       profileFallback.imageUrl,
+    );
+  }
+
+  // Admin already falls back to Google/OAuth metadata; public profiles should too.
+  // Persist so Find Care search/map cards pick up the same photo.
+  const authAvatarUrl = await findAuthMetadataAvatarUrl(
+    guruProfileWithAccountNames.user_id ||
+      guruProfileWithAccountNames.profile_id ||
+      (profile?.id != null ? String(profile.id) : null) ||
+      (guruProfileWithAccountNames.id != null
+        ? String(guruProfileWithAccountNames.id)
+        : null),
+  );
+
+  if (authAvatarUrl) {
+    await persistGuruAvatarFromAuth({
+      avatarUrl: authAvatarUrl,
+      guruId:
+        guruProfileWithAccountNames.id != null
+          ? String(guruProfileWithAccountNames.id)
+          : null,
+      profileId:
+        guruProfileWithAccountNames.user_id ||
+        guruProfileWithAccountNames.profile_id ||
+        (profile?.id != null ? String(profile.id) : null) ||
+        null,
+    });
+
+    return mergeAccountProfileAvatar(
+      guruProfileWithAccountNames,
+      authAvatarUrl,
     );
   }
 
