@@ -142,11 +142,24 @@ export default function AdminMessageComposer({
     );
   const [externalName, setExternalName] = useState(intent.recipientName || "");
   const [externalEmail, setExternalEmail] = useState(intent.recipientEmail || "");
-  const [senderOptions, setSenderOptions] = useState<ComposeDirectoryPerson[]>([]);
-  const [brandSender, setBrandSender] = useState<ComposeDirectoryPerson | null>(
-    null,
-  );
+  const [senderOptions, setSenderOptions] = useState<ComposeDirectoryPerson[]>([
+    {
+      id: currentUser.id,
+      name: currentUser.name || currentUser.email || "SitGuru Admin",
+      email: currentUser.email,
+      role: "admin",
+      subtitle: `SitGuru Admin · ${currentUser.email}`,
+    },
+  ]);
+  const [brandSender, setBrandSender] = useState<ComposeDirectoryPerson | null>({
+    id: "sitguru-support",
+    name: "SitGuru Support",
+    email: "support@sitguru.com",
+    role: "brand",
+    subtitle: "Official SitGuru outbound identity",
+  });
   const [senderId, setSenderId] = useState(currentUser.id);
+  const [directoryError, setDirectoryError] = useState("");
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
   const [showCcBcc, setShowCcBcc] = useState(false);
@@ -182,10 +195,19 @@ export default function AdminMessageComposer({
       try {
         const response = await fetch(
           "/api/admin/messages/compose-directory?kind=senders&limit=80",
+          { credentials: "same-origin" },
         );
-        const payload = await response.json();
-        if (!response.ok || !payload?.ok || cancelled) return;
+        const payload = await response.json().catch(() => null);
+        if (cancelled) return;
 
+        if (!response.ok || !payload?.ok) {
+          setDirectoryError(
+            String(payload?.error || "Could not load admin senders."),
+          );
+          return;
+        }
+
+        setDirectoryError("");
         const people = Array.isArray(payload.people)
           ? (payload.people as ComposeDirectoryPerson[])
           : [];
@@ -195,29 +217,28 @@ export default function AdminMessageComposer({
           : [
               {
                 id: currentUser.id,
-                name: currentUser.name,
+                name: currentUser.name || currentUser.email || "SitGuru Admin",
                 email: currentUser.email,
                 role: "admin",
-                subtitle: currentUser.email,
+                subtitle: `SitGuru Admin · ${currentUser.email}`,
               },
               ...people,
             ];
 
-        setSenderOptions(next);
+        setSenderOptions(
+          next.map((person) => ({
+            ...person,
+            subtitle:
+              person.subtitle ||
+              `SitGuru Admin${person.email ? ` · ${person.email}` : ""}`,
+          })),
+        );
         if (payload.brandSender) {
           setBrandSender(payload.brandSender as ComposeDirectoryPerson);
         }
       } catch {
         if (!cancelled) {
-          setSenderOptions([
-            {
-              id: currentUser.id,
-              name: currentUser.name,
-              email: currentUser.email,
-              role: "admin",
-              subtitle: currentUser.email,
-            },
-          ]);
+          setDirectoryError("Could not load admin senders.");
         }
       }
     }
@@ -243,10 +264,17 @@ export default function AdminMessageComposer({
           });
           const response = await fetch(
             `/api/admin/messages/compose-directory?${params.toString()}`,
-            { signal: controller.signal },
+            { signal: controller.signal, credentials: "same-origin" },
           );
-          const payload = await response.json();
-          if (!response.ok || !payload?.ok) return;
+          const payload = await response.json().catch(() => null);
+          if (!response.ok || !payload?.ok) {
+            setRecipientResults([]);
+            setDirectoryError(
+              String(payload?.error || "Could not load recipients."),
+            );
+            return;
+          }
+          setDirectoryError("");
           setRecipientResults(
             Array.isArray(payload.people)
               ? (payload.people as ComposeDirectoryPerson[])
@@ -424,11 +452,14 @@ export default function AdminMessageComposer({
                 ) : null}
                 {senderOptions.map((person) => (
                   <option key={person.id} value={person.id}>
-                    {person.name}
+                    {person.name} (SitGuru Admin)
                     {person.email ? ` · ${person.email}` : ""}
                   </option>
                 ))}
               </select>
+              {directoryError ? (
+                <p className="text-xs font-semibold text-rose-700">{directoryError}</p>
+              ) : null}
             </label>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -532,8 +563,9 @@ export default function AdminMessageComposer({
                     ) : null}
                     {!isSearching && recipientResults.length === 0 ? (
                       <p className="px-4 py-6 text-sm font-semibold text-slate-500">
-                        No matching SitGuru users. Try another role or switch to
-                        external email.
+                        {directoryError
+                          ? directoryError
+                          : "No matching SitGuru users. Try another role, clear search, or switch to external email."}
                       </p>
                     ) : null}
                     {recipientResults.map((person) => (
@@ -697,7 +729,7 @@ export default function AdminMessageComposer({
                       {selectedSender.name}
                     </p>
                     <p className="truncate text-xs font-semibold text-slate-500">
-                      {selectedSender.email || "support@sitguru.com"}
+                      SitGuru Admin · {selectedSender.email || "support@sitguru.com"}
                     </p>
                   </div>
                 </div>

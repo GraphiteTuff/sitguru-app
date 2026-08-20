@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminUser, supabaseAdmin } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -51,14 +52,19 @@ function avatarOf(row: Record<string, unknown>) {
   ]);
 }
 
-async function safeRows(label: string, query: PromiseLike<{ data: unknown; error: unknown }>) {
+async function safeRows(
+  label: string,
+  query: PromiseLike<{ data: unknown; error: unknown }>,
+) {
   try {
     const result = await query;
     if (result.error) {
       console.warn(`compose-directory skipped ${label}:`, result.error);
       return [] as Record<string, unknown>[];
     }
-    return Array.isArray(result.data) ? (result.data as Record<string, unknown>[]) : [];
+    return Array.isArray(result.data)
+      ? (result.data as Record<string, unknown>[])
+      : [];
   } catch (error) {
     console.warn(`compose-directory skipped ${label}:`, error);
     return [] as Record<string, unknown>[];
@@ -67,29 +73,95 @@ async function safeRows(label: string, query: PromiseLike<{ data: unknown; error
 
 function matchesQuery(person: DirectoryPerson, q: string) {
   if (!q) return true;
-  const haystack = `${person.name} ${person.email} ${person.role} ${person.subtitle}`.toLowerCase();
+  const haystack =
+    `${person.name} ${person.email} ${person.role} ${person.subtitle}`.toLowerCase();
   return haystack.includes(q);
 }
 
 function uniquePeople(rows: DirectoryPerson[]) {
   const map = new Map<string, DirectoryPerson>();
   for (const row of rows) {
-    const key = row.id || row.email.toLowerCase();
+    const key = (row.id || row.email).toLowerCase();
     if (!key || map.has(key)) continue;
     map.set(key, row);
   }
   return Array.from(map.values());
 }
 
+function toPerson(
+  row: Record<string, unknown>,
+  role: string,
+  fallbackName: string,
+): DirectoryPerson | null {
+  const id = firstString(row, ["user_id", "profile_id", "id", "owner_user_id"]);
+  const email = firstString(row, ["email"]);
+  if (!id && !email) return null;
+
+  return {
+    id: id || email.toLowerCase(),
+    name: displayName(row, fallbackName),
+    email,
+    phone: firstString(row, ["phone", "phone_number", "mobile_phone"]),
+    role,
+    avatarUrl: avatarOf(row),
+    subtitle: email || fallbackName,
+  };
+}
+
+async function requireCookieAdmin() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    return { ok: false as const, status: 401, error: "Not signed in as admin." };
+  }
+
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("id, role, account_status, email, full_name, display_name, name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const role = asString((profile as { role?: string } | null)?.role).toLowerCase();
+  if (profile && role && role !== "admin" && !role.includes("admin")) {
+    return { ok: false as const, status: 403, error: "Admin access required." };
+  }
+
+  return {
+    ok: true as const,
+    user,
+    profile: (profile || null) as Record<string, unknown> | null,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminUser(request);
+    const auth = await requireCookieAdmin();
+    if (!auth.ok) {
+      return NextResponse.json(
+        { ok: false, error: auth.error },
+        { status: auth.status },
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const q = asString(searchParams.get("q")).toLowerCase();
     const role = asString(searchParams.get("role")).toLowerCase() || "all";
     const kind = asString(searchParams.get("kind")).toLowerCase() || "recipients";
     const limit = Math.min(Number(searchParams.get("limit") || 40) || 40, 80);
+
+    const brandSender: DirectoryPerson = {
+      id: "sitguru-support",
+      name: "SitGuru Support",
+      email: "support@sitguru.com",
+      phone: "",
+      role: "brand",
+      avatarUrl: "",
+      subtitle: "Official SitGuru outbound identity",
+    };
 
     if (kind === "senders") {
       const accessRows = await safeRows(
@@ -107,9 +179,14 @@ export async function GET(request: NextRequest) {
         return !["false", "0", "no"].includes(String(active).toLowerCase());
       });
 
-      const ids = activeAccess
-        .map((row) => asString(row.user_id))
-        .filter(Boolean);
+      const ids = Array.from(
+        new Set(
+          [
+            auth.user.id,
+            ...activeAccess.map((row) => asString(row.user_id)),
+          ].filter(Boolean),
+        ),
+      );
 
       const profiles = ids.length
         ? await safeRows(
@@ -124,28 +201,60 @@ export async function GET(request: NextRequest) {
           )
         : [];
 
-      const profileMap = new Map(
-        profiles.map((row) => [asString(row.id), row] as const),
+      const adminProfiles = await safeRows(
+        "admin_profiles_fallback",
+        supabaseAdmin
+          .from("profiles")
+          .select(
+            "id,email,full_name,display_name,name,first_name,last_name,avatar_url,profile_photo_url,role,account_type",
+          )
+          .or("role.eq.admin,role.ilike.%admin%")
+          .limit(80),
       );
 
-      const senders = uniquePeople(
-        activeAccess.map((row) => {
-          const id = asString(row.user_id);
-          const profile = profileMap.get(id) || {};
-          const email =
-            firstString(profile, ["email"]) || asString(row.email);
-          const name = displayName(profile, email || "SitGuru Admin");
-          const department = asString(row.department_key);
-          const roleKey = asString(row.role_key) || "admin";
+      const profileMap = new Map<string, Record<string, unknown>>();
+      for (const row of [...profiles, ...adminProfiles]) {
+        const id = asString(row.id);
+        if (id) profileMap.set(id, row);
+      }
 
+      // Always include the signed-in admin.
+      if (auth.profile) {
+        profileMap.set(auth.user.id, {
+          ...auth.profile,
+          id: auth.user.id,
+          email: firstString(auth.profile, ["email"]) || auth.user.email || "",
+        });
+      } else {
+        profileMap.set(auth.user.id, {
+          id: auth.user.id,
+          email: auth.user.email || "",
+          full_name: auth.user.email || "SitGuru Admin",
+          role: "admin",
+        });
+      }
+
+      const senders = uniquePeople(
+        Array.from(profileMap.values()).map((profile) => {
+          const id = asString(profile.id);
+          const email = firstString(profile, ["email"]) || auth.user.email || "";
+          const access = activeAccess.find(
+            (row) => asString(row.user_id) === id,
+          );
           return {
             id,
-            name,
+            name: displayName(profile, email || "SitGuru Admin"),
             email,
             phone: "",
-            role: roleKey,
+            role: "admin",
             avatarUrl: avatarOf(profile),
-            subtitle: [roleKey, department].filter(Boolean).join(" · "),
+            subtitle: [
+              "SitGuru Admin",
+              asString(access?.department_key),
+              email,
+            ]
+              .filter(Boolean)
+              .join(" · "),
           } satisfies DirectoryPerson;
         }),
       )
@@ -155,44 +264,44 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         ok: true,
         people: senders,
-        brandSender: {
-          id: "sitguru-support",
-          name: "SitGuru Support",
-          email: "support@sitguru.com",
-          phone: "",
-          role: "brand",
-          avatarUrl: "",
-          subtitle: "Official SitGuru outbound identity",
-        } satisfies DirectoryPerson,
+        brandSender,
       });
     }
 
     const people: DirectoryPerson[] = [];
 
     if (role === "all" || role === "guru") {
+      // Use live-safe columns only (unknown columns empty the whole query).
       const gurus = await safeRows(
         "gurus",
         supabaseAdmin
           .from("gurus")
           .select(
-            "id,user_id,email,display_name,full_name,phone,phone_number,avatar_url,profile_photo_url",
+            "id,user_id,profile_id,email,display_name,full_name,name,phone,phone_number,avatar_url",
           )
-          .limit(q ? 120 : 60),
+          .limit(q ? 200 : 100),
       );
 
       for (const row of gurus) {
-        const id = firstString(row, ["user_id", "id"]);
-        const name = displayName(row, "Guru");
-        const email = firstString(row, ["email"]);
-        people.push({
-          id,
-          name,
-          email,
-          phone: firstString(row, ["phone", "phone_number"]),
-          role: "guru",
-          avatarUrl: avatarOf(row),
-          subtitle: email || "Guru",
-        });
+        const person = toPerson(row, "guru", "Guru");
+        if (person) people.push(person);
+      }
+
+      if (people.filter((p) => p.role === "guru").length === 0) {
+        const guruProfiles = await safeRows(
+          "guru_profiles",
+          supabaseAdmin
+            .from("profiles")
+            .select(
+              "id,email,full_name,display_name,name,first_name,last_name,phone,phone_number,avatar_url,profile_photo_url,role,account_type",
+            )
+            .or("role.eq.guru,role.ilike.%guru%,account_type.ilike.%guru%")
+            .limit(100),
+        );
+        for (const row of guruProfiles) {
+          const person = toPerson(row, "guru", "Guru");
+          if (person) people.push(person);
+        }
       }
     }
 
@@ -202,22 +311,33 @@ export async function GET(request: NextRequest) {
         supabaseAdmin
           .from("customers")
           .select(
-            "id,user_id,email,full_name,display_name,name,first_name,last_name,phone,phone_number,avatar_url,profile_photo_url",
+            "id,user_id,email,full_name,display_name,name,first_name,last_name,phone,phone_number,avatar_url",
           )
-          .limit(q ? 120 : 60),
+          .limit(q ? 200 : 100),
       );
 
       for (const row of customers) {
-        const id = firstString(row, ["user_id", "id"]);
-        people.push({
-          id,
-          name: displayName(row, "Pet Parent"),
-          email: firstString(row, ["email"]),
-          phone: firstString(row, ["phone", "phone_number"]),
-          role: "customer",
-          avatarUrl: avatarOf(row),
-          subtitle: firstString(row, ["email"]) || "Pet Parent",
-        });
+        const person = toPerson(row, "customer", "Pet Parent");
+        if (person) people.push(person);
+      }
+
+      if (people.filter((p) => p.role === "customer").length === 0) {
+        const parentProfiles = await safeRows(
+          "customer_profiles",
+          supabaseAdmin
+            .from("profiles")
+            .select(
+              "id,email,full_name,display_name,name,first_name,last_name,phone,phone_number,avatar_url,profile_photo_url,role,account_type",
+            )
+            .or(
+              "role.eq.customer,role.ilike.%customer%,role.ilike.%pet_parent%,account_type.ilike.%customer%",
+            )
+            .limit(100),
+        );
+        for (const row of parentProfiles) {
+          const person = toPerson(row, "customer", "Pet Parent");
+          if (person) people.push(person);
+        }
       }
     }
 
@@ -226,52 +346,48 @@ export async function GET(request: NextRequest) {
         "ambassadors",
         supabaseAdmin
           .from("ambassadors")
-          .select(
-            "id,user_id,email,full_name,display_name,phone,phone_number,referral_code",
-          )
-          .limit(q ? 120 : 60),
+          .select("id,user_id,email,full_name,display_name,phone,referral_code")
+          .limit(q ? 200 : 100),
       );
 
       for (const row of ambassadors) {
-        const id = firstString(row, ["user_id", "id"]);
-        people.push({
-          id,
-          name: displayName(row, "Ambassador"),
-          email: firstString(row, ["email"]),
-          phone: firstString(row, ["phone", "phone_number"]),
-          role: "ambassador",
-          avatarUrl: "",
-          subtitle:
-            firstString(row, ["referral_code"]) ||
-            firstString(row, ["email"]) ||
-            "Ambassador",
-        });
+        const person = toPerson(row, "ambassador", "Ambassador");
+        if (person) {
+          people.push({
+            ...person,
+            subtitle:
+              firstString(row, ["referral_code"]) ||
+              person.email ||
+              "Ambassador",
+          });
+        }
       }
     }
 
     if (role === "all" || role === "partner" || role === "vendor") {
       const partners = await safeRows(
-        "partner_profiles",
+        "partners",
         supabaseAdmin
-          .from("profiles")
-          .select(
-            "id,email,full_name,display_name,name,first_name,last_name,phone,phone_number,avatar_url,profile_photo_url,role,account_type",
-          )
-          .or(
-            "role.ilike.%partner%,role.ilike.%vendor%,account_type.ilike.%partner%,account_type.ilike.%vendor%",
-          )
-          .limit(80),
+          .from("partners")
+          .select("id,owner_user_id,business_name,contact_name,email,status")
+          .limit(100),
       );
 
       for (const row of partners) {
+        const id = firstString(row, ["owner_user_id", "id"]);
+        const email = firstString(row, ["email"]);
+        if (!id && !email) continue;
         people.push({
-          id: firstString(row, ["id"]),
-          name: displayName(row, "Partner"),
-          email: firstString(row, ["email"]),
-          phone: firstString(row, ["phone", "phone_number"]),
+          id: id || email.toLowerCase(),
+          name:
+            firstString(row, ["business_name", "contact_name"]) ||
+            email ||
+            "Partner",
+          email,
+          phone: "",
           role: "partner",
-          avatarUrl: avatarOf(row),
-          subtitle: firstString(row, ["email"]) || "Partner",
+          avatarUrl: "",
+          subtitle: email || "Partner",
         });
       }
     }
@@ -284,20 +400,13 @@ export async function GET(request: NextRequest) {
           .select(
             "id,email,full_name,display_name,name,first_name,last_name,phone,phone_number,avatar_url,profile_photo_url,role,account_type",
           )
-          .or("role.ilike.%admin%,account_type.ilike.%admin%")
+          .or("role.eq.admin,role.ilike.%admin%")
           .limit(80),
       );
 
       for (const row of admins) {
-        people.push({
-          id: firstString(row, ["id"]),
-          name: displayName(row, "SitGuru Admin"),
-          email: firstString(row, ["email"]),
-          phone: firstString(row, ["phone", "phone_number"]),
-          role: "admin",
-          avatarUrl: avatarOf(row),
-          subtitle: firstString(row, ["email"]) || "Admin / Staff",
-        });
+        const person = toPerson(row, "admin", "SitGuru Admin");
+        if (person) people.push(person);
       }
     }
 
@@ -312,29 +421,23 @@ export async function GET(request: NextRequest) {
           .or(
             `email.ilike.%${q}%,full_name.ilike.%${q}%,display_name.ilike.%${q}%,name.ilike.%${q}%`,
           )
-          .limit(40),
+          .limit(60),
       );
 
       for (const row of profiles) {
         const roleValue =
           firstString(row, ["role", "account_type"]).toLowerCase() || "user";
-        people.push({
-          id: firstString(row, ["id"]),
-          name: displayName(row),
-          email: firstString(row, ["email"]),
-          phone: firstString(row, ["phone", "phone_number"]),
-          role: roleValue.includes("guru")
-            ? "guru"
-            : roleValue.includes("ambassador")
-              ? "ambassador"
-              : roleValue.includes("admin")
-                ? "admin"
-                : roleValue.includes("partner") || roleValue.includes("vendor")
-                  ? "partner"
-                  : "customer",
-          avatarUrl: avatarOf(row),
-          subtitle: firstString(row, ["email"]) || roleValue,
-        });
+        const mappedRole = roleValue.includes("guru")
+          ? "guru"
+          : roleValue.includes("ambassador")
+            ? "ambassador"
+            : roleValue.includes("admin")
+              ? "admin"
+              : roleValue.includes("partner") || roleValue.includes("vendor")
+                ? "partner"
+                : "customer";
+        const person = toPerson(row, mappedRole, displayName(row));
+        if (person) people.push(person);
       }
     }
 
@@ -346,13 +449,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, people: filtered });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Unable to load compose directory.";
-    const status =
-      message.toLowerCase().includes("unauthorized") ||
-      message.toLowerCase().includes("admin")
-        ? 401
-        : 500;
-
-    return NextResponse.json({ ok: false, error: message }, { status });
+      error instanceof Error
+        ? error.message
+        : "Unable to load compose directory.";
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
