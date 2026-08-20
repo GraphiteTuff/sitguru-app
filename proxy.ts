@@ -303,7 +303,34 @@ function createSupabaseMiddlewareClient(
   );
 }
 
+function rewriteMangledAdminQueryPath(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Some email/SMS clients turn `?query=` into `@query=`, which 404s as a path.
+  // Recover common admin review links so SitGuru Alerts still open the account.
+  const mangledMatch = pathname.match(
+    /^(\/admin\/(?:account-lifecycle|customers|gurus|ambassadors|incomplete-profiles))@query=(.+)$/i,
+  );
+
+  if (!mangledMatch) return null;
+
+  const [, basePath, rawQuery] = mangledMatch;
+  const queryValue = decodeURIComponent(rawQuery).trim();
+  if (!queryValue) return null;
+
+  const redirectUrl = request.nextUrl.clone();
+  redirectUrl.pathname = basePath;
+  redirectUrl.search = "";
+  redirectUrl.searchParams.set("query", queryValue);
+  return NextResponse.redirect(redirectUrl);
+}
+
 export async function proxy(request: NextRequest) {
+  const mangledAdminRedirect = rewriteMangledAdminQueryPath(request);
+  if (mangledAdminRedirect) {
+    return mangledAdminRedirect;
+  }
+
   const { pathname } = request.nextUrl;
 
   if (isPasswordRecoveryPath(pathname)) {

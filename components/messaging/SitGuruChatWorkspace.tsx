@@ -21,6 +21,7 @@ import {
   SendHorizontal,
   ShieldAlert,
   Stethoscope,
+  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
@@ -355,7 +356,7 @@ export default function SitGuruChatWorkspace({
             type="button"
             onClick={onClose}
             className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 lg:hidden"
-            aria-label="Close chat"
+            aria-label="Back"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -366,9 +367,22 @@ export default function SitGuruChatWorkspace({
             Secure booking channel · room-{bookingId.slice(0, 8)}
           </p>
         </div>
-        <span className="hidden rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800 sm:inline-flex">
-          Encrypted in-app
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="hidden rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800 sm:inline-flex">
+            Encrypted in-app
+          </span>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close chat"
+              title="Close"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
       </header>
 
       <div

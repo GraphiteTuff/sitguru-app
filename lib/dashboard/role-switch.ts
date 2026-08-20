@@ -82,12 +82,27 @@ function expandRoleToken(value: unknown): DashboardSwitchRole[] {
     return ["parent", "guru"];
   }
 
+  // Multi-role Ambassador combinations keep the Pet Parent (and Guru) switcher.
+  if (
+    raw.includes("ambassador") &&
+    (raw.includes("guru") ||
+      raw.includes("parent") ||
+      raw.includes("pet_parent") ||
+      raw.includes("customer") ||
+      raw.includes("both"))
+  ) {
+    const roles: DashboardSwitchRole[] = ["parent", "ambassador"];
+    if (raw.includes("guru") || raw.includes("both")) roles.splice(1, 0, "guru");
+    return uniqueOrderedRoles(roles);
+  }
+
   if (raw.includes("admin") || raw.includes("super_admin")) {
     return ["admin"];
   }
 
   if (raw.includes("ambassador")) {
-    return ["ambassador"];
+    // Ambassadors also get Pet Parent for the multi-role portal switcher.
+    return ["parent", "ambassador"];
   }
 
   if (
@@ -296,8 +311,9 @@ export function authorizedRolesFromSignupIntent(
   if (normalized === "guru" || normalized === "future_guru") {
     return ["guru"];
   }
+  // Ambassadors get Pet Parent too so the multi-role portal switcher works.
   if (normalized === "ambassador") {
-    return ["ambassador"];
+    return ["parent", "ambassador"];
   }
   if (
     normalized === "pet_parent" ||

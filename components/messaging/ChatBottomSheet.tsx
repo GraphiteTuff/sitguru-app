@@ -7,7 +7,7 @@
  */
 
 import { useState } from "react";
-import { MessageCircle, ChevronDown } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import ChatWindow from "@/components/messaging/ChatWindow";
 
 type ChatBottomSheetProps = {
@@ -51,26 +51,19 @@ export default function ChatBottomSheet({
           <div className="flex items-center justify-center gap-2 pb-1">
             <button
               type="button"
-              aria-label="Drag sheet"
+              aria-label={expanded ? "Collapse chat" : "Expand chat"}
               onClick={() => setExpanded((v) => !v)}
               className="h-1.5 w-12 rounded-full bg-slate-300"
             />
           </div>
           <div className="relative h-[calc(100%-0.5rem)] px-2">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="absolute right-4 top-3 z-10 rounded-full bg-white/90 p-2 text-slate-600 shadow"
-              aria-label="Minimize chat"
-            >
-              <ChevronDown className="h-4 w-4" />
-            </button>
             <ChatWindow
               conversationId={conversationId}
               currentUserId={currentUserId}
               title={title}
               mode="sheet"
               aiAssistEnabled={aiAssistEnabled}
+              onClose={() => setOpen(false)}
               className="h-full"
             />
           </div>

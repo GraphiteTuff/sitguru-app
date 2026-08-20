@@ -17,6 +17,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import MessageRealtimeRefresh from "@/components/MessageRealtimeRefresh";
+import DismissibleFixedChat from "@/components/messaging/DismissibleFixedChat";
 
 export const dynamic = "force-dynamic";
 
@@ -1206,9 +1207,14 @@ function AdminQuickChatBox({
   const contactAvatar = contactCard?.avatar || "";
 
   return (
-    <aside className="fixed bottom-4 right-4 z-40 w-[min(430px,calc(100vw-2rem))] overflow-hidden rounded-[1.5rem] border border-green-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.22)]">
+    <DismissibleFixedChat
+      label="Admin Quick Chat"
+      storageKey={`admin-quick-chat:${conversation.id}`}
+      className="fixed bottom-4 right-4 z-40 w-[min(430px,calc(100vw-2rem))]"
+    >
+    <aside className="overflow-hidden rounded-[1.5rem] border border-green-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.22)]">
       <div className="border-b border-green-100 bg-green-50 p-4">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 pr-12">
           <div className="flex min-w-0 items-center gap-3">
             <Avatar
               name="SitGuru Admin"
@@ -1361,6 +1367,7 @@ function AdminQuickChatBox({
         </a>
       </form>
     </aside>
+    </DismissibleFixedChat>
   );
 }
 

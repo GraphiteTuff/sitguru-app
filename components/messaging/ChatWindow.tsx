@@ -19,6 +19,7 @@ import {
   SendHorizontal,
   Sparkles,
   Loader2,
+  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import MediaAttachmentDrawer from "@/components/messaging/MediaAttachmentDrawer";
@@ -40,6 +41,7 @@ export type ChatWindowProps = {
   aiAssistEnabled?: boolean;
   className?: string;
   onAiAssistChange?: (enabled: boolean) => void;
+  onClose?: () => void;
 };
 
 function normalizeRow(row: Record<string, unknown>): ChatMessage {
@@ -81,6 +83,7 @@ export default function ChatWindow({
   aiAssistEnabled = false,
   className = "",
   onAiAssistChange,
+  onClose,
 }: ChatWindowProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -273,12 +276,25 @@ export default function ChatWindow({
                 : "Secure SitGuru messaging")}
           </p>
         </div>
-        {aiEnabled ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
-            <Sparkles className="h-3 w-3" />
-            Claude
-          </span>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {aiEnabled ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
+              <Sparkles className="h-3 w-3" />
+              Claude
+            </span>
+          ) : null}
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close chat"
+              title="Close"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {/* Message list */}

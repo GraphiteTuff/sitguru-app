@@ -6,6 +6,7 @@ export { default as SitGuruChatWorkspace } from "@/components/messaging/SitGuruC
 export { default as MediaAttachmentDrawer } from "@/components/messaging/MediaAttachmentDrawer";
 export { default as AdminWalkChatPanel } from "@/components/messaging/AdminWalkChatPanel";
 export { default as HomepageChatBubble } from "@/components/messaging/HomepageChatBubble";
+export { default as DismissibleFixedChat } from "@/components/messaging/DismissibleFixedChat";
 export {
   scanMessageForOffPlatformContact,
   containsOffPlatformContact,
