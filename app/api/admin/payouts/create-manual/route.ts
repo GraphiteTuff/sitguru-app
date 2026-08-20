@@ -11,6 +11,7 @@ type ManualPayoutType =
   | "guru"
   | "ambassador"
   | "partner"
+  | "pet_parent"
   | "pawperks"
   | "referral";
 
@@ -48,6 +49,14 @@ function normalizePayoutType(value: unknown): ManualPayoutType | null {
   if (raw === "guru") return "guru";
   if (raw === "ambassador") return "ambassador";
   if (raw === "partner") return "partner";
+  if (
+    raw === "petparent" ||
+    raw === "pet_parent" ||
+    raw === "customer" ||
+    raw === "parent"
+  ) {
+    return "pet_parent";
+  }
   if (raw === "pawperks" || raw === "petperks") return "pawperks";
   if (raw === "referral" || raw === "referrals") return "referral";
 
@@ -332,6 +341,120 @@ async function createPartnerLedgerPayout({
   });
 }
 
+async function createPetParentCreditPayout({
+  recipientId,
+  amount,
+  payoutStatus,
+  reason,
+  createdBy,
+}: {
+  recipientId: string;
+  amount: number;
+  payoutStatus: string;
+  reason: string;
+  createdBy: string;
+}) {
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("id, user_id, full_name, display_name, name, email, role, account_type")
+    .or(`id.eq.${recipientId},user_id.eq.${recipientId}`)
+    .limit(1)
+    .maybeSingle();
+
+  if (profileError || !profile) {
+    return NextResponse.json(
+      { ok: false, error: "Pet Parent profile was not found." },
+      { status: 404 },
+    );
+  }
+
+  const row = profile as DbRow;
+  const role = firstString(row, ["role", "account_type"])
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  const isPetParent =
+    role === "customer" ||
+    role === "pet_parent" ||
+    role === "petparent" ||
+    role === "parent" ||
+    role === "client";
+
+  if (!isPetParent) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "Selected recipient is not a Pet Parent profile. Choose Pet Parent payout type for customer accounts.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const recipientName =
+    firstString(row, ["full_name", "display_name", "name"]) || "Pet Parent";
+  const recipientEmail = firstString(row, ["email"]);
+  const referrerUserId = firstString(row, ["id", "user_id"]) || recipientId;
+  const status = liabilityStatus(payoutStatus);
+
+  const insertPayload: Record<string, unknown> = {
+    referrer_user_id: referrerUserId,
+    partner_id: null,
+    ambassador_id: null,
+    reward_type: "welcome_bonus_account_credit",
+    amount,
+    currency: "usd",
+    status,
+    admin_notes: reason,
+    approved_by: status === "approved" ? createdBy : null,
+    approved_at: status === "approved" ? new Date().toISOString() : null,
+    normalized_status: status,
+    normalized_amount: amount,
+    financial_treatment: "account_credit",
+    financial_category: "marketing_welcome_bonus",
+    source_table: "manual_admin_pet_parent_credit",
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from("admin_referral_reward_liability")
+    .insert(insertPayload)
+    .select("*")
+    .maybeSingle();
+
+  if (error || !data) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Could not create Pet Parent account-credit liability row.",
+        details: error?.message || "Insert returned no row.",
+      },
+      { status: 500 },
+    );
+  }
+
+  const payout = data as DbRow;
+
+  return NextResponse.json({
+    ok: true,
+    payout: {
+      id: firstString(payout, ["id"]),
+      payoutType: "pet_parent",
+      recipientId: referrerUserId,
+      recipientName,
+      recipientEmail,
+      amount,
+      netAmount: amount,
+      payoutStatus: status,
+      reason,
+      canRelease: false,
+      ledgerSource: "admin_referral_reward_liability",
+      createdBy,
+      createdAt: firstString(payout, ["created_at"]) || new Date().toISOString(),
+      warning:
+        "Queued as SitGuru account credit / Welcome Bonus liability. Not a Stripe connected-account transfer.",
+    },
+  });
+}
+
 async function createReferralLiabilityPayout({
   payoutType,
   recipientId,
@@ -484,7 +607,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         error:
-          "Select a payout type: Guru, Ambassador, Partner, PawPerks, or Referrals.",
+          "Select a payout type: Guru, Ambassador, Partner, Pet Parent, PawPerks, or Referrals.",
       },
       { status: 400 },
     );
@@ -520,6 +643,16 @@ export async function POST(request: Request) {
   if (payoutType === "ambassador" || payoutType === "partner") {
     return createPartnerLedgerPayout({
       payoutType,
+      recipientId,
+      amount,
+      payoutStatus,
+      reason,
+      createdBy,
+    });
+  }
+
+  if (payoutType === "pet_parent") {
+    return createPetParentCreditPayout({
       recipientId,
       amount,
       payoutStatus,

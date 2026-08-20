@@ -7,6 +7,7 @@ export const MANUAL_PAYOUT_TYPES = [
   { value: "guru", label: "Guru" },
   { value: "ambassador", label: "Ambassador" },
   { value: "partner", label: "Partner" },
+  { value: "pet_parent", label: "Pet Parent" },
   { value: "pawperks", label: "PawPerks" },
   { value: "referral", label: "Referrals" },
 ] as const;
@@ -44,7 +45,7 @@ export default function CreateManualGuruPayoutForm({
   defaultGuruId = "",
   defaultAmount = 25,
   defaultPayoutType = "guru",
-  defaultReason = "Thank you for joining SitGuru!",
+  defaultReason = "SitGuru Welcome Bonus — Thank you for joining SitGuru",
 }: CreateManualGuruPayoutFormProps) {
   const router = useRouter();
   const allRecipients = recipients.length > 0 ? recipients : gurus;
@@ -63,7 +64,14 @@ export default function CreateManualGuruPayoutForm({
     () =>
       allRecipients
         .filter((recipient) => recipient.type === payoutType)
-        .sort((a, b) => a.name.localeCompare(b.name)),
+        .sort((a, b) => {
+          if (payoutType === "guru") {
+            const aReady = a.stripeAccountId ? 1 : 0;
+            const bReady = b.stripeAccountId ? 1 : 0;
+            if (bReady !== aReady) return bReady - aReady;
+          }
+          return a.name.localeCompare(b.name);
+        }),
     [allRecipients, payoutType],
   );
 
@@ -186,9 +194,10 @@ export default function CreateManualGuruPayoutForm({
             Create Manual Payout
           </h2>
           <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
-            Choose Guru, Ambassador, Partner, PawPerks, or Referrals, then pick
-            the recipient. Guru rows can Dry Run / Release through Stripe
-            Connect when balance covers the amount.
+            Choose Guru, Ambassador, Partner, Pet Parent, PawPerks, or Referrals,
+            then pick the recipient. Guru rows can Dry Run / Release through
+            Stripe Connect when balance covers the amount. Pet Parents are queued
+            as SitGuru account credit (no Stripe connected account required).
           </p>
         </div>
       </div>
@@ -231,8 +240,10 @@ export default function CreateManualGuruPayoutForm({
               <option key={`${recipient.type}-${recipient.id}`} value={recipient.id}>
                 {recipient.name}
                 {recipient.email ? ` · ${recipient.email}` : ""}
-                {payoutType === "guru" && !recipient.stripeAccountId
-                  ? " · missing Stripe"
+                {payoutType === "guru"
+                  ? recipient.stripeAccountId
+                    ? " · Stripe ready"
+                    : " · missing Stripe"
                   : ""}
               </option>
             ))}
@@ -241,7 +252,13 @@ export default function CreateManualGuruPayoutForm({
             <span className="text-xs font-bold text-rose-700">
               No {recipientLabel.toLowerCase()} recipients found.
             </span>
-          ) : null}
+          ) : (
+            <span className="text-xs font-bold text-slate-500">
+              {payoutType === "guru"
+                ? `${recipientsForType.filter((r) => r.stripeAccountId).length} of ${recipientsForType.length} Gurus have a Stripe connected account.`
+                : `${recipientsForType.length} ${recipientLabel.toLowerCase()} recipients available.`}
+            </span>
+          )}
         </label>
 
         <label className="grid gap-2">
@@ -308,7 +325,9 @@ export default function CreateManualGuruPayoutForm({
         <p className="text-xs font-bold text-slate-500">
           {payoutType === "guru"
             ? "After create: Dry Run first, then Release only if platform Stripe balance ≥ amount."
-            : "Non-Guru payouts are queued for admin review (not Stripe Release)."}
+            : payoutType === "pet_parent"
+              ? "Pet Parent payouts create SitGuru account credit / welcome-bonus liability (not Stripe Release)."
+              : "Non-Guru payouts are queued for admin review (not Stripe Release)."}
         </p>
       </div>
 

@@ -256,9 +256,19 @@ async function safeSelect(table: string, query = "*", limit = 1500): Promise<Saf
   try {
     const { data, error } = await supabaseAdmin.from(table).select(query).limit(limit);
 
-    if (error || !data) return [];
+    if (!error && Array.isArray(data)) {
+      return data as unknown as SafeRow[];
+    }
 
-    return Array.isArray(data) ? (data as unknown as SafeRow[]) : [];
+    // Column mismatches (common on gurus Stripe fields) should not blank the page.
+    if (error && query !== "*") {
+      const fallback = await supabaseAdmin.from(table).select("*").limit(limit);
+      if (!fallback.error && Array.isArray(fallback.data)) {
+        return fallback.data as unknown as SafeRow[];
+      }
+    }
+
+    return [];
   } catch {
     return [];
   }
@@ -429,11 +439,54 @@ function dedupeRows(rows: PayoutQueueRow[]) {
   return Array.from(map.values());
 }
 
+const PLACEHOLDER_PAYOUT_NAMES = new Set([
+  "avery johnson",
+  "caleb brooks",
+  "darius miller",
+  "emma walsh",
+  "maya reynolds",
+  "nina patel",
+  "olivia chen",
+  "sofia martinez",
+  "suzy q",
+]);
+
+function normalizePayoutName(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isExcludedManualPayoutRecipient(name: string, email: string) {
+  const normalizedName = normalizePayoutName(name);
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!normalizedName && !normalizedEmail) return true;
+  if (PLACEHOLDER_PAYOUT_NAMES.has(normalizedName)) return true;
+  if (normalizedEmail.endsWith("@placeholder.sitguru.local")) return true;
+  if (normalizedEmail.includes("+test@") || normalizedEmail.startsWith("test@")) {
+    return true;
+  }
+  if (
+    ["test", "demo", "admin", "sitguru", "guru", "member", "unknown"].includes(
+      normalizedName,
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[]> {
-  const [guruRows, ambassadorRows, partnerRows] = await Promise.all([
+  // Only select columns that exist on live gurus. Unknown Stripe column names
+  // make PostgREST fail the whole query and safeSelect returns [] — empty Guru dropdown.
+  const [guruRows, ambassadorRows, partnerRows, profileRows] = await Promise.all([
     safeSelect(
       "gurus",
-      "id, user_id, profile_id, display_name, full_name, name, email, stripe_account_id, stripe_connect_account_id, connected_account_id",
+      "id, user_id, profile_id, display_name, full_name, name, email, stripe_account_id, payouts_enabled, stripe_onboarding_complete, stripe_connect_status, is_test_account, status",
       5000,
     ),
     safeSelect(
@@ -446,7 +499,35 @@ async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[
       "id, owner_user_id, business_name, contact_name, email, status",
       5000,
     ),
+    safeSelect(
+      "profiles",
+      "id, user_id, full_name, display_name, name, email, role, account_type",
+      5000,
+    ),
   ]);
+
+  const profileById = new Map<string, SafeRow>();
+  for (const profile of profileRows) {
+    for (const key of [
+      getFirst(profile, ["id"]),
+      getFirst(profile, ["user_id"]),
+    ]) {
+      if (key) profileById.set(normalizeLookupId(key), profile);
+    }
+  }
+
+  function isPetParentProfile(row: SafeRow) {
+    const role = getFirst(row, ["role", "account_type"])
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_");
+    return (
+      role === "customer" ||
+      role === "pet_parent" ||
+      role === "petparent" ||
+      role === "parent" ||
+      role === "client"
+    );
+  }
 
   const mapRecipient = (
     row: SafeRow,
@@ -459,12 +540,39 @@ async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[
     const id = getFirst(row, idKeys);
     if (!id) return null;
 
+    const userId = getFirst(row, userIdKeys);
+    const profile =
+      profileById.get(normalizeLookupId(userId)) ||
+      profileById.get(normalizeLookupId(getFirst(row, ["profile_id"]))) ||
+      profileById.get(normalizeLookupId(id));
+
+    const name = getFirst(
+      row,
+      nameKeys,
+      getFirst(
+        profile || {},
+        ["full_name", "display_name", "name"],
+        type === "partner" ? "Partner" : "Recipient",
+      ),
+    );
+    const email = getFirst(row, ["email"], getFirst(profile || {}, ["email"], ""));
+
+    if (isExcludedManualPayoutRecipient(name, email)) return null;
+    if (
+      row.is_test_account === true ||
+      row.is_test_account === "true" ||
+      row.is_test_account === 1 ||
+      row.is_test_account === "1"
+    ) {
+      return null;
+    }
+
     return {
       id,
       type,
-      name: getFirst(row, nameKeys, type === "partner" ? "Partner" : "Recipient"),
-      email: getFirst(row, ["email"], ""),
-      userId: getFirst(row, userIdKeys) || undefined,
+      name,
+      email,
+      userId: userId || undefined,
       stripeAccountId: stripeKeys.length
         ? getFirst(row, stripeKeys) || undefined
         : undefined,
@@ -479,10 +587,18 @@ async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[
         ["display_name", "full_name", "name"],
         ["id"],
         ["user_id"],
-        ["stripe_account_id", "stripe_connect_account_id", "connected_account_id"],
+        ["stripe_account_id"],
       ),
     )
     .filter(Boolean) as ManualPayoutRecipientOption[];
+
+  // Prefer Stripe-ready Gurus first so the $10 Welcome Bonus test picks a real destination.
+  gurus.sort((a, b) => {
+    const aReady = a.stripeAccountId ? 1 : 0;
+    const bReady = b.stripeAccountId ? 1 : 0;
+    if (bReady !== aReady) return bReady - aReady;
+    return a.name.localeCompare(b.name);
+  });
 
   const ambassadors = ambassadorRows
     .map((row) =>
@@ -508,8 +624,21 @@ async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[
     )
     .filter(Boolean) as ManualPayoutRecipientOption[];
 
-  // PawPerks + Referrals can pay any of the network roles above.
-  const rewardPool = [...gurus, ...ambassadors, ...partners].flatMap(
+  const petParents = profileRows
+    .filter(isPetParentProfile)
+    .map((row) =>
+      mapRecipient(
+        row,
+        "pet_parent",
+        ["full_name", "display_name", "name"],
+        ["id"],
+        ["user_id", "id"],
+      ),
+    )
+    .filter(Boolean) as ManualPayoutRecipientOption[];
+
+  // PawPerks + Referrals can pay network roles including Pet Parents.
+  const rewardPool = [...gurus, ...ambassadors, ...partners, ...petParents].flatMap(
     (recipient) => {
       const base = {
         id: recipient.id,
@@ -526,9 +655,19 @@ async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[
     },
   );
 
-  return [...gurus, ...ambassadors, ...partners, ...rewardPool].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+  return [
+    ...gurus,
+    ...ambassadors,
+    ...partners,
+    ...petParents,
+    ...rewardPool,
+  ].sort((a, b) => {
+    if (a.type !== b.type) return a.type.localeCompare(b.type);
+    const aReady = a.stripeAccountId ? 1 : 0;
+    const bReady = b.stripeAccountId ? 1 : 0;
+    if (a.type === "guru" && bReady !== aReady) return bReady - aReady;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 async function getPayoutRows() {
