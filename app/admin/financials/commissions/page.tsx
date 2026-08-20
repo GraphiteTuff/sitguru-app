@@ -82,6 +82,23 @@ type ReferralRewardRow = {
   relatedName: string;
 };
 
+type PayoutLedgerRow = {
+  id: string;
+  guruId: string;
+  guruName: string;
+  guruAvatarUrl: string;
+  bookingId: string;
+  amount: number;
+  status: string;
+  reference: string;
+  sourceLabel: string;
+  createdAt: string;
+  createdAtRaw: string;
+  payoutDate: string;
+  payoutDateRaw: string;
+  href: string;
+};
+
 type ReferralRewardSummary = {
   rows: ReferralRewardRow[];
   pendingRows: ReferralRewardRow[];
@@ -137,6 +154,7 @@ type TrendPoint = {
 
 type CommissionData = {
   rows: CommissionRow[];
+  payoutLedger: PayoutLedgerRow[];
   referralRewards: ReferralRewardSummary;
   topGurus: TopGuruSummary[];
   topMarkets: MarketSummary[];
@@ -171,6 +189,10 @@ type CommissionData = {
     heldAmount: number;
     failedAmount: number;
     pendingAmount: number;
+    ledgerPaidAmount: number;
+    ledgerPendingAmount: number;
+    ledgerFailedAmount: number;
+    ledgerManualRows: number;
     referralRewardPendingAmount: number;
     referralRewardIssuedAmount: number;
     referralRewardTotalAmount: number;
@@ -723,6 +745,108 @@ function isPayoutPaid(status: string) {
   );
 }
 
+function isPayoutPending(status: string) {
+  const normalized = status.toLowerCase();
+  return (
+    normalized === "ready" ||
+    normalized === "pending" ||
+    normalized === "processing" ||
+    normalized === "scheduled" ||
+    normalized === "approved" ||
+    normalized.includes("ready") ||
+    normalized.includes("pending") ||
+    normalized.includes("processing")
+  );
+}
+
+function isPayoutFailed(status: string) {
+  const normalized = status.toLowerCase();
+  return (
+    normalized.includes("failed") ||
+    normalized.includes("error") ||
+    normalized.includes("declined")
+  );
+}
+
+function getPayoutLedgerAmount(row: DbRow) {
+  return (
+    Math.abs(
+      firstNumber(row, [
+        "net_amount",
+        "gross_amount",
+        "amount",
+        "payout_amount",
+        "amount_cents",
+      ]),
+    ) || 0
+  );
+}
+
+function normalizeGuruPayoutLedgerRows(
+  rows: DbRow[],
+  guruMap: Map<string, DbRow>,
+  profileMap: Map<string, DbRow>,
+): PayoutLedgerRow[] {
+  return rows
+    .map((row) => {
+      const id = firstString(row, ["id", "payout_id"]);
+      if (!id) return null;
+
+      const guruId = firstString(row, ["guru_id", "user_id", "profile_id"]);
+      const guru = guruMap.get(guruId);
+      const profile =
+        profileMap.get(guruId) ||
+        profileMap.get(firstString(guru, ["user_id", "profile_id", "id"]));
+      const bookingId = firstString(row, ["booking_id"]);
+      const status =
+        firstString(row, ["payout_status", "status", "release_status"]) ||
+        "pending";
+      const amount = getPayoutLedgerAmount(row);
+      const createdAtRaw =
+        firstString(row, ["created_at", "inserted_at"]) ||
+        new Date(0).toISOString();
+      const payoutDateRaw =
+        firstString(row, ["payout_date", "paid_at", "released_at", "updated_at"]) ||
+        createdAtRaw;
+      const reference = firstString(row, [
+        "stripe_transfer_id",
+        "transaction_reference",
+        "paypal_payout_id",
+        "reference",
+      ]);
+      const sourceLabel = bookingId
+        ? "Booking payout"
+        : reference.startsWith("pending:")
+          ? "Manual payout (queued)"
+          : "Manual / welcome bonus";
+
+      return {
+        id,
+        guruId,
+        guruName: getGuruName(row, guru, profile),
+        guruAvatarUrl: getAvatarUrl(row, guru, profile),
+        bookingId,
+        amount,
+        status,
+        reference,
+        sourceLabel,
+        createdAt: formatDateShort(createdAtRaw),
+        createdAtRaw,
+        payoutDate: formatDateShort(payoutDateRaw),
+        payoutDateRaw,
+        href: bookingId
+          ? `/admin/bookings?booking=${bookingId}`
+          : "/admin/financials/payouts",
+      } satisfies PayoutLedgerRow;
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const left = new Date(a!.payoutDateRaw || a!.createdAtRaw).getTime();
+      const right = new Date(b!.payoutDateRaw || b!.createdAtRaw).getTime();
+      return right - left;
+    }) as PayoutLedgerRow[];
+}
+
 function isPayoutHeld(status: string) {
   const normalized = status.toLowerCase();
   return (
@@ -805,7 +929,7 @@ function getStatusBadgeClasses(status: string) {
   if (normalized.includes("failed") || normalized.includes("chargeback")) {
     return "border-red-200 bg-red-50 text-red-800";
   }
-  if (normalized.includes("pending") || normalized.includes("unpaid")) {
+  if (normalized.includes("pending") || normalized.includes("unpaid") || normalized.includes("ready") || normalized.includes("processing")) {
     return "border-blue-200 bg-blue-50 text-blue-800";
   }
   return "border-slate-200 bg-slate-100 text-slate-700";
@@ -1221,6 +1345,14 @@ async function getCommissionData(): Promise<CommissionData> {
   });
 
   const referralRewardSummary = summarizeReferralRewards(referralRewards.map(normalizeReferralRewardRow));
+  const payoutLedger = normalizeGuruPayoutLedgerRows(guruPayouts, guruMap, profileMap);
+  const ledgerPaidRows = payoutLedger.filter((row) => isPayoutPaid(row.status));
+  const ledgerPendingRows = payoutLedger.filter((row) => isPayoutPending(row.status));
+  const ledgerFailedRows = payoutLedger.filter((row) => isPayoutFailed(row.status));
+  const ledgerManualRows = payoutLedger.filter((row) => !row.bookingId);
+  const ledgerPaidAmount = ledgerPaidRows.reduce((sum, row) => sum + row.amount, 0);
+  const ledgerPendingAmount = ledgerPendingRows.reduce((sum, row) => sum + row.amount, 0);
+  const ledgerFailedAmount = ledgerFailedRows.reduce((sum, row) => sum + row.amount, 0);
   const capturedRows = commissionRows.filter((row) => isPaymentCaptured(row.paymentStatus));
   const paidOutRows = commissionRows.filter((row) => isPayoutPaid(row.payoutStatus));
   const heldRows = commissionRows.filter((row) => row.ledgerStatus === "held");
@@ -1233,10 +1365,20 @@ async function getCommissionData(): Promise<CommissionData> {
   const partnerCommissions = commissionRows.reduce((sum, row) => sum + row.partnerCommission, 0);
   const guruNetPayouts = commissionRows.reduce((sum, row) => sum + row.guruNet, 0);
   const refundAmount = commissionRows.reduce((sum, row) => sum + row.refundAmount, 0);
-  const netReleased = paidOutRows.reduce((sum, row) => sum + row.guruNet, 0);
+  // Prefer guru_payouts as cash-out truth so manual/welcome bonuses (no booking_id) count.
+  const bookingNetReleased = paidOutRows.reduce((sum, row) => sum + row.guruNet, 0);
+  const netReleased = guruPayouts.length > 0 ? ledgerPaidAmount : bookingNetReleased;
   const heldAmount = heldRows.reduce((sum, row) => sum + row.guruNet, 0);
-  const failedAmount = failedRows.reduce((sum, row) => sum + row.guruNet, 0);
-  const pendingAmount = pendingRows.reduce((sum, row) => sum + row.guruNet, 0);
+  const orphanPendingAmount = ledgerPendingRows
+    .filter((row) => !row.bookingId)
+    .reduce((sum, row) => sum + row.amount, 0);
+  const orphanFailedAmount = ledgerFailedRows
+    .filter((row) => !row.bookingId)
+    .reduce((sum, row) => sum + row.amount, 0);
+  const failedAmount =
+    failedRows.reduce((sum, row) => sum + row.guruNet, 0) + orphanFailedAmount;
+  const pendingAmount =
+    pendingRows.reduce((sum, row) => sum + row.guruNet, 0) + orphanPendingAmount;
   const topGuruMap = new Map<string, TopGuruSummary>();
 
   for (const row of commissionRows) {
@@ -1272,6 +1414,28 @@ async function getCommissionData(): Promise<CommissionData> {
 
   const topMarkets = Array.from(marketMap.values()).sort((a, b) => b.amount - a.amount).slice(0, 5);
   const activity: ActivityItem[] = [
+    ...ledgerPaidRows.slice(0, 4).map((row) => ({
+      label: `Payout released to ${row.guruName}`,
+      detail: row.bookingId
+        ? `Booking ${row.bookingId}`
+        : `${row.sourceLabel}${row.reference ? ` · ${row.reference.slice(0, 18)}` : ""}`,
+      amount: money(row.amount),
+      status: "released" as const,
+      time: formatRelativeTime(row.payoutDateRaw || row.createdAtRaw),
+      actorName: row.guruName,
+      actorAvatarUrl: row.guruAvatarUrl,
+      actorTone: "green" as const,
+    })),
+    ...ledgerPendingRows.slice(0, 2).map((row) => ({
+      label: `Payout queued for ${row.guruName}`,
+      detail: row.sourceLabel,
+      amount: money(row.amount),
+      status: "pending" as const,
+      time: formatRelativeTime(row.createdAtRaw),
+      actorName: row.guruName,
+      actorAvatarUrl: row.guruAvatarUrl,
+      actorTone: "amber" as const,
+    })),
     ...capturedRows.slice(0, 3).map((row) => ({
       label: `Payment captured from ${row.customerName}`,
       detail: `Booking ${row.bookingId}`,
@@ -1281,16 +1445,6 @@ async function getCommissionData(): Promise<CommissionData> {
       actorName: row.customerName,
       actorAvatarUrl: row.customerAvatarUrl,
       actorTone: "blue" as const,
-    })),
-    ...paidOutRows.slice(0, 3).map((row) => ({
-      label: `Payout released to ${row.guruName}`,
-      detail: row.payoutDateRaw ? `Released ${row.payoutDate}` : "Guru net payout",
-      amount: money(row.guruNet),
-      status: "released" as const,
-      time: formatRelativeTime(row.payoutDateRaw || row.createdAtRaw),
-      actorName: row.guruName,
-      actorAvatarUrl: row.guruAvatarUrl,
-      actorTone: "green" as const,
     })),
     ...heldRows.slice(0, 2).map((row) => ({
       label: `Payout held for ${row.guruName}`,
@@ -1302,10 +1456,10 @@ async function getCommissionData(): Promise<CommissionData> {
       actorAvatarUrl: row.guruAvatarUrl,
       actorTone: "amber" as const,
     })),
-    ...failedRows.slice(0, 2).map((row) => ({
+    ...ledgerFailedRows.slice(0, 2).map((row) => ({
       label: `Payout failed for ${row.guruName}`,
-      detail: "Check payout destination or payment status",
-      amount: money(row.guruNet),
+      detail: row.sourceLabel,
+      amount: money(row.amount),
       status: "failed" as const,
       time: formatRelativeTime(row.createdAtRaw),
       actorName: row.guruName,
@@ -1326,6 +1480,7 @@ async function getCommissionData(): Promise<CommissionData> {
 
   return {
     rows: commissionRows,
+    payoutLedger,
     referralRewards: referralRewardSummary,
     topGurus,
     topMarkets,
@@ -1349,7 +1504,7 @@ async function getCommissionData(): Promise<CommissionData> {
     totals: {
       bookings: commissionRows.length,
       capturedRows: capturedRows.length,
-      releasedRows: paidOutRows.length,
+      releasedRows: guruPayouts.length > 0 ? ledgerPaidRows.length : paidOutRows.length,
       grossSales,
       capturedPayments,
       platformFees,
@@ -1360,12 +1515,20 @@ async function getCommissionData(): Promise<CommissionData> {
       heldAmount,
       failedAmount,
       pendingAmount,
+      ledgerPaidAmount,
+      ledgerPendingAmount,
+      ledgerFailedAmount,
+      ledgerManualRows: ledgerManualRows.length,
       referralRewardPendingAmount: referralRewardSummary.pendingAmount,
       referralRewardIssuedAmount: referralRewardSummary.issuedAmount,
       referralRewardTotalAmount: referralRewardSummary.totalAmount,
       takeRate: grossSales ? (platformFees / grossSales) * 100 : 0,
       partnerRate: grossSales ? (partnerCommissions / grossSales) * 100 : 0,
-      releaseRate: capturedRows.length ? (paidOutRows.length / capturedRows.length) * 100 : 0,
+      releaseRate: capturedRows.length
+        ? ((guruPayouts.length > 0 ? ledgerPaidRows.length : paidOutRows.length) /
+            capturedRows.length) *
+          100
+        : 0,
     },
   };
 }
@@ -1614,7 +1777,7 @@ function RevenueFlowBreakdown({
     { label: "Pending release", description: "Captured payment records that still need payout completion.", value: pendingAmount, tone: "bg-sky-400" },
     { label: "Held / review", description: "Payouts blocked for manual review, holds, or operational checks.", value: heldAmount, tone: "bg-amber-400" },
     { label: "Failed payout exposure", description: "Payouts marked failed, declined, errored, or canceled.", value: failedAmount, tone: "bg-red-500" },
-    { label: "Net released", description: "Guru net dollars already marked paid, released, or completed.", value: netReleased, tone: "bg-emerald-700" },
+    { label: "Net released", description: "Cash-out truth from guru_payouts (paid/released), including manual and welcome-bonus payouts.", value: netReleased, tone: "bg-emerald-700" },
   ];
   const max = Math.max(...rows.map((row) => row.value), 1);
 
@@ -1647,6 +1810,124 @@ function RevenueFlowBreakdown({
         ))}
       </div>
     </div>
+  );
+}
+
+function PayoutLedgerPanel({
+  rows,
+  paidAmount,
+  pendingAmount,
+  failedAmount,
+  manualRows,
+}: {
+  rows: PayoutLedgerRow[];
+  paidAmount: number;
+  pendingAmount: number;
+  failedAmount: number;
+  manualRows: number;
+}) {
+  return (
+    <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-xl font-black text-[#163127]">Guru Payout Ledger</h2>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            Direct view of `guru_payouts` — booking releases plus manual / welcome-bonus payouts that have no booking_id.
+          </p>
+        </div>
+        <Link
+          href="/admin/financials/payouts"
+          className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-[#f5fcf8] px-4 py-3 text-sm font-black text-[#118a43] transition hover:bg-[#ebf8f0]"
+        >
+          Open Payout Dashboard <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          label="Ledger Paid"
+          value={moneyShort(paidAmount)}
+          detail={`${rows.filter((row) => isPayoutPaid(row.status)).length} paid / released rows`}
+          icon={<CheckCircle2 className="h-5 w-5" />}
+          tone="bg-emerald-50 text-[#118a43]"
+        />
+        <KpiCard
+          label="Ledger Pending"
+          value={moneyShort(pendingAmount)}
+          detail="Ready, pending, or processing"
+          icon={<WalletCards className="h-5 w-5" />}
+          tone="bg-sky-50 text-sky-600"
+        />
+        <KpiCard
+          label="Ledger Failed"
+          value={moneyShort(failedAmount)}
+          detail="Failed, declined, or errored"
+          icon={<AlertTriangle className="h-5 w-5" />}
+          tone="bg-rose-50 text-rose-600"
+        />
+        <KpiCard
+          label="Manual / Bonus Rows"
+          value={manualRows.toLocaleString()}
+          detail="Payouts without a booking link"
+          icon={<HandCoins className="h-5 w-5" />}
+          tone="bg-violet-50 text-violet-600"
+        />
+      </div>
+
+      <div className="mt-6 overflow-hidden rounded-2xl border border-emerald-50">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left">
+            <thead className="bg-[#f5fcf8] text-xs font-black uppercase tracking-[0.08em] text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Guru</th>
+                <th className="px-4 py-3">Source</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Reference</th>
+                <th className="px-4 py-3">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice(0, 12).map((row) => (
+                <tr key={row.id} className="border-t border-emerald-50 transition hover:bg-[#fafefb]">
+                  <td className="px-4 py-3">
+                    <AvatarBadge
+                      name={row.guruName}
+                      subtitle={row.bookingId ? `Booking ${row.bookingId.slice(0, 10)}` : "Manual payout"}
+                      avatarUrl={row.guruAvatarUrl}
+                      tone="green"
+                      size="sm"
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-600">{row.sourceLabel}</td>
+                  <td className="px-4 py-3 text-sm font-black text-[#163127]">{money(row.amount)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${getStatusBadgeClasses(row.status)}`}>
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-500">
+                    {row.reference ? row.reference.slice(0, 22) : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-600">
+                    <Link href={row.href} className="hover:text-[#118a43]">
+                      {row.payoutDate || row.createdAt}
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm font-semibold text-slate-500">
+                    No guru_payouts rows found yet.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1954,7 +2235,7 @@ export default async function AdminCommissionsPage({ searchParams }: { searchPar
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-[#118a43]"><span className="h-2 w-2 rounded-full bg-[#118a43]" />Live Stripe + ledger truth</span>
             </div>
             <p className="mt-2 max-w-4xl text-sm font-medium leading-6 text-slate-500 sm:text-base">
-              End-to-end view of customer payments, marketplace support fees from booking_payments, partner commissions, referral rewards, Guru net payouts, refunds, holds, and net released funds.
+              End-to-end view of customer payments, marketplace support fees from booking_payments, partner commissions, referral rewards, Guru net payouts (including manual / welcome bonuses), refunds, holds, and net released funds.
             </p>
             {payoutFocus ? (
               <p className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
@@ -1988,18 +2269,18 @@ export default async function AdminCommissionsPage({ searchParams }: { searchPar
           <FlowCard step="04" label="Partner Commissions" value={moneyShort(commissions.totals.partnerCommissions)} detail={`${percent(commissions.totals.partnerRate)} of gross`} icon={<Users className="h-5 w-5" />} tone="bg-violet-50 text-violet-600" />
           <FlowCard step="05" label="Referral Rewards" value={moneyShort(commissions.totals.referralRewardPendingAmount)} detail="Pending liability" icon={<HandCoins className="h-5 w-5" />} tone="bg-amber-50 text-amber-600" />
           <FlowCard step="06" label="Guru Net Payouts" value={moneyShort(commissions.totals.guruNetPayouts)} detail="To Gurus" icon={<WalletCards className="h-5 w-5" />} tone="bg-emerald-50 text-[#118a43]" />
-          <FlowCard step="07" label="Net Released" value={moneyShort(commissions.totals.netReleased)} detail={`${percent(releaseRate)} release rate`} icon={<CheckCircle2 className="h-5 w-5" />} tone="bg-emerald-50 text-[#118a43]" />
+          <FlowCard step="07" label="Net Released" value={moneyShort(commissions.totals.netReleased)} detail={`${commissions.totals.releasedRows} ledger paid · ${percent(releaseRate)} rate`} icon={<CheckCircle2 className="h-5 w-5" />} tone="bg-emerald-50 text-[#118a43]" />
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
         <KpiCard label="Gross Sales Volume" value={moneyShort(commissions.totals.grossSales)} detail="Real booking value" icon={<TrendingUp className="h-5 w-5" />} tone="bg-emerald-50 text-[#118a43]" />
         <KpiCard label="Platform Fees" value={moneyShort(commissions.totals.platformFees)} detail={`${percent(commissions.totals.takeRate)} of gross`} icon={<HandCoins className="h-5 w-5" />} tone="bg-orange-50 text-orange-600" />
-        <KpiCard label="Guru Net Payouts" value={moneyShort(commissions.totals.guruNetPayouts)} detail="Total owed to Gurus" icon={<WalletCards className="h-5 w-5" />} tone="bg-emerald-50 text-[#118a43]" />
+        <KpiCard label="Guru Net Payouts" value={moneyShort(commissions.totals.guruNetPayouts)} detail="Booking obligation total" icon={<WalletCards className="h-5 w-5" />} tone="bg-emerald-50 text-[#118a43]" />
         <KpiCard label="Partner Commissions" value={moneyShort(commissions.totals.partnerCommissions)} detail="Referral and partner payouts" icon={<Users className="h-5 w-5" />} tone="bg-violet-50 text-violet-600" />
         <KpiCard label="Referral Rewards" value={moneyShort(commissions.totals.referralRewardPendingAmount)} detail="Pending reward liability" icon={<HandCoins className="h-5 w-5" />} tone="bg-amber-50 text-amber-600" />
         <KpiCard label="Held Payouts" value={moneyShort(commissions.totals.heldAmount)} detail="Needs review" icon={<AlertTriangle className="h-5 w-5" />} tone="bg-amber-50 text-amber-600" />
-        <KpiCard label="Net Released" value={moneyShort(commissions.totals.netReleased)} detail={`${percent(releaseRate)} payout completion`} icon={<CheckCircle2 className="h-5 w-5" />} tone="bg-emerald-50 text-[#118a43]" />
+        <KpiCard label="Net Released" value={moneyShort(commissions.totals.netReleased)} detail={`${moneyShort(commissions.totals.ledgerPendingAmount)} pending in ledger`} icon={<CheckCircle2 className="h-5 w-5" />} tone="bg-emerald-50 text-[#118a43]" />
       </section>
 
       <AnnualTrendChart points={commissions.trendPoints} />
@@ -2020,6 +2301,14 @@ export default async function AdminCommissionsPage({ searchParams }: { searchPar
       />
 
       <ReferralRewardsPanel summary={commissions.referralRewards} />
+
+      <PayoutLedgerPanel
+        rows={commissions.payoutLedger}
+        paidAmount={commissions.totals.ledgerPaidAmount}
+        pendingAmount={commissions.totals.ledgerPendingAmount}
+        failedAmount={commissions.totals.ledgerFailedAmount}
+        manualRows={commissions.totals.ledgerManualRows}
+      />
 
       <section className="grid gap-6 xl:grid-cols-3">
         <DonutCard
