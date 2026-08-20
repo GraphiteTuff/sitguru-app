@@ -548,6 +548,15 @@ function SitGuruQuickReplyBox({
       <div className="border-b border-emerald-100 bg-emerald-50/90 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
+            <Link
+              href={closeHref}
+              aria-label="Close SitGuru Quick Chat"
+              title="Close quick chat"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+            >
+              <X className="h-4 w-4" strokeWidth={2.5} />
+            </Link>
+
             <div className="relative shrink-0">
               <Avatar name={otherName} imageUrl={otherImageUrl} compact />
               <span
@@ -570,23 +579,12 @@ function SitGuruQuickReplyBox({
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            <Link
-              href={inboxHref}
-              className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-700 transition hover:bg-emerald-50"
-            >
-              Inbox
-            </Link>
-
-            <Link
-              href={closeHref}
-              aria-label="Close SitGuru Quick Chat"
-              title="Close quick chat"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
-            >
-              <X className="h-4 w-4" />
-            </Link>
-          </div>
+          <Link
+            href={inboxHref}
+            className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-black text-emerald-700 transition hover:bg-emerald-50"
+          >
+            Inbox
+          </Link>
         </div>
       </div>
 

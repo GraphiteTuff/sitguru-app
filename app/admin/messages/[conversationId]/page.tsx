@@ -1214,7 +1214,7 @@ function AdminQuickChatBox({
     >
     <aside className="overflow-hidden rounded-[1.5rem] border border-green-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.22)]">
       <div className="border-b border-green-100 bg-green-50 p-4">
-        <div className="flex items-start justify-between gap-3 pr-12">
+        <div className="flex items-start justify-between gap-3 pl-12">
           <div className="flex min-w-0 items-center gap-3">
             <Avatar
               name="SitGuru Admin"
