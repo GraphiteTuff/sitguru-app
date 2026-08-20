@@ -386,7 +386,7 @@ export default function CreateManualGuruPayoutForm({
         </button>
         <p className="text-xs font-bold text-slate-500">
           {payoutType === "guru"
-            ? "After create: Dry Run first, then Release. Stripe uses platform balance; PayPal uses the SitGuru PayPal payouts rail."
+            ? "After create: Dry Run first (checks Stripe platform available balance), then Release. PayPal rail validates funding on Release."
             : payoutType === "pet_parent"
               ? "Pet Parent payouts create SitGuru account credit / welcome-bonus liability (not Stripe Release)."
               : "Non-Guru payouts are queued for admin review (not Stripe Release)."}

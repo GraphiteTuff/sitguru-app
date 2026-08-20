@@ -30,32 +30,25 @@ function asString(value: unknown) {
 
 function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function firstString(row: DbRow | undefined | null, keys: string[]) {
   if (!row) return "";
-
   for (const key of keys) {
     const value = asString(row[key]);
-
     if (value) return value;
   }
-
   return "";
 }
 
 function firstNumber(row: DbRow | undefined | null, keys: string[]) {
   if (!row) return 0;
-
   for (const key of keys) {
     const value = asNumber(row[key]);
-
     if (value > 0) return value;
   }
-
   return 0;
 }
 
@@ -63,6 +56,22 @@ function normalizeStatus(value: unknown) {
   return String(value || "").trim().toLowerCase();
 }
 
+function hasColumn(row: DbRow, column: string) {
+  return Object.prototype.hasOwnProperty.call(row, column);
+}
+
+function filterPatchToExistingColumns(row: DbRow, patch: DbRow) {
+  const filtered: DbRow = {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    if (hasColumn(row, key)) filtered[key] = value;
+  }
+  return filtered;
+}
+
+function formatUsd(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
 
 async function getAuthenticatedAdmin() {
   const financeCheck = await requireFinanceAdminApi();
@@ -116,18 +125,25 @@ function getExistingStripeTransferId(row: DbRow) {
   const value = firstString(row, [
     "stripe_transfer_id",
     "transfer_id",
-    "stripe_payout_id",
+    "paypal_payout_id",
+    "paypal_batch_id",
     "transaction_reference",
+    "external_reference",
+    "provider_reference",
     "reference",
   ]);
 
-  // pending:* markers store the chosen rail before money moves.
   if (!value || value.startsWith("pending:")) return "";
   return value;
 }
 
 function getPreferredPayoutRail(row: DbRow): "stripe" | "paypal" | null {
-  const marker = firstString(row, ["stripe_transfer_id"]).toLowerCase();
+  const marker = firstString(row, [
+    "stripe_transfer_id",
+    "transaction_reference",
+    "reference",
+  ]).toLowerCase();
+
   if (marker === "pending:paypal") return "paypal";
   if (marker === "pending:stripe") return "stripe";
   return null;
@@ -140,7 +156,6 @@ function getPayoutAmountDollars(row: DbRow) {
     "guru_net_amount_cents",
     "net_amount_cents",
   ]);
-
   if (cents > 0) return cents / 100;
 
   return firstNumber(row, [
@@ -165,10 +180,8 @@ function getStripeAccountId(...rows: Array<DbRow | null | undefined>) {
       "stripe_connected_account_id",
       "stripe_destination_account_id",
     ]);
-
     if (accountId) return accountId;
   }
-
   return "";
 }
 
@@ -182,10 +195,8 @@ function getRecipientName(...rows: Array<DbRow | null | undefined>) {
       "recipient_name",
       "email",
     ]);
-
     if (name) return name;
   }
-
   return "Guru";
 }
 
@@ -200,156 +211,237 @@ function isReleaseableStatus(status: string) {
   ].includes(status);
 }
 
-async function safeUpdateGuruPayout(payoutId: string, patches: DbRow[]) {
+function getStripeClient() {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) throw new Error("Missing STRIPE_SECRET_KEY.");
+  return new Stripe(stripeKey);
+}
+
+async function getStripePlatformAvailableUsdCents() {
+  const stripe = getStripeClient();
+  const balance = await stripe.balance.retrieve();
+  return balance.available
+    .filter((entry) => entry.currency.toLowerCase() === "usd")
+    .reduce((sum, entry) => sum + entry.amount, 0);
+}
+
+async function safeUpdateGuruPayout(
+  payoutId: string,
+  payoutRow: DbRow,
+  patches: DbRow[],
+) {
   let lastError: unknown = null;
+  let attempted = false;
 
   for (const patch of patches) {
+    const filteredPatch = filterPatchToExistingColumns(payoutRow, patch);
+    if (!Object.keys(filteredPatch).length) continue;
+
+    attempted = true;
     const { error } = await supabaseAdmin
       .from("guru_payouts")
-      .update(patch)
+      .update(filteredPatch)
       .eq("id", payoutId);
 
-    if (!error) return { ok: true, error: null };
+    if (!error) {
+      return { ok: true, error: null, patch: filteredPatch };
+    }
 
     lastError = error;
   }
 
-  return { ok: false, error: lastError };
+  return {
+    ok: false,
+    error:
+      lastError ||
+      new Error(
+        attempted
+          ? "Unable to update guru_payouts."
+          : "No compatible guru_payouts columns were available to update.",
+      ),
+    patch: null,
+  };
 }
 
-async function markProcessing(payoutId: string) {
-  return safeUpdateGuruPayout(payoutId, [
+async function markProcessing(payoutId: string, payoutRow: DbRow) {
+  const now = new Date().toISOString();
+
+  return safeUpdateGuruPayout(payoutId, payoutRow, [
     {
       status: "processing",
       payout_status: "processing",
-      updated_at: new Date().toISOString(),
+      release_status: "processing",
+      updated_at: now,
     },
     {
       status: "processing",
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     },
     {
       payout_status: "processing",
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     },
     {
-      status: "processing",
+      release_status: "processing",
+      updated_at: now,
     },
-    {
-      payout_status: "processing",
-    },
+    { status: "processing" },
+    { payout_status: "processing" },
+    { release_status: "processing" },
   ]);
 }
 
 async function markReleased({
   payoutId,
-  stripeTransferId,
+  payoutRow,
+  externalReference,
   amountCents,
+  rail,
 }: {
   payoutId: string;
-  stripeTransferId: string;
+  payoutRow: DbRow;
+  externalReference: string;
   amountCents: number;
+  rail: "stripe" | "paypal";
 }) {
   const now = new Date().toISOString();
+  const statusCandidates = ["paid", "released", "completed", "complete"];
+  const patches: DbRow[] = [];
 
-  return safeUpdateGuruPayout(payoutId, [
-    {
-      status: "paid",
-      payout_status: "paid",
-      stripe_transfer_id: stripeTransferId,
-      transaction_reference: stripeTransferId,
+  for (const terminalStatus of statusCandidates) {
+    patches.push({
+      status: terminalStatus,
+      payout_status: terminalStatus,
+      release_status: terminalStatus,
+      stripe_transfer_id: rail === "stripe" ? externalReference : undefined,
+      paypal_payout_id: rail === "paypal" ? externalReference : undefined,
+      transaction_reference: externalReference,
+      external_reference: externalReference,
+      provider_reference: externalReference,
       amount_cents: amountCents,
+      payout_date: now,
       released_at: now,
       paid_at: now,
+      completed_at: now,
       updated_at: now,
-    },
-    {
-      status: "paid",
-      stripe_transfer_id: stripeTransferId,
-      transaction_reference: stripeTransferId,
-      released_at: now,
-      paid_at: now,
+    });
+
+    patches.push({
+      status: terminalStatus,
+      payout_status: terminalStatus,
+      release_status: terminalStatus,
+      transaction_reference: externalReference,
+      payout_date: now,
       updated_at: now,
-    },
-    {
-      payout_status: "paid",
-      stripe_transfer_id: stripeTransferId,
-      transaction_reference: stripeTransferId,
-      released_at: now,
-      paid_at: now,
+    });
+
+    if (rail === "stripe") {
+      patches.push({
+        status: terminalStatus,
+        payout_status: terminalStatus,
+        release_status: terminalStatus,
+        stripe_transfer_id: externalReference,
+        payout_date: now,
+        updated_at: now,
+      });
+      patches.push({
+        payout_status: terminalStatus,
+        stripe_transfer_id: externalReference,
+        payout_date: now,
+      });
+      patches.push({
+        payout_status: terminalStatus,
+        stripe_transfer_id: externalReference,
+      });
+    }
+
+    if (rail === "paypal") {
+      patches.push({
+        status: terminalStatus,
+        payout_status: terminalStatus,
+        release_status: terminalStatus,
+        paypal_payout_id: externalReference,
+        payout_date: now,
+        updated_at: now,
+      });
+      patches.push({
+        payout_status: terminalStatus,
+        stripe_transfer_id: externalReference,
+        payout_date: now,
+      });
+      patches.push({
+        payout_status: terminalStatus,
+        stripe_transfer_id: externalReference,
+      });
+    }
+
+    patches.push({
+      status: terminalStatus,
+      payout_status: terminalStatus,
+      release_status: terminalStatus,
       updated_at: now,
-    },
-    {
-      status: "paid",
-      stripe_transfer_id: stripeTransferId,
-      updated_at: now,
-    },
-    {
-      payout_status: "paid",
-      stripe_transfer_id: stripeTransferId,
-      updated_at: now,
-    },
-    {
-      status: "paid",
-      transaction_reference: stripeTransferId,
-    },
-    {
-      payout_status: "paid",
-      transaction_reference: stripeTransferId,
-    },
-  ]);
+    });
+    patches.push({
+      status: terminalStatus,
+      payout_status: terminalStatus,
+      release_status: terminalStatus,
+    });
+    patches.push({ payout_status: terminalStatus });
+  }
+
+  return safeUpdateGuruPayout(payoutId, payoutRow, patches);
 }
 
 async function markFailed({
   payoutId,
+  payoutRow,
   failureReason,
 }: {
   payoutId: string;
+  payoutRow: DbRow;
   failureReason: string;
 }) {
   const now = new Date().toISOString();
 
-  return safeUpdateGuruPayout(payoutId, [
+  return safeUpdateGuruPayout(payoutId, payoutRow, [
     {
       status: "failed",
       payout_status: "failed",
+      release_status: "failed",
       failure_reason: failureReason,
       failed_at: now,
       updated_at: now,
     },
     {
       status: "failed",
-      failure_reason: failureReason,
-      failed_at: now,
-      updated_at: now,
-    },
-    {
       payout_status: "failed",
+      release_status: "failed",
       failure_reason: failureReason,
-      failed_at: now,
       updated_at: now,
     },
     {
       status: "failed",
-      failure_reason: failureReason,
-    },
-    {
       payout_status: "failed",
-      failure_reason: failureReason,
+      release_status: "failed",
+      updated_at: now,
     },
     {
       status: "failed",
-    },
-    {
       payout_status: "failed",
+      release_status: "failed",
     },
+    { payout_status: "failed" },
   ]);
 }
 
 async function getGuruRecord(guruId: string) {
   if (!guruId) return null;
 
-  const byId = await supabaseAdmin.from("gurus").select("*").eq("id", guruId).maybeSingle();
+  const byId = await supabaseAdmin
+    .from("gurus")
+    .select("*")
+    .eq("id", guruId)
+    .maybeSingle();
 
   if (byId.data) return byId.data as DbRow;
 
@@ -360,28 +452,33 @@ async function getGuruRecord(guruId: string) {
     .maybeSingle();
 
   if (byUserId.data) return byUserId.data as DbRow;
-
   return null;
 }
 
-async function getProfileRecord(guruId: string) {
-  if (!guruId) return null;
+async function getProfileRecord(guruId: string, guru: DbRow | null) {
+  if (!guruId && !guru) return null;
 
-  const byId = await supabaseAdmin
+  const guruUserId = firstString(guru, ["user_id", "profile_id"]);
+  const profileId = guruUserId || guruId;
+  if (!profileId) return null;
+
+  const byProfileId = await supabaseAdmin
     .from("profiles")
     .select("*")
-    .eq("id", guruId)
+    .eq("id", profileId)
     .maybeSingle();
 
-  if (byId.data) return byId.data as DbRow;
+  if (byProfileId.data) return byProfileId.data as DbRow;
 
-  const byUserId = await supabaseAdmin
-    .from("profiles")
-    .select("*")
-    .eq("user_id", guruId)
-    .maybeSingle();
+  if (guruId && guruId !== profileId) {
+    const byGuruId = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", guruId)
+      .maybeSingle();
 
-  if (byUserId.data) return byUserId.data as DbRow;
+    if (byGuruId.data) return byGuruId.data as DbRow;
+  }
 
   return null;
 }
@@ -411,7 +508,13 @@ async function getPaypalDestination(guru: DbRow | null, profile: DbRow | null) {
     ) {
       continue;
     }
-    const status = `${firstString(row, ["status", "onboarding_status", "account_status"])}`.toLowerCase();
+
+    const status = firstString(row, [
+      "status",
+      "onboarding_status",
+      "account_status",
+    ]).toLowerCase();
+
     if (
       status.includes("disabled") ||
       status.includes("removed") ||
@@ -419,11 +522,13 @@ async function getPaypalDestination(guru: DbRow | null, profile: DbRow | null) {
     ) {
       continue;
     }
+
     const email = firstString(row, ["provider_email"]);
     const merchantId = firstString(row, [
       "provider_merchant_id",
       "provider_account_id",
     ]);
+
     if (email || merchantId) return { email, merchantId };
   }
 
@@ -501,14 +606,7 @@ async function createStripeTransfer({
   amountCents: number;
   adminUserId: string;
 }) {
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
-
-  if (!stripeKey) {
-    throw new Error("Missing STRIPE_SECRET_KEY.");
-  }
-
-  const stripe = new Stripe(stripeKey);
-
+  const stripe = getStripeClient();
   const payoutId = getPayoutId(payout);
   const bookingId = getBookingId(payout);
   const guruId = getGuruId(payout);
@@ -521,8 +619,6 @@ async function createStripeTransfer({
     );
   }
 
-  // Include destination so a retry after fixing the Connect account does not
-  // collide with Stripe's 24h idempotency cache from a prior failed attempt.
   const idempotencyKey = `sitguru-guru-payout-${payoutId}-${amountCents}-${destination}`;
 
   return stripe.transfers.create(
@@ -540,9 +636,7 @@ async function createStripeTransfer({
         source: "sitguru_admin_release",
       },
     },
-    {
-      idempotencyKey,
-    },
+    { idempotencyKey },
   );
 }
 
@@ -566,20 +660,18 @@ async function releaseOnePayout({
   }
 
   const existingTransferId = getExistingStripeTransferId(payout);
-
   if (existingTransferId) {
     return {
       payoutId,
       status: "skipped",
       stripeTransferId: existingTransferId,
-      message: "This payout already has a Stripe transfer/reference and was skipped.",
+      message:
+        "This payout already has a Stripe/PayPal transfer reference and was skipped.",
     };
   }
 
   const currentStatus = getPayoutStatus(payout);
 
-  // Only skip terminal / in-flight rows that already have money movement.
-  // "processing" with no stripe_transfer_id means a prior attempt stalled — allow retry.
   if (["paid", "released", "complete", "completed"].includes(currentStatus)) {
     return {
       payoutId,
@@ -610,11 +702,12 @@ async function releaseOnePayout({
   }
 
   const guruId = getGuruId(payout);
-  const [guru, profile] = await Promise.all([getGuruRecord(guruId), getProfileRecord(guruId)]);
-
+  const guru = await getGuruRecord(guruId);
+  const profile = await getProfileRecord(guruId, guru);
   const stripeDestination = getStripeAccountId(payout, guru, profile);
   const paypal = await getPaypalDestination(guru, profile);
   const preferredRail = getPreferredPayoutRail(payout);
+
   const rail =
     preferredRail === "paypal" && (paypal.email || paypal.merchantId)
       ? "paypal"
@@ -637,22 +730,69 @@ async function releaseOnePayout({
     };
   }
 
+  let stripeAvailableCents: number | null = null;
+
+  if (rail === "stripe") {
+    try {
+      stripeAvailableCents = await getStripePlatformAvailableUsdCents();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to read SitGuru Stripe platform balance.";
+
+      return {
+        payoutId,
+        status: "failed",
+        amount,
+        amountCents,
+        message: `Could not verify SitGuru Stripe platform available balance. ${message}`,
+      };
+    }
+
+    if (stripeAvailableCents < amountCents) {
+      return {
+        payoutId,
+        status: "failed",
+        amount,
+        amountCents,
+        message: `SitGuru Stripe platform available balance is ${formatUsd(
+          stripeAvailableCents,
+        )}, which does not cover this ${formatUsd(amountCents)} payout.`,
+      };
+    }
+  }
+
   if (dryRun) {
     const destinationLabel =
       rail === "stripe"
         ? stripeDestination
         : paypal.email || paypal.merchantId;
+
+    if (rail === "stripe") {
+      return {
+        payoutId,
+        status: "dry_run",
+        amount,
+        amountCents,
+        message: `Dry run passed. SitGuru Stripe available balance is ${formatUsd(
+          stripeAvailableCents || 0,
+        )}. This would transfer ${formatUsd(amountCents)} to ${destinationLabel}.`,
+      };
+    }
+
     return {
       payoutId,
       status: "dry_run",
       amount,
       amountCents,
-      message: `Dry run passed. This would send ${amountCents} cents via ${rail} to ${destinationLabel}.`,
+      message: `Dry run passed. This would send ${formatUsd(
+        amountCents,
+      )} via PayPal to ${destinationLabel}. PayPal will validate available funding when released.`,
     };
   }
 
-  const processingUpdate = await markProcessing(payoutId);
-
+  const processingUpdate = await markProcessing(payoutId, payout);
   if (!processingUpdate.ok) {
     return {
       payoutId,
@@ -685,8 +825,10 @@ async function releaseOnePayout({
 
     const releasedUpdate = await markReleased({
       payoutId,
-      stripeTransferId: transfer.id,
+      payoutRow: payout,
+      externalReference: transfer.id,
       amountCents,
+      rail,
     });
 
     if (!releasedUpdate.ok) {
@@ -696,8 +838,9 @@ async function releaseOnePayout({
         amount,
         amountCents,
         stripeTransferId: transfer.id,
-        message:
-          `${rail === "stripe" ? "Stripe" : "PayPal"} payout was created, but Supabase could not save all release fields. Check the guru_payouts table columns.`,
+        message: `${
+          rail === "stripe" ? "Stripe" : "PayPal"
+        } payout was created successfully, but SitGuru could not update the payout row to a terminal status. Do not release this payout again. Review guru_payouts schema and the external transfer reference.`,
       };
     }
 
@@ -709,14 +852,16 @@ async function releaseOnePayout({
       stripeTransferId: transfer.id,
       message:
         rail === "stripe"
-          ? "Stripe transfer created and Supabase payout marked paid."
-          : "PayPal payout created and Supabase payout marked paid.",
+          ? "Stripe transfer created and SitGuru payout marked paid."
+          : "PayPal payout created and SitGuru payout marked paid.",
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown payout transfer error.";
+    const message =
+      error instanceof Error ? error.message : "Unknown payout transfer error.";
 
     await markFailed({
       payoutId,
+      payoutRow: payout,
       failureReason: message,
     });
 
@@ -752,24 +897,20 @@ export async function POST(request: Request) {
     body = (await request.json()) as ReleasePayoutBody;
   } catch {
     return NextResponse.json(
-      {
-        ok: false,
-        error: "Invalid JSON body.",
-      },
+      { ok: false, error: "Invalid JSON body." },
       { status: 400 },
     );
   }
 
   const payoutIds = Array.from(
-    new Set([...(body.payoutIds || []), body.payoutId].filter(Boolean) as string[]),
+    new Set(
+      [...(body.payoutIds || []), body.payoutId].filter(Boolean) as string[],
+    ),
   );
 
   if (!payoutIds.length) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: "Provide payoutId or payoutIds.",
-      },
+      { ok: false, error: "Provide payoutId or payoutIds." },
       { status: 400 },
     );
   }
@@ -793,7 +934,6 @@ export async function POST(request: Request) {
   const payoutRows = Array.isArray(payouts) ? (payouts as DbRow[]) : [];
   const foundIds = new Set(payoutRows.map((row) => getPayoutId(row)));
   const missingIds = payoutIds.filter((id) => !foundIds.has(id));
-
   const results: ReleaseResult[] = [];
 
   for (const missingId of missingIds) {
@@ -805,13 +945,13 @@ export async function POST(request: Request) {
   }
 
   for (const payout of payoutRows) {
-    const result = await releaseOnePayout({
-      payout,
-      adminUserId: admin.user.id,
-      dryRun: body.dryRun === true,
-    });
-
-    results.push(result);
+    results.push(
+      await releaseOnePayout({
+        payout,
+        adminUserId: admin.user.id,
+        dryRun: body.dryRun === true,
+      }),
+    );
   }
 
   const released = results.filter((result) => result.status === "released").length;
