@@ -483,7 +483,8 @@ function isExcludedManualPayoutRecipient(name: string, email: string) {
 async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[]> {
   // Only select columns that exist on live gurus. Unknown Stripe column names
   // make PostgREST fail the whole query and safeSelect returns [] — empty Guru dropdown.
-  const [guruRows, ambassadorRows, partnerRows, profileRows] = await Promise.all([
+  const [guruRows, ambassadorRows, partnerRows, profileRows, paypalAccountRowsRaw] =
+    await Promise.all([
     safeSelect(
       "gurus",
       "id, user_id, profile_id, display_name, full_name, name, email, stripe_account_id, payouts_enabled, stripe_onboarding_complete, stripe_connect_status, is_test_account, status",
@@ -504,7 +505,46 @@ async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[
       "id, user_id, full_name, display_name, name, email, role, account_type",
       5000,
     ),
+    safeSelect(
+      "user_payout_accounts",
+      "user_id, provider, provider_email, provider_merchant_id, status, onboarding_status, payouts_enabled, account_status",
+      5000,
+    ),
   ]);
+
+  const paypalByUserId = new Map<
+    string,
+    { email: string; merchantId: string }
+  >();
+  for (const account of paypalAccountRowsRaw) {
+    const provider = getFirst(account, ["provider"]).toLowerCase();
+    if (provider && provider !== "paypal" && provider !== "paypal_payouts" && provider !== "venmo") {
+      continue;
+    }
+    const userId = getFirst(account, ["user_id"]);
+    if (!userId) continue;
+    const email = getFirst(account, ["provider_email"]);
+    const merchantId = getFirst(account, [
+      "provider_merchant_id",
+      "paypal_merchant_id",
+      "provider_account_id",
+    ]);
+    if (!email && !merchantId) continue;
+    const status = `${getFirst(account, ["status", "onboarding_status", "account_status"])}`.toLowerCase();
+    if (
+      status.includes("disabled") ||
+      status.includes("removed") ||
+      status.includes("failed")
+    ) {
+      continue;
+    }
+    const key = normalizeLookupId(userId);
+    const existing = paypalByUserId.get(key);
+    paypalByUserId.set(key, {
+      email: email || existing?.email || "",
+      merchantId: merchantId || existing?.merchantId || "",
+    });
+  }
 
   const profileById = new Map<string, SafeRow>();
   for (const profile of profileRows) {
@@ -576,6 +616,9 @@ async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[
       stripeAccountId: stripeKeys.length
         ? getFirst(row, stripeKeys) || undefined
         : undefined,
+      paypalEmail: paypalByUserId.get(normalizeLookupId(userId || id))?.email || undefined,
+      paypalMerchantId:
+        paypalByUserId.get(normalizeLookupId(userId || id))?.merchantId || undefined,
     };
   };
 
@@ -592,10 +635,12 @@ async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[
     )
     .filter(Boolean) as ManualPayoutRecipientOption[];
 
-  // Prefer Stripe-ready Gurus first so the $10 Welcome Bonus test picks a real destination.
+  // Prefer payout-ready Gurus first (Stripe preferred, then PayPal).
   gurus.sort((a, b) => {
-    const aReady = a.stripeAccountId ? 1 : 0;
-    const bReady = b.stripeAccountId ? 1 : 0;
+    const aReady =
+      (a.stripeAccountId ? 2 : 0) + (a.paypalEmail || a.paypalMerchantId ? 1 : 0);
+    const bReady =
+      (b.stripeAccountId ? 2 : 0) + (b.paypalEmail || b.paypalMerchantId ? 1 : 0);
     if (bReady !== aReady) return bReady - aReady;
     return a.name.localeCompare(b.name);
   });
@@ -646,6 +691,8 @@ async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[
         email: recipient.email,
         userId: recipient.userId,
         stripeAccountId: recipient.stripeAccountId,
+        paypalEmail: recipient.paypalEmail,
+        paypalMerchantId: recipient.paypalMerchantId,
       };
 
       return [
@@ -663,8 +710,10 @@ async function getManualPayoutRecipients(): Promise<ManualPayoutRecipientOption[
     ...rewardPool,
   ].sort((a, b) => {
     if (a.type !== b.type) return a.type.localeCompare(b.type);
-    const aReady = a.stripeAccountId ? 1 : 0;
-    const bReady = b.stripeAccountId ? 1 : 0;
+    const aReady =
+      (a.stripeAccountId ? 2 : 0) + (a.paypalEmail || a.paypalMerchantId ? 1 : 0);
+    const bReady =
+      (b.stripeAccountId ? 2 : 0) + (b.paypalEmail || b.paypalMerchantId ? 1 : 0);
     if (a.type === "guru" && bReady !== aReady) return bReady - aReady;
     return a.name.localeCompare(b.name);
   });

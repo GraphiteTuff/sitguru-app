@@ -19,6 +19,8 @@ export type ManualPayoutRecipientOption = {
   name: string;
   email: string;
   stripeAccountId?: string;
+  paypalEmail?: string;
+  paypalMerchantId?: string;
   userId?: string;
   type: ManualPayoutType;
 };
@@ -56,6 +58,9 @@ export default function CreateManualGuruPayoutForm({
   const [amount, setAmount] = useState(String(defaultAmount));
   const [reason, setReason] = useState(defaultReason);
   const [status, setStatus] = useState("ready");
+  const [payoutMethod, setPayoutMethod] = useState<"auto" | "stripe" | "paypal">(
+    "auto",
+  );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<"slate" | "emerald" | "rose">("slate");
@@ -66,8 +71,10 @@ export default function CreateManualGuruPayoutForm({
         .filter((recipient) => recipient.type === payoutType)
         .sort((a, b) => {
           if (payoutType === "guru") {
-            const aReady = a.stripeAccountId ? 1 : 0;
-            const bReady = b.stripeAccountId ? 1 : 0;
+            const aReady =
+              (a.stripeAccountId ? 2 : 0) + (a.paypalEmail || a.paypalMerchantId ? 1 : 0);
+            const bReady =
+              (b.stripeAccountId ? 2 : 0) + (b.paypalEmail || b.paypalMerchantId ? 1 : 0);
             if (bReady !== aReady) return bReady - aReady;
           }
           return a.name.localeCompare(b.name);
@@ -111,6 +118,7 @@ export default function CreateManualGuruPayoutForm({
           amount: Number(amount),
           reason,
           status,
+          payoutMethod: payoutType === "guru" ? payoutMethod : undefined,
         }),
       });
 
@@ -236,17 +244,30 @@ export default function CreateManualGuruPayoutForm({
             <option value="" disabled>
               Select a {recipientLabel}
             </option>
-            {recipientsForType.map((recipient) => (
+            {recipientsForType.map((recipient) => {
+              const stripeReady = Boolean(recipient.stripeAccountId);
+              const paypalReady = Boolean(
+                recipient.paypalEmail || recipient.paypalMerchantId,
+              );
+              const railLabel =
+                payoutType === "guru"
+                  ? stripeReady && paypalReady
+                    ? " · Stripe + PayPal ready"
+                    : stripeReady
+                      ? " · Stripe ready"
+                      : paypalReady
+                        ? " · PayPal ready"
+                        : " · missing payout rail"
+                  : "";
+
+              return (
               <option key={`${recipient.type}-${recipient.id}`} value={recipient.id}>
                 {recipient.name}
                 {recipient.email ? ` · ${recipient.email}` : ""}
-                {payoutType === "guru"
-                  ? recipient.stripeAccountId
-                    ? " · Stripe ready"
-                    : " · missing Stripe"
-                  : ""}
+                {railLabel}
               </option>
-            ))}
+              );
+            })}
           </select>
           {recipientsForType.length === 0 ? (
             <span className="text-xs font-bold text-rose-700">
@@ -255,7 +276,7 @@ export default function CreateManualGuruPayoutForm({
           ) : (
             <span className="text-xs font-bold text-slate-500">
               {payoutType === "guru"
-                ? `${recipientsForType.filter((r) => r.stripeAccountId).length} of ${recipientsForType.length} Gurus have a Stripe connected account.`
+                ? `${recipientsForType.filter((r) => r.stripeAccountId).length} Stripe-ready · ${recipientsForType.filter((r) => r.paypalEmail || r.paypalMerchantId).length} PayPal-ready of ${recipientsForType.length} Gurus.`
                 : `${recipientsForType.length} ${recipientLabel.toLowerCase()} recipients available.`}
             </span>
           )}
@@ -306,11 +327,52 @@ export default function CreateManualGuruPayoutForm({
       </div>
 
       {selectedRecipient && payoutType === "guru" ? (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-          Stripe destination:{" "}
-          <span className="font-black text-slate-950">
-            {selectedRecipient.stripeAccountId || "Missing connected account"}
-          </span>
+        <div className="mt-4 space-y-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+          <p>
+            Stripe destination:{" "}
+            <span className="font-black text-slate-950">
+              {selectedRecipient.stripeAccountId || "Missing connected account"}
+            </span>
+          </p>
+          <p>
+            PayPal destination:{" "}
+            <span className="font-black text-slate-950">
+              {selectedRecipient.paypalEmail ||
+                selectedRecipient.paypalMerchantId ||
+                "Missing PayPal payout account"}
+            </span>
+          </p>
+          <label className="grid gap-2 pt-1">
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+              Payout rail
+            </span>
+            <select
+              value={payoutMethod}
+              onChange={(event) =>
+                setPayoutMethod(event.target.value as "auto" | "stripe" | "paypal")
+              }
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none ring-emerald-500 focus:ring-2"
+            >
+              <option value="auto">
+                Auto (Stripe if ready, otherwise PayPal)
+              </option>
+              <option
+                value="stripe"
+                disabled={!selectedRecipient.stripeAccountId}
+              >
+                Stripe Connect
+              </option>
+              <option
+                value="paypal"
+                disabled={
+                  !selectedRecipient.paypalEmail &&
+                  !selectedRecipient.paypalMerchantId
+                }
+              >
+                PayPal
+              </option>
+            </select>
+          </label>
         </div>
       ) : null}
 
@@ -324,7 +386,7 @@ export default function CreateManualGuruPayoutForm({
         </button>
         <p className="text-xs font-bold text-slate-500">
           {payoutType === "guru"
-            ? "After create: Dry Run first, then Release only if platform Stripe balance ≥ amount."
+            ? "After create: Dry Run first, then Release. Stripe uses platform balance; PayPal uses the SitGuru PayPal payouts rail."
             : payoutType === "pet_parent"
               ? "Pet Parent payouts create SitGuru account credit / welcome-bonus liability (not Stripe Release)."
               : "Non-Guru payouts are queued for admin review (not Stripe Release)."}

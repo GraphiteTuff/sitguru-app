@@ -22,6 +22,7 @@ type CreateManualPayoutBody = {
   amount?: number | string;
   reason?: string;
   status?: string;
+  payoutMethod?: string;
 };
 
 function asString(value: unknown) {
@@ -142,18 +143,70 @@ async function getPartnerRecord(partnerId: string) {
   return (data as DbRow | null) || null;
 }
 
+async function getPaypalDestinationForUser(userId: string) {
+  if (!userId) return { email: "", merchantId: "" };
+
+  const { data } = await supabaseAdmin
+    .from("user_payout_accounts")
+    .select(
+      "provider, provider_email, provider_merchant_id, provider_account_id, status, onboarding_status, account_status, payouts_enabled",
+    )
+    .eq("user_id", userId)
+    .limit(20);
+
+  const rows = Array.isArray(data) ? (data as DbRow[]) : [];
+  for (const row of rows) {
+    const provider = firstString(row, ["provider"]).toLowerCase();
+    if (
+      provider &&
+      provider !== "paypal" &&
+      provider !== "paypal_payouts" &&
+      provider !== "venmo"
+    ) {
+      continue;
+    }
+    const status = `${firstString(row, ["status", "onboarding_status", "account_status"])}`.toLowerCase();
+    if (
+      status.includes("disabled") ||
+      status.includes("removed") ||
+      status.includes("failed")
+    ) {
+      continue;
+    }
+    const email = firstString(row, ["provider_email"]);
+    const merchantId = firstString(row, [
+      "provider_merchant_id",
+      "provider_account_id",
+    ]);
+    if (email || merchantId) {
+      return { email, merchantId };
+    }
+  }
+
+  return { email: "", merchantId: "" };
+}
+
+function normalizePayoutMethod(value: unknown): "auto" | "stripe" | "paypal" {
+  const raw = asString(value).toLowerCase();
+  if (raw === "stripe") return "stripe";
+  if (raw === "paypal") return "paypal";
+  return "auto";
+}
+
 async function createGuruPayout({
   recipientId,
   amount,
   payoutStatus,
   reason,
   createdBy,
+  payoutMethod,
 }: {
   recipientId: string;
   amount: number;
   payoutStatus: string;
   reason: string;
   createdBy: string;
+  payoutMethod: "auto" | "stripe" | "paypal";
 }) {
   const guru = await getGuruRecord(recipientId);
 
@@ -165,32 +218,60 @@ async function createGuruPayout({
   }
 
   const resolvedGuruId = firstString(guru, ["id", "guru_id"]) || recipientId;
+  const guruUserId = firstString(guru, ["user_id", "profile_id", "id"]);
   const stripeAccountId = firstString(guru, [
     "stripe_account_id",
     "stripe_connect_account_id",
     "connected_account_id",
     "stripe_connected_account_id",
   ]);
+  const paypal = await getPaypalDestinationForUser(guruUserId);
   const recipientName =
     firstString(guru, ["display_name", "full_name", "name"]) || "Guru";
-  const recipientEmail = firstString(guru, ["email"]);
+  const recipientEmail = firstString(guru, ["email"]) || paypal.email;
 
-  if (!stripeAccountId) {
+  const resolvedMethod =
+    payoutMethod === "auto"
+      ? stripeAccountId
+        ? "stripe"
+        : paypal.email || paypal.merchantId
+          ? "paypal"
+          : "stripe"
+      : payoutMethod;
+
+  if (resolvedMethod === "stripe" && !stripeAccountId) {
     return NextResponse.json(
       {
         ok: false,
-        error: `${recipientName} does not have a Stripe connected account saved. Add stripe_account_id before creating a releasable payout.`,
+        error: `${recipientName} does not have a Stripe connected account. Choose PayPal or complete Stripe setup.`,
       },
       { status: 400 },
     );
   }
+
+  if (
+    resolvedMethod === "paypal" &&
+    !paypal.email &&
+    !paypal.merchantId
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `${recipientName} does not have a PayPal payout destination. Choose Stripe or complete PayPal setup.`,
+      },
+      { status: 400 },
+    );
+  }
+
+  const pendingRailMarker =
+    resolvedMethod === "paypal" ? "pending:paypal" : null;
 
   const { data, error } = await supabaseAdmin
     .from("guru_payouts")
     .insert({
       guru_id: resolvedGuruId,
       booking_id: null,
-      stripe_transfer_id: null,
+      stripe_transfer_id: pendingRailMarker,
       gross_amount: amount,
       sitguru_fee_amount: 0,
       net_amount: amount,
@@ -218,6 +299,7 @@ async function createGuruPayout({
     payout: {
       id: firstString(payout, ["id"]),
       payoutType: "guru",
+      payoutMethod: resolvedMethod,
       recipientId: resolvedGuruId,
       recipientName,
       recipientEmail,
@@ -227,14 +309,18 @@ async function createGuruPayout({
       netAmount: amount,
       payoutStatus,
       reason,
-      stripeAccountId,
+      stripeAccountId: stripeAccountId || null,
+      paypalEmail: paypal.email || null,
+      paypalMerchantId: paypal.merchantId || null,
       stripeTransferId: null,
       canRelease: true,
       ledgerSource: "guru_payouts",
       createdBy,
       createdAt: firstString(payout, ["created_at"]) || new Date().toISOString(),
       warning:
-        "Dry-run before Release. Do not release until SitGuru Stripe platform available balance covers this amount.",
+        resolvedMethod === "paypal"
+          ? "Dry-run before Release. PayPal rail will send via SitGuru PayPal payouts."
+          : "Dry-run before Release. Do not release until SitGuru Stripe platform available balance covers this amount.",
     },
   });
 }
@@ -637,6 +723,7 @@ export async function POST(request: Request) {
       payoutStatus,
       reason,
       createdBy,
+      payoutMethod: normalizePayoutMethod(body.payoutMethod),
     });
   }
 

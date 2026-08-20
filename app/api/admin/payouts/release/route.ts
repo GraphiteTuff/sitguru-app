@@ -3,6 +3,7 @@ import Stripe from "stripe";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
+import { paypalRequest } from "@/lib/paypal/server";
 
 export const dynamic = "force-dynamic";
 
@@ -112,13 +113,24 @@ function getPayoutStatus(row: DbRow) {
 }
 
 function getExistingStripeTransferId(row: DbRow) {
-  return firstString(row, [
+  const value = firstString(row, [
     "stripe_transfer_id",
     "transfer_id",
     "stripe_payout_id",
     "transaction_reference",
     "reference",
   ]);
+
+  // pending:* markers store the chosen rail before money moves.
+  if (!value || value.startsWith("pending:")) return "";
+  return value;
+}
+
+function getPreferredPayoutRail(row: DbRow): "stripe" | "paypal" | null {
+  const marker = firstString(row, ["stripe_transfer_id"]).toLowerCase();
+  if (marker === "pending:paypal") return "paypal";
+  if (marker === "pending:stripe") return "stripe";
+  return null;
 }
 
 function getPayoutAmountDollars(row: DbRow) {
@@ -374,6 +386,108 @@ async function getProfileRecord(guruId: string) {
   return null;
 }
 
+async function getPaypalDestination(guru: DbRow | null, profile: DbRow | null) {
+  const userId =
+    firstString(guru, ["user_id", "profile_id", "id"]) ||
+    firstString(profile, ["id", "user_id"]);
+
+  if (!userId) return { email: "", merchantId: "" };
+
+  const { data } = await supabaseAdmin
+    .from("user_payout_accounts")
+    .select(
+      "provider, provider_email, provider_merchant_id, provider_account_id, status, onboarding_status, account_status",
+    )
+    .eq("user_id", userId)
+    .limit(20);
+
+  for (const row of (Array.isArray(data) ? data : []) as DbRow[]) {
+    const provider = firstString(row, ["provider"]).toLowerCase();
+    if (
+      provider &&
+      provider !== "paypal" &&
+      provider !== "paypal_payouts" &&
+      provider !== "venmo"
+    ) {
+      continue;
+    }
+    const status = `${firstString(row, ["status", "onboarding_status", "account_status"])}`.toLowerCase();
+    if (
+      status.includes("disabled") ||
+      status.includes("removed") ||
+      status.includes("failed")
+    ) {
+      continue;
+    }
+    const email = firstString(row, ["provider_email"]);
+    const merchantId = firstString(row, [
+      "provider_merchant_id",
+      "provider_account_id",
+    ]);
+    if (email || merchantId) return { email, merchantId };
+  }
+
+  return { email: "", merchantId: "" };
+}
+
+async function createPaypalPayout({
+  payout,
+  guru,
+  profile,
+  amountCents,
+  adminUserId,
+  paypal,
+}: {
+  payout: DbRow;
+  guru: DbRow | null;
+  profile: DbRow | null;
+  amountCents: number;
+  adminUserId: string;
+  paypal: { email: string; merchantId: string };
+}) {
+  const payoutId = getPayoutId(payout);
+  const recipientName = getRecipientName(payout, guru, profile);
+  const amount = (amountCents / 100).toFixed(2);
+  const receiver = paypal.email || paypal.merchantId;
+  const recipientType = paypal.email ? "EMAIL" : "PAYPAL_ID";
+  const senderItemId = `sg-${payoutId}`.slice(0, 30);
+
+  const response = await paypalRequest<{
+    batch_header?: { payout_batch_id?: string; batch_status?: string };
+    items?: Array<{ payout_item_id?: string; transaction_id?: string }>;
+  }>("/v1/payments/payouts", {
+    method: "POST",
+    requestId: `sitguru-guru-payout-${payoutId}-${amountCents}`,
+    body: {
+      sender_batch_header: {
+        sender_batch_id: `sg-batch-${payoutId}`.slice(0, 30),
+        email_subject: "You have a SitGuru payout",
+        email_message: `SitGuru sent ${recipientName} a payout.`,
+      },
+      items: [
+        {
+          recipient_type: recipientType,
+          amount: { value: amount, currency: "USD" },
+          note: `SitGuru Guru payout released by ${adminUserId}`,
+          sender_item_id: senderItemId,
+          receiver,
+        },
+      ],
+    },
+  });
+
+  const batchId = asString(response?.batch_header?.payout_batch_id);
+  const itemId = asString(response?.items?.[0]?.payout_item_id);
+  const transactionId = asString(response?.items?.[0]?.transaction_id);
+  const reference = batchId || itemId || transactionId;
+
+  if (!reference) {
+    throw new Error("PayPal payout was created but no batch/item id was returned.");
+  }
+
+  return { id: `paypal:${reference}` };
+}
+
 async function createStripeTransfer({
   payout,
   guru,
@@ -464,7 +578,9 @@ async function releaseOnePayout({
 
   const currentStatus = getPayoutStatus(payout);
 
-  if (["paid", "released", "complete", "completed", "processing"].includes(currentStatus)) {
+  // Only skip terminal / in-flight rows that already have money movement.
+  // "processing" with no stripe_transfer_id means a prior attempt stalled — allow retry.
+  if (["paid", "released", "complete", "completed"].includes(currentStatus)) {
     return {
       payoutId,
       status: "skipped",
@@ -472,7 +588,7 @@ async function releaseOnePayout({
     };
   }
 
-  if (!isReleaseableStatus(currentStatus)) {
+  if (!isReleaseableStatus(currentStatus) && currentStatus !== "processing") {
     return {
       payoutId,
       status: "failed",
@@ -496,26 +612,42 @@ async function releaseOnePayout({
   const guruId = getGuruId(payout);
   const [guru, profile] = await Promise.all([getGuruRecord(guruId), getProfileRecord(guruId)]);
 
-  const destination = getStripeAccountId(payout, guru, profile);
+  const stripeDestination = getStripeAccountId(payout, guru, profile);
+  const paypal = await getPaypalDestination(guru, profile);
+  const preferredRail = getPreferredPayoutRail(payout);
+  const rail =
+    preferredRail === "paypal" && (paypal.email || paypal.merchantId)
+      ? "paypal"
+      : preferredRail === "stripe" && stripeDestination
+        ? "stripe"
+        : stripeDestination
+          ? "stripe"
+          : paypal.email || paypal.merchantId
+            ? "paypal"
+            : null;
 
-  if (!destination) {
+  if (!rail) {
     return {
       payoutId,
       status: "failed",
       amount,
       amountCents,
       message:
-        "Missing Guru Stripe connected account. Add stripe_account_id or stripe_connect_account_id before release.",
+        "Missing Guru payout destination. Add Stripe Connect (stripe_account_id) or a PayPal payout account before release.",
     };
   }
 
   if (dryRun) {
+    const destinationLabel =
+      rail === "stripe"
+        ? stripeDestination
+        : paypal.email || paypal.merchantId;
     return {
       payoutId,
       status: "dry_run",
       amount,
       amountCents,
-      message: `Dry run passed. This would transfer ${amountCents} cents to ${destination}.`,
+      message: `Dry run passed. This would send ${amountCents} cents via ${rail} to ${destinationLabel}.`,
     };
   }
 
@@ -533,13 +665,23 @@ async function releaseOnePayout({
   }
 
   try {
-    const transfer = await createStripeTransfer({
-      payout,
-      guru,
-      profile,
-      amountCents,
-      adminUserId,
-    });
+    const transfer =
+      rail === "stripe"
+        ? await createStripeTransfer({
+            payout,
+            guru,
+            profile,
+            amountCents,
+            adminUserId,
+          })
+        : await createPaypalPayout({
+            payout,
+            guru,
+            profile,
+            amountCents,
+            adminUserId,
+            paypal,
+          });
 
     const releasedUpdate = await markReleased({
       payoutId,
@@ -555,7 +697,7 @@ async function releaseOnePayout({
         amountCents,
         stripeTransferId: transfer.id,
         message:
-          "Stripe transfer was created, but Supabase could not save all release fields. Check the guru_payouts table columns.",
+          `${rail === "stripe" ? "Stripe" : "PayPal"} payout was created, but Supabase could not save all release fields. Check the guru_payouts table columns.`,
       };
     }
 
@@ -565,10 +707,13 @@ async function releaseOnePayout({
       amount,
       amountCents,
       stripeTransferId: transfer.id,
-      message: "Stripe transfer created and Supabase payout marked paid.",
+      message:
+        rail === "stripe"
+          ? "Stripe transfer created and Supabase payout marked paid."
+          : "PayPal payout created and Supabase payout marked paid.",
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown Stripe transfer error.";
+    const message = error instanceof Error ? error.message : "Unknown payout transfer error.";
 
     await markFailed({
       payoutId,
