@@ -31,6 +31,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import AdminMessageRealtimeNotifier from "@/components/admin/AdminMessageRealtimeNotifier";
 import AdminQueueCardActions from "@/components/admin/AdminQueueCardActions";
 import ClearAllMessagesForm from "@/components/admin/ClearAllMessagesForm";
+import AdminMessageComposer from "@/components/admin/messages/AdminMessageComposer";
 import {
   clearAdminMessageCenter,
   hardDeleteConversation,
@@ -1253,12 +1254,16 @@ function resolveDirectThreadType(params: {
   if (role === "guru") return "direct_guru";
   if (role === "customer") return "direct_customer";
   if (role === "admin") return "direct_admin";
+  if (role === "external" || rawThreadType === "direct_external") {
+    return "direct_external";
+  }
 
   if (
     rawThreadType === "direct_guru" ||
     rawThreadType === "direct_customer" ||
     rawThreadType === "direct_ambassador" ||
     rawThreadType === "direct_admin" ||
+    rawThreadType === "direct_external" ||
     rawThreadType === "internal"
   ) {
     return rawThreadType;
@@ -1279,11 +1284,43 @@ function getConversationTopic(params: {
   return asString(params.messageCategory) || "internal";
 }
 
+function parseEmailList(raw: string) {
+  return Array.from(
+    new Set(
+      String(raw || "")
+        .split(/[,;\n]+/)
+        .map((value) => value.trim().toLowerCase())
+        .filter((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)),
+    ),
+  );
+}
+
+function buildOutboundFromHeader(senderName: string, senderEmail?: string) {
+  const supportFrom = getSupportFromEmail();
+  const name = asString(senderName) || "SitGuru Admin";
+  const emailMatch = supportFrom.match(/<([^>]+)>/);
+  const supportEmail = emailMatch?.[1] || "support@sitguru.com";
+  const safeName = name.replace(/[<>"]/g, "").trim() || "SitGuru Admin";
+
+  // Keep verified Resend domain; show selected sender as display name.
+  if (asString(senderEmail).toLowerCase() === "support@sitguru.com") {
+    return `SitGuru Support <${supportEmail}>`;
+  }
+
+  return `${safeName} via SitGuru <${supportEmail}>`;
+}
+
 async function sendRecipientEmail(params: {
   toEmail: string;
   recipientName: string;
   senderName: string;
+  senderEmail?: string;
   conversationId: string;
+  subject?: string;
+  body?: string;
+  includeFullBody?: boolean;
+  ccEmails?: string[];
+  bccEmails?: string[];
 }) {
   try {
     const apiKey = asString(process.env.RESEND_API_KEY);
@@ -1295,31 +1332,54 @@ async function sendRecipientEmail(params: {
     const threadUrl = buildPublicThreadUrl(params.conversationId);
     const safeRecipientName = escapeHtml(params.recipientName || "there");
     const safeSenderName = escapeHtml(params.senderName || "SitGuru Admin");
+    const safeSubject = escapeHtml(params.subject || "New SitGuru Message");
+    const includeFullBody = Boolean(params.includeFullBody && params.body);
+    const safeBodyHtml = includeFullBody
+      ? escapeHtml(params.body || "").replaceAll("\n", "<br />")
+      : "";
+    const cc = (params.ccEmails || []).filter(
+      (email) => email.toLowerCase() !== toEmail.toLowerCase(),
+    );
+    const bcc = (params.bccEmails || []).filter(
+      (email) =>
+        email.toLowerCase() !== toEmail.toLowerCase() &&
+        !cc.includes(email.toLowerCase()),
+    );
 
     const result = await resend.emails.send({
-      from: getSupportFromEmail(),
+      from: buildOutboundFromHeader(params.senderName, params.senderEmail),
       to: [toEmail],
-      replyTo: getSupportReplyToEmail(),
-      subject: "New SitGuru Message",
+      ...(cc.length ? { cc } : {}),
+      ...(bcc.length ? { bcc } : {}),
+      replyTo: asString(params.senderEmail) || getSupportReplyToEmail(),
+      subject: params.subject || "New SitGuru Message",
       html: `
         <div style="font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; background: #f6fbf7; padding: 24px;">
           <div style="max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #dcefe2; border-radius: 18px; overflow: hidden;">
             <div style="background: #0f5132; color: #ffffff; padding: 24px;">
-              <h1 style="margin: 0; font-size: 24px;">New SitGuru Message</h1>
+              <h1 style="margin: 0; font-size: 24px;">${safeSubject}</h1>
               <p style="margin: 8px 0 0; color: #d9f7e5;">Trusted Pet Care. Simplified.</p>
             </div>
             <div style="padding: 24px; color: #123524;">
               <p style="font-size: 16px; line-height: 1.6;">Hi ${safeRecipientName},</p>
-              <p style="font-size: 16px; line-height: 1.6;">
+              ${
+                includeFullBody
+                  ? `<div style="font-size: 16px; line-height: 1.7; margin: 16px 0;">${safeBodyHtml}</div>`
+                  : `<p style="font-size: 16px; line-height: 1.6;">
                 You have a new message from ${safeSenderName} in SitGuru.
-              </p>
+              </p>`
+              }
               <p style="margin: 24px 0;">
                 <a href="${threadUrl}" style="display: inline-block; background: #0f8f4f; color: #ffffff; text-decoration: none; padding: 13px 20px; border-radius: 999px; font-weight: 700;">
-                  Open SitGuru Message
+                  ${includeFullBody ? "View in SitGuru" : "Open SitGuru Message"}
                 </a>
               </p>
               <p style="font-size: 13px; color: #607568; line-height: 1.6;">
-                Please log in to SitGuru to read and reply to this message. If your account is not created yet, use this message as a reminder to finish your SitGuru onboarding.
+                ${
+                  includeFullBody
+                    ? "This message was sent by SitGuru Admin. You can reply by email or open SitGuru if you have an account."
+                    : "Please log in to SitGuru to read and reply to this message. If your account is not created yet, use this message as a reminder to finish your SitGuru onboarding."
+                }
               </p>
             </div>
           </div>
@@ -1328,12 +1388,14 @@ async function sendRecipientEmail(params: {
       text: [
         `Hi ${params.recipientName || "there"},`,
         "",
-        `You have a new message from ${params.senderName || "SitGuru Admin"} in SitGuru.`,
+        includeFullBody
+          ? params.body || ""
+          : `You have a new message from ${params.senderName || "SitGuru Admin"} in SitGuru.`,
         "",
         `Open your message here: ${threadUrl}`,
         "",
         "Thank you,",
-        "SitGuru",
+        params.senderName || "SitGuru",
         "Trusted Pet Care. Simplified.",
       ].join("\n"),
     });
@@ -2131,11 +2193,27 @@ async function createInternalThread(formData: FormData) {
   const ambassadorName = String(formData.get("ambassadorName") || "").trim();
   const ambassadorEmail = String(formData.get("ambassadorEmail") || "").trim();
   const referralCode = String(formData.get("referralCode") || "").trim();
+  const deliveryMode = String(formData.get("deliveryMode") || "sitguru")
+    .trim()
+    .toLowerCase();
+  const senderId = String(formData.get("senderId") || "").trim() || user.id;
+  const senderName =
+    String(formData.get("senderName") || "").trim() ||
+    user.email ||
+    "SitGuru Admin";
+  const senderEmail =
+    String(formData.get("senderEmail") || "").trim() || user.email || "";
+  const ccEmails = parseEmailList(String(formData.get("ccEmails") || ""));
+  const bccEmails = parseEmailList(String(formData.get("bccEmails") || ""));
+  const isExternalDelivery =
+    deliveryMode === "external" ||
+    recipientRole === "external" ||
+    rawThreadType === "direct_external";
 
   const isAmbassadorContextFromForm = Boolean(ambassadorId || ambassadorEmail || referralCode);
   const threadType = resolveDirectThreadType({
-    threadType: rawThreadType,
-    recipientRole,
+    threadType: isExternalDelivery ? "direct_external" : rawThreadType,
+    recipientRole: isExternalDelivery ? "external" : recipientRole,
     isDepartment: Boolean(department),
     isAmbassadorContext: isAmbassadorContextFromForm,
   });
@@ -2180,15 +2258,27 @@ async function createInternalThread(formData: FormData) {
     redirect(buildComposeErrorRedirect("missing_recipient"));
   }
 
+  if (isExternalDelivery && !recipientEmail && !ambassadorEmail) {
+    redirect(buildComposeErrorRedirect("missing_recipient"));
+  }
+
   const recipientContact = await getFirstMessageRecipientContact({
-    recipientId,
+    recipientId: isExternalDelivery ? "" : recipientId,
     recipientEmail,
     recipientName,
-    recipientRole,
+    recipientRole: isExternalDelivery ? "external" : recipientRole,
     ambassadorId,
     ambassadorName,
     ambassadorEmail,
   });
+
+  if (isExternalDelivery) {
+    recipientContact.userId = null;
+    recipientContact.role = "external";
+    recipientContact.name = recipientName || recipientEmail || recipientContact.name;
+    recipientContact.email = recipientEmail || recipientContact.email;
+    recipientContact.isSnapshotOnly = true;
+  }
 
   const now = new Date().toISOString();
   const topic = getConversationTopic({
@@ -2299,12 +2389,12 @@ async function createInternalThread(formData: FormData) {
 
   const { error: messageError } = await supabaseAdmin.from("messages").insert({
     conversation_id: conversationId,
-    sender_id: user.id,
+    sender_id: senderId === "sitguru-support" ? user.id : senderId || user.id,
     recipient_id: recipientContact.userId || null,
     sender_role: "admin",
     recipient_role: recipientContact.role || recipientRole || null,
-    sender_name_snapshot: user.email || "SitGuru Admin",
-    sender_email_snapshot: user.email || null,
+    sender_name_snapshot: senderName || user.email || "SitGuru Admin",
+    sender_email_snapshot: senderEmail || user.email || null,
     sender_role_snapshot: "admin",
     recipient_name_snapshot: recipientContact.name || recipientLabel,
     recipient_email_snapshot: recipientContact.email || recipientEmail || ambassadorEmail || null,
@@ -2353,16 +2443,25 @@ async function createInternalThread(formData: FormData) {
       : false;
 
   const emailSent = await sendRecipientEmail({
-    toEmail: recipientContact.email,
-    recipientName: recipientContact.name,
-    senderName: "SitGuru Admin",
+    toEmail: recipientContact.email || recipientEmail || ambassadorEmail,
+    recipientName: recipientContact.name || recipientLabel,
+    senderName,
+    senderEmail,
     conversationId,
+    subject,
+    body,
+    includeFullBody: isExternalDelivery,
+    ccEmails,
+    bccEmails,
   });
 
-  const smsSent = await sendRecipientSms({
-    toPhone: recipientContact.phone,
-    conversationId,
-  });
+  const smsSent =
+    !isExternalDelivery && recipientContact.phone
+      ? await sendRecipientSms({
+          toPhone: recipientContact.phone,
+          conversationId,
+        })
+      : false;
 
   await writeFirstMessageAuditLog({
     actorId: user.id,
@@ -2494,7 +2593,7 @@ function AdminComposeNotice({
     empty_message:
       "Please enter a message before starting the conversation thread.",
     missing_recipient:
-      "The recipient could not be confirmed. Please return to the user profile and start the message again.",
+      "Choose a SitGuru recipient or enter an external email address before sending.",
     thread_create_failed:
       "The message thread could not be created. If this was an Admin-to-Guru or Admin-to-Ambassador message, confirm the conversations table allows customer_id and guru_id to be blank when started_by_user_id is present.",
     message_create_failed:
@@ -3765,7 +3864,24 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
           conversationId={params.conversationId}
         />
 
-        {composeIntent ? <InternalComposer intent={composeIntent} /> : null}
+        {composeIntent ? (
+          <AdminMessageComposer
+            action={createInternalThread}
+            intent={composeIntent}
+            currentUser={{
+              id: user.id,
+              email: user.email || "",
+              name:
+                getProfileName(adminProfile) ||
+                user.email ||
+                "SitGuru Admin",
+            }}
+            inquiryTypes={inquiryTypes.map((inquiry) => ({
+              key: inquiry.key,
+              label: inquiry.label,
+            }))}
+          />
+        ) : null}
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <StatCard
