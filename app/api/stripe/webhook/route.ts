@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { upsertStripeTransactionFromBalanceTxn } from "@/lib/stripe/sync-ledger";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -281,6 +282,29 @@ async function fetchBookingByPaymentIntent(paymentIntentId: string) {
   }
 
   return (data as BookingRow | null) || null;
+}
+
+async function mirrorStripeLedgerFromChargeId(chargeId: string) {
+  if (!chargeId) return;
+
+  const stripe = getStripeClient();
+  if (!stripe) return;
+
+  try {
+    const charge = await stripe.charges.retrieve(chargeId);
+    const balanceTxnId =
+      typeof charge.balance_transaction === "string"
+        ? charge.balance_transaction
+        : charge.balance_transaction?.id || "";
+
+    if (!balanceTxnId) return;
+
+    const balanceTxn =
+      await stripe.balanceTransactions.retrieve(balanceTxnId);
+    await upsertStripeTransactionFromBalanceTxn(balanceTxn);
+  } catch (error) {
+    console.error("Stripe ledger mirror failed:", error);
+  }
 }
 
 async function findPaymentLedgerId({
@@ -1008,6 +1032,10 @@ async function updateBookingFromCheckoutSession(
     }),
   );
 
+  if (status === "paid") {
+    await mirrorStripeLedgerFromChargeId(payment.chargeId);
+  }
+
   console.log("Stripe checkout status recorded:", {
     bookingId,
     status: ledgerStatus,
@@ -1103,6 +1131,9 @@ async function updateBookingFromPaymentIntent(
         failureMessage,
       }),
     );
+    if (status === "paid") {
+      await mirrorStripeLedgerFromChargeId(payment.chargeId);
+    }
   } else {
     await safeBookingUpdateByPaymentIntent(
       payment.paymentIntentId,
@@ -1112,6 +1143,9 @@ async function updateBookingFromPaymentIntent(
       "PaymentIntent did not include a booking reference; ledger row was not created:",
       payment.paymentIntentId,
     );
+    if (status === "paid") {
+      await mirrorStripeLedgerFromChargeId(payment.chargeId);
+    }
   }
 }
 

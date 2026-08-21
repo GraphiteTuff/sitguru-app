@@ -81,17 +81,56 @@ function isWithinLastDays(value: string | null, days: number) {
 }
 
 async function safeRows(table: string, columns: string, limit = 1000) {
-  try {
-    const result = await supabaseAdmin
-      .from(table)
-      .select(columns)
-      .order("created_at", { ascending: false })
-      .limit(limit);
-    if (result.error) return [] as AnyRow[];
-    return ((result.data || []) as unknown as AnyRow[]).filter(Boolean);
-  } catch {
-    return [] as AnyRow[];
+  const extractMissingColumn = (message: string): string | null => {
+    const patterns = [
+      /Could not find the ['"`]?([a-zA-Z_][a-zA-Z0-9_]*)['"`]? column/i,
+      /column\s+[a-zA-Z0-9_]+\.([a-zA-Z_][a-zA-Z0-9_]*)\s+does not exist/i,
+      /column\s+['"`]?([a-zA-Z_][a-zA-Z0-9_]*)['"`]?\s+does not exist/i,
+    ];
+    for (const pattern of patterns) {
+      const match = message.match(pattern);
+      if (match?.[1]) return match[1];
+    }
+    return null;
+  };
+
+  const stripColumn = (cols: string, missing: string): string | null => {
+    if (!cols || cols.trim() === "*") return null;
+    const next = cols
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .filter((part) => {
+        const bare = part.includes(".")
+          ? part.split(".").pop()!.trim()
+          : part;
+        return bare.toLowerCase() !== missing.toLowerCase();
+      });
+    if (!next.length || next.join(",") === cols) return null;
+    return next.join(",");
+  };
+
+  let activeColumns = columns;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      const result = await supabaseAdmin
+        .from(table)
+        .select(activeColumns)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (!result.error) {
+        return ((result.data || []) as unknown as AnyRow[]).filter(Boolean);
+      }
+      const missing = extractMissingColumn(result.error.message || "");
+      if (!missing) return [] as AnyRow[];
+      const next = stripColumn(activeColumns, missing);
+      if (!next) return [] as AnyRow[];
+      activeColumns = next;
+    } catch {
+      return [] as AnyRow[];
+    }
   }
+  return [] as AnyRow[];
 }
 
 export async function getCustomerIntelligenceReportDigest(options?: {
@@ -103,7 +142,7 @@ export async function getCustomerIntelligenceReportDigest(options?: {
     await Promise.all([
       safeRows(
         "profiles",
-        "id,full_name,display_name,name,email,phone,role,account_type,city,state,service_city,service_state,zip_code,service_zip,source,signup_source,utm_source,admin_status,created_at,updated_at",
+        "id,full_name,first_name,last_name,email,phone,role,account_type,city,state,service_city,service_state,zip_code,service_zip,signup_source,admin_status,created_at,updated_at",
         1000,
       ),
       safeRows(

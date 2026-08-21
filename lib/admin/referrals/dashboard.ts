@@ -102,36 +102,85 @@ async function safeSelect(
   columns = "*",
   limit = 500,
 ): Promise<SafeResult> {
-  try {
-    const { data, error, count } = await supabaseAdmin
-      .from(table)
-      .select(columns, { count: "exact" })
-      .limit(limit);
+  const extractMissingColumn = (message: string): string | null => {
+    const patterns = [
+      /Could not find the ['"`]?([a-zA-Z_][a-zA-Z0-9_]*)['"`]? column/i,
+      /column\s+[a-zA-Z0-9_]+\.([a-zA-Z_][a-zA-Z0-9_]*)\s+does not exist/i,
+      /column\s+['"`]?([a-zA-Z_][a-zA-Z0-9_]*)['"`]?\s+does not exist/i,
+    ];
+    for (const pattern of patterns) {
+      const match = message.match(pattern);
+      if (match?.[1]) return match[1];
+    }
+    return null;
+  };
 
-    if (error) {
+  const stripColumn = (cols: string, missing: string): string | null => {
+    if (!cols || cols.trim() === "*") return null;
+    const next = cols
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .filter((part) => {
+        const bare = part.includes(".")
+          ? part.split(".").pop()!.trim()
+          : part;
+        return bare.toLowerCase() !== missing.toLowerCase();
+      });
+    if (!next.length || next.join(",") === cols) return null;
+    return next.join(",");
+  };
+
+  let activeColumns = columns;
+  const stripped: string[] = [];
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      const { data, error, count } = await supabaseAdmin
+        .from(table)
+        .select(activeColumns, { count: "exact" })
+        .limit(limit);
+
+      if (!error) {
+        const rows = Array.isArray(data) ? (data as unknown as AnyRow[]) : [];
+        return {
+          data: rows,
+          ok: true,
+          message: stripped.length
+            ? `${table} connected (omitted missing: ${stripped.join(", ")})`
+            : `${table} connected`,
+          count: typeof count === "number" ? count : rows.length,
+        };
+      }
+
+      const message = error.message || `${table} unavailable`;
+      const missing = extractMissingColumn(message);
+      if (!missing) {
+        return { data: [], ok: false, message, count: 0 };
+      }
+      const nextColumns = stripColumn(activeColumns, missing);
+      if (!nextColumns) {
+        return { data: [], ok: false, message, count: 0 };
+      }
+      stripped.push(missing);
+      activeColumns = nextColumns;
+    } catch (error) {
       return {
         data: [],
         ok: false,
-        message: error.message || `${table} unavailable`,
+        message:
+          error instanceof Error ? error.message : `${table} unavailable`,
         count: 0,
       };
     }
-
-    const rows = Array.isArray(data) ? (data as unknown as AnyRow[]) : [];
-    return {
-      data: rows,
-      ok: true,
-      message: `${table} connected`,
-      count: typeof count === "number" ? count : rows.length,
-    };
-  } catch (error) {
-    return {
-      data: [],
-      ok: false,
-      message: error instanceof Error ? error.message : `${table} unavailable`,
-      count: 0,
-    };
   }
+
+  return {
+    data: [],
+    ok: false,
+    message: `${table} unavailable after column retries`,
+    count: 0,
+  };
 }
 
 export async function getReferralsDashboardData(): Promise<ReferralsDashboardData> {

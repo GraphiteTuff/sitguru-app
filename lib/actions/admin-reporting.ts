@@ -134,6 +134,37 @@ export function periodLabel(period: ReportPeriod, now = new Date()) {
   return `Year ${now.getFullYear()}`;
 }
 
+function extractMissingColumn(message: string): string | null {
+  const patterns = [
+    /Could not find the ['"`]?([a-zA-Z_][a-zA-Z0-9_]*)['"`]? column/i,
+    /column\s+[a-zA-Z0-9_]+\.([a-zA-Z_][a-zA-Z0-9_]*)\s+does not exist/i,
+    /column\s+['"`]?([a-zA-Z_][a-zA-Z0-9_]*)['"`]?\s+does not exist/i,
+  ];
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return null;
+}
+
+function stripColumn(columns: string, missing: string): string | null {
+  if (!columns || columns.trim() === "*") return null;
+  const next = columns
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => {
+      const bare = part.includes(":")
+        ? part.split(":")[0].trim()
+        : part.includes(".")
+          ? part.split(".").pop()!.trim()
+          : part;
+      return bare.toLowerCase() !== missing.toLowerCase();
+    });
+  if (!next.length || next.join(",") === columns) return null;
+  return next.join(",");
+}
+
 async function safeSelect(
   table: string,
   columns = "*",
@@ -141,42 +172,63 @@ async function safeSelect(
   sinceIso?: string | null,
   dateColumn = "created_at",
 ): Promise<SafeResult> {
-  try {
-    let query = supabaseAdmin
-      .from(table)
-      .select(columns, { count: "exact" })
-      .limit(limit);
+  let activeColumns = columns;
+  const stripped: string[] = [];
 
-    if (sinceIso) {
-      query = query.gte(dateColumn, sinceIso);
-    }
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      let query = supabaseAdmin
+        .from(table)
+        .select(activeColumns, { count: "exact" })
+        .limit(limit);
 
-    const { data, error, count } = await query;
+      if (sinceIso) {
+        query = query.gte(dateColumn, sinceIso);
+      }
 
-    if (error) {
+      const { data, error, count } = await query;
+
+      if (!error) {
+        const rows = Array.isArray(data) ? (data as unknown as AnyRow[]) : [];
+        return {
+          ok: true,
+          rows,
+          count: typeof count === "number" ? count : rows.length,
+          message: stripped.length
+            ? `${table} connected (omitted missing: ${stripped.join(", ")})`
+            : `${table} connected`,
+        };
+      }
+
+      const message = error.message || `${table} unavailable`;
+      const missing = extractMissingColumn(message);
+      if (!missing) {
+        return { ok: false, rows: [], count: 0, message };
+      }
+
+      const nextColumns = stripColumn(activeColumns, missing);
+      if (!nextColumns) {
+        return { ok: false, rows: [], count: 0, message };
+      }
+
+      stripped.push(missing);
+      activeColumns = nextColumns;
+    } catch (error) {
       return {
         ok: false,
         rows: [],
         count: 0,
-        message: error.message || `${table} unavailable`,
+        message: error instanceof Error ? error.message : `${table} unavailable`,
       };
     }
-
-    const rows = Array.isArray(data) ? (data as unknown as AnyRow[]) : [];
-    return {
-      ok: true,
-      rows,
-      count: typeof count === "number" ? count : rows.length,
-      message: `${table} connected`,
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      rows: [],
-      count: 0,
-      message: error instanceof Error ? error.message : `${table} unavailable`,
-    };
   }
+
+  return {
+    ok: false,
+    rows: [],
+    count: 0,
+    message: `${table} unavailable after column retries`,
+  };
 }
 
 async function safeHeadCount(
@@ -218,9 +270,47 @@ async function safeHeadCount(
   }
 }
 
+async function safeHeadCountBetween(
+  table: string,
+  startIso: string,
+  endIso: string,
+  dateColumn = "created_at",
+): Promise<SafeResult> {
+  try {
+    const { error, count } = await supabaseAdmin
+      .from(table)
+      .select("*", { count: "exact", head: true })
+      .gte(dateColumn, startIso)
+      .lt(dateColumn, endIso);
+
+    if (error) {
+      return {
+        ok: false,
+        rows: [],
+        count: 0,
+        message: error.message || `${table} unavailable`,
+      };
+    }
+    return {
+      ok: true,
+      rows: [],
+      count: count ?? 0,
+      message: `${table} connected`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      rows: [],
+      count: 0,
+      message: error instanceof Error ? error.message : `${table} unavailable`,
+    };
+  }
+}
+
 function statusOf(row: AnyRow) {
   return asString(
     row.status ||
+      row.lead_status ||
       row.payout_status ||
       row.application_status ||
       row.check_status,
@@ -558,7 +648,20 @@ async function modulePetParents(since: string): Promise<ModuleSnapshot> {
   ]);
   const [profiles, customers, pets] = await Promise.all([
     safeSelect("profiles", "id,role,created_at,account_status", 300, since),
-    safeSelect("customers", "id,created_at,status", 200, since),
+    safeSelectCascade([
+      {
+        table: "customers",
+        columns: "id,created_at,status",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "profiles",
+        columns: "id,created_at,role,account_type,account_status",
+        limit: 300,
+        sinceIso: since,
+      },
+    ]),
     safeHeadCount("pets"),
   ]);
   const parentish = profiles.rows.filter((row) => {
@@ -991,13 +1094,43 @@ async function moduleSalesMarketing(since: string): Promise<ModuleSnapshot> {
     "admin_marketing_tasks",
   ]);
   const [campaigns, leads, tasks] = await Promise.all([
-    safeSelect("admin_marketing_campaigns", "id,status,created_at,name,title", 200),
-    safeSelect(
-      "admin_marketing_signup_leads",
-      "id,status,created_at,priority_level",
-      300,
-      since,
-    ),
+    safeSelectCascade([
+      {
+        table: "admin_marketing_campaigns",
+        columns: "id,status,created_at,name,title",
+        limit: 200,
+      },
+      {
+        table: "admin_marketing_campaigns",
+        columns: "id,status,created_at,name",
+        limit: 200,
+      },
+      {
+        table: "admin_marketing_campaigns",
+        columns: "id,status,created_at",
+        limit: 200,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "admin_marketing_signup_leads",
+        columns: "id,status,lead_status,created_at,priority_level",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "admin_marketing_signup_leads",
+        columns: "id,lead_status,created_at,priority_level",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "admin_marketing_signup_leads",
+        columns: "id,created_at,priority_level",
+        limit: 300,
+        sinceIso: since,
+      },
+    ]),
     safeSelect("admin_marketing_tasks", "id,status,created_at,needs_help", 200, since),
   ]);
   return finalize(
@@ -1025,8 +1158,43 @@ async function moduleGrowthReferrals(since: string): Promise<ModuleSnapshot> {
     "referral_rewards",
   ]);
   const [codes, events, rewards] = await Promise.all([
-    safeSelect("referral_codes", "id,status,created_at,program", 300),
-    safeSelect("referral_events", "id,created_at,event_type,status", 300, since),
+    safeSelectCascade([
+      {
+        table: "referral_codes",
+        columns: "id,status,created_at,program,program_type",
+        limit: 300,
+      },
+      {
+        table: "referral_codes",
+        columns: "id,status,created_at,program_type",
+        limit: 300,
+      },
+      {
+        table: "referral_codes",
+        columns: "id,status,created_at",
+        limit: 300,
+      },
+    ]),
+    safeSelectCascade([
+      {
+        table: "referral_events",
+        columns: "id,created_at,event_type,status",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "referral_events",
+        columns: "id,created_at,event_type,event_action",
+        limit: 300,
+        sinceIso: since,
+      },
+      {
+        table: "referral_events",
+        columns: "id,created_at",
+        limit: 300,
+        sinceIso: since,
+      },
+    ]),
     safeSelect("referral_rewards", "id,status,amount,created_at", 300, since),
   ]);
   const pendingRewards = sumField(
@@ -1136,26 +1304,60 @@ async function moduleAnalytics(since: string): Promise<ModuleSnapshot> {
     "launch_signups",
     "bookings",
   ]);
-  const [events, launches, bookings] = await Promise.all([
-    safeHeadCount("analytics_events", since),
-    safeHeadCount("launch_signups", since),
-    safeHeadCount("bookings", since),
-  ]);
+
+  const sinceMs = since && Date.parse(since) ? Date.parse(since) : NaN;
+  const periodMs = Number.isFinite(sinceMs)
+    ? Math.max(24 * 60 * 60 * 1000, Date.now() - sinceMs)
+    : 30 * 24 * 60 * 60 * 1000;
+  const currentStartIso = Number.isFinite(sinceMs)
+    ? new Date(sinceMs).toISOString()
+    : new Date(Date.now() - periodMs).toISOString();
+  const priorEndIso = currentStartIso;
+  const priorStartIso = new Date(
+    Date.parse(priorEndIso) - periodMs,
+  ).toISOString();
+
+  const momDelta = (current: number, prior: number) => {
+    if (!prior) return current ? 100 : 0;
+    return Number((((current - prior) / prior) * 100).toFixed(1));
+  };
+
+  const [events, launches, bookings, priorEvents, priorLaunches, priorBookings] =
+    await Promise.all([
+      safeHeadCount("analytics_events", since || currentStartIso),
+      safeHeadCount("launch_signups", since || currentStartIso),
+      safeHeadCount("bookings", since || currentStartIso),
+      safeHeadCountBetween("analytics_events", priorStartIso, priorEndIso),
+      safeHeadCountBetween("launch_signups", priorStartIso, priorEndIso),
+      safeHeadCountBetween("bookings", priorStartIso, priorEndIso),
+    ]);
+
   return finalize(
     snap,
     events.ok || launches.ok || bookings.ok,
-    `Growth KPIs in period: ${number(events.count)} tracked events · ${number(launches.count)} launch signups · ${number(bookings.count)} bookings.`,
+    `Growth KPIs in period: ${number(events.count)} tracked events · ${number(launches.count)} launch signups · ${number(bookings.count)} bookings. MoM: events ${momDelta(events.count, priorEvents.count)}% · launches ${momDelta(launches.count, priorLaunches.count)}% · bookings ${momDelta(bookings.count, priorBookings.count)}%.`,
     {
       events: events.count,
       launchSignups: launches.count,
       bookings: bookings.count,
+      priorEvents: priorEvents.count,
+      priorLaunchSignups: priorLaunches.count,
+      priorBookings: priorBookings.count,
+      eventsMomPct: momDelta(events.count, priorEvents.count),
+      launchesMomPct: momDelta(launches.count, priorLaunches.count),
+      bookingsMomPct: momDelta(bookings.count, priorBookings.count),
+      priorWindowStart: priorStartIso,
+      priorWindowEnd: priorEndIso,
     },
     [
       `${number(events.count)} events`,
       `${number(launches.count)} launch signups`,
       `${number(bookings.count)} bookings`,
+      `events MoM ${momDelta(events.count, priorEvents.count)}%`,
     ],
-    [events, launches, bookings].filter((r) => !r.ok).map((r) => r.message),
+    [events, launches, bookings, priorEvents, priorLaunches, priorBookings]
+      .filter((r) => !r.ok)
+      .map((r) => r.message),
   );
 }
 
@@ -1400,11 +1602,19 @@ async function moduleStripe(since: string): Promise<ModuleSnapshot> {
     ]),
   ]);
   const paymentRows = normalizePaymentRows(payments.rows);
-  const rows = stripeTx.ok
+  // Prefer non-empty sources so an empty stripe_transactions table does not
+  // hide balance or booking payment signal after the schema is restored.
+  const rows = stripeTx.ok && stripeTx.rows.length
     ? stripeTx.rows
-    : balanceTx.ok
+    : balanceTx.ok && balanceTx.rows.length
       ? balanceTx.rows
       : paymentRows;
+  const source =
+    stripeTx.ok && stripeTx.rows.length
+      ? "stripe_transactions"
+      : balanceTx.ok && balanceTx.rows.length
+        ? "stripe_balance_transactions"
+        : payments.tableUsed;
   const volume = sumField(rows, ["amount", "total", "amount_cents"]);
   const fees = sumField(rows, [
     "fee",
@@ -1425,11 +1635,7 @@ async function moduleStripe(since: string): Promise<ModuleSnapshot> {
       fees,
       disputes,
       rows: rows.length,
-      source: stripeTx.ok
-        ? "stripe_transactions"
-        : balanceTx.ok
-          ? "stripe_balance_transactions"
-          : payments.tableUsed,
+      source,
     },
     [`${money(volume)} volume`, `${money(fees)} fees`, `${number(disputes)} disputes`],
     [stripeTx, balanceTx, payments].filter((r) => !r.ok).map((r) => r.message),
@@ -1637,7 +1843,18 @@ async function moduleReconciliation(): Promise<ModuleSnapshot> {
   const [bank, payments, stripe] = await Promise.all([
     safeSelect("bank_transactions", "id,status,amount", 300),
     safeSelect("payments", "id,status,amount", 300),
-    safeSelect("stripe_transactions", "id,status,amount", 300),
+    safeSelectCascade([
+      {
+        table: "stripe_transactions",
+        columns: "id,status,amount",
+        limit: 300,
+      },
+      {
+        table: "stripe_balance_transactions",
+        columns: "id,status,amount",
+        limit: 300,
+      },
+    ]),
   ]);
   const unmatched = countWhere(bank.rows, (r) =>
     ["unmatched", "needs_review", "review"].includes(statusOf(r)),
