@@ -5,9 +5,11 @@ import { syncStripeLedger } from "@/lib/stripe/sync-ledger";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
-  const access = await requireFinanceAdminApi(request);
-  if (!access.ok) return access.response;
+export async function POST() {
+  const financeCheck = await requireFinanceAdminApi();
+  if (!financeCheck.identity) {
+    return financeCheck.response;
+  }
 
   try {
     const result = await syncStripeLedger({
