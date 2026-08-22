@@ -34,8 +34,10 @@ import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruProfilePhotoFrame from '@/components/SitGuruProfilePhotoFrame';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import MarketplaceTrustNote from '@/components/mobile/MarketplaceTrustNote';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
+import { getGuruVerification, MARKETPLACE_TRUST_LINES } from '@/lib/marketplace-trust';
 import {
   setThemePreference,
   type SitGuruThemePreference,
@@ -80,11 +82,7 @@ const THEME_OPTIONS: ThemeOption[] = [
   },
 ];
 
-const safetyNotes = [
-  'Keep booking and payment inside SitGuru',
-  'Message before booking to confirm fit',
-  'Use SitGuru care notes and updates during active care',
-];
+const safetyNotes = [...MARKETPLACE_TRUST_LINES];
 
 const SELECT_FIELDS = '*';
 
@@ -509,7 +507,26 @@ export default function GuruProfileScreen() {
                               strokeWidth={2.5}
                             />
                           }
-                          label="Verified"
+                          label={
+                            getGuruVerification(
+                              selectedGuru as Record<string, unknown>,
+                            ).label || 'Verified'
+                          }
+                          muted
+                          styles={styles}
+                        />
+                      ) : getGuruVerification(
+                          selectedGuru as Record<string, unknown>,
+                        ).backgroundChecked && !preview ? (
+                        <Badge
+                          icon={
+                            <BadgeCheck
+                              color={palette.primary}
+                              size={12}
+                              strokeWidth={2.5}
+                            />
+                          }
+                          label="Background checked"
                           muted
                           styles={styles}
                         />
@@ -822,6 +839,8 @@ export default function GuruProfileScreen() {
                     primary={!preview}
                     styles={styles}
                   />
+
+                  <MarketplaceTrustNote compact />
                 </View>
 
                 <View style={styles.sectionCard}>

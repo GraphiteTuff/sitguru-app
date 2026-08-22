@@ -7,12 +7,13 @@ import PushPrimingSheet from '@/components/mobile/PushPrimingSheet';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useIncomingMessageToast } from '@/hooks/data/useIncomingMessageToast';
 import { usePushRegistration } from '@/hooks/data/usePushRegistration';
+import { setPushPrimingHandler } from '@/lib/push-priming';
 
 const PUSH_PRIMING_KEY = 'sitguru-push-priming';
 const MAX_PRIMING_ASKS = 3;
 const PRIMING_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
-/** Long enough for the destination screen to settle before a sheet appears. */
-const PRIMING_DELAY_MS = 2500;
+/** Brief settle so the destination screen paints before the sheet. */
+const PRIMING_DELAY_MS = 400;
 
 type PrimingRecord = {
   asks: number;
@@ -59,42 +60,33 @@ export default function MobileAlertHosts() {
 
   const { toast, dismiss } = useIncomingMessageToast({ enabled: true });
 
-  useEffect(() => {
+  const maybeShow = useCallback(async () => {
     if (!canPrompt || primingAsked) return;
 
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    const record = await readPrimingRecord();
+    const cooledDown = Date.now() - record.lastShownAt > PRIMING_COOLDOWN_MS;
 
-    async function maybeShow() {
-      const record = await readPrimingRecord();
-      if (cancelled) return;
-
-      const cooledDown =
-        Date.now() - record.lastShownAt > PRIMING_COOLDOWN_MS;
-
-      if (record.asks >= MAX_PRIMING_ASKS || !cooledDown) {
-        return;
-      }
-
-      timer = setTimeout(() => {
-        if (cancelled) return;
-
-        setPrimingVisible(true);
-        setPrimingAsked(true);
-        void writePrimingRecord({
-          asks: record.asks + 1,
-          lastShownAt: Date.now(),
-        });
-      }, PRIMING_DELAY_MS);
+    if (record.asks >= MAX_PRIMING_ASKS || !cooledDown) {
+      return;
     }
 
-    void maybeShow();
-
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
+    setTimeout(() => {
+      setPrimingVisible(true);
+      setPrimingAsked(true);
+      void writePrimingRecord({
+        asks: record.asks + 1,
+        lastShownAt: Date.now(),
+      });
+    }, PRIMING_DELAY_MS);
   }, [canPrompt, primingAsked]);
+
+  useEffect(() => {
+    setPushPrimingHandler(() => {
+      void maybeShow();
+    });
+
+    return () => setPushPrimingHandler(null);
+  }, [maybeShow]);
 
   const handleAllow = useCallback(async () => {
     await requestPermission();

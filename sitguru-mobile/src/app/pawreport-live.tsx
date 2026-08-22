@@ -10,7 +10,7 @@ import {
   MessageCircle,
   Navigation,
 } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -35,6 +35,7 @@ import {
   TOUCH_MIN,
 } from '@/constants/mobile-layout';
 import { usePawReportLive } from '@/hooks/data/usePawReportLive';
+import { requestContextualPushPriming } from '@/lib/push-priming';
 import type { LiveCoords } from '@/hooks/useLiveLocation';
 
 function formatClock(date: Date | null) {
@@ -70,6 +71,12 @@ export default function PawReportLiveScreen() {
       timestamp: Date.now(),
     };
   }, [snapshot.latitude, snapshot.longitude]);
+
+  useEffect(() => {
+    if (snapshot.isLive) {
+      requestContextualPushPriming();
+    }
+  }, [snapshot.isLive]);
 
   return (
     <RoleGate requiredRole="pet_parent">

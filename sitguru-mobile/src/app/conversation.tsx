@@ -144,11 +144,11 @@ const THEME_OPTIONS: Array<{
 ];
 
 const QUICK_REPLIES = [
-  'What dates do you need?',
+  'What dates work for you?',
   'Can you share pet details?',
-  'I am available.',
-  'Please send a booking request.',
-  'That schedule works for me.',
+  'I am available — send a booking request.',
+  'That schedule works. Let’s book on SitGuru.',
+  'Happy to help. Any special care notes?',
 ];
 
 const PROFILE_SELECT =

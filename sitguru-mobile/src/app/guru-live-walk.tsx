@@ -17,11 +17,13 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Modal,
   Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -46,6 +48,8 @@ import * as ImagePicker from 'expo-image-picker';
 type RecordRow = Record<string, unknown>;
 type CareStatus = 'not_started' | 'active' | 'paused' | 'completed';
 type UpdateType = 'potty' | 'water' | 'food' | 'photo' | 'note';
+
+const VISIT_MOODS = ['Happy', 'Calm', 'Playful', 'Tired', 'Anxious'] as const;
 
 type Booking = {
   id: string;
@@ -116,6 +120,9 @@ export default function GuruLiveWalkScreen() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [message, setMessage] = useState('');
   const [now, setNow] = useState(Date.now());
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [visitMood, setVisitMood] = useState<string | null>(null);
+  const [visitSummary, setVisitSummary] = useState('');
   const [trail, setTrail] = useState<
     Array<{ latitude: number; longitude: number }>
   >([]);
@@ -304,84 +311,99 @@ export default function GuruLiveWalkScreen() {
     }
   }
 
+  async function applyStatus(nextStatus: CareStatus, summaryNote?: string) {
+    if (!session) return;
+
+    setSaving(true);
+
+    try {
+      if (nextStatus === 'completed' && user?.id && booking?.id) {
+        const moodLine = visitMood ? `Mood: ${visitMood}.` : '';
+        const note = [moodLine, summaryNote || visitSummary]
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .join(' ');
+
+        if (note) {
+          await createUpdate(
+            user.id,
+            booking.id,
+            session.id,
+            'note',
+            note,
+          );
+        }
+      }
+
+      await updateSessionStatus(session, nextStatus);
+
+      const nowDate = new Date();
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              status: nextStatus,
+              pausedAt: nextStatus === 'paused' ? nowDate : current.pausedAt,
+              completedAt:
+                nextStatus === 'completed' ? nowDate : current.completedAt,
+            }
+          : current,
+      );
+
+      setUpdates((current) => [
+        {
+          id: `status-${Date.now()}`,
+          type: 'status',
+          label:
+            nextStatus === 'completed'
+              ? 'Care completed'
+              : nextStatus === 'paused'
+                ? 'Care paused'
+                : 'Care resumed',
+          note:
+            nextStatus === 'completed'
+              ? summaryNote || visitSummary || 'Final PawReport is ready for review.'
+              : `PawReport status changed to ${nextStatus}.`,
+          photoUrl: null,
+          createdAt: nowDate,
+        },
+        ...current,
+      ]);
+
+      if (nextStatus === 'completed') {
+        setSummaryOpen(false);
+        setVisitMood(null);
+        setVisitSummary('');
+      }
+    } catch {
+      Alert.alert(
+        'Unable to update care',
+        'SitGuru could not save the PawReport status. Please try again.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function changeStatus(nextStatus: CareStatus) {
     if (!session) return;
 
-    const title =
-      nextStatus === 'paused'
-        ? 'Pause care?'
-        : nextStatus === 'active'
-          ? 'Resume care?'
-          : 'Complete care?';
+    if (nextStatus === 'completed') {
+      setSummaryOpen(true);
+      return;
+    }
 
+    const title = nextStatus === 'paused' ? 'Pause care?' : 'Resume care?';
     const description =
-      nextStatus === 'completed'
-        ? 'Complete this visit and prepare the final PawReport?'
-        : nextStatus === 'paused'
-          ? 'Pause the active timer until care resumes?'
-          : 'Resume the active care session?';
+      nextStatus === 'paused'
+        ? 'Pause the active timer until care resumes?'
+        : 'Resume the active care session?';
 
     Alert.alert(title, description, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text:
-          nextStatus === 'completed'
-            ? 'Complete'
-            : nextStatus === 'paused'
-              ? 'Pause'
-              : 'Resume',
-        onPress: async () => {
-          setSaving(true);
-
-          try {
-            await updateSessionStatus(session, nextStatus);
-
-            const nowDate = new Date();
-            setSession((current) =>
-              current
-                ? {
-                    ...current,
-                    status: nextStatus,
-                    pausedAt:
-                      nextStatus === 'paused'
-                        ? nowDate
-                        : current.pausedAt,
-                    completedAt:
-                      nextStatus === 'completed'
-                        ? nowDate
-                        : current.completedAt,
-                  }
-                : current,
-            );
-
-            setUpdates((current) => [
-              {
-                id: `status-${Date.now()}`,
-                type: 'status',
-                label:
-                  nextStatus === 'completed'
-                    ? 'Care completed'
-                    : nextStatus === 'paused'
-                      ? 'Care paused'
-                      : 'Care resumed',
-                note:
-                  nextStatus === 'completed'
-                    ? 'Final PawReport is ready for review.'
-                    : `PawReport status changed to ${nextStatus}.`,
-                photoUrl: null,
-                createdAt: nowDate,
-              },
-              ...current,
-            ]);
-          } catch {
-            Alert.alert(
-              'Unable to update care',
-              'SitGuru could not save the PawReport status. Please try again.',
-            );
-          } finally {
-            setSaving(false);
-          }
-        },
+        text: nextStatus === 'paused' ? 'Pause' : 'Resume',
+        onPress: () => void applyStatus(nextStatus),
       },
     ]);
   }
@@ -988,6 +1010,70 @@ export default function GuruLiveWalkScreen() {
             {isWebPreview ? <View style={styles.homeIndicator} /> : null}
           </View>
         </View>
+
+        <Modal
+          animationType="slide"
+          onRequestClose={() => setSummaryOpen(false)}
+          transparent
+          visible={summaryOpen}
+        >
+          <View style={styles.summaryOverlay}>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryEyebrow}>END OF VISIT</Text>
+              <Text style={styles.summaryTitle}>Finish the PawReport</Text>
+              <Text style={styles.summaryText}>
+                Parents see this mood and note as soon as you complete care.
+              </Text>
+
+              <View style={styles.moodRow}>
+                {VISIT_MOODS.map((mood) => {
+                  const active = visitMood === mood;
+                  return (
+                    <BubblePressable
+                      key={mood}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      haptic="selection"
+                      onPress={() => setVisitMood(mood)}
+                      scaleTo={0.92}
+                      style={[styles.moodChip, active && styles.moodChipActive]}
+                    >
+                      <Text
+                        style={[
+                          styles.moodChipText,
+                          active && styles.moodChipTextActive,
+                        ]}
+                      >
+                        {mood}
+                      </Text>
+                    </BubblePressable>
+                  );
+                })}
+              </View>
+
+              <TextInput
+                multiline
+                onChangeText={setVisitSummary}
+                placeholder="Behavior, potty, food, and anything the parent should know"
+                placeholderTextColor={palette.muted}
+                style={styles.summaryInput}
+                value={visitSummary}
+              />
+
+              <SitGuruButton
+                disabled={saving}
+                label={saving ? 'Saving…' : 'Complete visit'}
+                onPress={() => void applyStatus('completed')}
+              />
+              <SitGuruButton
+                disabled={saving}
+                label="Keep care open"
+                onPress={() => setSummaryOpen(false)}
+                variant="secondary"
+              />
+            </View>
+          </View>
+        </Modal>
       </RoleGate>
     </SitGuruScreen>
   );
@@ -2303,6 +2389,75 @@ function createStyles(isDark: boolean) {
       fontSize: 9,
       lineHeight: 14,
       textAlign: 'center',
+    },
+    summaryOverlay: {
+      backgroundColor: 'rgba(8, 17, 13, 0.46)',
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    summaryCard: {
+      backgroundColor: palette.surface,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      gap: 12,
+      paddingBottom: 28,
+      paddingHorizontal: 20,
+      paddingTop: 22,
+    },
+    summaryEyebrow: {
+      color: palette.primary,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 11,
+      letterSpacing: 0.8,
+    },
+    summaryTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 22,
+    },
+    summaryText: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    moodRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    moodChip: {
+      backgroundColor: palette.surfaceSoft,
+      borderColor: palette.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      minHeight: 36,
+      paddingHorizontal: 12,
+      justifyContent: 'center',
+    },
+    moodChipActive: {
+      backgroundColor: palette.primary,
+      borderColor: palette.primary,
+    },
+    moodChipText: {
+      color: palette.title,
+      fontFamily: AppFonts.bold,
+      fontSize: 13,
+    },
+    moodChipTextActive: {
+      color: '#FFFFFF',
+    },
+    summaryInput: {
+      backgroundColor: palette.surfaceSoft,
+      borderColor: palette.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      color: palette.title,
+      fontFamily: AppFonts.medium,
+      fontSize: 14,
+      minHeight: 96,
+      padding: 12,
+      textAlignVertical: 'top',
     },
   });
 }

@@ -40,6 +40,10 @@ import {
   useThemePreference,
 } from "@/hooks/use-color-scheme";
 import { useThemeMode } from "@/hooks/use-theme";
+import {
+  getCompletedBookingCount,
+  getGuruVerification,
+} from "@/lib/marketplace-trust";
 import { resolveSupabaseStorageUrl } from "@/lib/storage";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import {
@@ -2441,6 +2445,9 @@ function GuruDiscoveryCard({
   const locationLabel = getGuruCityStateLabel(guru);
   const ratingLabel = getGuruCardRatingLabel(guru);
   const reviewCount = getGuruReviewCount(guru);
+  const completedBookings = getCompletedBookingCount(
+    guru as Record<string, unknown>,
+  );
   const price = getGuruPriceDisplay(guru, feeRules);
   const badgeLabel = getGuruCardBadgeLabel(guru);
   const trustLabel = getGuruCardTrustLabel(guru);
@@ -2525,6 +2532,9 @@ function GuruDiscoveryCard({
                     reviewCount === 1 ? "review" : "reviews"
                   }`
                 : "New to SitGuru"}
+              {completedBookings
+                ? ` · ${completedBookings.toLocaleString()} completed`
+                : ""}
             </Text>
           </View>
 
@@ -2598,6 +2608,10 @@ function GuruDiscoveryCard({
             {actionLabel}
           </Text>
         </BubblePressable>
+
+        <Text style={styles.guruProfileBookNote}>
+          Nothing charged until they accept · Cancel free before accept
+        </Text>
       </View>
     </View>
   );
@@ -4066,39 +4080,8 @@ function getGuruCardTrustLabel(guru: PublicGuruProfile) {
     return "Local Guru profile preview";
   }
 
-  const record = guru as Record<string, unknown>;
-  const backgroundCheckStatus = getFirstString(record, [
-    "background_check_status",
-    "background_status",
-    "check_status",
-  ]).toLowerCase();
-
-  const backgroundCheckPassed = [
-    record.background_checked,
-    record.is_background_checked,
-    record.background_check_complete,
-    record.background_check_passed,
-    record.background_check_verified,
-  ].some(
-    (value) =>
-      value === true ||
-      value === 1 ||
-      value === "1" ||
-      String(value).toLowerCase() === "true",
-  );
-
-  if (
-    backgroundCheckPassed ||
-    ["approved", "complete", "completed", "passed", "verified"].includes(
-      backgroundCheckStatus,
-    )
-  ) {
-    return "Background checked";
-  }
-
-  if (record.is_verified === true || record.verified === true) {
-    return "Identity verified";
-  }
+  const verification = getGuruVerification(guru as Record<string, unknown>);
+  if (verification.label) return verification.label;
 
   return isGuruBookable(guru)
     ? "Booking-ready SitGuru profile"
@@ -6148,6 +6131,14 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.extraBold,
       fontSize: 11,
       letterSpacing: 0.05,
+    },
+    guruProfileBookNote: {
+      color: "rgba(255, 255, 255, 0.62)",
+      fontFamily: AppFonts.semiBold,
+      fontSize: 9,
+      lineHeight: 12,
+      marginTop: 6,
+      textAlign: "center",
     },
     guruProfileRequestButtonTextSecondary: {
       color: "#E8F8EE",

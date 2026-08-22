@@ -26,6 +26,7 @@ import {
 } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
+import MarketplaceTrustNote from '@/components/mobile/MarketplaceTrustNote';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
@@ -1678,6 +1679,7 @@ export default function RequestBookingScreen() {
               ? 'The Guru has this care request. Nothing is charged until they accept, and you can open the real booking any time.'
               : 'Nothing has been sent yet. Send it and the Guru can accept or decline. SitGuru does not charge when you send the request.'}
           </Text>
+          <MarketplaceTrustNote compact />
 
           {requestSent ? (
             <BubblePressable

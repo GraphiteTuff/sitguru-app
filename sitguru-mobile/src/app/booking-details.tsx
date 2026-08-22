@@ -43,6 +43,7 @@ import {
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import { formatUsd } from '@/lib/data/money';
+import { requestContextualPushPriming } from '@/lib/push-priming';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { AppRole } from '@/types/auth';
@@ -264,6 +265,15 @@ export default function BookingDetailsScreen() {
     () => (booking ? buildBookingView(booking.id, booking.raw as RecordRow) : null),
     [booking],
   );
+
+  useEffect(() => {
+    if (
+      bookingView?.statusStep === 'Accepted' ||
+      bookingView?.statusStep === 'Active'
+    ) {
+      requestContextualPushPriming();
+    }
+  }, [bookingView?.statusStep]);
 
   const profileRecord = (profile ?? {}) as RecordRow;
   const userMetadata = (user?.user_metadata ?? {}) as RecordRow;
