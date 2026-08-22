@@ -508,7 +508,7 @@ function getTipCentsFromBody(
     customTipAmount !== undefined &&
     customTipAmount !== ""
   ) {
-    return toStripeAmount(customTipAmount);
+    return Number(customTipAmount) > 0 ? toStripeAmount(customTipAmount) : 0;
   }
 
   const requestedPercentage = Number(

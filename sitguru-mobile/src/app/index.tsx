@@ -430,7 +430,12 @@ function MarketingHomeScreen() {
             ]}
           >
             <ScrollView
-              contentContainerStyle={styles.scrollContent}
+              contentContainerStyle={[
+                styles.scrollContent,
+                !isWebPreview && {
+                  paddingBottom: 104 + Math.max(insets.bottom, 8),
+                },
+              ]}
               keyboardShouldPersistTaps="handled"
               onScroll={(event) => {
                 const past =
@@ -922,7 +927,15 @@ function MarketingHomeScreen() {
               </View>
         </ScrollView>
 
-        <View style={styles.bottomNav}>
+        <View
+          style={[
+            styles.bottomNav,
+            {
+              height: 76 + Math.max(insets.bottom, 8),
+              paddingBottom: Math.max(insets.bottom, 8),
+            },
+          ]}
+        >
           {navItems.map((item) => {
             const active = item.icon === 'home';
 
@@ -935,22 +948,26 @@ function MarketingHomeScreen() {
                 active={active}
                 bubble
                 bubbleColor={styles.navBubble.backgroundColor}
-                bubbleStyle={styles.navBubbleShape}
+                bubblePlacement="glyph"
+                haptic="selection"
                 onPress={() => {
                   if (item.href) {
                     router.push(item.href as never);
                   }
                 }}
+                scaleTo={0.84}
                 style={styles.navItem}
               >
-                <SitGuruIcon
-                  name={item.icon}
-                  size={22}
-                  color={
-                    active ? styles.navActive.color : styles.navMuted.color
-                  }
-                  strokeWidth={active ? 2.6 : 2.25}
-                />
+                <View style={styles.navIconWell}>
+                  <SitGuruIcon
+                    name={item.icon}
+                    size={24}
+                    color={
+                      active ? styles.navActive.color : styles.navMuted.color
+                    }
+                    strokeWidth={active ? 2.6 : 2.15}
+                  />
+                </View>
                 <Text style={active ? styles.navLabelActive : styles.navLabel}>
                   {item.label}
                 </Text>
@@ -2092,6 +2109,7 @@ function createStyles(
       height: 76,
       justifyContent: 'space-around',
       left: Platform.OS === 'web' ? 10 : 0,
+      overflow: 'visible',
       paddingBottom: 8,
       paddingHorizontal: 8,
       paddingTop: 8,
@@ -2106,20 +2124,20 @@ function createStyles(
     navItem: {
       alignItems: 'center',
       flex: 1,
-      gap: 4,
+      gap: 2,
+      justifyContent: 'flex-start',
+      overflow: 'visible',
+    },
+    navIconWell: {
+      alignItems: 'center',
+      height: 36,
       justifyContent: 'center',
+      width: 46,
     },
     navBubble: {
       backgroundColor: isDark
-        ? 'rgba(88,213,138,0.16)'
-        : 'rgba(13,92,58,0.10)',
-    },
-    navBubbleShape: {
-      borderRadius: 18,
-      bottom: 8,
-      left: 10,
-      right: 10,
-      top: 8,
+        ? 'rgba(88,213,138,0.28)'
+        : 'rgba(26,78,55,0.16)',
     },
     navLabelActive: {
       color: accent,

@@ -39,7 +39,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_SITGURU_APP_CHANNEL": "production"
+        "EXPO_PUBLIC_SITGURU_APP_CHANNEL": "production",
+        "EXPO_PUBLIC_SITGURU_API_URL": "https://www.sitguru.com"
       },
       "channel": "production"
     }

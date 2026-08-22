@@ -1120,15 +1120,21 @@ export function AuthProvider({
               .isAvailableAsync();
 
           if (!available) {
-            return performBrowserOAuth(
+            return await performBrowserOAuth(
               'apple',
             );
           }
 
-          // Apple and Supabase each SHA-256 this value. Pre-hashing it
-          // here makes the identity token fail verification.
-          const nonce =
+          // Apple stores SHA-256(nonce) in the identity token. Supabase
+          // hashes the raw value we send to signInWithIdToken and compares.
+          const rawNonce =
             Crypto.randomUUID();
+          const hashedNonce =
+            await Crypto.digestStringAsync(
+              Crypto.CryptoDigestAlgorithm
+                .SHA256,
+              rawNonce,
+            );
 
           const credential =
             await AppleAuthentication
@@ -1141,7 +1147,7 @@ export function AuthProvider({
                     .AppleAuthenticationScope
                     .EMAIL,
                 ],
-                nonce,
+                nonce: hashedNonce,
               });
 
           if (
@@ -1161,30 +1167,13 @@ export function AuthProvider({
                 provider: 'apple',
                 token:
                   credential.identityToken,
-                nonce,
+                nonce: rawNonce,
               });
 
           if (error) {
-            const details =
-              error.message.toLowerCase();
-
-            if (
-              details.includes(
-                'audience',
-              ) ||
-              details.includes(
-                'nonce',
-              ) ||
-              details.includes(
-                'provider is not enabled',
-              )
-            ) {
-              return performBrowserOAuth(
-                'apple',
-              );
-            }
-
-            throw error;
+            return await performBrowserOAuth(
+              'apple',
+            );
           }
 
           const fullName = [
@@ -1262,19 +1251,9 @@ export function AuthProvider({
             };
           }
 
-          const message =
-            friendlyAuthError(
-              error instanceof Error
-                ? error.message
-                : undefined,
-            );
-
-          setAuthError(message);
-
-          return {
-            error: message,
-            cancelled: false,
-          };
+          return await performBrowserOAuth(
+            'apple',
+          );
         } finally {
           setSocialLoading(null);
         }

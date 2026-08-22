@@ -51,6 +51,7 @@ import {
   getCompletedBookingCount,
   getGuruVerification,
 } from "@/lib/marketplace-trust";
+import { loadPublicGuruCatalog } from "@/lib/gurus/public-catalog";
 import { resolveSupabaseStorageUrl } from "@/lib/storage";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import {
@@ -290,15 +291,6 @@ const SEARCH_PREFERENCES_STORAGE_KEY = "sitguru.findCareSearchPrefs.v1";
 const DEFAULT_SITGURU_FEE_PERCENT = 15;
 const MIN_SITGURU_FEE_PERCENT = 15;
 const MAX_SITGURU_FEE_PERCENT = 20;
-const SELECT_FIELDS =
-  "id, user_id, full_name, display_name, first_name, last_name, slug, username, handle, bio, title, city, state, service_city, service_state, service_area, zip_code, service_zip, service_zip_code, service_radius_miles, service_radius, radius_miles, avatar_url, profile_photo_url, photo_url, image_url, hourly_rate, starting_rate, rate, rating_avg, rating, review_count, is_verified, is_bookable, accepting_bookings, is_accepting_bookings, is_public_visible, admin_status, profile_quality_status, role, services, experience_years, latitude, longitude, lat, lng, service_latitude, service_longitude, completed_bookings";
-const SELECT_FIELDS_FALLBACK = "*";
-const GURU_CATALOG_TTL_MS = 45_000;
-
-let guruCatalogCache: {
-  expiresAt: number;
-  gurus: PublicGuruProfile[];
-} | null = null;
 const LOCAL_DISCOVERY_RADIUS_MILES = 75;
 const MAX_MAP_GURUS = 60;
 const MAX_NEARBY_MAP_GURUS = 20;
@@ -615,64 +607,6 @@ const localZipHints: Record<string, string[]> = {
   "austin tx": ["78701", "78702", "78703", "78704"],
   "boston ma": ["02108", "02109", "02110", "02111"],
 };
-
-async function loadPublicGurus(): Promise<PublicGuruProfile[]> {
-  if (!isSupabaseConfigured) return [];
-
-  if (guruCatalogCache && guruCatalogCache.expiresAt > Date.now()) {
-    return guruCatalogCache.gurus;
-  }
-
-  const sources: Array<{ table: string; profiles?: boolean }> = [
-    { table: "public_guru_search_profiles" },
-    { table: "guru_profiles" },
-    { table: "gurus" },
-    { table: "profiles", profiles: true },
-  ];
-
-  for (const source of sources) {
-    const gurus = await loadGurusFromSource(source);
-    if (gurus.length) {
-      guruCatalogCache = {
-        expiresAt: Date.now() + GURU_CATALOG_TTL_MS,
-        gurus,
-      };
-      return gurus;
-    }
-  }
-
-  return [];
-}
-
-async function loadGurusFromSource(source: {
-  table: string;
-  profiles?: boolean;
-}): Promise<PublicGuruProfile[]> {
-  for (const columns of [SELECT_FIELDS, SELECT_FIELDS_FALLBACK]) {
-    let query = supabase.from(source.table).select(columns).limit(60);
-
-    if (source.profiles) {
-      query = query.in("role", [
-        "guru",
-        "pet_guru",
-        "Guru",
-        "Pet Guru",
-        "pet care guru",
-      ]);
-    }
-
-    const result = await query;
-
-    if (!result.error && result.data?.length) {
-      return (result.data as PublicGuruProfile[]).map((guru) => ({
-        ...guru,
-        source: source.table as PublicGuruProfile["source"],
-      }));
-    }
-  }
-
-  return [];
-}
 
 function certificationStatusMeansComplete(value?: string | null) {
   const normalized = String(value || "")
@@ -1112,7 +1046,7 @@ export default function FindCareScreen() {
   useEffect(() => {
     let mounted = true;
 
-    loadPublicGurus()
+    loadPublicGuruCatalog()
       .then(async (gurus) => {
         if (!mounted) return;
         setDynamicGurus(gurus);

@@ -117,7 +117,7 @@ export default function BubblePressable({
         }
         onPressOut?.(event);
       }}
-      style={[style, contentStyle]}
+      style={[style, contentStyle, bubble ? styles.clipVisible : null]}
     >
       {bubble ? (
         <Animated.View
@@ -138,6 +138,9 @@ export default function BubblePressable({
 }
 
 const styles = StyleSheet.create({
+  clipVisible: {
+    overflow: 'visible',
+  },
   bubble: {
     borderRadius: 999,
     bottom: -6,

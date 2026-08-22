@@ -75,6 +75,17 @@ function normalizeSignupError(message: string) {
     return 'There were too many signup attempts. Wait a moment and try again.';
   }
 
+  if (
+    normalized.includes('apple') ||
+    normalized.includes('audience') ||
+    normalized.includes('nonce') ||
+    normalized.includes('oauth') ||
+    normalized.includes('identity token') ||
+    normalized.includes('google')
+  ) {
+    return message;
+  }
+
   return 'SitGuru could not create your account. Please try again.';
 }
 

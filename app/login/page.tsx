@@ -122,6 +122,7 @@ function isAudienceCompatiblePath(
   if (audience === "ambassador") {
     return (
       path.startsWith("/ambassador/") ||
+      path.startsWith("/api/stripe/return") ||
       path === "/login/route?preferred=ambassador"
     );
   }
@@ -129,6 +130,7 @@ function isAudienceCompatiblePath(
   if (audience === "guru") {
     return (
       path.startsWith("/guru/") ||
+      path.startsWith("/api/stripe/return") ||
       path === "/login/route?preferred=guru"
     );
   }

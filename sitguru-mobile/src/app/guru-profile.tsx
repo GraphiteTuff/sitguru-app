@@ -44,8 +44,8 @@ import {
   useThemePreference,
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
+import { loadPublicGuruCatalog } from '@/lib/gurus/public-catalog';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import {
   getGuruBookingLabel,
   getGuruDisplayName,
@@ -84,59 +84,8 @@ const THEME_OPTIONS: ThemeOption[] = [
 
 const safetyNotes = [...MARKETPLACE_TRUST_LINES];
 
-const SELECT_FIELDS = '*';
-
 async function loadPublicGurus() {
-  if (!isSupabaseConfigured) {
-    return [] as PublicGuruProfile[];
-  }
-
-  const sources: Array<{
-    profiles?: boolean;
-    table: string;
-  }> = [
-    {
-      table: 'public_guru_search_profiles',
-    },
-    {
-      table: 'guru_profiles',
-    },
-    {
-      table: 'gurus',
-    },
-    {
-      profiles: true,
-      table: 'profiles',
-    },
-  ];
-
-  for (const source of sources) {
-    let query = supabase
-      .from(source.table)
-      .select(SELECT_FIELDS)
-      .limit(24);
-
-    if (source.profiles) {
-      query = query.in('role', [
-        'guru',
-        'pet_guru',
-        'Guru',
-        'Pet Guru',
-        'pet care guru',
-      ]);
-    }
-
-    const result = await query;
-
-    if (!result.error && result.data?.length) {
-      return (result.data as PublicGuruProfile[]).map((guru) => ({
-        ...guru,
-        source: source.table as PublicGuruProfile['source'],
-      }));
-    }
-  }
-
-  return [] as PublicGuruProfile[];
+  return loadPublicGuruCatalog();
 }
 
 export default function GuruProfileScreen() {
@@ -164,12 +113,6 @@ export default function GuruProfileScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadGurus = useCallback(async () => {
-    if (!isSupabaseConfigured) {
-      setGurus([]);
-      setLoadError('Guru profiles are not configured in this build.');
-      return;
-    }
-
     try {
       const rows = await loadPublicGurus();
       setGurus(rows);

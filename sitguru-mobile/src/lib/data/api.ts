@@ -32,6 +32,8 @@ function normalizeBaseUrl(value: string) {
  * SitGuru web/API origin used for privileged mutations that must match
  * desktop (service-role writes after auth). Never put the service role here.
  */
+const SITGURU_WEB_ORIGIN_FALLBACK = 'https://www.sitguru.com';
+
 export function getSitGuruApiBaseUrl(): string {
   const candidates = [
     process.env.EXPO_PUBLIC_SITGURU_API_URL,
@@ -44,7 +46,7 @@ export function getSitGuruApiBaseUrl(): string {
     .map((value) => value?.trim())
     .find(Boolean);
 
-  return selected ? normalizeBaseUrl(selected) : '';
+  return normalizeBaseUrl(selected || SITGURU_WEB_ORIGIN_FALLBACK);
 }
 
 export async function getAccessToken(): Promise<string | null> {
@@ -64,6 +66,7 @@ type SitGuruApiOptions = {
   /** Defaults to true — privileged routes require Bearer. */
   auth?: boolean;
   idempotencyKey?: string;
+  timeoutMs?: number;
 };
 
 export async function sitguruApiFetch<T = unknown>(
@@ -132,7 +135,7 @@ export async function sitguruApiFetch<T = unknown>(
         options.body === undefined
           ? undefined
           : JSON.stringify(options.body),
-      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+      signal: AbortSignal.timeout(options.timeoutMs ?? API_TIMEOUT_MS),
     });
 
     const text = await response.text();

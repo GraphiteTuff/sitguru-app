@@ -186,7 +186,12 @@ function normalizeLoginError(
     ) ||
     normalized.includes(
       'supabase is not configured',
-    )
+    ) ||
+    normalized.includes('apple') ||
+    normalized.includes('audience') ||
+    normalized.includes('nonce') ||
+    normalized.includes('oauth') ||
+    normalized.includes('identity token')
   ) {
     return message;
   }
