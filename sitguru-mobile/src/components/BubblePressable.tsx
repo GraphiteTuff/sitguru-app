@@ -13,6 +13,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { playAppHaptic, type AppHaptic } from '@/lib/haptics';
+
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type BubblePressableProps = Omit<PressableProps, 'style'> & {
@@ -25,6 +28,7 @@ type BubblePressableProps = Omit<PressableProps, 'style'> & {
   bubbleColor?: string;
   bubbleStyle?: ViewStyle;
   active?: boolean;
+  haptic?: AppHaptic;
 };
 
 const PRESS_SPRING = {
@@ -51,16 +55,24 @@ export default function BubblePressable({
   bubbleColor = 'rgba(13,92,58,0.12)',
   bubbleStyle,
   active = false,
+  haptic = 'light',
+  disabled,
+  hitSlop,
   onPressIn,
   onPressOut,
   ...rest
 }: BubblePressableProps) {
+  const reduceMotion = useReducedMotion();
   const scale = useSharedValue(1);
   const bubbleProgress = useSharedValue(active ? 1 : 0);
 
   useEffect(() => {
-    bubbleProgress.value = withTiming(active ? 1 : 0, { duration: 220 });
-  }, [active, bubbleProgress]);
+    bubbleProgress.value = reduceMotion
+      ? active
+        ? 1
+        : 0
+      : withTiming(active ? 1 : 0, { duration: 220 });
+  }, [active, bubbleProgress, reduceMotion]);
 
   const contentStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -74,15 +86,26 @@ export default function BubblePressable({
   return (
     <AnimatedPressable
       {...rest}
+      disabled={disabled}
+      hitSlop={hitSlop ?? 6}
       onPressIn={(event) => {
-        scale.value = withSpring(scaleTo, PRESS_SPRING);
-        bubbleProgress.value = withTiming(1, { duration: 140 });
+        if (!disabled) {
+          playAppHaptic(haptic);
+          scale.value = reduceMotion
+            ? scaleTo
+            : withSpring(scaleTo, PRESS_SPRING);
+          bubbleProgress.value = reduceMotion
+            ? 1
+            : withTiming(1, { duration: 140 });
+        }
         onPressIn?.(event);
       }}
       onPressOut={(event) => {
-        scale.value = withSpring(1, RELEASE_SPRING);
+        scale.value = reduceMotion ? 1 : withSpring(1, RELEASE_SPRING);
         if (!active) {
-          bubbleProgress.value = withTiming(0, { duration: 220 });
+          bubbleProgress.value = reduceMotion
+            ? 0
+            : withTiming(0, { duration: 220 });
         }
         onPressOut?.(event);
       }}

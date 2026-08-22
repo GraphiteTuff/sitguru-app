@@ -527,12 +527,11 @@ export default function AmbassadorDashboardScreen() {
                   <View style={styles.header}>
                     <View style={styles.headerCopy}>
                       <Text style={styles.dashboardTitle}>
-                        Ambassador Dashboard
+                        Hey, {firstName}
                       </Text>
 
                       <Text style={styles.welcomeText}>
-                        Welcome back, {firstName}!{' '}
-                        <Text style={styles.wave}>👋</Text>
+                        Share SitGuru. Earn as your pack grows.
                       </Text>
 
                       <SitGuruRoleStatus role="ambassador" />

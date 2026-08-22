@@ -2,12 +2,13 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import GlassChrome from '@/components/mobile/GlassChrome';
 import {
   MobileSpace,
   ThumbZone,
   TOUCH_MIN,
 } from '@/constants/mobile-layout';
-import { SitGuruColors } from '@/constants/colors';
+import { useTheme } from '@/hooks/use-theme';
 
 type StickyActionBarProps = {
   children: ReactNode;
@@ -32,6 +33,7 @@ export default function StickyActionBar({
   bottomNavHeight = 64,
 }: StickyActionBarProps) {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   const bottomPad = embedded
     ? MobileSpace.sm
     : Math.max(insets.bottom, MobileSpace.sm) +
@@ -39,18 +41,24 @@ export default function StickyActionBar({
 
   return (
     <View
-      pointerEvents="box-none"
       collapsable={false}
+      pointerEvents="box-none"
       style={[
         embedded ? styles.wrapEmbedded : styles.wrapAbsolute,
         { paddingBottom: bottomPad },
         style,
       ]}
     >
-      <View pointerEvents="auto" style={styles.bar}>
-        {secondary ? <View style={styles.secondary}>{secondary}</View> : null}
-        <View style={styles.primary}>{children}</View>
-      </View>
+      <GlassChrome
+        fallbackColor={theme.colors.elevatedCard}
+        style={[styles.bar, { borderTopColor: theme.colors.divider }]}
+        tintColor={theme.colors.elevatedCard}
+      >
+        <View pointerEvents="auto">
+          {secondary ? <View style={styles.secondary}>{secondary}</View> : null}
+          <View style={styles.primary}>{children}</View>
+        </View>
+      </GlassChrome>
     </View>
   );
 }
@@ -71,20 +79,14 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   bar: {
-    backgroundColor: SitGuruColors.surface,
-    borderColor: SitGuruColors.border,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
-    borderTopWidth: 1,
-    elevation: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
     gap: MobileSpace.sm,
     minHeight: ThumbZone.stickyActionMinHeight,
+    overflow: 'hidden',
     paddingHorizontal: MobileSpace.lg,
     paddingTop: MobileSpace.md,
-    shadowColor: '#0B3D28',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
   },
   primary: {
     gap: MobileSpace.sm,

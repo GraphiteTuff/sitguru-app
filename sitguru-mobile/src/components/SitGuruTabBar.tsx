@@ -14,6 +14,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import BubblePressable from '@/components/BubblePressable';
+import GlassChrome from '@/components/mobile/GlassChrome';
+import { AppFonts } from '@/constants/fonts';
+import { TOUCH_MIN } from '@/constants/mobile-layout';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import type { AppRole } from '@/types/auth';
@@ -126,90 +129,103 @@ export default function SitGuruTabBar({
 
   const palette = isDark
     ? {
-        background: '#081C14',
-        border: '#1E3B2B',
+        fallback: '#081C14',
+        border: 'rgba(30,59,43,0.7)',
         activeColor: '#58D58A',
         mutedColor: '#8FA096',
         bubble: 'rgba(88,213,138,0.16)',
+        tint: '#081C14',
       }
     : {
-        background: '#FFFFFF',
-        border: '#E5DFD4',
+        fallback: '#FFFFFF',
+        border: 'rgba(229,223,212,0.85)',
         activeColor: '#1A4E37',
         mutedColor: '#79857B',
         bubble: 'rgba(26,78,55,0.10)',
+        tint: '#FFFCF7',
       };
 
   const tabs = TAB_SETS[resolvedRole];
 
   return (
-    <View
-      accessibilityRole="tablist"
+    <GlassChrome
+      fallbackColor={palette.fallback}
       style={[
         styles.bar,
         {
-          backgroundColor: palette.background,
           borderTopColor: palette.border,
           paddingBottom: Math.max(insets.bottom, 10),
         },
       ]}
+      tintColor={palette.tint}
     >
-      {tabs.map((tab) => {
-        const isActive = tab.key === active;
-        const color = isActive ? palette.activeColor : palette.mutedColor;
-        const badge = badges?.[tab.key];
-        const Icon = tab.icon;
+      <View accessibilityRole="tablist" style={styles.row}>
+        {tabs.map((tab) => {
+          const isActive = tab.key === active;
+          const color = isActive ? palette.activeColor : palette.mutedColor;
+          const badge = badges?.[tab.key];
+          const Icon = tab.icon;
 
-        return (
-          <BubblePressable
-            key={tab.key}
-            accessibilityLabel={tab.label}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: isActive }}
-            active={isActive}
-            bubble
-            bubbleColor={palette.bubble}
-            bubbleStyle={styles.bubble}
-            onPress={() => {
-              if (!isActive) {
-                router.navigate(tab.href as never);
-              }
-            }}
-            style={styles.tab}
-          >
-            <View>
-              <Icon color={color} size={22} strokeWidth={isActive ? 2.6 : 2.2} />
+          return (
+            <BubblePressable
+              key={tab.key}
+              accessibilityLabel={tab.label}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              active={isActive}
+              bubble
+              bubbleColor={palette.bubble}
+              bubbleStyle={styles.bubble}
+              haptic="selection"
+              onPress={() => {
+                if (!isActive) {
+                  router.navigate(tab.href as never);
+                }
+              }}
+              scaleTo={0.9}
+              style={styles.tab}
+            >
+              <View>
+                <Icon
+                  color={color}
+                  size={22}
+                  strokeWidth={isActive ? 2.6 : 2.2}
+                />
 
-              {badge ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {badge > 9 ? '9+' : badge}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
+                {badge ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {badge > 9 ? '9+' : badge}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
 
-            <Text style={[styles.label, { color }]} numberOfLines={1}>
-              {tab.label}
-            </Text>
-          </BubblePressable>
-        );
-      })}
-    </View>
+              <Text style={[styles.label, { color }]} numberOfLines={1}>
+                {tab.label}
+              </Text>
+            </BubblePressable>
+          );
+        })}
+      </View>
+    </GlassChrome>
   );
 }
 
 const styles = StyleSheet.create({
   bar: {
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  row: {
     flexDirection: 'row',
-    paddingTop: 10,
+    paddingTop: 8,
   },
   tab: {
     alignItems: 'center',
     flex: 1,
-    gap: 4,
+    gap: 3,
     justifyContent: 'center',
+    minHeight: TOUCH_MIN,
     paddingVertical: 4,
   },
   bubble: {
@@ -220,8 +236,8 @@ const styles = StyleSheet.create({
     top: -2,
   },
   label: {
+    fontFamily: AppFonts.bold,
     fontSize: 11,
-    fontWeight: '700',
     lineHeight: 14,
   },
   badge: {
@@ -238,8 +254,8 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: '#FFFFFF',
+    fontFamily: AppFonts.extraBold,
     fontSize: 10,
-    fontWeight: '800',
     lineHeight: 13,
   },
 });

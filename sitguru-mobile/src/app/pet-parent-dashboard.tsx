@@ -755,10 +755,10 @@ export default function PetParentDashboardScreen() {
             <View style={styles.header}>
               <View style={styles.headerCopy}>
                 <Text style={styles.dashboardTitle}>
-                  Pet Parent Dashboard
+                  Hey, {firstName}
                 </Text>
                 <Text style={styles.welcomeText}>
-                  Welcome back, {firstName}! <Text style={styles.wave}>👋</Text>
+                  Your pets, bookings, and Gurus in one place.
                 </Text>
 
                 <SitGuruRoleStatus role="pet_parent" />

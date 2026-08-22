@@ -2,6 +2,7 @@ import { StyleSheet, Text } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
 import { SitGuruColors } from '@/constants/colors';
+import { AppFonts } from '@/constants/fonts';
 
 type SitGuruButtonProps = {
   accessibilityLabel?: string;
@@ -104,8 +105,8 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonText: {
+    fontFamily: AppFonts.extraBold,
     fontSize: 16,
-    fontWeight: '900',
     lineHeight: 20,
     textAlign: 'center',
   },

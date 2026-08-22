@@ -961,7 +961,7 @@ export default function GuruDashboardScreen() {
                           styles.dashboardTitle
                         }
                       >
-                        Guru Dashboard
+                        Good {dayPart()}, {firstName}
                       </Text>
 
                       <Text
@@ -969,15 +969,7 @@ export default function GuruDashboardScreen() {
                           styles.welcomeText
                         }
                       >
-                        Good {dayPart()},{' '}
-                        {firstName}!{' '}
-                        <Text
-                          style={
-                            styles.wave
-                          }
-                        >
-                          👋
-                        </Text>
+                        Requests, today's care, and earnings.
                       </Text>
 
 

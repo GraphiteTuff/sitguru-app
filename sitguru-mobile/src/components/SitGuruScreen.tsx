@@ -54,8 +54,10 @@ export default function SitGuruScreen({
             },
             center ? styles.centered : styles.topAligned,
           ]}
-          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets
+          keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           <View style={contentStyle}>{children}</View>
         </ScrollView>

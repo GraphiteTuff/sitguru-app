@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -7,10 +8,10 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MobileSpace } from '@/constants/mobile-layout';
-import { SitGuruColors } from '@/constants/colors';
+import { useTheme } from '@/hooks/use-theme';
 
 type MobileScreenProps = {
   children: ReactNode;
@@ -26,8 +27,8 @@ type MobileScreenProps = {
 };
 
 /**
- * Mobile-first screen shell: vertical scroll only, flex footer for thumb-zone
- * actions, no horizontal overflow. Prefer this over phone-chrome frames.
+ * Mobile-first screen shell: vertical scroll only, glass footer over content,
+ * no horizontal overflow. Prefer this over phone-chrome frames.
  */
 export default function MobileScreen({
   children,
@@ -35,47 +36,58 @@ export default function MobileScreen({
   scrollBottomInset = MobileSpace.xxl,
   refreshing = false,
   onRefresh,
-  refreshColor = SitGuruColors.primary,
+  refreshColor,
   style,
   contentStyle,
 }: MobileScreenProps) {
-  const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const [footerHeight, setFooterHeight] = useState(0);
+  const bottomPad = footer
+    ? Math.max(footerHeight, scrollBottomInset) + MobileSpace.sm
+    : scrollBottomInset;
 
   return (
-    <SafeAreaView style={[styles.safe, style]} edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={[styles.safe, { backgroundColor: theme.colors.screen }, style]}
+    >
       <View style={styles.shell}>
         <ScrollView
-          style={styles.scroll}
+          automaticallyAdjustKeyboardInsets
+          bounces
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: scrollBottomInset },
+            { paddingBottom: bottomPad },
             contentStyle,
           ]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
           horizontal={false}
-          bounces
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             onRefresh ? (
               <RefreshControl
-                refreshing={refreshing}
+                colors={[refreshColor ?? theme.colors.primary]}
                 onRefresh={onRefresh}
-                tintColor={refreshColor}
-                colors={[refreshColor]}
+                refreshing={refreshing}
+                tintColor={refreshColor ?? theme.colors.primary}
               />
             ) : undefined
           }
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+          style={styles.scroll}
         >
           <View style={styles.inner}>{children}</View>
         </ScrollView>
 
         {footer ? (
           <View
-            style={[
-              styles.footerSlot,
-              { paddingBottom: Math.max(insets.bottom, MobileSpace.xs) },
-            ]}
+            onLayout={(event) => {
+              const next = Math.ceil(event.nativeEvent.layout.height);
+              setFooterHeight((current) => (current === next ? current : next));
+            }}
+            pointerEvents="box-none"
+            style={styles.footerOverlay}
           >
             {footer}
           </View>
@@ -87,7 +99,6 @@ export default function MobileScreen({
 
 const styles = StyleSheet.create({
   safe: {
-    backgroundColor: SitGuruColors.background,
     flex: 1,
     overflow: 'hidden',
   },
@@ -112,10 +123,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     width: '100%',
   },
-  footerSlot: {
-    backgroundColor: SitGuruColors.surface,
-    borderTopColor: SitGuruColors.border,
-    borderTopWidth: StyleSheet.hairlineWidth,
+  footerOverlay: {
+    backgroundColor: 'transparent',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
     width: '100%',
   },
 });
