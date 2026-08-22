@@ -372,7 +372,9 @@ export const supabase =
         detectSessionInUrl:
           false,
         flowType: 'pkce',
-        lock: processLock,
+        // processLock can deadlock getSession() on native SecureStore
+        // startups. Web still needs it for multi-tab token refresh.
+        ...(Platform.OS === 'web' ? { lock: processLock } : {}),
       },
       realtime: {
         // Keep cross-device sync resilient when the app resumes.
@@ -383,20 +385,43 @@ export const supabase =
     },
   );
 
+const SESSION_WAIT_MS = 4_000;
+
+/**
+ * Native SecureStore + auth locks have hung `getSession()` on TestFlight.
+ * Never wait forever for a session — boot must be able to paint a real screen.
+ */
+export async function getSupabaseSession(timeoutMs = SESSION_WAIT_MS) {
+  if (!isSupabaseConfigured) {
+    return { session: null, error: null as string | null, timedOut: false };
+  }
+
+  let timedOut = false;
+
+  const result = await Promise.race([
+    supabase.auth.getSession(),
+    new Promise<{
+      data: { session: null };
+      error: null;
+    }>((resolve) => {
+      setTimeout(() => {
+        timedOut = true;
+        resolve({ data: { session: null }, error: null });
+      }, timeoutMs);
+    }),
+  ]);
+
+  return {
+    session: result.data.session ?? null,
+    error: result.error?.message ?? null,
+    timedOut,
+  };
+}
+
 /** Current access token for SitGuru web API Bearer auth (never service role). */
 export async function getSupabaseAccessToken() {
-  if (!isSupabaseConfigured) {
-    return null;
-  }
-
-  const { data, error } =
-    await supabase.auth.getSession();
-
-  if (error) {
-    return null;
-  }
-
-  return data.session?.access_token ?? null;
+  const { session } = await getSupabaseSession();
+  return session?.access_token ?? null;
 }
 
 type SitGuruGlobal =

@@ -188,24 +188,28 @@ const services: ServiceCard[] = [
 export default function HomeScreen() {
   const { isAuthenticated, loading, primaryRole, profile, user } = useAuth();
   const [expiredForUserId, setExpiredForUserId] = useState<string | null>(null);
+  const [bootEscaped, setBootEscaped] = useState(false);
 
   const userId = user?.id ?? null;
   const awaitingProfile = isAuthenticated && !profile;
   const rolesTimedOut = Boolean(userId) && expiredForUserId === userId;
+  const bootBlocked =
+    !bootEscaped && (loading || (awaitingProfile && !rolesTimedOut));
 
   useEffect(() => {
-    if (!awaitingProfile || !userId) {
-      return;
-    }
-
-    /* A stalled profile query must never leave the user on a boot screen
-     * forever — fall through to the pet-parent dashboard instead. */
-    const timer = setTimeout(() => setExpiredForUserId(userId), 6000);
+    /* Session restore and profile fetch can both hang on device. Never keep
+     * the launch spinner up longer than this, even if auth never settles. */
+    const timer = setTimeout(() => {
+      setBootEscaped(true);
+      if (userId) {
+        setExpiredForUserId(userId);
+      }
+    }, 5000);
     return () => clearTimeout(timer);
-  }, [awaitingProfile, userId]);
+  }, [userId]);
 
-  if (loading || (awaitingProfile && !rolesTimedOut)) {
-    return <HomeBootScreen />;
+  if (bootBlocked) {
+    return <HomeBootScreen onContinue={() => setBootEscaped(true)} />;
   }
 
   if (isAuthenticated) {
@@ -221,8 +225,14 @@ export default function HomeScreen() {
   return <MarketingHomeScreen />;
 }
 
-function HomeBootScreen() {
+function HomeBootScreen({ onContinue }: { onContinue: () => void }) {
   const isDark = useThemeMode() === 'dark';
+  const [showContinue, setShowContinue] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowContinue(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <View
@@ -241,6 +251,15 @@ function HomeBootScreen() {
       >
         Loading your SitGuru…
       </Text>
+      {showContinue ? (
+        <BubblePressable
+          accessibilityRole="button"
+          onPress={onContinue}
+          style={bootStyles.continueButton}
+        >
+          <Text style={bootStyles.continueLabel}>Continue</Text>
+        </BubblePressable>
+      ) : null}
     </View>
   );
 }
@@ -257,6 +276,19 @@ const bootStyles = StyleSheet.create({
     fontFamily: AppFonts.medium,
     fontSize: 14,
     textAlign: 'center',
+  },
+  continueButton: {
+    backgroundColor: '#0D5C3A',
+    borderRadius: 999,
+    marginTop: 8,
+    minHeight: 46,
+    paddingHorizontal: 22,
+    justifyContent: 'center',
+  },
+  continueLabel: {
+    color: '#FFFFFF',
+    fontFamily: AppFonts.extraBold,
+    fontSize: 14,
   },
 });
 

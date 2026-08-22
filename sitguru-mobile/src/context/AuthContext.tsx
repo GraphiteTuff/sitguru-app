@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 
 import {
+  getSupabaseSession,
   isSupabaseConfigured,
   supabase,
 } from '@/lib/supabase';
@@ -602,6 +603,10 @@ export function AuthProvider({
         setProfileLoading(true);
         setProfileError(null);
 
+        const profileWatchdog = setTimeout(() => {
+          setProfileLoading(false);
+        }, 6_000);
+
         let nextProfile:
           | ProfileSummary
           | null = null;
@@ -756,6 +761,7 @@ export function AuthProvider({
         setProfile(nextProfile);
         setRoles(nextRoles);
         setProfileError(nextError);
+        clearTimeout(profileWatchdog);
         setProfileLoading(false);
       },
       [clearProfile],
@@ -1265,21 +1271,16 @@ export function AuthProvider({
       setLoading(true);
 
       const {
-        data,
+        session: nextSession,
         error,
-      } =
-        await supabase.auth
-          .getSession();
-
-      const nextSession =
-        data.session ?? null;
+      } = await getSupabaseSession();
 
       setSession(nextSession);
 
       setAuthError(
         error
           ? friendlyAuthError(
-              error.message,
+              error,
             )
           : null,
       );
@@ -1302,8 +1303,14 @@ export function AuthProvider({
 
   useEffect(() => {
     let active = true;
+    const bootWatchdog = setTimeout(() => {
+      if (active) {
+        setLoading(false);
+      }
+    }, 5_000);
 
     async function loadInitialSession() {
+
       if (
         !isSupabaseConfigured
       ) {
@@ -1319,25 +1326,20 @@ export function AuthProvider({
       }
 
       const {
-        data,
+        session: nextSession,
         error,
-      } =
-        await supabase.auth
-          .getSession();
+      } = await getSupabaseSession();
 
       if (!active) {
         return;
       }
-
-      const nextSession =
-        data.session ?? null;
 
       setSession(nextSession);
 
       setAuthError(
         error
           ? friendlyAuthError(
-              error.message,
+              error,
             )
           : null,
       );
@@ -1362,6 +1364,7 @@ export function AuthProvider({
     ) {
       return () => {
         active = false;
+        clearTimeout(bootWatchdog);
       };
     }
 
@@ -1393,6 +1396,7 @@ export function AuthProvider({
 
     return () => {
       active = false;
+      clearTimeout(bootWatchdog);
 
       data.subscription
         .unsubscribe();

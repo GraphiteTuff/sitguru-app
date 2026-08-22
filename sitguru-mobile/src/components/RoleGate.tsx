@@ -1,5 +1,5 @@
 import { router, type Href } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
@@ -43,11 +43,26 @@ function AccessCard({ eyebrow, title, message, detail, buttons }: { eyebrow: str
 
 export default function RoleGate({ requiredRole, title, children, previewAllowed = false }: RoleGateProps) {
   const { loading, isAuthenticated, roles, canAccessRequiredRole, profileError } = useRoleAccess(requiredRole);
+  const [accessTimedOut, setAccessTimedOut] = useState(false);
   const requiredLabel = roleLabel(requiredRole);
   const loadedRoleLabels = roles.length ? roles.map(roleLabel).join(', ') : 'No roles loaded yet';
 
-  if (loading) {
+  useEffect(() => {
+    if (!loading) {
+      setAccessTimedOut(false);
+      return;
+    }
+
+    const timer = setTimeout(() => setAccessTimedOut(true), 5_000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  if (loading && !accessTimedOut) {
     return <AccessCard eyebrow="Checking access" title={title ?? 'Loading your SitGuru roles'} message="We’re confirming your account session and dashboard permissions." detail="This usually takes just a moment." buttons={[]} />;
+  }
+
+  if (loading && accessTimedOut && !isAuthenticated) {
+    return <AccessCard eyebrow="Taking longer than usual" title="Sign in to continue" message="SitGuru could not finish loading your session." buttons={[{ label: 'Log In', href: '/login', primary: true }, { label: 'Create Account', href: '/signup' }, { label: 'Find Care', href: '/find-care' }]} />;
   }
 
   if (!isAuthenticated) {
