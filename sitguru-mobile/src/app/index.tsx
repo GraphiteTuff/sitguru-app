@@ -32,10 +32,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StatusBar } from 'expo-status-bar';
 
+import * as SplashScreen from 'expo-splash-screen';
+
 import BubblePressable from '@/components/BubblePressable';
-import HomeHeroMedia, {
-  HOME_HERO_VIDEO_LABELS,
-} from '@/components/HomeHeroMedia';
 import {
   SitGuruIcon,
   type SitGuruIconName,
@@ -80,11 +79,17 @@ type SocialLink = {
   url: string;
 };
 
-const heroVideoAssets = [
-  require('../assets/videos/sitguru-homepage-hero.mp4'),
-  require('../assets/videos/sitguru-homepage-hero-2.mp4'),
-  require('../assets/videos/sitguru-homepage-hero-3-ambassadors.mp4'),
-] as const;
+function loadHeroMedia() {
+  return require('@/components/HomeHeroMedia') as typeof import('@/components/HomeHeroMedia');
+}
+
+function loadHeroVideoAssets() {
+  return [
+    require('../assets/videos/sitguru-homepage-hero.mp4'),
+    require('../assets/videos/sitguru-homepage-hero-2.mp4'),
+    require('../assets/videos/sitguru-homepage-hero-3-ambassadors.mp4'),
+  ] as const;
+}
 
 const heroVideoPosterAsset = require(
   '../assets/images/sitguru-homepage-hero-poster.jpg'
@@ -190,6 +195,10 @@ export default function HomeScreen() {
   const [expiredForUserId, setExpiredForUserId] = useState<string | null>(null);
   const [bootEscaped, setBootEscaped] = useState(false);
 
+  useEffect(() => {
+    void SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
+
   const userId = user?.id ?? null;
   const awaitingProfile = isAuthenticated && !profile;
   const rolesTimedOut = Boolean(userId) && expiredForUserId === userId;
@@ -226,7 +235,6 @@ export default function HomeScreen() {
 }
 
 function HomeBootScreen({ onContinue }: { onContinue: () => void }) {
-  const isDark = useThemeMode() === 'dark';
   const [showContinue, setShowContinue] = useState(false);
 
   useEffect(() => {
@@ -235,20 +243,10 @@ function HomeBootScreen({ onContinue }: { onContinue: () => void }) {
   }, []);
 
   return (
-    <View
-      style={[
-        bootStyles.screen,
-        { backgroundColor: isDark ? '#06140F' : '#FAF6EE' },
-      ]}
-    >
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <ActivityIndicator color={isDark ? '#58D58A' : '#1A4E37'} size="large" />
-      <Text
-        style={[
-          bootStyles.label,
-          { color: isDark ? '#AEB9B0' : '#79857B' },
-        ]}
-      >
+    <View style={bootStyles.screen}>
+      <StatusBar style="light" />
+      <ActivityIndicator color="#FFFFFF" size="large" />
+      <Text style={bootStyles.label}>
         Loading your SitGuru…
       </Text>
       {showContinue ? (
@@ -267,18 +265,20 @@ function HomeBootScreen({ onContinue }: { onContinue: () => void }) {
 const bootStyles = StyleSheet.create({
   screen: {
     alignItems: 'center',
+    backgroundColor: '#0D5C3A',
     flex: 1,
     gap: 14,
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
   label: {
+    color: '#FFFFFF',
     fontFamily: AppFonts.medium,
     fontSize: 14,
     textAlign: 'center',
   },
   continueButton: {
-    backgroundColor: '#0D5C3A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 999,
     marginTop: 8,
     minHeight: 46,
@@ -286,13 +286,15 @@ const bootStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   continueLabel: {
-    color: '#FFFFFF',
+    color: '#0D5C3A',
     fontFamily: AppFonts.extraBold,
     fontSize: 14,
   },
 });
 
 function MarketingHomeScreen() {
+  const { default: HomeHeroMedia, HOME_HERO_VIDEO_LABELS } = loadHeroMedia();
+  const heroVideoAssets = loadHeroVideoAssets();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const theme = useTheme();

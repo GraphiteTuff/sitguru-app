@@ -18,7 +18,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import MobileAlertHosts from '@/components/mobile/MobileAlertHosts';
 import RootErrorBoundary from '@/components/RootErrorBoundary';
 import SitGuruPaymentsProvider from '@/components/SitGuruPaymentsProvider';
-import { getAppTheme } from '@/constants/theme';
 import { AuthProvider } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
@@ -38,9 +37,6 @@ const BOOT_TIMEOUT_MS = 8_000;
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const appTheme = getAppTheme(
-    colorScheme === 'dark' ? 'dark' : 'light',
-  );
   const [bootTimedOut, setBootTimedOut] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
@@ -115,7 +111,7 @@ export default function RootLayout() {
               screenOptions={{
                 headerShown: false,
                 contentStyle: {
-                  backgroundColor: appTheme.colors.screen,
+                  backgroundColor: '#0D5C3A',
                 },
               }}
             />
@@ -129,7 +125,7 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { backgroundColor: '#0D5C3A', flex: 1 },
   boot: {
     alignItems: 'center',
     backgroundColor: '#0D5C3A',
