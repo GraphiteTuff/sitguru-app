@@ -137,7 +137,9 @@ function matchesLocation(
     guru.service_zip || guru.service_zip_code || guru.zip_code,
   ).replace(/\D/g, "");
   const guruCity = lower(guru.service_city || guru.city);
-  const guruState = normalizeUsState(guru.service_state || guru.state);
+  const guruState = normalizeUsState(
+    clean(guru.service_state || guru.state),
+  );
   const hay = [
     guruCity,
     lower(guru.service_state || guru.state),
