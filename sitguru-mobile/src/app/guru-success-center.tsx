@@ -8,8 +8,6 @@ import {
     ChevronRight,
     CircleDollarSign,
     HeartHandshake,
-    Home,
-    MessageCircle,
     PawPrint,
     Search,
     ShieldCheck,
@@ -18,11 +16,9 @@ import {
     UserRound,
     X,
 } from 'lucide-react-native';
-import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import {
     Platform,
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -30,9 +26,11 @@ import {
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -379,10 +377,11 @@ export default function GuruSuccessCenterScreen() {
                   showsVerticalScrollIndicator={false}
                 >
                   <View style={styles.header}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityLabel="Back to Guru Dashboard"
                       onPress={() => router.push('/guru-dashboard')}
+                      scaleTo={0.88}
                       style={styles.headerIconButton}
                     >
                       <ChevronLeft
@@ -390,7 +389,7 @@ export default function GuruSuccessCenterScreen() {
                         size={20}
                         strokeWidth={2.4}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
                     <View style={styles.headerCopy}>
                       <Text style={styles.title}>Guru Success Center</Text>
@@ -419,7 +418,7 @@ export default function GuruSuccessCenterScreen() {
                       </Text>
                     </View>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       onPress={() => {
                         setCategory(recommendedLesson.category);
@@ -433,7 +432,7 @@ export default function GuruSuccessCenterScreen() {
                         size={17}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
 
                   <View style={styles.progressCard}>
@@ -472,17 +471,18 @@ export default function GuruSuccessCenterScreen() {
                       value={query}
                     />
                     {query ? (
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         accessibilityLabel="Clear search"
                         onPress={() => setQuery('')}
+                        scaleTo={0.88}
                       >
                         <X
                           color={palette.muted}
                           size={18}
                           strokeWidth={2.2}
                         />
-                      </Pressable>
+                      </BubblePressable>
                     ) : null}
                   </View>
 
@@ -495,11 +495,12 @@ export default function GuruSuccessCenterScreen() {
                       const active = category === item.id;
 
                       return (
-                        <Pressable
+                        <BubblePressable
                           key={item.id}
                           accessibilityRole="button"
                           accessibilityState={{ selected: active }}
                           onPress={() => setCategory(item.id)}
+                          scaleTo={0.88}
                           style={[
                             styles.categoryButton,
                             active && styles.categoryButtonActive,
@@ -513,7 +514,7 @@ export default function GuruSuccessCenterScreen() {
                           >
                             {item.label}
                           </Text>
-                        </Pressable>
+                        </BubblePressable>
                       );
                     })}
                   </ScrollView>
@@ -581,9 +582,10 @@ export default function GuruSuccessCenterScreen() {
                       </Text>
                     </View>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       onPress={() => router.push('/support')}
+                      scaleTo={0.88}
                       style={styles.supportButton}
                     >
                       <ChevronRight
@@ -591,78 +593,11 @@ export default function GuruSuccessCenterScreen() {
                         size={18}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
                 </ScrollView>
 
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    icon={
-                      <Home
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Dashboard"
-                    onPress={() => router.push('/guru-dashboard')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    active
-                    icon={
-                      <BookOpen
-                        color={palette.primary}
-                        size={21}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    label="Learn"
-                    onPress={() => undefined}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <CalendarDays
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Bookings"
-                    onPress={() => router.push('/guru-requests')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <MessageCircle
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Messages"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/messages',
-                        params: { role: 'guru' },
-                      })
-                    }
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <UserRound
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Profile"
-                    onPress={() => router.push('/guru-profile')}
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar active="profile" role="guru" />
               </View>
             </View>
 
@@ -693,10 +628,11 @@ function LessonCard({
 }) {
   return (
     <View style={styles.lessonCard}>
-      <Pressable
+      <BubblePressable
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         onPress={onExpand}
+        scaleTo={0.97}
         style={styles.lessonHeader}
       >
         <View style={styles.lessonIcon}>
@@ -736,7 +672,7 @@ function LessonCard({
             strokeWidth={2.3}
           />
         </View>
-      </Pressable>
+      </BubblePressable>
 
       {expanded ? (
         <View style={styles.lessonBody}>
@@ -749,7 +685,7 @@ function LessonCard({
 
           <View style={styles.lessonActions}>
             {lesson.route ? (
-              <Pressable
+              <BubblePressable
                 accessibilityRole="button"
                 onPress={() => router.push(lesson.route as never)}
                 style={styles.openToolButton}
@@ -760,10 +696,10 @@ function LessonCard({
                   size={17}
                   strokeWidth={2.3}
                 />
-              </Pressable>
+              </BubblePressable>
             ) : null}
 
-            <Pressable
+            <BubblePressable
               accessibilityRole="button"
               onPress={onToggleComplete}
               style={styles.completeButton}
@@ -776,7 +712,7 @@ function LessonCard({
               <Text style={styles.completeButtonText}>
                 {completed ? 'Mark Incomplete' : 'Mark Complete'}
               </Text>
-            </Pressable>
+            </BubblePressable>
           </View>
         </View>
       ) : null}
@@ -803,34 +739,6 @@ function LessonIcon({
   if (category === 'earnings') return <CircleDollarSign {...common} />;
   if (category === 'growth') return <TrendingUp {...common} />;
   return <ShieldCheck {...common} />;
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      {icon}
-      <Text style={active ? styles.navLabelActive : styles.navLabel}>
-        {label}
-      </Text>
-    </Pressable>
-  );
 }
 
 function PhoneStatusBar({
@@ -1049,7 +957,7 @@ function createStyles(isDark: boolean) {
     },
     scrollContent: {
       gap: 13,
-      paddingBottom: 110,
+      paddingBottom: 16,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -1441,42 +1349,6 @@ function createStyles(isDark: boolean) {
       height: 34,
       justifyContent: 'center',
       width: 34,
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 72,
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: -7 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
     },
   });
 }

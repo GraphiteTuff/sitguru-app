@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-    Pressable,
     StyleSheet,
     Text,
     TextInput,
@@ -9,9 +8,18 @@ import {
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
+import SaveFeedbackBanner, {
+    useSaveFeedback,
+} from '@/components/SaveFeedbackBanner';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
+import {
+    useGuruSetup,
+    type GuruSetupDraft,
+} from '@/hooks/data/useRoleSetup';
+import { useThemeMode } from '@/hooks/use-theme';
 
 type StepNumber = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -125,18 +133,81 @@ function extractZipCode(value: string) {
 export default function GuruSetupScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
+  const isDark = useThemeMode() === 'dark';
+  const { loading, saving, load, save } = useGuruSetup();
+  const {
+    feedback,
+    showSaved,
+    showError,
+    dismissFeedback,
+  } = useSaveFeedback();
 
   const [currentStep, setCurrentStep] = useState<StepNumber>(1);
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [yearsExperience, setYearsExperience] = useState('');
+  const [bio, setBio] = useState('');
   const [serviceArea, setServiceArea] = useState('');
   const [serviceAreaEnabled, setServiceAreaEnabled] = useState(true);
   const [serviceCity, setServiceCity] = useState('');
   const [serviceState, setServiceState] = useState('');
   const [serviceZip, setServiceZip] = useState('');
+  const [serviceAreaNotes, setServiceAreaNotes] = useState('');
   const [locationMessage, setLocationMessage] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedPetTypes, setSelectedPetTypes] = useState<string[]>([]);
+  const [walkingRate, setWalkingRate] = useState('');
+  const [sittingRate, setSittingRate] = useState('');
+  const [boardingRate, setBoardingRate] = useState('');
+  const [dropInRate, setDropInRate] = useState('');
+  const [serviceNotes, setServiceNotes] = useState('');
   const [selectedTrustItems, setSelectedTrustItems] = useState<string[]>([]);
+  const [trustNotes, setTrustNotes] = useState('');
   const [selectedOnboardingItems, setSelectedOnboardingItems] = useState<string[]>([]);
+  const [loadError, setLoadError] = useState('');
+
+  const applyDraft = useCallback((draft: GuruSetupDraft, step: number) => {
+    setDisplayName(draft.displayName);
+    setEmail(draft.email);
+    setPhone(draft.phone);
+    setYearsExperience(draft.yearsExperience);
+    setBio(draft.bio);
+    setServiceArea(draft.serviceArea);
+    setServiceAreaEnabled(draft.serviceAreaEnabled);
+    setServiceCity(draft.serviceCity);
+    setServiceState(draft.serviceState);
+    setServiceZip(draft.serviceZip);
+    setServiceAreaNotes(draft.serviceAreaNotes);
+    setSelectedServices(draft.selectedServices);
+    setSelectedPetTypes(draft.selectedPetTypes);
+    setWalkingRate(draft.walkingRate);
+    setSittingRate(draft.sittingRate);
+    setBoardingRate(draft.boardingRate);
+    setDropInRate(draft.dropInRate);
+    setServiceNotes(draft.serviceNotes);
+    setSelectedTrustItems(draft.selectedTrustItems);
+    setTrustNotes(draft.trustNotes);
+    setSelectedOnboardingItems(draft.selectedOnboardingItems);
+    setCurrentStep(clampGuruStep(step));
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    void load().then((result) => {
+      if (!active) return;
+      applyDraft(result.draft, result.step);
+      setLoadError(result.error ?? '');
+      if (result.error) {
+        showError('Unable to load Guru setup', result.error);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [applyDraft, load, showError]);
 
   const activeStep =
     setupSteps.find((step) => step.step === currentStep) || setupSteps[0];
@@ -144,6 +215,53 @@ export default function GuruSetupScreen() {
   const progressWidth = `${Math.round(
     (currentStep / setupSteps.length) * 100,
   )}%` as `${number}%`;
+
+  function buildDraft(): GuruSetupDraft {
+    return {
+      displayName,
+      email,
+      phone,
+      yearsExperience,
+      bio,
+      serviceArea,
+      serviceAreaEnabled,
+      serviceCity,
+      serviceState,
+      serviceZip,
+      serviceAreaNotes,
+      selectedServices,
+      selectedPetTypes,
+      walkingRate,
+      sittingRate,
+      boardingRate,
+      dropInRate,
+      serviceNotes,
+      selectedTrustItems,
+      trustNotes,
+      selectedOnboardingItems,
+    };
+  }
+
+  async function persistAndAdvance(nextStep: StepNumber, complete = false) {
+    const result = await save(buildDraft(), nextStep, { complete });
+
+    if (!result.persisted) {
+      showError(
+        'Guru setup was not saved',
+        result.error || 'Your changes were not stored. Please try again.',
+      );
+      return false;
+    }
+
+    if (complete) {
+      showSaved(
+        'Guru setup saved',
+        'Your profile, service area, services, and readiness details were saved to your Guru account.',
+      );
+    }
+
+    return true;
+  }
 
   function applyZipLookup(nextZip: string) {
     const location = zipLookup[nextZip];
@@ -205,13 +323,31 @@ export default function GuruSetupScreen() {
     setCurrentStep((currentStep - 1) as StepNumber);
   }
 
-  function goNext() {
+  async function goNext() {
+    if (saving || loading) return;
+
     if (currentStep < 6) {
-      setCurrentStep((currentStep + 1) as StepNumber);
+      const nextStep = (currentStep + 1) as StepNumber;
+      const saved = await persistAndAdvance(nextStep);
+      if (!saved) return;
+      setCurrentStep(nextStep);
       return;
     }
 
+    const saved = await persistAndAdvance(6, true);
+    if (!saved) return;
     router.push('/guru-dashboard');
+  }
+
+  async function goToStep(step: StepNumber) {
+    if (step === currentStep || saving || loading) return;
+
+    if (step > currentStep) {
+      const saved = await persistAndAdvance(step);
+      if (!saved) return;
+    }
+
+    setCurrentStep(step);
   }
 
   function renderStepContent() {
@@ -232,16 +368,40 @@ export default function GuruSetupScreen() {
           </View>
 
           <View style={[styles.formGrid, isWide && styles.formGridWide]}>
-            <Field label="Display name" placeholder="Alex Pet Care" />
-            <Field label="Email address" placeholder="alex@example.com" keyboardType="email-address" />
-            <Field label="Phone number" placeholder="555-555-5555" keyboardType="phone-pad" />
-            <Field label="Years of experience" placeholder="3 years" />
+            <Field
+              label="Display name"
+              onChangeText={setDisplayName}
+              placeholder="Alex Pet Care"
+              value={displayName}
+            />
+            <Field
+              keyboardType="email-address"
+              label="Email address"
+              onChangeText={setEmail}
+              placeholder="alex@example.com"
+              value={email}
+            />
+            <Field
+              keyboardType="phone-pad"
+              label="Phone number"
+              onChangeText={setPhone}
+              placeholder="555-555-5555"
+              value={phone}
+            />
+            <Field
+              label="Years of experience"
+              onChangeText={setYearsExperience}
+              placeholder="3 years"
+              value={yearsExperience}
+            />
           </View>
 
           <Field
             label="Short Guru bio"
-            placeholder="Tell Pet Parents about your care style, experience, pets you love caring for, and what makes you reliable."
             multiline
+            onChangeText={setBio}
+            placeholder="Tell Pet Parents about your care style, experience, pets you love caring for, and what makes you reliable."
+            value={bio}
           />
         </View>
       );
@@ -295,7 +455,7 @@ export default function GuruSetupScreen() {
             </View>
           ) : null}
 
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             onPress={() => setServiceAreaEnabled(!serviceAreaEnabled)}
             style={[
@@ -313,12 +473,14 @@ export default function GuruSetupScreen() {
                 ? 'Service area enabled'
                 : 'Service area paused'}
             </Text>
-          </Pressable>
+          </BubblePressable>
 
           <Field
             label="Service area notes"
-            placeholder="Neighborhoods, towns, travel limits, apartment access notes, or areas you prefer to serve."
             multiline
+            onChangeText={setServiceAreaNotes}
+            placeholder="Neighborhoods, towns, travel limits, apartment access notes, or areas you prefer to serve."
+            value={serviceAreaNotes}
           />
         </View>
       );
@@ -334,12 +496,13 @@ export default function GuruSetupScreen() {
                 const selected = selectedServices.includes(service);
 
                 return (
-                  <Pressable
+                  <BubblePressable
                     key={service}
                     accessibilityRole="button"
                     onPress={() =>
                       toggleValue(service, selectedServices, setSelectedServices)
                     }
+                    scaleTo={0.88}
                     style={[styles.choicePill, selected && styles.choicePillActive]}
                   >
                     <Text
@@ -350,7 +513,7 @@ export default function GuruSetupScreen() {
                     >
                       {service}
                     </Text>
-                  </Pressable>
+                  </BubblePressable>
                 );
               })}
             </View>
@@ -363,12 +526,13 @@ export default function GuruSetupScreen() {
                 const selected = selectedPetTypes.includes(petType);
 
                 return (
-                  <Pressable
+                  <BubblePressable
                     key={petType}
                     accessibilityRole="button"
                     onPress={() =>
                       toggleValue(petType, selectedPetTypes, setSelectedPetTypes)
                     }
+                    scaleTo={0.88}
                     style={[styles.petTypeButton, selected && styles.petTypeButtonActive]}
                   >
                     <Text style={styles.petTypeIcon}>
@@ -382,23 +546,45 @@ export default function GuruSetupScreen() {
                     >
                       {petType}
                     </Text>
-                  </Pressable>
+                  </BubblePressable>
                 );
               })}
             </View>
           </View>
 
           <View style={[styles.formGrid, isWide && styles.formGridWide]}>
-            <Field label="Starting walking rate" placeholder="$20" />
-            <Field label="Starting sitting rate" placeholder="$35" />
-            <Field label="Starting boarding rate" placeholder="$50" />
-            <Field label="Drop-in visit rate" placeholder="$20" />
+            <Field
+              label="Starting walking rate"
+              onChangeText={setWalkingRate}
+              placeholder="$20"
+              value={walkingRate}
+            />
+            <Field
+              label="Starting sitting rate"
+              onChangeText={setSittingRate}
+              placeholder="$35"
+              value={sittingRate}
+            />
+            <Field
+              label="Starting boarding rate"
+              onChangeText={setBoardingRate}
+              placeholder="$50"
+              value={boardingRate}
+            />
+            <Field
+              label="Drop-in visit rate"
+              onChangeText={setDropInRate}
+              placeholder="$20"
+              value={dropInRate}
+            />
           </View>
 
           <Field
             label="Service notes"
-            placeholder="Describe what is included, care limits, availability preferences, and what Pet Parents should know before requesting care."
             multiline
+            onChangeText={setServiceNotes}
+            placeholder="Describe what is included, care limits, availability preferences, and what Pet Parents should know before requesting care."
+            value={serviceNotes}
           />
         </View>
       );
@@ -412,12 +598,13 @@ export default function GuruSetupScreen() {
               const selected = selectedTrustItems.includes(item);
 
               return (
-                <Pressable
+                <BubblePressable
                   key={item}
                   accessibilityRole="button"
                   onPress={() =>
                     toggleValue(item, selectedTrustItems, setSelectedTrustItems)
                   }
+                  scaleTo={0.97}
                   style={[styles.checkCard, selected && styles.checkCardActive]}
                 >
                   <Text style={[styles.checkIcon, selected && styles.checkIconActive]}>
@@ -426,15 +613,17 @@ export default function GuruSetupScreen() {
                   <Text style={[styles.checkText, selected && styles.checkTextActive]}>
                     {item}
                   </Text>
-                </Pressable>
+                </BubblePressable>
               );
             })}
           </View>
 
           <Field
             label="Trust and safety notes"
-            placeholder="Share relevant experience, comfort with pets, reliability, communication style, or safety practices."
             multiline
+            onChangeText={setTrustNotes}
+            placeholder="Share relevant experience, comfort with pets, reliability, communication style, or safety practices."
+            value={trustNotes}
           />
         </View>
       );
@@ -448,12 +637,13 @@ export default function GuruSetupScreen() {
               const selected = selectedOnboardingItems.includes(item);
 
               return (
-                <Pressable
+                <BubblePressable
                   key={item}
                   accessibilityRole="button"
                   onPress={() =>
                     toggleValue(item, selectedOnboardingItems, setSelectedOnboardingItems)
                   }
+                  scaleTo={0.97}
                   style={[styles.checkCard, selected && styles.checkCardActive]}
                 >
                   <Text style={[styles.checkIcon, selected && styles.checkIconActive]}>
@@ -462,7 +652,7 @@ export default function GuruSetupScreen() {
                   <Text style={[styles.checkText, selected && styles.checkTextActive]}>
                     {item}
                   </Text>
-                </Pressable>
+                </BubblePressable>
               );
             })}
           </View>
@@ -505,21 +695,28 @@ export default function GuruSetupScreen() {
         </View>
 
         <View style={[styles.readyActions, isWide && styles.readyActionsWide]}>
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
-            onPress={() => router.push('/guru-dashboard')}
+            disabled={saving || loading}
+            onPress={() => {
+              void persistAndAdvance(6, true).then((saved) => {
+                if (saved) router.push('/guru-dashboard');
+              });
+            }}
             style={styles.primaryButton}
           >
-            <Text style={styles.primaryButtonText}>Go to Guru Dashboard</Text>
-          </Pressable>
+            <Text style={styles.primaryButtonText}>
+              {saving ? 'Saving...' : 'Go to Guru Dashboard'}
+            </Text>
+          </BubblePressable>
 
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             onPress={() => router.push('/role-selection')}
             style={styles.secondaryButton}
           >
             <Text style={styles.secondaryButtonText}>Switch Role</Text>
-          </Pressable>
+          </BubblePressable>
         </View>
       </View>
     );
@@ -527,17 +724,24 @@ export default function GuruSetupScreen() {
 
   return (
     <SitGuruScreen scroll center={false} maxWidth={860}>
+      <SaveFeedbackBanner
+        feedback={feedback}
+        isDark={isDark}
+        onDismiss={dismissFeedback}
+      />
+
       <View style={styles.page}>
         <View style={styles.topBar}>
           <SitGuruLogo size="small" variant="symbol" />
 
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             onPress={() => router.push('/role-selection')}
+            scaleTo={0.88}
             style={styles.topLinkButton}
           >
             <Text style={styles.topLinkText}>Roles</Text>
-          </Pressable>
+          </BubblePressable>
         </View>
 
         <View style={[styles.heroPanel, isWide && styles.heroPanelWide]}>
@@ -591,10 +795,12 @@ export default function GuruSetupScreen() {
             const complete = step.step < currentStep;
 
             return (
-              <Pressable
+              <BubblePressable
                 key={step.step}
                 accessibilityRole="button"
-                onPress={() => setCurrentStep(step.step)}
+                disabled={saving || loading}
+                onPress={() => void goToStep(step.step)}
+                scaleTo={0.88}
                 style={[
                   styles.stepPill,
                   active && styles.stepPillActive,
@@ -617,7 +823,7 @@ export default function GuruSetupScreen() {
                 >
                   {step.shortTitle}
                 </Text>
-              </Pressable>
+              </BubblePressable>
             );
           })}
         </View>
@@ -638,6 +844,20 @@ export default function GuruSetupScreen() {
 
           <Text style={styles.stepDescription}>{activeStep.description}</Text>
 
+          {loadError ? (
+            <View style={styles.locationMessage}>
+              <Text style={styles.locationMessageText}>{loadError}</Text>
+            </View>
+          ) : null}
+
+          {loading ? (
+            <View style={styles.locationMessage}>
+              <Text style={styles.locationMessageText}>
+                Loading your saved Guru setup...
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.usedForCard}>
             <Text style={styles.usedForLabel}>Used for</Text>
             <Text style={styles.usedForText}>{activeStep.usedFor}</Text>
@@ -650,28 +870,40 @@ export default function GuruSetupScreen() {
       </View>
 
       <View style={styles.bottomDock}>
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
+          disabled={saving}
           onPress={goBack}
           style={styles.dockSecondaryAction}
         >
           <Text style={styles.dockSecondaryText}>
             {currentStep === 1 ? 'Roles' : 'Back'}
           </Text>
-        </Pressable>
+        </BubblePressable>
 
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
-          onPress={goNext}
+          disabled={saving || loading}
+          onPress={() => void goNext()}
           style={styles.dockPrimaryAction}
         >
           <Text style={styles.dockPrimaryText}>
-            {currentStep === 6 ? 'Dashboard' : 'Continue'}
+            {saving
+              ? 'Saving...'
+              : currentStep === 6
+                ? 'Dashboard'
+                : 'Continue'}
           </Text>
-        </Pressable>
+        </BubblePressable>
       </View>
     </SitGuruScreen>
   );
+}
+
+function clampGuruStep(step: number): StepNumber {
+  if (step <= 1) return 1;
+  if (step >= 6) return 6;
+  return step as StepNumber;
 }
 
 function Field({

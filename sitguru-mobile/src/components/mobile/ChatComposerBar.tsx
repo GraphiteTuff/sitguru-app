@@ -1,12 +1,17 @@
-import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
+import {
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio';
 import { Camera, ImagePlus, Mic, Send, Square, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +19,7 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import { MobileSpace, MobileType, TOUCH_MIN } from '@/constants/mobile-layout';
@@ -50,17 +56,19 @@ export default function ChatComposerBar({
   onFocus,
 }: ChatComposerBarProps) {
   const [attachment, setAttachment] = useState<ChatAttachment | null>(null);
-  const [recording, setRecording] = useState(false);
-  const [recordingMs, setRecordingMs] = useState(0);
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [recordingMs, setRecordingMs] = useState(0);
 
   useEffect(() => {
     return () => {
       if (tickRef.current) clearInterval(tickRef.current);
-      void recordingRef.current?.stopAndUnloadAsync().catch(() => undefined);
+      if (recorderState.isRecording) {
+        void recorder.stop().catch(() => undefined);
+      }
     };
-  }, []);
+  }, [recorder, recorderState.isRecording]);
 
   async function pickPhoto(fromCamera: boolean) {
     const permission = fromCamera
@@ -97,22 +105,19 @@ export default function ChatComposerBar({
   }
 
   async function toggleVoiceNote() {
-    if (recording) {
+    if (recorderState.isRecording) {
       if (tickRef.current) {
         clearInterval(tickRef.current);
         tickRef.current = null;
       }
 
-      const active = recordingRef.current;
-      recordingRef.current = null;
-      setRecording(false);
-
-      if (!active) return;
-
       try {
-        await active.stopAndUnloadAsync();
-        const uri = active.getURI();
-        const durationMs = recordingMs;
+        await recorder.stop();
+        const uri = recorder.uri;
+        const durationMs =
+          recorderState.durationMillis > 0
+            ? recorderState.durationMillis
+            : recordingMs;
 
         if (uri) {
           setAttachment({
@@ -132,27 +137,26 @@ export default function ChatComposerBar({
     }
 
     try {
-      const permission = await Audio.requestPermissionsAsync();
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
       if (!permission.granted) return;
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
       });
 
-      const next = new Audio.Recording();
-      await next.prepareToRecordAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      );
-      await next.startAsync();
-      recordingRef.current = next;
-      setRecording(true);
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       setRecordingMs(0);
       tickRef.current = setInterval(() => {
         setRecordingMs((ms) => ms + 250);
       }, 250);
     } catch {
-      setRecording(false);
+      if (tickRef.current) {
+        clearInterval(tickRef.current);
+        tickRef.current = null;
+      }
+      setRecordingMs(0);
     }
   }
 
@@ -167,6 +171,7 @@ export default function ChatComposerBar({
     setAttachment(null);
   }
 
+  const recording = recorderState.isRecording;
   const canSend = !sending && (!!value.trim() || !!attachment);
 
   return (
@@ -177,33 +182,32 @@ export default function ChatComposerBar({
         contentContainerStyle={styles.quickBar}
         keyboardShouldPersistTaps="handled"
       >
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           accessibilityLabel="Take photo"
           onPress={() => void pickPhoto(true)}
-          style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+          scaleTo={0.88}
+          style={styles.chip}
         >
           <Camera color={SitGuruColors.primary} size={16} strokeWidth={2.4} />
           <Text style={styles.chipText}>Camera</Text>
-        </Pressable>
-        <Pressable
+        </BubblePressable>
+        <BubblePressable
           accessibilityRole="button"
           accessibilityLabel="Choose photo"
           onPress={() => void pickPhoto(false)}
-          style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+          scaleTo={0.88}
+          style={styles.chip}
         >
           <ImagePlus color={SitGuruColors.primary} size={16} strokeWidth={2.4} />
           <Text style={styles.chipText}>Photo</Text>
-        </Pressable>
-        <Pressable
+        </BubblePressable>
+        <BubblePressable
           accessibilityRole="button"
           accessibilityLabel={recording ? 'Stop voice note' : 'Record voice note'}
           onPress={() => void toggleVoiceNote()}
-          style={({ pressed }) => [
-            styles.chip,
-            recording && styles.chipRecording,
-            pressed && styles.pressed,
-          ]}
+          scaleTo={0.88}
+          style={[styles.chip, recording && styles.chipRecording]}
         >
           {recording ? (
             <Square color="#FFFFFF" size={14} fill="#FFFFFF" />
@@ -213,7 +217,7 @@ export default function ChatComposerBar({
           <Text style={[styles.chipText, recording && styles.chipTextRecording]}>
             {recording ? formatMs(recordingMs) : 'Voice'}
           </Text>
-        </Pressable>
+        </BubblePressable>
       </ScrollView>
 
       {attachment ? (
@@ -228,14 +232,15 @@ export default function ChatComposerBar({
               </Text>
             </View>
           )}
-          <Pressable
+          <BubblePressable
             accessibilityLabel="Remove attachment"
             accessibilityRole="button"
             onPress={clearAttachment}
+            scaleTo={0.88}
             style={styles.clearAttachment}
           >
             <X color={SitGuruColors.textMuted} size={16} strokeWidth={2.4} />
-          </Pressable>
+          </BubblePressable>
         </View>
       ) : null}
 
@@ -255,24 +260,21 @@ export default function ChatComposerBar({
           />
         </View>
 
-        <Pressable
+        <BubblePressable
           accessibilityLabel="Send message"
           accessibilityRole="button"
           accessibilityState={{ disabled: !canSend }}
           disabled={!canSend}
           onPress={handleSend}
-          style={({ pressed }) => [
-            styles.send,
-            !canSend && styles.sendDisabled,
-            pressed && canSend && styles.pressed,
-          ]}
+          scaleTo={0.88}
+          style={[styles.send, !canSend && styles.sendDisabled]}
         >
           {sending ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
             <Send color="#FFFFFF" size={18} strokeWidth={2.6} />
           )}
-        </Pressable>
+        </BubblePressable>
       </View>
     </View>
   );
@@ -388,8 +390,5 @@ const styles = StyleSheet.create({
   },
   sendDisabled: {
     opacity: 0.45,
-  },
-  pressed: {
-    opacity: 0.85,
   },
 });

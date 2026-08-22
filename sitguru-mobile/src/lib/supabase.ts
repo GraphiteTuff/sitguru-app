@@ -352,8 +352,12 @@ const nativeSecureStorage = {
 
 export const supabase =
   createClient(
-    supabaseUrl,
-    supabaseKey,
+    isSupabaseConfigured
+      ? supabaseUrl
+      : 'https://example.supabase.co',
+    isSupabaseConfigured
+      ? supabaseKey
+      : 'public-anon-key',
     {
       auth: {
         storage:
@@ -362,9 +366,9 @@ export const supabase =
             ? webStorage
             : nativeSecureStorage,
         autoRefreshToken:
-          true,
+          isSupabaseConfigured,
         persistSession:
-          true,
+          isSupabaseConfigured,
         detectSessionInUrl:
           false,
         flowType: 'pkce',

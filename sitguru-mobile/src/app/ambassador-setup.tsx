@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-    Pressable,
     StyleSheet,
     Text,
     TextInput,
@@ -9,9 +8,18 @@ import {
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
+import SaveFeedbackBanner, {
+    useSaveFeedback,
+} from '@/components/SaveFeedbackBanner';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
+import {
+    useAmbassadorSetup,
+    type AmbassadorSetupDraft,
+} from '@/hooks/data/useRoleSetup';
+import { useThemeMode } from '@/hooks/use-theme';
 
 type StepNumber = 1 | 2 | 3 | 4 | 5;
 
@@ -96,14 +104,73 @@ const trainingItems = [
 export default function AmbassadorSetupScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
+  const isDark = useThemeMode() === 'dark';
+  const { loading, saving, load, save } = useAmbassadorSetup();
+  const {
+    feedback,
+    showSaved,
+    showError,
+    dismissFeedback,
+  } = useSaveFeedback();
 
   const [currentStep, setCurrentStep] = useState<StepNumber>(1);
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
+  const [stateValue, setStateValue] = useState('');
+  const [outreachArea, setOutreachArea] = useState('');
+  const [communityNotes, setCommunityNotes] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [selectedReferralTypes, setSelectedReferralTypes] = useState<string[]>([
     'Pet Parent referral link',
     'Guru referral link',
   ]);
+  const [referralNotes, setReferralNotes] = useState('');
   const [selectedPacketItems, setSelectedPacketItems] = useState<string[]>([]);
+  const [legalName, setLegalName] = useState('');
+  const [packetNotes, setPacketNotes] = useState('');
   const [selectedTrainingItems, setSelectedTrainingItems] = useState<string[]>([]);
+  const [loadError, setLoadError] = useState('');
+
+  const applyDraft = useCallback((draft: AmbassadorSetupDraft, step: number) => {
+    setDisplayName(draft.displayName);
+    setEmail(draft.email);
+    setPhone(draft.phone);
+    setCity(draft.city);
+    setStateValue(draft.state);
+    setOutreachArea(draft.outreachArea);
+    setCommunityNotes(draft.communityNotes);
+    setReferralCode(draft.referralCode);
+    setSelectedReferralTypes(
+      draft.selectedReferralTypes.length
+        ? draft.selectedReferralTypes
+        : ['Pet Parent referral link', 'Guru referral link'],
+    );
+    setReferralNotes(draft.referralNotes);
+    setSelectedPacketItems(draft.selectedPacketItems);
+    setLegalName(draft.legalName);
+    setPacketNotes(draft.packetNotes);
+    setSelectedTrainingItems(draft.selectedTrainingItems);
+    setCurrentStep(clampAmbassadorStep(step));
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    void load().then((result) => {
+      if (!active) return;
+      applyDraft(result.draft, result.step);
+      setLoadError(result.error ?? '');
+      if (result.error) {
+        showError('Unable to load Ambassador setup', result.error);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [applyDraft, load, showError]);
 
   const activeStep =
     setupSteps.find((step) => step.step === currentStep) || setupSteps[0];
@@ -121,6 +188,46 @@ export default function AmbassadorSetupScreen() {
     setter([...values, value]);
   }
 
+  function buildDraft(): AmbassadorSetupDraft {
+    return {
+      displayName,
+      email,
+      phone,
+      city,
+      state: stateValue,
+      outreachArea,
+      communityNotes,
+      referralCode,
+      selectedReferralTypes,
+      referralNotes,
+      selectedPacketItems,
+      legalName,
+      packetNotes,
+      selectedTrainingItems,
+    };
+  }
+
+  async function persistAndAdvance(nextStep: StepNumber, complete = false) {
+    const result = await save(buildDraft(), nextStep, { complete });
+
+    if (!result.persisted) {
+      showError(
+        'Ambassador setup was not saved',
+        result.error || 'Your changes were not stored. Please try again.',
+      );
+      return false;
+    }
+
+    if (complete) {
+      showSaved(
+        'Ambassador setup saved',
+        'Your Ambassador profile, onboarding progress, and training details were saved.',
+      );
+    }
+
+    return true;
+  }
+
   function goBack() {
     if (currentStep === 1) {
       router.push('/role-selection');
@@ -130,13 +237,31 @@ export default function AmbassadorSetupScreen() {
     setCurrentStep((currentStep - 1) as StepNumber);
   }
 
-  function goNext() {
+  async function goNext() {
+    if (saving || loading) return;
+
     if (currentStep < 5) {
-      setCurrentStep((currentStep + 1) as StepNumber);
+      const nextStep = (currentStep + 1) as StepNumber;
+      const saved = await persistAndAdvance(nextStep);
+      if (!saved) return;
+      setCurrentStep(nextStep);
       return;
     }
 
+    const saved = await persistAndAdvance(5, true);
+    if (!saved) return;
     router.push('/ambassador-dashboard');
+  }
+
+  async function goToStep(step: StepNumber) {
+    if (step === currentStep || saving || loading) return;
+
+    if (step > currentStep) {
+      const saved = await persistAndAdvance(step);
+      if (!saved) return;
+    }
+
+    setCurrentStep(step);
   }
 
   function renderStepContent() {
@@ -157,18 +282,52 @@ export default function AmbassadorSetupScreen() {
           </View>
 
           <View style={[styles.formGrid, isWide && styles.formGridWide]}>
-            <Field label="Display name" placeholder="Alex Ambassador" />
-            <Field label="Email address" placeholder="alex@example.com" keyboardType="email-address" />
-            <Field label="Phone number" placeholder="555-555-5555" keyboardType="phone-pad" />
-            <Field label="City" placeholder="Quakertown" />
-            <Field label="State" placeholder="PA" />
-            <Field label="Outreach area" placeholder="Upper Bucks County" />
+            <Field
+              label="Display name"
+              onChangeText={setDisplayName}
+              placeholder="Alex Ambassador"
+              value={displayName}
+            />
+            <Field
+              keyboardType="email-address"
+              label="Email address"
+              onChangeText={setEmail}
+              placeholder="alex@example.com"
+              value={email}
+            />
+            <Field
+              keyboardType="phone-pad"
+              label="Phone number"
+              onChangeText={setPhone}
+              placeholder="555-555-5555"
+              value={phone}
+            />
+            <Field
+              label="City"
+              onChangeText={setCity}
+              placeholder="Quakertown"
+              value={city}
+            />
+            <Field
+              label="State"
+              onChangeText={setStateValue}
+              placeholder="PA"
+              value={stateValue}
+            />
+            <Field
+              label="Outreach area"
+              onChangeText={setOutreachArea}
+              placeholder="Upper Bucks County"
+              value={outreachArea}
+            />
           </View>
 
           <Field
             label="Community notes"
-            placeholder="Neighborhoods, pet businesses, vet offices, groomers, groups, schools, or local spaces where you may share SitGuru."
             multiline
+            onChangeText={setCommunityNotes}
+            placeholder="Neighborhoods, pet businesses, vet offices, groomers, groups, schools, or local spaces where you may share SitGuru."
+            value={communityNotes}
           />
         </View>
       );
@@ -179,9 +338,13 @@ export default function AmbassadorSetupScreen() {
         <View style={styles.stepBody}>
           <View style={styles.referralCodePanel}>
             <Text style={styles.referralEyebrow}>Referral code preview</Text>
-            <Text style={styles.referralCode}>SITGURU</Text>
+            <Text style={styles.referralCode}>
+              {referralCode.trim() || 'SITGURU'}
+            </Text>
             <Text style={styles.referralText}>
-              Your final Ambassador referral code will be generated and tracked after setup is connected.
+              {referralCode.trim()
+                ? 'This is your Ambassador referral code. Keep using it for Pet Parent, Guru, and community sharing.'
+                : 'Your Ambassador referral code will appear here once it is on your Ambassador account.'}
             </Text>
           </View>
 
@@ -190,7 +353,7 @@ export default function AmbassadorSetupScreen() {
               const selected = selectedReferralTypes.includes(item);
 
               return (
-                <Pressable
+                <BubblePressable
                   key={item}
                   accessibilityRole="button"
                   onPress={() =>
@@ -204,15 +367,17 @@ export default function AmbassadorSetupScreen() {
                   <Text style={[styles.checkText, selected && styles.checkTextActive]}>
                     {item}
                   </Text>
-                </Pressable>
+                </BubblePressable>
               );
             })}
           </View>
 
           <Field
             label="Referral notes"
-            placeholder="Who do you plan to share SitGuru with first?"
             multiline
+            onChangeText={setReferralNotes}
+            placeholder="Who do you plan to share SitGuru with first?"
+            value={referralNotes}
           />
         </View>
       );
@@ -226,7 +391,7 @@ export default function AmbassadorSetupScreen() {
               const selected = selectedPacketItems.includes(item);
 
               return (
-                <Pressable
+                <BubblePressable
                   key={item}
                   accessibilityRole="button"
                   onPress={() =>
@@ -240,20 +405,24 @@ export default function AmbassadorSetupScreen() {
                   <Text style={[styles.checkText, selected && styles.checkTextActive]}>
                     {item}
                   </Text>
-                </Pressable>
+                </BubblePressable>
               );
             })}
           </View>
 
           <Field
             label="Legal name for acknowledgment"
+            onChangeText={setLegalName}
             placeholder="Alex Peterson"
+            value={legalName}
           />
 
           <Field
             label="Packet notes"
-            placeholder="Questions about referral expectations, rewards, social sharing, or community outreach."
             multiline
+            onChangeText={setPacketNotes}
+            placeholder="Questions about referral expectations, rewards, social sharing, or community outreach."
+            value={packetNotes}
           />
         </View>
       );
@@ -277,7 +446,7 @@ export default function AmbassadorSetupScreen() {
               const selected = selectedTrainingItems.includes(item);
 
               return (
-                <Pressable
+                <BubblePressable
                   key={item}
                   accessibilityRole="button"
                   onPress={() =>
@@ -291,7 +460,7 @@ export default function AmbassadorSetupScreen() {
                   <Text style={[styles.checkText, selected && styles.checkTextActive]}>
                     {item}
                   </Text>
-                </Pressable>
+                </BubblePressable>
               );
             })}
           </View>
@@ -327,21 +496,28 @@ export default function AmbassadorSetupScreen() {
         </View>
 
         <View style={[styles.readyActions, isWide && styles.readyActionsWide]}>
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
-            onPress={() => router.push('/ambassador-dashboard')}
+            disabled={saving || loading}
+            onPress={() => {
+              void persistAndAdvance(5, true).then((saved) => {
+                if (saved) router.push('/ambassador-dashboard');
+              });
+            }}
             style={styles.primaryButton}
           >
-            <Text style={styles.primaryButtonText}>Go to Ambassador Dashboard</Text>
-          </Pressable>
+            <Text style={styles.primaryButtonText}>
+              {saving ? 'Saving...' : 'Go to Ambassador Dashboard'}
+            </Text>
+          </BubblePressable>
 
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             onPress={() => router.push('/role-selection')}
             style={styles.secondaryButton}
           >
             <Text style={styles.secondaryButtonText}>Switch Role</Text>
-          </Pressable>
+          </BubblePressable>
         </View>
       </View>
     );
@@ -349,17 +525,23 @@ export default function AmbassadorSetupScreen() {
 
   return (
     <SitGuruScreen scroll center={false} maxWidth={860}>
+      <SaveFeedbackBanner
+        feedback={feedback}
+        isDark={isDark}
+        onDismiss={dismissFeedback}
+      />
+
       <View style={styles.page}>
         <View style={styles.topBar}>
           <SitGuruLogo size="small" variant="symbol" />
 
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             onPress={() => router.push('/role-selection')}
             style={styles.topLinkButton}
           >
             <Text style={styles.topLinkText}>Roles</Text>
-          </Pressable>
+          </BubblePressable>
         </View>
 
         <View style={[styles.heroPanel, isWide && styles.heroPanelWide]}>
@@ -412,10 +594,12 @@ export default function AmbassadorSetupScreen() {
             const complete = step.step < currentStep;
 
             return (
-              <Pressable
+              <BubblePressable
                 key={step.step}
                 accessibilityRole="button"
-                onPress={() => setCurrentStep(step.step)}
+                disabled={saving || loading}
+                onPress={() => void goToStep(step.step)}
+                scaleTo={0.88}
                 style={[
                   styles.stepPill,
                   active && styles.stepPillActive,
@@ -438,7 +622,7 @@ export default function AmbassadorSetupScreen() {
                 >
                   {step.shortTitle}
                 </Text>
-              </Pressable>
+              </BubblePressable>
             );
           })}
         </View>
@@ -459,6 +643,22 @@ export default function AmbassadorSetupScreen() {
 
           <Text style={styles.stepDescription}>{activeStep.description}</Text>
 
+          {loadError ? (
+            <View style={styles.usedForCard}>
+              <Text style={styles.usedForLabel}>Save status</Text>
+              <Text style={styles.usedForText}>{loadError}</Text>
+            </View>
+          ) : null}
+
+          {loading ? (
+            <View style={styles.usedForCard}>
+              <Text style={styles.usedForLabel}>Loading</Text>
+              <Text style={styles.usedForText}>
+                Loading your saved Ambassador setup...
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.usedForCard}>
             <Text style={styles.usedForLabel}>Used for</Text>
             <Text style={styles.usedForText}>{activeStep.usedFor}</Text>
@@ -471,28 +671,40 @@ export default function AmbassadorSetupScreen() {
       </View>
 
       <View style={styles.bottomDock}>
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
+          disabled={saving}
           onPress={goBack}
           style={styles.dockSecondaryAction}
         >
           <Text style={styles.dockSecondaryText}>
             {currentStep === 1 ? 'Roles' : 'Back'}
           </Text>
-        </Pressable>
+        </BubblePressable>
 
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
-          onPress={goNext}
+          disabled={saving || loading}
+          onPress={() => void goNext()}
           style={styles.dockPrimaryAction}
         >
           <Text style={styles.dockPrimaryText}>
-            {currentStep === 5 ? 'Dashboard' : 'Continue'}
+            {saving
+              ? 'Saving...'
+              : currentStep === 5
+                ? 'Dashboard'
+                : 'Continue'}
           </Text>
-        </Pressable>
+        </BubblePressable>
       </View>
     </SitGuruScreen>
   );
+}
+
+function clampAmbassadorStep(step: number): StepNumber {
+  if (step <= 1) return 1;
+  if (step >= 5) return 5;
+  return step as StepNumber;
 }
 
 function Field({

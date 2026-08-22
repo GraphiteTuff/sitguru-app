@@ -37,6 +37,7 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
@@ -360,23 +361,21 @@ export default function RoleSelectionScreen() {
                   </View>
 
                   <View style={styles.headerActions}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityLabel="Open notifications"
                       accessibilityRole="button"
                       onPress={() =>
                         router.push('/notifications')
                       }
-                      style={({ pressed }) => [
-                        styles.headerIconButton,
-                        pressed && styles.pressed,
-                      ]}
+                      scaleTo={0.88}
+                      style={styles.headerIconButton}
                     >
                       <Bell
                         color={palette.text}
                         size={18}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
                     <ThemeToggle
                       isDark={isDark}
@@ -387,16 +386,14 @@ export default function RoleSelectionScreen() {
                       }
                     />
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityLabel="Open workspace menu"
                       accessibilityRole="button"
                       onPress={() =>
                         setWorkspaceMenuOpen(true)
                       }
-                      style={({ pressed }) => [
-                        styles.profileButton,
-                        pressed && styles.pressed,
-                      ]}
+                      scaleTo={0.88}
+                      style={styles.profileButton}
                     >
                       <ProfileAvatar
                         avatarUrl={avatarUrl}
@@ -414,7 +411,7 @@ export default function RoleSelectionScreen() {
                       <View
                         style={styles.onlineDot}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
                 </View>
 
@@ -433,16 +430,13 @@ export default function RoleSelectionScreen() {
                   </Text>
                 </View>
 
-                <Pressable
+                <BubblePressable
                   accessibilityRole="button"
                   onPress={() =>
                     router.push(heroDestination)
                   }
-                  style={({ pressed }) => [
-                    styles.heroCard,
-                    pressed &&
-                      styles.primaryPressed,
-                  ]}
+                  scaleTo={0.97}
+                  style={styles.heroCard}
                 >
                   <View style={styles.heroIcon}>
                     <Sparkles
@@ -472,7 +466,7 @@ export default function RoleSelectionScreen() {
                     size={23}
                     strokeWidth={2.6}
                   />
-                </Pressable>
+                </BubblePressable>
 
                 {profileError ? (
                   <View style={styles.errorCard}>
@@ -540,15 +534,13 @@ export default function RoleSelectionScreen() {
                   ))}
                 </View>
 
-                <Pressable
+                <BubblePressable
                   accessibilityRole="button"
                   onPress={() =>
                     setWorkspaceMenuOpen(true)
                   }
-                  style={({ pressed }) => [
-                    styles.switchingCard,
-                    pressed && styles.pressed,
-                  ]}
+                  scaleTo={0.97}
+                  style={styles.switchingCard}
                 >
                   <View
                     style={styles.switchingIcon}
@@ -580,19 +572,15 @@ export default function RoleSelectionScreen() {
                     size={19}
                     strokeWidth={2.4}
                   />
-                </Pressable>
+                </BubblePressable>
 
                 {!isAuthenticated ? (
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     onPress={() =>
                       router.replace('/login')
                     }
-                    style={({ pressed }) => [
-                      styles.loginButton,
-                      pressed &&
-                        styles.primaryPressed,
-                    ]}
+                    style={styles.loginButton}
                   >
                     <Text
                       style={styles.loginButtonText}
@@ -605,7 +593,7 @@ export default function RoleSelectionScreen() {
                       size={20}
                       strokeWidth={2.5}
                     />
-                  </Pressable>
+                  </BubblePressable>
                 ) : null}
               </ScrollView>
 
@@ -738,7 +726,7 @@ function ThemeToggle({
 }) {
   return (
     <View style={styles.themeToggle}>
-      <Pressable
+      <BubblePressable
         accessibilityLabel="Use light mode"
         accessibilityRole="button"
         accessibilityState={{
@@ -747,6 +735,7 @@ function ThemeToggle({
         onPress={() =>
           setThemePreference('light')
         }
+        scaleTo={0.88}
         style={[
           styles.themeOption,
           themePreference === 'light' &&
@@ -762,9 +751,9 @@ function ThemeToggle({
           size={15}
           strokeWidth={2.3}
         />
-      </Pressable>
+      </BubblePressable>
 
-      <Pressable
+      <BubblePressable
         accessibilityLabel="Use dark mode"
         accessibilityRole="button"
         accessibilityState={{
@@ -773,6 +762,7 @@ function ThemeToggle({
         onPress={() =>
           setThemePreference('dark')
         }
+        scaleTo={0.88}
         style={[
           styles.themeOption,
           themePreference === 'dark' &&
@@ -790,7 +780,7 @@ function ThemeToggle({
           size={15}
           strokeWidth={2.3}
         />
-      </Pressable>
+      </BubblePressable>
     </View>
   );
 }
@@ -832,13 +822,13 @@ function WorkspaceCard({
         : 'Continue setup';
 
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
+      scaleTo={0.97}
+      style={[
         styles.roleCard,
         active && styles.roleCardActive,
-        pressed && styles.pressed,
       ]}
     >
       <View
@@ -907,7 +897,7 @@ function WorkspaceCard({
           </Text>
         </View>
       </View>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -972,21 +962,19 @@ function WorkspaceSheet({
             </View>
           </View>
 
-          <Pressable
+          <BubblePressable
             accessibilityLabel="Close workspace menu"
             accessibilityRole="button"
             onPress={onClose}
-            style={({ pressed }) => [
-              styles.sheetCloseButton,
-              pressed && styles.pressed,
-            ]}
+            scaleTo={0.88}
+            style={styles.sheetCloseButton}
           >
             <X
               color={palette.textMuted}
               size={18}
               strokeWidth={2.3}
             />
-          </Pressable>
+          </BubblePressable>
         </View>
 
         <View style={styles.sheetRoleList}>
@@ -995,16 +983,14 @@ function WorkspaceSheet({
               activeWorkspace === role;
 
             return (
-              <Pressable
+              <BubblePressable
                 key={role}
                 accessibilityRole="button"
                 onPress={() =>
                   onOpenWorkspace(role)
                 }
-                style={({ pressed }) => [
-                  styles.sheetRoleRow,
-                  pressed && styles.pressed,
-                ]}
+                scaleTo={0.97}
+                style={styles.sheetRoleRow}
               >
                 <View
                   style={styles.sheetRoleIcon}
@@ -1044,23 +1030,21 @@ function WorkspaceSheet({
                     strokeWidth={2.3}
                   />
                 )}
-              </Pressable>
+              </BubblePressable>
             );
           })}
         </View>
 
         <View style={styles.sheetDivider} />
 
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           onPress={() => {
             onClose();
             router.push('/account');
           }}
-          style={({ pressed }) => [
-            styles.sheetAccountRow,
-            pressed && styles.pressed,
-          ]}
+          scaleTo={0.97}
+          style={styles.sheetAccountRow}
         >
           <View style={styles.sheetRoleIcon}>
             <Settings
@@ -1086,18 +1070,15 @@ function WorkspaceSheet({
             size={18}
             strokeWidth={2.3}
           />
-        </Pressable>
+        </BubblePressable>
 
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           disabled={signingOut}
           onPress={onSignOut}
-          style={({ pressed }) => [
+          style={[
             styles.sheetSignOutRow,
             signingOut && styles.disabled,
-            pressed &&
-              !signingOut &&
-              styles.pressed,
           ]}
         >
           {signingOut ? (
@@ -1118,7 +1099,7 @@ function WorkspaceSheet({
               ? 'Signing out…'
               : 'Sign out of SitGuru'}
           </Text>
-        </Pressable>
+        </BubblePressable>
       </View>
     </>
   );
@@ -1138,7 +1119,7 @@ function BottomNavItem({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       accessibilityState={{
         selected: active,
@@ -1157,7 +1138,7 @@ function BottomNavItem({
       >
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -2177,22 +2158,6 @@ function createStyles(isDark: boolean) {
       color: palette.textMuted,
       fontFamily: AppFonts.bold,
       fontSize: 10,
-    },
-    pressed: {
-      opacity: 0.76,
-      transform: [
-        {
-          scale: 0.99,
-        },
-      ],
-    },
-    primaryPressed: {
-      opacity: 0.87,
-      transform: [
-        {
-          scale: 0.99,
-        },
-      ],
     },
     disabled: {
       opacity: 0.5,

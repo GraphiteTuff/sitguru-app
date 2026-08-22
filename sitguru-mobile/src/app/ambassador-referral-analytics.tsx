@@ -7,10 +7,7 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
-  Home,
   Image as ImageIcon,
-  Link2,
-  MessageCircle,
   MousePointerClick,
   PawPrint,
   QrCode,
@@ -33,7 +30,6 @@ import {
   Alert,
   Image,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   Share,
@@ -42,6 +38,8 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
@@ -1113,13 +1111,13 @@ export default function AmbassadorReferralAnalyticsScreen() {
         <Text style={styles.loadingBody}>
           Sign in with an Ambassador account to view referral analytics.
         </Text>
-        <Pressable
+        <BubblePressable
           onPress={() => go(user ? '/account' : '/login')}
           style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>
             {user ? 'Open account' : 'Sign in'}
           </Text>
-        </Pressable>
+        </BubblePressable>
       </View>
     );
   }
@@ -1143,8 +1141,9 @@ export default function AmbassadorReferralAnalyticsScreen() {
             <Text style={styles.roleText}>Ambassador • Live</Text>
           </View>
 
-          <Pressable
+          <BubblePressable
             onPress={() => go('/ambassador-dashboard')}
+            scaleTo={0.88}
             style={styles.dashboardButton}>
             <ArrowLeft
               color={theme.colors.primary}
@@ -1154,24 +1153,26 @@ export default function AmbassadorReferralAnalyticsScreen() {
             <Text style={styles.dashboardButtonText}>
               Dashboard
             </Text>
-          </Pressable>
+          </BubblePressable>
         </View>
 
         <View style={styles.headerActions}>
-          <Pressable
+          <BubblePressable
             onPress={() => go('/notifications')}
+            scaleTo={0.88}
             style={styles.headerIconButton}>
             <Bell
               color={theme.colors.text}
               size={18}
               strokeWidth={2.3}
             />
-          </Pressable>
+          </BubblePressable>
 
-          <Pressable
+          <BubblePressable
             accessibilityLabel="Switch workspace"
             accessibilityRole="button"
             onPress={() => setWorkspaceSwitcherOpen(true)}
+            scaleTo={0.88}
             style={styles.avatar}>
             {avatarUrl && !avatarFailed ? (
               <Image
@@ -1185,7 +1186,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
                 {(firstName[0] || 'A').toUpperCase()}
               </Text>
             )}
-          </Pressable>
+          </BubblePressable>
         </View>
       </View>
 
@@ -1234,7 +1235,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
               </Text>
             </View>
 
-            <Pressable
+            <BubblePressable
               onPress={() => void shareReferralLink()}
               style={styles.referralCenterButton}>
               <QrCode
@@ -1245,15 +1246,16 @@ export default function AmbassadorReferralAnalyticsScreen() {
               <Text style={styles.referralCenterText}>
                 Share link
               </Text>
-            </Pressable>
+            </BubblePressable>
           </View>
         </View>
 
         {loadError ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{loadError}</Text>
-            <Pressable
+            <BubblePressable
               onPress={() => void refreshAnalytics(false)}
+              scaleTo={0.88}
               style={styles.retryButton}>
               <RefreshCw
                 color={theme.colors.danger}
@@ -1261,7 +1263,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
                 strokeWidth={2.4}
               />
               <Text style={styles.retryText}>Retry</Text>
-            </Pressable>
+            </BubblePressable>
           </View>
         ) : null}
 
@@ -1599,8 +1601,9 @@ export default function AmbassadorReferralAnalyticsScreen() {
               </Text>
             </View>
 
-            <Pressable
+            <BubblePressable
               onPress={() => go('/payments')}
+              scaleTo={0.88}
               style={styles.smallActionButton}>
               <CircleDollarSign
                 color={theme.colors.primary}
@@ -1610,7 +1613,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
               <Text style={styles.smallActionText}>
                 Rewards
               </Text>
-            </Pressable>
+            </BubblePressable>
           </View>
 
           <Text style={styles.rewardNote}>
@@ -1683,67 +1686,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      <View style={styles.bottomNav}>
-        <Pressable
-          onPress={() => go('/ambassador-dashboard')}
-          style={styles.navItem}>
-          <Home
-            color={theme.colors.textSecondary}
-            size={20}
-            strokeWidth={2.3}
-          />
-          <Text style={styles.navLabel}>Home</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => go('/ambassador-dashboard')}
-          style={styles.navItem}>
-          <Link2
-            color={theme.colors.textSecondary}
-            size={20}
-            strokeWidth={2.3}
-          />
-          <Text style={styles.navLabel}>Referrals</Text>
-        </Pressable>
-
-        <Pressable style={styles.navItem}>
-          <BarChart3
-            color={theme.colors.primary}
-            size={20}
-            strokeWidth={2.4}
-          />
-          <Text style={[styles.navLabel, styles.navLabelActive]}>
-            Analytics
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() =>
-            router.push({
-              pathname: '/messages',
-              params: { role: 'ambassador' },
-            })
-          }
-          style={styles.navItem}>
-          <MessageCircle
-            color={theme.colors.textSecondary}
-            size={20}
-            strokeWidth={2.3}
-          />
-          <Text style={styles.navLabel}>Messages</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => setWorkspaceSwitcherOpen(true)}
-          style={styles.navItem}>
-          <UserRound
-            color={theme.colors.textSecondary}
-            size={20}
-            strokeWidth={2.3}
-          />
-          <Text style={styles.navLabel}>Profile</Text>
-        </Pressable>
-      </View>
+      <SitGuruTabBar active="referrals" role="ambassador" />
 
       <SitGuruWorkspaceSwitcher
         currentRole="ambassador"
@@ -2488,37 +2431,7 @@ function createStyles(theme: Theme) {
       textAlign: 'center',
     },
     bottomSpacer: {
-      height: 94,
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: theme.colors.tabBar,
-      borderTopColor: theme.colors.tabBarBorder,
-      borderTopWidth: 1,
-      bottom: 0,
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      left: 0,
-      minHeight: 70,
-      paddingBottom: Platform.OS === 'ios' ? 16 : 8,
-      paddingHorizontal: 8,
-      paddingTop: 8,
-      position: 'absolute',
-      right: 0,
-    },
-    navItem: {
-      alignItems: 'center',
-      gap: 3,
-      justifyContent: 'center',
-      minWidth: 52,
-    },
-    navLabel: {
-      color: theme.colors.textSecondary,
-      fontFamily: Fonts.bold,
-      fontSize: 8,
-    },
-    navLabelActive: {
-      color: theme.colors.primary,
+      height: 24,
     },
     primaryButton: {
       backgroundColor: theme.colors.primary,

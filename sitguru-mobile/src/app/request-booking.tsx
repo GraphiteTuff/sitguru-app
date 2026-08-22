@@ -1,19 +1,23 @@
-import { router } from 'expo-router';
+import * as Linking from 'expo-linking';
+import { router, useLocalSearchParams } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import {
+  AlertTriangle,
   CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
   PawPrint,
+  Send,
   ShieldCheck,
-  Sparkles,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import {
+  ActivityIndicator,
   Image,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,10 +25,12 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
+import { useBookings } from '@/hooks/data/useBookings';
 import {
   setThemePreference,
   type SitGuruThemePreference,
@@ -115,7 +121,7 @@ const bookingSteps: {
     shortTitle: 'Send',
     title: 'Send request',
     description:
-      'Send this request to the Guru. Payment happens later after the Guru accepts.',
+      'Nothing has been sent yet. Send the request and the Guru decides to accept or decline. Nothing is charged when you send it.',
   },
 ];
 
@@ -223,6 +229,58 @@ const pawReportOptions = [
   'Care notes',
   'Visit timing',
 ];
+
+function paramText(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return (value.find((item) => typeof item === 'string' && item.trim()) ?? '').trim();
+  }
+
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function errorText(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  if (typeof error === 'string' && error.trim()) return error.trim();
+  return fallback;
+}
+
+function serviceMatchKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z]/g, '');
+}
+
+/** Callers pass web-style labels ("Doggy Day Care"), so match loosely. */
+function findServiceForParam(serviceType: string) {
+  const target = serviceMatchKey(serviceType);
+  if (!target) return null;
+
+  return (
+    services.find((service) => {
+      const title = serviceMatchKey(service.title);
+      const id = serviceMatchKey(service.id);
+
+      return (
+        title === target ||
+        id === target ||
+        title.startsWith(target) ||
+        target.startsWith(title)
+      );
+    }) ?? null
+  );
+}
+
+function guruDisplayLabel(guruSlug: string, guruId: string) {
+  if (guruSlug) {
+    const pretty = guruSlug
+      .split(/[-_]+/)
+      .filter(Boolean)
+      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+      .join(' ');
+
+    return pretty || 'Selected Guru';
+  }
+
+  return guruId ? 'Selected Guru' : 'No Guru selected yet';
+}
 
 async function loadPetOptions(userId: string): Promise<PetOption[]> {
   for (const table of PET_TABLES) {
@@ -566,7 +624,9 @@ const THEME_OPTIONS: Array<{
 ];
 
 export default function RequestBookingScreen() {
-  const { user, profile } = useAuth();
+  const { isAuthenticated, user, profile } = useAuth();
+  const params = useLocalSearchParams();
+  const { createBooking } = useBookings({ enabled: false, realtime: false });
   const isWebPreview = Platform.OS === 'web';
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
@@ -592,13 +652,14 @@ export default function RequestBookingScreen() {
 
   const [petOptions, setPetOptions] = useState<PetOption[]>(FALLBACK_PETS);
   const [selectedPetId, setSelectedPetId] = useState('scout');
+  const [hasSavedPets, setHasSavedPets] = useState(false);
   const [petLoadMessage, setPetLoadMessage] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState('dog-walking');
   const [startDateId, setStartDateId] = useState(firstAvailable.id);
   const [endDateId, setEndDateId] = useState('');
   const [selectedTime, setSelectedTime] = useState('Midday');
   const [additionalPets, setAdditionalPets] = useState(0);
-  const [applyPawPerks, setApplyPawPerks] = useState(true);
+  const [applyPawPerks, setApplyPawPerks] = useState(false);
   const [applyReferralCredit, setApplyReferralCredit] = useState(false);
   const [careNotes, setCareNotes] = useState('');
   const [accessNotes, setAccessNotes] = useState('');
@@ -607,6 +668,22 @@ export default function RequestBookingScreen() {
     'Care notes',
   ]);
   const [notice, setNotice] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [submitOutcome, setSubmitOutcome] = useState<{
+    bookingId: string;
+    checkoutUrl: string | null;
+  } | null>(null);
+  const [openingCheckout, setOpeningCheckout] = useState(false);
+  const [checkoutNotice, setCheckoutNotice] = useState('');
+
+  const guruTargetId = paramText(params.guruId);
+  const guruTargetSlug =
+    paramText(params.guruSlug) || paramText(params.slug);
+  const hasGuruTarget = Boolean(guruTargetId || guruTargetSlug);
+  const guruLabel = guruDisplayLabel(guruTargetSlug, guruTargetId);
+  const paramPetId = paramText(params.petId);
+  const paramServiceType = paramText(params.serviceType);
 
   const profileRecord = (profile ?? {}) as RecordRow;
   const userMetadata = (user?.user_metadata ?? {}) as RecordRow;
@@ -646,8 +723,13 @@ export default function RequestBookingScreen() {
           : loadedPets;
 
         setPetOptions(nextOptions);
+        setHasSavedPets(true);
         setPetLoadMessage('');
         setSelectedPetId((currentId) => {
+          if (paramPetId && loadedPets.some((pet) => pet.id === paramPetId)) {
+            return paramPetId;
+          }
+
           if (loadedPets.some((pet) => pet.id === currentId)) {
             return currentId;
           }
@@ -671,7 +753,16 @@ export default function RequestBookingScreen() {
     return () => {
       active = false;
     };
-  }, [user?.id]);
+  }, [paramPetId, user?.id]);
+
+  useEffect(() => {
+    const match = findServiceForParam(paramServiceType);
+    if (!match) return;
+
+    setSelectedServiceId(match.id);
+    setEndDateId('');
+    setSelectedTime(match.mode === 'single' ? 'Midday' : 'Flexible handoff');
+  }, [paramServiceType]);
 
   const selectedPet =
     petOptions.find((pet) => pet.id === selectedPetId) || petOptions[0];
@@ -706,6 +797,33 @@ export default function RequestBookingScreen() {
       ? singleTimeOptions
       : overnightTimeOptions;
 
+  const dateMode: 'single' | 'range' =
+    selectedService.mode === 'single' ? 'single' : 'range';
+  const requestedEndDate = endDateId || startDateId;
+  const requestedDates =
+    dateMode === 'range'
+      ? getRangeDateIds(startDateId, requestedEndDate)
+      : [startDateId].filter(Boolean);
+  const petIsSendable = Boolean(
+    hasSavedPets && selectedPet && selectedPet.id !== 'add-pet',
+  );
+  const canSubmitRequest = hasGuruTarget && petIsSendable;
+  const accentOnWhite = isDark ? palette.primaryDark : palette.primary;
+  const dockPrimaryLabel =
+    currentStep < 6
+      ? 'Continue'
+      : submitting
+        ? 'Sending…'
+        : submitOutcome
+          ? submitOutcome.bookingId
+            ? 'Open Booking Details'
+            : 'Request sent'
+          : 'Send request';
+  const dockPrimaryDisabled =
+    currentStep === 6 &&
+    (submitting ||
+      (submitOutcome ? !submitOutcome.bookingId : !canSubmitRequest));
+
   function goBack() {
     setNotice('');
 
@@ -725,9 +843,167 @@ export default function RequestBookingScreen() {
       return;
     }
 
-    setNotice(
-      'Your request is ready to review in Booking Details. No payment has been charged and no booking is confirmed until a Guru accepts.',
-    );
+    if (submitOutcome) {
+      openCreatedBooking();
+      return;
+    }
+
+    void sendRequestToGuru();
+  }
+
+  function openCreatedBooking() {
+    if (!submitOutcome?.bookingId) return;
+
+    router.push({
+      pathname: '/booking-details',
+      params: {
+        bookingId: submitOutcome.bookingId,
+        viewerRole: 'pet_parent',
+      },
+    });
+  }
+
+  /**
+   * The API has no columns for access notes, PawReport choices, extra pets, or
+   * applied credits, so they ride along in the booking notes the Guru reads.
+   */
+  function buildRequestNotes() {
+    const appliedSavings = [
+      estimate.multiPetSavings > 0 ? 'multi-pet savings' : '',
+      estimate.longStaySavings > 0 ? 'long-stay savings' : '',
+      applyPawPerks ? 'PawPerks credit' : '',
+      applyReferralCredit ? 'referral credit' : '',
+    ].filter(Boolean);
+
+    return [
+      careNotes.trim() ? `Care notes: ${careNotes.trim()}` : '',
+      accessNotes.trim() ? `Access notes: ${accessNotes.trim()}` : '',
+      additionalPets > 0
+        ? `Additional pets included: ${additionalPets}`
+        : '',
+      pawReportItems.length > 0
+        ? `PawReport updates requested: ${pawReportItems.join(', ')}`
+        : '',
+      `Preferred time: ${selectedTime}`,
+      `Requested care length: ${estimate.units} ${unitLabel}`,
+      appliedSavings.length > 0
+        ? `Savings requested in app: ${appliedSavings.join(', ')}`
+        : '',
+      `In-app estimate shown to the Pet Parent: ${currency(estimate.total)} (estimate only).`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  async function sendRequestToGuru() {
+    if (submitting || submitOutcome) return;
+
+    setNotice('');
+    setCheckoutNotice('');
+
+    if (!isAuthenticated || !user?.id) {
+      setSubmitError(
+        'Sign in as the Pet Parent on this account before sending a care request.',
+      );
+      return;
+    }
+
+    if (!hasGuruTarget) {
+      setSubmitError(
+        'This request has no Guru attached yet. Open Find Care and start the request from the Guru you want.',
+      );
+      return;
+    }
+
+    if (!petIsSendable) {
+      setSubmitError(
+        'Save a Pet Passport first. Every request links to a real pet profile so the Guru sees live care details.',
+      );
+      return;
+    }
+
+    if (!startDateId) {
+      setSubmitError(
+        'Choose a care date on the Calendar step before sending this request.',
+      );
+      return;
+    }
+
+    setSubmitError('');
+    setSubmitting(true);
+
+    const result = await createBooking({
+      guruId: guruTargetId || undefined,
+      guruSlug: guruTargetSlug || undefined,
+      petId: selectedPet.id,
+      petName: selectedPet.name,
+      requestedStartDate: startDateId,
+      requestedEndDate: dateMode === 'range' ? requestedEndDate : undefined,
+      dateSelectionMode: dateMode,
+      selectedDates: requestedDates,
+      serviceType: selectedService.title,
+      serviceKey: selectedService.id.replace(/-/g, '_'),
+      timeWindow: selectedTime,
+      visitLength: `${estimate.units} ${unitLabel}`,
+      notes: buildRequestNotes(),
+      customerName: petParentName,
+      customerEmail: user.email ?? undefined,
+      ...(estimate.total > 0 ? { subtotalAmount: estimate.total } : {}),
+    });
+
+    setSubmitting(false);
+
+    if (result.error) {
+      setSubmitError(result.error);
+      return;
+    }
+
+    setSubmitOutcome({
+      bookingId: result.booking?.id ?? '',
+      checkoutUrl: result.checkoutUrl,
+    });
+    setCurrentStep(6);
+  }
+
+  async function openCheckout(checkoutUrl: string) {
+    if (openingCheckout) return;
+
+    setOpeningCheckout(true);
+    setCheckoutNotice('');
+
+    try {
+      if (Platform.OS === 'web') {
+        await Linking.openURL(checkoutUrl);
+        return;
+      }
+
+      const returnUrl = Linking.createURL('/booking-details', {
+        queryParams: {
+          bookingId: submitOutcome?.bookingId ?? '',
+          viewerRole: 'pet_parent',
+        },
+      });
+
+      const result = await WebBrowser.openAuthSessionAsync(
+        checkoutUrl,
+        returnUrl,
+      );
+
+      setCheckoutNotice(
+        result.type === 'success'
+          ? 'Stripe is finishing this payment. Paid status only appears in Booking Details after SitGuru confirms it with the server.'
+          : 'Secure checkout closed and no payment was confirmed. Your request is still with the Guru and you can pay later from Booking Details.',
+      );
+    } catch (error) {
+      setCheckoutNotice(
+        errorText(
+          error,
+          'Secure checkout could not be opened. Your request is still with the Guru.',
+        ),
+      );
+    } finally {
+      setOpeningCheckout(false);
+    }
   }
 
   function choosePet(petId: string) {
@@ -787,6 +1063,36 @@ export default function RequestBookingScreen() {
     }
 
     setPawReportItems([...pawReportItems, item]);
+  }
+
+  function renderRequestBlockers() {
+    if (canSubmitRequest) return null;
+
+    return (
+      <View style={styles.blockerStack}>
+        {!hasGuruTarget ? (
+          <WarningCard
+            actionLabel="Find a Guru"
+            message="SitGuru needs to know which Guru receives this request. Open Find Care and start the request from a Guru profile."
+            onPress={() => router.push('/find-care')}
+            palette={palette}
+            styles={styles}
+            title="No Guru selected"
+          />
+        ) : null}
+
+        {!petIsSendable ? (
+          <WarningCard
+            actionLabel="Open Pet Passports"
+            message="The pets shown here are a preview until a Pet Passport is saved. Save one so the Guru receives real care details."
+            onPress={() => router.push('/pet-passports')}
+            palette={palette}
+            styles={styles}
+            title="No saved Pet Passport"
+          />
+        ) : null}
+      </View>
+    );
   }
 
   function renderEstimateCard() {
@@ -878,15 +1184,12 @@ export default function RequestBookingScreen() {
               const selected = selectedPetId === pet.id;
 
               return (
-                <Pressable
+                <BubblePressable
                   key={pet.id}
                   accessibilityRole="button"
                   onPress={() => choosePet(pet.id)}
-                  style={({ pressed }) => [
-                    styles.petCard,
-                    selected && styles.petCardActive,
-                    pressed && styles.pressed,
-                  ]}
+                  scaleTo={0.97}
+                  style={[styles.petCard, selected && styles.petCardActive]}
                 >
                   <AvatarImage
                     fallback={pet.emoji}
@@ -919,7 +1222,7 @@ export default function RequestBookingScreen() {
                       />
                     )}
                   </View>
-                </Pressable>
+                </BubblePressable>
               );
             })}
           </View>
@@ -934,25 +1237,27 @@ export default function RequestBookingScreen() {
               </View>
 
               <View style={styles.counterRow}>
-                <Pressable
+                <BubblePressable
                   accessibilityRole="button"
                   onPress={() =>
                     setAdditionalPets(Math.max(0, additionalPets - 1))
                   }
+                  scaleTo={0.88}
                   style={styles.counterButton}
                 >
                   <Text style={styles.counterButtonText}>−</Text>
-                </Pressable>
+                </BubblePressable>
 
                 <Text style={styles.counterNumber}>{additionalPets}</Text>
 
-                <Pressable
+                <BubblePressable
                   accessibilityRole="button"
                   onPress={() => setAdditionalPets(additionalPets + 1)}
+                  scaleTo={0.88}
                   style={styles.counterButton}
                 >
                   <Text style={styles.counterButtonText}>+</Text>
-                </Pressable>
+                </BubblePressable>
               </View>
             </View>
           </View>
@@ -975,9 +1280,10 @@ export default function RequestBookingScreen() {
             </View>
           </View>
 
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             onPress={() => router.push('/pet-passports')}
+            scaleTo={0.97}
             style={styles.passportCard}
           >
             <View style={styles.passportIcon}>
@@ -994,7 +1300,7 @@ export default function RequestBookingScreen() {
               size={18}
               strokeWidth={2.4}
             />
-          </Pressable>
+          </BubblePressable>
 
           {renderEstimateCard()}
         </View>
@@ -1009,14 +1315,14 @@ export default function RequestBookingScreen() {
               const selected = selectedServiceId === service.id;
 
               return (
-                <Pressable
+                <BubblePressable
                   key={service.id}
                   accessibilityRole="button"
                   onPress={() => chooseService(service)}
-                  style={({ pressed }) => [
+                  scaleTo={0.97}
+                  style={[
                     styles.serviceCard,
                     selected && styles.serviceCardActive,
-                    pressed && styles.pressed,
                   ]}
                 >
                   <View style={styles.serviceHeader}>
@@ -1066,7 +1372,7 @@ export default function RequestBookingScreen() {
                     per {service.rateUnit} • additional pet +
                     {currency(service.additionalPetRate)}
                   </Text>
-                </Pressable>
+                </BubblePressable>
               );
             })}
           </View>
@@ -1093,13 +1399,14 @@ export default function RequestBookingScreen() {
 
           <View style={styles.calendarCard}>
             <View style={styles.calendarHeader}>
-              <Pressable
+              <BubblePressable
                 accessibilityRole="button"
                 onPress={() => setDisplayMonth((month) => addMonths(month, -1))}
+                scaleTo={0.88}
                 style={styles.monthButton}
               >
                 <Text style={styles.monthButtonText}>‹</Text>
-              </Pressable>
+              </BubblePressable>
 
               <View style={styles.calendarTitleWrap}>
                 <Text style={styles.calendarTitle}>
@@ -1108,25 +1415,27 @@ export default function RequestBookingScreen() {
                     year: 'numeric',
                   })}
                 </Text>
-                <Pressable
+                <BubblePressable
                   accessibilityRole="button"
                   onPress={() => {
                     setDisplayMonth(monthStart(new Date()));
                     setStartDateId(toDateId(todayStart()));
                     setEndDateId('');
                   }}
+                  scaleTo={0.88}
                 >
                   <Text style={styles.todayButtonText}>Today</Text>
-                </Pressable>
+                </BubblePressable>
               </View>
 
-              <Pressable
+              <BubblePressable
                 accessibilityRole="button"
                 onPress={() => setDisplayMonth((month) => addMonths(month, 1))}
+                scaleTo={0.88}
                 style={styles.monthButton}
               >
                 <Text style={styles.monthButtonText}>›</Text>
-              </Pressable>
+              </BubblePressable>
             </View>
 
             <Text style={styles.calendarHelp}>
@@ -1158,10 +1467,11 @@ export default function RequestBookingScreen() {
                     const outsideMonth = !sameMonth(day.date, displayMonth);
 
                     return (
-                      <Pressable
+                      <BubblePressable
                         key={day.id}
                         accessibilityRole="button"
                         onPress={() => chooseDate(day)}
+                        scaleTo={0.88}
                         style={[
                           styles.dateCell,
                           outsideMonth && styles.dateOutsideMonth,
@@ -1196,7 +1506,7 @@ export default function RequestBookingScreen() {
                                 ? 'End'
                                 : day.label || ''}
                         </Text>
-                      </Pressable>
+                      </BubblePressable>
                     );
                   })}
                 </View>
@@ -1332,35 +1642,88 @@ export default function RequestBookingScreen() {
       );
     }
 
+    const requestSent = Boolean(submitOutcome?.bookingId);
+
     return (
       <View style={styles.stepBody}>
+        {renderRequestBlockers()}
+
+        {submitError ? (
+          <View style={styles.submitErrorCard}>
+            <AlertTriangle color="#B45309" size={16} strokeWidth={2.4} />
+            <Text style={styles.submitErrorTitle}>Request not sent</Text>
+            <Text style={styles.submitErrorText}>{submitError}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.readyCard}>
           <View style={styles.readyIcon}>
-            <Sparkles color="#FFFFFF" size={24} strokeWidth={2.4} />
+            {requestSent ? (
+              <CheckCircle2 color="#FFFFFF" size={24} strokeWidth={2.4} />
+            ) : submitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Send color="#FFFFFF" size={22} strokeWidth={2.4} />
+            )}
           </View>
-          <Text style={styles.readyTitle}>Ready for Guru review</Text>
-          <Text style={styles.readyText}>
-            Your request is prepared. No payment is charged and the booking is
-            not confirmed until the Guru accepts.
+          <Text style={styles.readyTitle}>
+            {requestSent
+              ? 'Request sent to the Guru'
+              : submitting
+                ? 'Sending your request…'
+                : 'Send this request'}
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() =>
-              router.push({
-                pathname: '/booking-details',
-                params: {
-                  petId: selectedPet.id,
-                  petName: selectedPet.name,
-                  viewerRole: 'pet_parent',
-                },
-              })
-            }
-            style={styles.readyButton}
-          >
-            <Text style={styles.readyButtonText}>Open Booking Details</Text>
-            <ChevronRight color={palette.primary} size={18} strokeWidth={2.4} />
-          </Pressable>
+          <Text style={styles.readyText}>
+            {requestSent
+              ? 'The Guru has this care request. Nothing is charged until they accept, and you can open the real booking any time.'
+              : 'Nothing has been sent yet. Send it and the Guru can accept or decline. SitGuru does not charge when you send the request.'}
+          </Text>
+
+          {requestSent ? (
+            <BubblePressable
+              accessibilityRole="button"
+              onPress={openCreatedBooking}
+              style={styles.readyButton}
+            >
+              <Text style={styles.readyButtonText}>Open Booking Details</Text>
+              <ChevronRight color={palette.primary} size={18} strokeWidth={2.4} />
+            </BubblePressable>
+          ) : (
+            <BubblePressable
+              accessibilityRole="button"
+              disabled={submitting || !canSubmitRequest}
+              onPress={() => void sendRequestToGuru()}
+              style={[
+                styles.readyButton,
+                (submitting || !canSubmitRequest) && styles.readyButtonDisabled,
+              ]}
+            >
+              <Text style={styles.readyButtonText}>
+                {submitting ? 'Sending…' : 'Send request to Guru'}
+              </Text>
+              <Send color={palette.primary} size={16} strokeWidth={2.4} />
+            </BubblePressable>
+          )}
+
+          {requestSent && submitOutcome?.checkoutUrl ? (
+            <BubblePressable
+              accessibilityRole="button"
+              disabled={openingCheckout}
+              onPress={() => void openCheckout(submitOutcome.checkoutUrl as string)}
+              style={styles.readyGhostButton}
+            >
+              <Text style={styles.readyGhostButtonText}>
+                {openingCheckout ? 'Opening checkout…' : 'Pay now (optional)'}
+              </Text>
+            </BubblePressable>
+          ) : null}
         </View>
+
+        {checkoutNotice ? (
+          <View style={styles.noticeCard}>
+            <Text style={styles.noticeText}>{checkoutNotice}</Text>
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -1396,10 +1759,11 @@ export default function RequestBookingScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 <View style={styles.header}>
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     accessibilityLabel="Go back"
                     onPress={goBack}
+                    scaleTo={0.88}
                     style={styles.headerButton}
                   >
                     <ChevronLeft
@@ -1407,7 +1771,7 @@ export default function RequestBookingScreen() {
                       size={20}
                       strokeWidth={2.5}
                     />
-                  </Pressable>
+                  </BubblePressable>
 
                   <View style={styles.headerCopy}>
                     <Text style={styles.headerTitle}>Request Care</Text>
@@ -1423,12 +1787,13 @@ export default function RequestBookingScreen() {
                         const active = themePreference === option.value;
 
                         return (
-                          <Pressable
+                          <BubblePressable
                             key={option.value}
                             accessibilityRole="button"
                             accessibilityLabel={`Switch to ${option.label} mode`}
                             accessibilityState={{ selected: active }}
                             onPress={() => setThemePreference(option.value)}
+                            scaleTo={0.88}
                             style={[
                               styles.modeButton,
                               active && styles.modeButtonActive,
@@ -1448,15 +1813,16 @@ export default function RequestBookingScreen() {
                               }
                               strokeWidth={2.4}
                             />
-                          </Pressable>
+                          </BubblePressable>
                         );
                       })}
                     </View>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityLabel="Open Pet Parent profile"
                       accessibilityRole="button"
                       onPress={() => router.push('/account')}
+                      scaleTo={0.88}
                       style={styles.profileButton}
                     >
                       <AvatarImage
@@ -1465,7 +1831,7 @@ export default function RequestBookingScreen() {
                         palette={palette}
                         size={38}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
                 </View>
 
@@ -1504,13 +1870,14 @@ export default function RequestBookingScreen() {
                     const complete = step.step < currentStep;
 
                     return (
-                      <Pressable
+                      <BubblePressable
                         key={step.step}
                         accessibilityRole="button"
                         onPress={() => {
                           setNotice('');
                           setCurrentStep(step.step);
                         }}
+                        scaleTo={0.88}
                         style={[
                           styles.stepPill,
                           active && styles.stepPillActive,
@@ -1535,7 +1902,7 @@ export default function RequestBookingScreen() {
                         >
                           {step.shortTitle}
                         </Text>
-                      </Pressable>
+                      </BubblePressable>
                     );
                   })}
                 </ScrollView>
@@ -1552,7 +1919,7 @@ export default function RequestBookingScreen() {
               </ScrollView>
 
               <View style={styles.bottomDock}>
-                <Pressable
+                <BubblePressable
                   accessibilityRole="button"
                   onPress={goBack}
                   style={styles.dockSecondaryButton}
@@ -1560,9 +1927,9 @@ export default function RequestBookingScreen() {
                   <Text style={styles.dockSecondaryText}>
                     {currentStep === 1 ? 'Find Care' : 'Back'}
                   </Text>
-                </Pressable>
+                </BubblePressable>
 
-                <Pressable
+                <BubblePressable
                   accessibilityRole="button"
                   onPress={goNext}
                   style={styles.dockPrimaryButton}
@@ -1571,7 +1938,7 @@ export default function RequestBookingScreen() {
                     {currentStep === 6 ? 'Finish' : 'Continue'}
                   </Text>
                   <ChevronRight color="#FFFFFF" size={18} strokeWidth={2.5} />
-                </Pressable>
+                </BubblePressable>
               </View>
             </View>
           </View>
@@ -1651,10 +2018,11 @@ function TogglePill({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
+      scaleTo={0.88}
       style={[styles.togglePill, active && styles.togglePillActive]}
     >
       <Text
@@ -1666,7 +2034,7 @@ function TogglePill({
         {active ? '✓ ' : ''}
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1754,6 +2122,39 @@ function ReviewRow({
     <View style={[styles.reviewRow, last && styles.reviewRowLast]}>
       <Text style={styles.reviewLabel}>{label}</Text>
       <Text style={styles.reviewValue}>{value}</Text>
+    </View>
+  );
+}
+
+function WarningCard({
+  actionLabel,
+  message,
+  onPress,
+  palette,
+  styles,
+  title,
+}: {
+  actionLabel: string;
+  message: string;
+  onPress: () => void;
+  palette: ReturnType<typeof getPalette>;
+  styles: ReturnType<typeof createStyles>;
+  title: string;
+}) {
+  return (
+    <View style={styles.warningCard}>
+      <AlertTriangle color="#B45309" size={16} strokeWidth={2.4} />
+      <Text style={styles.warningTitle}>{title}</Text>
+      <Text style={styles.warningText}>{message}</Text>
+      <BubblePressable
+        accessibilityRole="button"
+        onPress={onPress}
+        scaleTo={0.97}
+        style={styles.warningAction}
+      >
+        <Text style={styles.warningActionText}>{actionLabel}</Text>
+        <ChevronRight color={palette.primary} size={16} strokeWidth={2.4} />
+      </BubblePressable>
     </View>
   );
 }
@@ -1942,7 +2343,7 @@ function createStyles(isDark: boolean) {
     },
     scrollContent: {
       gap: 12,
-      paddingBottom: 116,
+      paddingBottom: 12,
       paddingHorizontal: 15,
       paddingTop: 10,
     },
@@ -2714,6 +3115,83 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.extraBold,
       fontSize: 11,
     },
+    readyButtonDisabled: {
+      opacity: 0.55,
+    },
+    readyGhostButton: {
+      alignItems: 'center',
+      borderColor: 'rgba(255,255,255,0.28)',
+      borderRadius: 999,
+      borderWidth: 1,
+      justifyContent: 'center',
+      minHeight: 42,
+      paddingHorizontal: 16,
+      width: '100%',
+    },
+    readyGhostButtonText: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 11,
+    },
+    blockerStack: {
+      gap: 8,
+    },
+    warningCard: {
+      backgroundColor: isDark ? '#2A1C0A' : '#FFF6E8',
+      borderColor: isDark ? '#8A5A18' : '#F3D7A4',
+      borderRadius: 16,
+      borderWidth: 1,
+      gap: 6,
+      padding: 12,
+    },
+    warningTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 13,
+    },
+    warningText: {
+      color: palette.text,
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    warningAction: {
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: palette.surface,
+      borderColor: palette.borderStrong,
+      borderRadius: 999,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 4,
+      marginTop: 4,
+      minHeight: 36,
+      paddingHorizontal: 12,
+    },
+    warningActionText: {
+      color: palette.primary,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 11,
+    },
+    submitErrorCard: {
+      backgroundColor: isDark ? '#2A1C0A' : '#FFF6E8',
+      borderColor: isDark ? '#8A5A18' : '#F3D7A4',
+      borderRadius: 16,
+      borderWidth: 1,
+      gap: 6,
+      padding: 12,
+    },
+    submitErrorTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 13,
+    },
+    submitErrorText: {
+      color: palette.text,
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 14,
+    },
     noticeCard: {
       backgroundColor: palette.surfaceSoft,
       borderColor: palette.borderStrong,
@@ -2727,10 +3205,6 @@ function createStyles(isDark: boolean) {
       fontSize: 9,
       lineHeight: 13,
     },
-    pressed: {
-      opacity: 0.78,
-      transform: [{ scale: 0.99 }],
-    },
     bottomSpacer: {
       height: 18,
     },
@@ -2740,13 +3214,11 @@ function createStyles(isDark: boolean) {
       borderColor: palette.border,
       borderRadius: 21,
       borderWidth: 1,
-      bottom: 8,
       flexDirection: 'row',
       gap: 8,
-      left: 10,
+      marginBottom: 8,
+      marginHorizontal: 10,
       padding: 8,
-      position: 'absolute',
-      right: 10,
       shadowColor: palette.shadow,
       shadowOffset: { width: 0, height: -7 },
       shadowOpacity: isDark ? 0.26 : 0.08,

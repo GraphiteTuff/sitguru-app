@@ -26,7 +26,6 @@ import {
     KeyboardAvoidingView,
     Linking,
     Platform,
-    Pressable,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -37,8 +36,10 @@ import {
     type TextStyle,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { getAppTheme } from '@/constants/theme';
 import {
     setThemePreference,
@@ -275,16 +276,15 @@ function Button({
   fullWidth?: boolean;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.button,
         fullWidth ? styles.buttonFullWidth : null,
         primary ? styles.buttonPrimary : styles.buttonSecondary,
-        pressed ? styles.pressed : null,
         disabled ? styles.disabled : null,
       ]}>
       {icon}
@@ -297,7 +297,7 @@ function Button({
         ]}>
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -318,11 +318,12 @@ function SegmentedChoice({
         const active = option.value === value;
 
         return (
-          <Pressable
+          <BubblePressable
             key={option.value}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             onPress={() => onChange(option.value)}
+            scaleTo={0.88}
             style={[
               styles.segmentedButton,
               active ? styles.segmentedButtonActive : null,
@@ -334,7 +335,7 @@ function SegmentedChoice({
               ]}>
               {option.label}
             </Text>
-          </Pressable>
+          </BubblePressable>
         );
       })}
     </View>
@@ -398,15 +399,13 @@ function ProviderCard({
         selected ? styles.providerCardSelected : null,
         ready ? styles.providerCardReady : null,
       ]}>
-      <Pressable
+      <BubblePressable
         accessibilityLabel={`Choose ${choice.label}`}
         accessibilityRole="button"
         accessibilityState={{ selected }}
         onPress={onSelect}
-        style={({ pressed }) => [
-          styles.providerCardHeader,
-          pressed ? styles.pressed : null,
-        ]}>
+        scaleTo={0.97}
+        style={[styles.providerCardHeader]}>
         <ProviderBadge
           provider={choice.provider}
           styles={styles}
@@ -450,7 +449,7 @@ function ProviderCard({
           size={18}
           strokeWidth={2.4}
         />
-      </Pressable>
+      </BubblePressable>
 
       {children ? (
         <View style={styles.providerForm}>{children}</View>
@@ -1001,21 +1000,19 @@ export default function AmbassadorPayoutsScreen() {
                     isTablet ? styles.pageTablet : null,
                   ]}>
           <View style={styles.header}>
-            <Pressable
+            <BubblePressable
               accessibilityLabel="Back"
               accessibilityHint="Returns to the previous Ambassador screen."
               accessibilityRole="button"
               onPress={goBack}
-              style={({ pressed }) => [
-                styles.backButton,
-                pressed ? styles.headerControlPressed : null,
-              ]}>
+              scaleTo={0.88}
+              style={[styles.backButton]}>
               <ArrowLeft
                 color={theme.colors.primary}
                 size={19}
                 strokeWidth={2.7}
               />
-            </Pressable>
+            </BubblePressable>
 
             <View style={styles.headerCopy}>
               <Text style={styles.headerTitle}>
@@ -1031,16 +1028,14 @@ export default function AmbassadorPayoutsScreen() {
                 <Text style={styles.roleStatusText}>Ambassador • Live</Text>
               </View>
 
-              <Pressable
+              <BubblePressable
                 accessibilityLabel="Open Ambassador Portal"
                 accessibilityRole="button"
                 onPress={() =>
                   router.push('/ambassador-command-center' as never)
                 }
-                style={({ pressed }) => [
-                  styles.portalButton,
-                  pressed ? styles.headerControlPressed : null,
-                ]}>
+                scaleTo={0.88}
+                style={[styles.portalButton]}>
                 <BriefcaseBusiness
                   color={theme.colors.primary}
                   size={13}
@@ -1052,36 +1047,35 @@ export default function AmbassadorPayoutsScreen() {
                   size={13}
                   strokeWidth={2.5}
                 />
-              </Pressable>
+              </BubblePressable>
             </View>
 
             <View style={styles.headerActions}>
-              <Pressable
+              <BubblePressable
                 accessibilityLabel="Open notifications"
                 accessibilityRole="button"
                 onPress={() => router.push('/notifications' as never)}
-                style={({ pressed }) => [
-                  styles.headerIconButton,
-                  pressed ? styles.headerControlPressed : null,
-                ]}>
+                scaleTo={0.88}
+                style={[styles.headerIconButton]}>
                 <Bell
                   color={theme.colors.text}
                   size={18}
                   strokeWidth={2.3}
                 />
-              </Pressable>
+              </BubblePressable>
 
               <View style={styles.modeToggle}>
                 {THEME_OPTIONS.map((option) => {
                   const active = themePreference === option.value;
 
                   return (
-                    <Pressable
+                    <BubblePressable
                       key={option.value}
                       accessibilityLabel={`Switch to ${option.label} mode`}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                       onPress={() => setThemePreference(option.value)}
+                      scaleTo={0.88}
                       style={[
                         styles.modeButton,
                         active ? styles.modeButtonActive : null,
@@ -1100,19 +1094,17 @@ export default function AmbassadorPayoutsScreen() {
                         size={15}
                         strokeWidth={2.4}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   );
                 })}
               </View>
 
-              <Pressable
+              <BubblePressable
                 accessibilityLabel="Open profile and workspace switcher"
                 accessibilityRole="button"
                 onPress={() => router.push('/account' as never)}
-                style={({ pressed }) => [
-                  styles.avatar,
-                  pressed ? styles.headerControlPressed : null,
-                ]}>
+                scaleTo={0.88}
+                style={[styles.avatar]}>
                 {avatarUrl && !avatarImageFailed ? (
                   <Image
                     onError={() => setAvatarImageFailed(true)}
@@ -1125,7 +1117,7 @@ export default function AmbassadorPayoutsScreen() {
                     {(firstName[0] || 'A').toUpperCase()}
                   </Text>
                 )}
-              </Pressable>
+              </BubblePressable>
             </View>
           </View>
 
@@ -1203,35 +1195,31 @@ export default function AmbassadorPayoutsScreen() {
 
                   {feedback.tone !== 'success' ? (
                     <View style={styles.feedbackActions}>
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={() => void loadSetup(true)}
-                        style={({ pressed }) => [
-                          styles.feedbackAction,
-                          pressed ? styles.pressed : null,
-                        ]}>
+                        scaleTo={0.88}
+                        style={[styles.feedbackAction]}>
                         <RefreshCw
                           color={theme.colors.primary}
                           size={14}
                           strokeWidth={2.5}
                         />
                         <Text style={styles.feedbackActionText}>Refresh</Text>
-                      </Pressable>
+                      </BubblePressable>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={() => router.push('/support' as never)}
-                        style={({ pressed }) => [
-                          styles.feedbackAction,
-                          pressed ? styles.pressed : null,
-                        ]}>
+                        scaleTo={0.88}
+                        style={[styles.feedbackAction]}>
                         <ShieldCheck
                           color={theme.colors.primary}
                           size={14}
                           strokeWidth={2.5}
                         />
                         <Text style={styles.feedbackActionText}>Get help</Text>
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   ) : null}
                 </View>
@@ -1631,6 +1619,8 @@ export default function AmbassadorPayoutsScreen() {
             <View style={styles.bottomSpacer} />
           </ScrollView>
                 </View>
+
+                <SitGuruTabBar active="payouts" role="ambassador" />
               </View>
             </View>
 
@@ -1830,10 +1820,6 @@ function createStyles(theme: Theme) {
       paddingBottom: 10,
       paddingHorizontal: 12,
       paddingTop: 10,
-    },
-    headerControlPressed: {
-      opacity: 0.72,
-      transform: [{ scale: 0.97 }],
     },
     backButton: {
       alignItems: 'center',
@@ -2369,10 +2355,6 @@ function createStyles(theme: Theme) {
     },
     buttonTextPrimary: {
       color: '#FFFFFF',
-    },
-    pressed: {
-      opacity: 0.78,
-      transform: [{ scale: 0.99 }],
     },
     disabled: {
       opacity: 0.55,

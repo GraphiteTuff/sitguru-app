@@ -6,7 +6,6 @@ import {
   ChevronRight,
   CircleDollarSign,
   Clock3,
-  Home,
   MapPin,
   MessageCircle,
   PawPrint,
@@ -19,20 +18,23 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
+import { useBooking } from '@/hooks/data/useBookings';
 import {
   setThemePreference,
   type SitGuruThemePreference,
@@ -40,8 +42,10 @@ import {
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { formatUsd } from '@/lib/data/money';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import type { AppRole } from '@/types/auth';
 
 type RecordRow = Record<string, unknown>;
 
@@ -74,6 +78,39 @@ type PrimaryAction = {
   route: '/conversation' | '/payments' | '/pawreport-live' | '/reviews';
   icon: 'message' | 'payment' | 'live' | 'review';
 };
+
+/** Everything this screen shows about the booking, read from the booking row. */
+type BookingView = {
+  id: string;
+  reference: string;
+  statusStep: BookingStatus | null;
+  statusLabel: string;
+  /** Cancelled, declined, or otherwise closed without care happening. */
+  closed: boolean;
+  paid: boolean;
+  serviceLabel: string;
+  petId: string;
+  petName: string;
+  guruId: string;
+  guruName: string;
+  guruPhotoUrl: string | null;
+  location: string;
+  startAt: Date | null;
+  endAt: Date | null;
+  durationMinutes: number | null;
+  notes: string;
+  subtotal: number | null;
+  fees: number | null;
+  credit: number | null;
+  total: number | null;
+};
+
+type CareNote = {
+  title: string;
+  detail: string;
+};
+
+const NOT_PROVIDED = 'Not provided';
 
 const STATUS_STEPS: StatusStep[] = [
   {
@@ -111,68 +148,92 @@ const THEME_OPTIONS: Array<{
   },
 ];
 
-const PRICE_ROWS = [
-  {
-    label: 'Service rate',
-    value: '$25',
-  },
-  {
-    label: 'Additional pet fee',
-    value: '$0',
-  },
-  {
-    label: 'Multi-pet savings',
-    value: '—',
-  },
-  {
-    label: 'PawPerks credit',
-    value: '-$5',
-    savings: true,
-  },
-];
-
 const PET_TABLES = ['pets', 'pet_profiles', 'pet_passports'];
 const PET_OWNER_FIELDS = ['owner_id', 'pet_parent_id', 'user_id', 'created_by'];
 
-const FALLBACK_PET: PetDetail = {
-  id: 'scout',
-  name: 'Scout',
-  species: 'Dog',
-  breed: '',
-  ageLabel: '4 years old',
-  photoUrl: null,
-  helper: 'Friendly, loves brisk walks, and prefers a quiet greeting.',
-};
+const PENDING_STATUSES = new Set([
+  'pending',
+  'pending_guru_review',
+  'requested',
+  'awaiting_guru',
+  'submitted',
+  'new',
+  'unpaid',
+]);
+const ACCEPTED_STATUSES = new Set([
+  'accepted',
+  'confirmed',
+  'paid',
+  'upcoming',
+  'scheduled',
+]);
+const ACTIVE_STATUSES = new Set([
+  'active',
+  'in_progress',
+  'started',
+  'in_care',
+]);
+const COMPLETED_STATUSES = new Set(['completed', 'complete', 'finished']);
+const CLOSED_STATUSES = new Set([
+  'cancelled',
+  'canceled',
+  'declined',
+  'rejected',
+  'expired',
+  'refunded',
+]);
+const PAID_STATUSES = new Set(['paid', 'succeeded', 'captured', 'complete']);
 
-const CARE_NOTES = [
-  {
-    title: 'Feeding & water',
-    detail: 'Fresh water before and after the walk.',
-  },
-  {
-    title: 'Walk & potty',
-    detail: 'Neighborhood loop, potty update, and a calm return home.',
-  },
-  {
-    title: 'Medication & allergies',
-    detail: 'No medication listed. Allergy details remain available for Guru review.',
-  },
-  {
-    title: 'Access notes',
-    detail: 'Use SitGuru messages for safe handoff and entry details.',
-  },
+const SUBTOTAL_FIELDS = [
+  'subtotal_amount',
+  'subtotal',
+  'service_amount',
+  'base_amount',
+  'service_rate',
+  'subtotal_amount_cents',
+  'subtotal_cents',
+];
+const FEE_FIELDS = [
+  'fee_amount',
+  'service_fee',
+  'platform_fee',
+  'marketplace_fee_amount',
+  'sitguru_fee_amount',
+  'fee_amount_cents',
+  'service_fee_cents',
+];
+const CREDIT_FIELDS = [
+  'credit_amount',
+  'discount_amount',
+  'promo_amount',
+  'pawperks_credit',
+  'credit_amount_cents',
+  'discount_amount_cents',
+];
+const TOTAL_FIELDS = [
+  'total_amount',
+  'total',
+  'amount_total',
+  'total_customer_paid',
+  'estimated_total',
+  'amount',
+  'price',
+  'total_amount_cents',
+  'amount_cents',
+  'total_cents',
 ];
 
 export default function BookingDetailsScreen() {
-  const { bookingId, conversationId, guruId, petId, petName } =
+  const { bookingId, conversationId, guruId, petId, petName, viewerRole } =
     useLocalSearchParams<{
       bookingId?: string;
       conversationId?: string;
       guruId?: string;
       petId?: string;
       petName?: string;
+      viewerRole?: string;
     }>();
-  const { user, profile } = useAuth();
+  const { user, profile, primaryRole } = useAuth();
   const isWebPreview = Platform.OS === 'web';
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
@@ -180,10 +241,29 @@ export default function BookingDetailsScreen() {
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
 
-  const [selectedStatus, setSelectedStatus] =
-    useState<BookingStatus>('Pending Guru Review');
-  const [selectedPet, setSelectedPet] = useState<PetDetail>(FALLBACK_PET);
+  const requestedBookingId =
+    typeof bookingId === 'string' ? bookingId.trim() : '';
+  const role: AppRole =
+    viewerRole === 'guru' || viewerRole === 'pet_parent'
+      ? viewerRole
+      : (primaryRole ?? 'pet_parent');
+  const isGuruViewer = role === 'guru';
+  const listRoute = isGuruViewer ? '/guru-requests' : '/bookings';
+  const listLabel = isGuruViewer ? 'View care requests' : 'View my bookings';
+
+  const {
+    booking,
+    loading: bookingLoading,
+    error: bookingError,
+  } = useBooking(requestedBookingId || null);
+
+  const [selectedPet, setSelectedPet] = useState<PetDetail | null>(null);
   const [petLoadMessage, setPetLoadMessage] = useState('');
+
+  const bookingView = useMemo(
+    () => (booking ? buildBookingView(booking.id, booking.raw as RecordRow) : null),
+    [booking],
+  );
 
   const profileRecord = (profile ?? {}) as RecordRow;
   const userMetadata = (user?.user_metadata ?? {}) as RecordRow;
@@ -202,6 +282,13 @@ export default function BookingDetailsScreen() {
     ]) || firstString(userMetadata, ['avatar_url', 'picture']),
   );
 
+  const requestedPetId =
+    (typeof petId === 'string' ? petId.trim() : '') || bookingView?.petId || '';
+  const requestedPetName =
+    (typeof petName === 'string' ? petName.trim() : '') ||
+    bookingView?.petName ||
+    '';
+
   useEffect(() => {
     let active = true;
 
@@ -210,26 +297,30 @@ export default function BookingDetailsScreen() {
         return;
       }
 
+      if (!requestedPetId && !requestedPetName) {
+        setSelectedPet(null);
+        return;
+      }
+
       try {
         const pets = await loadPetDetails(user.id);
-        if (!active || pets.length === 0) return;
+        if (!active) return;
 
-        const requestedId = typeof petId === 'string' ? petId : '';
-        const requestedName =
-          typeof petName === 'string' ? petName.trim().toLowerCase() : '';
+        const normalizedName = requestedPetName.toLowerCase();
 
+        // Only ever show the pet this booking is actually for.
         const matchingPet =
-          pets.find((pet) => pet.id === requestedId) ||
-          pets.find((pet) => pet.name.toLowerCase() === requestedName) ||
-          pets.find((pet) => pet.name.toLowerCase() === 'scout') ||
-          pets[0];
+          pets.find((pet) => pet.id === requestedPetId) ||
+          pets.find((pet) => pet.name.toLowerCase() === normalizedName) ||
+          null;
 
         setSelectedPet(matchingPet);
         setPetLoadMessage('');
       } catch {
         if (active) {
+          setSelectedPet(null);
           setPetLoadMessage(
-            'Scout’s Pet Passport photo could not be refreshed. Showing the saved fallback instead.',
+            'The Pet Passport for this booking could not be loaded. Pull the booking up again in a moment.',
           );
         }
       }
@@ -240,25 +331,64 @@ export default function BookingDetailsScreen() {
     return () => {
       active = false;
     };
-  }, [petId, petName, user?.id]);
+  }, [requestedPetId, requestedPetName, user?.id]);
 
-  const activeStatusIndex = STATUS_STEPS.findIndex(
-    (step) => step.label === selectedStatus,
-  );
+  const activeStatusIndex = bookingView?.statusStep
+    ? STATUS_STEPS.findIndex((step) => step.label === bookingView.statusStep)
+    : -1;
+
+  const petDisplayName =
+    selectedPet?.name || bookingView?.petName || NOT_PROVIDED;
+  const serviceDisplayLabel = bookingView?.serviceLabel || NOT_PROVIDED;
+
+  const careNotes = buildCareNotes(bookingView, selectedPet);
+
+  const priceRows = useMemo(() => {
+    if (!bookingView) return [];
+
+    const rows: Array<{ label: string; value: string; savings?: boolean }> = [];
+
+    if (bookingView.subtotal !== null) {
+      rows.push({
+        label: 'Service rate',
+        value: formatUsd(bookingView.subtotal),
+      });
+    }
+
+    if (bookingView.fees !== null) {
+      rows.push({ label: 'Service fee', value: formatUsd(bookingView.fees) });
+    }
+
+    if (bookingView.credit !== null && bookingView.credit > 0) {
+      rows.push({
+        label: 'Credit applied',
+        value: `-${formatUsd(bookingView.credit)}`,
+        savings: true,
+      });
+    }
+
+    return rows;
+  }, [bookingView]);
 
   const primaryAction = useMemo<PrimaryAction>(() => {
-    if (selectedStatus === 'Accepted') {
+    const step = bookingView?.statusStep;
+
+    if (step === 'Accepted') {
       return {
         eyebrow: 'REQUEST ACCEPTED',
-        title: 'Complete payment when ready',
-        text: 'Review the final amount and pay securely inside SitGuru before care begins.',
-        label: 'Open Payments',
+        title: bookingView?.paid
+          ? 'Payment received'
+          : 'Complete payment when ready',
+        text: bookingView?.paid
+          ? 'Review your receipt and payment status for this booking.'
+          : 'Review the final amount and pay securely inside SitGuru before care begins.',
+        label: bookingView?.paid ? 'View Payment Status' : 'Open Payments',
         route: '/payments',
         icon: 'payment',
       };
     }
 
-    if (selectedStatus === 'Active') {
+    if (step === 'Active') {
       return {
         eyebrow: 'CARE IN PROGRESS',
         title: 'Follow PawReport Live',
@@ -269,7 +399,7 @@ export default function BookingDetailsScreen() {
       };
     }
 
-    if (selectedStatus === 'Completed') {
+    if (step === 'Completed') {
       return {
         eyebrow: 'CARE COMPLETED',
         title: 'Review the completed visit',
@@ -280,24 +410,19 @@ export default function BookingDetailsScreen() {
       };
     }
 
+    const guruName = bookingView?.guruName;
+
     return {
       eyebrow: 'AWAITING GURU',
-      title: 'Stay connected while Jordan reviews',
+      title: guruName
+        ? `Stay connected while ${guruName} reviews`
+        : 'Stay connected while a Guru reviews',
       text: 'Use SitGuru messages for availability questions, pet details, and safe care planning.',
       label: 'Message Guru',
       route: '/conversation',
       icon: 'message',
     };
-  }, [selectedStatus]);
-
-  function previewStatus(status: BookingStatus) {
-    setSelectedStatus(status);
-
-    Alert.alert(
-      'Status preview only',
-      `The screen is now previewing the “${status}” state. No booking status was changed or saved.`,
-    );
-  }
+  }, [bookingView]);
 
   function showPlaceholderAlert(action: string) {
     Alert.alert(
@@ -306,20 +431,39 @@ export default function BookingDetailsScreen() {
     );
   }
 
-  function openConversation(viewerRole: 'pet_parent' | 'guru' = 'pet_parent') {
+  /** Every hand-off keeps the booking id so the next screen loads real data too. */
+  const bookingParams = requestedBookingId
+    ? { bookingId: requestedBookingId }
+    : {};
+
+  function openConversation(
+    conversationRole: 'pet_parent' | 'guru' = isGuruViewer
+      ? 'guru'
+      : 'pet_parent',
+  ) {
     router.push({
       pathname: '/conversation',
       params: {
-        viewerRole,
-        ...(typeof bookingId === 'string' && bookingId ? { bookingId } : {}),
+        viewerRole: conversationRole,
+        ...bookingParams,
         ...(typeof conversationId === 'string' && conversationId
           ? { conversationId }
           : {}),
-        ...(typeof guruId === 'string' && guruId ? { guruId } : {}),
-        ...(selectedPet.id ? { petId: selectedPet.id } : {}),
-        ...(selectedPet.name ? { petName: selectedPet.name } : {}),
+        ...(typeof guruId === 'string' && guruId
+          ? { guruId }
+          : bookingView?.guruId
+            ? { guruId: bookingView.guruId }
+            : {}),
+        ...(selectedPet?.id ? { petId: selectedPet.id } : {}),
+        ...(selectedPet?.name ? { petName: selectedPet.name } : {}),
       },
     });
+  }
+
+  function openBookingRoute(
+    pathname: '/payments' | '/pawreport-live' | '/reviews' | '/guru-live-walk',
+  ) {
+    router.push({ pathname, params: bookingParams });
   }
 
   function openPrimaryAction() {
@@ -328,19 +472,7 @@ export default function BookingDetailsScreen() {
       return;
     }
 
-    if (primaryAction.route === '/reviews') {
-      router.push({
-        pathname: '/reviews',
-        params: {
-          ...(typeof bookingId === 'string' && bookingId
-            ? { bookingId }
-            : {}),
-        },
-      });
-      return;
-    }
-
-    router.push(primaryAction.route);
+    openBookingRoute(primaryAction.route);
   }
 
   return (
@@ -373,26 +505,34 @@ export default function BookingDetailsScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 <View style={styles.header}>
-                  <Pressable
+                  <BubblePressable
                     accessibilityLabel="Back to dashboard"
                     accessibilityRole="button"
-                    onPress={() => router.push('/pet-parent-dashboard')}
-                    style={({ pressed }) => [
-                      styles.headerButton,
-                      pressed && styles.pressed,
-                    ]}
+                    onPress={() =>
+                      router.push(
+                        isGuruViewer
+                          ? '/guru-dashboard'
+                          : '/pet-parent-dashboard',
+                      )
+                    }
+                    scaleTo={0.88}
+                    style={styles.headerButton}
                   >
                     <ChevronLeft
                       color={palette.title}
                       size={20}
                       strokeWidth={2.5}
                     />
-                  </Pressable>
+                  </BubblePressable>
 
                   <View style={styles.headerCopy}>
                     <Text style={styles.headerTitle}>Booking Details</Text>
-                    <Text style={styles.headerSubtitle}>{selectedPet.name} • Dog Walking</Text>
-                    <SitGuruRoleStatus compact role="pet_parent" />
+                    <Text style={styles.headerSubtitle}>
+                      {bookingView
+                        ? `${petDisplayName} • ${serviceDisplayLabel}`
+                        : 'No booking selected'}
+                    </Text>
+                    <SitGuruRoleStatus compact role={role} />
                   </View>
 
                   <View style={styles.headerActions}>
@@ -401,12 +541,13 @@ export default function BookingDetailsScreen() {
                         const active = themePreference === option.value;
 
                         return (
-                          <Pressable
+                          <BubblePressable
                             key={option.value}
                             accessibilityLabel={`Switch to ${option.label} mode`}
                             accessibilityRole="button"
                             accessibilityState={{ selected: active }}
                             onPress={() => setThemePreference(option.value)}
+                            scaleTo={0.88}
                             style={[
                               styles.modeButton,
                               active && styles.modeButtonActive,
@@ -426,31 +567,30 @@ export default function BookingDetailsScreen() {
                               size={14}
                               strokeWidth={2.4}
                             />
-                          </Pressable>
+                          </BubblePressable>
                         );
                       })}
                     </View>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityLabel="Open notifications"
                       accessibilityRole="button"
                       onPress={() => router.push('/notifications')}
-                      style={({ pressed }) => [
-                        styles.headerButton,
-                        pressed && styles.pressed,
-                      ]}
+                      scaleTo={0.88}
+                      style={styles.headerButton}
                     >
                       <Bell
                         color={palette.title}
                         size={18}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityLabel="Open Pet Parent profile"
                       accessibilityRole="button"
                       onPress={() => router.push('/account')}
+                      scaleTo={0.88}
                       style={styles.profileButton}
                     >
                       <AvatarImage
@@ -459,56 +599,117 @@ export default function BookingDetailsScreen() {
                         palette={palette}
                         size={38}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
                 </View>
 
+                {!requestedBookingId ? (
+                  <EmptyBookingState
+                    listLabel={listLabel}
+                    onOpenList={() => router.push(listRoute)}
+                    onOpenSupport={() => router.push('/support')}
+                    palette={palette}
+                    styles={styles}
+                    text={
+                      isGuruViewer
+                        ? 'This screen shows one booking at a time — schedule, pet, care notes, and payment. Nothing opened here because no booking was passed in. Pick a request from your inbox and the real details load.'
+                        : 'This screen shows one booking at a time — schedule, your Guru, care notes, and payment. Nothing opened here because no booking was passed in. Pick a booking from your list and the real details load.'
+                    }
+                    title="No booking selected"
+                  />
+                ) : bookingLoading ? (
+                  <View style={styles.stateCard}>
+                    <ActivityIndicator color={palette.primary} />
+                    <Text style={styles.stateTitle}>Loading booking…</Text>
+                    <Text style={styles.stateText}>
+                      Pulling the saved schedule, care notes, and payment
+                      details for this booking.
+                    </Text>
+                  </View>
+                ) : !bookingView ? (
+                  <EmptyBookingState
+                    listLabel={listLabel}
+                    onOpenList={() => router.push(listRoute)}
+                    onOpenSupport={() => router.push('/support')}
+                    palette={palette}
+                    styles={styles}
+                    text={
+                      bookingError
+                        ? `SitGuru could not load this booking: ${bookingError}`
+                        : 'This booking is no longer available to you. It may have been cancelled, or the link may be out of date.'
+                    }
+                    title="Booking unavailable"
+                  />
+                ) : (
+                  <>
                 <View style={styles.summaryCard}>
                   <View style={styles.summaryTopRow}>
                     <View style={styles.summaryStatusPill}>
                       <Clock3 color="#FFFFFF" size={13} strokeWidth={2.4} />
                       <Text style={styles.summaryStatusText}>
-                        {selectedStatus}
+                        {bookingView.statusLabel}
                       </Text>
                     </View>
 
-                    <Text style={styles.bookingId}>#SG-24017</Text>
+                    <Text style={styles.bookingId}>
+                      {bookingView.reference}
+                    </Text>
                   </View>
 
                   <View style={styles.summaryMainRow}>
                     <AvatarImage
-                      fallback={getPetEmoji(selectedPet.species)}
-                      imageUrl={selectedPet.photoUrl}
+                      fallback={getPetEmoji(selectedPet?.species ?? '')}
+                      imageUrl={selectedPet?.photoUrl}
                       palette={palette}
                       size={50}
                       style={styles.summaryPetAvatar}
                     />
 
                     <View style={styles.summaryCopy}>
-                      <Text style={styles.summaryPet}>{selectedPet.name}</Text>
+                      <Text style={styles.summaryPet}>{petDisplayName}</Text>
                       <Text style={styles.summaryService}>
-                        Dog Walking • Today • 12:30 PM
+                        {[
+                          bookingView.serviceLabel,
+                          formatBookingDate(bookingView.startAt),
+                          formatBookingTime(bookingView.startAt),
+                        ]
+                          .filter(Boolean)
+                          .join(' • ') || 'Schedule not provided'}
                       </Text>
-                      <View style={styles.summaryLocationRow}>
-                        <MapPin
-                          color="rgba(255,255,255,0.78)"
-                          size={12}
-                          strokeWidth={2.3}
-                        />
-                        <Text style={styles.summaryLocation}>
-                          Quakertown, PA
-                        </Text>
-                      </View>
+                      {bookingView.location ? (
+                        <View style={styles.summaryLocationRow}>
+                          <MapPin
+                            color="rgba(255,255,255,0.78)"
+                            size={12}
+                            strokeWidth={2.3}
+                          />
+                          <Text style={styles.summaryLocation}>
+                            {bookingView.location}
+                          </Text>
+                        </View>
+                      ) : null}
                     </View>
 
                     <View style={styles.summaryPrice}>
-                      <Text style={styles.summaryPriceLabel}>ESTIMATE</Text>
-                      <Text style={styles.summaryPriceValue}>$20</Text>
+                      <Text style={styles.summaryPriceLabel}>
+                        {bookingView.paid ? 'PAID' : 'ESTIMATE'}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.summaryPriceValue,
+                          bookingView.total === null &&
+                            styles.summaryPriceValueEmpty,
+                        ]}
+                      >
+                        {bookingView.total === null
+                          ? NOT_PROVIDED
+                          : formatUsd(bookingView.total)}
+                      </Text>
                     </View>
                   </View>
 
                   <Text style={styles.summaryPaymentNote}>
-                    No payment is charged until the Guru accepts and the final amount is confirmed.
+                    {bookingPaymentNote(bookingView)}
                   </Text>
                 </View>
 
@@ -524,26 +725,28 @@ export default function BookingDetailsScreen() {
                       <Text style={styles.sectionEyebrow}>BOOKING STATUS</Text>
                       <Text style={styles.sectionTitle}>Care progress</Text>
                     </View>
-                    <Text style={styles.previewLabel}>Preview</Text>
+                    <Text style={styles.previewLabel}>
+                      {bookingView.statusLabel}
+                    </Text>
                   </View>
 
                   <View style={styles.statusTimeline}>
                     {STATUS_STEPS.map((step, index) => {
                       const active = index === activeStatusIndex;
-                      const complete = index < activeStatusIndex;
+                      const complete =
+                        activeStatusIndex >= 0 && index < activeStatusIndex;
 
                       return (
                         <View key={step.label} style={styles.statusStepWrap}>
-                          <Pressable
-                            accessibilityLabel={`Preview ${step.label} status`}
-                            accessibilityRole="button"
-                            onPress={() => previewStatus(step.label)}
-                            style={({ pressed }) => [
-                              styles.statusStep,
-                              complete && styles.statusStepComplete,
-                              active && styles.statusStepActive,
-                              pressed && styles.pressed,
-                            ]}
+                          <View
+                            accessibilityLabel={`${step.label}: ${
+                              complete
+                                ? 'done'
+                                : active
+                                  ? 'current step'
+                                  : 'not reached yet'
+                            }`}
+                            style={styles.statusStep}
                           >
                             <View
                               style={[
@@ -572,13 +775,14 @@ export default function BookingDetailsScreen() {
                             >
                               {step.shortLabel}
                             </Text>
-                          </Pressable>
+                          </View>
 
                           {index < STATUS_STEPS.length - 1 ? (
                             <View
                               style={[
                                 styles.statusLine,
-                                index < activeStatusIndex &&
+                                activeStatusIndex >= 0 &&
+                                  index < activeStatusIndex &&
                                   styles.statusLineComplete,
                               ]}
                             />
@@ -589,17 +793,19 @@ export default function BookingDetailsScreen() {
                   </View>
 
                   <Text style={styles.statusHelper}>
-                    Tap a status to preview the interface only. Status changes are not saved from this screen yet.
+                    {bookingView.closed
+                      ? `This booking is ${bookingView.statusLabel.toLowerCase()}, so care never moved through the steps above.`
+                      : activeStatusIndex < 0
+                        ? 'This booking has not reached a tracked care step yet.'
+                        : 'Status updates as your Guru accepts, starts, and completes care.'}
                   </Text>
                 </View>
 
-                <Pressable
+                <BubblePressable
                   accessibilityRole="button"
                   onPress={openPrimaryAction}
-                  style={({ pressed }) => [
-                    styles.primaryActionCard,
-                    pressed && styles.primaryActionPressed,
-                  ]}
+                  scaleTo={0.97}
+                  style={styles.primaryActionCard}
                 >
                   <View style={styles.primaryActionIcon}>
                     <PrimaryActionIcon icon={primaryAction.icon} />
@@ -622,7 +828,7 @@ export default function BookingDetailsScreen() {
                     size={20}
                     strokeWidth={2.5}
                   />
-                </Pressable>
+                </BubblePressable>
 
                 <View style={styles.quickActions}>
                   <QuickAction
@@ -647,7 +853,7 @@ export default function BookingDetailsScreen() {
                       />
                     }
                     label="Payment"
-                    onPress={() => router.push('/payments')}
+                    onPress={() => openBookingRoute('/payments')}
                     styles={styles}
                   />
 
@@ -660,7 +866,7 @@ export default function BookingDetailsScreen() {
                       />
                     }
                     label="PawReport"
-                    onPress={() => router.push('/pawreport-live')}
+                    onPress={() => openBookingRoute('/pawreport-live')}
                     styles={styles}
                   />
 
@@ -691,15 +897,17 @@ export default function BookingDetailsScreen() {
                   title="Pet"
                 >
                   <ProfileRow
-                    avatar={getPetEmoji(selectedPet.species)}
+                    avatar={getPetEmoji(selectedPet?.species ?? '')}
                     detail={
-                      [selectedPet.species, selectedPet.breed, selectedPet.ageLabel]
-                        .filter(Boolean)
-                        .join(' • ') || 'Pet Passport'
+                      selectedPet
+                        ? [selectedPet.species, selectedPet.breed, selectedPet.ageLabel]
+                            .filter(Boolean)
+                            .join(' • ') || NOT_PROVIDED
+                        : NOT_PROVIDED
                     }
-                    helper={selectedPet.helper}
-                    imageUrl={selectedPet.photoUrl}
-                    name={selectedPet.name}
+                    helper={selectedPet?.helper || NOT_PROVIDED}
+                    imageUrl={selectedPet?.photoUrl}
+                    name={petDisplayName}
                     palette={palette}
                     styles={styles}
                   />
@@ -725,11 +933,14 @@ export default function BookingDetailsScreen() {
                   title="Guru"
                 >
                   <ProfileRow
-                    avatar="🧢"
-                    badge="Booking-ready Guru profile"
-                    detail="Jordan P. • Near Quakertown"
-                    helper="Background checked • SitGuru communication enabled"
-                    name="Jordan P."
+                    avatar={
+                      bookingView.guruName
+                        ? initials(bookingView.guruName)
+                        : '?'
+                    }
+                    detail={bookingView.location || NOT_PROVIDED}
+                    imageUrl={bookingView.guruPhotoUrl}
+                    name={bookingView.guruName || NOT_PROVIDED}
                     palette={palette}
                     styles={styles}
                   />
@@ -737,7 +948,14 @@ export default function BookingDetailsScreen() {
                   <View style={styles.twoButtonRow}>
                     <ActionButton
                       label="View Guru"
-                      onPress={() => router.push('/guru-profile')}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/guru-profile',
+                          params: bookingView.guruId
+                            ? { guruId: bookingView.guruId }
+                            : {},
+                        })
+                      }
                       styles={styles}
                       variant="secondary"
                     />
@@ -762,52 +980,62 @@ export default function BookingDetailsScreen() {
                   title="Schedule"
                 >
                   <View style={styles.infoGrid}>
-                    <InfoTile label="Date" styles={styles} value="Today" />
-                    <InfoTile label="Time" styles={styles} value="12:30 PM" />
+                    <InfoTile
+                      label="Date"
+                      styles={styles}
+                      value={
+                        formatBookingDate(bookingView.startAt) || NOT_PROVIDED
+                      }
+                    />
+                    <InfoTile
+                      label="Time"
+                      styles={styles}
+                      value={
+                        formatBookingTime(bookingView.startAt) || NOT_PROVIDED
+                      }
+                    />
                     <InfoTile
                       label="Duration"
                       styles={styles}
-                      value="30 min"
+                      value={formatDuration(bookingView.durationMinutes)}
                     />
                     <InfoTile
                       label="Service"
                       styles={styles}
-                      value="Dog Walk"
+                      value={bookingView.serviceLabel || NOT_PROVIDED}
                     />
                   </View>
 
-                  <View style={styles.calendarPreview}>
-                    {['Mo', 'Tu', 'We', 'Th', 'Fr'].map((day, index) => {
-                      const active = index === 2;
-
-                      return (
+                  {bookingView.startAt ? (
+                    <View style={styles.calendarPreview}>
+                      {nearbyDayStrip(bookingView.startAt).map((day) => (
                         <View
-                          key={day}
+                          key={day.key}
                           style={[
                             styles.calendarDay,
-                            active && styles.calendarDayActive,
+                            day.active && styles.calendarDayActive,
                           ]}
                         >
                           <Text
                             style={[
                               styles.calendarDayText,
-                              active && styles.calendarDayTextActive,
+                              day.active && styles.calendarDayTextActive,
                             ]}
                           >
-                            {day}
+                            {day.label}
                           </Text>
                           <Text
                             style={[
                               styles.calendarDateText,
-                              active && styles.calendarDayTextActive,
+                              day.active && styles.calendarDayTextActive,
                             ]}
                           >
-                            {12 + index}
+                            {day.date}
                           </Text>
                         </View>
-                      );
-                    })}
-                  </View>
+                      ))}
+                    </View>
+                  ) : null}
                 </SectionCard>
 
                 <SectionCard
@@ -822,26 +1050,30 @@ export default function BookingDetailsScreen() {
                   styles={styles}
                   title="Care notes"
                 >
-                  <View style={styles.noteList}>
-                    {CARE_NOTES.map((note, index) => (
-                      <View
-                        key={note.title}
-                        style={[
-                          styles.noteRow,
-                          index === CARE_NOTES.length - 1 &&
-                            styles.noteRowLast,
-                        ]}
-                      >
-                        <View style={styles.noteCheck}>
-                          <Text style={styles.noteCheckText}>✓</Text>
+                  {careNotes.length ? (
+                    <View style={styles.noteList}>
+                      {careNotes.map((note, index) => (
+                        <View
+                          key={note.title}
+                          style={[
+                            styles.noteRow,
+                            index === careNotes.length - 1 &&
+                              styles.noteRowLast,
+                          ]}
+                        >
+                          <View style={styles.noteCheck}>
+                            <Text style={styles.noteCheckText}>✓</Text>
+                          </View>
+                          <View style={styles.noteCopy}>
+                            <Text style={styles.noteTitle}>{note.title}</Text>
+                            <Text style={styles.noteText}>{note.detail}</Text>
+                          </View>
                         </View>
-                        <View style={styles.noteCopy}>
-                          <Text style={styles.noteTitle}>{note.title}</Text>
-                          <Text style={styles.noteText}>{note.detail}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.sectionBodyText}>{NOT_PROVIDED}</Text>
+                  )}
                 </SectionCard>
 
                 <SectionCard
@@ -856,26 +1088,45 @@ export default function BookingDetailsScreen() {
                   styles={styles}
                   title="Pricing"
                 >
-                  <View style={styles.priceList}>
-                    {PRICE_ROWS.map((row) => (
-                      <InfoRow
-                        key={row.label}
-                        label={row.label}
-                        savings={Boolean(row.savings)}
-                        styles={styles}
-                        value={row.value}
-                      />
-                    ))}
-                  </View>
+                  {priceRows.length ? (
+                    <View style={styles.priceList}>
+                      {priceRows.map((row) => (
+                        <InfoRow
+                          key={row.label}
+                          label={row.label}
+                          savings={Boolean(row.savings)}
+                          styles={styles}
+                          value={row.value}
+                        />
+                      ))}
+                    </View>
+                  ) : bookingView.total === null ? (
+                    <Text style={styles.sectionBodyText}>{NOT_PROVIDED}</Text>
+                  ) : null}
 
                   <View style={styles.totalRow}>
                     <View>
-                      <Text style={styles.totalLabel}>Estimated total</Text>
+                      <Text style={styles.totalLabel}>
+                        {bookingView.paid ? 'Amount paid' : 'Estimated total'}
+                      </Text>
                       <Text style={styles.totalHelper}>
-                        Final after Guru accepts
+                        {bookingView.total === null
+                          ? 'No amount is saved on this booking'
+                          : bookingView.paid
+                            ? 'Recorded on this booking'
+                            : 'Saved on this booking'}
                       </Text>
                     </View>
-                    <Text style={styles.totalValue}>$20</Text>
+                    <Text
+                      style={[
+                        styles.totalValue,
+                        bookingView.total === null && styles.totalValueEmpty,
+                      ]}
+                    >
+                      {bookingView.total === null
+                        ? NOT_PROVIDED
+                        : formatUsd(bookingView.total)}
+                    </Text>
                   </View>
 
                   <View style={styles.paymentNotice}>
@@ -885,13 +1136,13 @@ export default function BookingDetailsScreen() {
                       strokeWidth={2.3}
                     />
                     <Text style={styles.paymentNoticeText}>
-                      Payment happens later. This request has not charged your payment method.
+                      {bookingPaymentNote(bookingView)}
                     </Text>
                   </View>
 
                   <ActionButton
                     label="View Payment Status"
-                    onPress={() => router.push('/payments')}
+                    onPress={() => openBookingRoute('/payments')}
                     styles={styles}
                     variant="secondary"
                   />
@@ -906,9 +1157,9 @@ export default function BookingDetailsScreen() {
                     />
                   }
                   meta={
-                    selectedStatus === 'Active'
+                    bookingView.statusStep === 'Active'
                       ? 'Care in progress'
-                      : selectedStatus === 'Completed'
+                      : bookingView.statusStep === 'Completed'
                         ? 'Completed report'
                         : 'Starts with care'
                   }
@@ -921,9 +1172,9 @@ export default function BookingDetailsScreen() {
                     </View>
                     <View style={styles.pawReportCopy}>
                       <Text style={styles.pawReportTitle}>
-                        {selectedStatus === 'Active'
+                        {bookingView.statusStep === 'Active'
                           ? 'Live care updates available'
-                          : selectedStatus === 'Completed'
+                          : bookingView.statusStep === 'Completed'
                             ? 'Completed PawReport ready'
                             : 'PawReport begins at check-in'}
                       </Text>
@@ -936,7 +1187,7 @@ export default function BookingDetailsScreen() {
                   <View style={styles.twoButtonRow}>
                     <ActionButton
                       label="Open PawReport"
-                      onPress={() => router.push('/pawreport-live')}
+                      onPress={() => openBookingRoute('/pawreport-live')}
                       styles={styles}
                     />
                     <ActionButton
@@ -987,7 +1238,7 @@ export default function BookingDetailsScreen() {
                     />
                     <ActionButton
                       label="Start Live Walk"
-                      onPress={() => router.push('/guru-live-walk')}
+                      onPress={() => openBookingRoute('/guru-live-walk')}
                       styles={styles}
                       variant="secondary"
                     />
@@ -1041,75 +1292,11 @@ export default function BookingDetailsScreen() {
                 </SectionCard>
 
                 <View style={styles.bottomSpacer} />
+                  </>
+                )}
               </ScrollView>
 
-              <View style={styles.bottomNav}>
-                <BottomNavItem
-                  icon={
-                    <Home
-                      color={palette.navMuted}
-                      size={21}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Dashboard"
-                  onPress={() => router.push('/pet-parent-dashboard')}
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  icon={
-                    <MessageCircle
-                      color={palette.navMuted}
-                      size={21}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Messages"
-                  onPress={openConversation}
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  active
-                  icon={
-                    <CalendarDays
-                      color={palette.primary}
-                      size={21}
-                      strokeWidth={2.4}
-                    />
-                  }
-                  label="Booking"
-                  onPress={() => undefined}
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  icon={
-                    <PawPrint
-                      color={palette.navMuted}
-                      size={21}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Live"
-                  onPress={() => router.push('/pawreport-live')}
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  icon={
-                    <ShieldCheck
-                      color={palette.navMuted}
-                      size={21}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Help"
-                  onPress={() => router.push('/support')}
-                  styles={styles}
-                />
-              </View>
+              <SitGuruTabBar active="bookings" />
             </View>
           </View>
 
@@ -1190,17 +1377,14 @@ function QuickAction({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.quickAction,
-        pressed && styles.pressed,
-      ]}
+      style={styles.quickAction}
     >
       <View style={styles.quickActionIcon}>{icon}</View>
       <Text style={styles.quickActionLabel}>{label}</Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1244,7 +1428,7 @@ function ProfileRow({
   avatar: string;
   badge?: string;
   detail: string;
-  helper: string;
+  helper?: string;
   imageUrl?: string | null;
   name: string;
   palette: ReturnType<typeof getPalette>;
@@ -1262,7 +1446,9 @@ function ProfileRow({
       <View style={styles.profileCopy}>
         <Text style={styles.profileName}>{name}</Text>
         <Text style={styles.profileMeta}>{detail}</Text>
-        <Text style={styles.profileHelper}>{helper}</Text>
+        {helper ? (
+          <Text style={styles.profileHelper}>{helper}</Text>
+        ) : null}
         {badge ? (
           <View style={styles.profileBadge}>
             <ShieldCheck color="#FFFFFF" size={11} strokeWidth={2.3} />
@@ -1324,14 +1510,13 @@ function ActionButton({
   variant?: 'primary' | 'secondary' | 'danger';
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.actionButton,
         variant === 'secondary' && styles.actionButtonSecondary,
         variant === 'danger' && styles.actionButtonDanger,
-        pressed && styles.pressed,
       ]}
     >
       <Text
@@ -1342,7 +1527,7 @@ function ActionButton({
       >
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1360,34 +1545,6 @@ function SafetyRow({
       </View>
       <Text style={styles.safetyText}>{text}</Text>
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      {icon}
-      <Text style={active ? styles.navLabelActive : styles.navLabel}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -1425,7 +1582,7 @@ function mapPetDetail(row: RecordRow, index: number): PetDetail | null {
       'behavior_notes',
       'bio',
       'description',
-    ]) || 'Pet Passport care details are ready for the Guru to review.';
+    ]) || '';
 
   return {
     id: firstString(row, ['id', 'pet_id']) || `pet-${index}`,
@@ -1472,6 +1629,340 @@ function firstNumber(record: RecordRow, keys: string[]) {
     }
   }
   return null;
+}
+
+function firstDate(record: RecordRow, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+    if (typeof value === 'string' || typeof value === 'number') {
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) return date;
+    }
+  }
+  return null;
+}
+
+function firstBoolean(record: RecordRow, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'boolean') return value;
+    if (value === true || value === 'true' || value === 1 || value === '1') {
+      return true;
+    }
+    if (value === false || value === 'false' || value === 0 || value === '0') {
+      return false;
+    }
+  }
+  return null;
+}
+
+function firstMoney(record: RecordRow, keys: string[]) {
+  for (const key of keys) {
+    const value = firstNumber(record, [key]);
+    if (value === null) continue;
+    return /cents/i.test(key) ? value / 100 : value;
+  }
+  return null;
+}
+
+function normalizeBookingStatus(value: string) {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function humanizeStatus(status: string) {
+  const trimmed = status.trim();
+  if (!trimmed) return NOT_PROVIDED;
+  return trimmed
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function mapStatusStep(status: string): BookingStatus | null {
+  const normalized = normalizeBookingStatus(status);
+  if (PENDING_STATUSES.has(normalized)) return 'Pending Guru Review';
+  if (ACCEPTED_STATUSES.has(normalized)) return 'Accepted';
+  if (ACTIVE_STATUSES.has(normalized)) return 'Active';
+  if (COMPLETED_STATUSES.has(normalized)) return 'Completed';
+  return null;
+}
+
+function buildBookingView(id: string, row: RecordRow): BookingView {
+  const rawStatus = firstString(row, [
+    'status',
+    'booking_status',
+    'request_status',
+  ]);
+  const normalized = normalizeBookingStatus(rawStatus);
+  const statusStep = mapStatusStep(rawStatus);
+  const closed = CLOSED_STATUSES.has(normalized);
+  const paymentStatus = normalizeBookingStatus(
+    firstString(row, ['payment_status', 'paid_status', 'paymentStatus']),
+  );
+  const paid =
+    PAID_STATUSES.has(paymentStatus) ||
+    firstBoolean(row, ['paid', 'is_paid', 'payment_complete']) === true;
+
+  const startAt = firstDate(row, [
+    'start_time',
+    'starts_at',
+    'scheduled_at',
+    'requested_start_date',
+    'booking_date',
+    'service_date',
+    'start_date',
+    'date',
+  ]);
+  const endAt = firstDate(row, [
+    'end_time',
+    'ends_at',
+    'requested_end_date',
+    'completed_at',
+    'end_date',
+  ]);
+
+  let durationMinutes = firstNumber(row, [
+    'duration_minutes',
+    'visit_length_minutes',
+    'visit_minutes',
+    'length_minutes',
+  ]);
+  if (durationMinutes === null) {
+    const visitLength = firstString(row, [
+      'visit_length',
+      'duration',
+      'time_window',
+    ]);
+    const parsedMinutes = visitLength.match(/(\d+)/);
+    if (parsedMinutes) {
+      durationMinutes = Number(parsedMinutes[1]);
+    }
+  }
+  if (durationMinutes === null && startAt && endAt) {
+    const diff = Math.round((endAt.getTime() - startAt.getTime()) / 60000);
+    if (diff > 0) durationMinutes = diff;
+  }
+
+  const subtotal = firstMoney(row, SUBTOTAL_FIELDS);
+  const fees = firstMoney(row, FEE_FIELDS);
+  const credit = firstMoney(row, CREDIT_FIELDS);
+  let total = firstMoney(row, TOTAL_FIELDS);
+  if (total === null && subtotal !== null) {
+    total = subtotal + (fees ?? 0) - (credit ?? 0);
+  }
+
+  const reference =
+    firstString(row, [
+      'booking_reference',
+      'reference',
+      'confirmation_code',
+      'public_id',
+      'short_code',
+    ]) || `#${id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+
+  return {
+    id,
+    reference,
+    statusStep,
+    statusLabel: statusStep || humanizeStatus(rawStatus),
+    closed,
+    paid,
+    serviceLabel: firstString(row, [
+      'service_name',
+      'service_type',
+      'service',
+      'booking_type',
+      'serviceType',
+    ]),
+    petId: firstString(row, ['pet_id', 'petId']),
+    petName: firstString(row, [
+      'pet_name',
+      'animal_name',
+      'pet_display_name',
+      'petName',
+    ]),
+    guruId: firstString(row, [
+      'guru_id',
+      'provider_id',
+      'sitter_id',
+      'caregiver_id',
+      'guruId',
+    ]),
+    guruName: firstString(row, [
+      'guru_name',
+      'provider_name',
+      'sitter_name',
+      'caregiver_name',
+      'guruName',
+    ]),
+    guruPhotoUrl: resolveSupabaseStorageUrl(
+      firstString(row, [
+        'guru_photo_url',
+        'provider_photo_url',
+        'guru_avatar_url',
+        'caregiver_photo_url',
+      ]),
+    ),
+    location: firstString(row, [
+      'service_address',
+      'location',
+      'service_location',
+      'service_city',
+      'city',
+      'service_area',
+      'service_zip',
+    ]),
+    startAt,
+    endAt,
+    durationMinutes,
+    notes: firstString(row, [
+      'notes',
+      'care_notes',
+      'booking_notes',
+      'special_instructions',
+      'request_notes',
+    ]),
+    subtotal,
+    fees,
+    credit,
+    total,
+  };
+}
+
+function sameCalendarDay(left: Date, right: Date) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function formatBookingDate(date: Date | null) {
+  if (!date) return '';
+
+  const today = new Date();
+  if (sameCalendarDay(date, today)) return 'Today';
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  if (sameCalendarDay(date, tomorrow)) return 'Tomorrow';
+
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function formatBookingTime(date: Date | null) {
+  if (!date) return '';
+
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function formatDuration(minutes: number | null) {
+  if (minutes === null || !Number.isFinite(minutes) || minutes <= 0) {
+    return NOT_PROVIDED;
+  }
+
+  if (minutes < 60) return `${Math.round(minutes)} min`;
+
+  const hours = minutes / 60;
+  if (Number.isInteger(hours)) return `${hours} hr`;
+
+  return `${Math.round(minutes)} min`;
+}
+
+function nearbyDayStrip(date: Date) {
+  return [-2, -1, 0, 1, 2].map((offset) => {
+    const day = new Date(date);
+    day.setDate(date.getDate() + offset);
+    day.setHours(0, 0, 0, 0);
+
+    return {
+      key: `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`,
+      label: day.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 2),
+      date: day.getDate(),
+      active: offset === 0,
+    };
+  });
+}
+
+function buildCareNotes(
+  bookingView: BookingView | null,
+  selectedPet: PetDetail | null,
+): CareNote[] {
+  const notes: CareNote[] = [];
+
+  if (bookingView?.notes) {
+    notes.push({
+      title: 'Booking instructions',
+      detail: bookingView.notes,
+    });
+  }
+
+  if (selectedPet?.helper) {
+    notes.push({
+      title: `${selectedPet.name} — Pet Passport notes`,
+      detail: selectedPet.helper,
+    });
+  }
+
+  return notes;
+}
+
+function bookingPaymentNote(view: BookingView) {
+  if (view.paid) {
+    return view.total === null
+      ? 'Payment was received for this booking.'
+      : `Payment of ${formatUsd(view.total)} was received for this booking.`;
+  }
+
+  if (view.total === null) {
+    return 'No payment amount is saved on this booking yet. SitGuru has not charged a payment method.';
+  }
+
+  if (view.statusStep === 'Pending Guru Review' || !view.statusStep) {
+    return 'Payment happens after the Guru accepts. This request has not charged a payment method.';
+  }
+
+  return 'Review the amount saved on this booking and pay securely inside SitGuru when you are ready.';
+}
+
+function EmptyBookingState({
+  listLabel,
+  onOpenList,
+  onOpenSupport,
+  styles,
+  text,
+  title,
+}: {
+  listLabel: string;
+  onOpenList: () => void;
+  onOpenSupport: () => void;
+  palette?: ReturnType<typeof getPalette>;
+  styles: ReturnType<typeof createStyles>;
+  text: string;
+  title: string;
+}) {
+  return (
+    <View style={styles.stateCard}>
+      <Text style={styles.stateTitle}>{title}</Text>
+      <Text style={styles.stateText}>{text}</Text>
+      <View style={styles.buttonStack}>
+        <ActionButton label={listLabel} onPress={onOpenList} styles={styles} />
+        <ActionButton
+          label="Help & Support"
+          onPress={onOpenSupport}
+          styles={styles}
+          variant="secondary"
+        />
+      </View>
+    </View>
+  );
 }
 
 function getPetEmoji(species: string) {
@@ -1557,7 +2048,6 @@ function getPalette(isDark: boolean) {
     primary: isDark ? '#39D982' : '#087449',
     primaryDark: isDark ? '#087A4C' : '#076A43',
     primarySoft: isDark ? '#123E2A' : '#E4F5E9',
-    navMuted: isDark ? '#9BAAA1' : '#748079',
     danger: '#D94A4A',
     orange: '#F15A3A',
     shadow: '#000000',
@@ -1704,7 +2194,7 @@ function createStyles(isDark: boolean) {
     },
     scrollContent: {
       gap: 12,
-      paddingBottom: 110,
+      paddingBottom: 24,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -1856,6 +2346,10 @@ function createStyles(isDark: boolean) {
       fontSize: 22,
       marginTop: 1,
     },
+    summaryPriceValueEmpty: {
+      color: 'rgba(255,255,255,0.72)',
+      fontSize: 16,
+    },
     summaryPaymentNote: {
       color: 'rgba(255,255,255,0.78)',
       fontFamily: AppFonts.medium,
@@ -1871,6 +2365,25 @@ function createStyles(isDark: boolean) {
     },
     loadNoticeText: {
       color: palette.text,
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    stateCard: {
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 20,
+      borderWidth: 1,
+      gap: 10,
+      padding: 16,
+    },
+    stateTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 16,
+    },
+    stateText: {
+      color: palette.muted,
       fontFamily: AppFonts.medium,
       fontSize: 10,
       lineHeight: 14,
@@ -1996,10 +2509,6 @@ function createStyles(isDark: boolean) {
       shadowOffset: { width: 0, height: 9 },
       shadowOpacity: isDark ? 0.28 : 0.14,
       shadowRadius: 17,
-    },
-    primaryActionPressed: {
-      opacity: 0.86,
-      transform: [{ scale: 0.99 }],
     },
     primaryActionIcon: {
       alignItems: 'center',
@@ -2322,6 +2831,10 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.extraBold,
       fontSize: 22,
     },
+    totalValueEmpty: {
+      color: palette.muted,
+      fontSize: 14,
+    },
     paymentNotice: {
       alignItems: 'flex-start',
       backgroundColor: palette.primarySoft,
@@ -2405,49 +2918,8 @@ function createStyles(isDark: boolean) {
       fontSize: 9,
       lineHeight: 13,
     },
-    pressed: {
-      opacity: 0.76,
-      transform: [{ scale: 0.99 }],
-    },
     bottomSpacer: {
       height: 16,
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: isDark ? '#071A12' : '#FFFDF8',
-      borderColor: palette.border,
-      borderRadius: 24,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 76,
-      justifyContent: 'space-around',
-      left: 10,
-      paddingBottom: 8,
-      paddingHorizontal: 7,
-      paddingTop: 8,
-      position: 'absolute',
-      right: 10,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: -8 },
-      shadowOpacity: isDark ? 0.28 : 0.08,
-      shadowRadius: 18,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 4,
-      justifyContent: 'center',
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.bold,
-      fontSize: 9,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 9,
     },
   });
 }

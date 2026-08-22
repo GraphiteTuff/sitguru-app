@@ -9,6 +9,7 @@ import {
   type ImageStyle,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruColors } from '@/constants/colors';
 import { MobileSpace, TOUCH_MIN } from '@/constants/mobile-layout';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
@@ -38,13 +39,14 @@ export default function CachedRemoteImage({
 
   return (
     <>
-      <Pressable
+      <BubblePressable
         accessibilityRole="imagebutton"
         accessibilityLabel={accessibilityLabel}
         disabled={!expandable}
         onPress={() => {
           if (expandable) setOpen(true);
         }}
+        scaleTo={0.88}
         style={styles.pressable}
       >
         <Image
@@ -56,7 +58,7 @@ export default function CachedRemoteImage({
           transition={160}
           recyclingKey={resolved}
         />
-      </Pressable>
+      </BubblePressable>
 
       <Modal
         visible={open}

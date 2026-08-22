@@ -2,13 +2,15 @@ import { ReactNode } from 'react';
 import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { SitGuruColors } from '@/constants/colors';
+import { useTheme } from '@/hooks/use-theme';
 
 type SitGuruScreenProps = {
   children: ReactNode;
   center?: boolean;
   maxWidth?: number;
   scroll?: boolean;
+  /** Full-bleed layouts (homepage hero video) — no side padding / cream chrome. */
+  edgeToEdge?: boolean;
 };
 
 export default function SitGuruScreen({
@@ -16,22 +18,37 @@ export default function SitGuruScreen({
   center = true,
   maxWidth = 560,
   scroll = false,
+  edgeToEdge = false,
 }: SitGuruScreenProps) {
   const { width } = useWindowDimensions();
-  const horizontalPadding = width < 390 ? 16 : 20;
-  const contentStyle = [
-    styles.inner,
-    {
-      maxWidth,
-    },
-  ];
+  const theme = useTheme();
+  const horizontalPadding = edgeToEdge ? 0 : width < 390 ? 16 : 20;
+  const backgroundStyle = { backgroundColor: theme.colors.screen };
+  const widthStyle = edgeToEdge ? styles.innerFullWidth : { maxWidth };
+
+  /*
+   * Non-scrolling screens nest canvases that use flex: 1. Without a flexible
+   * wrapper the wrapper height stays auto and those children collapse to zero,
+   * which renders as a blank screen on device.
+   */
+  const contentStyle = scroll
+    ? [styles.inner, widthStyle]
+    : [styles.inner, styles.innerFlexible, widthStyle];
 
   if (scroll) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView
+        edges={edgeToEdge ? [] : undefined}
+        style={[
+          styles.safeArea,
+          backgroundStyle,
+          edgeToEdge && styles.safeAreaEdgeToEdge,
+        ]}
+      >
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
+            edgeToEdge && styles.scrollContentEdgeToEdge,
             {
               paddingHorizontal: horizontalPadding,
             },
@@ -47,10 +64,18 @@ export default function SitGuruScreen({
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      edges={edgeToEdge ? [] : undefined}
+      style={[
+        styles.safeArea,
+        backgroundStyle,
+        edgeToEdge && styles.safeAreaEdgeToEdge,
+      ]}
+    >
       <View
         style={[
           styles.content,
+          edgeToEdge && styles.contentEdgeToEdge,
           {
             paddingHorizontal: horizontalPadding,
           },
@@ -66,7 +91,9 @@ export default function SitGuruScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: SitGuruColors.background,
+  },
+  safeAreaEdgeToEdge: {
+    backgroundColor: '#020807',
   },
   content: {
     flex: 1,
@@ -74,11 +101,19 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     alignItems: 'center',
   },
+  contentEdgeToEdge: {
+    paddingBottom: 0,
+    paddingTop: 0,
+  },
   scrollContent: {
     flexGrow: 1,
     paddingTop: 20,
     paddingBottom: 28,
     alignItems: 'center',
+  },
+  scrollContentEdgeToEdge: {
+    paddingBottom: 0,
+    paddingTop: 0,
   },
   centered: {
     justifyContent: 'center',
@@ -88,5 +123,11 @@ const styles = StyleSheet.create({
   },
   inner: {
     width: '100%',
+  },
+  innerFlexible: {
+    flex: 1,
+  },
+  innerFullWidth: {
+    maxWidth: '100%',
   },
 });

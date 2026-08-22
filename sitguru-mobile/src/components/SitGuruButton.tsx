@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruColors } from '@/constants/colors';
 
 type SitGuruButtonProps = {
@@ -26,12 +27,13 @@ export default function SitGuruButton({
   const isDanger = variant === 'danger';
 
   return (
-    <Pressable
+    <BubblePressable
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      scaleTo={disabled ? 1 : 0.96}
+      style={[
         styles.button,
         fullWidth ? styles.fullWidth : null,
         size === 'compact' ? styles.compactButton : styles.defaultButton,
@@ -40,7 +42,6 @@ export default function SitGuruButton({
         isDanger ? styles.dangerButton : null,
         variant === 'ghost' ? styles.ghostButton : null,
         disabled ? styles.disabledButton : null,
-        pressed && !disabled ? styles.pressedButton : null,
       ]}
     >
       <Text
@@ -56,7 +57,7 @@ export default function SitGuruButton({
       >
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -98,17 +99,6 @@ const styles = StyleSheet.create({
   },
   ghostButton: {
     backgroundColor: 'transparent',
-  },
-  pressedButton: {
-    opacity: 0.9,
-    transform: [
-      {
-        scale: 0.985,
-      },
-      {
-        translateY: 1,
-      },
-    ],
   },
   disabledButton: {
     opacity: 0.5,

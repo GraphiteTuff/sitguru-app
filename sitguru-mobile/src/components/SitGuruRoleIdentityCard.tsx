@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import SitGuruProfilePhotoFrame from '@/components/SitGuruProfilePhotoFrame';
 import { SitGuruColors } from '@/constants/colors';
 
@@ -38,8 +39,8 @@ export default function SitGuruRoleIdentityCard({ title, subtitle, profileName, 
           {statusLabel ? <Text style={[styles.badge, styles.statusBadge]}>{statusLabel}</Text> : null}
         </View>
         <View style={styles.actions}>
-          {primaryActionLabel && onPrimaryAction ? <Pressable accessibilityRole="button" onPress={onPrimaryAction} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{primaryActionLabel}</Text></Pressable> : null}
-          {secondaryActionLabel && onSecondaryAction ? <Pressable accessibilityRole="button" onPress={onSecondaryAction} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{secondaryActionLabel}</Text></Pressable> : null}
+          {primaryActionLabel && onPrimaryAction ? <BubblePressable accessibilityRole="button" onPress={onPrimaryAction} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{primaryActionLabel}</Text></BubblePressable> : null}
+          {secondaryActionLabel && onSecondaryAction ? <BubblePressable accessibilityRole="button" onPress={onSecondaryAction} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{secondaryActionLabel}</Text></BubblePressable> : null}
         </View>
       </View>
     </View>

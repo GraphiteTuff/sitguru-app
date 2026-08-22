@@ -1,7 +1,8 @@
 import type { ComponentProps } from 'react';
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import SitGuruIconBadge, { type SitGuruIconName } from '@/components/SitGuruIconBadge';
 import { SitGuruColors } from '@/constants/colors';
 
@@ -31,14 +32,11 @@ export default function SitGuruRoleCard({
 }: SitGuruRoleCardProps) {
   return (
     <Link href={href} asChild>
-      <Pressable
+      <BubblePressable
         accessibilityLabel={`${title}. ${description}`}
         accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.card,
-          toneStyles[tone].card,
-          pressed ? styles.pressed : null,
-        ]}
+        scaleTo={0.97}
+        style={[styles.card, toneStyles[tone].card]}
       >
         <SitGuruIconBadge name={icon} size="large" tone={toneStyles[tone].badgeTone} />
 
@@ -62,7 +60,7 @@ export default function SitGuruRoleCard({
           </Text>
           <Text style={[styles.arrow, toneStyles[tone].meta]}>→</Text>
         </View>
-      </Pressable>
+      </BubblePressable>
     </Link>
   );
 }
@@ -79,14 +77,6 @@ const styles = StyleSheet.create({
     minHeight: 122,
     padding: 18,
     elevation: 4,
-  },
-  pressed: {
-    opacity: 0.88,
-    transform: [
-      {
-        translateY: 1,
-      },
-    ],
   },
   content: {
     flex: 1,

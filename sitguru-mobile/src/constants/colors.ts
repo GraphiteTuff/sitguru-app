@@ -1,17 +1,24 @@
+import { BrandColors } from '@/constants/theme';
+
+/**
+ * Static light palette for components that predate the themed tokens.
+ * Derived from BrandColors so these screens match the design system instead
+ * of drifting toward a cooler, greyer green.
+ */
 export const SitGuruColors = {
-  background: '#F7FBF8',
-  surface: '#FFFFFF',
-  surfaceSoft: '#E7F6EC',
+  background: '#FAF6EE',
+  surface: BrandColors.white,
+  surfaceSoft: BrandColors.greenSoft,
 
-  primary: '#166534',
-  primaryDark: '#102417',
-  primaryLight: '#CFE6D5',
+  primary: '#1A4E37',
+  primaryDark: BrandColors.ink,
+  primaryLight: '#C9DDD1',
 
-  text: '#102417',
-  textMuted: '#496154',
-  textSoft: '#6C7D70',
+  text: '#14291F',
+  textMuted: '#465349',
+  textSoft: '#79857B',
 
-  border: '#D9EADF',
-  danger: '#B42318',
-  warning: '#B54708',
+  border: BrandColors.border,
+  danger: BrandColors.danger,
+  warning: BrandColors.warning,
 };

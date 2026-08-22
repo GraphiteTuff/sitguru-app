@@ -20,13 +20,13 @@ import { useMemo, useState } from 'react';
 import {
     Alert,
     Platform,
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
@@ -237,21 +237,19 @@ export default function BookingDetailsScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 <View style={styles.header}>
-                  <Pressable
+                  <BubblePressable
                     accessibilityLabel="Back to dashboard"
                     accessibilityRole="button"
                     onPress={() => router.push('/pet-parent-dashboard')}
-                    style={({ pressed }) => [
-                      styles.headerButton,
-                      pressed && styles.pressed,
-                    ]}
+                    scaleTo={0.88}
+                    style={styles.headerButton}
                   >
                     <ChevronLeft
                       color={palette.title}
                       size={20}
                       strokeWidth={2.5}
                     />
-                  </Pressable>
+                  </BubblePressable>
 
                   <View style={styles.headerCopy}>
                     <Text style={styles.headerTitle}>Booking Details</Text>
@@ -264,12 +262,13 @@ export default function BookingDetailsScreen() {
                         const active = themePreference === option.value;
 
                         return (
-                          <Pressable
+                          <BubblePressable
                             key={option.value}
                             accessibilityLabel={`Switch to ${option.label} mode`}
                             accessibilityRole="button"
                             accessibilityState={{ selected: active }}
                             onPress={() => setThemePreference(option.value)}
+                            scaleTo={0.88}
                             style={[
                               styles.modeButton,
                               active && styles.modeButtonActive,
@@ -289,26 +288,24 @@ export default function BookingDetailsScreen() {
                               size={14}
                               strokeWidth={2.4}
                             />
-                          </Pressable>
+                          </BubblePressable>
                         );
                       })}
                     </View>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityLabel="Open notifications"
                       accessibilityRole="button"
                       onPress={() => router.push('/notifications')}
-                      style={({ pressed }) => [
-                        styles.headerButton,
-                        pressed && styles.pressed,
-                      ]}
+                      scaleTo={0.88}
+                      style={styles.headerButton}
                     >
                       <Bell
                         color={palette.title}
                         size={18}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
                 </View>
 
@@ -373,15 +370,15 @@ export default function BookingDetailsScreen() {
 
                       return (
                         <View key={step.label} style={styles.statusStepWrap}>
-                          <Pressable
+                          <BubblePressable
                             accessibilityLabel={`Preview ${step.label} status`}
                             accessibilityRole="button"
                             onPress={() => previewStatus(step.label)}
-                            style={({ pressed }) => [
+                            scaleTo={0.88}
+                            style={[
                               styles.statusStep,
                               complete && styles.statusStepComplete,
                               active && styles.statusStepActive,
-                              pressed && styles.pressed,
                             ]}
                           >
                             <View
@@ -411,7 +408,7 @@ export default function BookingDetailsScreen() {
                             >
                               {step.shortLabel}
                             </Text>
-                          </Pressable>
+                          </BubblePressable>
 
                           {index < STATUS_STEPS.length - 1 ? (
                             <View
@@ -432,13 +429,11 @@ export default function BookingDetailsScreen() {
                   </Text>
                 </View>
 
-                <Pressable
+                <BubblePressable
                   accessibilityRole="button"
                   onPress={() => router.push(primaryAction.route)}
-                  style={({ pressed }) => [
-                    styles.primaryActionCard,
-                    pressed && styles.primaryActionPressed,
-                  ]}
+                  scaleTo={0.97}
+                  style={styles.primaryActionCard}
                 >
                   <View style={styles.primaryActionIcon}>
                     <PrimaryActionIcon icon={primaryAction.icon} />
@@ -461,7 +456,7 @@ export default function BookingDetailsScreen() {
                     size={20}
                     strokeWidth={2.5}
                   />
-                </Pressable>
+                </BubblePressable>
 
                 <View style={styles.quickActions}>
                   <QuickAction
@@ -1013,17 +1008,14 @@ function QuickAction({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.quickAction,
-        pressed && styles.pressed,
-      ]}
+      style={styles.quickAction}
     >
       <View style={styles.quickActionIcon}>{icon}</View>
       <Text style={styles.quickActionLabel}>{label}</Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1139,14 +1131,13 @@ function ActionButton({
   variant?: 'primary' | 'secondary' | 'danger';
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.actionButton,
         variant === 'secondary' && styles.actionButtonSecondary,
         variant === 'danger' && styles.actionButtonDanger,
-        pressed && styles.pressed,
       ]}
     >
       <Text
@@ -1157,7 +1148,7 @@ function ActionButton({
       >
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1192,17 +1183,18 @@ function BottomNavItem({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
+      scaleTo={0.88}
       style={styles.navItem}
     >
       {icon}
       <Text style={active ? styles.navLabelActive : styles.navLabel}>
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1643,10 +1635,6 @@ function createStyles(isDark: boolean) {
       shadowOpacity: isDark ? 0.28 : 0.14,
       shadowRadius: 17,
     },
-    primaryActionPressed: {
-      opacity: 0.86,
-      transform: [{ scale: 0.99 }],
-    },
     primaryActionIcon: {
       alignItems: 'center',
       backgroundColor: 'rgba(255,255,255,0.16)',
@@ -2055,10 +2043,6 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.medium,
       fontSize: 9,
       lineHeight: 13,
-    },
-    pressed: {
-      opacity: 0.76,
-      transform: [{ scale: 0.99 }],
     },
     bottomSpacer: {
       height: 16,

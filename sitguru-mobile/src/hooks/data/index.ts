@@ -15,6 +15,18 @@ export { usePublicGurus, useGuruProfile } from '@/hooks/data/useGurus';
 export { useWalkSession } from '@/hooks/data/useWalkSession';
 export { usePawReportLive } from '@/hooks/data/usePawReportLive';
 export { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
+export {
+  useGuruSetup,
+  usePetParentSetup,
+  useAmbassadorSetup,
+} from '@/hooks/data/useRoleSetup';
+export {
+  usePawPerks,
+  PAWPERKS_POINTS_PER_DOLLAR,
+  PAWPERK_BADGE_LEVELS,
+  pointsToUsd,
+  pawPerkSourceLabel,
+} from '@/hooks/data/usePawPerks';
 
 export type { CanonicalPet, CanonicalPetForm } from '@/lib/data/pets';
 export type { SitGuruBooking, CreateBookingInput } from '@/hooks/data/useBookings';
@@ -39,3 +51,16 @@ export type {
   GuruPayoutSetup,
   GuruPerformanceAnalytics,
 } from '@/hooks/data/useGuruEarnings';
+export type {
+  GuruSetupDraft,
+  PetParentSetupDraft,
+  AmbassadorSetupDraft,
+} from '@/hooks/data/useRoleSetup';
+export type {
+  PawPerkBadgeLevel,
+  PawPerkBadgeProgress,
+  PawPerkLedgerEntry,
+  PawPerksReferralActivity,
+  PawPerksReferralProfile,
+  PawPerksVault,
+} from '@/hooks/data/usePawPerks';

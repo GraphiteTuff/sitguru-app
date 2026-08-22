@@ -11,7 +11,6 @@ import {
 import {
     KeyboardAvoidingView,
     Platform,
-    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -19,6 +18,7 @@ import {
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
@@ -213,7 +213,7 @@ export default function ForgotPasswordScreen() {
                 <View
                   style={styles.topBar}
                 >
-                  <Pressable
+                  <BubblePressable
                     accessibilityLabel="Return to Login"
                     accessibilityRole="button"
                     onPress={() =>
@@ -221,13 +221,8 @@ export default function ForgotPasswordScreen() {
                         '/login',
                       )
                     }
-                    style={({
-                      pressed,
-                    }) => [
-                      styles.backButton,
-                      pressed &&
-                        styles.buttonPressed,
-                    ]}
+                    scaleTo={0.88}
+                    style={styles.backButton}
                   >
                     <ArrowLeft
                       color={
@@ -236,7 +231,7 @@ export default function ForgotPasswordScreen() {
                       size={20}
                       strokeWidth={2.4}
                     />
-                  </Pressable>
+                  </BubblePressable>
 
                   <SitGuruLogo
                     size="small"
@@ -419,7 +414,7 @@ export default function ForgotPasswordScreen() {
                     </View>
                   </View>
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     accessibilityState={{
                       disabled:
@@ -429,15 +424,10 @@ export default function ForgotPasswordScreen() {
                     onPress={() =>
                       void handleResetPassword()
                     }
-                    style={({
-                      pressed,
-                    }) => [
+                    style={[
                       styles.primaryButton,
                       !canSubmit &&
                         styles.primaryButtonDisabled,
-                      pressed &&
-                        canSubmit &&
-                        styles.buttonPressed,
                     ]}
                   >
                     <Text
@@ -449,22 +439,16 @@ export default function ForgotPasswordScreen() {
                         ? 'Sending instructions…'
                         : 'Send reset instructions'}
                     </Text>
-                  </Pressable>
+                  </BubblePressable>
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     onPress={() =>
                       router.replace(
                         '/login',
                       )
                     }
-                    style={({
-                      pressed,
-                    }) => [
-                      styles.secondaryButton,
-                      pressed &&
-                        styles.buttonPressed,
-                    ]}
+                    style={styles.secondaryButton}
                   >
                     <Text
                       style={
@@ -473,7 +457,7 @@ export default function ForgotPasswordScreen() {
                     >
                       Return to Login
                     </Text>
-                  </Pressable>
+                  </BubblePressable>
                 </View>
 
                 <View
@@ -949,13 +933,5 @@ const styles = StyleSheet.create({
       AppFonts.medium,
     fontSize: 11,
     lineHeight: 16,
-  },
-  buttonPressed: {
-    opacity: 0.82,
-    transform: [
-      {
-        scale: 0.99,
-      },
-    ],
   },
 });

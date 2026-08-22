@@ -21,7 +21,6 @@ import {
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -29,6 +28,7 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
@@ -879,19 +879,14 @@ export default function LoginScreen() {
                 <View
                   style={styles.topBar}
                 >
-                  <Pressable
+                  <BubblePressable
                     accessibilityLabel="Return home"
                     accessibilityRole="button"
                     onPress={() =>
                       router.replace('/')
                     }
-                    style={({
-                      pressed,
-                    }) => [
-                      styles.backButton,
-                      pressed &&
-                        styles.buttonPressed,
-                    ]}
+                    scaleTo={0.88}
+                    style={styles.backButton}
                   >
                     <ChevronLeft
                       color={
@@ -900,7 +895,7 @@ export default function LoginScreen() {
                       size={20}
                       strokeWidth={2.4}
                     />
-                  </Pressable>
+                  </BubblePressable>
 
                   <SitGuruLogo
                     size="small"
@@ -912,12 +907,13 @@ export default function LoginScreen() {
                       const active = themePreference === option.value;
 
                       return (
-                        <Pressable
+                        <BubblePressable
                           key={option.value}
                           accessibilityLabel={`Switch to ${option.label} mode`}
                           accessibilityRole="button"
                           accessibilityState={{ selected: active }}
                           onPress={() => setThemePreference(option.value)}
+                          scaleTo={0.88}
                           style={[
                             styles.modeButton,
                             active && styles.modeButtonActive,
@@ -937,7 +933,7 @@ export default function LoginScreen() {
                             size={16}
                             strokeWidth={2.4}
                           />
-                        </Pressable>
+                        </BubblePressable>
                       );
                     })}
                   </View>
@@ -1164,7 +1160,7 @@ export default function LoginScreen() {
                       styles.methodToggle
                     }
                   >
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityState={{
                         selected:
@@ -1177,6 +1173,7 @@ export default function LoginScreen() {
                           'password',
                         )
                       }
+                      scaleTo={0.88}
                       style={[
                         styles.methodButton,
                         loginMethod ===
@@ -1205,9 +1202,9 @@ export default function LoginScreen() {
                       >
                         Password
                       </Text>
-                    </Pressable>
+                    </BubblePressable>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityState={{
                         selected:
@@ -1220,6 +1217,7 @@ export default function LoginScreen() {
                           'email_code',
                         )
                       }
+                      scaleTo={0.88}
                       style={[
                         styles.methodButton,
                         loginMethod ===
@@ -1248,9 +1246,9 @@ export default function LoginScreen() {
                       >
                         Email code
                       </Text>
-                    </Pressable>
+                    </BubblePressable>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityState={{
                         selected:
@@ -1263,6 +1261,7 @@ export default function LoginScreen() {
                           'sms_code',
                         )
                       }
+                      scaleTo={0.88}
                       style={[
                         styles.methodButton,
                         loginMethod ===
@@ -1291,7 +1290,7 @@ export default function LoginScreen() {
                       >
                         Text code
                       </Text>
-                    </Pressable>
+                    </BubblePressable>
                   </View>
 
                   <Text
@@ -1510,7 +1509,7 @@ export default function LoginScreen() {
                           value={password}
                         />
 
-                        <Pressable
+                        <BubblePressable
                           accessibilityLabel={
                             passwordVisible
                               ? 'Hide password'
@@ -1524,6 +1523,7 @@ export default function LoginScreen() {
                                 !current,
                             )
                           }
+                          scaleTo={0.88}
                           style={
                             styles.eyeButton
                           }
@@ -1545,7 +1545,7 @@ export default function LoginScreen() {
                               strokeWidth={2.2}
                             />
                           )}
-                        </Pressable>
+                        </BubblePressable>
                       </View>
                     </View>
                   ) : codeSent ? (
@@ -1661,7 +1661,7 @@ export default function LoginScreen() {
                           Didn’t receive it?
                         </Text>
 
-                        <Pressable
+                        <BubblePressable
                           accessibilityRole="button"
                           disabled={
                             authBusy ||
@@ -1670,6 +1670,7 @@ export default function LoginScreen() {
                           onPress={() =>
                             void handleSendCode()
                           }
+                          scaleTo={0.88}
                           style={
                             styles.resendButton
                           }
@@ -1687,7 +1688,7 @@ export default function LoginScreen() {
                               ? `Resend in ${resendSeconds}s`
                               : 'Resend code'}
                           </Text>
-                        </Pressable>
+                        </BubblePressable>
                       </View>
                     </View>
                   ) : (
@@ -1736,7 +1737,7 @@ export default function LoginScreen() {
                     </View>
                   )}
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     accessibilityState={{
                       disabled:
@@ -1746,15 +1747,10 @@ export default function LoginScreen() {
                     onPress={() =>
                       void handlePrimaryAction()
                     }
-                    style={({
-                      pressed,
-                    }) => [
+                    style={[
                       styles.loginButton,
                       !canSubmit &&
                         styles.loginButtonDisabled,
-                      pressed &&
-                        canSubmit &&
-                        styles.buttonPressed,
                     ]}
                   >
                     <Text
@@ -1787,7 +1783,7 @@ export default function LoginScreen() {
                         strokeWidth={2.5}
                       />
                     ) : null}
-                  </Pressable>
+                  </BubblePressable>
 
                   <View
                     style={
@@ -1856,20 +1852,15 @@ export default function LoginScreen() {
                     </Text>
                   </View>
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     onPress={() =>
                       router.push(
                         '/signup',
                       )
                     }
-                    style={({
-                      pressed,
-                    }) => [
-                      styles.createButton,
-                      pressed &&
-                        styles.buttonPressed,
-                    ]}
+                    scaleTo={0.88}
+                    style={styles.createButton}
                   >
                     <Text
                       style={
@@ -1878,7 +1869,7 @@ export default function LoginScreen() {
                     >
                       Create
                     </Text>
-                  </Pressable>
+                  </BubblePressable>
                 </View>
 
                 <Text
@@ -2643,14 +2634,6 @@ function createStyles(isDark: boolean) {
     lineHeight: 15,
     paddingHorizontal: 18,
     textAlign: 'center',
-  },
-  buttonPressed: {
-    opacity: 0.82,
-    transform: [
-      {
-        scale: 0.99,
-      },
-    ],
   },
   });
 }

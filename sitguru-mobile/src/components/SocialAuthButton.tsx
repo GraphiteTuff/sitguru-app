@@ -1,10 +1,10 @@
 import {
     ActivityIndicator,
-    Pressable,
     StyleSheet,
     Text,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import SocialAuthBrandIcon from '@/components/SocialAuthBrandIcon';
 import { AppFonts } from '@/constants/fonts';
 
@@ -41,7 +41,7 @@ export default function SocialAuthButton({
       : `Continue with ${providerLabel}`;
 
   return (
-    <Pressable
+    <BubblePressable
       accessibilityLabel={actionLabel}
       accessibilityRole="button"
       accessibilityState={{
@@ -50,13 +50,10 @@ export default function SocialAuthButton({
       }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.button,
         isApple && styles.appleButton,
         disabled && styles.disabled,
-        pressed &&
-          !disabled &&
-          styles.pressed,
       ]}
     >
       {loading ? (
@@ -82,7 +79,7 @@ export default function SocialAuthButton({
           ? loadingLabel
           : actionLabel}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -113,13 +110,5 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.48,
-  },
-  pressed: {
-    opacity: 0.82,
-    transform: [
-      {
-        scale: 0.99,
-      },
-    ],
   },
 });

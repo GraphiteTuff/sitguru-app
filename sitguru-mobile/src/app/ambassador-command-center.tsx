@@ -51,8 +51,10 @@ import {
   type TextStyle,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { getAppTheme } from '@/constants/theme';
 import {
   setThemePreference,
@@ -701,13 +703,12 @@ function Button({
   disabled?: boolean;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.button,
         primary ? styles.buttonPrimary : styles.buttonSecondary,
-        pressed ? styles.pressed : null,
         disabled ? styles.disabled : null,
       ]}>
       {icon}
@@ -718,7 +719,7 @@ function Button({
         ]}>
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -743,14 +744,15 @@ function ChipRow({
       {values.map((item) => {
         const active = item === value;
         return (
-          <Pressable
+          <BubblePressable
             key={item}
             onPress={() => onChange(item)}
+            scaleTo={0.88}
             style={[styles.chip, active ? styles.chipActive : null]}>
             <Text style={[styles.chipText, active ? styles.chipTextActive : null]}>
               {formatLabel(item)}
             </Text>
-          </Pressable>
+          </BubblePressable>
         );
       })}
     </ScrollView>
@@ -860,16 +862,14 @@ function StatCard({
   }
 
   return (
-    <Pressable
+    <BubblePressable
       accessibilityLabel={`Open ${label}`}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.statCard,
-        pressed ? styles.pressed : null,
-      ]}>
+      scaleTo={0.97}
+      style={[styles.statCard]}>
       {content}
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -889,15 +889,13 @@ function PortalLinkButton({
   theme: Theme;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityHint={`Opens ${label}`}
       accessibilityLabel={label}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.portalLinkButton,
-        pressed ? styles.pressed : null,
-      ]}>
+      scaleTo={0.97}
+      style={[styles.portalLinkButton]}>
       <View style={styles.portalLinkIcon}>{icon}</View>
       <View style={styles.portalLinkCopy}>
         <Text style={styles.portalLinkTitle}>{label}</Text>
@@ -908,7 +906,7 @@ function PortalLinkButton({
         size={17}
         strokeWidth={2.4}
       />
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -942,9 +940,9 @@ function ActivityCard({
             {titleCase(record.activity_type)} • {titleCase(record.engagement_mode)}
           </Text>
         </View>
-        <Pressable onPress={onEdit} style={styles.iconButton}>
+        <BubblePressable onPress={onEdit} scaleTo={0.88} style={styles.iconButton}>
           <Target color={theme.colors.primary} size={17} strokeWidth={2.4} />
-        </Pressable>
+        </BubblePressable>
       </View>
 
       {record.organization_name || record.venue_name || record.city ? (
@@ -1119,13 +1117,14 @@ function FormModal({
           <Text style={styles.modalSubtitle}>{subtitle}</Text>
         </View>
 
-        <Pressable
+        <BubblePressable
           accessibilityLabel="Close form"
           accessibilityRole="button"
           onPress={onClose}
+          scaleTo={0.88}
           style={styles.iconButton}>
           <X color={theme.colors.text} size={20} strokeWidth={2.4} />
-        </Pressable>
+        </BubblePressable>
       </View>
 
       <ScrollView
@@ -1892,15 +1891,13 @@ export default function AmbassadorCommandCenterScreen() {
                         Ambassador • Live
                       </Text>
                     </View>
-                    <Pressable
+                    <BubblePressable
                         accessibilityHint="Returns to the Ambassador Dashboard."
                         accessibilityLabel="Back to Ambassador Dashboard"
                         accessibilityRole="button"
                         onPress={() => openRoute('/ambassador-dashboard')}
-                        style={({ pressed }) => [
-                          styles.dashboardReturnButton,
-                          pressed ? styles.headerControlPressed : null,
-                        ]}>
+                        scaleTo={0.88}
+                        style={[styles.dashboardReturnButton]}>
                         <ArrowLeft
                           color={theme.colors.primary}
                           size={12}
@@ -1909,33 +1906,49 @@ export default function AmbassadorCommandCenterScreen() {
                         <Text style={styles.dashboardReturnText}>
                           Dashboard
                         </Text>
-                      </Pressable>
+                      </BubblePressable>
                   </View>
 
                   <View style={styles.headerActions}>
-                    <Pressable
+                    <BubblePressable
+                        accessibilityHint="Opens the menu to add a lead, booking, or reminder."
+                        accessibilityLabel="Add"
+                        accessibilityRole="button"
+                        onPress={() => setAddMenuOpen(true)}
+                        scaleTo={0.88}
+                        style={styles.headerAddButton}>
+                        <Plus
+                          color={theme.colors.chipActiveText}
+                          size={19}
+                          strokeWidth={2.6}
+                        />
+                      </BubblePressable>
+
+                    <BubblePressable
                         accessibilityLabel="Open notifications"
                         accessibilityRole="button"
                         onPress={() => openRoute('/notifications')}
+                        scaleTo={0.88}
                         style={styles.headerIconButton}>
                         <Bell
                           color={theme.colors.text}
                           size={18}
                           strokeWidth={2.3}
                         />
-                      </Pressable>
+                      </BubblePressable>
 
                     <View style={styles.modeToggle}>
                       {THEME_OPTIONS.map((option) => {
                         const active = themePreference === option.value;
 
                         return (
-                          <Pressable
+                          <BubblePressable
                             key={option.value}
                             accessibilityLabel={`Switch to ${option.label} mode`}
                             accessibilityRole="button"
                             accessibilityState={{ selected: active }}
                             onPress={() => setThemePreference(option.value)}
+                            scaleTo={0.88}
                             style={[
                               styles.modeButton,
                               active ? styles.modeButtonActive : null,
@@ -1955,14 +1968,15 @@ export default function AmbassadorCommandCenterScreen() {
                               size={15}
                               strokeWidth={2.4}
                             />
-                          </Pressable>
+                          </BubblePressable>
                         );
                       })}
                     </View>
-                    <Pressable
+                    <BubblePressable
                         accessibilityLabel="Open profile and workspace switcher"
                         accessibilityRole="button"
                         onPress={() => openRoute('/account')}
+                        scaleTo={0.88}
                         style={styles.avatar}>
                         {avatarUrl && !avatarImageFailed ? (
                           <Image
@@ -1976,7 +1990,7 @@ export default function AmbassadorCommandCenterScreen() {
                             {(firstName[0] || 'A').toUpperCase()}
                           </Text>
                         )}
-                      </Pressable>
+                      </BubblePressable>
                   </View>
                 </View>
 
@@ -2033,9 +2047,9 @@ export default function AmbassadorCommandCenterScreen() {
                       : styles.feedbackInfo,
                 ]}>
                 <Text style={styles.feedbackText}>{feedback.message}</Text>
-                <Pressable onPress={() => setFeedback(null)}>
+                <BubblePressable onPress={() => setFeedback(null)} scaleTo={0.88}>
                   <X color={theme.colors.text} size={17} strokeWidth={2.4} />
-                </Pressable>
+                </BubblePressable>
               </View>
             ) : null}
 
@@ -2197,9 +2211,10 @@ export default function AmbassadorCommandCenterScreen() {
                 const active = view === key;
                 const IconComponent = Icon as typeof Home;
                 return (
-                  <Pressable
+                  <BubblePressable
                     key={key as string}
                     onPress={() => setView(key as CommandView)}
+                    scaleTo={0.88}
                     style={[styles.tab, active ? styles.tabActive : null]}>
                     <IconComponent
                       color={active ? theme.colors.chipActiveText : theme.colors.textSecondary}
@@ -2207,7 +2222,7 @@ export default function AmbassadorCommandCenterScreen() {
                       strokeWidth={2.4}
                     />
                     <Text style={[styles.tabText, active ? styles.tabTextActive : null]}>{label as string}</Text>
-                  </Pressable>
+                  </BubblePressable>
                 );
               })}
             </ScrollView>
@@ -2221,9 +2236,9 @@ export default function AmbassadorCommandCenterScreen() {
                       <Text style={styles.sectionTitle}>Your work schedule</Text>
                       <Text style={styles.sectionBody}>Planned, confirmed, and in-progress activities.</Text>
                     </View>
-                    <Pressable onPress={() => openActivity()} style={styles.roundAdd}>
+                    <BubblePressable onPress={() => openActivity()} scaleTo={0.88} style={styles.roundAdd}>
                       <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
                   <View style={styles.list}>
                     {upcoming.length ? (
@@ -2258,9 +2273,9 @@ export default function AmbassadorCommandCenterScreen() {
                       <Text style={styles.sectionTitle}>Leads needing attention</Text>
                       <Text style={styles.sectionBody}>Upcoming follow-ups and Support-assisted opportunities.</Text>
                     </View>
-                    <Pressable onPress={openLead} style={styles.roundAdd}>
+                    <BubblePressable onPress={openLead} scaleTo={0.88} style={styles.roundAdd}>
                       <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
                   <View style={styles.list}>
                     {followUps.length ? (
@@ -2315,25 +2330,27 @@ export default function AmbassadorCommandCenterScreen() {
                   </View>
                 </View>
                 <View style={styles.calendarToolbar}>
-                  <Pressable
+                  <BubblePressable
                     onPress={() =>
                       setCalendarMonth(
                         (current) => new Date(current.getFullYear(), current.getMonth() - 1, 1),
                       )
                     }
+                    scaleTo={0.88}
                     style={styles.iconButton}>
                     <ChevronLeft color={theme.colors.text} size={20} strokeWidth={2.4} />
-                  </Pressable>
+                  </BubblePressable>
                   <Button label="Today" onPress={() => { const today = new Date(); setCalendarMonth(today); setSelectedDate(dateKey(today)); }} styles={styles} theme={theme} />
-                  <Pressable
+                  <BubblePressable
                     onPress={() =>
                       setCalendarMonth(
                         (current) => new Date(current.getFullYear(), current.getMonth() + 1, 1),
                       )
                     }
+                    scaleTo={0.88}
                     style={styles.iconButton}>
                     <ChevronRight color={theme.colors.text} size={20} strokeWidth={2.4} />
-                  </Pressable>
+                  </BubblePressable>
                 </View>
                 <View style={styles.weekRow}>
                   {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
@@ -2345,9 +2362,10 @@ export default function AmbassadorCommandCenterScreen() {
                     const count = (activitiesByDate.get(day.key) || []).length;
                     const selected = selectedDate === day.key;
                     return (
-                      <Pressable
+                      <BubblePressable
                         key={day.key}
                         onPress={() => setSelectedDate(day.key)}
+                        scaleTo={0.88}
                         style={[
                           styles.calendarDay,
                           !day.inMonth ? styles.calendarDayMuted : null,
@@ -2357,7 +2375,7 @@ export default function AmbassadorCommandCenterScreen() {
                           {day.date.getDate()}
                         </Text>
                         {count ? <View style={styles.calendarDot} /> : null}
-                      </Pressable>
+                      </BubblePressable>
                     );
                   })}
                 </View>
@@ -2393,9 +2411,9 @@ export default function AmbassadorCommandCenterScreen() {
                     <Text style={styles.eyebrow}>Activity log</Text>
                     <Text style={styles.sectionTitle}>Planned and completed work</Text>
                   </View>
-                  <Pressable onPress={() => openActivity()} style={styles.roundAdd}>
+                  <BubblePressable onPress={() => openActivity()} scaleTo={0.88} style={styles.roundAdd}>
                     <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
-                  </Pressable>
+                  </BubblePressable>
                 </View>
                 <View style={styles.searchBar}>
                   <Search color={theme.colors.textSecondary} size={17} strokeWidth={2.3} />
@@ -2430,9 +2448,9 @@ export default function AmbassadorCommandCenterScreen() {
                     <Text style={styles.eyebrow}>Marketing efforts</Text>
                     <Text style={styles.sectionTitle}>Track outreach beyond referral links</Text>
                   </View>
-                  <Pressable onPress={openMarketing} style={styles.roundAdd}>
+                  <BubblePressable onPress={openMarketing} scaleTo={0.88} style={styles.roundAdd}>
                     <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
-                  </Pressable>
+                  </BubblePressable>
                 </View>
                 <View style={styles.list}>
                   {marketing.length ? (
@@ -2503,9 +2521,9 @@ export default function AmbassadorCommandCenterScreen() {
                     <Text style={styles.eyebrow}>Lead generator</Text>
                     <Text style={styles.sectionTitle}>Send opportunities to SitGuru Support</Text>
                   </View>
-                  <Pressable onPress={openLead} style={styles.roundAdd}>
+                  <BubblePressable onPress={openLead} scaleTo={0.88} style={styles.roundAdd}>
                     <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
-                  </Pressable>
+                  </BubblePressable>
                 </View>
                 <View style={styles.searchBar}>
                   <Search color={theme.colors.textSecondary} size={17} strokeWidth={2.3} />
@@ -2711,57 +2729,7 @@ export default function AmbassadorCommandCenterScreen() {
             <View style={styles.bottomSpacer} />
           </ScrollView>
 
-          <View style={styles.bottomNav}>
-            <Pressable
-              accessibilityLabel="Open Ambassador Dashboard"
-              accessibilityRole="button"
-              onPress={() => openRoute('/ambassador-dashboard')}
-              style={styles.bottomNavItem}>
-              <Home color={theme.colors.textSecondary} size={20} strokeWidth={2.3} />
-              <Text style={styles.bottomLabel}>Home</Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityLabel="Open Portal calendar"
-              accessibilityRole="button"
-              onPress={() => setView('calendar')}
-              style={styles.bottomNavItem}>
-              <CalendarDays
-                color={view === 'calendar' ? theme.colors.primary : theme.colors.textSecondary}
-                size={20}
-                strokeWidth={2.3}
-              />
-              <Text style={[styles.bottomLabel, view === 'calendar' ? styles.bottomLabelActive : null]}>
-                Calendar
-              </Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityLabel="Add to Ambassador Portal"
-              accessibilityRole="button"
-              onPress={() => setAddMenuOpen(true)}
-              style={styles.bottomAdd}>
-              <Plus color="#FFFFFF" size={26} strokeWidth={2.8} />
-            </Pressable>
-
-            <Pressable
-              accessibilityLabel="Open Ambassador messages"
-              accessibilityRole="button"
-              onPress={openMessages}
-              style={styles.bottomNavItem}>
-              <MessageCircle color={theme.colors.textSecondary} size={20} strokeWidth={2.3} />
-              <Text style={styles.bottomLabel}>Messages</Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityLabel="Open profile"
-              accessibilityRole="button"
-              onPress={() => openRoute('/account')}
-              style={styles.bottomNavItem}>
-              <UserRound color={theme.colors.textSecondary} size={20} strokeWidth={2.3} />
-              <Text style={styles.bottomLabel}>Profile</Text>
-            </Pressable>
-          </View>
+          <SitGuruTabBar active="home" role="ambassador" />
               </View>
             </View>
 
@@ -2779,13 +2747,14 @@ export default function AmbassadorCommandCenterScreen() {
               <View style={styles.sheetHandle} />
               <View style={styles.sheetHeaderRow}>
                 <Text style={styles.sheetTitle}>Add to Ambassador Portal</Text>
-                <Pressable
+                <BubblePressable
                   accessibilityLabel="Close Add menu"
                   accessibilityRole="button"
                   onPress={() => setAddMenuOpen(false)}
+                  scaleTo={0.88}
                   style={styles.sheetCloseButton}>
                   <X color={theme.colors.text} size={18} strokeWidth={2.4} />
-                </Pressable>
+                </BubblePressable>
               </View>
 
               {[
@@ -2811,9 +2780,10 @@ export default function AmbassadorCommandCenterScreen() {
                 const IconComponent = Icon as typeof CalendarPlus;
 
                 return (
-                  <Pressable
+                  <BubblePressable
                     key={title as string}
                     onPress={action as () => void}
+                    scaleTo={0.97}
                     style={styles.sheetItem}>
                     <View style={styles.sheetIcon}>
                       <IconComponent
@@ -2826,15 +2796,16 @@ export default function AmbassadorCommandCenterScreen() {
                       <Text style={styles.sheetItemTitle}>{title as string}</Text>
                       <Text style={styles.sheetItemBody}>{detail as string}</Text>
                     </View>
-                  </Pressable>
+                  </BubblePressable>
                 );
               })}
 
-              <Pressable
+              <BubblePressable
                 onPress={() => {
                   setAddMenuOpen(false);
                   setTimeout(() => go('/support'), Platform.OS === 'web' ? 50 : 0);
                 }}
+                scaleTo={0.97}
                 style={styles.sheetItem}>
                 <View style={styles.sheetIcon}>
                   <Headphones
@@ -2851,7 +2822,7 @@ export default function AmbassadorCommandCenterScreen() {
                     Ask for help with a lead, event, materials, account, or payout.
                   </Text>
                 </View>
-              </Pressable>
+              </BubblePressable>
             </View>
           </View>
             </View>
@@ -2873,13 +2844,14 @@ export default function AmbassadorCommandCenterScreen() {
               <View style={styles.sheetHandle} />
               <View style={styles.sheetHeaderRow}>
                 <Text style={styles.sheetTitle}>Add to Ambassador Portal</Text>
-                <Pressable
+                <BubblePressable
                   accessibilityLabel="Close Add menu"
                   accessibilityRole="button"
                   onPress={() => setAddMenuOpen(false)}
+                  scaleTo={0.88}
                   style={styles.sheetCloseButton}>
                   <X color={theme.colors.text} size={18} strokeWidth={2.4} />
-                </Pressable>
+                </BubblePressable>
               </View>
 
               {[
@@ -2905,9 +2877,10 @@ export default function AmbassadorCommandCenterScreen() {
                 const IconComponent = Icon as typeof CalendarPlus;
 
                 return (
-                  <Pressable
+                  <BubblePressable
                     key={title as string}
                     onPress={action as () => void}
+                    scaleTo={0.97}
                     style={styles.sheetItem}>
                     <View style={styles.sheetIcon}>
                       <IconComponent
@@ -2920,15 +2893,16 @@ export default function AmbassadorCommandCenterScreen() {
                       <Text style={styles.sheetItemTitle}>{title as string}</Text>
                       <Text style={styles.sheetItemBody}>{detail as string}</Text>
                     </View>
-                  </Pressable>
+                  </BubblePressable>
                 );
               })}
 
-              <Pressable
+              <BubblePressable
                 onPress={() => {
                   setAddMenuOpen(false);
                   setTimeout(() => go('/support'), Platform.OS === 'web' ? 50 : 0);
                 }}
+                scaleTo={0.97}
                 style={styles.sheetItem}>
                 <View style={styles.sheetIcon}>
                   <Headphones
@@ -2945,7 +2919,7 @@ export default function AmbassadorCommandCenterScreen() {
                     Ask for help with a lead, event, materials, account, or payout.
                   </Text>
                 </View>
-              </Pressable>
+              </BubblePressable>
             </Pressable>
           </Pressable>
         </View>
@@ -2969,7 +2943,7 @@ export default function AmbassadorCommandCenterScreen() {
             <Text style={styles.formSectionTitle}>Quick-start templates</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateRow}>
               {templates.slice(0, 12).map((template) => (
-                <Pressable
+                <BubblePressable
                   key={template.id}
                   onPress={() =>
                     setActivityForm((current) => ({
@@ -2985,7 +2959,7 @@ export default function AmbassadorCommandCenterScreen() {
                   style={styles.templateCard}>
                   <Text style={styles.templateTitle}>{template.title}</Text>
                   <Text style={styles.templateBody} numberOfLines={3}>{template.description}</Text>
-                </Pressable>
+                </BubblePressable>
               ))}
             </ScrollView>
           </View>
@@ -3311,10 +3285,6 @@ function createStyles(theme: Theme) {
       gap: 8,
       backgroundColor: theme.colors.screen,
     },
-    headerControlPressed: {
-      opacity: 0.72,
-      transform: [{ scale: 0.97 }],
-    },
     headerCopy: {
       flex: 1,
       gap: 2,
@@ -3387,6 +3357,16 @@ function createStyles(theme: Theme) {
       backgroundColor: theme.colors.elevatedCard,
       borderWidth: 1,
       borderColor: theme.colors.border,
+    },
+    headerAddButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.primary,
+      borderWidth: 1,
+      borderColor: theme.colors.primary,
     },
     modeToggle: {
       alignItems: 'center',
@@ -3488,7 +3468,6 @@ function createStyles(theme: Theme) {
     buttonSecondary: { backgroundColor: theme.colors.elevatedCard, borderColor: theme.colors.borderStrong },
     buttonText: { fontFamily: Fonts.extraBold, fontSize: 11 },
     buttonTextPrimary: { color: '#FFFFFF' },
-    pressed: { opacity: 0.8 },
     disabled: { opacity: 0.55 },
     feedback: {
       flexDirection: 'row',
@@ -3787,12 +3766,7 @@ function createStyles(theme: Theme) {
     },
     accuracyNote: { padding: 13, borderRadius: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 9, backgroundColor: theme.colors.primarySoft, borderWidth: 1, borderColor: theme.colors.border },
     accuracyText: { flex: 1, color: theme.colors.text, fontFamily: Fonts.bold, fontSize: 10, lineHeight: 16 },
-    bottomSpacer: { height: 100 },
-    bottomNav: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, elevation: 20, minHeight: 76, paddingHorizontal: 10, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 18 : 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: theme.colors.tabBar, borderTopWidth: 1, borderColor: theme.colors.tabBarBorder },
-    bottomNavItem: { minWidth: 54, alignItems: 'center', justifyContent: 'center', gap: 3 },
-    bottomLabel: { color: theme.colors.textSecondary, fontFamily: Fonts.bold, fontSize: 8 },
-    bottomLabelActive: { color: theme.colors.primary },
-    bottomAdd: { width: 52, height: 52, marginTop: -24, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.primary, borderWidth: 4, borderColor: theme.colors.tabBar },
+    bottomSpacer: { height: 24 },
     webInlineOverlayRoot: {
       alignItems: 'center',
       bottom: 0,

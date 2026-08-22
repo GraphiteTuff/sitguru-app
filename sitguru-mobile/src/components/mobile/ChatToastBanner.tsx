@@ -3,13 +3,13 @@ import { useEffect, useRef } from 'react';
 import {
   Animated,
   Easing,
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import BubblePressable from '@/components/BubblePressable';
 import { AppFonts } from '@/constants/fonts';
 import { MobileSpace, StickyFooterClearance } from '@/constants/mobile-layout';
 import type { ChatToastPayload } from '@/hooks/data/useIncomingMessageToast';
@@ -92,18 +92,18 @@ export default function ChatToastBanner({
         },
       ]}
     >
-      <Pressable
+      <BubblePressable
         accessibilityRole="button"
         onPress={() => {
           onPress?.(toast);
           onDismiss();
         }}
-        style={({ pressed }) => [
+        scaleTo={0.97}
+        style={[
           styles.banner,
           {
             backgroundColor: palette.background,
             borderColor: palette.border,
-            opacity: pressed ? 0.92 : 1,
           },
         ]}
       >
@@ -120,7 +120,7 @@ export default function ChatToastBanner({
           </Text>
         </View>
 
-        <Pressable
+        <BubblePressable
           accessibilityLabel="Dismiss notification"
           accessibilityRole="button"
           hitSlop={10}
@@ -128,11 +128,12 @@ export default function ChatToastBanner({
             event.stopPropagation?.();
             onDismiss();
           }}
+          scaleTo={0.88}
           style={styles.dismiss}
         >
           <X color={palette.text} size={16} strokeWidth={2.4} />
-        </Pressable>
-      </Pressable>
+        </BubblePressable>
+      </BubblePressable>
     </Animated.View>
   );
 }

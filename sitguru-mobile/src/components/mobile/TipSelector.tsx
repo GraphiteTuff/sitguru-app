@@ -1,5 +1,4 @@
 import {
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -8,6 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import { MobileSpace, MobileType, TOUCH_MIN } from '@/constants/mobile-layout';
@@ -53,7 +53,7 @@ export default function TipSelector({
           const amount = computeTipCents(serviceCents, percent, '');
 
           return (
-            <Pressable
+            <BubblePressable
               key={percent}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
@@ -67,11 +67,11 @@ export default function TipSelector({
               <Text style={[styles.cardAmount, active ? styles.cardTextActive : null]}>
                 {formatUsd(centsToDollars(amount))}
               </Text>
-            </Pressable>
+            </BubblePressable>
           );
         })}
 
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           accessibilityState={{ selected: choice === 'custom' }}
           accessibilityLabel="Custom tip"
@@ -94,9 +94,9 @@ export default function TipSelector({
           >
             Tip
           </Text>
-        </Pressable>
+        </BubblePressable>
 
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           accessibilityState={{ selected: choice === 'none' }}
           accessibilityLabel="No tip"
@@ -119,7 +119,7 @@ export default function TipSelector({
           >
             $0.00
           </Text>
-        </Pressable>
+        </BubblePressable>
       </View>
 
       {choice === 'custom' ? (

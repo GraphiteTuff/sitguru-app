@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Home,
   MapPin,
   MessageCircle,
   Search,
@@ -32,10 +31,8 @@ import TouchTarget from '@/components/mobile/TouchTarget';
 import RoleGate from '@/components/RoleGate';
 import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruScreen from '@/components/SitGuruScreen';
-import {
-  StickyFooterClearance,
-  TOUCH_MIN,
-} from '@/constants/mobile-layout';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { TOUCH_MIN } from '@/constants/mobile-layout';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -215,7 +212,6 @@ export default function GuruRequestsScreen() {
   const stickyPending = tab === 'pending' && focusedRequest?.pending;
   const stickyUpcoming = tab === 'upcoming' && focusedRequest?.upcoming;
   const showStickyActions = Boolean(stickyPending || stickyUpcoming);
-  const scrollBottomInset = StickyFooterClearance.navOnly;
 
   async function updateRequestStatus(
     request: CareRequest,
@@ -295,7 +291,6 @@ export default function GuruRequestsScreen() {
     <SitGuruScreen center={false} maxWidth={620} scroll={false}>
       <RoleGate requiredRole="guru">
         <MobileScreen
-          scrollBottomInset={scrollBottomInset}
           refreshing={refreshing}
           onRefresh={() => void loadRequests(true)}
           refreshColor={palette.primary}
@@ -345,74 +340,7 @@ export default function GuruRequestsScreen() {
                 </StickyActionBar>
               ) : null}
 
-              <View style={styles.bottomNav}>
-                <BottomNavItem
-                  icon={
-                    <Home
-                      color={palette.navMuted}
-                      size={22}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Dashboard"
-                  onPress={() => router.push('/guru-dashboard')}
-                  styles={styles}
-                />
-                <BottomNavItem
-                  icon={
-                    <MapPin
-                      color={palette.navMuted}
-                      size={22}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Care Map"
-                  onPress={() => router.push('/guru-care-map')}
-                  styles={styles}
-                />
-                <BottomNavItem
-                  active
-                  icon={
-                    <CalendarDays
-                      color={palette.primary}
-                      size={22}
-                      strokeWidth={2.4}
-                    />
-                  }
-                  label="Bookings"
-                  onPress={() => undefined}
-                  styles={styles}
-                />
-                <BottomNavItem
-                  icon={
-                    <MessageCircle
-                      color={palette.navMuted}
-                      size={22}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Messages"
-                  onPress={() =>
-                    router.push({
-                      pathname: '/messages',
-                      params: { role: 'guru' },
-                    })
-                  }
-                  styles={styles}
-                />
-                <BottomNavItem
-                  icon={
-                    <UserRound
-                      color={palette.navMuted}
-                      size={22}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Profile"
-                  onPress={() => router.push('/guru-profile')}
-                  styles={styles}
-                />
-              </View>
+              <SitGuruTabBar active="bookings" role="guru" />
             </View>
           }
         >
@@ -762,37 +690,6 @@ function Detail({
         {label}
       </Text>
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <TouchTarget
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      {icon}
-      <Text
-        style={active ? styles.navLabelActive : styles.navLabel}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-    </TouchTarget>
   );
 }
 
@@ -1659,45 +1556,6 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.medium,
       fontSize: 8,
       lineHeight: 12,
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 72,
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: -7 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 2,
-      justifyContent: 'center',
-      minHeight: TOUCH_MIN,
-      minWidth: 0,
-      paddingHorizontal: 2,
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
     },
   });
 }

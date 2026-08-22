@@ -3,15 +3,12 @@ import {
   AlertTriangle,
   Bell,
   CalendarCheck2,
-  CalendarDays,
   CheckCircle2,
   ChevronRight,
   Clock3,
   Flag,
-  Home,
   MessageCircle,
   PawPrint,
-  Search,
   Send,
   ShieldCheck,
   Sparkles,
@@ -30,7 +27,6 @@ import {
   ActivityIndicator,
   Image,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -39,15 +35,16 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import StickyActionBar from '@/components/mobile/StickyActionBar';
 import VisitReviewControls from '@/components/mobile/VisitReviewControls';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
-import { StickyFooterClearance } from '@/constants/mobile-layout';
 import { getAppTheme } from '@/constants/theme';
 import {
   setThemePreference,
@@ -861,16 +858,15 @@ function Button({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.button,
         primary ? styles.buttonPrimary : null,
         disabled ? styles.buttonDisabled : null,
-        pressed && !disabled ? styles.pressed : null,
       ]}>
       {icon}
       <Text
@@ -880,7 +876,7 @@ function Button({
         ]}>
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1334,12 +1330,7 @@ export default function ReviewsScreen() {
                 ) : null}
 
                 <ScrollView
-                  contentContainerStyle={[
-                    styles.scrollContent,
-                    canSubmitReview
-                      ? { paddingBottom: StickyFooterClearance.actionPlusNav }
-                      : null,
-                  ]}
+                  contentContainerStyle={styles.scrollContent}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}>
                   <View style={styles.page}>
@@ -1354,29 +1345,31 @@ export default function ReviewsScreen() {
                       </View>
 
                       <View style={styles.headerActions}>
-                        <Pressable
+                        <BubblePressable
                           accessibilityLabel="Open notifications"
                           accessibilityRole="button"
                           onPress={() => router.push('/notifications')}
+                          scaleTo={0.88}
                           style={styles.headerIconButton}>
                           <Bell
                             color={theme.colors.text}
                             size={18}
                             strokeWidth={2.3}
                           />
-                        </Pressable>
+                        </BubblePressable>
 
                         <View style={styles.modeToggle}>
                           {THEME_OPTIONS.map((option) => {
                             const active = themePreference === option.value;
 
                             return (
-                              <Pressable
+                              <BubblePressable
                                 key={option.value}
                                 accessibilityLabel={`Switch to ${option.label} mode`}
                                 accessibilityRole="button"
                                 accessibilityState={{ selected: active }}
                                 onPress={() => setThemePreference(option.value)}
+                                scaleTo={0.88}
                                 style={[
                                   styles.modeButton,
                                   active ? styles.modeButtonActive : null,
@@ -1395,22 +1388,23 @@ export default function ReviewsScreen() {
                                   size={15}
                                   strokeWidth={2.4}
                                 />
-                              </Pressable>
+                              </BubblePressable>
                             );
                           })}
                         </View>
 
-                        <Pressable
+                        <BubblePressable
                           accessibilityLabel="Switch workspace"
                           accessibilityRole="button"
                           onPress={() => setWorkspaceSwitcherOpen(true)}
+                          scaleTo={0.88}
                           style={styles.profileButton}>
                           <HeaderAvatar
                             fallback={initials(currentUserName)}
                             imageUrl={avatarUrl}
                             styles={styles}
                           />
-                        </Pressable>
+                        </BubblePressable>
                       </View>
                     </View>
 
@@ -1551,7 +1545,7 @@ export default function ReviewsScreen() {
                           selectedCategories[category.key] === option;
 
                         return (
-                          <Pressable
+                          <BubblePressable
                             key={option}
                             accessibilityRole="button"
                             accessibilityState={{ selected: active }}
@@ -1561,6 +1555,7 @@ export default function ReviewsScreen() {
                                 [category.key]: option,
                               }))
                             }
+                            scaleTo={0.88}
                             style={[
                               styles.chip,
                               active ? styles.chipActive : null,
@@ -1572,7 +1567,7 @@ export default function ReviewsScreen() {
                               ]}>
                               {option}
                             </Text>
-                          </Pressable>
+                          </BubblePressable>
                         );
                       })}
                     </View>
@@ -1905,9 +1900,10 @@ export default function ReviewsScreen() {
                     )
                   ) : null}
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     onPress={() => reportReview(item)}
+                    scaleTo={0.88}
                     style={styles.reportButton}>
                     <Flag
                       color={theme.colors.textSecondary}
@@ -1917,7 +1913,7 @@ export default function ReviewsScreen() {
                     <Text style={styles.reportButtonText}>
                       Report a concern
                     </Text>
-                  </Pressable>
+                  </BubblePressable>
                 </View>
               ))}
             </View>
@@ -1952,7 +1948,7 @@ export default function ReviewsScreen() {
               payment, conduct, account, or private booking concerns.
             </Text>
           </View>
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             onPress={() => router.push('/support')}
             style={styles.supportButton}>
@@ -1962,13 +1958,31 @@ export default function ReviewsScreen() {
               size={16}
               strokeWidth={2.5}
             />
-          </Pressable>
+          </BubblePressable>
         </View>
 
         <View style={styles.buttonStack}>
           <Button
-            label="Back to booking details"
-            onPress={() => router.push('/booking-details')}
+            label={
+              booking?.id
+                ? 'Back to booking details'
+                : effectiveRole === 'guru'
+                  ? 'Back to care requests'
+                  : 'Back to my bookings'
+            }
+            onPress={() => {
+              if (booking?.id) {
+                router.push({
+                  pathname: '/booking-details',
+                  params: { bookingId: booking.id },
+                });
+                return;
+              }
+
+              router.push(
+                effectiveRole === 'guru' ? '/guru-requests' : '/bookings',
+              );
+            }}
             styles={styles}
           />
           <Button
@@ -2012,79 +2026,7 @@ export default function ReviewsScreen() {
                   </StickyActionBar>
                 ) : null}
 
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    label="Home"
-                    icon={
-                      <Home
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() =>
-                      router.push(
-                        effectiveRole === 'guru'
-                          ? '/guru-dashboard'
-                          : effectiveRole === 'ambassador'
-                            ? '/ambassador-dashboard'
-                            : effectiveRole === 'admin'
-                              ? '/admin-dashboard'
-                              : '/pet-parent-dashboard',
-                      )
-                    }
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    label="Explore"
-                    icon={
-                      <Search
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() => router.push('/find-care')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    active
-                    label="Bookings"
-                    icon={
-                      <CalendarDays
-                        color={theme.colors.primary}
-                        size={20}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    onPress={() => router.push('/booking-details')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    label="Messages"
-                    icon={
-                      <MessageCircle
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() => router.push('/conversation')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    label="Profile"
-                    icon={
-                      <UserRound
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() => router.push('/account')}
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar active="bookings" />
 
                 {isWebPreview ? <View style={styles.homeIndicator} /> : null}
               </View>
@@ -2139,40 +2081,6 @@ function HeaderAvatar({
         <Text style={styles.avatarInitials}>{fallback}</Text>
       )}
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.bottomNavItem,
-        pressed ? styles.pressed : null,
-      ]}>
-      {icon}
-      <Text
-        style={[
-          styles.bottomNavText,
-          active ? styles.bottomNavTextActive : null,
-        ]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -2328,7 +2236,7 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
       width: 2,
     },
     scrollContent: {
-      paddingBottom: 112,
+      paddingBottom: 24,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -2455,9 +2363,6 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
       fontSize: 11,
       fontFamily: AppFonts.extraBold,
       fontWeight: '900',
-    },
-    pressed: {
-      opacity: 0.76,
     },
     hero: {
       backgroundColor: dark ? '#0D2A1C' : '#0F563E',
@@ -3182,39 +3087,6 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
       fontSize: 10,
       fontFamily: AppFonts.extraBold,
       fontWeight: '900',
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: theme.colors.elevatedCard,
-      borderColor: theme.colors.border,
-      borderRadius: 22,
-      borderWidth: 1,
-      bottom: 12,
-      flexDirection: 'row',
-      left: 12,
-      paddingHorizontal: 6,
-      paddingVertical: 8,
-      position: 'absolute',
-      right: 12,
-      shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 5 },
-      shadowOpacity: dark ? 0.22 : 0.08,
-      shadowRadius: 10,
-    },
-    bottomNavItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-      minHeight: 49,
-    },
-    bottomNavText: {
-      color: theme.colors.textSecondary,
-      fontFamily: AppFonts.bold,
-      fontSize: 8,
-    },
-    bottomNavTextActive: {
-      color: theme.colors.primary,
     },
     homeIndicator: {
       alignSelf: 'center',

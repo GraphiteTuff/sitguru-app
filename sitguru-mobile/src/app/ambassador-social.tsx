@@ -33,7 +33,6 @@ import {
     Alert,
     Image,
     Platform,
-    Pressable,
     RefreshControl,
     ScrollView,
     Share,
@@ -42,10 +41,12 @@ import {
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import RoleGate from '@/components/RoleGate';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import {
@@ -528,10 +529,11 @@ export default function AmbassadorDashboardScreen() {
                     </View>
 
                     <View style={styles.headerActions}>
-                      <Pressable
+                      <BubblePressable
                         accessibilityLabel="Open notifications"
                         accessibilityRole="button"
                         onPress={() => router.push('/notifications')}
+                        scaleTo={0.88}
                         style={styles.headerIconButton}
                       >
                         <Bell
@@ -547,19 +549,20 @@ export default function AmbassadorDashboardScreen() {
                             </Text>
                           </View>
                         ) : null}
-                      </Pressable>
+                      </BubblePressable>
 
                       <View style={styles.modeToggle}>
                         {THEME_OPTIONS.map((option) => {
                           const active = themePreference === option.value;
 
                           return (
-                            <Pressable
+                            <BubblePressable
                               key={option.value}
                               accessibilityLabel={`Switch to ${option.label} mode`}
                               accessibilityRole="button"
                               accessibilityState={{ selected: active }}
                               onPress={() => setThemePreference(option.value)}
+                              scaleTo={0.88}
                               style={[
                                 styles.modeButton,
                                 active && styles.modeButtonActive,
@@ -579,15 +582,16 @@ export default function AmbassadorDashboardScreen() {
                                 size={15}
                                 strokeWidth={2.4}
                               />
-                            </Pressable>
+                            </BubblePressable>
                           );
                         })}
                       </View>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityLabel="Switch workspace"
                         accessibilityRole="button"
                         onPress={() => setWorkspaceSwitcherOpen(true)}
+                        scaleTo={0.88}
                         style={styles.profileButton}
                       >
                         <Avatar
@@ -596,7 +600,7 @@ export default function AmbassadorDashboardScreen() {
                           palette={palette}
                           size={42}
                         />
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   </View>
 
@@ -697,13 +701,11 @@ export default function AmbassadorDashboardScreen() {
                     </View>
                   </View>
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     onPress={() => void shareReferralLink()}
-                    style={({ pressed }) => [
-                      styles.primaryActionCard,
-                      pressed && styles.primaryPressed,
-                    ]}
+                    scaleTo={0.97}
+                    style={[styles.primaryActionCard]}
                   >
                     <View style={styles.primaryActionCopy}>
                       <Text style={styles.primaryActionEyebrow}>
@@ -730,7 +732,7 @@ export default function AmbassadorDashboardScreen() {
                       size={21}
                       strokeWidth={2.5}
                     />
-                  </Pressable>
+                  </BubblePressable>
 
                   {loading ? (
                     <LoadingCard styles={styles} />
@@ -797,15 +799,13 @@ export default function AmbassadorDashboardScreen() {
                         </Text>
                       </View>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityHint="Opens detailed referral visits, conversions, channels, and reward analytics."
                         accessibilityLabel="View referral analytics"
                         accessibilityRole="button"
                         onPress={openReferralAnalytics}
-                        style={({ pressed }) => [
-                          styles.analyticsButton,
-                          pressed && styles.pressed,
-                        ]}
+                        scaleTo={0.97}
+                        style={[styles.analyticsButton]}
                       >
                         <View style={styles.analyticsButtonIcon}>
                           <BarChart3
@@ -829,7 +829,7 @@ export default function AmbassadorDashboardScreen() {
                           size={18}
                           strokeWidth={2.4}
                         />
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   )}
 
@@ -943,13 +943,11 @@ export default function AmbassadorDashboardScreen() {
                     />
                   </View>
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     onPress={openReferralAnalytics}
-                    style={({ pressed }) => [
-                      styles.analyticsStrip,
-                      pressed && styles.pressed,
-                    ]}
+                    scaleTo={0.97}
+                    style={[styles.analyticsStrip]}
                   >
                     <BarChart3
                       color={palette.accent}
@@ -969,7 +967,7 @@ export default function AmbassadorDashboardScreen() {
                       size={17}
                       strokeWidth={2.4}
                     />
-                  </Pressable>
+                  </BubblePressable>
 
                   <View style={styles.pipelineCard}>
                     <View style={styles.sectionHeaderRow}>
@@ -978,12 +976,12 @@ export default function AmbassadorDashboardScreen() {
                         <Text style={styles.sectionTitle}>Follow-up pipeline</Text>
                       </View>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={() => openPortal('leads')}
                       >
                         <Text style={styles.sectionLink}>Manage</Text>
-                      </Pressable>
+                      </BubblePressable>
                     </View>
 
                     <PipelineRow
@@ -1038,12 +1036,12 @@ export default function AmbassadorDashboardScreen() {
                         <Text style={styles.sectionTitle}>Rewards program</Text>
                       </View>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={openRewards}
                       >
                         <Text style={styles.sectionLink}>View rewards</Text>
-                      </Pressable>
+                      </BubblePressable>
                     </View>
 
                     <View style={styles.earnCard}>
@@ -1216,74 +1214,7 @@ export default function AmbassadorDashboardScreen() {
                   </View>
                 </ScrollView>
 
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    active
-                    icon={
-                      <Home
-                        color={palette.accent}
-                        size={21}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    label="Dashboard"
-                    onPress={() => undefined}
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    icon={
-                      <BarChart3
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Referrals"
-                    onPress={openReferralAnalytics}
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    icon={
-                      <ClipboardList
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Leads"
-                    onPress={() => openPortal('leads')}
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    badgeCount={data.unreadMessages}
-                    icon={
-                      <MessageCircle
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Messages"
-                    onPress={openMessages}
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    icon={
-                      <UserRound
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Profile"
-                    onPress={() => setWorkspaceSwitcherOpen(true)}
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar active="referrals" role="ambassador" />
 
                 <SitGuruWorkspaceSwitcher
                   currentRole="ambassador"
@@ -1346,13 +1277,10 @@ function QuickAction({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.quickAction,
-        pressed && styles.pressed,
-      ]}
+      style={[styles.quickAction]}
     >
       <View style={styles.quickActionIcon}>
         {icon}
@@ -1366,7 +1294,7 @@ function QuickAction({
         ) : null}
       </View>
       <Text style={styles.quickActionLabel}>{label}</Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1388,9 +1316,10 @@ function PipelineRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
+      scaleTo={0.97}
       style={[
         styles.pipelineRow,
         last && styles.pipelineRowLast,
@@ -1406,7 +1335,7 @@ function PipelineRow({
         size={17}
         strokeWidth={2.3}
       />
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1430,10 +1359,11 @@ function ReadinessRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityLabel={`Open ${label}`}
       accessibilityRole="button"
       onPress={onPress}
+      scaleTo={0.97}
       style={[
         styles.readinessRow,
         last && styles.readinessRowLast,
@@ -1467,7 +1397,7 @@ function ReadinessRow({
         size={17}
         strokeWidth={2.3}
       />
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1510,17 +1440,14 @@ function ToolkitAction({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.toolAction,
-        pressed && styles.pressed,
-      ]}
+      style={[styles.toolAction]}
     >
       <View style={styles.toolActionIcon}>{icon}</View>
       <Text style={styles.toolActionLabel}>{label}</Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1545,39 +1472,6 @@ function ProgramRow({
         <Text style={styles.programText}>{text}</Text>
       </View>
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  badgeCount = 0,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  badgeCount?: number;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      <View style={styles.navIconWrap}>
-        {icon}
-        {badgeCount > 0 ? <View style={styles.navBadge} /> : null}
-      </View>
-      <Text style={active ? styles.navLabelActive : styles.navLabel}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -2542,7 +2436,7 @@ function createStyles(isDark: boolean) {
     },
     scrollContent: {
       gap: 13,
-      paddingBottom: 112,
+      paddingBottom: 20,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -2830,10 +2724,6 @@ function createStyles(isDark: boolean) {
       justifyContent: 'center',
       width: 44,
     },
-    primaryPressed: {
-      opacity: 0.86,
-      transform: [{ scale: 0.99 }],
-    },
     loadingCard: {
       backgroundColor: palette.surface,
       borderColor: palette.border,
@@ -3054,10 +2944,6 @@ function createStyles(isDark: boolean) {
       color: palette.muted,
       fontFamily: AppFonts.medium,
       fontSize: 8,
-    },
-    pressed: {
-      opacity: 0.72,
-      transform: [{ scale: 0.985 }],
     },
     pipelineCard: {
       backgroundColor: palette.surface,
@@ -3287,57 +3173,6 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.medium,
       fontSize: 8,
       lineHeight: 12,
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 72,
-      justifyContent: 'space-around',
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: -7 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-    },
-    navIconWrap: {
-      position: 'relative',
-    },
-    navBadge: {
-      backgroundColor: palette.orange,
-      borderColor: palette.surface,
-      borderRadius: 999,
-      borderWidth: 1.5,
-      height: 8,
-      position: 'absolute',
-      right: -2,
-      top: -2,
-      width: 8,
-    },
-    navLabelActive: {
-      color: palette.accent,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
     },
   });
 }

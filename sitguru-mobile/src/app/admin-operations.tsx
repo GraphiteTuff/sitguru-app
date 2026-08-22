@@ -1,7 +1,8 @@
 import { router, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import RoleGate from '@/components/RoleGate';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
@@ -11,14 +12,14 @@ type Action = { label: string; href?: Href; alert?: string };
 type CardProps = { title: string; eyebrow?: string; children: ReactNode };
 
 const summaryCards = [
-  ['Active bookings', '3'],
-  ['Live walks', '1'],
-  ['Pending Guru requests', '4'],
-  ['New Pet Parents', '7'],
-  ['Support queue', '2'],
-  ['Payment alerts', '1'],
-  ['Ambassador leads', '5'],
-  ['Safety flags', '0'],
+  ['Active bookings', '—'],
+  ['Live walks', '—'],
+  ['Pending Guru requests', '—'],
+  ['New Pet Parents', '—'],
+  ['Support queue', '—'],
+  ['Payment alerts', '—'],
+  ['Ambassador leads', '—'],
+  ['Safety flags', '—'],
 ] as const;
 
 const filters = [
@@ -32,12 +33,6 @@ const filters = [
   'Ambassadors',
   'Support',
   'Safety',
-];
-
-const activeCare = [
-  { pet: 'Scout', icon: '🐶', service: 'Dog Walking', status: 'Live now', time: 'Started 18 min ago' },
-  { pet: 'Luna', icon: '🐱', service: 'Drop-In Visit', status: 'Pending', time: 'Today · 4:30 PM' },
-  { pet: 'Weekend', icon: '🏡', service: 'Multi-Day Care', status: 'Upcoming', time: 'Fri 6 PM – Sun 10 AM' },
 ];
 
 function previewAlert(label: string) {
@@ -68,12 +63,12 @@ function Card({ title, eyebrow, children }: CardProps) {
 
 function Button({ action, primary = false }: { action: Action; primary?: boolean }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={() => go(action)}
       style={[styles.button, primary && styles.primaryButton]}>
       <Text style={[styles.buttonText, primary && styles.primaryButtonText]}>{action.label}</Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -112,12 +107,13 @@ export default function AdminOperationsScreen() {
       <RoleGate requiredRole="admin">
         <View style={styles.page}>
           <View style={styles.topBar}>
-            <Pressable
+            <BubblePressable
               accessibilityRole="button"
               onPress={() => router.push('/account')}
+              scaleTo={0.88}
               style={styles.backButton}>
               <Text style={styles.backButtonText}>← Back to Account</Text>
-            </Pressable>
+            </BubblePressable>
             <SitGuruLogo size="small" variant="symbol" />
           </View>
 
@@ -129,7 +125,8 @@ export default function AdminOperationsScreen() {
               local growth from one operations view.
             </Text>
             <Text style={styles.notice}>
-              Visual-only preview. Real admin permissions and data access will be wired later.
+              Live counts are not loaded. Values marked — are empty, not sample
+              operations data.
             </Text>
           </View>
 
@@ -144,55 +141,37 @@ export default function AdminOperationsScreen() {
 
           <View style={styles.chips}>
             {filters.map((filter, index) => (
-              <Pressable
+              <BubblePressable
                 key={filter}
                 accessibilityRole="button"
                 onPress={() => previewAlert(`${filter} filter`)}
+                scaleTo={0.88}
                 style={[styles.chip, index === 0 && styles.chipActive]}>
                 <Text style={[styles.chipText, index === 0 && styles.chipTextActive]}>{filter}</Text>
-              </Pressable>
+              </BubblePressable>
             ))}
           </View>
 
           <Card title="Active Care">
-            {activeCare.map((item) => (
-              <View key={item.pet} style={styles.careItem}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{item.icon}</Text>
-                </View>
+            <Text style={styles.emptyText}>
+              No live care sessions are loaded. This view does not show sample pets
+              or placeholder visits.
+            </Text>
 
-                <View style={styles.careCopy}>
-                  <Text style={styles.itemTitle}>
-                    {item.pet} • {item.service}
-                  </Text>
-                  <Text style={styles.itemMeta}>{item.time}</Text>
-                  <Text style={styles.badge}>{item.status}</Text>
-                </View>
-
-                <ActionRow
-                  actions={[
-                    { label: 'Booking Details', href: '/booking-details' },
-                    { label: 'PawReport Live', href: '/pawreport-live' },
-                    { label: 'Message', href: '/conversation' },
-                  ]}
-                />
-              </View>
-            ))}
+            <ActionRow
+              actions={[
+                { label: 'Bookings', href: '/bookings' },
+                { label: 'PawReport Live', href: '/pawreport-live' },
+                { label: 'Message', href: '/conversation' },
+              ]}
+            />
           </Card>
 
           <Card title="Live Walk Monitor">
-            <View style={styles.metricGrid}>
-              {[
-                ['Current walk status', 'Live now'],
-                ['Elapsed time', '18 min'],
-                ['Distance', '0.8 mi'],
-                ['Last location update', '2 min ago'],
-                ['Guru placeholder', 'SitGuru Guru A.'],
-                ['Pet Parent placeholder', 'Pet Parent P.'],
-              ].map(([label, value]) => (
-                <StatRow key={label} label={label} value={value} />
-              ))}
-            </View>
+            <Text style={styles.emptyText}>
+              No live walk is loaded. Elapsed time, distance, Guru, and Pet Parent
+              details stay empty until real walk data is connected.
+            </Text>
 
             <ActionRow
               actions={[
@@ -206,11 +185,11 @@ export default function AdminOperationsScreen() {
           <Card title="Booking Requests">
             <View style={styles.metricGrid}>
               {[
-                ['New requests', '2'],
-                ['Pending Guru review', '4'],
-                ['Accepted', '3'],
-                ['Active', '3'],
-                ['Completed', '12'],
+                ['New requests', '—'],
+                ['Pending Guru review', '—'],
+                ['Accepted', '—'],
+                ['Active', '—'],
+                ['Completed', '—'],
               ].map(([label, value]) => (
                 <StatRow key={label} label={label} value={value} />
               ))}
@@ -256,7 +235,7 @@ export default function AdminOperationsScreen() {
             <ActionRow
               actions={[
                 { label: 'Payments & Payouts', href: '/payments' },
-                { label: 'Booking Details', href: '/booking-details' },
+                { label: 'Bookings', href: '/bookings' },
                 { label: 'Guru Pricing', href: '/guru-pricing' },
                 { label: 'Review payout' },
                 { label: 'Flag payment issue' },
@@ -287,7 +266,7 @@ export default function AdminOperationsScreen() {
           </Card>
 
           <Card title="Ambassador Activity">
-            {['Leads: 5', 'Referral clicks: 18', 'Training reminders: 3', 'Reward status: pending preview'].map(
+            {['Leads: —', 'Referral clicks: —', 'Training reminders: —', 'Reward status: not loaded'].map(
               (label) => (
                 <Bullet key={label} label={label} />
               ),
@@ -315,7 +294,7 @@ export default function AdminOperationsScreen() {
             <ActionRow
               actions={[
                 { label: 'Help & Support', href: '/support' },
-                { label: 'Booking Details', href: '/booking-details' },
+                { label: 'Bookings', href: '/bookings' },
                 { label: 'PawReport Live', href: '/pawreport-live' },
                 { label: 'Open safety review' },
                 { label: 'Add internal note' },
@@ -341,15 +320,7 @@ export default function AdminOperationsScreen() {
             </Text>
 
             <ActionRow
-              actions={[
-                { label: 'Real Wiring Start Plan', href: '/wiring-start-plan' },
-                { label: 'Supabase Schema Readiness', href: '/schema-readiness' },
-                { label: 'Auth & Role Session Plan', href: '/auth-readiness' },
-                { label: 'Backend Readiness', href: '/backend-readiness' },
-                { label: 'QA Test Center', href: '/qa-test-center' },
-                { label: 'Release Readiness', href: '/release-readiness' },
-                { label: 'Notifications', href: '/notifications' },
-              ]}
+              actions={[{ label: 'Notifications', href: '/notifications' }]}
             />
           </Card>
 
@@ -360,17 +331,17 @@ export default function AdminOperationsScreen() {
       <View style={styles.bottomDock}>
         {[
           ['Dashboard', '/account'],
-          ['Bookings', '/booking-details'],
+          ['Bookings', '/bookings'],
           ['Alerts', '/notifications'],
           ['Support', '/support'],
         ].map(([label, href]) => (
-          <Pressable
+          <BubblePressable
             key={label}
             accessibilityRole="button"
             onPress={() => router.push(href as Href)}
             style={styles.dockButton}>
             <Text style={styles.dockButtonText}>{label}</Text>
-          </Pressable>
+          </BubblePressable>
         ))}
       </View>
     </SitGuruScreen>
@@ -436,6 +407,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 19,
     padding: 12,
+  },
+  emptyText: {
+    color: SitGuruColors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   summaryGrid: {
     flexDirection: 'row',

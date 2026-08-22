@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
@@ -73,12 +74,13 @@ export default function AdminDashboardScreen() {
         <View style={styles.topBar}>
           <SitGuruLogo size="small" variant="symbol" />
 
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             onPress={() => router.push('/guru-dashboard')}
+            scaleTo={0.88}
             style={styles.topLinkButton}>
             <Text style={styles.topLinkText}>Guru Dashboard</Text>
-          </Pressable>
+          </BubblePressable>
         </View>
 
         <View style={[styles.heroPanel, isWide && styles.heroPanelWide]}>
@@ -116,14 +118,24 @@ export default function AdminDashboardScreen() {
         </View>
 
         <View style={styles.guruList}>
-          {gurus.map((guru) => (
+          {gurus.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No Gurus loaded</Text>
+              <Text style={styles.emptyText}>
+                This dashboard does not show a sample roster. Live Guru booking
+                status data is not connected yet.
+              </Text>
+            </View>
+          ) : (
+            gurus.map((guru) => (
             <GuruStatusCard
               guru={guru}
               isWide={isWide}
               key={guru.id}
               onChangeStatus={(booking_status) => updateGuruBookingStatus(guru.id, booking_status)}
             />
-          ))}
+            ))
+          )}
         </View>
 
         <View style={styles.bottomSpacer} />
@@ -217,10 +229,11 @@ function GuruStatusCard({
             const tone = statusTones[option.value];
 
             return (
-              <Pressable
+              <BubblePressable
                 accessibilityRole="button"
                 key={option.value}
                 onPress={() => onChangeStatus(option.value)}
+                scaleTo={0.88}
                 style={[
                   styles.statusButton,
                   selected && {
@@ -231,7 +244,7 @@ function GuruStatusCard({
                 <Text style={[styles.statusButtonText, selected && { color: tone.textColor }]}>
                   {option.label}
                 </Text>
-              </Pressable>
+              </BubblePressable>
             );
           })}
         </View>
@@ -370,6 +383,25 @@ const styles = StyleSheet.create({
   },
   guruList: {
     gap: 12,
+  },
+  emptyState: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.border,
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 8,
+    padding: 18,
+  },
+  emptyTitle: {
+    color: SitGuruColors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  emptyText: {
+    color: SitGuruColors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   guruCard: {
     backgroundColor: SitGuruColors.surface,

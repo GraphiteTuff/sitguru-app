@@ -1,4 +1,6 @@
+import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import {
     AlertCircle,
     Banknote,
@@ -9,12 +11,9 @@ import {
     CircleDollarSign,
     Clock3,
     ExternalLink,
-    Home,
-    MessageCircle,
     RefreshCw,
     ShieldCheck,
     TrendingUp,
-    UserRound,
     Users,
     WalletCards
 } from 'lucide-react-native';
@@ -22,9 +21,7 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
-    Linking,
     Platform,
-    Pressable,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -32,17 +29,19 @@ import {
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import DistributionBars from '@/components/mobile/DistributionBars';
 import StickyActionBar from '@/components/mobile/StickyActionBar';
 import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
 import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
-import { StickyFooterClearance } from '@/constants/mobile-layout';
 import { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { getSitGuruApiBaseUrl, sitguruApiFetch } from '@/lib/data/api';
 import { formatUsd } from '@/lib/data/money';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
@@ -127,6 +126,127 @@ const SITE_URL =
   process.env.EXPO_PUBLIC_SITE_URL?.replace(/\/+$/, '') ||
   'https://www.sitguru.com';
 
+/** Payout routes that actually exist on the SitGuru web app. */
+const PAYOUT_SETUP_PATH = '/api/payouts/setup';
+const STRIPE_CONNECT_PATH = '/api/stripe/connect';
+const STRIPE_ONBOARD_PATH = '/api/stripe/connect/onboard?role=guru';
+const PAYPAL_ONBOARDING_PATH = '/api/paypal/onboarding';
+
+type PayoutProvider = 'stripe' | 'paypal';
+
+type PayoutSetupAccount = {
+  provider?: string | null;
+  onboardingStatus?: string | null;
+  accountStatus?: string | null;
+  detailsSubmitted?: boolean;
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+  requirementsCurrentlyDue?: unknown[];
+};
+
+type PayoutSetupResponse = {
+  success?: boolean;
+  setup?: {
+    selectedProvider?: string | null;
+    setupComplete?: boolean;
+    nextAction?: string | null;
+    readyAccount?: PayoutSetupAccount | null;
+    accounts?: PayoutSetupAccount[];
+    warnings?: string[];
+    messaging?: {
+      headline?: string;
+      readyMessage?: string;
+      blockedMessage?: string;
+    };
+  };
+  error?: string;
+};
+
+type StripeConnectResponse = {
+  ok?: boolean;
+  url?: string;
+  error?: string;
+};
+
+type PayPalOnboardingResponse = {
+  success?: boolean;
+  alreadyConnected?: boolean;
+  onboardingUrl?: string;
+  message?: string;
+  error?: string;
+};
+
+/** Payout readiness as reported by `/api/payouts/setup?role=guru`. */
+type GuruPayoutStatus = {
+  loaded: boolean;
+  provider: string;
+  setupComplete: boolean;
+  detailsSubmitted: boolean;
+  payoutsEnabled: boolean;
+  requirements: string[];
+  headline: string;
+  message: string;
+};
+
+const EMPTY_PAYOUT_STATUS: GuruPayoutStatus = {
+  loaded: false,
+  provider: '',
+  setupComplete: false,
+  detailsSubmitted: false,
+  payoutsEnabled: false,
+  requirements: [],
+  headline: '',
+  message: '',
+};
+
+function providerLabel(provider: string) {
+  if (provider === 'stripe') return 'Stripe';
+  if (provider === 'paypal') return 'PayPal';
+  return '';
+}
+
+async function loadGuruPayoutStatus(): Promise<GuruPayoutStatus> {
+  const result = await sitguruApiFetch<PayoutSetupResponse>(
+    `${PAYOUT_SETUP_PATH}?role=guru`,
+    { method: 'GET' },
+  );
+
+  const setup = result.data?.setup;
+
+  if (result.error || !setup) {
+    return EMPTY_PAYOUT_STATUS;
+  }
+
+  const account =
+    setup.readyAccount ||
+    setup.accounts?.find((item) => item.payoutsEnabled) ||
+    setup.accounts?.[0] ||
+    null;
+
+  const provider =
+    (account?.provider ?? '') || (setup.selectedProvider ?? '') || '';
+
+  const requirements = Array.isArray(account?.requirementsCurrentlyDue)
+    ? account.requirementsCurrentlyDue
+        .map((item) => (typeof item === 'string' ? item : ''))
+        .filter(Boolean)
+    : [];
+
+  return {
+    loaded: true,
+    provider: provider === 'set_up_later' ? '' : provider,
+    setupComplete: setup.setupComplete === true,
+    detailsSubmitted: account?.detailsSubmitted === true,
+    payoutsEnabled: account?.payoutsEnabled === true,
+    requirements,
+    headline: setup.messaging?.headline ?? '',
+    message:
+      (setup.setupComplete
+        ? setup.messaging?.readyMessage
+        : setup.messaging?.blockedMessage) ?? '',
+  };
+}
+
 export default function GuruEarningsScreen() {
   const params = useLocalSearchParams<{ focus?: string }>();
   const focus =
@@ -157,6 +277,16 @@ export default function GuruEarningsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [openingStripe, setOpeningStripe] = useState(false);
   const [message, setMessage] = useState('');
+  const [payoutStatus, setPayoutStatus] =
+    useState<GuruPayoutStatus>(EMPTY_PAYOUT_STATUS);
+
+  const apiBaseUrl = getSitGuruApiBaseUrl() || SITE_URL;
+
+  const refreshPayoutStatus = useCallback(async () => {
+    const next = await loadGuruPayoutStatus();
+    setPayoutStatus(next);
+    return next;
+  }, []);
 
   const loadEarnings = useCallback(
     async (showRefresh = false) => {
@@ -174,6 +304,7 @@ export default function GuruEarningsScreen() {
         const [payoutRows, transactionRows] = await Promise.all([
           queryRows(PAYOUT_TABLES, OWNER_FIELDS, user.id, 10),
           queryRows(TRANSACTION_TABLES, OWNER_FIELDS, user.id, 200),
+          refreshPayoutStatus(),
         ]);
 
         await refreshLedger();
@@ -191,7 +322,7 @@ export default function GuruEarningsScreen() {
         setRefreshing(false);
       }
     },
-    [profileRecord, refreshLedger, user?.id],
+    [profileRecord, refreshLedger, refreshPayoutStatus, user?.id],
   );
 
   const weekNetTotal =
@@ -296,7 +427,11 @@ export default function GuruEarningsScreen() {
     return weeklyBuckets;
   }, [data.transactions]);
 
-  async function openStripeFlow(mode: 'onboarding' | 'dashboard') {
+  /**
+   * Stripe Account Links and PayPal Partner Referrals are hosted redirects,
+   * so they have to complete in a browser session rather than natively.
+   */
+  async function openPayoutProvider(provider: PayoutProvider) {
     if (!user?.id) {
       Alert.alert('Sign in required', 'Please sign in to manage payouts.');
       return;
@@ -305,87 +440,101 @@ export default function GuruEarningsScreen() {
     setOpeningStripe(true);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
+      // Record the choice first so payout readiness reflects it either way.
+      await sitguruApiFetch(PAYOUT_SETUP_PATH, {
+        method: 'PATCH',
+        body: { role: 'guru', provider },
+      });
 
-      const endpoints =
-        mode === 'onboarding'
-          ? [
-              '/api/stripe/connect/onboarding',
-              '/api/stripe/connect/account-link',
-              '/api/stripe/connect/create-account-link',
-            ]
-          : [
-              '/api/stripe/connect/dashboard-link',
-              '/api/stripe/connect/login-link',
-            ];
+      let hostedUrl = '';
 
-      let stripeUrl = '';
+      if (provider === 'stripe') {
+        const connect = await sitguruApiFetch<StripeConnectResponse>(
+          STRIPE_CONNECT_PATH,
+          { method: 'POST', body: {} },
+        );
 
-      for (const endpoint of endpoints) {
-        try {
-          const response = await fetch(`${SITE_URL}${endpoint}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({
-              guruId: user.id,
-              accountId: data.stripeAccountId || undefined,
-              returnUrl: `${SITE_URL}/guru-dashboard`,
-              refreshUrl: `${SITE_URL}/guru-earnings`,
-            }),
-          });
+        /*
+          POST /api/stripe/connect authenticates from web cookies only, so a
+          bearer-token call can be rejected. The hosted onboarding redirect
+          handles its own sign-in, so it is the reliable mobile fallback.
+        */
+        hostedUrl =
+          (typeof connect.data?.url === 'string' ? connect.data.url : '') ||
+          `${apiBaseUrl}${STRIPE_ONBOARD_PATH}`;
+      } else {
+        const paypal = await sitguruApiFetch<PayPalOnboardingResponse>(
+          PAYPAL_ONBOARDING_PATH,
+          { method: 'POST', body: {} },
+        );
 
-          if (!response.ok) continue;
-
-          const payload = (await response.json()) as {
-            url?: string;
-            onboardingUrl?: string;
-            dashboardUrl?: string;
-            accountLink?: string;
-          };
-
-          stripeUrl =
-            payload.url ||
-            payload.onboardingUrl ||
-            payload.dashboardUrl ||
-            payload.accountLink ||
-            '';
-
-          if (stripeUrl) break;
-        } catch {
-          // Try the next supported SitGuru Stripe endpoint.
+        if (paypal.data?.alreadyConnected) {
+          setMessage(
+            paypal.data.message ||
+              'PayPal is already connected and ready for eligible SitGuru payouts.',
+          );
+          await refreshPayoutStatus();
+          return;
         }
+
+        if (paypal.error || !paypal.data?.onboardingUrl) {
+          Alert.alert(
+            'PayPal payout setup unavailable',
+            paypal.error ||
+              'SitGuru could not start PayPal payout setup right now. Your current payout status is unchanged.',
+          );
+          return;
+        }
+
+        hostedUrl = paypal.data.onboardingUrl;
       }
 
-      if (!stripeUrl) {
-        Alert.alert(
-          'Stripe connection not available',
-          'The Guru payout link endpoint is not connected in this build yet. Your current payout status is still shown safely.',
+      const returnUrl = Linking.createURL('/guru-earnings');
+      const result = await WebBrowser.openAuthSessionAsync(
+        hostedUrl,
+        returnUrl,
+      );
+
+      if (result.type === 'cancel') {
+        setMessage(
+          `${providerLabel(provider)} payout setup was closed before finishing. Your progress is saved and you can pick it back up anytime.`,
         );
+        await refreshPayoutStatus();
         return;
       }
 
-      const supported = await Linking.canOpenURL(stripeUrl);
+      /*
+        Neither provider returns to a mobile deep link, so a completed run
+        cannot be confirmed from the browser result. Re-read payout readiness
+        from SitGuru instead of assuming success.
+      */
+      const nextStatus = await refreshPayoutStatus();
 
-      if (!supported) {
-        throw new Error('Stripe URL cannot be opened.');
-      }
-
-      await Linking.openURL(stripeUrl);
-    } catch {
+      setMessage(
+        nextStatus.payoutsEnabled
+          ? `${providerLabel(nextStatus.provider) || providerLabel(provider)} payouts are confirmed and ready.`
+          : `SitGuru could not confirm ${providerLabel(provider)} payout setup yet. Pull down to refresh, or reopen setup to finish any remaining steps.`,
+      );
+    } catch (error) {
       Alert.alert(
-        'Unable to open Stripe',
-        'SitGuru could not open the secure Stripe payout flow. Please try again or contact support.',
+        `Unable to open ${providerLabel(provider)}`,
+        error instanceof Error
+          ? error.message
+          : `SitGuru could not open the secure ${providerLabel(provider)} payout flow. Please try again or contact support.`,
       );
     } finally {
       setOpeningStripe(false);
     }
   }
 
-  const payoutState = getPayoutState(data);
+  const payoutState = getPayoutState(data, payoutStatus);
+
+  const payoutsReady = payoutStatus.loaded
+    ? payoutStatus.payoutsEnabled
+    : data.payoutsEnabled;
+
+  const activeProvider: PayoutProvider =
+    payoutStatus.provider === 'paypal' ? 'paypal' : 'stripe';
 
   return (
     <SitGuruScreen center={isWebPreview} maxWidth={620}>
@@ -415,10 +564,7 @@ export default function GuruEarningsScreen() {
 
                 <ScrollView
                   ref={scrollRef}
-                  contentContainerStyle={[
-                    styles.scrollContent,
-                    { paddingBottom: StickyFooterClearance.actionPlusNav },
-                  ]}
+                  contentContainerStyle={styles.scrollContent}
                   refreshControl={
                     <RefreshControl
                       refreshing={refreshing}
@@ -430,10 +576,11 @@ export default function GuruEarningsScreen() {
                   showsVerticalScrollIndicator={false}
                 >
                   <View style={styles.header}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityLabel="Back to Guru Dashboard"
                       onPress={() => router.push('/guru-dashboard')}
+                      scaleTo={0.88}
                       style={styles.headerIconButton}
                     >
                       <ChevronLeft
@@ -441,7 +588,7 @@ export default function GuruEarningsScreen() {
                         size={20}
                         strokeWidth={2.4}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
                     <View style={styles.headerCopy}>
                       <Text numberOfLines={1} style={styles.title}>Earnings & Payouts</Text>
@@ -490,7 +637,7 @@ export default function GuruEarningsScreen() {
 
                     <View style={styles.payoutStatusCopy}>
                       <Text style={styles.payoutStatusEyebrow}>
-                        STRIPE PAYOUT STATUS
+                        PAYOUT STATUS
                       </Text>
                       <Text style={styles.payoutStatusTitle}>
                         {payoutState.title}
@@ -500,14 +647,12 @@ export default function GuruEarningsScreen() {
                       </Text>
                     </View>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
+                      accessibilityLabel={`Open ${providerLabel(activeProvider)} payout setup`}
                       disabled={openingStripe}
-                      onPress={() =>
-                        void openStripeFlow(
-                          data.payoutsEnabled ? 'dashboard' : 'onboarding',
-                        )
-                      }
+                      onPress={() => void openPayoutProvider(activeProvider)}
+                      scaleTo={0.88}
                       style={styles.payoutStatusButton}
                     >
                       {openingStripe ? (
@@ -523,7 +668,7 @@ export default function GuruEarningsScreen() {
                           strokeWidth={2.3}
                         />
                       )}
-                    </Pressable>
+                    </BubblePressable>
                   </View>
 
                   {displayLoading ? (
@@ -887,26 +1032,22 @@ export default function GuruEarningsScreen() {
                       </Text>
                       <Text style={styles.stripeText}>
                         Identity, tax, and bank details are completed directly
-                        through Stripe. SitGuru does not display your full bank
-                        or identity information.
+                        with Stripe or PayPal. SitGuru does not display your
+                        full bank or identity information.
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.actionStack}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       disabled={openingStripe}
-                      onPress={() =>
-                        void openStripeFlow(
-                          data.payoutsEnabled ? 'dashboard' : 'onboarding',
-                        )
-                      }
+                      onPress={() => void openPayoutProvider('stripe')}
                       style={styles.primaryButton}
                     >
                       <Text style={styles.primaryButtonText}>
-                        {data.payoutsEnabled
-                          ? 'Manage Stripe Payout Account'
+                        {payoutsReady && activeProvider === 'stripe'
+                          ? 'Update Stripe Payout Details'
                           : 'Set Up Stripe Payouts'}
                       </Text>
                       <ExternalLink
@@ -914,9 +1055,27 @@ export default function GuruEarningsScreen() {
                         size={17}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
-                    <Pressable
+                    <BubblePressable
+                      accessibilityRole="button"
+                      disabled={openingStripe}
+                      onPress={() => void openPayoutProvider('paypal')}
+                      style={styles.secondaryButton}
+                    >
+                      <Text style={styles.secondaryButtonText}>
+                        {payoutsReady && activeProvider === 'paypal'
+                          ? 'Update PayPal Payout Details'
+                          : 'Get Paid With PayPal Instead'}
+                      </Text>
+                      <ExternalLink
+                        color={palette.primary}
+                        size={17}
+                        strokeWidth={2.3}
+                      />
+                    </BubblePressable>
+
+                    <BubblePressable
                       accessibilityRole="button"
                       onPress={() => router.push('/guru-referrals')}
                       style={styles.secondaryButton}
@@ -929,9 +1088,9 @@ export default function GuruEarningsScreen() {
                         size={17}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       onPress={() => router.push('/support')}
                       style={styles.secondaryButton}
@@ -944,7 +1103,7 @@ export default function GuruEarningsScreen() {
                         size={17}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
                 </ScrollView>
 
@@ -952,17 +1111,13 @@ export default function GuruEarningsScreen() {
                   <SitGuruButton
                     label={
                       openingStripe
-                        ? 'Opening Stripe…'
-                        : data.payoutsEnabled
-                          ? 'Open Stripe dashboard'
+                        ? `Opening ${providerLabel(activeProvider)}…`
+                        : payoutsReady
+                          ? `Update ${providerLabel(activeProvider)} payout details`
                           : 'Set up payouts'
                     }
                     disabled={openingStripe}
-                    onPress={() =>
-                      void openStripeFlow(
-                        data.payoutsEnabled ? 'dashboard' : 'onboarding',
-                      )
-                    }
+                    onPress={() => void openPayoutProvider(activeProvider)}
                   />
                   <SitGuruButton
                     label="Back to dashboard"
@@ -971,74 +1126,7 @@ export default function GuruEarningsScreen() {
                   />
                 </StickyActionBar>
 
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    icon={
-                      <Home
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Dashboard"
-                    onPress={() => router.push('/guru-dashboard')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    active
-                    icon={
-                      <WalletCards
-                        color={palette.primary}
-                        size={21}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    label="Earnings"
-                    onPress={() => undefined}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <CalendarDays
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Bookings"
-                    onPress={() => router.push('/guru-requests')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <MessageCircle
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Messages"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/messages',
-                        params: { role: 'guru' },
-                      })
-                    }
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <UserRound
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Profile"
-                    onPress={() => router.push('/guru-profile')}
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar active="home" role="guru" />
               </View>
             </View>
 
@@ -1195,34 +1283,6 @@ function TransactionRow({
         <Text style={styles.transactionStatus}>{item.status}</Text>
       </View>
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      {icon}
-      <Text style={active ? styles.navLabelActive : styles.navLabel}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -1486,19 +1546,55 @@ function mapTransaction(
   };
 }
 
-function getPayoutState(data: EarningsData) {
+/** SitGuru's payout API is authoritative; table scans are only a fallback. */
+function getPayoutState(data: EarningsData, status: GuruPayoutStatus) {
+  if (status.loaded) {
+    const label = providerLabel(status.provider) || 'a payout provider';
+
+    if (status.payoutsEnabled) {
+      return {
+        tone: 'success' as const,
+        title: 'Payouts are active',
+        text:
+          status.message ||
+          `Your verified ${label} account can receive Guru payouts.`,
+      };
+    }
+
+    if (!status.provider) {
+      return {
+        tone: 'warning' as const,
+        title: 'Choose how you get paid',
+        text:
+          status.message ||
+          'Pick Stripe or PayPal before your first paid SitGuru booking.',
+      };
+    }
+
+    return {
+      tone: 'warning' as const,
+      title: `${label} setup in progress`,
+      text: status.requirements.length
+        ? `Still needed: ${status.requirements
+            .map((item) => item.replace(/_/g, ' '))
+            .join(', ')}.`
+        : status.message ||
+          `Finish the remaining ${label} steps before payouts can be released.`,
+    };
+  }
+
   if (!data.connected) {
     return {
       tone: 'warning' as const,
       title: 'Payout setup needed',
-      text: 'Connect Stripe before receiving Guru earnings.',
+      text: 'Connect Stripe or PayPal before receiving Guru earnings.',
     };
   }
 
   if (data.actionRequired) {
     return {
       tone: 'warning' as const,
-      title: 'Stripe needs attention',
+      title: 'Payout account needs attention',
       text:
         data.disabledReason ||
         'Complete the remaining verification requirements.',
@@ -1509,14 +1605,14 @@ function getPayoutState(data: EarningsData) {
     return {
       tone: 'success' as const,
       title: 'Payouts are active',
-      text: 'Your verified Stripe account can receive Guru payouts.',
+      text: 'Your verified payout account can receive Guru payouts.',
     };
   }
 
   return {
     tone: 'warning' as const,
     title: 'Payout setup in progress',
-    text: 'Complete all Stripe onboarding and verification steps.',
+    text: 'Complete all payout onboarding and verification steps.',
   };
 }
 
@@ -1724,7 +1820,7 @@ function createStyles(isDark: boolean) {
     },
     scrollContent: {
       gap: 13,
-      paddingBottom: 110,
+      paddingBottom: 16,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -2224,42 +2320,6 @@ function createStyles(isDark: boolean) {
       color: palette.primary,
       fontFamily: AppFonts.extraBold,
       fontSize: 9,
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 72,
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: -7 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
     },
   });
 }

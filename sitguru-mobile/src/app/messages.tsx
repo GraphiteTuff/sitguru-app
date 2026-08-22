@@ -1,20 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   Bell,
-  CalendarDays,
   ChevronRight,
-  Home,
   MessageCircle,
   Search,
   ShieldCheck,
-  UserRound,
   X
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -23,8 +19,10 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
 import {
   setThemePreference,
@@ -135,13 +133,6 @@ export default function MessagesScreen() {
     userMetadata: (user?.user_metadata ?? {}) as RecordRow,
     roles,
   });
-
-  const homeRoute =
-    activeRole === 'guru'
-      ? '/guru-dashboard'
-      : activeRole === 'ambassador'
-        ? '/ambassador-dashboard'
-        : '/pet-parent-dashboard';
 
   const loadMessages = useCallback(
     async (showRefresh = false) => {
@@ -287,10 +278,11 @@ export default function MessagesScreen() {
                     </View>
 
                     <View style={styles.headerActions}>
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         accessibilityLabel="Open notifications"
                         onPress={() => router.push('/notifications')}
+                        scaleTo={0.88}
                         style={styles.headerIconButton}
                       >
                         <Bell
@@ -305,19 +297,20 @@ export default function MessagesScreen() {
                             </Text>
                           </View>
                         ) : null}
-                      </Pressable>
+                      </BubblePressable>
 
                       <View style={styles.modeToggle}>
                         {themeOptions.map((option) => {
                           const active = themePreference === option.value;
 
                           return (
-                            <Pressable
+                            <BubblePressable
                               key={option.value}
                               accessibilityRole="button"
                               accessibilityLabel={`Switch to ${option.label} mode`}
                               accessibilityState={{ selected: active }}
                               onPress={() => setThemePreference(option.value)}
+                              scaleTo={0.88}
                               style={[
                                 styles.modeButton,
                                 active && styles.modeButtonActive,
@@ -337,15 +330,16 @@ export default function MessagesScreen() {
                                 }
                                 strokeWidth={2.4}
                               />
-                            </Pressable>
+                            </BubblePressable>
                           );
                         })}
                       </View>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         accessibilityLabel="Open profile"
                         onPress={() => router.push('/account')}
+                        scaleTo={0.88}
                         style={styles.profileButton}
                       >
                         <Avatar
@@ -354,7 +348,7 @@ export default function MessagesScreen() {
                           palette={palette}
                           size={40}
                         />
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   </View>
 
@@ -374,18 +368,19 @@ export default function MessagesScreen() {
                     />
 
                     {searchQuery ? (
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         accessibilityLabel="Clear search"
                         hitSlop={8}
                         onPress={() => setSearchQuery('')}
+                        scaleTo={0.88}
                       >
                         <X
                           color={palette.muted}
                           size={17}
                           strokeWidth={2.3}
                         />
-                      </Pressable>
+                      </BubblePressable>
                     ) : null}
                   </View>
 
@@ -398,11 +393,12 @@ export default function MessagesScreen() {
                       const active = activeFilter === option.value;
 
                       return (
-                        <Pressable
+                        <BubblePressable
                           key={option.value}
                           accessibilityRole="button"
                           accessibilityState={{ selected: active }}
                           onPress={() => setActiveFilter(option.value)}
+                          scaleTo={0.88}
                           style={[
                             styles.filterPill,
                             active && styles.filterPillActive,
@@ -416,7 +412,7 @@ export default function MessagesScreen() {
                           >
                             {option.label}
                           </Text>
-                        </Pressable>
+                        </BubblePressable>
                       );
                     })}
                   </ScrollView>
@@ -472,7 +468,7 @@ export default function MessagesScreen() {
                           : 'Find a Guru and start a conversation before requesting care.'}
                       </Text>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={() => {
                           if (searchQuery || activeFilter !== 'all') {
@@ -490,13 +486,14 @@ export default function MessagesScreen() {
                             ? 'Reset'
                             : 'Find a Guru'}
                         </Text>
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   )}
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     onPress={() => router.push('/support')}
+                    scaleTo={0.97}
                     style={styles.supportCard}
                   >
                     <View style={styles.supportIcon}>
@@ -519,77 +516,13 @@ export default function MessagesScreen() {
                       size={18}
                       strokeWidth={2.3}
                     />
-                  </Pressable>
+                  </BubblePressable>
                 </ScrollView>
 
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    icon={
-                      <Home
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Home"
-                    onPress={() => router.push(homeRoute)}
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    icon={
-                      <Search
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Explore"
-                    onPress={() => router.push('/find-care')}
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    icon={
-                      <CalendarDays
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Bookings"
-                    onPress={() => router.push('/booking-details')}
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    active
-                    badge={unreadTotal}
-                    icon={
-                      <MessageCircle
-                        color={palette.primary}
-                        size={21}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    label="Messages"
-                    onPress={() => undefined}
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    icon={
-                      <UserRound
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Profile"
-                    onPress={() => router.push('/account')}
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar
+                  active="messages"
+                  badges={{ messages: unreadTotal }}
+                />
               </View>
             </View>
 
@@ -610,7 +543,7 @@ function ConversationRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={() =>
         router.push({
@@ -618,10 +551,8 @@ function ConversationRow({
           params: { conversationId: conversation.id },
         })
       }
-      style={({ pressed }) => [
-        styles.conversationRow,
-        pressed && styles.pressed,
-      ]}
+      scaleTo={0.97}
+      style={styles.conversationRow}
     >
       <View style={styles.avatarWrap}>
         <Avatar
@@ -678,41 +609,7 @@ function ConversationRow({
           strokeWidth={2.2}
         />
       )}
-    </Pressable>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  badge = 0,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  badge?: number;
-  icon: React.ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      <View style={styles.navIconWrap}>
-        {icon}
-        {badge > 0 ? <View style={styles.navBadge} /> : null}
-      </View>
-
-      <Text style={active ? styles.navLabelActive : styles.navLabel}>
-        {label}
-      </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1179,10 +1076,8 @@ function getPalette(isDark: boolean) {
     primary: isDark ? '#39D982' : '#087449',
     primarySoft: isDark ? '#123E2A' : '#E4F5E9',
     orange: '#F15A3A',
-    navMuted: isDark ? '#9BAAA1' : '#748079',
     avatarBg: isDark ? '#173527' : '#EEF5EE',
     avatarBorder: isDark ? '#2E6C4B' : '#FFFFFF',
-    shadow: '#000000',
   };
 }
 
@@ -1333,7 +1228,7 @@ function createStyles(isDark: boolean) {
 
     scrollContent: {
       gap: 13,
-      paddingBottom: 105,
+      paddingBottom: 24,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -1489,9 +1384,6 @@ function createStyles(isDark: boolean) {
       minHeight: 76,
       paddingHorizontal: 12,
       paddingVertical: 10,
-    },
-    pressed: {
-      opacity: 0.72,
     },
     avatarWrap: {
       position: 'relative',
@@ -1673,58 +1565,6 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.medium,
       fontSize: 9,
       lineHeight: 13,
-    },
-
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 72,
-      justifyContent: 'space-around',
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: -7 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-    },
-    navIconWrap: {
-      position: 'relative',
-    },
-    navBadge: {
-      backgroundColor: palette.orange,
-      borderColor: palette.surface,
-      borderRadius: 999,
-      borderWidth: 1.5,
-      height: 8,
-      position: 'absolute',
-      right: -2,
-      top: -2,
-      width: 8,
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
     },
   });
 }

@@ -4,12 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import FocusTextInput from '@/components/mobile/FocusTextInput';
 import MobileScreen from '@/components/mobile/MobileScreen';
 import MobileWizard, { type WizardStep } from '@/components/mobile/MobileWizard';
@@ -660,7 +660,7 @@ export default function PetPassportsScreen() {
           const incomplete = completion < 70;
 
           return (
-            <Pressable
+            <BubblePressable
               key={pet.id}
               accessibilityRole="button"
               accessibilityLabel={
@@ -669,6 +669,7 @@ export default function PetPassportsScreen() {
                   : `${pet.name}'s passport`
               }
               onPress={() => startWizard(pet)}
+              scaleTo={0.97}
               style={styles.petCard}
             >
               <View style={styles.petTop}>
@@ -751,7 +752,7 @@ export default function PetPassportsScreen() {
                   <Text style={styles.secondaryLinkText}>Request Care</Text>
                 </TouchTarget>
               </View>
-            </Pressable>
+            </BubblePressable>
           );
         })
       )}

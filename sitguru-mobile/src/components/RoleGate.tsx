@@ -1,7 +1,8 @@
 import { router, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruColors } from '@/constants/colors';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { roleLabel, type AppRole } from '@/types/auth';
@@ -17,13 +18,13 @@ type GateButton = { label: string; href: Href; primary?: boolean };
 
 function GateActionButton({ button }: { button: GateButton }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={() => router.push(button.href)}
       style={[styles.button, button.primary && styles.primaryButton]}
     >
       <Text style={[styles.buttonText, button.primary && styles.primaryButtonText]}>{button.label}</Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 

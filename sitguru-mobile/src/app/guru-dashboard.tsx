@@ -6,7 +6,6 @@ import {
   CircleDollarSign,
   Clock3,
   Gift,
-  Home,
   MapPin,
   MessageCircle,
   PawPrint,
@@ -26,7 +25,6 @@ import {
 import {
   Image,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -34,6 +32,7 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import RoleGate from '@/components/RoleGate';
 import PriorityCarousel, {
   type PriorityCard,
@@ -45,6 +44,7 @@ import SitGuruButton from '@/components/SitGuruButton';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
@@ -531,12 +531,9 @@ export default function GuruDashboardScreen() {
       ),
     );
 
-  const upcomingCount =
-    data.bookings.filter(
-      (booking) =>
-        !booking.pending &&
-        !booking.completed,
-    ).length;
+  const scheduleFocusBooking =
+    todayBookings[0] ??
+    nextBooking;
 
   const trendPercent =
     data.earningsLastMonth > 0
@@ -591,7 +588,13 @@ export default function GuruDashboardScreen() {
           } • ${formatTime(
             nextBooking.startAt,
           )}`,
-          route: '/booking-details',
+          route: {
+            pathname: '/booking-details',
+            params: {
+              bookingId:
+                nextBooking.id,
+            },
+          },
           icon: 'calendar',
         };
       }
@@ -638,7 +641,13 @@ export default function GuruDashboardScreen() {
           } • ${formatDay(
             nextBooking.startAt,
           )}`,
-          route: '/booking-details',
+          route: {
+            pathname: '/booking-details',
+            params: {
+              bookingId:
+                nextBooking.id,
+            },
+          },
           icon: 'calendar',
         };
       }
@@ -703,7 +712,14 @@ export default function GuruDashboardScreen() {
         helper: primaryAction.helper,
         tone: 'primary',
         ctaLabel: 'Continue',
-        onPress: () => router.push(primaryAction.route),
+        onPress: () => {
+          if (primaryAction.route === '/booking-details') {
+            router.push('/guru-requests');
+            return;
+          }
+
+          router.push(primaryAction.route);
+        },
       },
     ];
 
@@ -743,7 +759,11 @@ export default function GuruDashboardScreen() {
         eyebrow: 'Next booking',
         title: nextBooking.serviceLabel,
         helper: `${nextBooking.petName} · ${formatDay(nextBooking.startAt)}`,
-        onPress: () => router.push('/booking-details'),
+        onPress: () =>
+          router.push({
+            pathname: '/booking-details',
+            params: { bookingId: nextBooking.id },
+          }),
       });
     }
 
@@ -1009,7 +1029,7 @@ export default function GuruDashboardScreen() {
                         styles.headerActions
                       }
                     >
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         accessibilityLabel="Open notifications"
                         onPress={() =>
@@ -1017,6 +1037,7 @@ export default function GuruDashboardScreen() {
                             '/notifications',
                           )
                         }
+                        scaleTo={0.88}
                         style={
                           styles.headerIconButton
                         }
@@ -1049,7 +1070,7 @@ export default function GuruDashboardScreen() {
                             </Text>
                           </View>
                         ) : null}
-                      </Pressable>
+                      </BubblePressable>
 
                       <View
                         style={
@@ -1063,7 +1084,7 @@ export default function GuruDashboardScreen() {
                               option.value;
 
                             return (
-                              <Pressable
+                              <BubblePressable
                                 key={
                                   option.value
                                 }
@@ -1078,6 +1099,7 @@ export default function GuruDashboardScreen() {
                                     option.value,
                                   )
                                 }
+                                scaleTo={0.88}
                                 style={[
                                   styles.modeButton,
                                   active &&
@@ -1103,18 +1125,19 @@ export default function GuruDashboardScreen() {
                                     2.4
                                   }
                                 />
-                              </Pressable>
+                              </BubblePressable>
                             );
                           },
                         )}
                       </View>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         accessibilityLabel="Switch workspace"
                         onPress={() =>
                           setWorkspaceSwitcherOpen(true)
                         }
+                        scaleTo={0.88}
                         style={
                           styles.profileButton
                         }
@@ -1131,7 +1154,7 @@ export default function GuruDashboardScreen() {
                           }
                           size={42}
                         />
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   </View>
 
@@ -1166,13 +1189,14 @@ export default function GuruDashboardScreen() {
                         watchKey={`${data.earningsMonth}-${data.earningsWeek}-${data.requests.length}-${data.payout.available}-${data.payout.pending}`}
                         style={styles.earningsCard}
                       >
-                        <Pressable
+                        <BubblePressable
                           accessibilityRole="button"
                           onPress={() =>
                             router.push(
                               '/payments',
                             )
                           }
+                          scaleTo={0.97}
                           style={styles.earningsCardInner}
                         >
                         <View
@@ -1268,7 +1292,7 @@ export default function GuruDashboardScreen() {
                             }
                           />
                         </View>
-                        </Pressable>
+                        </BubblePressable>
                       </LiveUpdateHighlight>
 
                       <LiveUpdateHighlight
@@ -1299,13 +1323,14 @@ export default function GuruDashboardScreen() {
                             </Text>
                           </View>
 
-                          <Pressable
+                          <BubblePressable
                             accessibilityRole="button"
                             onPress={() =>
                               router.push(
                                 '/guru-requests',
                               )
                             }
+                            scaleTo={0.88}
                           >
                             <Text
                               style={
@@ -1314,7 +1339,7 @@ export default function GuruDashboardScreen() {
                             >
                               View all
                             </Text>
-                          </Pressable>
+                          </BubblePressable>
                         </View>
 
                         <BusinessRow
@@ -1343,9 +1368,20 @@ export default function GuruDashboardScreen() {
                           }
                           label="Bookings today"
                           onPress={() =>
-                            router.push(
-                              '/booking-details',
-                            )
+                            scheduleFocusBooking
+                              ? router.push(
+                                  {
+                                    pathname:
+                                      '/booking-details',
+                                    params: {
+                                      bookingId:
+                                        scheduleFocusBooking.id,
+                                    },
+                                  },
+                                )
+                              : router.push(
+                                  '/guru-requests',
+                                )
                           }
                           palette={
                             palette
@@ -1605,13 +1641,14 @@ export default function GuruDashboardScreen() {
                     />
                   </View>
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     onPress={() =>
                       router.push(
                         '/guru-success-center',
                       )
                     }
+                    scaleTo={0.97}
                     style={
                       styles.successCard
                     }
@@ -1672,7 +1709,7 @@ export default function GuruDashboardScreen() {
                       size={18}
                       strokeWidth={2.3}
                     />
-                  </Pressable>
+                  </BubblePressable>
 
                   <View
                     style={
@@ -1737,7 +1774,7 @@ export default function GuruDashboardScreen() {
                         styles.twoButtonRow
                       }
                     >
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={() =>
                           router.push(
@@ -1755,9 +1792,9 @@ export default function GuruDashboardScreen() {
                         >
                           Availability
                         </Text>
-                      </Pressable>
+                      </BubblePressable>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={() =>
                           router.push(
@@ -1775,7 +1812,7 @@ export default function GuruDashboardScreen() {
                         >
                           Edit Profile
                         </Text>
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   </View>
                 </ScrollView>
@@ -1783,119 +1820,19 @@ export default function GuruDashboardScreen() {
                 <StickyActionBar embedded>
                   <SitGuruButton
                     label={primaryAction.title}
-                    onPress={() => router.push(primaryAction.route)}
+                    onPress={() => {
+                      if (primaryAction.route === '/booking-details') {
+                        router.push('/guru-requests');
+                        return;
+                      }
+
+                      router.push(primaryAction.route);
+                    }}
                     accessibilityLabel={`${primaryAction.title}. ${primaryAction.helper}`}
                   />
                 </StickyActionBar>
 
-                <View
-                  style={
-                    styles.bottomNav
-                  }
-                >
-                  <BottomNavItem
-                    active
-                    icon={
-                      <Home
-                        color={
-                          palette.primary
-                        }
-                        size={21}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    label="Dashboard"
-                    onPress={() =>
-                      undefined
-                    }
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    icon={
-                      <MapPin
-                        color={
-                          palette.navMuted
-                        }
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Care Map"
-                    onPress={() =>
-                      router.push(
-                        '/guru-care-map',
-                      )
-                    }
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    badgeCount={
-                      upcomingCount +
-                      data.requests.length
-                    }
-                    icon={
-                      <CalendarDays
-                        color={
-                          palette.navMuted
-                        }
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Bookings"
-                    onPress={() =>
-                      router.push(
-                        '/guru-requests',
-                      )
-                    }
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    badgeCount={
-                      data.unreadMessages
-                    }
-                    icon={
-                      <MessageCircle
-                        color={
-                          palette.navMuted
-                        }
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Messages"
-                    onPress={() =>
-                      router.push({
-                        pathname:
-                          '/messages',
-                        params: {
-                          role: 'guru',
-                        },
-                      })
-                    }
-                    styles={styles}
-                  />
-
-                  <BottomNavItem
-                    icon={
-                      <UserRound
-                        color={
-                          palette.navMuted
-                        }
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Profile"
-                    onPress={() =>
-                      setWorkspaceSwitcherOpen(true)
-                    }
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar active="home" role="guru" />
 
                 <SitGuruWorkspaceSwitcher
                   currentRole="guru"
@@ -2093,9 +2030,10 @@ function BusinessRow({
   >;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
+      scaleTo={0.97}
       style={[
         styles.businessRow,
         last &&
@@ -2154,7 +2092,7 @@ function BusinessRow({
         size={17}
         strokeWidth={2.3}
       />
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -2174,14 +2112,10 @@ function QuickAction({
   >;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.quickAction,
-        pressed &&
-          styles.pressed,
-      ]}
+      style={styles.quickAction}
     >
       <View
         style={
@@ -2214,7 +2148,7 @@ function QuickAction({
       >
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -2328,7 +2262,7 @@ function RequestCard({
           styles.requestButtonRow
         }
       >
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           onPress={() =>
             router.push(
@@ -2346,9 +2280,9 @@ function RequestCard({
           >
             Decline
           </Text>
-        </Pressable>
+        </BubblePressable>
 
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           onPress={() =>
             router.push(
@@ -2366,7 +2300,7 @@ function RequestCard({
           >
             Review Request
           </Text>
-        </Pressable>
+        </BubblePressable>
       </View>
     </View>
   );
@@ -2392,9 +2326,10 @@ function StatusCard({
   value: string;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
+      scaleTo={0.97}
       style={
         styles.statusCard
       }
@@ -2438,7 +2373,7 @@ function StatusCard({
       >
         {link}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -2487,61 +2422,6 @@ function ReadinessRow({
         </Text>
       </View>
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  badgeCount = 0,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  badgeCount?: number;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<
-    typeof createStyles
-  >;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{
-        selected: active,
-      }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      <View
-        style={
-          styles.navIconWrap
-        }
-      >
-        {icon}
-
-        {badgeCount > 0 ? (
-          <View
-            style={
-              styles.navBadge
-            }
-          />
-        ) : null}
-      </View>
-
-      <Text
-        style={
-          active
-            ? styles.navLabelActive
-            : styles.navLabel
-        }
-      >
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -4120,7 +4000,7 @@ function createStyles(
     },
     scrollContent: {
       gap: 13,
-      paddingBottom: 112,
+      paddingBottom: 16,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -4566,14 +4446,6 @@ function createStyles(
       fontSize: 9,
       textAlign: 'center',
     },
-    pressed: {
-      opacity: 0.72,
-      transform: [
-        {
-          scale: 0.985,
-        },
-      ],
-    },
     requestCard: {
       backgroundColor:
         palette.surface,
@@ -4793,71 +4665,6 @@ function createStyles(
     },
     readinessValueWarning: {
       color: palette.orange,
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor:
-        palette.surface,
-      borderColor:
-        palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 72,
-      justifyContent:
-        'space-around',
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor:
-        palette.shadow,
-      shadowOffset: {
-        width: 0,
-        height: -7,
-      },
-      shadowOpacity: isDark
-        ? 0.3
-        : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent:
-        'center',
-    },
-    navIconWrap: {
-      position: 'relative',
-    },
-    navBadge: {
-      backgroundColor:
-        palette.orange,
-      borderColor:
-        palette.surface,
-      borderRadius: 999,
-      borderWidth: 1.5,
-      height: 8,
-      position: 'absolute',
-      right: -2,
-      top: -2,
-      width: 8,
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily:
-        AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily:
-        AppFonts.medium,
-      fontSize: 8,
     },
   });
 }

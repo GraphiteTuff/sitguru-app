@@ -37,7 +37,7 @@ NativeWind/Tailwind is **not** installed. Use StyleSheet + shared primitives:
    - **Live PawReport** — Walk snapshot via Bearer `GET /api/walk/stream/[bookingId]?format=json` (`usePawReportLive`).
    - **Live photo pipeline** — Guru camera capture uploads to `pawreport-photos` (fallback `provider-media` / `pet-media`) via `uploadSitGuruMedia`; Pet Parent feed uses `CachedRemoteImage` + dynamic `N new photos` badges. StickyActionBar owns capture on `guru-live-walk`.
    - **Live route** — Floating compact map (`LiveRouteHeader` + `expo-location`); oversized Potty / Water (`CareQuickActions`).
-   - **Chat** — Photo bar + voice notes (`ChatComposerBar` + `expo-image-picker` / `expo-av`) with `KeyboardAvoidingView`.
+   - **Chat** — Photo bar + voice notes (`ChatComposerBar` + `expo-image-picker` / `expo-audio`) with `KeyboardAvoidingView`.
    - **Pet Passports** — Step wizard (`MobileWizard`) + vaccine camera scan (`VaccineScanStep` + `expo-camera`).
    - **Notifications** — Native push + lock-screen Accept Booking (`expo-notifications`, `src/lib/notifications/push.ts`).
 

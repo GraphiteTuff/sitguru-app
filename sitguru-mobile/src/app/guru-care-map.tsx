@@ -1,20 +1,14 @@
 import { router } from 'expo-router';
 import {
-    CalendarDays,
     ChevronLeft,
     ChevronRight,
-    Home,
     MapPin,
-    MessageCircle,
     Navigation,
-    SlidersHorizontal,
-    UserRound
+    SlidersHorizontal
 } from 'lucide-react-native';
-import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Platform,
-    Pressable,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -22,9 +16,11 @@ import {
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -533,10 +529,11 @@ export default function GuruCareMapScreen() {
                   showsVerticalScrollIndicator={false}
                 >
                   <View style={styles.header}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityLabel="Back to Guru Dashboard"
                       onPress={() => router.push('/guru-dashboard')}
+                      scaleTo={0.88}
                       style={styles.headerIconButton}
                     >
                       <ChevronLeft
@@ -544,7 +541,7 @@ export default function GuruCareMapScreen() {
                         size={20}
                         strokeWidth={2.4}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
                     <View style={styles.headerCopy}>
                       <Text style={styles.title}>Care Map</Text>
@@ -600,7 +597,7 @@ export default function GuruCareMapScreen() {
                       </View>
                     </View>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       onPress={() => router.push('/guru-pricing')}
                       style={styles.statusButton}
@@ -613,7 +610,7 @@ export default function GuruCareMapScreen() {
                         size={17}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
 
                   {message ? (
@@ -633,9 +630,10 @@ export default function GuruCareMapScreen() {
                         </Text>
                       </View>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={() => router.push('/guru-pricing')}
+                        scaleTo={0.88}
                         style={styles.filterButton}
                       >
                         <SlidersHorizontal
@@ -643,7 +641,7 @@ export default function GuruCareMapScreen() {
                           size={17}
                           strokeWidth={2.3}
                         />
-                      </Pressable>
+                      </BubblePressable>
                     </View>
 
                     <CoverageMap
@@ -707,11 +705,12 @@ export default function GuruCareMapScreen() {
                           const active = distanceFilter === distance;
 
                           return (
-                            <Pressable
+                            <BubblePressable
                               key={distance}
                               accessibilityRole="button"
                               accessibilityState={{ selected: active }}
                               onPress={() => setDistanceFilter(distance)}
+                              scaleTo={0.88}
                               style={[
                                 styles.distanceButton,
                                 active && styles.distanceButtonActive,
@@ -725,7 +724,7 @@ export default function GuruCareMapScreen() {
                               >
                                 {distance} mi
                               </Text>
-                            </Pressable>
+                            </BubblePressable>
                           );
                         },
                       )}
@@ -734,12 +733,12 @@ export default function GuruCareMapScreen() {
 
                   <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Nearby opportunities</Text>
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       onPress={() => router.push('/guru-requests')}
                     >
                       <Text style={styles.sectionLink}>View requests</Text>
-                    </Pressable>
+                    </BubblePressable>
                   </View>
 
                   {loading ? (
@@ -779,74 +778,7 @@ export default function GuruCareMapScreen() {
                   )}
                 </ScrollView>
 
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    icon={
-                      <Home
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Dashboard"
-                    onPress={() => router.push('/guru-dashboard')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    active
-                    icon={
-                      <MapPin
-                        color={palette.primary}
-                        size={21}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    label="Care Map"
-                    onPress={() => undefined}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <CalendarDays
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Bookings"
-                    onPress={() => router.push('/guru-requests')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <MessageCircle
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Messages"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/messages',
-                        params: { role: 'guru' },
-                      })
-                    }
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <UserRound
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Profile"
-                    onPress={() => router.push('/guru-profile')}
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar active="careMap" role="guru" />
               </View>
             </View>
 
@@ -1621,7 +1553,7 @@ function OpportunityCard({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={() =>
         router.push({
@@ -1629,6 +1561,7 @@ function OpportunityCard({
           params: { requestId: item.id },
         })
       }
+      scaleTo={0.97}
       style={styles.opportunityCard}
     >
       <View style={styles.opportunityIcon}>
@@ -1660,35 +1593,7 @@ function OpportunityCard({
           strokeWidth={2.3}
         />
       </View>
-    </Pressable>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      {icon}
-      <Text style={active ? styles.navLabelActive : styles.navLabel}>
-        {label}
-      </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -2046,7 +1951,7 @@ function createStyles(isDark: boolean) {
     },
     scrollContent: {
       gap: 13,
-      paddingBottom: 110,
+      paddingBottom: 16,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -2605,42 +2510,6 @@ function createStyles(isDark: boolean) {
       borderRadius: 999,
       height: 8,
       width: '38%',
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 72,
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: -7 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
     },
   });
 }

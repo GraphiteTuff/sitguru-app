@@ -20,8 +20,8 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -30,9 +30,11 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruProfilePhotoFrame from '@/components/SitGuruProfilePhotoFrame';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
 import {
   setThemePreference,
@@ -78,132 +80,13 @@ const THEME_OPTIONS: ThemeOption[] = [
   },
 ];
 
-const previewGurus: PublicGuruProfile[] = [
-  [
-    'preview-avery',
-    'Avery',
-    'Quakertown',
-    'PA',
-    28,
-    ['Dog Walking', 'Drop-In Visits', 'Pet Sitting'],
-  ],
-  [
-    'preview-caleb',
-    'Caleb',
-    'Bethlehem',
-    'PA',
-    30,
-    ['Boarding', 'Dog Walking', 'House Sitting'],
-  ],
-  [
-    'preview-darius',
-    'Darius',
-    'Philadelphia',
-    'PA',
-    32,
-    ['Drop-In Visits', 'Senior Pets', 'Dog Walking'],
-  ],
-  [
-    'preview-emma',
-    'Emma',
-    'Doylestown',
-    'PA',
-    29,
-    ['Pet Sitting', 'Cats', 'Medication Reminders'],
-  ],
-  [
-    'preview-jason',
-    'Jason',
-    'Allentown',
-    'PA',
-    31,
-    ['Doggy Day Care', 'Boarding', 'Large Dogs'],
-  ],
-  [
-    'preview-maya',
-    'Maya',
-    'Lansdale',
-    'PA',
-    27,
-    ['Puppy Visits', 'Dog Walking', 'Photo Updates'],
-  ],
-  [
-    'preview-nina',
-    'Nina',
-    'Easton',
-    'PA',
-    26,
-    ['Cats', 'Drop-In Visits', 'House Sitting'],
-  ],
-  [
-    'preview-olivia',
-    'Olivia',
-    'New Hope',
-    'PA',
-    34,
-    ['Pet Sitting', 'Trail Walks', 'Weekend Care'],
-  ],
-  [
-    'preview-sofia',
-    'Sofia',
-    'Yardley',
-    'PA',
-    33,
-    ['Dog Walking', 'Boarding', 'Senior Pets'],
-  ],
-  [
-    'preview-suzy',
-    'Suzy',
-    'Perkasie',
-    'PA',
-    25,
-    ['Drop-In Visits', 'Small Dogs', 'Pet Sitting'],
-  ],
-].map(([id, name, city, state, rate, services]) => ({
-  id: id as string,
-  display_name: name as string,
-  first_name: name as string,
-  slug: String(name).toLowerCase(),
-  bio: `${name} is a local Guru preview designed to show families the quality of SitGuru profiles while local care availability grows.`,
-  service_city: city as string,
-  service_state: state as string,
-  hourly_rate: rate as number,
-  rating_avg: null,
-  review_count: null,
-  is_verified: false,
-  is_bookable: false,
-  accepting_bookings: false,
-  is_accepting_bookings: false,
-  role: 'Local Pet Care Guru',
-  services: services as string[],
-  source: 'placeholder',
-}));
-
-const SELECT_FIELDS = '*';
-
-const fallbackServices = [
-  'Dog Walking',
-  'Drop-In Visits',
-  'Pet Sitting',
-  'Boarding',
-];
-
 const safetyNotes = [
   'Keep booking and payment inside SitGuru',
   'Message before booking to confirm fit',
   'Use SitGuru care notes and updates during active care',
 ];
 
-const reviewPreview = [
-  [
-    'Local family',
-    'Reviews will appear after completed SitGuru bookings.',
-  ],
-  [
-    'SitGuru',
-    'Profiles highlight communication, services, and safety details before families request care.',
-  ],
-];
+const SELECT_FIELDS = '*';
 
 async function loadPublicGurus() {
   if (!isSupabaseConfigured) {
@@ -275,71 +158,81 @@ export default function GuruProfileScreen() {
   const themePreference = useThemePreference();
   const isDark = themeMode === 'dark';
   const palette = getPalette(isDark);
-  const styles = createStyles(isDark, isTablet);
+  const styles = createStyles(isDark);
 
-  const [gurus, setGurus] =
-    useState<PublicGuruProfile[]>(previewGurus);
+  const [gurus, setGurus] = useState<PublicGuruProfile[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadGurus = useCallback(async () => {
-    const rows = await loadPublicGurus();
+    if (!isSupabaseConfigured) {
+      setGurus([]);
+      setLoadError('Guru profiles are not configured in this build.');
+      return;
+    }
 
-    if (rows.length) {
+    try {
+      const rows = await loadPublicGurus();
       setGurus(rows);
+      setLoadError(null);
+    } catch (error) {
+      setGurus([]);
+      setLoadError(
+        error instanceof Error
+          ? `SitGuru could not load this Guru profile: ${error.message}`
+          : 'SitGuru could not load this Guru profile.',
+      );
     }
   }, []);
 
   useEffect(() => {
     let mounted = true;
 
-    loadPublicGurus()
-      .then((rows) => {
-        if (mounted && rows.length) {
-          setGurus(rows);
-        }
-      })
-      .catch(() => undefined);
+    setLoading(true);
+    loadGurus()
+      .catch(() => undefined)
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadGurus]);
 
   const normalizedSlug =
     typeof slug === 'string' ? slug.toLowerCase() : '';
 
-  const selectedGuru = useMemo(
-    () =>
-      gurus.find(
-        (guru) =>
-          guru.id === guruId ||
-          getGuruSlug(guru).toLowerCase() === normalizedSlug,
-      ) ??
-      previewGurus.find(
-        (guru) =>
-          guru.id === guruId ||
-          getGuruSlug(guru).toLowerCase() === normalizedSlug,
-      ) ??
-      gurus[0] ??
-      previewGurus[0],
-    [guruId, gurus, normalizedSlug],
-  );
+  const selectedGuru = useMemo(() => {
+    const match = gurus.find(
+      (guru) =>
+        guru.id === guruId ||
+        getGuruSlug(guru).toLowerCase() === normalizedSlug,
+    );
 
-  const guruName = getGuruDisplayName(selectedGuru);
-  const guruFirstName = getGuruFirstName(selectedGuru);
-  const guruLocation = getGuruLocationLabel(selectedGuru);
-  const guruPhotoUrl = resolveSupabaseStorageUrl(
-    getGuruPhotoUrl(selectedGuru),
-  );
-  const preview = isKnownPreviewGuru(selectedGuru);
-  const bookable = isGuruBookable(selectedGuru);
-  const services = getGuruServices(selectedGuru);
-  const serviceList = services.length
-    ? services
-    : fallbackServices;
-  const notice = getGuruProfileNotice(selectedGuru);
-  const ratingLabel = getGuruRatingLabel(selectedGuru);
-  const reviewCount = Number(selectedGuru.review_count || 0);
+    if (match) return match;
+    if (guruId || normalizedSlug) return undefined;
+    return gurus[0];
+  }, [guruId, gurus, normalizedSlug]);
+
+  const guruName = selectedGuru ? getGuruDisplayName(selectedGuru) : '';
+  const guruFirstName = selectedGuru ? getGuruFirstName(selectedGuru) : '';
+  const guruLocation = selectedGuru
+    ? getGuruLocationLabel(selectedGuru)
+    : '';
+  const guruPhotoUrl = selectedGuru
+    ? resolveSupabaseStorageUrl(getGuruPhotoUrl(selectedGuru))
+    : '';
+  const preview = selectedGuru ? isKnownPreviewGuru(selectedGuru) : false;
+  const bookable = selectedGuru ? isGuruBookable(selectedGuru) : false;
+  const serviceList = selectedGuru ? getGuruServices(selectedGuru) : [];
+  const notice = selectedGuru ? getGuruProfileNotice(selectedGuru) : '';
+  const ratingLabel = selectedGuru
+    ? getGuruRatingLabel(selectedGuru)
+    : 'No rating yet';
+  const reviewCount = Number(selectedGuru?.review_count || 0);
+  const hasRating = Number(selectedGuru?.rating_avg) > 0;
 
   const statusCopy = preview
     ? 'Profile preview'
@@ -364,6 +257,8 @@ export default function GuruProfileScreen() {
   }
 
   function openConversation() {
+    if (!selectedGuru) return;
+
     router.push({
       pathname: '/conversation',
       params: {
@@ -374,6 +269,8 @@ export default function GuruProfileScreen() {
   }
 
   function handleBookingAction() {
+    if (!selectedGuru) return;
+
     if (preview) {
       Alert.alert(
         'Profile preview',
@@ -440,20 +337,18 @@ export default function GuruProfileScreen() {
                 }
                 showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
-                  <Pressable
+                  <BubblePressable
                     accessibilityLabel="Back to Find Care"
                     accessibilityRole="button"
                     onPress={() => router.push('/find-care')}
-                    style={({ pressed }) => [
-                      styles.headerBackButton,
-                      pressed && styles.pressed,
-                    ]}>
+                    scaleTo={0.88}
+                    style={styles.headerBackButton}>
                     <ArrowLeft
                       color={palette.primary}
                       size={20}
                       strokeWidth={2.5}
                     />
-                  </Pressable>
+                  </BubblePressable>
 
                   <View style={styles.headerCopy}>
                     <Text style={styles.headerTitle}>
@@ -465,35 +360,31 @@ export default function GuruProfileScreen() {
                   </View>
 
                   <View style={styles.headerActions}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityLabel="Refresh profile"
                       accessibilityRole="button"
                       onPress={() => void handleRefresh()}
-                      style={({ pressed }) => [
-                        styles.headerIconButton,
-                        pressed && styles.pressed,
-                      ]}>
+                      scaleTo={0.88}
+                      style={styles.headerIconButton}>
                       <RefreshCw
                         color={palette.title}
                         size={17}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityLabel="Open notifications"
                       accessibilityRole="button"
                       onPress={() => router.push('/notifications')}
-                      style={({ pressed }) => [
-                        styles.headerIconButton,
-                        pressed && styles.pressed,
-                      ]}>
+                      scaleTo={0.88}
+                      style={styles.headerIconButton}>
                       <Bell
                         color={palette.title}
                         size={17}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
                     <View style={styles.modeToggle}>
                       {THEME_OPTIONS.map((option) => {
@@ -501,7 +392,7 @@ export default function GuruProfileScreen() {
                           themePreference === option.value;
 
                         return (
-                          <Pressable
+                          <BubblePressable
                             key={option.value}
                             accessibilityLabel={`Switch to ${option.label} mode`}
                             accessibilityRole="button"
@@ -511,6 +402,7 @@ export default function GuruProfileScreen() {
                             onPress={() =>
                               setThemePreference(option.value)
                             }
+                            scaleTo={0.88}
                             style={[
                               styles.modeButton,
                               active &&
@@ -530,13 +422,41 @@ export default function GuruProfileScreen() {
                               size={15}
                               strokeWidth={2.4}
                             />
-                          </Pressable>
+                          </BubblePressable>
                         );
                       })}
                     </View>
                   </View>
                 </View>
 
+                {loading ? (
+                  <View style={styles.emptyState}>
+                    <ActivityIndicator color={palette.primary} size="small" />
+                    <Text style={styles.emptyTitle}>Loading Guru profile</Text>
+                    <Text style={styles.emptyText}>
+                      SitGuru is checking live Guru data for this profile.
+                    </Text>
+                  </View>
+                ) : loadError ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyTitle}>Profile unavailable</Text>
+                    <Text style={styles.emptyText}>{loadError}</Text>
+                  </View>
+                ) : !selectedGuru ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyTitle}>
+                      {guruId || normalizedSlug
+                        ? 'Guru not found'
+                        : 'No Guru profiles yet'}
+                    </Text>
+                    <Text style={styles.emptyText}>
+                      {guruId || normalizedSlug
+                        ? 'This Guru profile could not be found. No sample Gurus are shown.'
+                        : 'No live Guru profiles are available yet. SitGuru does not show placeholder Gurus here.'}
+                    </Text>
+                  </View>
+                ) : (
+                  <>
                 <View style={styles.heroCard}>
                   <View style={styles.heroPhotoWrap}>
                     <SitGuruProfilePhotoFrame
@@ -625,7 +545,7 @@ export default function GuruProfileScreen() {
 
                       <Star
                         color={palette.star}
-                        fill={palette.star}
+                        fill={hasRating ? palette.star : 'transparent'}
                         size={13}
                         strokeWidth={2.2}
                       />
@@ -698,7 +618,7 @@ export default function GuruProfileScreen() {
                     icon={
                       <Star
                         color={palette.star}
-                        fill={palette.star}
+                        fill={hasRating ? palette.star : 'transparent'}
                         size={17}
                         strokeWidth={2.35}
                       />
@@ -743,7 +663,8 @@ export default function GuruProfileScreen() {
                   </View>
 
                   <View style={styles.servicePills}>
-                    {serviceList.map((service) => (
+                    {serviceList.length ? (
+                      serviceList.map((service) => (
                       <View
                         key={service}
                         style={styles.servicePill}>
@@ -751,7 +672,12 @@ export default function GuruProfileScreen() {
                           {service}
                         </Text>
                       </View>
-                    ))}
+                      ))
+                    ) : (
+                      <Text style={styles.bodyText}>
+                        This Guru has not listed services yet.
+                      </Text>
+                    )}
                   </View>
                 </View>
 
@@ -777,7 +703,7 @@ export default function GuruProfileScreen() {
 
                   <Text style={styles.bodyText}>
                     {selectedGuru.bio ||
-                      'Friendly local Guru who values clear communication, thoughtful care notes, and calm pet routines for nearby families.'}
+                      'This Guru has not added a bio yet.'}
                   </Text>
                 </View>
 
@@ -920,38 +846,16 @@ export default function GuruProfileScreen() {
                     </View>
                   </View>
 
-                  {reviewPreview.map(([name, text]) => (
-                    <View key={name} style={styles.reviewCard}>
-                      <View style={styles.reviewTopRow}>
-                        <View style={styles.reviewAvatar}>
-                          <Text style={styles.reviewAvatarText}>
-                            {name.slice(0, 1)}
-                          </Text>
-                        </View>
-
-                        <View style={styles.reviewCopy}>
-                          <Text style={styles.reviewName}>
-                            {name}
-                          </Text>
-                          <View style={styles.reviewStars}>
-                            {[0, 1, 2, 3, 4].map((star) => (
-                              <Star
-                                color={palette.star}
-                                fill={palette.star}
-                                key={star}
-                                size={10}
-                                strokeWidth={2}
-                              />
-                            ))}
-                          </View>
-                        </View>
-                      </View>
-
-                      <Text style={styles.reviewText}>
-                        {text}
-                      </Text>
-                    </View>
-                  ))}
+                  {reviewCount > 0 ? (
+                    <Text style={styles.bodyText}>
+                      {reviewCount} verified review
+                      {reviewCount === 1 ? '' : 's'} on completed SitGuru bookings.
+                    </Text>
+                  ) : (
+                    <Text style={styles.bodyText}>
+                      No reviews yet. Reviews appear after completed SitGuru bookings.
+                    </Text>
+                  )}
                 </View>
 
                 <View style={styles.connectCard}>
@@ -1009,84 +913,11 @@ export default function GuruProfileScreen() {
                     />
                   </View>
                 </View>
+                  </>
+                )}
               </ScrollView>
 
-              <View style={styles.bottomNav}>
-                <BottomNavItem
-                  icon={
-                    <SitGuruIcon
-                      color={palette.navMuted}
-                      name="home"
-                      size={21}
-                      strokeWidth={2.4}
-                    />
-                  }
-                  label="Home"
-                  onPress={() =>
-                    router.push('/pet-parent-dashboard')
-                  }
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  active
-                  icon={
-                    <SitGuruIcon
-                      color={palette.primary}
-                      name="explore"
-                      size={21}
-                      strokeWidth={2.4}
-                    />
-                  }
-                  label="Care"
-                  onPress={() => router.push('/find-care')}
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  icon={
-                    <SitGuruIcon
-                      color={palette.navMuted}
-                      name="bookings"
-                      size={21}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Bookings"
-                  onPress={() =>
-                    router.push('/request-booking')
-                  }
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  icon={
-                    <SitGuruIcon
-                      color={palette.navMuted}
-                      name="messages"
-                      size={21}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Messages"
-                  onPress={openConversation}
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  icon={
-                    <SitGuruIcon
-                      color={palette.navMuted}
-                      name="profile"
-                      size={21}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Profile"
-                  onPress={() => router.push('/account')}
-                  styles={styles}
-                />
-              </View>
+              <SitGuruTabBar active="profile" role="guru" />
             </View>
           </View>
 
@@ -1144,16 +975,15 @@ function ActionButton({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.actionButton,
         primary && styles.actionButtonPrimary,
         disabled && styles.actionButtonDisabled,
-        pressed && !disabled && styles.pressed,
       ]}>
       {icon}
       <Text
@@ -1164,7 +994,7 @@ function ActionButton({
         ]}>
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1249,38 +1079,6 @@ function InlineNotice({
   );
 }
 
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}>
-      {icon}
-      <Text
-        style={
-          active
-            ? styles.navLabelActive
-            : styles.navLabel
-        }>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 function PhoneStatusBar({
   styles,
 }: {
@@ -1327,10 +1125,7 @@ function getPalette(isDark: boolean) {
   };
 }
 
-function createStyles(
-  isDark: boolean,
-  isTablet: boolean,
-) {
+function createStyles(isDark: boolean) {
   const palette = getPalette(isDark);
 
   return StyleSheet.create({
@@ -1475,7 +1270,7 @@ function createStyles(
 
     scrollContent: {
       gap: 13,
-      paddingBottom: 108,
+      paddingBottom: 16,
       paddingHorizontal: 15,
       paddingTop: 9,
     },
@@ -1484,6 +1279,31 @@ function createStyles(
       maxWidth: 860,
       paddingHorizontal: 24,
       width: '100%',
+    },
+    emptyState: {
+      alignItems: 'center',
+      backgroundColor: palette.surface,
+      borderColor: palette.border,
+      borderRadius: 20,
+      borderWidth: 1,
+      gap: 8,
+      justifyContent: 'center',
+      minHeight: 220,
+      paddingHorizontal: 22,
+      paddingVertical: 28,
+    },
+    emptyTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 16,
+      textAlign: 'center',
+    },
+    emptyText: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 12,
+      lineHeight: 18,
+      textAlign: 'center',
     },
 
     header: {
@@ -1956,50 +1776,5 @@ function createStyles(
       width: '100%',
     },
 
-    pressed: {
-      opacity: 0.72,
-      transform: [{ scale: 0.985 }],
-    },
-
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 72,
-      justifyContent: 'space-around',
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor: '#000000',
-      shadowOffset: {
-        width: 0,
-        height: -7,
-      },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
-    },
   });
 }

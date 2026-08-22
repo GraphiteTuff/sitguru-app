@@ -19,12 +19,16 @@ export type PushRegistrationResult = {
  */
 export async function registerAndPersistPushToken(
   userId: string,
+  options?: { prompt?: boolean },
 ): Promise<PushRegistrationResult> {
   if (!userId) {
     return { token: null, saved: false, error: 'Sign in required.' };
   }
 
-  const token = await registerForPushNotificationsAsync();
+  const token = await registerForPushNotificationsAsync({
+    prompt: options?.prompt,
+  });
+
   if (!token) {
     return {
       token: null,

@@ -1,6 +1,8 @@
 import { Asset } from "expo-asset";
 import { router, useLocalSearchParams } from "expo-router";
 import {
+  ArrowUpDown,
+  Check,
   ChevronLeft,
   Heart,
   List,
@@ -10,22 +12,27 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Star,
+  X,
 } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
+  type ImageStyle,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  type StyleProp,
   Text,
   TextInput,
   View,
 } from "react-native";
 
+import BubblePressable from "@/components/BubblePressable";
 import { SitGuruIcon } from "@/components/SitGuruIcon";
 import SitGuruScreen from "@/components/SitGuruScreen";
+import SitGuruTabBar from "@/components/SitGuruTabBar";
 import { AppFonts } from "@/constants/fonts";
 import {
   setThemePreference,
@@ -49,10 +56,14 @@ import {
   type PublicGuruProfile,
 } from "@/types/guru";
 
+// react-native-maps has no web build, so it can only be loaded conditionally.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const MapsModule = Platform.OS === "web" ? null : require("react-native-maps");
 const NativeMapView = MapsModule?.default ?? MapsModule?.MapView;
 const NativeMarker = MapsModule?.Marker;
 
+// Metro resolves bundled image assets through require().
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const SITGURU_FALLBACK_AVATAR = require("../assets/images/sitguru-symbol-green.jpg");
 
 function resolveBundledAssetUri(assetModule: unknown) {
@@ -86,18 +97,27 @@ const SITGURU_FALLBACK_AVATAR_URI = resolveBundledAssetUri(
   SITGURU_FALLBACK_AVATAR,
 );
 
+/**
+ * Tracks the photo that failed rather than a boolean, so a new photoUrl clears
+ * the failure during render instead of through a cascading effect.
+ */
+function useFailedPhotoUrl(photoUrl?: string | null) {
+  const [failedPhotoUrl, setFailedPhotoUrl] = useState<string | null>(null);
+
+  return {
+    imageFailed: failedPhotoUrl !== null && failedPhotoUrl === (photoUrl ?? ""),
+    markImageFailed: () => setFailedPhotoUrl(photoUrl ?? ""),
+  };
+}
+
 function GuruAvatarImage({
   photoUrl,
   style,
 }: {
   photoUrl?: string | null;
-  style: any;
+  style: StyleProp<ImageStyle>;
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [photoUrl]);
+  const { imageFailed, markImageFailed } = useFailedPhotoUrl(photoUrl);
 
   const source =
     photoUrl && !imageFailed ? { uri: photoUrl } : SITGURU_FALLBACK_AVATAR;
@@ -105,7 +125,7 @@ function GuruAvatarImage({
   return (
     <Image
       accessibilityLabel="Guru profile photo"
-      onError={() => setImageFailed(true)}
+      onError={markImageFailed}
       resizeMode="cover"
       source={source}
       style={style}
@@ -120,11 +140,7 @@ function GuruCardHeroImage({
   photoUrl?: string | null;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [photoUrl]);
+  const { imageFailed, markImageFailed } = useFailedPhotoUrl(photoUrl);
 
   const source =
     photoUrl && !imageFailed ? { uri: photoUrl } : SITGURU_FALLBACK_AVATAR;
@@ -134,7 +150,7 @@ function GuruCardHeroImage({
       <Image
         accessibilityElementsHidden
         blurRadius={Platform.OS === "web" ? 0 : 6}
-        onError={() => setImageFailed(true)}
+        onError={markImageFailed}
         resizeMode="cover"
         source={source}
         style={styles.guruProfilePhotoBackdrop}
@@ -147,7 +163,7 @@ function GuruCardHeroImage({
 
       <Image
         accessibilityLabel="Guru profile photo"
-        onError={() => setImageFailed(true)}
+        onError={markImageFailed}
         resizeMode="contain"
         source={source}
         style={styles.guruProfilePhoto}
@@ -162,11 +178,6 @@ type ServiceOption = {
   keywords: string[];
 };
 
-type GuruLoadResult = {
-  gurus: PublicGuruProfile[];
-  usedFallback: boolean;
-};
-
 type ThemeOption = {
   label: string;
   value: SitGuruThemePreference;
@@ -175,6 +186,49 @@ type ThemeOption = {
 
 type ExploreView = "list" | "map";
 type DiscoveryScope = "all" | "nearby";
+type GuruSortKey =
+  | "recommended"
+  | "rating"
+  | "reviews"
+  | "distance"
+  | "price";
+
+type SearchFilters = {
+  minRating: number | null;
+  minReviews: number | null;
+  maxAllInHourly: number | null;
+};
+
+type SearchPreferences = {
+  sortKey: GuruSortKey;
+  serviceValue: string;
+  filters: SearchFilters;
+};
+
+/**
+ * Subset of `marketplace_fee_rules` that the checkout route reads when it
+ * resolves the SitGuru marketplace fee for a booking.
+ */
+type MarketplaceFeeRule = {
+  id?: string | null;
+  locality_name?: string | null;
+  state?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  radius_miles?: number | string | null;
+  fee_percent?: number | string | null;
+};
+
+type GuruPriceDisplay = {
+  allInHourly: number | null;
+  baseHourly: number | null;
+  detailLabel: string;
+  feePercent: number;
+  headline: string;
+  isAllIn: boolean;
+};
 
 type HomeLocation = {
   zipCode: string;
@@ -194,6 +248,13 @@ type MapRegion = MapCoordinate & {
   longitudeDelta: number;
 };
 
+/**
+ * MapLibre and the DOM are only reachable on web, where the library is pulled in
+ * through a runtime require(), so its handles carry no static type here.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type WebMapHandle = any;
+
 type GuruMapPoint = {
   guru: PublicGuruProfile;
   id: string;
@@ -210,11 +271,17 @@ type GuruMapPoint = {
 const FAVORITE_GURUS_STORAGE_KEY = "sitguru.favoriteGuruIds.v1";
 const HOME_LOCATION_STORAGE_KEY = "sitguru.homeLocation.v1";
 const DISCOVERY_SCOPE_STORAGE_KEY = "sitguru.discoveryScope.v1";
+const SEARCH_PREFERENCES_STORAGE_KEY = "sitguru.findCareSearchPrefs.v1";
+
+// These mirror app/api/stripe/checkout/route.ts, which resolves the real fee
+// from marketplace_fee_rules and clamps every result into the same band.
+const DEFAULT_SITGURU_FEE_PERCENT = 15;
+const MIN_SITGURU_FEE_PERCENT = 15;
+const MAX_SITGURU_FEE_PERCENT = 20;
 const SELECT_FIELDS = "*";
 const LOCAL_DISCOVERY_RADIUS_MILES = 75;
 const MAX_MAP_GURUS = 60;
 const MAX_NEARBY_MAP_GURUS = 20;
-const MINIMUM_MAP_GURU_COUNT = 8;
 const WEB_MAPLIBRE_CSS_ID = "sitguru-maplibre-css";
 const WEB_MAPLIBRE_CSS_URL =
   "https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css";
@@ -336,6 +403,67 @@ const services: ServiceOption[] = [
     value: "custom_care",
     keywords: ["custom", "custom care", "special"],
   },
+];
+
+const sortOptions: {
+  detail: string;
+  label: string;
+  value: GuruSortKey;
+}[] = [
+  {
+    value: "recommended",
+    label: "Recommended",
+    detail: "SitGuru's default match order",
+  },
+  {
+    value: "rating",
+    label: "Highest rated",
+    detail: "Best star rating first",
+  },
+  {
+    value: "reviews",
+    label: "Most reviewed",
+    detail: "Most reviews on SitGuru first",
+  },
+  {
+    value: "distance",
+    label: "Nearest first",
+    detail: "Closest to your home area",
+  },
+  {
+    value: "price",
+    label: "Price: low to high",
+    detail: "Lowest all-in hourly price first",
+  },
+];
+
+const DEFAULT_SEARCH_FILTERS: SearchFilters = {
+  minRating: null,
+  minReviews: null,
+  maxAllInHourly: null,
+};
+
+const ratingFilterOptions: { label: string; value: number | null }[] = [
+  { label: "Any", value: null },
+  { label: "4.0+", value: 4 },
+  { label: "4.5+", value: 4.5 },
+  { label: "4.8+", value: 4.8 },
+];
+
+const reviewFilterOptions: { label: string; value: number | null }[] = [
+  { label: "Any", value: null },
+  { label: "1+", value: 1 },
+  { label: "5+", value: 5 },
+  { label: "10+", value: 10 },
+  { label: "25+", value: 25 },
+];
+
+const priceFilterOptions: { label: string; value: number | null }[] = [
+  { label: "Any", value: null },
+  { label: "Under $25", value: 25 },
+  { label: "Under $40", value: 40 },
+  { label: "Under $60", value: 60 },
+  { label: "Under $80", value: 80 },
 ];
 
 const STATE_COORDS: Record<string, MapCoordinate & { stateName: string }> = {
@@ -468,157 +596,8 @@ const localZipHints: Record<string, string[]> = {
   "boston ma": ["02108", "02109", "02110", "02111"],
 };
 
-const previewGurus: PublicGuruProfile[] = [
-  [
-    "preview-wa",
-    "Willow Parker",
-    "Seattle",
-    "WA",
-    32,
-    18,
-    ["Dog Walking", "Drop-In Visits", "Pet Sitting"],
-  ],
-  [
-    "preview-or",
-    "Olivia Rivers",
-    "Portland",
-    "OR",
-    29,
-    15,
-    ["Walks", "Sitting", "Cats"],
-  ],
-  [
-    "preview-ca",
-    "Camila Santos",
-    "Los Angeles",
-    "CA",
-    36,
-    25,
-    ["Dog Walking", "Boarding", "Drop-In Visits"],
-  ],
-  [
-    "preview-az",
-    "Avery Stone",
-    "Phoenix",
-    "AZ",
-    28,
-    20,
-    ["Drop-In Visits", "Senior Pets", "Dog Walking"],
-  ],
-  [
-    "preview-co",
-    "Caleb Reed",
-    "Denver",
-    "CO",
-    31,
-    22,
-    ["Boarding", "Dog Walking", "House Sitting"],
-  ],
-  [
-    "preview-mn",
-    "Mia North",
-    "Minneapolis",
-    "MN",
-    30,
-    18,
-    ["Walks", "Sitting", "Boarding"],
-  ],
-  [
-    "preview-il",
-    "Isla Brooks",
-    "Chicago",
-    "IL",
-    27,
-    15,
-    ["Drop-In Visits", "Pet Sitting", "Cats"],
-  ],
-  [
-    "preview-oh",
-    "Owen Hart",
-    "Columbus",
-    "OH",
-    29,
-    18,
-    ["Walks", "Boarding", "Drop-In Visits"],
-  ],
-  [
-    "preview-tn",
-    "Tessa Green",
-    "Nashville",
-    "TN",
-    28,
-    20,
-    ["Pet Sitting", "Dog Walking", "Weekend Care"],
-  ],
-  [
-    "preview-ga",
-    "Alyssa Brooks",
-    "Atlanta",
-    "GA",
-    22,
-    18,
-    ["Walks", "Drop-In Visits", "Sitting"],
-  ],
-  [
-    "preview-ny",
-    "Nina Hart",
-    "New York",
-    "NY",
-    36,
-    16,
-    ["Cats", "Drop-In Visits", "House Sitting"],
-  ],
-  [
-    "preview-pa",
-    "Darius Miller",
-    "Philadelphia",
-    "PA",
-    32,
-    25,
-    ["Drop-In Visits", "Senior Pets", "Dog Walking"],
-  ],
-  [
-    "preview-ma",
-    "Jessica M.",
-    "Boston",
-    "MA",
-    35,
-    16,
-    ["Walks", "Sitting", "Boarding"],
-  ],
-  [
-    "preview-fl",
-    "Faith Lopez",
-    "Miami",
-    "FL",
-    30,
-    30,
-    ["Boarding", "Walks", "Drop-In Visits"],
-  ],
-].map(([id, name, city, state, rate, radius, svc]) => ({
-  id: id as string,
-  display_name: name as string,
-  first_name: String(name).split(" ")[0],
-  slug: String(name).toLowerCase().replace(/\s+/g, "-"),
-  bio: `${name} is a polished local Guru preview showing the care style, services, and trust details SitGuru families can review as local availability grows.`,
-  service_city: city as string,
-  service_state: state as string,
-  hourly_rate: rate as number,
-  service_radius_miles: radius as number,
-  rating_avg: null,
-  review_count: null,
-  is_verified: false,
-  is_bookable: false,
-  accepting_bookings: false,
-  is_accepting_bookings: false,
-  role: "Local Pet Care Guru",
-  services: svc as string[],
-  service_area: `${city}, ${state} service area`,
-  source: "placeholder",
-}));
-
-async function loadPublicGurus(): Promise<GuruLoadResult> {
-  if (!isSupabaseConfigured) return { gurus: [], usedFallback: true };
+async function loadPublicGurus(): Promise<PublicGuruProfile[]> {
+  if (!isSupabaseConfigured) return [];
 
   const sources: Array<{ table: string; profiles?: boolean }> = [
     { table: "public_guru_search_profiles" },
@@ -643,17 +622,41 @@ async function loadPublicGurus(): Promise<GuruLoadResult> {
     const result = await query;
 
     if (!result.error && result.data?.length) {
-      return {
-        gurus: (result.data as PublicGuruProfile[]).map((guru) => ({
-          ...guru,
-          source: source.table as PublicGuruProfile["source"],
-        })),
-        usedFallback: false,
-      };
+      return (result.data as PublicGuruProfile[]).map((guru) => ({
+        ...guru,
+        source: source.table as PublicGuruProfile["source"],
+      }));
     }
   }
 
-  return { gurus: [], usedFallback: true };
+  return [];
+}
+
+/**
+ * Reads the same marketplace_fee_rules rows the Stripe checkout route uses so
+ * the search results quote the real fee instead of a guessed one. The table is
+ * privileged, so an anon-key read is expected to come back empty; callers then
+ * fall back to the route's documented default.
+ */
+async function loadMarketplaceFeeRules(): Promise<MarketplaceFeeRule[]> {
+  if (!isSupabaseConfigured) return [];
+
+  try {
+    const result = await supabase
+      .from("marketplace_fee_rules")
+      .select(
+        "id, locality_name, state, city, postal_code, latitude, longitude, radius_miles, fee_percent, is_active, priority, created_at",
+      )
+      .eq("is_active", true)
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (result.error || !result.data) return [];
+
+    return result.data as MarketplaceFeeRule[];
+  } catch {
+    return [];
+  }
 }
 
 export default function FindCareScreen() {
@@ -674,10 +677,20 @@ export default function FindCareScreen() {
   const initialZipParam = Array.isArray(routeParams.zip)
     ? routeParams.zip[0]
     : routeParams.zip;
+  const hasServiceRouteParam = Boolean(
+    String(initialServiceParam || "").trim(),
+  );
 
   const matchedInitialService = useMemo(() => {
     const raw = String(initialServiceParam || "").trim().toLowerCase();
-    if (!raw || raw === "all" || raw === "all services") return services[0];
+
+    if (!raw) {
+      return (
+        findServiceByValue(sessionSearchPreferences?.serviceValue) ?? services[0]
+      );
+    }
+
+    if (raw === "all" || raw === "all services") return services[0];
 
     return (
       services.find(
@@ -710,6 +723,14 @@ export default function FindCareScreen() {
   const [isEditingHomeZip, setIsEditingHomeZip] = useState(false);
   const [isSavingHomeZip, setIsSavingHomeZip] = useState(false);
   const [isMapPreviewExpanded, setIsMapPreviewExpanded] = useState(false);
+  const [sortKey, setSortKey] = useState<GuruSortKey>(
+    () => sessionSearchPreferences?.sortKey ?? "recommended",
+  );
+  const [filters, setFilters] = useState<SearchFilters>(
+    () => sessionSearchPreferences?.filters ?? DEFAULT_SEARCH_FILTERS,
+  );
+  const [openSheet, setOpenSheet] = useState<"sort" | "filters" | null>(null);
+  const [feeRules, setFeeRules] = useState<MarketplaceFeeRule[]>([]);
 
   const cleanZip = searchQuery.replace(/\D/g, "").slice(0, 5);
   const hasValidZip = cleanZip.length === 5;
@@ -718,124 +739,158 @@ export default function FindCareScreen() {
     : homeLocation
       ? `ZIP ${homeLocation.zipCode}`
       : "your care area";
-  const sourceGurus = useMemo(() => {
-    const requestedSearchCenter = getSearchCenter(searchQuery);
-    const requestedSearchArea = getSearchArea(searchQuery);
-    const hasSearch = Boolean(searchQuery.trim());
-    const homeCoordinate =
-      homeLocation &&
-      homeLocation.latitude !== null &&
-      homeLocation.longitude !== null
-        ? {
-            latitude: homeLocation.latitude,
-            longitude: homeLocation.longitude,
-          }
-        : null;
-    const previewCenter = requestedSearchCenter
-      ? {
-          latitude: requestedSearchCenter.latitude,
-          longitude: requestedSearchCenter.longitude,
-        }
-      : discoveryScope === "nearby" && !hasSearch
-        ? homeCoordinate
-        : null;
-
-    const localizedPreviewGurus = previewGurus.map((guru, index) => {
-      if (!previewCenter) return guru;
-
-      const coordinate = offsetCoordinateByMiles(
-        previewCenter,
-        2 + (index % 7) * 1.8,
-        (index * 47) % 360,
-      );
-      const localCity = requestedSearchCenter
-        ? requestedSearchArea?.city ||
-          (requestedSearchArea?.stateCode ? "Statewide" : "Local area")
-        : homeLocation?.city || guru.service_city;
-      const localState = requestedSearchCenter
-        ? requestedSearchArea?.stateCode || guru.service_state
-        : homeLocation?.stateCode || guru.service_state;
-      const localZip = requestedSearchArea?.zipCode || homeLocation?.zipCode;
-
-      return {
-        ...guru,
-        service_city: localCity,
-        service_state: localState,
-        service_area: requestedSearchCenter
-          ? `${localCity}, ${localState} service area`
-          : `${homeLocation?.city || guru.service_city}, ${
-              homeLocation?.stateCode || guru.service_state
-            } service area`,
-        zip_code: localZip || undefined,
-        service_zip: localZip || undefined,
-        service_zip_code: localZip || undefined,
-        latitude: coordinate.latitude,
-        longitude: coordinate.longitude,
-      };
-    });
-
-    const previewCandidates = requestedSearchCenter
-      ? localizedPreviewGurus
-      : previewGurus;
-
-    if (dynamicGurus.length === 0) return previewCandidates;
-
-    const guruIdentity = (guru: PublicGuruProfile) =>
-      `${getGuruDisplayName(guru).trim().toLowerCase()}|${getGuruStateCode(guru)}`;
-    const liveGuruIdentities = new Set(dynamicGurus.map(guruIdentity));
-    const previewFillers = previewCandidates.filter(
-      (guru) => !liveGuruIdentities.has(guruIdentity(guru)),
-    );
-
-    // Search must run across the complete Guru catalog. Previously the preview
-    // fillers were removed whenever the live table already contained eight or
-    // more rows, which could leave every search with only one visible match.
-    if (hasSearch || discoveryScope === "all") {
-      return [...dynamicGurus, ...previewFillers];
-    }
-
-    const fillerCount = Math.max(
-      0,
-      MINIMUM_MAP_GURU_COUNT - dynamicGurus.length,
-    );
-
-    return [...dynamicGurus, ...previewFillers.slice(0, fillerCount)];
-  }, [discoveryScope, dynamicGurus, homeLocation, searchQuery]);
+  const sourceGurus = dynamicGurus;
+  const activeFilterCount = countActiveFilters(filters, selectedService);
   const hasActiveFilters =
-    Boolean(searchQuery.trim()) || selectedService.value !== "all";
+    Boolean(searchQuery.trim()) || activeFilterCount > 0;
 
-  const displayedGurus = useMemo(() => {
-    const filtered = sourceGurus.filter((guru) => {
-      return (
-        guruMatchesService(guru, selectedService) &&
-        guruMatchesSearch(guru, searchQuery)
-      );
-    });
-
+  const homeCoordinate = useMemo<MapCoordinate | null>(() => {
     if (
-      discoveryScope === "all" ||
-      searchQuery.trim() ||
       !homeLocation ||
       homeLocation.latitude === null ||
       homeLocation.longitude === null
     ) {
-      return filtered;
+      return null;
     }
 
-    return [...filtered].sort((firstGuru, secondGuru) => {
-      const firstCoordinate = getGuruCoordinate(firstGuru, 0);
-      const secondCoordinate = getGuruCoordinate(secondGuru, 0);
-      const homeCoordinate = {
-        latitude: homeLocation.latitude as number,
-        longitude: homeLocation.longitude as number,
-      };
+    return {
+      latitude: homeLocation.latitude,
+      longitude: homeLocation.longitude,
+    };
+  }, [homeLocation]);
 
-      return (
-        getDistanceMiles(homeCoordinate, firstCoordinate) -
-        getDistanceMiles(homeCoordinate, secondCoordinate)
-      );
+  // Distance ordering needs a real reference point. A resolved search area wins
+  // over the saved home ZIP because it is what the user just asked for.
+  const distanceOrigin = useMemo<MapCoordinate | null>(() => {
+    const searchCenter = getSearchCenter(searchQuery);
+
+    if (searchCenter) {
+      return {
+        latitude: searchCenter.latitude,
+        longitude: searchCenter.longitude,
+      };
+    }
+
+    return homeCoordinate;
+  }, [homeCoordinate, searchQuery]);
+
+  const canSortByDistance = distanceOrigin !== null;
+  const appliedSortKey: GuruSortKey =
+    sortKey === "distance" && !canSortByDistance ? "recommended" : sortKey;
+  const appliedSortLabel =
+    sortOptions.find((option) => option.value === appliedSortKey)?.label ??
+    "Recommended";
+
+  const searchMatchedGurus = useMemo(
+    () => sourceGurus.filter((guru) => guruMatchesSearch(guru, searchQuery)),
+    [sourceGurus, searchQuery],
+  );
+
+  const filteredGurus = useMemo(() => {
+    return searchMatchedGurus.filter((guru) => {
+      if (!guruMatchesService(guru, selectedService)) return false;
+
+      if (filters.minRating !== null) {
+        const rating = getGuruRatingValue(guru);
+        if (rating === null || rating < filters.minRating) return false;
+      }
+
+      if (
+        filters.minReviews !== null &&
+        getGuruReviewCount(guru) < filters.minReviews
+      ) {
+        return false;
+      }
+
+      if (filters.maxAllInHourly !== null) {
+        const allInHourly = getGuruPriceDisplay(guru, feeRules).allInHourly;
+        if (allInHourly === null || allInHourly > filters.maxAllInHourly) {
+          return false;
+        }
+      }
+
+      return true;
     });
-  }, [sourceGurus, selectedService, searchQuery, homeLocation, discoveryScope]);
+  }, [feeRules, filters, searchMatchedGurus, selectedService]);
+
+  const displayedGurus = useMemo(() => {
+    // "Recommended" keeps the screen's original ordering: nearest-first inside a
+    // saved home area, otherwise the order the catalog came back in.
+    if (appliedSortKey === "recommended") {
+      if (
+        discoveryScope === "all" ||
+        searchQuery.trim() ||
+        homeCoordinate === null
+      ) {
+        return filteredGurus;
+      }
+
+      return sortGurusByValue(
+        filteredGurus,
+        (guru, index) =>
+          getDistanceMiles(homeCoordinate, getGuruCoordinate(guru, index)),
+        "ascending",
+      );
+    }
+
+    if (appliedSortKey === "rating") {
+      return sortGurusByValue(filteredGurus, getGuruRatingValue, "descending");
+    }
+
+    if (appliedSortKey === "reviews") {
+      return sortGurusByValue(
+        filteredGurus,
+        (guru) => {
+          const reviewCount = getGuruReviewCount(guru);
+          return reviewCount > 0 ? reviewCount : null;
+        },
+        "descending",
+      );
+    }
+
+    if (appliedSortKey === "price") {
+      return sortGurusByValue(
+        filteredGurus,
+        (guru) => getGuruPriceDisplay(guru, feeRules).allInHourly,
+        "ascending",
+      );
+    }
+
+    if (distanceOrigin === null) return filteredGurus;
+
+    return sortGurusByValue(
+      filteredGurus,
+      (guru, index) =>
+        getDistanceMiles(distanceOrigin, getGuruCoordinate(guru, index)),
+      "ascending",
+    );
+  }, [
+    appliedSortKey,
+    discoveryScope,
+    distanceOrigin,
+    feeRules,
+    filteredGurus,
+    homeCoordinate,
+    searchQuery,
+  ]);
+
+  const feeDisclosureLabel = useMemo(() => {
+    const percents = Array.from(
+      new Set(
+        displayedGurus.map((guru) => resolveGuruFeePercent(guru, feeRules)),
+      ),
+    ).sort((first, second) => first - second);
+
+    if (percents.length === 0) {
+      return `${formatFeePercent(DEFAULT_SITGURU_FEE_PERCENT)}%`;
+    }
+
+    if (percents.length === 1) return `${formatFeePercent(percents[0])}%`;
+
+    return `${formatFeePercent(percents[0])}–${formatFeePercent(
+      percents[percents.length - 1],
+    )}%`;
+  }, [displayedGurus, feeRules]);
 
   const mapPoints = useMemo<GuruMapPoint[]>(() => {
     const allPoints = displayedGurus.map((guru, index) => {
@@ -942,7 +997,7 @@ export default function FindCareScreen() {
     let mounted = true;
 
     loadPublicGurus()
-      .then(({ gurus }) => {
+      .then((gurus) => {
         if (!mounted) return;
         setDynamicGurus(gurus);
       })
@@ -973,6 +1028,40 @@ export default function FindCareScreen() {
 
   useEffect(() => {
     setDiscoveryScope(readDiscoveryScope());
+  }, []);
+
+  useEffect(() => {
+    if (sessionSearchPreferences) return;
+
+    const restored = readStoredSearchPreferences();
+    if (!restored) return;
+
+    persistSearchPreferences(restored);
+    setSortKey(restored.sortKey);
+    setFilters(restored.filters);
+
+    // A service passed in the route is an explicit request and outranks the
+    // stored choice.
+    if (hasServiceRouteParam) return;
+
+    const restoredService = findServiceByValue(restored.serviceValue);
+    if (restoredService) setSelectedService(restoredService);
+  }, [hasServiceRouteParam]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    loadMarketplaceFeeRules()
+      .then((rules) => {
+        if (mounted) setFeeRules(rules);
+      })
+      .catch(() => {
+        if (mounted) setFeeRules([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -1011,6 +1100,73 @@ export default function FindCareScreen() {
     });
     setIsMapPreviewExpanded(false);
   }, [displayedGurus, mapPoints, selectedService.value, searchQuery]);
+
+  function handleSelectService(service: ServiceOption) {
+    setSelectedService(service);
+    setNoticeMessage("");
+    persistSearchPreferences({
+      sortKey,
+      serviceValue: service.value,
+      filters,
+    });
+  }
+
+  function handleSelectSort(nextSortKey: GuruSortKey) {
+    if (nextSortKey === "distance" && !canSortByDistance) {
+      // Never leave a sort selected that has nothing to sort by. Send the user
+      // straight to the one input that unlocks it instead.
+      setOpenSheet(null);
+      setActiveView("list");
+      setNoticeMessage(
+        "Add your home ZIP to sort Gurus by distance, or search a ZIP, city, or state.",
+      );
+      handleOpenHomeZipEditor();
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      return;
+    }
+
+    setSortKey(nextSortKey);
+    setOpenSheet(null);
+    setNoticeMessage("");
+    persistSearchPreferences({
+      sortKey: nextSortKey,
+      serviceValue: selectedService.value,
+      filters,
+    });
+  }
+
+  function handleChangeFilters(nextFilters: SearchFilters) {
+    setFilters(nextFilters);
+    setNoticeMessage("");
+    persistSearchPreferences({
+      sortKey,
+      serviceValue: selectedService.value,
+      filters: nextFilters,
+    });
+  }
+
+  function handleClearFilters() {
+    setFilters(DEFAULT_SEARCH_FILTERS);
+    setSelectedService(services[0]);
+    setNoticeMessage("");
+    persistSearchPreferences({
+      sortKey,
+      serviceValue: services[0].value,
+      filters: DEFAULT_SEARCH_FILTERS,
+    });
+  }
+
+  function handleClearSortAndFilters() {
+    setFilters(DEFAULT_SEARCH_FILTERS);
+    setSelectedService(services[0]);
+    setSortKey("recommended");
+    setNoticeMessage("");
+    persistSearchPreferences({
+      sortKey: "recommended",
+      serviceValue: services[0].value,
+      filters: DEFAULT_SEARCH_FILTERS,
+    });
+  }
 
   function handleOpenHomeZipEditor() {
     setHomeZipDraft(homeLocation?.zipCode ?? "");
@@ -1072,7 +1228,7 @@ export default function FindCareScreen() {
     setDiscoveryScope("all");
     writeDiscoveryScope("all");
     setSearchQuery("");
-    setSelectedService(services[0]);
+    handleSelectService(services[0]);
     setNoticeMessage("Showing all available Gurus across SitGuru.");
     setSelectedGuruId(null);
     setHighlightedGuruId(null);
@@ -1220,7 +1376,7 @@ export default function FindCareScreen() {
               </View>
 
               <View style={styles.header}>
-                <Pressable
+                <BubblePressable
                   accessibilityRole="button"
                   accessibilityLabel="Go back home"
                   onPress={() => {
@@ -1234,6 +1390,7 @@ export default function FindCareScreen() {
 
                     router.push("/");
                   }}
+                  scaleTo={0.88}
                   style={styles.backButton}
                 >
                   <ChevronLeft
@@ -1241,7 +1398,7 @@ export default function FindCareScreen() {
                     color={palette.title}
                     strokeWidth={2.7}
                   />
-                </Pressable>
+                </BubblePressable>
 
                 <Text style={styles.headerTitle}>
                   {activeView === "list" ? "Explore Gurus" : "Explore Map"}
@@ -1252,11 +1409,12 @@ export default function FindCareScreen() {
                     const active = themePreference === option.value;
 
                     return (
-                      <Pressable
+                      <BubblePressable
                         key={option.value}
                         accessibilityRole="button"
                         accessibilityLabel={`Switch to ${option.label} mode`}
                         onPress={() => setThemePreference(option.value)}
+                        scaleTo={0.88}
                         style={[
                           styles.modeButton,
                           active && styles.modeButtonActive,
@@ -1276,7 +1434,7 @@ export default function FindCareScreen() {
                           }
                           strokeWidth={2.4}
                         />
-                      </Pressable>
+                      </BubblePressable>
                     );
                   })}
                 </View>
@@ -1304,10 +1462,11 @@ export default function FindCareScreen() {
                     style={styles.searchInput}
                   />
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     accessibilityLabel="Apply search filters"
                     onPress={handleSearch}
+                    scaleTo={0.88}
                     style={styles.filterButton}
                   >
                     <SlidersHorizontal
@@ -1315,7 +1474,7 @@ export default function FindCareScreen() {
                       color={palette.title}
                       strokeWidth={2.4}
                     />
-                  </Pressable>
+                  </BubblePressable>
                 </View>
 
                 <ScrollView
@@ -1327,14 +1486,12 @@ export default function FindCareScreen() {
                     const selected = selectedService.value === service.value;
 
                     return (
-                      <Pressable
+                      <BubblePressable
                         key={service.value}
                         accessibilityRole="button"
                         accessibilityLabel={`Filter by ${service.label}`}
-                        onPress={() => {
-                          setSelectedService(service);
-                          setNoticeMessage("");
-                        }}
+                        onPress={() => handleSelectService(service)}
+                        scaleTo={0.88}
                         style={[
                           styles.serviceChip,
                           selected && styles.serviceChipSelected,
@@ -1348,10 +1505,102 @@ export default function FindCareScreen() {
                         >
                           {service.label}
                         </Text>
-                      </Pressable>
+                      </BubblePressable>
                     );
                   })}
                 </ScrollView>
+
+                <View style={styles.refineRow}>
+                  <BubblePressable
+                    accessibilityLabel={`Change sort order. Currently ${appliedSortLabel}`}
+                    accessibilityRole="button"
+                    onPress={() => setOpenSheet("sort")}
+                    scaleTo={0.88}
+                    style={[
+                      styles.refinePill,
+                      appliedSortKey !== "recommended" &&
+                        styles.refinePillActive,
+                    ]}
+                  >
+                    <ArrowUpDown
+                      color={
+                        appliedSortKey !== "recommended"
+                          ? isDark
+                            ? "#DFFFEA"
+                            : "#FFFFFF"
+                          : palette.muted
+                      }
+                      size={13}
+                      strokeWidth={2.5}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.refinePillText,
+                        appliedSortKey !== "recommended" &&
+                          styles.refinePillTextActive,
+                      ]}
+                    >
+                      {appliedSortLabel}
+                    </Text>
+                  </BubblePressable>
+
+                  <BubblePressable
+                    accessibilityLabel={
+                      activeFilterCount > 0
+                        ? `Edit filters. ${activeFilterCount} active`
+                        : "Add filters"
+                    }
+                    accessibilityRole="button"
+                    onPress={() => setOpenSheet("filters")}
+                    scaleTo={0.88}
+                    style={[
+                      styles.refinePill,
+                      activeFilterCount > 0 && styles.refinePillActive,
+                    ]}
+                  >
+                    <SlidersHorizontal
+                      color={
+                        activeFilterCount > 0
+                          ? isDark
+                            ? "#DFFFEA"
+                            : "#FFFFFF"
+                          : palette.muted
+                      }
+                      size={13}
+                      strokeWidth={2.5}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.refinePillText,
+                        activeFilterCount > 0 && styles.refinePillTextActive,
+                      ]}
+                    >
+                      Filters
+                    </Text>
+
+                    {activeFilterCount > 0 ? (
+                      <View style={styles.refineBadge}>
+                        <Text style={styles.refineBadgeText}>
+                          {activeFilterCount}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </BubblePressable>
+
+                  {activeFilterCount > 0 || appliedSortKey !== "recommended" ? (
+                    <BubblePressable
+                      accessibilityLabel="Clear all sorts and filters"
+                      accessibilityRole="button"
+                      onPress={handleClearSortAndFilters}
+                      scaleTo={0.88}
+                      style={styles.refineClearButton}
+                    >
+                      <Text style={styles.refineClearText}>Clear all</Text>
+                    </BubblePressable>
+                  ) : null}
+                </View>
               </View>
 
               {noticeMessage && activeView === "list" ? (
@@ -1404,7 +1653,11 @@ export default function FindCareScreen() {
                             : "Recommended near you"}
                         </Text>
                         <Text style={styles.recommendedSubtitle}>
-                          Trusted, local pet care Gurus
+                          {displayedGurus.length === 0
+                            ? "Trusted, local pet care Gurus"
+                            : `${displayedGurus.length} ${
+                                displayedGurus.length === 1 ? "Guru" : "Gurus"
+                              } • prices include the ${feeDisclosureLabel} SitGuru fee`}
                         </Text>
                       </View>
                     </View>
@@ -1434,30 +1687,32 @@ export default function FindCareScreen() {
                       <View style={styles.locationActionGroup}>
                         {discoveryScope === "nearby" ? (
                           <>
-                            <Pressable
+                            <BubblePressable
                               accessibilityRole="button"
                               accessibilityLabel="Change home ZIP code"
                               onPress={handleOpenHomeZipEditor}
+                              scaleTo={0.88}
                               style={styles.changeLocationButton}
                             >
                               <Text style={styles.changeLocationText}>
                                 Change
                               </Text>
-                            </Pressable>
+                            </BubblePressable>
 
-                            <Pressable
+                            <BubblePressable
                               accessibilityRole="button"
                               accessibilityLabel="Show all Gurus"
                               onPress={handleShowAllGurus}
+                              scaleTo={0.88}
                               style={styles.allGurusLinkButton}
                             >
                               <Text style={styles.allGurusLinkText}>
                                 All Gurus
                               </Text>
-                            </Pressable>
+                            </BubblePressable>
                           </>
                         ) : (
-                          <Pressable
+                          <BubblePressable
                             accessibilityRole="button"
                             accessibilityLabel={
                               homeLocation
@@ -1465,12 +1720,13 @@ export default function FindCareScreen() {
                                 : "Set home ZIP code"
                             }
                             onPress={handleShowNearbyGurus}
+                            scaleTo={0.88}
                             style={styles.changeLocationButton}
                           >
                             <Text style={styles.changeLocationText}>
                               {homeLocation ? "Near Me" : "Set ZIP"}
                             </Text>
-                          </Pressable>
+                          </BubblePressable>
                         )}
                       </View>
                     </View>
@@ -1507,7 +1763,7 @@ export default function FindCareScreen() {
                           value={homeZipDraft}
                         />
 
-                        <Pressable
+                        <BubblePressable
                           accessibilityRole="button"
                           disabled={isSavingHomeZip}
                           onPress={handleSaveHomeZip}
@@ -1519,48 +1775,103 @@ export default function FindCareScreen() {
                           <Text style={styles.homeZipSaveText}>
                             {isSavingHomeZip ? "Saving..." : "Save"}
                           </Text>
-                        </Pressable>
+                        </BubblePressable>
 
-                        <Pressable
+                        <BubblePressable
                           accessibilityRole="button"
                           disabled={isSavingHomeZip}
                           onPress={handleCancelHomeZipEditor}
                           style={styles.homeZipCancelButton}
                         >
                           <Text style={styles.homeZipCancelText}>Cancel</Text>
-                        </Pressable>
+                        </BubblePressable>
                       </View>
                     </View>
                   ) : null}
 
                   {displayedGurus.length === 0 && !isLoadingGurus ? (
-                    <View style={styles.emptyState}>
-                      <Text style={styles.emptyIcon}>🐾</Text>
-                      <Text style={styles.emptyTitle}>
-                        No Gurus matched this search.
-                      </Text>
-                      <Text style={styles.emptyText}>
-                        Try another ZIP, city, state, or service. You can also
-                        switch back to All.
-                      </Text>
+                    activeFilterCount > 0 && searchMatchedGurus.length > 0 ? (
+                      <View style={styles.emptyState}>
+                        <Text style={styles.emptyIcon}>🎚️</Text>
+                        <Text style={styles.emptyTitle}>
+                          Your filters hid every Guru here.
+                        </Text>
+                        <Text style={styles.emptyText}>
+                          {searchMatchedGurus.length}{" "}
+                          {searchMatchedGurus.length === 1 ? "Guru" : "Gurus"}{" "}
+                          {searchMatchedGurus.length === 1 ? "matches" : "match"}{" "}
+                          {careAreaLabel}, but none clear all{" "}
+                          {activeFilterCount}{" "}
+                          {activeFilterCount === 1 ? "filter" : "filters"}. Ease
+                          one off or clear them.
+                        </Text>
 
-                      <Pressable
-                        accessibilityRole="button"
-                        onPress={() => {
-                          setSearchQuery("");
-                          setSelectedService(services[0]);
-                          setNoticeMessage("");
-                        }}
-                        style={styles.emptyButton}
-                      >
-                        <Text style={styles.emptyButtonText}>Reset Search</Text>
-                      </Pressable>
-                    </View>
+                        <BubblePressable
+                          accessibilityLabel="Clear all filters"
+                          accessibilityRole="button"
+                          onPress={handleClearFilters}
+                          style={styles.emptyButton}
+                        >
+                          <Text style={styles.emptyButtonText}>
+                            Clear filters
+                          </Text>
+                        </BubblePressable>
+
+                        <BubblePressable
+                          accessibilityLabel="Edit filters"
+                          accessibilityRole="button"
+                          onPress={() => setOpenSheet("filters")}
+                          scaleTo={0.88}
+                          style={styles.emptySecondaryButton}
+                        >
+                          <Text style={styles.emptySecondaryButtonText}>
+                            Edit filters
+                          </Text>
+                        </BubblePressable>
+                      </View>
+                    ) : sourceGurus.length === 0 ? (
+                      <View style={styles.emptyState}>
+                        <Text style={styles.emptyIcon}>🐾</Text>
+                        <Text style={styles.emptyTitle}>
+                          No Gurus in this area yet.
+                        </Text>
+                        <Text style={styles.emptyText}>
+                          SitGuru does not have live Guru profiles to show for{" "}
+                          {careAreaLabel} right now. Try another ZIP, city, or
+                          state, or check back as local availability grows.
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.emptyState}>
+                        <Text style={styles.emptyIcon}>🐾</Text>
+                        <Text style={styles.emptyTitle}>
+                          No Gurus matched this search.
+                        </Text>
+                        <Text style={styles.emptyText}>
+                          Try another ZIP, city, state, or service. You can also
+                          switch back to All.
+                        </Text>
+
+                        <BubblePressable
+                          accessibilityRole="button"
+                          onPress={() => {
+                            setSearchQuery("");
+                            handleClearFilters();
+                          }}
+                          style={styles.emptyButton}
+                        >
+                          <Text style={styles.emptyButtonText}>
+                            Reset Search
+                          </Text>
+                        </BubblePressable>
+                      </View>
+                    )
                   ) : (
                     <View style={styles.guruList}>
                       {displayedGurus.map((guru, index) => (
                         <GuruDiscoveryCard
                           favoriteGuruIds={favoriteGuruIds}
+                          feeRules={feeRules}
                           guru={guru}
                           homeLocation={homeLocation}
                           index={index}
@@ -1609,20 +1920,21 @@ export default function FindCareScreen() {
                   />
 
                   {discoveryScope === "nearby" ? (
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityLabel="Show all Gurus on the map"
                       onPress={handleShowAllGurus}
+                      scaleTo={0.88}
                       style={styles.mapAllGurusButton}
                     >
                       <Text style={styles.mapAllGurusButtonText}>
                         All Gurus
                       </Text>
-                    </Pressable>
+                    </BubblePressable>
                   ) : null}
 
                   <View style={styles.mapUtilityStack}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityLabel="Center map on home area"
                       onPress={() => {
@@ -1640,12 +1952,13 @@ export default function FindCareScreen() {
                           });
                         }
                       }}
+                      scaleTo={0.88}
                       style={styles.mapUtilityButton}
                     >
                       <Text style={styles.mapUtilityIcon}>◎</Text>
-                    </Pressable>
+                    </BubblePressable>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityLabel="View Guru list"
                       onPress={() => {
@@ -1654,6 +1967,7 @@ export default function FindCareScreen() {
                         setHighlightedGuruId(null);
                         scrollRef.current?.scrollTo({ y: 0, animated: false });
                       }}
+                      scaleTo={0.88}
                       style={styles.mapUtilityButton}
                     >
                       <List
@@ -1661,13 +1975,14 @@ export default function FindCareScreen() {
                         color={palette.title}
                         strokeWidth={2.5}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
 
                   {selectedGuru ? (
                     <MapGuruPreviewCard
                       expanded={isMapPreviewExpanded}
                       favoriteGuruIds={favoriteGuruIds}
+                      feeRules={feeRules}
                       guru={selectedGuru}
                       homeLocation={homeLocation}
                       onBook={handleBookingAction}
@@ -1688,7 +2003,7 @@ export default function FindCareScreen() {
             </ScrollView>
 
             {activeView === "list" ? (
-              <Pressable
+              <BubblePressable
                 accessibilityRole="button"
                 accessibilityLabel="View Guru map"
                 onPress={() => {
@@ -1702,76 +2017,51 @@ export default function FindCareScreen() {
               >
                 <MapIcon size={18} color="#FFFFFF" strokeWidth={2.5} />
                 <Text style={styles.floatingMapButtonText}>View Map</Text>
-              </Pressable>
+              </BubblePressable>
             ) : null}
 
-            <View style={styles.bottomNav}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push("/")}
-                style={styles.navItem}
-              >
-                <SitGuruIcon
-                  name="home"
-                  size={22}
-                  color={palette.navMuted}
-                  strokeWidth={2.25}
-                />
-                <Text style={styles.navLabel}>Home</Text>
-              </Pressable>
+            <SitGuruTabBar active="explore" />
 
-              <Pressable accessibilityRole="button" style={styles.navItem}>
-                <SitGuruIcon
-                  name="explore"
-                  size={22}
-                  color={palette.navActive}
-                  strokeWidth={2.6}
+            {openSheet ? (
+              <View style={styles.sheetOverlay}>
+                {/*
+                  A plain Pressable on purpose: BubblePressable would visibly
+                  squash the whole dismiss-catcher behind the sheet.
+                */}
+                <Pressable
+                  accessibilityLabel="Close panel"
+                  accessibilityRole="button"
+                  onPress={() => setOpenSheet(null)}
+                  style={styles.sheetBackdrop}
                 />
-                <Text style={styles.navLabelActive}>Explore</Text>
-              </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push("/request-booking")}
-                style={styles.navItem}
-              >
-                <SitGuruIcon
-                  name="bookings"
-                  size={22}
-                  color={palette.navMuted}
-                  strokeWidth={2.25}
-                />
-                <Text style={styles.navLabel}>Bookings</Text>
-              </Pressable>
-
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push("/messages")}
-                style={styles.navItem}
-              >
-                <SitGuruIcon
-                  name="messages"
-                  size={22}
-                  color={palette.navMuted}
-                  strokeWidth={2.25}
-                />
-                <Text style={styles.navLabel}>Messages</Text>
-              </Pressable>
-
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push("/login")}
-                style={styles.navItem}
-              >
-                <SitGuruIcon
-                  name="profile"
-                  size={22}
-                  color={palette.navMuted}
-                  strokeWidth={2.25}
-                />
-                <Text style={styles.navLabel}>Profile</Text>
-              </Pressable>
-            </View>
+                {openSheet === "sort" ? (
+                  <SortSheet
+                    appliedSortKey={appliedSortKey}
+                    canSortByDistance={canSortByDistance}
+                    isDark={isDark}
+                    onClose={() => setOpenSheet(null)}
+                    onSelect={handleSelectSort}
+                    palette={palette}
+                    styles={styles}
+                  />
+                ) : (
+                  <FiltersSheet
+                    activeFilterCount={activeFilterCount}
+                    feeDisclosureLabel={feeDisclosureLabel}
+                    filters={filters}
+                    matchCount={displayedGurus.length}
+                    onChangeFilters={handleChangeFilters}
+                    onClear={handleClearFilters}
+                    onClose={() => setOpenSheet(null)}
+                    onSelectService={handleSelectService}
+                    palette={palette}
+                    selectedService={selectedService}
+                    styles={styles}
+                  />
+                )}
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.homeIndicator} />
@@ -1782,8 +2072,345 @@ export default function FindCareScreen() {
 }
 
 
+function SortSheet({
+  appliedSortKey,
+  canSortByDistance,
+  isDark,
+  onClose,
+  onSelect,
+  palette,
+  styles,
+}: {
+  appliedSortKey: GuruSortKey;
+  canSortByDistance: boolean;
+  isDark: boolean;
+  onClose: () => void;
+  onSelect: (sortKey: GuruSortKey) => void;
+  palette: ReturnType<typeof getPalette>;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.sheetCard}>
+      <View style={styles.sheetHandle} />
+
+      <View style={styles.sheetHeaderRow}>
+        <View style={styles.sheetHeaderCopy}>
+          <Text style={styles.sheetTitle}>Sort Gurus</Text>
+          <Text style={styles.sheetSubtitle}>
+            Pick the order that matters most to you.
+          </Text>
+        </View>
+
+        <BubblePressable
+          accessibilityLabel="Close sort options"
+          accessibilityRole="button"
+          onPress={onClose}
+          scaleTo={0.88}
+          style={styles.sheetCloseButton}
+        >
+          <X color={palette.title} size={17} strokeWidth={2.5} />
+        </BubblePressable>
+      </View>
+
+      <View style={styles.sheetOptionList}>
+        {sortOptions.map((option) => {
+          const unavailable = option.value === "distance" && !canSortByDistance;
+          const selected = !unavailable && appliedSortKey === option.value;
+
+          return (
+            <BubblePressable
+              accessibilityLabel={`Sort by ${option.label}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={option.value}
+              onPress={() => onSelect(option.value)}
+              scaleTo={0.97}
+              style={[
+                styles.sheetOptionRow,
+                selected && styles.sheetOptionRowSelected,
+                unavailable && styles.sheetOptionRowUnavailable,
+              ]}
+            >
+              <View style={styles.sheetOptionCopy}>
+                <Text
+                  style={[
+                    styles.sheetOptionLabel,
+                    selected && styles.sheetOptionLabelSelected,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+                <Text
+                  style={[
+                    styles.sheetOptionDetail,
+                    selected && styles.sheetOptionDetailSelected,
+                  ]}
+                >
+                  {unavailable
+                    ? "Needs a home ZIP or an area search — tap to add one"
+                    : option.detail}
+                </Text>
+              </View>
+
+              {selected ? (
+                <View style={styles.sheetOptionCheck}>
+                  <Check
+                    color={isDark ? "#DFFFEA" : "#FFFFFF"}
+                    size={13}
+                    strokeWidth={3}
+                  />
+                </View>
+              ) : null}
+            </BubblePressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function FiltersSheet({
+  activeFilterCount,
+  feeDisclosureLabel,
+  filters,
+  matchCount,
+  onChangeFilters,
+  onClear,
+  onClose,
+  onSelectService,
+  palette,
+  selectedService,
+  styles,
+}: {
+  activeFilterCount: number;
+  feeDisclosureLabel: string;
+  filters: SearchFilters;
+  matchCount: number;
+  onChangeFilters: (filters: SearchFilters) => void;
+  onClear: () => void;
+  onClose: () => void;
+  onSelectService: (service: ServiceOption) => void;
+  palette: ReturnType<typeof getPalette>;
+  selectedService: ServiceOption;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <View style={styles.sheetCard}>
+      <View style={styles.sheetHandle} />
+
+      <View style={styles.sheetHeaderRow}>
+        <View style={styles.sheetHeaderCopy}>
+          <Text style={styles.sheetTitle}>Filters</Text>
+          <Text style={styles.sheetSubtitle}>
+            {matchCount} {matchCount === 1 ? "Guru" : "Gurus"} match right now
+          </Text>
+        </View>
+
+        {activeFilterCount > 0 ? (
+          <BubblePressable
+            accessibilityLabel="Clear all filters"
+            accessibilityRole="button"
+            onPress={onClear}
+            scaleTo={0.88}
+            style={styles.sheetClearButton}
+          >
+            <Text style={styles.sheetClearText}>Clear all</Text>
+          </BubblePressable>
+        ) : null}
+
+        <BubblePressable
+          accessibilityLabel="Close filters"
+          accessibilityRole="button"
+          onPress={onClose}
+          scaleTo={0.88}
+          style={styles.sheetCloseButton}
+        >
+          <X color={palette.title} size={17} strokeWidth={2.5} />
+        </BubblePressable>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.sheetScrollContent}
+        showsVerticalScrollIndicator={false}
+        style={styles.sheetScroll}
+      >
+        <View style={styles.sheetGroup}>
+          <Text style={styles.sheetGroupLabel}>Minimum rating</Text>
+          <View style={styles.sheetChipRow}>
+            {ratingFilterOptions.map((option) => {
+              const selected = filters.minRating === option.value;
+
+              return (
+                <BubblePressable
+                  accessibilityLabel={`Minimum rating ${option.label}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={option.label}
+                  onPress={() =>
+                    onChangeFilters({ ...filters, minRating: option.value })
+                  }
+                  scaleTo={0.88}
+                  style={[
+                    styles.sheetChip,
+                    selected && styles.sheetChipSelected,
+                  ]}
+                >
+                  {option.value !== null ? (
+                    <Star
+                      color={selected ? palette.gold : palette.muted}
+                      fill={selected ? palette.gold : "transparent"}
+                      size={11}
+                      strokeWidth={2.3}
+                    />
+                  ) : null}
+                  <Text
+                    style={[
+                      styles.sheetChipText,
+                      selected && styles.sheetChipTextSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </BubblePressable>
+              );
+            })}
+          </View>
+          <Text style={styles.sheetGroupNote}>
+            Gurus with no rating yet are hidden while a minimum is set.
+          </Text>
+        </View>
+
+        <View style={styles.sheetGroup}>
+          <Text style={styles.sheetGroupLabel}>Minimum reviews</Text>
+          <View style={styles.sheetChipRow}>
+            {reviewFilterOptions.map((option) => {
+              const selected = filters.minReviews === option.value;
+
+              return (
+                <BubblePressable
+                  accessibilityLabel={`Minimum reviews ${option.label}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={option.label}
+                  onPress={() =>
+                    onChangeFilters({ ...filters, minReviews: option.value })
+                  }
+                  scaleTo={0.88}
+                  style={[
+                    styles.sheetChip,
+                    selected && styles.sheetChipSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.sheetChipText,
+                      selected && styles.sheetChipTextSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </BubblePressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.sheetGroup}>
+          <Text style={styles.sheetGroupLabel}>All-in price per hour</Text>
+          <View style={styles.sheetChipRow}>
+            {priceFilterOptions.map((option) => {
+              const selected = filters.maxAllInHourly === option.value;
+
+              return (
+                <BubblePressable
+                  accessibilityLabel={`All-in price ${option.label}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={option.label}
+                  onPress={() =>
+                    onChangeFilters({
+                      ...filters,
+                      maxAllInHourly: option.value,
+                    })
+                  }
+                  scaleTo={0.88}
+                  style={[
+                    styles.sheetChip,
+                    selected && styles.sheetChipSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.sheetChipText,
+                      selected && styles.sheetChipTextSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </BubblePressable>
+              );
+            })}
+          </View>
+          <Text style={styles.sheetGroupNote}>
+            Compared against the total you pay, including the{" "}
+            {feeDisclosureLabel} SitGuru fee. Gurus without a published rate are
+            hidden while a price cap is set.
+          </Text>
+        </View>
+
+        <View style={styles.sheetGroup}>
+          <Text style={styles.sheetGroupLabel}>Service type</Text>
+          <View style={styles.sheetChipRow}>
+            {services.map((service) => {
+              const selected = selectedService.value === service.value;
+
+              return (
+                <BubblePressable
+                  accessibilityLabel={`Service type ${service.label}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={service.value}
+                  onPress={() => onSelectService(service)}
+                  scaleTo={0.88}
+                  style={[
+                    styles.sheetChip,
+                    selected && styles.sheetChipSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.sheetChipText,
+                      selected && styles.sheetChipTextSelected,
+                    ]}
+                  >
+                    {service.label}
+                  </Text>
+                </BubblePressable>
+              );
+            })}
+          </View>
+        </View>
+      </ScrollView>
+
+      <BubblePressable
+        accessibilityLabel={`Show ${matchCount} matching Gurus`}
+        accessibilityRole="button"
+        onPress={onClose}
+        style={styles.sheetApplyButton}
+      >
+        <Text style={styles.sheetApplyButtonText}>
+          {matchCount === 0
+            ? "No matches — ease a filter off"
+            : `Show ${matchCount} ${matchCount === 1 ? "Guru" : "Gurus"}`}
+        </Text>
+      </BubblePressable>
+    </View>
+  );
+}
+
 function GuruDiscoveryCard({
   favoriteGuruIds,
+  feeRules,
   guru,
   homeLocation,
   index,
@@ -1794,6 +2421,7 @@ function GuruDiscoveryCard({
   styles,
 }: {
   favoriteGuruIds: string[];
+  feeRules: MarketplaceFeeRule[];
   guru: PublicGuruProfile;
   homeLocation: HomeLocation | null;
   index: number;
@@ -1813,7 +2441,7 @@ function GuruDiscoveryCard({
   const locationLabel = getGuruCityStateLabel(guru);
   const ratingLabel = getGuruCardRatingLabel(guru);
   const reviewCount = getGuruReviewCount(guru);
-  const rate = formatCompactRate(getGuruRateLabel(guru));
+  const price = getGuruPriceDisplay(guru, feeRules);
   const badgeLabel = getGuruCardBadgeLabel(guru);
   const trustLabel = getGuruCardTrustLabel(guru);
   const bio = getGuruCardBio(guru);
@@ -1825,17 +2453,18 @@ function GuruDiscoveryCard({
 
   return (
     <View style={styles.guruProfileCard}>
-      <Pressable
+      <BubblePressable
         accessibilityLabel={`View ${name} profile`}
         accessibilityRole="button"
         onPress={() => onView(guru)}
+        scaleTo={0.97}
         style={styles.guruProfilePhotoButton}
       >
         <GuruCardHeroImage photoUrl={photoUrl} styles={styles} />
         <View pointerEvents="none" style={styles.guruProfilePhotoShade} />
-      </Pressable>
+      </BubblePressable>
 
-      <Pressable
+      <BubblePressable
         accessibilityLabel={
           isFavorite
             ? `Remove ${name} from favorite Gurus`
@@ -1845,6 +2474,7 @@ function GuruDiscoveryCard({
         accessibilityState={{ selected: isFavorite }}
         hitSlop={8}
         onPress={() => onFavorite(guru)}
+        scaleTo={0.88}
         style={[
           styles.guruProfileFavoriteButton,
           isFavorite && styles.guruProfileFavoriteButtonSaved,
@@ -1856,17 +2486,18 @@ function GuruDiscoveryCard({
           size={19}
           strokeWidth={2.35}
         />
-      </Pressable>
+      </BubblePressable>
 
       <View style={styles.guruProfilePanel}>
         <View style={styles.guruProfileBadge}>
           <Text style={styles.guruProfileBadgeText}>{badgeLabel}</Text>
         </View>
 
-        <Pressable
+        <BubblePressable
           accessibilityLabel={`Open ${name} profile details`}
           accessibilityRole="button"
           onPress={() => onView(guru)}
+          scaleTo={0.97}
           style={styles.guruProfileContentButton}
         >
           <View style={styles.guruProfileNameRow}>
@@ -1878,10 +2509,6 @@ function GuruDiscoveryCard({
                 {locationLabel} • {distanceLabel}
               </Text>
             </View>
-
-            <Text numberOfLines={1} style={styles.guruProfileRate}>
-              {rate}
-            </Text>
           </View>
 
           <View style={styles.guruProfileRatingRow}>
@@ -1898,6 +2525,21 @@ function GuruDiscoveryCard({
                     reviewCount === 1 ? "review" : "reviews"
                   }`
                 : "New to SitGuru"}
+            </Text>
+          </View>
+
+          <View style={styles.guruProfilePriceRow}>
+            <View style={styles.guruProfilePriceCopy}>
+              <Text style={styles.guruProfilePriceLabel}>
+                {price.isAllIn ? "All-in price" : "Price"}
+              </Text>
+              <Text numberOfLines={2} style={styles.guruProfilePriceDetail}>
+                {price.detailLabel}
+              </Text>
+            </View>
+
+            <Text numberOfLines={1} style={styles.guruProfilePriceValue}>
+              {price.headline}
             </Text>
           </View>
 
@@ -1934,16 +2576,15 @@ function GuruDiscoveryCard({
             />
             <Text style={styles.guruProfileTrustText}>{trustLabel}</Text>
           </View>
-        </Pressable>
+        </BubblePressable>
 
-        <Pressable
+        <BubblePressable
           accessibilityLabel={`${actionLabel} with ${name}`}
           accessibilityRole="button"
           onPress={() => onBook(guru)}
-          style={({ pressed }) => [
+          style={[
             styles.guruProfileRequestButton,
             !bookable && !preview && styles.guruProfileRequestButtonSecondary,
-            pressed && styles.guruProfileRequestButtonPressed,
           ]}
         >
           <Text
@@ -1956,7 +2597,7 @@ function GuruDiscoveryCard({
           >
             {actionLabel}
           </Text>
-        </Pressable>
+        </BubblePressable>
       </View>
     </View>
   );
@@ -1965,6 +2606,7 @@ function GuruDiscoveryCard({
 function MapGuruPreviewCard({
   expanded,
   favoriteGuruIds,
+  feeRules,
   guru,
   homeLocation,
   onBook,
@@ -1977,6 +2619,7 @@ function MapGuruPreviewCard({
 }: {
   expanded: boolean;
   favoriteGuruIds: string[];
+  feeRules: MarketplaceFeeRule[];
   guru: PublicGuruProfile;
   homeLocation: HomeLocation | null;
   onBook: (guru: PublicGuruProfile) => void;
@@ -1993,17 +2636,18 @@ function MapGuruPreviewCard({
   const preview = isKnownPreviewGuru(guru);
   const serviceMiles = getGuruServiceRadiusMiles(guru);
   const chips = getGuruServices(guru).slice(0, 3);
-  const rate = formatCompactRate(getGuruRateLabel(guru));
+  const price = getGuruPriceDisplay(guru, feeRules);
   const distanceLabel = getGuruDistanceLabel(guru, homeLocation, 0);
   const locationLabel = getGuruCityStateLabel(guru);
 
   if (!expanded) {
     return (
       <View style={styles.mapGuruPreviewCompact}>
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           accessibilityLabel={`Expand ${name} preview`}
           onPress={onExpand}
+          scaleTo={0.97}
           style={styles.mapGuruPreviewCompactMain}
         >
           <View style={styles.mapCompactAvatarWrap}>
@@ -2036,12 +2680,13 @@ function MapGuruPreviewCard({
               {distanceLabel} • Serves up to {serviceMiles} mi
             </Text>
           </View>
-        </Pressable>
+        </BubblePressable>
 
         <View style={styles.mapGuruPreviewCompactRight}>
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             onPress={() => onFavorite(guru)}
+            scaleTo={0.88}
             style={[
               styles.favoriteButton,
               isFavorite && styles.favoriteButtonSaved,
@@ -2053,8 +2698,16 @@ function MapGuruPreviewCard({
               fill={isFavorite ? palette.favoriteRed : "transparent"}
               strokeWidth={2.2}
             />
-          </Pressable>
-          <Text style={styles.mapGuruPreviewRate}>{rate}</Text>
+          </BubblePressable>
+
+          <View style={styles.mapGuruPreviewPriceBlock}>
+            <Text numberOfLines={1} style={styles.mapGuruPreviewRate}>
+              {price.headline}
+            </Text>
+            <Text numberOfLines={1} style={styles.mapGuruPreviewRateNote}>
+              {price.isAllIn ? "all-in" : "quote needed"}
+            </Text>
+          </View>
         </View>
       </View>
     );
@@ -2062,14 +2715,15 @@ function MapGuruPreviewCard({
 
   return (
     <View style={styles.mapGuruPreviewExpanded}>
-      <Pressable
+      <BubblePressable
         accessibilityRole="button"
         accessibilityLabel="Collapse Guru preview"
         onPress={onCollapse}
+        scaleTo={0.88}
         style={styles.mapSheetGrabberButton}
       >
         <View style={styles.mapSheetGrabber} />
-      </Pressable>
+      </BubblePressable>
 
       <View style={styles.mapGuruExpandedTop}>
         <View style={styles.mapExpandedAvatarWrap}>
@@ -2115,9 +2769,10 @@ function MapGuruPreviewCard({
           </Text>
         </View>
 
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           onPress={() => onFavorite(guru)}
+          scaleTo={0.88}
           style={[
             styles.favoriteButtonLarge,
             isFavorite && styles.favoriteButtonSaved,
@@ -2129,7 +2784,7 @@ function MapGuruPreviewCard({
             fill={isFavorite ? palette.favoriteRed : palette.favoriteRed}
             strokeWidth={2.2}
           />
-        </Pressable>
+        </BubblePressable>
       </View>
 
       <View style={styles.mapExpandedServices}>
@@ -2153,23 +2808,31 @@ function MapGuruPreviewCard({
       <View style={styles.mapExpandedDivider} />
 
       <View style={styles.mapExpandedActionRow}>
-        <Text style={styles.mapExpandedPrice}>{rate}</Text>
-        <Pressable
+        <View style={styles.mapExpandedPriceBlock}>
+          <Text numberOfLines={1} style={styles.mapExpandedPrice}>
+            {price.headline}
+          </Text>
+          <Text numberOfLines={2} style={styles.mapExpandedPriceNote}>
+            {price.detailLabel}
+          </Text>
+        </View>
+
+        <BubblePressable
           accessibilityRole="button"
           onPress={() => onView(guru)}
           style={styles.mapExpandedViewButton}
         >
           <Text style={styles.mapExpandedViewButtonText}>View Profile</Text>
-        </Pressable>
+        </BubblePressable>
       </View>
 
-      <Pressable
+      <BubblePressable
         accessibilityRole="button"
         onPress={() => onBook(guru)}
         style={styles.mapExpandedRequestButton}
       >
         <Text style={styles.mapExpandedRequestButtonText}>Request Care</Text>
-      </Pressable>
+      </BubblePressable>
     </View>
   );
 }
@@ -2312,13 +2975,13 @@ function WebCoverageMap({
   styles: ReturnType<typeof createStyles>;
   userCoordinate: MapCoordinate | null;
 }) {
-  const containerRef = useRef<any>(null);
-  const mapRef = useRef<any>(null);
-  const mapLibreRef = useRef<any>(null);
-  const readyMapRef = useRef<any>(null);
+  const containerRef = useRef<WebMapHandle>(null);
+  const mapRef = useRef<WebMapHandle>(null);
+  const mapLibreRef = useRef<WebMapHandle>(null);
+  const readyMapRef = useRef<WebMapHandle>(null);
   const viewportRef = useRef<MapRegion>(mapRegion);
-  const guruMarkersRef = useRef<any[]>([]);
-  const userMarkerRef = useRef<any>(null);
+  const guruMarkersRef = useRef<WebMapHandle[]>([]);
+  const userMarkerRef = useRef<WebMapHandle>(null);
   const callbacksRef = useRef({
     onMarkerLeave,
     onMarkerOpen,
@@ -2344,12 +3007,16 @@ function WebCoverageMap({
 
     // A theme change creates a new MapLibre map. Reset the ready-map guard
     // immediately so effects from the previous map cannot add layers to the
-    // new map before its style has finished loading.
+    // new map before its style has finished loading. The reset has to happen
+    // synchronously here, before the new map is constructed below.
     readyMapRef.current = null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMapReadyVersion(0);
 
     try {
       ensureMapLibreCss();
+      // maplibre-gl is web-only, so it can only be pulled in at runtime.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const maplibregl = require("maplibre-gl");
       mapLibreRef.current = maplibregl;
 
@@ -2555,7 +3222,7 @@ function WebCoverageMap({
 }
 
 function ensureMapLibreCss() {
-  const documentRef = (globalThis as any).document;
+  const documentRef = (globalThis as unknown as { document: WebMapHandle }).document;
   if (!documentRef || documentRef.getElementById(WEB_MAPLIBRE_CSS_ID)) return;
 
   const link = documentRef.createElement("link");
@@ -2574,7 +3241,7 @@ function createWebGuruMarkerElement({
   point: GuruMapPoint;
   palette: ReturnType<typeof getPalette>;
 }) {
-  const documentRef = (globalThis as any).document;
+  const documentRef = (globalThis as unknown as { document: WebMapHandle }).document;
   const element = documentRef.createElement("button");
   const size = highlighted ? 50 : 42;
 
@@ -2616,7 +3283,7 @@ function createWebGuruMarkerElement({
 }
 
 function createWebUserLocationElement() {
-  const documentRef = (globalThis as any).document;
+  const documentRef = (globalThis as unknown as { document: WebMapHandle }).document;
   const halo = documentRef.createElement("div");
   const dot = documentRef.createElement("div");
 
@@ -2956,6 +3623,96 @@ function writeDiscoveryScope(scope: DiscoveryScope) {
   }
 }
 
+/**
+ * Sort and filter choices survive navigation for the whole app session even on
+ * native, where there is no localStorage to fall back on.
+ */
+let sessionSearchPreferences: SearchPreferences | null = null;
+
+function coerceSortKey(value: unknown): GuruSortKey {
+  return sortOptions.some((option) => option.value === value)
+    ? (value as GuruSortKey)
+    : "recommended";
+}
+
+function coerceFilterValue(
+  value: unknown,
+  allowed: { value: number | null }[],
+) {
+  const parsed = typeof value === "number" && Number.isFinite(value) ? value : null;
+
+  return allowed.some((option) => option.value === parsed) ? parsed : null;
+}
+
+function readStoredSearchPreferences(): SearchPreferences | null {
+  try {
+    const storage = getBrowserStorage();
+    if (!storage) return null;
+
+    const rawValue = storage.getItem(SEARCH_PREFERENCES_STORAGE_KEY);
+    if (!rawValue) return null;
+
+    const parsed = JSON.parse(rawValue) as Record<string, unknown>;
+    const storedFilters = (parsed.filters ?? {}) as Record<string, unknown>;
+    const storedService = String(parsed.serviceValue ?? "all");
+
+    return {
+      sortKey: coerceSortKey(parsed.sortKey),
+      serviceValue: services.some((service) => service.value === storedService)
+        ? storedService
+        : "all",
+      filters: {
+        minRating: coerceFilterValue(
+          storedFilters.minRating,
+          ratingFilterOptions,
+        ),
+        minReviews: coerceFilterValue(
+          storedFilters.minReviews,
+          reviewFilterOptions,
+        ),
+        maxAllInHourly: coerceFilterValue(
+          storedFilters.maxAllInHourly,
+          priceFilterOptions,
+        ),
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistSearchPreferences(preferences: SearchPreferences) {
+  sessionSearchPreferences = preferences;
+
+  try {
+    const storage = getBrowserStorage();
+    if (!storage) return;
+
+    storage.setItem(
+      SEARCH_PREFERENCES_STORAGE_KEY,
+      JSON.stringify(preferences),
+    );
+  } catch {
+    // The in-session store above still keeps the choices for this session.
+  }
+}
+
+function findServiceByValue(value: string | undefined) {
+  return services.find((service) => service.value === value) ?? null;
+}
+
+function countActiveFilters(
+  filters: SearchFilters,
+  selectedService: ServiceOption,
+) {
+  return [
+    selectedService.value !== "all",
+    filters.minRating !== null,
+    filters.minReviews !== null,
+    filters.maxAllInHourly !== null,
+  ].filter(Boolean).length;
+}
+
 function getDistanceMiles(first: MapCoordinate, second: MapCoordinate) {
   const earthRadiusMiles = 3958.8;
   const latitudeDelta = degreesToRadians(second.latitude - first.latitude);
@@ -2999,7 +3756,7 @@ function getGuruDistanceLabel(
     return `${Math.max(1, Math.round(distance))} mi away`;
   }
 
-  return `${index + 2} mi away`;
+  return "Distance unknown";
 }
 
 
@@ -3020,6 +3777,251 @@ function getGuruCardRatingLabel(guru: PublicGuruProfile) {
   const numericMatch = fallback.match(/[0-9]+(?:\.[0-9]+)?/);
 
   return numericMatch?.[0] ?? "New";
+}
+
+/**
+ * Stable ordering helper. Ties fall back to the incoming order and Gurus with no
+ * value for the active sort always land at the end, never at the top.
+ */
+function sortGurusByValue(
+  gurus: PublicGuruProfile[],
+  getValue: (guru: PublicGuruProfile, index: number) => number | null,
+  direction: "ascending" | "descending",
+) {
+  const decorated = gurus.map((guru, index) => ({
+    guru,
+    index,
+    value: getValue(guru, index),
+  }));
+
+  decorated.sort((first, second) => {
+    if (first.value === null && second.value === null) {
+      return first.index - second.index;
+    }
+
+    if (first.value === null) return 1;
+    if (second.value === null) return -1;
+
+    if (first.value !== second.value) {
+      return direction === "ascending"
+        ? first.value - second.value
+        : second.value - first.value;
+    }
+
+    return first.index - second.index;
+  });
+
+  return decorated.map((entry) => entry.guru);
+}
+
+function getGuruRatingValue(guru: PublicGuruProfile) {
+  const rating = getFirstNumber(guru as Record<string, unknown>, [
+    "rating_avg",
+    "average_rating",
+    "rating",
+    "review_rating",
+  ]);
+
+  return rating !== null && rating > 0 ? rating : null;
+}
+
+function getGuruBaseHourlyRate(guru: PublicGuruProfile) {
+  const rate = getFirstNumber(guru as Record<string, unknown>, [
+    "hourly_rate",
+    "starting_rate",
+    "rate",
+  ]);
+
+  return rate !== null && rate > 0 ? rate : null;
+}
+
+function clampMarketplaceFeePercent(value: unknown) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) return DEFAULT_SITGURU_FEE_PERCENT;
+
+  return clampNumber(
+    parsed,
+    MIN_SITGURU_FEE_PERCENT,
+    MAX_SITGURU_FEE_PERCENT,
+  );
+}
+
+function normalizeFeeRuleText(value?: string | null) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function normalizeFeeRulePostalCode(value?: string | null) {
+  return String(value ?? "").replace(/\D/g, "").slice(0, 5);
+}
+
+function getGuruPostalCode(guru: PublicGuruProfile) {
+  const record = guru as Record<string, unknown>;
+
+  return normalizeFeeRulePostalCode(
+    getFirstString(record, [
+      "service_zip",
+      "service_zip_code",
+      "zip_code",
+      "zip",
+      "postal_code",
+      "service_postal_code",
+    ]),
+  );
+}
+
+/**
+ * Applies the same match precedence the checkout route uses — postal code,
+ * radius, city + state, city, state, then a catch-all rule — against the Guru's
+ * published service location, and falls back to the route's default percent.
+ */
+function resolveGuruFeePercent(
+  guru: PublicGuruProfile,
+  feeRules: MarketplaceFeeRule[],
+) {
+  if (feeRules.length === 0) return DEFAULT_SITGURU_FEE_PERCENT;
+
+  const guruPostalCode = getGuruPostalCode(guru);
+  const guruCity = normalizeFeeRuleText(getGuruCity(guru));
+  const guruState = normalizeFeeRuleText(getGuruStateCode(guru));
+
+  const ruleParts = feeRules.map((rule) => ({
+    rule,
+    city: normalizeFeeRuleText(rule.city),
+    latitude: getFirstNumber(rule as Record<string, unknown>, ["latitude"]),
+    longitude: getFirstNumber(rule as Record<string, unknown>, ["longitude"]),
+    postalCode: normalizeFeeRulePostalCode(rule.postal_code),
+    radiusMiles: getFirstNumber(rule as Record<string, unknown>, [
+      "radius_miles",
+    ]),
+    state: normalizeFeeRuleText(rule.state),
+  }));
+
+  const postalMatch = ruleParts.find(
+    (part) =>
+      part.postalCode.length > 0 &&
+      guruPostalCode.length > 0 &&
+      part.postalCode === guruPostalCode,
+  );
+
+  if (postalMatch) return clampMarketplaceFeePercent(postalMatch.rule.fee_percent);
+
+  const radiusMatch = ruleParts.find((part) => {
+    if (
+      part.latitude === null ||
+      part.longitude === null ||
+      part.radiusMiles === null ||
+      part.radiusMiles <= 0
+    ) {
+      return false;
+    }
+
+    const distance = getDistanceMiles(
+      { latitude: part.latitude, longitude: part.longitude },
+      getGuruCoordinate(guru, 0),
+    );
+
+    return distance <= part.radiusMiles;
+  });
+
+  if (radiusMatch) return clampMarketplaceFeePercent(radiusMatch.rule.fee_percent);
+
+  const cityStateMatch = ruleParts.find(
+    (part) =>
+      part.city.length > 0 &&
+      part.state.length > 0 &&
+      part.city === guruCity &&
+      part.state === guruState,
+  );
+
+  if (cityStateMatch) {
+    return clampMarketplaceFeePercent(cityStateMatch.rule.fee_percent);
+  }
+
+  const cityMatch = ruleParts.find(
+    (part) =>
+      part.city.length > 0 && part.state.length === 0 && part.city === guruCity,
+  );
+
+  if (cityMatch) return clampMarketplaceFeePercent(cityMatch.rule.fee_percent);
+
+  const stateMatch = ruleParts.find(
+    (part) =>
+      part.state.length > 0 &&
+      part.city.length === 0 &&
+      part.postalCode.length === 0 &&
+      part.latitude === null &&
+      part.longitude === null &&
+      part.radiusMiles === null &&
+      part.state === guruState,
+  );
+
+  if (stateMatch) return clampMarketplaceFeePercent(stateMatch.rule.fee_percent);
+
+  const catchAllMatch = ruleParts.find(
+    (part) =>
+      part.postalCode.length === 0 &&
+      part.city.length === 0 &&
+      part.state.length === 0 &&
+      part.latitude === null &&
+      part.longitude === null &&
+      part.radiusMiles === null,
+  );
+
+  if (catchAllMatch) {
+    return clampMarketplaceFeePercent(catchAllMatch.rule.fee_percent);
+  }
+
+  return DEFAULT_SITGURU_FEE_PERCENT;
+}
+
+function formatMoneyAmount(value: number) {
+  const rounded = Math.round(value * 100) / 100;
+
+  return `$${
+    Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)
+  }`;
+}
+
+function formatFeePercent(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+/**
+ * The Guru's published rate is hourly, so the all-in figure is that rate plus
+ * the resolved marketplace fee. Gurus with no published rate are never shown a
+ * number that could read as a final price.
+ */
+function getGuruPriceDisplay(
+  guru: PublicGuruProfile,
+  feeRules: MarketplaceFeeRule[],
+): GuruPriceDisplay {
+  const feePercent = resolveGuruFeePercent(guru, feeRules);
+  const baseHourly = getGuruBaseHourlyRate(guru);
+
+  if (baseHourly === null) {
+    return {
+      allInHourly: null,
+      baseHourly: null,
+      detailLabel: "No published rate yet — message for a quote",
+      feePercent,
+      headline: "Rate on request",
+      isAllIn: false,
+    };
+  }
+
+  const allInHourly = baseHourly * (1 + feePercent / 100);
+
+  return {
+    allInHourly,
+    baseHourly,
+    detailLabel: `${formatMoneyAmount(baseHourly)}/hr rate + ${formatFeePercent(
+      feePercent,
+    )}% SitGuru fee`,
+    feePercent,
+    headline: `${formatMoneyAmount(allInHourly)}/hr`,
+    isAllIn: true,
+  };
 }
 
 function getGuruReviewCount(guru: PublicGuruProfile) {
@@ -3116,16 +4118,6 @@ function getGuruCardBio(guru: PublicGuruProfile) {
     ]) ||
     "Reliable local pet care with thoughtful updates, clear communication, and routines tailored to each pet."
   );
-}
-
-function formatCompactRate(rateLabel: string) {
-  const normalized = rateLabel.replace(/\s+/g, " ").trim();
-  const amountMatch = normalized.match(/\$?([0-9]+(?:\.[0-9]{1,2})?)/);
-
-  if (!amountMatch) return normalized || "Rate shown on profile";
-
-  const amount = amountMatch[1].replace(/\.00$/, "");
-  return `$${amount}/hr`;
 }
 
 function readFavoriteGuruIds() {
@@ -3453,25 +4445,6 @@ function addSmallPinOffset(
   };
 }
 
-function offsetCoordinateByMiles(
-  coordinate: MapCoordinate,
-  distanceMiles: number,
-  bearingDegrees: number,
-): MapCoordinate {
-  const bearing = degreesToRadians(bearingDegrees);
-  const latitudeMiles = distanceMiles * Math.cos(bearing);
-  const longitudeMiles = distanceMiles * Math.sin(bearing);
-  const milesPerLongitudeDegree = Math.max(
-    1,
-    69 * Math.cos(degreesToRadians(coordinate.latitude)),
-  );
-
-  return {
-    latitude: coordinate.latitude + latitudeMiles / 69,
-    longitude: coordinate.longitude + longitudeMiles / milesPerLongitudeDegree,
-  };
-}
-
 function getGuruServiceRadiusMiles(guru: PublicGuruProfile) {
   const record = guru as Record<string, unknown>;
   const keys = [
@@ -3611,64 +4584,6 @@ function getRegionForMapPoints(mapPoints: GuruMapPoint[]): MapRegion {
   };
 }
 
-function getSearchArea(searchQuery: string): {
-  city: string;
-  stateCode: string;
-  zipCode: string;
-} | null {
-  const normalized = searchQuery.trim().toLowerCase();
-  const zipCode = searchQuery.replace(/\D/g, "").slice(0, 5);
-
-  if (zipCode.length === 5 && ZIP_COORDS[zipCode]) {
-    for (const [cityStateKey, zipCodes] of Object.entries(localZipHints)) {
-      if (!zipCodes.includes(zipCode)) continue;
-
-      const parts = cityStateKey.split(" ");
-      const stateCode = (parts.pop() || "").toUpperCase();
-      const city = parts
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(" ");
-
-      return { city, stateCode, zipCode };
-    }
-
-    return { city: `ZIP ${zipCode}`, stateCode: "", zipCode };
-  }
-
-  for (const cityKey of Object.keys(CITY_COORDS)) {
-    const parts = cityKey.split(" ");
-    const stateCode = (parts.pop() || "").toUpperCase();
-    const cityWords = parts.join(" ");
-
-    if (
-      normalized === cityKey ||
-      normalized.includes(cityKey) ||
-      (normalized.includes(cityWords) &&
-        normalized.includes(stateCode.toLowerCase()))
-    ) {
-      return {
-        city: cityWords
-          .split(" ")
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join(" "),
-        stateCode,
-        zipCode: "",
-      };
-    }
-  }
-
-  for (const [stateCode, state] of Object.entries(STATE_COORDS)) {
-    if (
-      normalized === stateCode.toLowerCase() ||
-      normalized === state.stateName.toLowerCase()
-    ) {
-      return { city: "Statewide", stateCode, zipCode: "" };
-    }
-  }
-
-  return null;
-}
-
 function getSearchCenter(searchQuery: string) {
   const normalized = searchQuery.trim().toLowerCase();
   const zip = searchQuery.replace(/\D/g, "").slice(0, 5);
@@ -3754,8 +4669,6 @@ function getPalette(isDark: boolean) {
     heart: isDark ? "#F0CF62" : "#7FA35C",
     favoriteRed: "#F05252",
     favoriteRedSoft: isDark ? "rgba(240, 82, 82, 0.16)" : "#FFE7E7",
-    navActive: isDark ? "#39D982" : "#0B6B45",
-    navMuted: isDark ? "#A7B5AC" : "#6F7B73",
     disabledBg: isDark ? "#173324" : "#F1EADB",
     disabledText: isDark ? "#AEB9AF" : "#657068",
     frame: "#121714",
@@ -3820,7 +4733,7 @@ function createStyles(isDark: boolean) {
       flex: 1,
     },
     scrollContent: {
-      paddingBottom: 150,
+      paddingBottom: 84,
       paddingHorizontal: 18,
       paddingTop: 14,
     },
@@ -3991,6 +4904,62 @@ function createStyles(isDark: boolean) {
     },
     serviceChipTextSelected: {
       color: isDark ? "#DFFFEA" : "#FFFFFF",
+    },
+
+    refineRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+    },
+    refinePill: {
+      alignItems: "center",
+      backgroundColor: palette.card,
+      borderColor: palette.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 6,
+      minHeight: 38,
+      paddingHorizontal: 13,
+    },
+    refinePillActive: {
+      backgroundColor: isDark ? "#13452E" : "#0B6B45",
+      borderColor: isDark ? "#2CCB74" : "#0B6B45",
+    },
+    refinePillText: {
+      color: palette.muted,
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+      maxWidth: 108,
+    },
+    refinePillTextActive: {
+      color: isDark ? "#DFFFEA" : "#FFFFFF",
+    },
+    refineBadge: {
+      alignItems: "center",
+      backgroundColor: isDark ? "#39D982" : "#F3A631",
+      borderRadius: 999,
+      justifyContent: "center",
+      minWidth: 17,
+      paddingHorizontal: 4,
+      paddingVertical: 1,
+    },
+    refineBadgeText: {
+      color: isDark ? "#06301E" : "#FFFFFF",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 9,
+    },
+    refineClearButton: {
+      alignItems: "center",
+      borderRadius: 999,
+      justifyContent: "center",
+      minHeight: 38,
+      paddingHorizontal: 8,
+    },
+    refineClearText: {
+      color: isDark ? palette.greenBright : palette.primary,
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
     },
 
     noticePanel: {
@@ -4606,6 +5575,20 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.bold,
       fontSize: 12,
     },
+    emptySecondaryButton: {
+      alignItems: "center",
+      borderColor: palette.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      justifyContent: "center",
+      minHeight: 34,
+      paddingHorizontal: 16,
+    },
+    emptySecondaryButtonText: {
+      color: isDark ? palette.greenBright : palette.primary,
+      fontFamily: AppFonts.bold,
+      fontSize: 12,
+    },
 
     legacyGuruList: {
       gap: 12,
@@ -4828,7 +5811,7 @@ function createStyles(isDark: boolean) {
     },
 
     mapScrollContent: {
-      paddingBottom: 88,
+      paddingBottom: 16,
     },
     recommendedSection: {
       gap: 7,
@@ -5032,13 +6015,42 @@ function createStyles(isDark: boolean) {
       fontSize: 10,
       lineHeight: 14,
     },
-    guruProfileRate: {
-      color: "#DFF6E8",
+    guruProfilePriceRow: {
+      alignItems: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.08)",
+      borderColor: "rgba(223, 246, 232, 0.22)",
+      borderRadius: 13,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 10,
+      justifyContent: "space-between",
+      paddingHorizontal: 11,
+      paddingVertical: 9,
+    },
+    guruProfilePriceCopy: {
+      flex: 1,
+      gap: 1,
+      minWidth: 0,
+    },
+    guruProfilePriceLabel: {
+      color: "#BFE9D0",
       fontFamily: AppFonts.extraBold,
-      fontSize: 11,
-      lineHeight: 15,
-      marginTop: 2,
-      maxWidth: 78,
+      fontSize: 8,
+      letterSpacing: 0.5,
+      textTransform: "uppercase",
+    },
+    guruProfilePriceDetail: {
+      color: "rgba(255, 255, 255, 0.78)",
+      fontFamily: AppFonts.medium,
+      fontSize: 9,
+      lineHeight: 13,
+    },
+    guruProfilePriceValue: {
+      color: "#FFFFFF",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 17,
+      letterSpacing: -0.4,
+      lineHeight: 21,
       textAlign: "right",
     },
     guruProfileRatingRow: {
@@ -5130,10 +6142,6 @@ function createStyles(isDark: boolean) {
     guruProfileRequestButtonSecondary: {
       backgroundColor: "transparent",
       borderColor: "rgba(255, 255, 255, 0.38)",
-    },
-    guruProfileRequestButtonPressed: {
-      opacity: 0.84,
-      transform: [{ scale: 0.992 }],
     },
     guruProfileRequestButtonText: {
       color: "#FFFFFF",
@@ -5331,7 +6339,7 @@ function createStyles(isDark: boolean) {
     },
     listMapStage: {
       backgroundColor: palette.mapWater,
-      borderColor: palette.cardBorder,
+      borderColor: palette.border,
       borderRadius: 28,
       borderWidth: 1,
       height: 300,
@@ -5590,11 +6598,23 @@ function createStyles(isDark: boolean) {
       justifyContent: "space-between",
       marginLeft: 7,
     },
+    mapGuruPreviewPriceBlock: {
+      alignItems: "flex-end",
+      maxWidth: 96,
+    },
     mapGuruPreviewRate: {
       color: palette.text,
       fontFamily: AppFonts.extraBold,
       fontSize: 12,
       lineHeight: 16,
+    },
+    mapGuruPreviewRateNote: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 8,
+      letterSpacing: 0.3,
+      lineHeight: 11,
+      textTransform: "uppercase",
     },
 
     mapGuruPreviewExpanded: {
@@ -5737,12 +6757,22 @@ function createStyles(isDark: boolean) {
       flexDirection: "row",
       gap: 14,
     },
+    mapExpandedPriceBlock: {
+      gap: 1,
+      maxWidth: 132,
+      minWidth: 92,
+    },
     mapExpandedPrice: {
       color: palette.text,
       fontFamily: AppFonts.extraBold,
       fontSize: 19,
       letterSpacing: -0.35,
-      minWidth: 72,
+    },
+    mapExpandedPriceNote: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 8,
+      lineHeight: 11,
     },
     mapExpandedViewButton: {
       alignItems: "center",
@@ -5830,44 +6860,6 @@ function createStyles(isDark: boolean) {
       fontSize: 12,
     },
 
-    bottomNav: {
-      alignItems: "center",
-      backgroundColor: isDark ? "#071A12" : "#FFFDF8",
-      borderColor: isDark ? "#224D38" : "#EEDFCC",
-      borderRadius: 24,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: "row",
-      height: 76,
-      justifyContent: "space-around",
-      left: 10,
-      paddingBottom: 8,
-      paddingHorizontal: 8,
-      paddingTop: 8,
-      position: "absolute",
-      right: 10,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: -8 },
-      shadowOpacity: isDark ? 0.28 : 0.08,
-      shadowRadius: 18,
-    },
-    navItem: {
-      alignItems: "center",
-      flex: 1,
-      gap: 4,
-      justifyContent: "center",
-    },
-    navLabelActive: {
-      color: palette.navActive,
-      fontFamily: AppFonts.bold,
-      fontSize: 11,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 11,
-    },
-
     homeIndicator: {
       alignSelf: "center",
       backgroundColor: "#F4F2EC",
@@ -5876,6 +6868,216 @@ function createStyles(isDark: boolean) {
       marginTop: 10,
       opacity: 0.9,
       width: 120,
+    },
+
+    sheetOverlay: {
+      bottom: 0,
+      justifyContent: "flex-end",
+      left: 0,
+      position: "absolute",
+      right: 0,
+      top: 0,
+      zIndex: 80,
+    },
+    sheetBackdrop: {
+      backgroundColor: isDark
+        ? "rgba(2, 12, 8, 0.72)"
+        : "rgba(9, 40, 28, 0.42)",
+      bottom: 0,
+      left: 0,
+      position: "absolute",
+      right: 0,
+      top: 0,
+    },
+    sheetCard: {
+      backgroundColor: palette.card,
+      borderColor: palette.border,
+      borderTopLeftRadius: 26,
+      borderTopRightRadius: 26,
+      borderWidth: 1,
+      maxHeight: "82%",
+      paddingBottom: 16,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: -10 },
+      shadowOpacity: isDark ? 0.4 : 0.18,
+      shadowRadius: 22,
+    },
+    sheetHandle: {
+      alignSelf: "center",
+      backgroundColor: palette.border,
+      borderRadius: 999,
+      height: 4,
+      marginBottom: 12,
+      width: 42,
+    },
+    sheetHeaderRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      justifyContent: "space-between",
+    },
+    sheetHeaderCopy: {
+      flex: 1,
+      gap: 2,
+      minWidth: 0,
+    },
+    sheetTitle: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 18,
+      letterSpacing: -0.3,
+    },
+    sheetSubtitle: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 11,
+      lineHeight: 15,
+    },
+    sheetCloseButton: {
+      alignItems: "center",
+      backgroundColor: palette.cardSoft,
+      borderColor: palette.borderSoft,
+      borderRadius: 999,
+      borderWidth: 1,
+      height: 34,
+      justifyContent: "center",
+      width: 34,
+    },
+    sheetClearButton: {
+      alignItems: "center",
+      borderColor: palette.border,
+      borderRadius: 999,
+      borderWidth: 1,
+      justifyContent: "center",
+      minHeight: 32,
+      paddingHorizontal: 12,
+    },
+    sheetClearText: {
+      color: isDark ? palette.greenBright : palette.primary,
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+    },
+
+    sheetOptionList: {
+      gap: 8,
+      marginTop: 14,
+    },
+    sheetOptionRow: {
+      alignItems: "center",
+      backgroundColor: palette.cardSoft,
+      borderColor: palette.borderSoft,
+      borderRadius: 16,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 10,
+      minHeight: 56,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    sheetOptionRowSelected: {
+      backgroundColor: isDark ? "#13452E" : "#0B6B45",
+      borderColor: isDark ? "#2CCB74" : "#0B6B45",
+    },
+    sheetOptionRowUnavailable: {
+      backgroundColor: palette.disabledBg,
+      borderStyle: "dashed",
+    },
+    sheetOptionCopy: {
+      flex: 1,
+      gap: 2,
+      minWidth: 0,
+    },
+    sheetOptionLabel: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 13,
+    },
+    sheetOptionLabelSelected: {
+      color: isDark ? "#DFFFEA" : "#FFFFFF",
+    },
+    sheetOptionDetail: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 10,
+      lineHeight: 14,
+    },
+    sheetOptionDetailSelected: {
+      color: isDark ? "rgba(223, 255, 234, 0.82)" : "rgba(255, 255, 255, 0.84)",
+    },
+    sheetOptionCheck: {
+      alignItems: "center",
+      backgroundColor: isDark ? "rgba(57, 217, 130, 0.22)" : "rgba(255, 255, 255, 0.22)",
+      borderRadius: 999,
+      height: 24,
+      justifyContent: "center",
+      width: 24,
+    },
+
+    sheetScroll: {
+      marginTop: 14,
+    },
+    sheetScrollContent: {
+      gap: 16,
+      paddingBottom: 6,
+    },
+    sheetGroup: {
+      gap: 8,
+    },
+    sheetGroupLabel: {
+      color: palette.title,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 12,
+    },
+    sheetGroupNote: {
+      color: palette.muted,
+      fontFamily: AppFonts.medium,
+      fontSize: 9,
+      lineHeight: 13,
+    },
+    sheetChipRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 7,
+    },
+    sheetChip: {
+      alignItems: "center",
+      backgroundColor: palette.cardSoft,
+      borderColor: palette.borderSoft,
+      borderRadius: 999,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 4,
+      justifyContent: "center",
+      minHeight: 38,
+      paddingHorizontal: 13,
+    },
+    sheetChipSelected: {
+      backgroundColor: isDark ? "#13452E" : "#0B6B45",
+      borderColor: isDark ? "#2CCB74" : "#0B6B45",
+    },
+    sheetChipText: {
+      color: palette.muted,
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+    },
+    sheetChipTextSelected: {
+      color: isDark ? "#DFFFEA" : "#FFFFFF",
+    },
+
+    sheetApplyButton: {
+      alignItems: "center",
+      backgroundColor: isDark ? "#1D8E55" : palette.primary,
+      borderRadius: 14,
+      justifyContent: "center",
+      marginTop: 14,
+      minHeight: 46,
+    },
+    sheetApplyButtonText: {
+      color: "#FFFFFF",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 13,
     },
   });
 }

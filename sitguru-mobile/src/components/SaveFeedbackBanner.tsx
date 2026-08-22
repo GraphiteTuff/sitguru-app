@@ -9,12 +9,12 @@ import {
     Animated,
     Easing,
     Platform,
-    Pressable,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { AppFonts } from '@/constants/fonts';
 
 export type SaveFeedbackTone = 'success' | 'warning' | 'error';
@@ -206,11 +206,12 @@ export default function SaveFeedbackBanner({
         ) : null}
       </View>
 
-      <Pressable
+      <BubblePressable
         accessibilityLabel="Dismiss save confirmation"
         accessibilityRole="button"
         hitSlop={10}
         onPress={onDismiss}
+        scaleTo={0.88}
         style={styles.dismissButton}
       >
         <X
@@ -218,7 +219,7 @@ export default function SaveFeedbackBanner({
           size={18}
           strokeWidth={2.4}
         />
-      </Pressable>
+      </BubblePressable>
     </Animated.View>
   );
 }

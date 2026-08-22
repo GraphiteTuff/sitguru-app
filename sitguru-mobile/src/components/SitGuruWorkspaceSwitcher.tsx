@@ -31,6 +31,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import BubblePressable from '@/components/BubblePressable';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -292,17 +293,12 @@ export default function SitGuruWorkspaceSwitcher({
                 </View>
               </View>
 
-              <Pressable
+              <BubblePressable
                 accessibilityLabel="Close workspace menu"
                 accessibilityRole="button"
                 onPress={onClose}
-                style={({
-                  pressed,
-                }) => [
-                  styles.closeButton,
-                  pressed &&
-                    styles.pressed,
-                ]}
+                scaleTo={0.88}
+                style={styles.closeButton}
               >
                 <X
                   color={
@@ -311,7 +307,7 @@ export default function SitGuruWorkspaceSwitcher({
                   size={18}
                   strokeWidth={2.3}
                 />
-              </Pressable>
+              </BubblePressable>
             </View>
 
             <View
@@ -326,7 +322,7 @@ export default function SitGuruWorkspaceSwitcher({
                     currentRole;
 
                   return (
-                    <Pressable
+                    <BubblePressable
                       key={role}
                       accessibilityLabel={`Open ${workspaceLabel(
                         role,
@@ -341,14 +337,11 @@ export default function SitGuruWorkspaceSwitcher({
                           role,
                         )
                       }
-                      style={({
-                        pressed,
-                      }) => [
+                      scaleTo={0.97}
+                      style={[
                         styles.workspaceRow,
                         active &&
                           styles.workspaceRowActive,
-                        pressed &&
-                          styles.pressed,
                       ]}
                     >
                       <View
@@ -421,7 +414,7 @@ export default function SitGuruWorkspaceSwitcher({
                           strokeWidth={2.3}
                         />
                       )}
-                    </Pressable>
+                    </BubblePressable>
                   );
                 },
               )}
@@ -431,18 +424,15 @@ export default function SitGuruWorkspaceSwitcher({
               style={styles.divider}
             />
 
-            <Pressable
+            <BubblePressable
               accessibilityRole="button"
               onPress={() =>
                 openDestination(
                   profileHref,
                 )
               }
-              style={({ pressed }) => [
-                styles.actionRow,
-                pressed &&
-                  styles.pressed,
-              ]}
+              scaleTo={0.97}
+              style={styles.actionRow}
             >
               <View
                 style={
@@ -486,20 +476,17 @@ export default function SitGuruWorkspaceSwitcher({
                 size={18}
                 strokeWidth={2.3}
               />
-            </Pressable>
+            </BubblePressable>
 
-            <Pressable
+            <BubblePressable
               accessibilityRole="button"
               onPress={() =>
                 openDestination(
                   '/account',
                 )
               }
-              style={({ pressed }) => [
-                styles.actionRow,
-                pressed &&
-                  styles.pressed,
-              ]}
+              scaleTo={0.97}
+              style={styles.actionRow}
             >
               <View
                 style={
@@ -544,9 +531,9 @@ export default function SitGuruWorkspaceSwitcher({
                 size={18}
                 strokeWidth={2.3}
               />
-            </Pressable>
+            </BubblePressable>
 
-            <Pressable
+            <BubblePressable
               accessibilityRole="button"
               onPress={() => {
                 onClose();
@@ -554,11 +541,8 @@ export default function SitGuruWorkspaceSwitcher({
                   '/role-selection',
                 );
               }}
-              style={({ pressed }) => [
-                styles.actionRow,
-                pressed &&
-                  styles.pressed,
-              ]}
+              scaleTo={0.97}
+              style={styles.actionRow}
             >
               <View
                 style={
@@ -603,13 +587,13 @@ export default function SitGuruWorkspaceSwitcher({
                 size={18}
                 strokeWidth={2.3}
               />
-            </Pressable>
+            </BubblePressable>
 
             <View
               style={styles.divider}
             />
 
-            <Pressable
+            <BubblePressable
               accessibilityRole="button"
               accessibilityState={{
                 disabled:
@@ -620,13 +604,10 @@ export default function SitGuruWorkspaceSwitcher({
               onPress={() =>
                 void handleSignOut()
               }
-              style={({ pressed }) => [
+              style={[
                 styles.signOutButton,
                 signingOut &&
                   styles.disabled,
-                pressed &&
-                  !signingOut &&
-                  styles.pressed,
               ]}
             >
               {signingOut ? (
@@ -655,7 +636,7 @@ export default function SitGuruWorkspaceSwitcher({
                   ? 'Signing out…'
                   : 'Sign out of SitGuru'}
               </Text>
-            </Pressable>
+            </BubblePressable>
           </View>
         </View>
       </View>
@@ -1094,14 +1075,6 @@ function createStyles(
       fontFamily:
         AppFonts.bold,
       fontSize: 10,
-    },
-    pressed: {
-      opacity: 0.72,
-      transform: [
-        {
-          scale: 0.99,
-        },
-      ],
     },
     disabled: {
       opacity: 0.5,

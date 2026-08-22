@@ -1,7 +1,8 @@
 import type { ComponentProps } from 'react';
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import SitGuruIconBadge, { type SitGuruIconName } from '@/components/SitGuruIconBadge';
 import { SitGuruColors } from '@/constants/colors';
 
@@ -31,16 +32,13 @@ export default function SitGuruActionCard({
 }: SitGuruActionCardProps) {
   const isActionable = Boolean(href || onPress);
   const card = (
-    <Pressable
+    <BubblePressable
       accessibilityLabel={`${title}. ${description}`}
       accessibilityRole={isActionable ? 'button' : undefined}
       disabled={!isActionable}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        toneStyles[tone].card,
-        pressed && isActionable ? styles.pressed : null,
-      ]}
+      scaleTo={isActionable ? 0.965 : 1}
+      style={[styles.card, toneStyles[tone].card]}
     >
       <View style={styles.topRow}>
         <SitGuruIconBadge
@@ -69,7 +67,7 @@ export default function SitGuruActionCard({
           </Text>
         </View>
       ) : null}
-    </Pressable>
+    </BubblePressable>
   );
 
   if (href) {
@@ -94,14 +92,6 @@ const styles = StyleSheet.create({
     gap: 12,
     minWidth: 156,
     padding: 15,
-  },
-  pressed: {
-    opacity: 0.88,
-    transform: [
-      {
-        translateY: 1,
-      },
-    ],
   },
   topRow: {
     alignItems: 'center',

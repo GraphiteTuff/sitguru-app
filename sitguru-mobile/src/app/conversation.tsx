@@ -1,5 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Audio } from 'expo-av';
+import {
+  setAudioModeAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+} from 'expo-audio';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   Bell,
@@ -22,7 +26,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,15 +33,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import BubblePressable from '@/components/BubblePressable';
 import ChatComposerBar, {
   type ChatAttachment,
 } from '@/components/mobile/ChatComposerBar';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
-import { getWorkspaceDashboardPath, LAST_WORKSPACE_KEY } from '@/constants/workspaces';
+import { LAST_WORKSPACE_KEY } from '@/constants/workspaces';
 import {
   setThemePreference,
   useThemePreference,
@@ -152,47 +157,17 @@ const PROFILE_SELECT =
 const PET_TABLES = ['pets', 'pet_profiles', 'pet_passports'];
 const PET_OWNER_FIELDS = ['owner_id', 'pet_parent_id', 'user_id', 'created_by'];
 
-const PREVIEW_MESSAGES: UiMessage[] = [
-  {
-    id: 'preview-1',
-    conversationId: null,
-    senderId: 'preview-parent',
-    recipientId: 'preview-guru',
-    body: 'Hi! I am looking for dog walking help next week around lunchtime.',
-    createdAt: new Date(Date.now() - 18 * 60 * 1000).toISOString(),
-    delivery: 'preview',
-  },
-  {
-    id: 'preview-2',
-    conversationId: null,
-    senderId: 'preview-guru',
-    recipientId: 'preview-parent',
-    body: 'Thanks for reaching out. I can usually help with lunchtime walks. What ZIP code is care needed in?',
-    createdAt: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
-    delivery: 'preview',
-  },
-  {
-    id: 'preview-3',
-    conversationId: null,
-    senderId: 'preview-parent',
-    recipientId: 'preview-guru',
-    body: 'The care ZIP is 18951. Scout is friendly and usually walks for about 30 minutes.',
-    createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    delivery: 'preview',
-  },
-];
-
-const FALLBACK_BOOKING_CONTEXT: BookingContext = {
+const EMPTY_BOOKING_CONTEXT: BookingContext = {
   id: null,
   petId: null,
-  petName: 'Scout',
+  petName: '',
   petPhotoUrl: null,
-  service: 'Dog Walking',
-  dateLabel: 'Schedule not selected',
-  timeLabel: 'Flexible',
-  locationLabel: 'Care location shared after booking',
-  statusLabel: 'Care question',
-  paymentLabel: 'No payment due',
+  service: '',
+  dateLabel: '',
+  timeLabel: '',
+  locationLabel: '',
+  statusLabel: '',
+  paymentLabel: '',
 };
 
 function firstString(record: RecordRow | null | undefined, keys: string[]) {
@@ -568,7 +543,7 @@ async function loadBookingContext({
   const requestedPetId =
     petId || firstString(booking, ['pet_id', 'pet_profile_id', 'pet_passport_id']);
   const requestedPetName =
-    petName || firstString(booking, ['pet_name', 'animal_name']) || FALLBACK_BOOKING_CONTEXT.petName;
+    petName || firstString(booking, ['pet_name', 'animal_name']);
 
   const pet = await loadPetContext({
     userId,
@@ -578,29 +553,29 @@ async function loadBookingContext({
 
   if (!booking) {
     return {
-      ...FALLBACK_BOOKING_CONTEXT,
+      ...EMPTY_BOOKING_CONTEXT,
       petId: pet.id,
       petName: pet.name,
       petPhotoUrl: pet.photoUrl,
     };
   }
 
-  const service =
-    firstString(booking, ['service', 'service_type', 'booking_type', 'service_name']) ||
-    'Pet Care';
-  const location =
-    firstString(booking, [
-      'service_location',
-      'location',
-      'city_state',
-      'service_area',
-      'zip_code',
-      'postal_code',
-    ]) || 'Care location shared securely';
-  const status =
-    firstString(booking, ['booking_status', 'status', 'request_status']) || 'Care question';
-  const payment =
-    firstString(booking, ['payment_status']) || 'Payment after Guru accepts';
+  const service = firstString(booking, [
+    'service',
+    'service_type',
+    'booking_type',
+    'service_name',
+  ]);
+  const location = firstString(booking, [
+    'service_location',
+    'location',
+    'city_state',
+    'service_area',
+    'zip_code',
+    'postal_code',
+  ]);
+  const status = firstString(booking, ['booking_status', 'status', 'request_status']);
+  const payment = firstString(booking, ['payment_status']);
 
   return {
     id: firstString(booking, ['id']) || bookingId || null,
@@ -640,16 +615,18 @@ async function loadPetContext({
       const rows = result.data as RecordRow[];
       const match =
         rows.find((row) => firstString(row, ['id', 'pet_id']) === petId) ||
-        rows.find(
-          (row) =>
-            firstString(row, ['name', 'pet_name', 'animal_name']).toLowerCase() === cleanName,
-        ) ||
-        rows.find(
-          (row) => firstString(row, ['name', 'pet_name', 'animal_name']).toLowerCase() === 'scout',
-        ) ||
-        rows[0];
+        (cleanName
+          ? rows.find(
+              (row) =>
+                firstString(row, ['name', 'pet_name', 'animal_name']).toLowerCase() ===
+                cleanName,
+            )
+          : undefined) ||
+        (!petId && !cleanName ? rows[0] : undefined);
 
-      const name = firstString(match, ['name', 'pet_name', 'animal_name']) || petName || 'Pet';
+      if (!match) continue;
+
+      const name = firstString(match, ['name', 'pet_name', 'animal_name']) || petName;
       const photo = resolveSupabaseStorageUrl(
         firstString(match, [
           'photo_url',
@@ -670,7 +647,7 @@ async function loadPetContext({
 
   return {
     id: petId || null,
-    name: petName || 'Scout',
+    name: petName,
     photoUrl: null,
   };
 }
@@ -704,7 +681,7 @@ export default function ConversationScreen() {
   const [conversation, setConversation] = useState<ConversationRow | null>(null);
   const [profiles, setProfiles] = useState<Record<string, ProfileRow>>({});
   const [bookingContext, setBookingContext] =
-    useState<BookingContext>(FALLBACK_BOOKING_CONTEXT);
+    useState<BookingContext>(EMPTY_BOOKING_CONTEXT);
   const [loadingThread, setLoadingThread] = useState(true);
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<NoticeState>(null);
@@ -937,7 +914,8 @@ export default function ConversationScreen() {
 
     if (!isSupabaseConfigured || !currentUserId) {
       setPreviewMode(true);
-      setMessages(PREVIEW_MESSAGES);
+      setMessages([]);
+      setBookingContext(EMPTY_BOOKING_CONTEXT);
       setRealtimeState('preview');
       setLoadingThread(false);
       setNotice({
@@ -991,6 +969,7 @@ export default function ConversationScreen() {
       if (!nextConversation) {
         setConversation(null);
         setMessages([]);
+        setBookingContext(EMPTY_BOOKING_CONTEXT);
         setRealtimeState('offline');
         setNotice({
           tone: 'info',
@@ -1023,6 +1002,7 @@ export default function ConversationScreen() {
       });
       setBookingContext(nextBookingContext);
     } catch (error) {
+      setBookingContext(EMPTY_BOOKING_CONTEXT);
       setRealtimeState('offline');
       setNotice({
         tone: 'error',
@@ -1275,34 +1255,6 @@ export default function ConversationScreen() {
     .reverse()
     .find((message) => currentSenderIds.has(message.senderId))?.id;
 
-  const navigationIsGuru = currentRole === 'guru';
-  const navigationIsPetParent = currentRole === 'pet_parent';
-  const workspaceHomeRoute = getWorkspaceDashboardPath(currentRole);
-  const secondaryRoute = navigationIsGuru
-    ? '/guru-requests'
-    : navigationIsPetParent
-      ? '/find-care'
-      : workspaceHomeRoute;
-  const secondaryLabel = navigationIsGuru
-    ? 'Requests'
-    : navigationIsPetParent
-      ? 'Find Care'
-      : currentRole === 'ambassador'
-        ? 'Ambassador'
-        : 'Operations';
-  const fourthRoute = navigationIsGuru
-    ? '/payments'
-    : navigationIsPetParent
-      ? '/booking-details'
-      : workspaceHomeRoute;
-  const fourthLabel = navigationIsGuru
-    ? 'Earnings'
-    : navigationIsPetParent
-      ? 'Bookings'
-      : currentRole === 'ambassador'
-        ? 'Referrals'
-        : 'Admin';
-
   return (
     <SitGuruScreen center={isWebPreview} maxWidth={620}>
       <View style={[styles.previewCanvas, !isWebPreview && styles.previewCanvasNative]}>
@@ -1320,16 +1272,17 @@ export default function ConversationScreen() {
               {isWebPreview ? <PhoneStatusBar palette={palette} styles={styles} /> : null}
 
               <View style={styles.header}>
-                <Pressable
+                <BubblePressable
                   accessibilityLabel="Go back"
                   accessibilityRole="button"
                   onPress={() => router.back()}
-                  style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
+                  scaleTo={0.88}
+                  style={styles.headerButton}
                 >
                   <ChevronLeft color={palette.title} size={20} strokeWidth={2.6} />
-                </Pressable>
+                </BubblePressable>
 
-                <Pressable
+                <BubblePressable
                   accessibilityLabel={`Open my ${currentRoleLabel} profile`}
                   accessibilityRole="button"
                   onPress={openHeaderProfile}
@@ -1353,7 +1306,7 @@ export default function ConversationScreen() {
                       statusLabel={realtimeLabel}
                     />
                   </View>
-                </Pressable>
+                </BubblePressable>
 
                 <View style={styles.headerActions}>
                   <View style={styles.modeToggle}>
@@ -1361,11 +1314,12 @@ export default function ConversationScreen() {
                       const active = themePreference === option.value;
 
                       return (
-                        <Pressable
+                        <BubblePressable
                           key={option.value}
                           accessibilityLabel={`Switch to ${option.label} mode`}
                           accessibilityRole="button"
                           onPress={() => setThemePreference(option.value)}
+                          scaleTo={0.88}
                           style={[styles.modeButton, active && styles.modeButtonActive]}
                         >
                           <SitGuruIcon
@@ -1380,24 +1334,26 @@ export default function ConversationScreen() {
                             size={14}
                             strokeWidth={2.4}
                           />
-                        </Pressable>
+                        </BubblePressable>
                       );
                     })}
                   </View>
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityLabel="Open notifications"
                     accessibilityRole="button"
                     onPress={() => router.push('/notifications')}
-                    style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
+                    scaleTo={0.88}
+                    style={styles.headerButton}
                   >
                     <Bell color={palette.title} size={18} strokeWidth={2.4} />
-                  </Pressable>
+                  </BubblePressable>
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityLabel="Open workspace switcher"
                     accessibilityRole="button"
                     onPress={() => setWorkspaceSwitcherOpen(true)}
+                    scaleTo={0.88}
                     style={styles.profileButton}
                   >
                     <ProfileAvatar
@@ -1407,19 +1363,20 @@ export default function ConversationScreen() {
                       isDark={isDark}
                       styles={styles}
                     />
-                  </Pressable>
+                  </BubblePressable>
                 </View>
               </View>
 
               <View style={styles.body}>
                 <View style={styles.contextCard}>
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     onPress={() => setContextExpanded((current) => !current)}
+                    scaleTo={0.97}
                     style={styles.contextTop}
                   >
                     <PetAvatar
-                      name={bookingContext.petName}
+                      name={bookingContext.petName || 'Pet'}
                       uri={bookingContext.petPhotoUrl}
                       isDark={isDark}
                       styles={styles}
@@ -1428,19 +1385,22 @@ export default function ConversationScreen() {
                     <View style={styles.contextPrimaryCopy}>
                       <View style={styles.contextTitleRow}>
                         <Text style={styles.contextPetName} numberOfLines={1}>
-                          {bookingContext.petName}
+                          {bookingContext.petName.trim() || 'No pet linked'}
                         </Text>
                         <View style={styles.contextStatusPill}>
                           <Text style={styles.contextStatusText} numberOfLines={1}>
-                            {bookingContext.statusLabel}
+                            {bookingContext.statusLabel.trim() || 'No booking linked'}
                           </Text>
                         </View>
                       </View>
                       <Text style={styles.contextService} numberOfLines={1}>
-                        {bookingContext.service}
+                        {bookingContext.service.trim() || 'No service linked'}
                       </Text>
                       <Text style={styles.contextSchedule} numberOfLines={1}>
-                        {bookingContext.dateLabel} • {bookingContext.timeLabel}
+                        {[bookingContext.dateLabel, bookingContext.timeLabel]
+                          .map((part) => part.trim())
+                          .filter(Boolean)
+                          .join(' • ') || 'No schedule yet'}
                       </Text>
                     </View>
 
@@ -1449,7 +1409,7 @@ export default function ConversationScreen() {
                     ) : (
                       <ChevronDown color={palette.muted} size={19} strokeWidth={2.4} />
                     )}
-                  </Pressable>
+                  </BubblePressable>
 
                   {contextExpanded ? (
                     <View style={styles.contextExpanded}>
@@ -1457,35 +1417,35 @@ export default function ConversationScreen() {
                         <ContextDetail
                           icon={<MapPin color={palette.primary} size={15} strokeWidth={2.4} />}
                           label="Care area"
-                          value={bookingContext.locationLabel}
+                          value={bookingContext.locationLabel.trim() || 'No location listed'}
                           styles={styles}
                         />
                         <ContextDetail
                           icon={<CircleDollarSign color={palette.primary} size={15} strokeWidth={2.4} />}
                           label="Payment"
-                          value={bookingContext.paymentLabel}
+                          value={bookingContext.paymentLabel.trim() || 'No payment on file'}
                           styles={styles}
                         />
                       </View>
 
                       <View style={styles.contextActions}>
-                        <Pressable
+                        <BubblePressable
                           accessibilityRole="button"
                           onPress={openBookingDetails}
                           style={styles.contextSecondaryButton}
                         >
                           <CalendarDays color={palette.primary} size={16} strokeWidth={2.4} />
                           <Text style={styles.contextSecondaryText}>Booking</Text>
-                        </Pressable>
+                        </BubblePressable>
 
-                        <Pressable
+                        <BubblePressable
                           accessibilityRole="button"
                           onPress={openRequestCare}
                           style={styles.contextPrimaryButton}
                         >
                           <PawPrint color="#FFFFFF" size={16} strokeWidth={2.4} />
                           <Text style={styles.contextPrimaryText}>Request Care</Text>
-                        </Pressable>
+                        </BubblePressable>
                       </View>
                     </View>
                   ) : null}
@@ -1622,15 +1582,16 @@ export default function ConversationScreen() {
                     showsHorizontalScrollIndicator={false}
                   >
                     {QUICK_REPLIES.map((reply) => (
-                      <Pressable
+                      <BubblePressable
                         key={reply}
                         accessibilityRole="button"
                         onPress={() => handleQuickReply(reply)}
-                        style={({ pressed }) => [styles.quickReply, pressed && styles.pressed]}
+                        scaleTo={0.88}
+                        style={styles.quickReply}
                       >
                         <Sparkles color={palette.primary} size={13} strokeWidth={2.4} />
                         <Text style={styles.quickReplyText}>{reply}</Text>
-                      </Pressable>
+                      </BubblePressable>
                     ))}
                   </ScrollView>
                 </View>
@@ -1653,53 +1614,7 @@ export default function ConversationScreen() {
                 />
               </View>
 
-              <View style={styles.bottomNav}>
-                <NavItem
-                  active={false}
-                  icon="home"
-                  label="Home"
-                  onPress={() => router.push(workspaceHomeRoute)}
-                  palette={palette}
-                  styles={styles}
-                />
-                <NavItem
-                  active={false}
-                  icon={navigationIsGuru ? 'bookings' : 'explore'}
-                  label={secondaryLabel}
-                  onPress={() => router.push(secondaryRoute)}
-                  palette={palette}
-                  styles={styles}
-                />
-                <NavItem
-                  active
-                  icon="messages"
-                  label="Messages"
-                  onPress={() =>
-                    router.push({
-                      pathname: '/messages',
-                      params: { viewerRole: currentRole },
-                    })
-                  }
-                  palette={palette}
-                  styles={styles}
-                />
-                <NavItem
-                  active={false}
-                  icon="bookings"
-                  label={fourthLabel}
-                  onPress={() => router.push(fourthRoute)}
-                  palette={palette}
-                  styles={styles}
-                />
-                <NavItem
-                  active={false}
-                  icon="profile"
-                  label="Profile"
-                  onPress={() => setWorkspaceSwitcherOpen(true)}
-                  palette={palette}
-                  styles={styles}
-                />
-              </View>
+              <SitGuruTabBar active="messages" />
             </KeyboardAvoidingView>
           </View>
 
@@ -1766,55 +1681,34 @@ function VoiceNotePlayer({
   styles: ReturnType<typeof createStyles>;
   url: string;
 }) {
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const [playing, setPlaying] = useState(false);
+  const player = useAudioPlayer({ uri: url });
+  const status = useAudioPlayerStatus(player);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    return () => {
-      void soundRef.current?.unloadAsync().catch(() => undefined);
-      soundRef.current = null;
-    };
-  }, []);
+  const playing = Boolean(status.playing);
 
   async function togglePlayback() {
     if (loading) return;
 
     try {
-      if (playing && soundRef.current) {
-        await soundRef.current.pauseAsync();
-        setPlaying(false);
+      setLoading(true);
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+      });
+
+      if (playing) {
+        player.pause();
         return;
       }
 
-      setLoading(true);
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-      });
-
-      if (!soundRef.current) {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: url },
-          { shouldPlay: true },
-        );
-        soundRef.current = sound;
-        sound.setOnPlaybackStatusUpdate((status) => {
-          if (!status.isLoaded) return;
-          if (status.didJustFinish) {
-            setPlaying(false);
-            void sound.setPositionAsync(0).catch(() => undefined);
-          } else {
-            setPlaying(status.isPlaying);
-          }
-        });
-        setPlaying(true);
-      } else {
-        await soundRef.current.playAsync();
-        setPlaying(true);
+      const duration = status.duration || 0;
+      if (duration > 0 && status.currentTime >= duration - 0.05) {
+        player.seekTo(0);
       }
+
+      player.play();
     } catch {
-      setPlaying(false);
+      // Keep UI quiet if a voice note fails to load.
     } finally {
       setLoading(false);
     }
@@ -1823,14 +1717,13 @@ function VoiceNotePlayer({
   const iconColor = isOwn ? '#FFFFFF' : '#0D5C3A';
 
   return (
-    <Pressable
+    <BubblePressable
       accessibilityLabel={`Play ${label}`}
       accessibilityRole="button"
       onPress={() => void togglePlayback()}
-      style={({ pressed }) => [
+      style={[
         styles.voiceNoteRow,
         isOwn ? styles.voiceNoteRowOwn : styles.voiceNoteRowOther,
-        pressed && styles.pressed,
       ]}
     >
       <View style={[styles.voiceNoteIcon, isOwn && styles.voiceNoteIconOwn]}>
@@ -1848,7 +1741,7 @@ function VoiceNotePlayer({
           {label}
         </Text>
       </View>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1890,11 +1783,8 @@ function ProfileAvatar({
   styles: ReturnType<typeof createStyles>;
   uri: string | null;
 }) {
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    setFailed(false);
-  }, [uri]);
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const failed = Boolean(uri) && failedUri === uri;
 
   const imageSizeStyle = size === 'header' ? styles.avatarHeaderImage : styles.avatarMessageImage;
   const wrapperSizeStyle = size === 'header' ? styles.avatarHeader : styles.avatarMessage;
@@ -1905,7 +1795,7 @@ function ProfileAvatar({
       {uri && !failed ? (
         <Image
           accessibilityLabel={`${fallbackName} profile photo`}
-          onError={() => setFailed(true)}
+          onError={() => setFailedUri(uri)}
           resizeMode="cover"
           source={{ uri }}
           style={imageSizeStyle}
@@ -1930,18 +1820,15 @@ function PetAvatar({
   styles: ReturnType<typeof createStyles>;
   uri: string | null;
 }) {
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    setFailed(false);
-  }, [uri]);
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const failed = Boolean(uri) && failedUri === uri;
 
   return (
     <View style={styles.petAvatar}>
       {uri && !failed ? (
         <Image
           accessibilityLabel={`${name} pet photo`}
-          onError={() => setFailed(true)}
+          onError={() => setFailedUri(uri)}
           resizeMode="cover"
           source={{ uri }}
           style={styles.petAvatarImage}
@@ -2009,40 +1896,6 @@ function NoticeCard({
   );
 }
 
-function NavItem({
-  active,
-  icon,
-  label,
-  onPress,
-  palette,
-  styles,
-}: {
-  active: boolean;
-  icon: 'home' | 'explore' | 'messages' | 'bookings' | 'profile';
-  label: string;
-  onPress: () => void;
-  palette: ReturnType<typeof getPalette>;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}
-    >
-      <View style={[styles.navIconWrap, active && styles.navIconWrapActive]}>
-        <SitGuruIcon
-          color={active ? palette.navActive : palette.navMuted}
-          name={icon}
-          size={20}
-          strokeWidth={active ? 2.6 : 2.25}
-        />
-      </View>
-      <Text style={[styles.navLabel, active && styles.navLabelActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 function getPalette(isDark: boolean) {
   return {
     bg: isDark ? '#06140F' : '#FFF8EF',
@@ -2062,8 +1915,6 @@ function getPalette(isDark: boolean) {
     primaryBright: '#39D982',
     ownBubble: isDark ? '#0B7A4B' : '#0B7A4B',
     otherBubble: isDark ? '#123124' : '#FFFFFF',
-    navActive: isDark ? '#39D982' : '#0B7A4B',
-    navMuted: isDark ? '#91A198' : '#79847D',
     frame: '#121714',
     frameBorder: '#2D3430',
   };
@@ -2729,43 +2580,6 @@ function createStyles(isDark: boolean) {
     sendButtonDisabled: {
       opacity: 0.42,
     },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderTopColor: palette.border,
-      borderTopWidth: 1,
-      flexDirection: 'row',
-      height: 70,
-      justifyContent: 'space-around',
-      paddingBottom: 6,
-      paddingHorizontal: 5,
-      paddingTop: 5,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 2,
-      justifyContent: 'center',
-    },
-    navIconWrap: {
-      alignItems: 'center',
-      borderRadius: 999,
-      height: 28,
-      justifyContent: 'center',
-      width: 38,
-    },
-    navIconWrapActive: {
-      backgroundColor: palette.surfaceSoft,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
-    },
-    navLabelActive: {
-      color: palette.navActive,
-      fontFamily: AppFonts.bold,
-    },
     avatarBase: {
       alignItems: 'center',
       backgroundColor: palette.surfaceSoft,
@@ -2836,10 +2650,6 @@ function createStyles(isDark: boolean) {
     },
     petAvatarFallbackDark: {
       backgroundColor: '#183A2A',
-    },
-    pressed: {
-      opacity: 0.78,
-      transform: [{ scale: 0.99 }],
     },
     homeIndicator: {
       alignSelf: 'center',

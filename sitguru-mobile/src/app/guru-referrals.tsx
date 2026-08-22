@@ -1,13 +1,10 @@
 import { router } from 'expo-router';
 import {
-    CalendarDays,
     ChevronLeft,
     ChevronRight,
     Copy,
     Gift,
-    Home,
     Link2,
-    MessageCircle,
     QrCode,
     Share2,
     TrendingUp,
@@ -19,7 +16,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Alert,
     Platform,
-    Pressable,
     RefreshControl,
     ScrollView,
     Share,
@@ -28,9 +24,11 @@ import {
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -267,10 +265,11 @@ export default function GuruReferralsScreen() {
                   showsVerticalScrollIndicator={false}
                 >
                   <View style={styles.header}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityLabel="Back to Guru Dashboard"
                       onPress={() => router.push('/guru-dashboard')}
+                      scaleTo={0.88}
                       style={styles.headerIconButton}
                     >
                       <ChevronLeft
@@ -278,7 +277,7 @@ export default function GuruReferralsScreen() {
                         size={20}
                         strokeWidth={2.4}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
                     <View style={styles.headerCopy}>
                       <Text style={styles.title}>Referrals & Rewards</Text>
@@ -318,7 +317,7 @@ export default function GuruReferralsScreen() {
                     </Text>
 
                     <View style={styles.heroActions}>
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={() =>
                           void copyValue(referralCode, 'Referral code')
@@ -327,9 +326,9 @@ export default function GuruReferralsScreen() {
                       >
                         <Copy color="#FFFFFF" size={16} strokeWidth={2.3} />
                         <Text style={styles.heroSecondaryText}>Copy Code</Text>
-                      </Pressable>
+                      </BubblePressable>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={() => void shareReferral()}
                         style={styles.heroPrimaryButton}
@@ -340,7 +339,7 @@ export default function GuruReferralsScreen() {
                           strokeWidth={2.3}
                         />
                         <Text style={styles.heroPrimaryText}>Share Link</Text>
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   </View>
 
@@ -360,12 +359,13 @@ export default function GuruReferralsScreen() {
                       </Text>
                     </View>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityLabel="Copy referral link"
                       onPress={() =>
                         void copyValue(referralLink, 'Referral link')
                       }
+                      scaleTo={0.88}
                       style={styles.copyButton}
                     >
                       <Copy
@@ -373,7 +373,7 @@ export default function GuruReferralsScreen() {
                         size={17}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
 
                   {loading ? (
@@ -489,7 +489,7 @@ export default function GuruReferralsScreen() {
                           />
                         </View>
 
-                        <Pressable
+                        <BubblePressable
                           accessibilityRole="button"
                           onPress={() => router.push('/guru-earnings')}
                           style={styles.primaryButton}
@@ -502,7 +502,7 @@ export default function GuruReferralsScreen() {
                             size={17}
                             strokeWidth={2.3}
                           />
-                        </Pressable>
+                        </BubblePressable>
                       </View>
 
                       <View style={styles.activityCard}>
@@ -613,7 +613,7 @@ export default function GuruReferralsScreen() {
                       </View>
                     ))}
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       onPress={() => router.push('/guru-success-center')}
                       style={styles.secondaryButton}
@@ -626,78 +626,11 @@ export default function GuruReferralsScreen() {
                         size={17}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
                 </ScrollView>
 
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    icon={
-                      <Home
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Dashboard"
-                    onPress={() => router.push('/guru-dashboard')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <Gift
-                        color={palette.primary}
-                        size={21}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    active
-                    label="Referrals"
-                    onPress={() => undefined}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <CalendarDays
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Bookings"
-                    onPress={() => router.push('/guru-requests')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <MessageCircle
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Messages"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/messages',
-                        params: { role: 'guru' },
-                      })
-                    }
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <UserRound
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Profile"
-                    onPress={() => router.push('/guru-profile')}
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar active="profile" role="guru" />
               </View>
             </View>
 
@@ -832,42 +765,14 @@ function ShareTool({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
       style={styles.shareTool}
     >
       <View style={styles.shareToolIcon}>{icon}</View>
       <Text style={styles.shareToolLabel}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      {icon}
-      <Text style={active ? styles.navLabelActive : styles.navLabel}>
-        {label}
-      </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1263,7 +1168,7 @@ function createStyles(isDark: boolean) {
     },
     scrollContent: {
       gap: 13,
-      paddingBottom: 110,
+      paddingBottom: 16,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -1766,42 +1671,6 @@ function createStyles(isDark: boolean) {
       color: palette.primary,
       fontFamily: AppFonts.extraBold,
       fontSize: 9,
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 72,
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: -7 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
     },
   });
 }

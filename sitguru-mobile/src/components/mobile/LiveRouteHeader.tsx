@@ -2,7 +2,6 @@ import { Camera, MapPin, Navigation, LocateFixed } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -15,6 +14,7 @@ import MapView, {
 } from 'react-native-maps';
 
 import type { LiveCoords } from '@/hooks/useLiveLocation';
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import { MobileSpace, MobileType, TOUCH_MIN } from '@/constants/mobile-layout';
@@ -217,7 +217,7 @@ export default function LiveRouteHeader({
         </View>
 
         {showNativeMap && !followUser ? (
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             accessibilityLabel="Recenter live map"
             onPress={() => {
@@ -229,11 +229,12 @@ export default function LiveRouteHeader({
                 );
               }
             }}
+            scaleTo={0.88}
             style={styles.recenterChip}
           >
             <LocateFixed color="#FFFFFF" size={14} strokeWidth={2.4} />
             <Text style={styles.recenterText}>Recenter</Text>
-          </Pressable>
+          </BubblePressable>
         ) : null}
       </View>
 

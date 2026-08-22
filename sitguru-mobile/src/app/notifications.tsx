@@ -6,13 +6,10 @@ import {
   CheckCheck,
   CircleDollarSign,
   Gift,
-  Home,
   MessageCircle,
   PawPrint,
-  Search,
   ShieldCheck,
   Star,
-  UserRound,
   X
 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
@@ -26,7 +23,6 @@ import {
   ActivityIndicator,
   Image,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -34,6 +30,7 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import StickyActionBar from '@/components/mobile/StickyActionBar';
 import NotificationPreferencePanel from '@/components/mobile/NotificationPreferencePanel';
 import SitGuruButton from '@/components/SitGuruButton';
@@ -41,9 +38,9 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import { scheduleDemoBookingRequestNotification } from '@/lib/notifications/push';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
-import { StickyFooterClearance } from '@/constants/mobile-layout';
 import { getAppTheme } from '@/constants/theme';
 import {
   setThemePreference,
@@ -185,7 +182,45 @@ function normalizeCategory(row: RecordRow): NotificationCategory {
   return 'account';
 }
 
-function resolveHref(category: NotificationCategory, row: RecordRow) {
+function bookingIdFromRow(row: RecordRow) {
+  return firstText(row, [
+    'booking_id',
+    'bookingId',
+    'booking_request_id',
+    'care_booking_id',
+    'related_booking_id',
+    'entity_id',
+  ]);
+}
+
+function bookingListHref(role: AppRole) {
+  return role === 'guru' ? '/guru-requests' : '/bookings';
+}
+
+function bookingDetailsHrefFromExplicit(
+  href: string,
+  row: RecordRow,
+  role: AppRole,
+) {
+  const [path, query = ''] = href.split('?');
+  if (path !== '/booking-details') return null;
+
+  const params = new URLSearchParams(query);
+  const bookingId =
+    params.get('bookingId') ||
+    params.get('id') ||
+    bookingIdFromRow(row);
+
+  return bookingId
+    ? `/booking-details?bookingId=${encodeURIComponent(bookingId)}`
+    : bookingListHref(role);
+}
+
+function resolveHref(
+  category: NotificationCategory,
+  row: RecordRow,
+  role: AppRole,
+) {
   const explicit = firstText(row, [
     'href',
     'route',
@@ -194,11 +229,20 @@ function resolveHref(category: NotificationCategory, row: RecordRow) {
     'link',
   ]);
 
-  if (explicit.startsWith('/')) return explicit;
+  if (explicit.startsWith('/')) {
+    const bookingHref = bookingDetailsHrefFromExplicit(explicit, row, role);
+    if (bookingHref) return bookingHref;
+    return explicit;
+  }
 
   switch (category) {
-    case 'bookings':
-      return '/booking-details';
+    case 'bookings': {
+      const bookingId = bookingIdFromRow(row);
+
+      return bookingId
+        ? `/booking-details?bookingId=${encodeURIComponent(bookingId)}`
+        : bookingListHref(role);
+    }
     case 'messages':
       return '/conversation';
     case 'pawreport':
@@ -216,13 +260,18 @@ function resolveHref(category: NotificationCategory, row: RecordRow) {
   }
 }
 
-function actionLabel(category: NotificationCategory, row: RecordRow) {
+function actionLabel(
+  category: NotificationCategory,
+  row: RecordRow,
+  role: AppRole,
+) {
   const explicit = firstText(row, ['action_label', 'cta_label', 'button_label']);
   if (explicit) return explicit;
 
   switch (category) {
     case 'bookings':
-      return 'View booking';
+      if (bookingIdFromRow(row)) return 'View booking';
+      return role === 'guru' ? 'View care requests' : 'View my bookings';
     case 'messages':
       return 'Open messages';
     case 'pawreport':
@@ -244,6 +293,7 @@ function notificationFromRow(
   row: RecordRow,
   index: number,
   table: string,
+  role: AppRole,
 ): NotificationItem {
   const category = normalizeCategory(row);
 
@@ -275,8 +325,8 @@ function notificationFromRow(
       ]) || new Date().toISOString(),
     unread: !read,
     dismissed,
-    actionLabel: actionLabel(category, row),
-    href: resolveHref(category, row),
+    actionLabel: actionLabel(category, row, role),
+    href: resolveHref(category, row, role),
     raw: row,
     table,
   };
@@ -350,7 +400,7 @@ function categoryIcon(
   }
 }
 
-async function loadNotifications(userId: string) {
+async function loadNotifications(userId: string, role: AppRole) {
   for (const table of NOTIFICATION_TABLES) {
     for (const field of [
       'user_id',
@@ -369,7 +419,7 @@ async function loadNotifications(userId: string) {
       if (result.error) continue;
 
       return ((result.data || []) as RecordRow[])
-        .map((row, index) => notificationFromRow(row, index, table))
+        .map((row, index) => notificationFromRow(row, index, table, role))
         .filter((item) => !item.dismissed)
         .sort(
           (left, right) =>
@@ -485,7 +535,7 @@ export default function NotificationsScreen() {
       }
 
       try {
-        const nextItems = await loadNotifications(user.id);
+        const nextItems = await loadNotifications(user.id, activeRole);
 
         setItems(nextItems);
         setMessage('');
@@ -500,7 +550,7 @@ export default function NotificationsScreen() {
         setRefreshing(false);
       }
     },
-    [authLoading, isAuthenticated, user?.id],
+    [activeRole, authLoading, isAuthenticated, user?.id],
   );
 
   useEffect(() => {
@@ -682,10 +732,7 @@ export default function NotificationsScreen() {
                 ) : null}
 
                 <ScrollView
-                  contentContainerStyle={[
-                    styles.scrollContent,
-                    { paddingBottom: StickyFooterClearance.actionPlusNav },
-                  ]}
+                  contentContainerStyle={styles.scrollContent}
                   refreshControl={
                     <RefreshControl
                       colors={[theme.colors.primary]}
@@ -706,24 +753,25 @@ export default function NotificationsScreen() {
                     </View>
 
                     <View style={styles.headerActions}>
-                      <Pressable
+                      <BubblePressable
                         accessibilityLabel="Mark all notifications read"
                         accessibilityRole="button"
                         onPress={() => void markAllRead()}
+                        scaleTo={0.88}
                         style={styles.headerIconButton}>
                         <CheckCheck
                           color={theme.colors.text}
                           size={18}
                           strokeWidth={2.3}
                         />
-                      </Pressable>
+                      </BubblePressable>
 
                       <View style={styles.modeToggle}>
                         {THEME_OPTIONS.map((option) => {
                           const active = themePreference === option.value;
 
                           return (
-                            <Pressable
+                            <BubblePressable
                               key={option.value}
                               accessibilityLabel={`Switch to ${option.label} mode`}
                               accessibilityRole="button"
@@ -731,6 +779,7 @@ export default function NotificationsScreen() {
                               onPress={() =>
                                 setThemePreference(option.value)
                               }
+                              scaleTo={0.88}
                               style={[
                                 styles.modeButton,
                                 active ? styles.modeButtonActive : null,
@@ -749,22 +798,23 @@ export default function NotificationsScreen() {
                                 size={15}
                                 strokeWidth={2.4}
                               />
-                            </Pressable>
+                            </BubblePressable>
                           );
                         })}
                       </View>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityLabel="Switch workspace"
                         accessibilityRole="button"
                         onPress={() => setWorkspaceSwitcherOpen(true)}
+                        scaleTo={0.88}
                         style={styles.profileButton}>
                         <HeaderAvatar
                           fallback={initials(displayName)}
                           imageUrl={avatarUrl}
                           styles={styles}
                         />
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   </View>
 
@@ -812,11 +862,12 @@ export default function NotificationsScreen() {
                       const active = selectedFilter === filter.key;
 
                       return (
-                        <Pressable
+                        <BubblePressable
                           key={filter.key}
                           accessibilityRole="button"
                           accessibilityState={{ selected: active }}
                           onPress={() => setSelectedFilter(filter.key)}
+                          scaleTo={0.88}
                           style={[
                             styles.filterPill,
                             active ? styles.filterPillActive : null,
@@ -828,7 +879,7 @@ export default function NotificationsScreen() {
                             ]}>
                             {filter.label}
                           </Text>
-                        </Pressable>
+                        </BubblePressable>
                       );
                     })}
                   </ScrollView>
@@ -857,12 +908,12 @@ export default function NotificationsScreen() {
                         Notifications are connected to your SitGuru account
                         and active workspace.
                       </Text>
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={() => router.push('/login')}
                         style={styles.primaryButton}>
                         <Text style={styles.primaryButtonText}>Sign in</Text>
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   ) : visibleItems.length ? (
                     <View style={styles.notificationStack}>
@@ -909,38 +960,40 @@ export default function NotificationsScreen() {
                           </View>
 
                           <View style={styles.cardActions}>
-                            <Pressable
+                            <BubblePressable
                               accessibilityRole="button"
                               onPress={() => openNotification(item)}
                               style={styles.primaryButton}>
                               <Text style={styles.primaryButtonText}>
                                 {item.actionLabel}
                               </Text>
-                            </Pressable>
+                            </BubblePressable>
 
                             {item.unread ? (
-                              <Pressable
+                              <BubblePressable
                                 accessibilityRole="button"
                                 onPress={() => void markRead(item)}
+                                scaleTo={0.88}
                                 style={styles.iconActionButton}>
                                 <Check
                                   color={theme.colors.primary}
                                   size={17}
                                   strokeWidth={2.5}
                                 />
-                              </Pressable>
+                              </BubblePressable>
                             ) : null}
 
-                            <Pressable
+                            <BubblePressable
                               accessibilityRole="button"
                               onPress={() => void dismiss(item)}
+                              scaleTo={0.88}
                               style={styles.iconActionButton}>
                               <X
                                 color={theme.colors.primary}
                                 size={17}
                                 strokeWidth={2.5}
                               />
-                            </Pressable>
+                            </BubblePressable>
                           </View>
                         </View>
                       ))}
@@ -961,7 +1014,7 @@ export default function NotificationsScreen() {
                   )}
 
                   <View style={styles.preferencesCard}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityLabel="Try Accept Booking lock screen alert"
                       onPress={() => {
@@ -983,7 +1036,7 @@ export default function NotificationsScreen() {
                       <Text style={styles.pushDemoButtonText}>
                         Try Accept Booking push
                       </Text>
-                    </Pressable>
+                    </BubblePressable>
 
                     <NotificationPreferencePanel />
                   </View>
@@ -1017,79 +1070,7 @@ export default function NotificationsScreen() {
                   />
                 </StickyActionBar>
 
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    label="Home"
-                    icon={
-                      <Home
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() =>
-                      router.push(
-                        activeRole === 'guru'
-                          ? '/guru-dashboard'
-                          : activeRole === 'ambassador'
-                            ? '/ambassador-dashboard'
-                            : activeRole === 'admin'
-                              ? '/admin-dashboard'
-                              : '/pet-parent-dashboard',
-                      )
-                    }
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    label="Explore"
-                    icon={
-                      <Search
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() => router.push('/find-care')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    label="Bookings"
-                    icon={
-                      <CalendarDays
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() => router.push('/booking-details')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    label="Messages"
-                    icon={
-                      <MessageCircle
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() => router.push('/conversation')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    active
-                    label="Profile"
-                    icon={
-                      <UserRound
-                        color={theme.colors.primary}
-                        size={20}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    onPress={() => router.push('/account')}
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar active="profile" />
 
                 {isWebPreview ? <View style={styles.homeIndicator} /> : null}
               </View>
@@ -1143,40 +1124,6 @@ function HeaderAvatar({
         <Text style={styles.avatarInitials}>{fallback}</Text>
       )}
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.bottomNavItem,
-        pressed ? styles.pressed : null,
-      ]}>
-      {icon}
-      <Text
-        style={[
-          styles.bottomNavText,
-          active ? styles.bottomNavTextActive : null,
-        ]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -1313,7 +1260,7 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
     },
     scrollContent: {
       gap: 13,
-      paddingBottom: 112,
+      paddingBottom: 24,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -1726,39 +1673,6 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
     scrollBottomSpace: {
       height: 6,
     },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: theme.colors.elevatedCard,
-      borderColor: theme.colors.border,
-      borderRadius: 22,
-      borderWidth: 1,
-      bottom: 12,
-      flexDirection: 'row',
-      left: 12,
-      paddingHorizontal: 6,
-      paddingVertical: 8,
-      position: 'absolute',
-      right: 12,
-      shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 5 },
-      shadowOpacity: dark ? 0.22 : 0.08,
-      shadowRadius: 10,
-    },
-    bottomNavItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-      minHeight: 49,
-    },
-    bottomNavText: {
-      color: theme.colors.textSecondary,
-      fontFamily: AppFonts.bold,
-      fontSize: 8,
-    },
-    bottomNavTextActive: {
-      color: theme.colors.primary,
-    },
     homeIndicator: {
       alignSelf: 'center',
       backgroundColor: dark ? '#E7EFEA' : '#101612',
@@ -1767,9 +1681,6 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
       height: 4,
       position: 'absolute',
       width: 116,
-    },
-    pressed: {
-      opacity: 0.76,
     },
   });
 }

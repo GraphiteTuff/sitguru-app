@@ -5,7 +5,6 @@ import {
   ChevronRight,
   CreditCard,
   Gift,
-  Home,
   MapPin,
   MessageCircle,
   PawPrint,
@@ -27,12 +26,12 @@ import {
 } from 'react';
 import {
   Image,
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import RoleGate from '@/components/RoleGate';
 import MobileScreen from '@/components/mobile/MobileScreen';
 import PriorityCarousel, {
@@ -49,6 +48,7 @@ import SitGuruButton from '@/components/SitGuruButton';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { isVisitReviewClosed } from '@/lib/reviews/visit-review';
 import { AI_COMPANIONS } from '@/constants/companions';
@@ -443,6 +443,7 @@ export default function PetParentDashboardScreen() {
         title: 'View Upcoming Care',
         helper: 'Review timing, your Guru, and pet instructions.',
         route: '/booking-details' as const,
+        params: { bookingId: currentBooking.id },
       };
     }
 
@@ -545,7 +546,11 @@ export default function PetParentDashboardScreen() {
           .join(' · '),
         tone: needsVisitReview ? 'surface' : 'primary',
         ctaLabel: 'View booking',
-        onPress: () => router.push('/booking-details'),
+        onPress: () =>
+          router.push({
+            pathname: '/booking-details',
+            params: { bookingId: currentBooking.id },
+          }),
         icon: (
           <CalendarDays
             color={needsVisitReview ? palette.primary : '#FFFFFF'}
@@ -641,7 +646,7 @@ export default function PetParentDashboardScreen() {
         availableCredit > 0
           ? `$${availableCredit.toFixed(2)} credit ready`
           : 'Earn rewards through bookings and referrals.',
-      onPress: () => router.push('/payments'),
+      onPress: () => router.push('/pawperks'),
       icon: <Gift color={palette.primary} size={22} strokeWidth={2.4} />,
     });
 
@@ -734,62 +739,10 @@ export default function PetParentDashboardScreen() {
                 />
               </StickyActionBar>
 
-              <View style={styles.bottomNav}>
-                <BottomNavItem
-                  active
-                  icon={
-                    <Home color={palette.primary} size={22} strokeWidth={2.4} />
-                  }
-                  label="Home"
-                  onPress={() => undefined}
-                  styles={styles}
-                />
-                <BottomNavItem
-                  icon={
-                    <Search color={palette.navMuted} size={22} strokeWidth={2.3} />
-                  }
-                  label="Explore"
-                  onPress={() => router.push('/find-care')}
-                  styles={styles}
-                />
-                <BottomNavItem
-                  icon={
-                    <CalendarDays
-                      color={palette.navMuted}
-                      size={22}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Bookings"
-                  onPress={() => router.push('/booking-details')}
-                  styles={styles}
-                />
-                <BottomNavItem
-                  badge={dashboardData.unreadMessages}
-                  icon={
-                    <MessageCircle
-                      color={palette.navMuted}
-                      size={22}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Messages"
-                  onPress={() => router.push('/messages')}
-                  styles={styles}
-                />
-                <BottomNavItem
-                  icon={
-                    <UserRound
-                      color={palette.navMuted}
-                      size={22}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Profile"
-                  onPress={() => setWorkspaceSwitcherOpen(true)}
-                  styles={styles}
-                />
-              </View>
+              <SitGuruTabBar
+                active="home"
+                badges={{ messages: dashboardData.unreadMessages }}
+              />
 
               <SitGuruWorkspaceSwitcher
                 currentRole="pet_parent"
@@ -977,37 +930,9 @@ export default function PetParentDashboardScreen() {
               />
             </View>
 
+            {/* Messages and My Pets live in the quick-action tiles above, so
+              * this list only carries destinations that appear nowhere else. */}
             <View style={styles.menuCard}>
-              <ActivityRow
-                badge={dashboardData.unreadMessages}
-                icon={
-                  <MessageCircle
-                    color={palette.primary}
-                    size={18}
-                    strokeWidth={2.3}
-                  />
-                }
-                label="Messages"
-                onPress={() => router.push('/messages')}
-                palette={palette}
-                styles={styles}
-              />
-
-              <ActivityRow
-                badge={dashboardData.pets.length}
-                icon={
-                  <PawPrint
-                    color={palette.primary}
-                    size={18}
-                    strokeWidth={2.3}
-                  />
-                }
-                label="My Pets"
-                onPress={() => router.push('/pet-passports')}
-                palette={palette}
-                styles={styles}
-              />
-
               <ActivityRow
                 badge={upcomingCount}
                 icon={
@@ -1018,7 +943,7 @@ export default function PetParentDashboardScreen() {
                   />
                 }
                 label="Bookings"
-                onPress={() => router.push('/booking-details')}
+                onPress={() => router.push('/bookings')}
                 palette={palette}
                 styles={styles}
               />
@@ -1074,10 +999,11 @@ export default function PetParentDashboardScreen() {
               {dashboardData.pets.length > 0 ? (
                 <View style={styles.petPreviewList}>
                   {dashboardData.pets.slice(0, 2).map((pet) => (
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       key={pet.id}
                       onPress={() => router.push('/pet-passports')}
+                      scaleTo={0.97}
                       style={styles.petPreviewRow}
                     >
                       <Avatar
@@ -1120,7 +1046,7 @@ export default function PetParentDashboardScreen() {
                         size={18}
                         strokeWidth={2.2}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   ))}
                 </View>
               ) : (
@@ -1155,9 +1081,10 @@ export default function PetParentDashboardScreen() {
               </TouchTarget>
             </View>
 
-            <Pressable
+            <BubblePressable
               accessibilityRole="button"
-              onPress={() => router.push('/payments')}
+              onPress={() => router.push('/pawperks')}
+              scaleTo={0.97}
               style={styles.rewardsCard}
             >
               <View style={styles.rewardsIcon}>
@@ -1181,7 +1108,7 @@ export default function PetParentDashboardScreen() {
                 size={34}
                 strokeWidth={2.2}
               />
-            </Pressable>
+            </BubblePressable>
 
             <View style={styles.toolsCard}>
               <ToolRow
@@ -1340,7 +1267,12 @@ function UpcomingCareCard({
 
         <TouchTarget
           accessibilityRole="button"
-          onPress={() => router.push('/booking-details')}
+          onPress={() =>
+            router.push({
+              pathname: '/booking-details',
+              params: { bookingId: booking.id },
+            })
+          }
           style={styles.filledButton}
         >
           <Text style={styles.filledButtonText}>View Details</Text>
@@ -1477,7 +1409,7 @@ function LiveCareCard({
       </View>
 
       <View style={styles.twoButtonRow}>
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           onPress={() => router.push('/pawreport-live')}
           style={styles.filledButton}
@@ -1485,15 +1417,15 @@ function LiveCareCard({
           <Text style={styles.filledButtonText}>
             {care.isWalk ? 'View Live Walk' : 'View Live Care'}
           </Text>
-        </Pressable>
+        </BubblePressable>
 
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           onPress={() => router.push('/conversation')}
           style={styles.outlineButton}
         >
           <Text style={styles.outlineButtonText}>Message Guru</Text>
-        </Pressable>
+        </BubblePressable>
       </View>
     </View>
   );
@@ -1524,7 +1456,7 @@ function CompletedCareCard({
         </Text>
       </View>
 
-      <Pressable
+      <BubblePressable
         accessibilityRole="button"
         onPress={() =>
           router.push({
@@ -1535,7 +1467,7 @@ function CompletedCareCard({
         style={styles.completedButton}
       >
         <Text style={styles.completedButtonText}>Rate Guru</Text>
-      </Pressable>
+      </BubblePressable>
     </View>
   );
 }
@@ -1557,10 +1489,7 @@ function QuickAction({
     <TouchTarget
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.quickAction,
-        pressed && styles.pressed,
-      ]}
+      style={styles.quickAction}
     >
       <View style={styles.quickActionIcon}>
         {icon}
@@ -1648,43 +1577,6 @@ function ToolRow({
         size={18}
         strokeWidth={2.3}
       />
-    </TouchTarget>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  badge = 0,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  badge?: number;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <TouchTarget
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      <View style={styles.navIconWrap}>
-        {icon}
-        {badge > 0 ? <View style={styles.navBadge} /> : null}
-      </View>
-
-      <Text
-        style={active ? styles.navLabelActive : styles.navLabel}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
     </TouchTarget>
   );
 }
@@ -2537,7 +2429,6 @@ function getPalette(isDark: boolean) {
     orange: '#F15A3A',
     gold: '#F4B93E',
     white: '#FFFFFF',
-    navMuted: isDark ? '#9BAAA1' : '#748079',
     avatarBg: isDark ? '#173527' : '#EEF5EE',
     avatarBorder: isDark ? '#2E6C4B' : '#FFFFFF',
     routeBg: isDark ? '#142A22' : '#EDF3EE',
@@ -3411,11 +3302,6 @@ function createStyles(isDark: boolean) {
       fontSize: 13,
       textAlign: 'center',
     },
-    pressed: {
-      opacity: 0.72,
-      transform: [{ scale: 0.985 }],
-    },
-
     menuCard: {
       backgroundColor: palette.surface,
       borderColor: palette.border,
@@ -3654,52 +3540,6 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.bold,
       fontSize: 14,
       minWidth: 0,
-    },
-
-    bottomNav: {
-      alignItems: 'stretch',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderTopWidth: 1,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      paddingBottom: 6,
-      paddingHorizontal: 4,
-      paddingTop: 6,
-      width: '100%',
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 2,
-      justifyContent: 'center',
-      minHeight: TOUCH_MIN,
-      minWidth: 0,
-      paddingHorizontal: 2,
-    },
-    navIconWrap: {
-      position: 'relative',
-    },
-    navBadge: {
-      backgroundColor: palette.orange,
-      borderColor: palette.surface,
-      borderRadius: 999,
-      borderWidth: 1.5,
-      height: 8,
-      position: 'absolute',
-      right: -2,
-      top: -2,
-      width: 8,
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
     },
   });
 }

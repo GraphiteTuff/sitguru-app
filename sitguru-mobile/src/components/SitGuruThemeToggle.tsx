@@ -1,9 +1,9 @@
 import {
-    Pressable,
     StyleSheet,
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import {
     setThemePreference,
@@ -29,7 +29,7 @@ export default function SitGuruThemeToggle() {
       accessibilityLabel="Appearance"
       style={styles.container}
     >
-      <Pressable
+      <BubblePressable
         accessibilityLabel="Use light mode"
         accessibilityRole="button"
         accessibilityState={{
@@ -39,11 +39,11 @@ export default function SitGuruThemeToggle() {
         onPress={() =>
           setThemePreference('light')
         }
-        style={({ pressed }) => [
+        scaleTo={0.88}
+        style={[
           styles.option,
           themePreference === 'light' &&
             styles.optionActive,
-          pressed && styles.pressed,
         ]}
       >
         <SitGuruIcon
@@ -56,9 +56,9 @@ export default function SitGuruThemeToggle() {
           size={15}
           strokeWidth={2.4}
         />
-      </Pressable>
+      </BubblePressable>
 
-      <Pressable
+      <BubblePressable
         accessibilityLabel="Use dark mode"
         accessibilityRole="button"
         accessibilityState={{
@@ -68,11 +68,11 @@ export default function SitGuruThemeToggle() {
         onPress={() =>
           setThemePreference('dark')
         }
-        style={({ pressed }) => [
+        scaleTo={0.88}
+        style={[
           styles.option,
           themePreference === 'dark' &&
             styles.optionActive,
-          pressed && styles.pressed,
         ]}
       >
         <SitGuruIcon
@@ -87,7 +87,7 @@ export default function SitGuruThemeToggle() {
           size={15}
           strokeWidth={2.4}
         />
-      </Pressable>
+      </BubblePressable>
     </View>
   );
 }
@@ -126,14 +126,6 @@ function createStyles(
       color: isDark
         ? '#9DB0A5'
         : '#738078',
-    },
-    pressed: {
-      opacity: 0.72,
-      transform: [
-        {
-          scale: 0.96,
-        },
-      ],
     },
   });
 }

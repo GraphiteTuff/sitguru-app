@@ -1,7 +1,8 @@
 import type { ComponentProps } from 'react';
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import SitGuruIconBadge, { type SitGuruIconName } from '@/components/SitGuruIconBadge';
 import { SitGuruColors } from '@/constants/colors';
 
@@ -32,16 +33,14 @@ export default function SitGuruDashboardHeader({
   const action =
     actionHref && actionLabel ? (
       <Link href={actionHref} asChild>
-        <Pressable
+        <BubblePressable
           accessibilityLabel={actionLabel}
           accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.action,
-            pressed ? styles.actionPressed : null,
-          ]}
+          scaleTo={0.88}
+          style={styles.action}
         >
           <Text style={styles.actionText}>{actionLabel}</Text>
-        </Pressable>
+        </BubblePressable>
       </Link>
     ) : null;
 
@@ -105,9 +104,6 @@ const styles = StyleSheet.create({
     backgroundColor: SitGuruColors.surface,
     paddingHorizontal: 13,
     paddingVertical: 8,
-  },
-  actionPressed: {
-    opacity: 0.76,
   },
   actionText: {
     color: SitGuruColors.primary,

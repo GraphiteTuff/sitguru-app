@@ -11,17 +11,14 @@ import {
   CreditCard,
   Headphones,
   HeartHandshake,
-  Home,
   LifeBuoy,
   LockKeyhole,
   MessageCircle,
   PawPrint,
   RefreshCw,
-  Search,
   Send,
   ShieldAlert,
   Star,
-  UserRound,
   UserRoundCog,
   WalletCards,
 } from 'lucide-react-native';
@@ -37,7 +34,6 @@ import {
   ActivityIndicator,
   Image,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -46,9 +42,11 @@ import {
   View
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
@@ -145,16 +143,26 @@ const THEME_OPTIONS: {
   },
 ];
 
-const commonCategories: HelpCategory[] = [
-  {
+/**
+ * Booking help lands on the list the member owns, because support has no single
+ * booking in context — the pet parent picks a booking, the Guru picks a request.
+ */
+function bookingCategoryForRole(role: AppRole): HelpCategory {
+  const guru = role === 'guru';
+
+  return {
     key: 'booking',
     icon: CalendarDays,
     title: 'Booking help',
-    description:
-      'Review booking status, schedule details, care notes, cancellation questions, and next steps.',
-    actionLabel: 'Open booking details',
-    href: '/booking-details',
-  },
+    description: guru
+      ? 'Review incoming care requests, schedule details, care notes, cancellation questions, and next steps.'
+      : 'Review booking status, schedule details, care notes, cancellation questions, and next steps.',
+    actionLabel: guru ? 'Open care requests' : 'Open my bookings',
+    href: guru ? '/guru-requests' : '/bookings',
+  };
+}
+
+const commonCategories: HelpCategory[] = [
   {
     key: 'messages',
     icon: MessageCircle,
@@ -582,16 +590,15 @@ function ActionButton({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.actionButton,
         primary && styles.actionButtonPrimary,
         disabled && styles.disabledButton,
-        pressed && !disabled ? styles.pressed : null,
       ]}>
       {icon}
       <Text
@@ -601,7 +608,7 @@ function ActionButton({
         ]}>
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -678,8 +685,12 @@ export default function SupportScreen() {
       return category.roles.some((role) => currentRoles.includes(role));
     });
 
-    return [...commonCategories, ...availableRoleCategories];
-  }, [primaryRole, roles]);
+    return [
+      bookingCategoryForRole(activeRole),
+      ...commonCategories,
+      ...availableRoleCategories,
+    ];
+  }, [activeRole, primaryRole, roles]);
 
   const recentRequests = useMemo(
     () => requestRows.map(supportRequestFromRow),
@@ -872,29 +883,31 @@ export default function SupportScreen() {
         </View>
 
         <View style={styles.headerActions}>
-          <Pressable
+          <BubblePressable
             accessibilityLabel="Open notifications"
             accessibilityRole="button"
             onPress={() => router.push('/notifications')}
+            scaleTo={0.88}
             style={styles.headerIconButton}>
             <Bell
               color={theme.colors.text}
               size={18}
               strokeWidth={2.3}
             />
-          </Pressable>
+          </BubblePressable>
 
           <View style={styles.modeToggle}>
             {THEME_OPTIONS.map((option) => {
               const active = themePreference === option.value;
 
               return (
-                <Pressable
+                <BubblePressable
                   key={option.value}
                   accessibilityLabel={`Switch to ${option.label} mode`}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   onPress={() => setThemePreference(option.value)}
+                  scaleTo={0.88}
                   style={[
                     styles.modeButton,
                     active ? styles.modeButtonActive : null,
@@ -913,22 +926,23 @@ export default function SupportScreen() {
                     size={15}
                     strokeWidth={2.4}
                   />
-                </Pressable>
+                </BubblePressable>
               );
             })}
           </View>
 
-          <Pressable
+          <BubblePressable
             accessibilityLabel="Switch workspace"
             accessibilityRole="button"
             onPress={() => setWorkspaceSwitcherOpen(true)}
+            scaleTo={0.88}
             style={styles.profileButton}>
             <HeaderAvatar
               fallback={initials(displayName)}
               imageUrl={avatarUrl}
               styles={styles}
             />
-          </Pressable>
+          </BubblePressable>
         </View>
       </View>
 
@@ -1015,14 +1029,14 @@ export default function SupportScreen() {
           const Icon = category.icon;
 
           return (
-            <Pressable
+            <BubblePressable
               key={category.key}
               accessibilityRole="button"
               onPress={() => router.push(category.href)}
-              style={({ pressed }) => [
+              scaleTo={0.97}
+              style={[
                 styles.categoryCard,
                 compactGrid ? styles.categoryCardCompact : null,
-                pressed ? styles.pressedCard : null,
               ]}>
               <View style={styles.categoryIcon}>
                 <Icon
@@ -1048,7 +1062,7 @@ export default function SupportScreen() {
                   />
                 </View>
               </View>
-            </Pressable>
+            </BubblePressable>
           );
         })}
       </View>
@@ -1094,15 +1108,15 @@ export default function SupportScreen() {
             const active = item.key === topic;
 
             return (
-              <Pressable
+              <BubblePressable
                 key={item.key}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 onPress={() => setTopic(item.key)}
-                style={({ pressed }) => [
+                scaleTo={0.88}
+                style={[
                   styles.topicChip,
                   active ? styles.topicChipActive : null,
-                  pressed ? styles.pressed : null,
                 ]}>
                 <Icon
                   color={
@@ -1120,17 +1134,18 @@ export default function SupportScreen() {
                   ]}>
                   {item.key}
                 </Text>
-              </Pressable>
+              </BubblePressable>
             );
           })}
         </View>
 
         <Text style={styles.fieldLabel}>Priority</Text>
         <View style={styles.priorityRow}>
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             accessibilityState={{ selected: priority === 'normal' }}
             onPress={() => setPriority('normal')}
+            scaleTo={0.88}
             style={[
               styles.priorityButton,
               priority === 'normal' ? styles.priorityButtonActive : null,
@@ -1151,12 +1166,13 @@ export default function SupportScreen() {
               ]}>
               Standard
             </Text>
-          </Pressable>
+          </BubblePressable>
 
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             accessibilityState={{ selected: priority === 'urgent' }}
             onPress={() => setPriority('urgent')}
+            scaleTo={0.88}
             style={[
               styles.priorityButton,
               priority === 'urgent' ? styles.priorityButtonUrgent : null,
@@ -1177,7 +1193,7 @@ export default function SupportScreen() {
               ]}>
               Urgent
             </Text>
-          </Pressable>
+          </BubblePressable>
         </View>
 
         <Text style={styles.fieldLabel}>Reference number</Text>
@@ -1269,14 +1285,12 @@ export default function SupportScreen() {
             <Text style={styles.sectionTitle}>Recent requests</Text>
           </View>
 
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             onPress={() => void refreshRequests()}
             disabled={loadingRequests}
-            style={({ pressed }) => [
-              styles.refreshButton,
-              pressed ? styles.pressed : null,
-            ]}>
+            scaleTo={0.88}
+            style={styles.refreshButton}>
             {loadingRequests ? (
               <ActivityIndicator
                 color={theme.colors.primary}
@@ -1289,7 +1303,7 @@ export default function SupportScreen() {
                 strokeWidth={2.4}
               />
             )}
-          </Pressable>
+          </BubblePressable>
         </View>
 
         {requestLoadError ? (
@@ -1467,79 +1481,7 @@ export default function SupportScreen() {
                 {supportContent}
               </ScrollView>
 
-              <View style={styles.bottomNav}>
-                <BottomNavItem
-                  label="Home"
-                  icon={
-                    <Home
-                      color={theme.colors.textSecondary}
-                      size={20}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  onPress={() =>
-                    router.push(
-                      primaryRole === 'guru'
-                        ? '/guru-dashboard'
-                        : primaryRole === 'ambassador'
-                          ? '/ambassador-dashboard'
-                          : primaryRole === 'admin'
-                            ? '/admin-dashboard'
-                            : '/pet-parent-dashboard',
-                    )
-                  }
-                  styles={styles}
-                />
-                <BottomNavItem
-                  label="Explore"
-                  icon={
-                    <Search
-                      color={theme.colors.textSecondary}
-                      size={20}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  onPress={() => router.push('/find-care')}
-                  styles={styles}
-                />
-                <BottomNavItem
-                  label="Bookings"
-                  icon={
-                    <CalendarDays
-                      color={theme.colors.textSecondary}
-                      size={20}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  onPress={() => router.push('/booking-details')}
-                  styles={styles}
-                />
-                <BottomNavItem
-                  label="Messages"
-                  icon={
-                    <MessageCircle
-                      color={theme.colors.textSecondary}
-                      size={20}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  onPress={() => router.push('/conversation')}
-                  styles={styles}
-                />
-                <BottomNavItem
-                  active
-                  label="Profile"
-                  icon={
-                    <UserRound
-                      color={theme.colors.primary}
-                      size={20}
-                      strokeWidth={2.4}
-                    />
-                  }
-                  onPress={() => router.push('/account')}
-                  styles={styles}
-                />
-              </View>
+              <SitGuruTabBar active="profile" />
 
               {isWebPreview ? <View style={styles.homeIndicator} /> : null}
             </View>
@@ -1598,39 +1540,6 @@ function HeaderAvatar({
         <Text style={styles.avatarInitials}>{fallback}</Text>
       )}
     </View>
-  );
-}
-
-function BottomNavItem({
-  label,
-  icon,
-  onPress,
-  styles,
-  active = false,
-}: {
-  label: string;
-  icon: ReactNode;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-  active?: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.bottomNavItem,
-        pressed ? styles.pressed : null,
-      ]}>
-      {icon}
-      <Text
-        style={[
-          styles.bottomNavText,
-          active ? styles.bottomNavTextActive : null,
-        ]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -1758,7 +1667,7 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
     },
     scrollContent: {
       gap: 14,
-      paddingBottom: 112,
+      paddingBottom: 24,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -1984,9 +1893,6 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
     disabledButton: {
       opacity: 0.5,
     },
-    pressed: {
-      opacity: 0.76,
-    },
     actionButtonText: {
       color: theme.colors.primary,
       fontFamily: AppFonts.extraBold,
@@ -2042,10 +1948,6 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
     categoryCardCompact: {
       width: '100%',
       minHeight: 0,
-    },
-    pressedCard: {
-      opacity: 0.76,
-      transform: [{ scale: 0.995 }],
     },
     categoryIcon: {
       alignItems: 'center',
@@ -2435,39 +2337,6 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
     },
     scrollBottomSpace: {
       height: 8,
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: theme.colors.elevatedCard,
-      borderColor: theme.colors.border,
-      borderRadius: 22,
-      borderWidth: 1,
-      bottom: 12,
-      flexDirection: 'row',
-      left: 12,
-      paddingHorizontal: 6,
-      paddingVertical: 8,
-      position: 'absolute',
-      right: 12,
-      shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 5 },
-      shadowOpacity: dark ? 0.22 : 0.08,
-      shadowRadius: 10,
-    },
-    bottomNavItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-      minHeight: 49,
-    },
-    bottomNavText: {
-      color: theme.colors.textSecondary,
-      fontFamily: AppFonts.bold,
-      fontSize: 8,
-    },
-    bottomNavTextActive: {
-      color: theme.colors.primary,
     },
     homeIndicator: {
       alignSelf: 'center',

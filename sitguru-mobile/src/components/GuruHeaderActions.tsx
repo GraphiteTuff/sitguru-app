@@ -2,12 +2,12 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import {
     Image,
-    Pressable,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import { AppFonts } from '@/constants/fonts';
 import {
@@ -67,12 +67,13 @@ export function GuruHeaderActions({
           const active = themePreference === option.value;
 
           return (
-            <Pressable
+            <BubblePressable
               key={option.value}
               accessibilityRole="button"
               accessibilityLabel={`Switch to ${option.label} mode`}
               accessibilityState={{ selected: active }}
               onPress={() => setThemePreference(option.value)}
+              scaleTo={0.88}
               style={[
                 styles.modeButton,
                 active && styles.modeButtonActive,
@@ -92,15 +93,16 @@ export function GuruHeaderActions({
                 }
                 strokeWidth={2.4}
               />
-            </Pressable>
+            </BubblePressable>
           );
         })}
       </View>
 
-      <Pressable
+      <BubblePressable
         accessibilityRole="button"
         accessibilityLabel="Open Guru profile"
         onPress={() => router.push('/guru-profile')}
+        scaleTo={0.88}
         style={styles.avatarButton}
       >
         <View style={styles.avatarFrame}>
@@ -117,7 +119,7 @@ export function GuruHeaderActions({
             </Text>
           )}
         </View>
-      </Pressable>
+      </BubblePressable>
     </View>
   );
 }

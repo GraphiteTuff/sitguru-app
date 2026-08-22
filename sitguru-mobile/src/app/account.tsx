@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   CreditCard,
+  Gift,
   HelpCircle,
   LockKeyhole,
   LogOut,
@@ -28,7 +29,6 @@ import {
   Alert,
   Image,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -37,8 +37,10 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import {
@@ -189,22 +191,6 @@ export default function AccountScreen() {
 
   const currentRole: AppRole = primaryRole ?? 'pet_parent';
 
-  const currentDashboardRoute = useMemo<Href>(() => {
-    const currentOption = roleOptions.find(
-      (option) => option.role === currentRole,
-    );
-
-    if (currentOption?.dashboardPath) {
-      return currentOption.dashboardPath;
-    }
-
-    if (currentRole === 'guru') return '/guru-dashboard';
-    if (currentRole === 'ambassador') return '/ambassador-dashboard';
-    if (currentRole === 'admin') return '/admin-operations';
-
-    return '/pet-parent-dashboard';
-  }, [currentRole, roleOptions]);
-
   const statusLabel = profileError
     ? 'Needs attention'
     : profile
@@ -244,6 +230,11 @@ export default function AccountScreen() {
         ),
         label: 'Payments',
         onPress: () => router.push('/payments'),
+      },
+      {
+        icon: <Gift color={palette.primary} size={21} strokeWidth={2.4} />,
+        label: 'PawPerks',
+        onPress: () => router.push('/pawperks'),
       },
       {
         icon: <BellRing color={palette.primary} size={21} strokeWidth={2.4} />,
@@ -362,20 +353,18 @@ export default function AccountScreen() {
                 }
                 showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
-                  <Pressable
+                  <BubblePressable
                     accessibilityLabel="Go back"
                     accessibilityRole="button"
                     onPress={() => router.back()}
-                    style={({ pressed }) => [
-                      styles.headerBackButton,
-                      pressed && styles.pressed,
-                    ]}>
+                    scaleTo={0.88}
+                    style={styles.headerBackButton}>
                     <ArrowLeft
                       color={palette.primary}
                       size={20}
                       strokeWidth={2.5}
                     />
-                  </Pressable>
+                  </BubblePressable>
 
                   <View style={styles.headerCopy}>
                     <Text style={styles.headerTitle}>Account</Text>
@@ -385,20 +374,18 @@ export default function AccountScreen() {
                   </View>
 
                   <View style={styles.headerActions}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityLabel="Open notifications"
                       accessibilityRole="button"
                       onPress={() => router.push('/notifications')}
-                      style={({ pressed }) => [
-                        styles.headerIconButton,
-                        pressed && styles.pressed,
-                      ]}>
+                      scaleTo={0.88}
+                      style={styles.headerIconButton}>
                       <Bell
                         color={palette.title}
                         size={18}
                         strokeWidth={2.3}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
                     <View style={styles.modeToggle}>
                       {THEME_OPTIONS.map((option) => {
@@ -406,7 +393,7 @@ export default function AccountScreen() {
                           themePreference === option.value;
 
                         return (
-                          <Pressable
+                          <BubblePressable
                             key={option.value}
                             accessibilityLabel={`Switch to ${option.label} mode`}
                             accessibilityRole="button"
@@ -414,6 +401,7 @@ export default function AccountScreen() {
                             onPress={() =>
                               setThemePreference(option.value)
                             }
+                            scaleTo={0.88}
                             style={[
                               styles.modeButton,
                               active && styles.modeButtonActive,
@@ -432,12 +420,12 @@ export default function AccountScreen() {
                               size={15}
                               strokeWidth={2.4}
                             />
-                          </Pressable>
+                          </BubblePressable>
                         );
                       })}
                     </View>
 
-                    <Pressable
+                    <BubblePressable
                       accessibilityLabel={
                         isAuthenticated
                           ? 'Switch workspace'
@@ -452,17 +440,15 @@ export default function AccountScreen() {
 
                         router.push('/login');
                       }}
-                      style={({ pressed }) => [
-                        styles.profileButton,
-                        pressed && styles.pressed,
-                      ]}>
+                      scaleTo={0.88}
+                      style={styles.profileButton}>
                       <Avatar
                         fallback={initials(profileName)}
                         imageUrl={avatarUrl}
                         palette={palette}
                         size={40}
                       />
-                    </Pressable>
+                    </BubblePressable>
                   </View>
                 </View>
 
@@ -878,19 +864,6 @@ export default function AccountScreen() {
                       }
                       styles={styles}
                     />
-                    <ActionRow
-                      icon={
-                        <ShieldCheck
-                          color={palette.primary}
-                          size={18}
-                          strokeWidth={2.3}
-                        />
-                      }
-                      label="Auth readiness"
-                      onPress={() => router.push('/auth-readiness')}
-                      styles={styles}
-                    />
-
                     <InlineNotice
                       styles={styles}
                       text="Keep bookings, payments, messages, and PawReport updates inside SitGuru."
@@ -920,6 +893,18 @@ export default function AccountScreen() {
                       }
                       label="Payments and payouts"
                       onPress={() => router.push('/payments')}
+                      styles={styles}
+                    />
+                    <ActionRow
+                      icon={
+                        <Gift
+                          color={palette.primary}
+                          size={18}
+                          strokeWidth={2.3}
+                        />
+                      }
+                      label="PawPerks rewards"
+                      onPress={() => router.push('/pawperks')}
                       styles={styles}
                     />
                     <ActionRow
@@ -958,8 +943,18 @@ export default function AccountScreen() {
                           strokeWidth={2.3}
                         />
                       }
-                      label="Booking details"
-                      onPress={() => router.push('/booking-details')}
+                      label={
+                        currentRole === 'guru'
+                          ? 'Care requests'
+                          : 'My bookings'
+                      }
+                      onPress={() =>
+                        router.push(
+                          currentRole === 'guru'
+                            ? '/guru-requests'
+                            : '/bookings',
+                        )
+                      }
                       styles={styles}
                     />
                   </SectionCard>
@@ -1055,14 +1050,11 @@ export default function AccountScreen() {
                 </View>
 
                 {isAuthenticated ? (
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     disabled={loading}
                     onPress={() => void handleSignOut()}
-                    style={({ pressed }) => [
-                      styles.signOutButton,
-                      pressed && styles.pressed,
-                    ]}>
+                    style={styles.signOutButton}>
                     <LogOut
                       color={palette.danger}
                       size={18}
@@ -1071,82 +1063,11 @@ export default function AccountScreen() {
                     <Text style={styles.signOutButtonText}>
                       {loading ? 'Signing out...' : 'Sign out'}
                     </Text>
-                  </Pressable>
+                  </BubblePressable>
                 ) : null}
               </ScrollView>
 
-              <View style={styles.bottomNav}>
-                <BottomNavItem
-                  icon={
-                    <SitGuruIcon
-                      color={palette.navMuted}
-                      name="home"
-                      size={21}
-                      strokeWidth={2.4}
-                    />
-                  }
-                  label="Home"
-                  onPress={() => router.push(currentDashboardRoute)}
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  icon={
-                    <SitGuruIcon
-                      color={palette.navMuted}
-                      name="explore"
-                      size={21}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Care"
-                  onPress={() => router.push('/find-care')}
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  icon={
-                    <SitGuruIcon
-                      color={palette.navMuted}
-                      name="bookings"
-                      size={21}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Bookings"
-                  onPress={() => router.push('/booking-details')}
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  icon={
-                    <SitGuruIcon
-                      color={palette.navMuted}
-                      name="messages"
-                      size={21}
-                      strokeWidth={2.3}
-                    />
-                  }
-                  label="Messages"
-                  onPress={() => router.push('/conversation')}
-                  styles={styles}
-                />
-
-                <BottomNavItem
-                  active
-                  icon={
-                    <SitGuruIcon
-                      color={palette.primary}
-                      name="profile"
-                      size={21}
-                      strokeWidth={2.4}
-                    />
-                  }
-                  label="Account"
-                  onPress={() => undefined}
-                  styles={styles}
-                />
-              </View>
+              <SitGuruTabBar active="profile" />
 
               {isAuthenticated ? (
                 <SitGuruWorkspaceSwitcher
@@ -1179,13 +1100,12 @@ function ActionButton({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.actionButton,
         primary && styles.actionButtonPrimary,
-        pressed && styles.pressed,
       ]}>
       {icon}
       <Text
@@ -1195,7 +1115,7 @@ function ActionButton({
         ]}>
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1211,13 +1131,11 @@ function QuickAction({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.quickAction,
-        pressed && styles.pressed,
-      ]}>
+      scaleTo={0.97}
+      style={styles.quickAction}>
       <View style={styles.quickActionIcon}>{icon}</View>
       <Text style={styles.quickActionLabel}>{label}</Text>
       <ChevronRight
@@ -1225,7 +1143,7 @@ function QuickAction({
         size={15}
         strokeWidth={2.4}
       />
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1248,14 +1166,12 @@ function SectionCard({
 }) {
   return (
     <View style={styles.sectionCard}>
-      <Pressable
+      <BubblePressable
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         onPress={onPress}
-        style={({ pressed }) => [
-          styles.sectionCardHeader,
-          pressed && styles.pressed,
-        ]}>
+        scaleTo={0.97}
+        style={styles.sectionCardHeader}>
         <View style={styles.sectionCardIcon}>{icon}</View>
 
         <View style={styles.sectionCardCopy}>
@@ -1271,7 +1187,7 @@ function SectionCard({
             transform: [{ rotate: expanded ? '180deg' : '0deg' }],
           }}
         />
-      </Pressable>
+      </BubblePressable>
 
       {expanded ? (
         <View style={styles.sectionCardBody}>{children}</View>
@@ -1309,13 +1225,11 @@ function ActionRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.actionRow,
-        pressed && styles.pressed,
-      ]}>
+      scaleTo={0.97}
+      style={styles.actionRow}>
       <View style={styles.actionRowIcon}>{icon}</View>
       <Text style={styles.actionRowLabel}>{label}</Text>
       <ChevronRight
@@ -1323,7 +1237,7 @@ function ActionRow({
         size={17}
         strokeWidth={2.35}
       />
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1339,14 +1253,12 @@ function ToggleRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="switch"
       accessibilityState={{ checked: enabled }}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.toggleRow,
-        pressed && styles.pressed,
-      ]}>
+      scaleTo={0.97}
+      style={styles.toggleRow}>
       <Text style={styles.toggleRowLabel}>{label}</Text>
 
       <View
@@ -1361,7 +1273,7 @@ function ToggleRow({
           ]}
         />
       </View>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1397,34 +1309,6 @@ function InlineNotice({
         {text}
       </Text>
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}>
-      {icon}
-      <Text
-        style={active ? styles.navLabelActive : styles.navLabel}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -2170,50 +2054,5 @@ function createStyles(isDark: boolean, isTablet: boolean) {
       fontSize: 10,
     },
 
-    pressed: {
-      opacity: 0.72,
-      transform: [{ scale: 0.985 }],
-    },
-
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 72,
-      justifyContent: 'space-around',
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor: '#000000',
-      shadowOffset: {
-        width: 0,
-        height: -7,
-      },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
-    },
   });
 }

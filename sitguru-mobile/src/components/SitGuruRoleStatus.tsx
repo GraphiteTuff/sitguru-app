@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
 import { BriefcaseBusiness, ChevronRight } from 'lucide-react-native';
 import {
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import type { AppRole } from '@/types/auth';
@@ -67,19 +67,19 @@ export default function SitGuruRoleStatus({
       </View>
 
       {role === 'ambassador' ? (
-        <Pressable
+        <BubblePressable
           accessibilityHint="Opens your calendar, activities, marketing, leads, and Support tools."
           accessibilityLabel="Open SitGuru Ambassador Portal"
           accessibilityRole="button"
           onPress={openAmbassadorPortal}
-          style={({ pressed }) => [
+          scaleTo={0.88}
+          style={[
             styles.portalTab,
             compact ? styles.portalTabCompact : styles.portalTabRegular,
             {
               backgroundColor: portalBackground,
               borderColor: portalBorder,
             },
-            pressed ? styles.portalTabPressed : null,
           ]}
         >
           <BriefcaseBusiness
@@ -105,7 +105,7 @@ export default function SitGuruRoleStatus({
             size={compact ? 12 : 14}
             strokeWidth={2.6}
           />
-        </Pressable>
+        </BubblePressable>
       ) : null}
     </View>
   );
@@ -170,10 +170,6 @@ const styles = StyleSheet.create({
     minHeight: 32,
     paddingHorizontal: 11,
     paddingVertical: 6,
-  },
-  portalTabPressed: {
-    opacity: 0.76,
-    transform: [{ scale: 0.98 }],
   },
   portalTabText: {
     fontFamily: AppFonts.extraBold,

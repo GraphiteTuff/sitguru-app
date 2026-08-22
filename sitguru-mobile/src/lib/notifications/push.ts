@@ -72,9 +72,25 @@ export async function registerNotificationCategories() {
   ]);
 }
 
-export async function registerForPushNotificationsAsync(): Promise<
-  string | null
-> {
+export type PushPermissionStatus = 'granted' | 'denied' | 'undetermined';
+
+/** Reads the OS permission without ever showing the system dialog. */
+export async function getPushPermissionStatus(): Promise<PushPermissionStatus> {
+  if (Platform.OS === 'web' || !Device.isDevice) {
+    return 'denied';
+  }
+
+  const existing = await Notifications.getPermissionsAsync();
+
+  if (existing.status === 'granted') return 'granted';
+  if (existing.canAskAgain) return 'undetermined';
+  return 'denied';
+}
+
+export async function registerForPushNotificationsAsync(options?: {
+  /** iOS allows exactly one system prompt, so callers must opt in to asking. */
+  prompt?: boolean;
+}): Promise<string | null> {
   if (Platform.OS === 'web') {
     return null;
   }
@@ -90,6 +106,10 @@ export async function registerForPushNotificationsAsync(): Promise<
   let status = existing.status;
 
   if (status !== 'granted') {
+    if (options?.prompt !== true) {
+      return null;
+    }
+
     const asked = await Notifications.requestPermissionsAsync({
       ios: {
         allowAlert: true,

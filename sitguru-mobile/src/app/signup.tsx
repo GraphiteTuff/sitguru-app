@@ -14,7 +14,6 @@ import { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,6 +21,7 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
@@ -183,10 +183,11 @@ export default function SignupScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 <View style={styles.topBar}>
-                  <Pressable
+                  <BubblePressable
                     accessibilityLabel="Return home"
                     accessibilityRole="button"
                     onPress={() => router.replace('/')}
+                    scaleTo={0.88}
                     style={styles.backButton}
                   >
                     <ChevronLeft
@@ -194,7 +195,7 @@ export default function SignupScreen() {
                       size={20}
                       strokeWidth={2.4}
                     />
-                  </Pressable>
+                  </BubblePressable>
 
                   <SitGuruLogo size="small" variant="symbol" />
 
@@ -342,7 +343,7 @@ export default function SignupScreen() {
                         value={password}
                       />
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityLabel={
                           passwordVisible
                             ? 'Hide password'
@@ -353,6 +354,7 @@ export default function SignupScreen() {
                         onPress={() =>
                           setPasswordVisible((current) => !current)
                         }
+                        scaleTo={0.88}
                         style={styles.eyeButton}
                       >
                         {passwordVisible ? (
@@ -368,7 +370,7 @@ export default function SignupScreen() {
                             strokeWidth={2.2}
                           />
                         )}
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   </View>
 
@@ -380,11 +382,12 @@ export default function SignupScreen() {
                         const active = signupIntent === option.id;
 
                         return (
-                          <Pressable
+                          <BubblePressable
                             key={option.id}
                             accessibilityRole="button"
                             accessibilityState={{ selected: active }}
                             onPress={() => setSignupIntent(option.id)}
+                            scaleTo={0.97}
                             style={[
                               styles.intentCard,
                               active && styles.intentCardActive,
@@ -418,24 +421,21 @@ export default function SignupScreen() {
                                 {option.short}
                               </Text>
                             </View>
-                          </Pressable>
+                          </BubblePressable>
                         );
                       })}
                     </View>
                   </View>
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     accessibilityState={{ disabled: !canSubmit }}
                     disabled={!canSubmit}
                     onPress={() => void handleSignup()}
-                    style={({ pressed }) => [
+                    style={[
                       styles.createAccountButton,
                       !canSubmit &&
                         styles.createAccountButtonDisabled,
-                      pressed &&
-                        canSubmit &&
-                        styles.createAccountButtonPressed,
                     ]}
                   >
                     <Text style={styles.createAccountText}>
@@ -449,7 +449,7 @@ export default function SignupScreen() {
                         strokeWidth={2.5}
                       />
                     ) : null}
-                  </Pressable>
+                  </BubblePressable>
 
                   <View style={styles.securityRow}>
                     <ShieldCheck
@@ -469,13 +469,14 @@ export default function SignupScreen() {
                     Already have an account?
                   </Text>
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     onPress={() => router.replace('/login')}
+                    scaleTo={0.88}
                     style={styles.loginCardButton}
                   >
                     <Text style={styles.loginCardButtonText}>Log In</Text>
-                  </Pressable>
+                  </BubblePressable>
                 </View>
 
                 <Text style={styles.legalText}>
@@ -855,9 +856,6 @@ const styles = StyleSheet.create({
   },
   createAccountButtonDisabled: {
     opacity: 0.45,
-  },
-  createAccountButtonPressed: {
-    transform: [{ scale: 0.99 }],
   },
   createAccountText: {
     color: '#FFFFFF',

@@ -42,6 +42,80 @@ export type SitGuruBooking = {
   raw: BookingAccessRow;
 };
 
+/**
+ * Server-computed money breakdown returned by `/api/stripe/checkout` and
+ * forwarded verbatim by `/api/mobile/payments/checkout`.
+ *
+ * `taxAmount` is always 0 because sales tax is added by Stripe Automatic Tax
+ * on the hosted Checkout page, so `totalCustomerPaid` is a pre-tax total.
+ */
+export type CheckoutFinancialPreview = {
+  subtotalAmount: number;
+  marketplaceFeePercent: number;
+  marketplaceFeeSource: string;
+  marketplaceFeeAmount: number;
+  sitguruFeeAmount: number;
+  tipAmount: number;
+  guruNetAmount: number;
+  guruPayoutAmount: number;
+  taxAmount: number;
+  totalCustomerPaid: number;
+  customerFeeMessage: string;
+  tipMessage: string;
+};
+
+type RawFinancialPreview = Partial<
+  Record<keyof CheckoutFinancialPreview, unknown>
+>;
+
+function asFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return null;
+}
+
+/**
+ * Only returns a preview when the server actually sent the authoritative
+ * money fields. A partial payload is treated as "unknown" so callers never
+ * render a total they cannot verify.
+ */
+export function parseFinancialPreview(
+  value: unknown,
+): CheckoutFinancialPreview | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const raw = value as RawFinancialPreview;
+  const subtotalAmount = asFiniteNumber(raw.subtotalAmount);
+  const totalCustomerPaid = asFiniteNumber(raw.totalCustomerPaid);
+  const feeAmount =
+    asFiniteNumber(raw.sitguruFeeAmount) ??
+    asFiniteNumber(raw.marketplaceFeeAmount);
+
+  if (subtotalAmount === null || totalCustomerPaid === null || feeAmount === null) {
+    return null;
+  }
+
+  return {
+    subtotalAmount,
+    marketplaceFeePercent: asFiniteNumber(raw.marketplaceFeePercent) ?? 0,
+    marketplaceFeeSource: asString(raw.marketplaceFeeSource),
+    marketplaceFeeAmount: feeAmount,
+    sitguruFeeAmount: feeAmount,
+    tipAmount: asFiniteNumber(raw.tipAmount) ?? 0,
+    guruNetAmount: asFiniteNumber(raw.guruNetAmount) ?? 0,
+    guruPayoutAmount: asFiniteNumber(raw.guruPayoutAmount) ?? 0,
+    taxAmount: asFiniteNumber(raw.taxAmount) ?? 0,
+    totalCustomerPaid,
+    customerFeeMessage: asString(raw.customerFeeMessage),
+    tipMessage: asString(raw.tipMessage),
+  };
+}
+
 export type CreateBookingInput = {
   guruId?: string;
   guruSlug?: string;
@@ -278,6 +352,7 @@ export function useBookings(options?: {
         checkoutUrl?: string;
         url?: string;
         error?: string;
+        financialPreview?: unknown;
       }>(API_PATHS.mobileCheckout, {
         body: {
           bookingId,
@@ -297,7 +372,11 @@ export function useBookings(options?: {
       setMutating(false);
 
       if (result.error) {
-        return { checkoutUrl: null as string | null, error: result.error };
+        return {
+          checkoutUrl: null as string | null,
+          financialPreview: null as CheckoutFinancialPreview | null,
+          error: result.error,
+        };
       }
 
       return {
@@ -305,6 +384,7 @@ export function useBookings(options?: {
           asString(result.data?.checkoutUrl) ||
           asString(result.data?.url) ||
           null,
+        financialPreview: parseFinancialPreview(result.data?.financialPreview),
         error: null as string | null,
       };
     },

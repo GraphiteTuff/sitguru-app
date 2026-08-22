@@ -12,12 +12,9 @@ import {
   CreditCard,
   ExternalLink,
   Gift,
-  Home,
   Landmark,
   Link2,
-  MessageCircle,
   Receipt,
-  Search,
   ShieldCheck,
   Smartphone,
   Star,
@@ -37,7 +34,6 @@ import {
   ActivityIndicator,
   Image,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -46,21 +42,23 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import StickyActionBar from '@/components/mobile/StickyActionBar';
 import TipSelector from '@/components/mobile/TipSelector';
 import SitGuruButton from '@/components/SitGuruButton';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
-import { StickyFooterClearance } from '@/constants/mobile-layout';
 import { getAppTheme } from '@/constants/theme';
 import {
-  computeProjectedTotalCents,
-  computeTipCents,
-  type TipChoice,
-} from '@/lib/payments/tipping';
+  parseFinancialPreview,
+  type CheckoutFinancialPreview,
+} from '@/hooks/data/useBookings';
+import { sitguruApiFetch } from '@/lib/data/api';
+import { computeTipCents, type TipChoice } from '@/lib/payments/tipping';
 import {
   setThemePreference,
   useColorScheme,
@@ -88,17 +86,34 @@ type BookingSummary = {
   guruName: string;
   serviceName: string;
   status: string;
-  subtotalCents: number;
+  /** Null when the booking row carries no readable service price. */
+  subtotalCents: number | null;
   additionalPetCents: number;
   discountCents: number;
-  marketplaceSupportCents: number;
+  /** Null until the server confirms the marketplace fee for this booking. */
+  sitguruFeeCents: number | null;
+  sitguruFeePercent: number | null;
   creditsCents: number;
   tipCents: number;
-  totalCents: number;
+  /** Total recorded on the booking row, if any. Never used as a guarantee. */
+  recordedTotalCents: number | null;
   currency: string;
   acceptedAt: string;
   completedAt: string;
   createdAt: string;
+};
+
+/** Where the numbers on screen came from, so labels can stay truthful. */
+type PriceSource = 'server' | 'booking' | 'unknown';
+
+type PriceBreakdown = {
+  source: PriceSource;
+  subtotalCents: number | null;
+  feeCents: number | null;
+  feePercent: number | null;
+  tipCents: number;
+  /** Pre-tax total. Null whenever it cannot be derived honestly. */
+  totalBeforeTaxCents: number | null;
 };
 
 type PaymentSummary = {
@@ -145,6 +160,15 @@ type CheckoutResponse = {
   error?: string;
   paymentIntentId?: string;
   sessionId?: string;
+  stripeSessionId?: string;
+  financialPreview?: unknown;
+};
+
+type StripeConnectResponse = {
+  ok?: boolean;
+  url?: string;
+  stripe_account_id?: string;
+  error?: string;
 };
 
 type PaymentMethodDefinition = {
@@ -158,6 +182,11 @@ type PaymentMethodDefinition = {
     strokeWidth?: number;
   }>;
 };
+
+/** Payout routes that actually exist on the SitGuru web app. */
+const PAYOUT_SETUP_PATH = '/api/payouts/setup';
+const STRIPE_CONNECT_PATH = '/api/stripe/connect';
+const STRIPE_ONBOARD_PATH = '/api/stripe/connect/onboard?role=guru';
 
 const THEME_OPTIONS: {
   icon: 'sun' | 'moon';
@@ -405,7 +434,12 @@ function formatDate(value: unknown) {
   });
 }
 
-function valueAsCents(row: RecordRow, centKeys: string[], dollarKeys: string[]) {
+/** Returns null when no key is present, so "absent" never reads as "$0.00". */
+function valueAsCentsOrNull(
+  row: RecordRow,
+  centKeys: string[],
+  dollarKeys: string[],
+) {
   for (const key of centKeys) {
     if (row[key] !== undefined && row[key] !== null) {
       return Math.round(asNumber(row[key]));
@@ -418,7 +452,23 @@ function valueAsCents(row: RecordRow, centKeys: string[], dollarKeys: string[]) 
     }
   }
 
-  return 0;
+  return null;
+}
+
+function valueAsCents(row: RecordRow, centKeys: string[], dollarKeys: string[]) {
+  return valueAsCentsOrNull(row, centKeys, dollarKeys) ?? 0;
+}
+
+function dollarsToCents(dollars: number) {
+  return Number.isFinite(dollars) ? Math.round(dollars * 100) : 0;
+}
+
+/**
+ * Mirrors the fee arithmetic in `app/api/stripe/checkout/route.ts` so a
+ * percent-only booking row resolves to the exact cents Stripe will charge.
+ */
+function feeCentsFromPercent(subtotalCents: number, feePercent: number) {
+  return Math.round(subtotalCents * (feePercent / 100));
 }
 
 function bookingFromRow(row: RecordRow | null): BookingSummary | null {
@@ -427,7 +477,12 @@ function bookingFromRow(row: RecordRow | null): BookingSummary | null {
   const id = firstText(row, ['id', 'booking_id']);
   if (!id) return null;
 
-  const subtotalCents = valueAsCents(
+  /*
+    Field order mirrors the server's subtotal resolution in
+    app/api/stripe/checkout/route.ts, so the subtotal shown here is the one
+    Stripe will actually bill.
+  */
+  const subtotalCents = valueAsCentsOrNull(
     row,
     [
       'subtotal_cents',
@@ -435,7 +490,19 @@ function bookingFromRow(row: RecordRow | null): BookingSummary | null {
       'service_amount_cents',
       'base_amount_cents',
     ],
-    ['subtotal', 'service_subtotal', 'service_amount', 'base_amount'],
+    [
+      'subtotal_amount',
+      'subtotal',
+      'service_price',
+      'booking_subtotal_amount',
+      'service_subtotal',
+      'service_amount',
+      'base_amount',
+      'total_amount',
+      'amount',
+      'price',
+      'hourly_rate',
+    ],
   );
 
   const additionalPetCents = valueAsCents(
@@ -450,21 +517,40 @@ function bookingFromRow(row: RecordRow | null): BookingSummary | null {
     ['discount', 'discount_amount', 'savings'],
   );
 
-  const marketplaceSupportCents = valueAsCents(
+  const recordedFeeCents = valueAsCentsOrNull(
     row,
     [
+      'sitguru_fee_cents',
+      'marketplace_fee_cents',
       'marketplace_support_cents',
       'platform_fee_cents',
       'application_fee_cents',
       'service_fee_cents',
     ],
     [
+      'sitguru_fee_amount',
+      'marketplace_fee_amount',
       'marketplace_support',
       'platform_fee',
       'application_fee',
       'service_fee',
     ],
   );
+
+  const rawFeePercent = row.marketplace_fee_percent ?? row.sitguru_fee_percent;
+  const parsedFeePercent =
+    rawFeePercent === undefined || rawFeePercent === null
+      ? null
+      : asNumber(rawFeePercent);
+  const sitguruFeePercent =
+    parsedFeePercent !== null && parsedFeePercent > 0 ? parsedFeePercent : null;
+
+  const sitguruFeeCents =
+    recordedFeeCents !== null
+      ? recordedFeeCents
+      : subtotalCents !== null && sitguruFeePercent !== null
+        ? feeCentsFromPercent(subtotalCents, sitguruFeePercent)
+        : null;
 
   const creditsCents = valueAsCents(
     row,
@@ -488,26 +574,25 @@ function bookingFromRow(row: RecordRow | null): BookingSummary | null {
     ['tip', 'tip_amount'],
   );
 
-  const explicitTotalCents = valueAsCents(
+  const recordedTotalCents = valueAsCentsOrNull(
     row,
     [
+      'total_customer_paid_cents',
+      'customer_total_cents',
       'total_cents',
       'amount_due_cents',
       'final_total_cents',
       'price_cents',
       'amount_cents',
     ],
-    ['total', 'amount_due', 'final_total', 'price', 'amount'],
-  );
-
-  const calculatedTotalCents = Math.max(
-    0,
-    subtotalCents +
-      additionalPetCents +
-      marketplaceSupportCents +
-      tipCents -
-      discountCents -
-      creditsCents,
+    [
+      'total_customer_paid',
+      'customer_total_amount',
+      'amount_total',
+      'total',
+      'amount_due',
+      'final_total',
+    ],
   );
 
   return {
@@ -549,10 +634,11 @@ function bookingFromRow(row: RecordRow | null): BookingSummary | null {
     subtotalCents,
     additionalPetCents,
     discountCents,
-    marketplaceSupportCents,
+    sitguruFeeCents,
+    sitguruFeePercent,
     creditsCents,
     tipCents,
-    totalCents: explicitTotalCents || calculatedTotalCents,
+    recordedTotalCents,
     currency: firstText(row, ['currency', 'currency_code']) || 'usd',
     acceptedAt: firstText(row, [
       'accepted_at',
@@ -982,16 +1068,15 @@ function Button({
   icon?: ReactNode;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={[
         styles.button,
         primary ? styles.primaryButton : null,
         disabled ? styles.disabledButton : null,
-        pressed && !disabled ? styles.pressed : null,
       ]}>
       {icon}
       <Text
@@ -1001,7 +1086,7 @@ function Button({
         ]}>
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1010,11 +1095,14 @@ function InfoRow({
   value,
   styles,
   emphasize = false,
+  pending = false,
 }: {
   label: string;
   value: string;
   styles: ReturnType<typeof createStyles>;
   emphasize?: boolean;
+  /** Renders the value as an unresolved amount instead of a hard number. */
+  pending?: boolean;
 }) {
   return (
     <View style={[styles.infoRow, emphasize ? styles.infoRowEmphasis : null]}>
@@ -1023,6 +1111,7 @@ function InfoRow({
         style={[
           styles.infoValue,
           emphasize ? styles.infoValueEmphasis : null,
+          pending ? styles.infoValuePending : null,
         ]}>
         {value}
       </Text>
@@ -1131,6 +1220,10 @@ export default function PaymentsScreen() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [loadError, setLoadError] = useState('');
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
+  const [serverPreview, setServerPreview] =
+    useState<CheckoutFinancialPreview | null>(null);
+  const [serverPreviewBookingId, setServerPreviewBookingId] = useState('');
+  const [openingPayoutSetup, setOpeningPayoutSetup] = useState(false);
 
   const currentUserName =
     profile?.full_name ||
@@ -1165,32 +1258,82 @@ export default function PaymentsScreen() {
     effectiveRole === 'pet_parent' &&
     Boolean(booking?.id) &&
     accepted &&
-    !alreadyPaid &&
-    (booking?.totalCents ?? 0) > 0;
+    !alreadyPaid;
+
+  const preview =
+    serverPreview && serverPreviewBookingId === booking?.id
+      ? serverPreview
+      : null;
+
+  /*
+    Tip percentages apply to the service subtotal, matching the percentage
+    math in the checkout API. A tip is never charged on the SitGuru fee.
+  */
+  const tipBaseCents =
+    preview !== null
+      ? dollarsToCents(preview.subtotalAmount)
+      : (booking?.subtotalCents ?? 0);
 
   const selectedTipCents = useMemo(
-    () =>
-      computeTipCents(
-        booking?.totalCents ?? booking?.subtotalCents ?? 0,
-        tipChoice,
-        customTipDollars,
-      ),
-    [booking?.subtotalCents, booking?.totalCents, customTipDollars, tipChoice],
+    () => computeTipCents(tipBaseCents, tipChoice, customTipDollars),
+    [customTipDollars, tipBaseCents, tipChoice],
   );
 
-  const projectedTotalCents = useMemo(
-    () =>
-      computeProjectedTotalCents(
-        booking?.totalCents ?? 0,
-        selectedTipCents,
-        applyCredits ? credits.availableCents : 0,
-      ),
-    [
-      applyCredits,
-      booking?.totalCents,
-      credits.availableCents,
-      selectedTipCents,
-    ],
+  /**
+   * Prefers the server-computed breakdown, falls back to the booking record,
+   * and reports `unknown` rather than inventing a total we cannot verify.
+   */
+  const breakdown = useMemo<PriceBreakdown>(() => {
+    if (preview) {
+      const subtotalCents = dollarsToCents(preview.subtotalAmount);
+      const feeCents = dollarsToCents(preview.sitguruFeeAmount);
+
+      return {
+        source: 'server',
+        subtotalCents,
+        feeCents,
+        feePercent: preview.marketplaceFeePercent || null,
+        tipCents: selectedTipCents,
+        totalBeforeTaxCents: subtotalCents + feeCents + selectedTipCents,
+      };
+    }
+
+    const subtotalCents = booking?.subtotalCents ?? null;
+    const feeCents = booking?.sitguruFeeCents ?? null;
+
+    if (subtotalCents === null || feeCents === null) {
+      return {
+        source: 'unknown',
+        subtotalCents,
+        feeCents,
+        feePercent: booking?.sitguruFeePercent ?? null,
+        tipCents: selectedTipCents,
+        totalBeforeTaxCents: null,
+      };
+    }
+
+    return {
+      source: 'booking',
+      subtotalCents,
+      feeCents,
+      feePercent: booking?.sitguruFeePercent ?? null,
+      tipCents: selectedTipCents,
+      totalBeforeTaxCents: subtotalCents + feeCents + selectedTipCents,
+    };
+  }, [
+    booking?.sitguruFeeCents,
+    booking?.sitguruFeePercent,
+    booking?.subtotalCents,
+    preview,
+    selectedTipCents,
+  ]);
+
+  const bookingCurrency = booking?.currency || 'usd';
+
+  const formatOrUnknown = useCallback(
+    (cents: number | null, unknownLabel = 'Confirmed at checkout') =>
+      cents === null ? unknownLabel : formatCurrency(cents, bookingCurrency),
+    [bookingCurrency],
   );
 
   const refresh = useCallback(async () => {
@@ -1423,12 +1566,17 @@ export default function PaymentsScreen() {
         },
       });
 
+      /*
+        The checkout API falls back to a $25 default tip whenever tipAmount
+        is present but not greater than zero, so a no-tip checkout must omit
+        the tip amount and percent entirely.
+      */
+      const hasTip = tipCentsForCheckout > 0;
+
       const tipPercentForCheckout =
-        tipCentsForCheckout <= 0
-          ? 0
-          : tipChoice === 'custom' || tipChoice === 'none'
-            ? undefined
-            : tipChoice;
+        hasTip && tipChoice !== 'custom' && tipChoice !== 'none'
+          ? tipChoice
+          : undefined;
 
       const response = await fetch(
         `${apiBaseUrl}/api/mobile/payments/checkout`,
@@ -1444,7 +1592,9 @@ export default function PaymentsScreen() {
             applyCredits,
             tipCents: tipCentsForCheckout,
             tip_cents: tipCentsForCheckout,
-            tipAmount: Number((tipCentsForCheckout / 100).toFixed(2)),
+            tipAmount: hasTip
+              ? Number((tipCentsForCheckout / 100).toFixed(2))
+              : undefined,
             tipPercent: tipPercentForCheckout,
             returnUrl,
             cancelUrl: Linking.createURL('/payments', {
@@ -1474,6 +1624,13 @@ export default function PaymentsScreen() {
             body.message ||
             'SitGuru Checkout could not be started.',
         );
+      }
+
+      const confirmedPreview = parseFinancialPreview(body.financialPreview);
+
+      if (confirmedPreview) {
+        setServerPreview(confirmedPreview);
+        setServerPreviewBookingId(booking.id);
       }
 
       const checkoutUrl = body.checkoutUrl || body.url;
@@ -1523,7 +1680,7 @@ export default function PaymentsScreen() {
     }
   }
 
-  function openPayoutSetup() {
+  async function openPayoutSetup() {
     const apiBaseUrl = getApiBaseUrl();
 
     if (!apiBaseUrl) {
@@ -1531,16 +1688,74 @@ export default function PaymentsScreen() {
         tone: 'error',
         title: 'Payout setup is not configured',
         message:
-          'Add the SitGuru web or API URL before opening Stripe Connect onboarding.',
+          'Add EXPO_PUBLIC_SITGURU_API_URL or EXPO_PUBLIC_SITGURU_WEB_URL before opening Stripe payout setup.',
       });
       return;
     }
 
-    void Linking.openURL(
-      `${apiBaseUrl}/guru/payouts?returnTo=${encodeURIComponent(
-        '/payments',
-      )}`,
-    );
+    setFeedback(null);
+    setOpeningPayoutSetup(true);
+
+    try {
+      /*
+        Records the Guru's Stripe preference first so payout readiness is
+        tracked even if the hosted Stripe steps are abandoned.
+      */
+      await sitguruApiFetch(PAYOUT_SETUP_PATH, {
+        method: 'PATCH',
+        body: { role: 'guru', provider: 'stripe' },
+      });
+
+      const connect = await sitguruApiFetch<StripeConnectResponse>(
+        STRIPE_CONNECT_PATH,
+        { method: 'POST', body: {} },
+      );
+
+      /*
+        POST /api/stripe/connect authenticates from web cookies only, so a
+        bearer-token call can be rejected. The hosted onboarding redirect
+        handles its own sign-in, so it is the reliable mobile fallback.
+      */
+      const accountLinkUrl =
+        asText(connect.data?.url) ||
+        `${apiBaseUrl}${STRIPE_ONBOARD_PATH}`;
+
+      const returnUrl = Linking.createURL('/payments');
+      const result = await WebBrowser.openAuthSessionAsync(
+        accountLinkUrl,
+        returnUrl,
+      );
+
+      /*
+        Stripe Account Links return to a web URL rather than a mobile deep
+        link, so the browser result cannot confirm completion. Re-read the
+        payout record instead of assuming either outcome.
+      */
+      setFeedback({
+        tone: 'warning',
+        title:
+          result.type === 'cancel'
+            ? 'Payout setup closed'
+            : 'Checking payout setup',
+        message:
+          result.type === 'cancel'
+            ? 'Stripe payout setup was closed. Any completed steps are saved and you can pick it back up anytime.'
+            : 'SitGuru is re-reading your payout record. Payouts stay disabled until Stripe confirms the account is ready.',
+      });
+
+      await refresh();
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        title: 'Payout setup could not open',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'SitGuru could not open Stripe payout setup.',
+      });
+    } finally {
+      setOpeningPayoutSetup(false);
+    }
   }
 
   const bookingPaymentStatus = latestPayment
@@ -1549,11 +1764,18 @@ export default function PaymentsScreen() {
       ? 'Ready for checkout'
       : 'Waiting for Guru acceptance';
 
-  const amountAfterAvailableCredits = Math.max(
-    0,
-    (booking?.totalCents || 0) -
-      (applyCredits ? credits.availableCents : 0),
+  const totalBeforeTaxLabel = formatOrUnknown(
+    breakdown.totalBeforeTaxCents,
+    'Shown at checkout',
   );
+
+  const payActionLabel =
+    breakdown.totalBeforeTaxCents === null
+      ? 'Continue to checkout'
+      : `Pay ${formatCurrency(
+          breakdown.totalBeforeTaxCents,
+          bookingCurrency,
+        )} before tax`;
 
   const showCheckoutSticky =
     effectiveRole === 'pet_parent' && Boolean(booking?.id) && !alreadyPaid;
@@ -1604,12 +1826,7 @@ export default function PaymentsScreen() {
                 ) : null}
 
                 <ScrollView
-                  contentContainerStyle={[
-                    styles.scrollContent,
-                    showCheckoutSticky
-                      ? { paddingBottom: StickyFooterClearance.actionPlusNav }
-                      : null,
-                  ]}
+                  contentContainerStyle={styles.scrollContent}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}>
                   <View style={styles.page}>
@@ -1626,29 +1843,31 @@ export default function PaymentsScreen() {
                       </View>
 
                       <View style={styles.headerActions}>
-                        <Pressable
+                        <BubblePressable
                           accessibilityLabel="Open notifications"
                           accessibilityRole="button"
                           onPress={() => router.push('/notifications')}
+                          scaleTo={0.88}
                           style={styles.headerIconButton}>
                           <Bell
                             color={theme.colors.text}
                             size={18}
                             strokeWidth={2.3}
                           />
-                        </Pressable>
+                        </BubblePressable>
 
                         <View style={styles.modeToggle}>
                           {THEME_OPTIONS.map((option) => {
                             const active = themePreference === option.value;
 
                             return (
-                              <Pressable
+                              <BubblePressable
                                 key={option.value}
                                 accessibilityLabel={`Switch to ${option.label} mode`}
                                 accessibilityRole="button"
                                 accessibilityState={{ selected: active }}
                                 onPress={() => setThemePreference(option.value)}
+                                scaleTo={0.88}
                                 style={[
                                   styles.modeButton,
                                   active ? styles.modeButtonActive : null,
@@ -1667,22 +1886,23 @@ export default function PaymentsScreen() {
                                   size={15}
                                   strokeWidth={2.4}
                                 />
-                              </Pressable>
+                              </BubblePressable>
                             );
                           })}
                         </View>
 
-                        <Pressable
+                        <BubblePressable
                           accessibilityLabel="Switch workspace"
                           accessibilityRole="button"
                           onPress={() => setWorkspaceSwitcherOpen(true)}
+                          scaleTo={0.88}
                           style={styles.profileButton}>
                           <HeaderAvatar
                             fallback={initials(currentUserName)}
                             imageUrl={avatarUrl}
                             styles={styles}
                           />
-                        </Pressable>
+                        </BubblePressable>
                       </View>
                     </View>
 
@@ -1806,10 +2026,12 @@ export default function PaymentsScreen() {
                     : alreadyPaid
                       ? 'Payment confirmed'
                       : accepted
-                        ? `Pay ${formatCurrency(
-                            amountAfterAvailableCredits,
-                            booking.currency,
-                          )} securely`
+                        ? breakdown.totalBeforeTaxCents === null
+                          ? 'Confirm your total securely'
+                          : `Pay ${formatCurrency(
+                              breakdown.totalBeforeTaxCents,
+                              bookingCurrency,
+                            )} before tax`
                         : 'Waiting for Guru acceptance'}
               </Text>
               <Text style={styles.nextStepMessage}>
@@ -1822,7 +2044,9 @@ export default function PaymentsScreen() {
                     : alreadyPaid
                       ? 'This booking has a confirmed payment. Open the receipt or booking details below.'
                       : accepted
-                        ? 'The booking is accepted and ready for SitGuru Checkout.'
+                        ? breakdown.totalBeforeTaxCents === null
+                          ? 'SitGuru confirms the service fee and your final total on the secure checkout page.'
+                          : 'The booking is accepted and ready for SitGuru Checkout. Sales tax, if any, is added by Stripe.'
                         : 'No payment is due yet. The Pay button appears after the Guru accepts and the final amount is confirmed.'}
               </Text>
             </View>
@@ -1839,10 +2063,7 @@ export default function PaymentsScreen() {
                       ? 'View receipt'
                       : 'View booking details'
                     : accepted
-                      ? `Pay ${formatCurrency(
-                          amountAfterAvailableCredits,
-                          booking.currency,
-                        )} now`
+                      ? payActionLabel
                       : 'View booking request'
             }
             onPress={() => {
@@ -1960,12 +2181,12 @@ export default function PaymentsScreen() {
                 : 'Waiting for booking information'}
             </Text>
             <Text style={styles.bookingAmount}>
-              {booking
-                ? formatCurrency(booking.totalCents, booking.currency)
-                : '—'}
+              {booking ? totalBeforeTaxLabel : '—'}
             </Text>
             <Text style={styles.bookingStatusText}>
-              {bookingPaymentStatus}
+              {booking && breakdown.totalBeforeTaxCents !== null
+                ? `${bookingPaymentStatus} • before tax`
+                : bookingPaymentStatus}
             </Text>
           </View>
 
@@ -1987,7 +2208,7 @@ export default function PaymentsScreen() {
         {effectiveRole === 'pet_parent' ? (
           <>
             <SectionCard
-              eyebrow="Final booking amount"
+              eyebrow="Itemized before tax"
               title="SitGuru Checkout"
               styles={styles}>
               {!isAuthenticated && !authLoading ? (
@@ -2005,70 +2226,56 @@ export default function PaymentsScreen() {
                 </View>
               ) : null}
 
+              {booking ? (
+                <View
+                  style={[
+                    styles.noticeCard,
+                    breakdown.source === 'unknown'
+                      ? styles.noticeCardCaution
+                      : null,
+                  ]}>
+                  <Text style={styles.noticeTitle}>
+                    {breakdown.source === 'server'
+                      ? 'Confirmed by SitGuru'
+                      : breakdown.source === 'booking'
+                        ? 'Estimated from your booking'
+                        : 'Total confirmed at checkout'}
+                  </Text>
+                  <Text style={styles.body}>
+                    {breakdown.source === 'server'
+                      ? 'These amounts came straight from the SitGuru payment server, so the pre-tax total below is what Stripe will collect.'
+                      : breakdown.source === 'booking'
+                        ? 'These amounts come from your booking record. SitGuru re-confirms the service fee the moment checkout opens, and the confirmed figures replace the ones below.'
+                        : 'This booking does not carry a confirmed SitGuru service fee yet, so no total is shown here. Your exact amount appears on the secure checkout page before you pay anything.'}
+                  </Text>
+                </View>
+              ) : null}
+
               <InfoRow
                 label="Service subtotal"
                 value={
                   booking
-                    ? formatCurrency(
-                        booking.subtotalCents,
-                        booking.currency,
-                      )
+                    ? formatOrUnknown(breakdown.subtotalCents)
                     : 'Not available'
                 }
                 styles={styles}
               />
               <InfoRow
-                label="Additional pet charges"
+                label={
+                  breakdown.feePercent
+                    ? `SitGuru service fee (${breakdown.feePercent}%)`
+                    : 'SitGuru service fee'
+                }
                 value={
-                  booking
-                    ? formatCurrency(
-                        booking.additionalPetCents,
-                        booking.currency,
-                      )
-                    : 'Not available'
+                  booking ? formatOrUnknown(breakdown.feeCents) : 'Not available'
                 }
                 styles={styles}
-              />
-              <InfoRow
-                label="Discounts"
-                value={
-                  booking
-                    ? `-${formatCurrency(
-                        booking.discountCents,
-                        booking.currency,
-                      )}`
-                    : 'Not available'
-                }
-                styles={styles}
-              />
-              <InfoRow
-                label="SitGuru marketplace support"
-                value={
-                  booking
-                    ? formatCurrency(
-                        booking.marketplaceSupportCents,
-                        booking.currency,
-                      )
-                    : 'Not available'
-                }
-                styles={styles}
-              />
-              <InfoRow
-                label="Booking credits already applied"
-                value={
-                  booking
-                    ? `-${formatCurrency(
-                        booking.creditsCents,
-                        booking.currency,
-                      )}`
-                    : 'Not available'
-                }
-                styles={styles}
+                pending={Boolean(booking) && breakdown.feeCents === null}
               />
 
               {booking && !alreadyPaid ? (
                 <TipSelector
-                  serviceCents={booking.totalCents || booking.subtotalCents}
+                  serviceCents={tipBaseCents}
                   choice={tipChoice}
                   customDollars={customTipDollars}
                   onChoiceChange={(next) => {
@@ -2077,23 +2284,74 @@ export default function PaymentsScreen() {
                   }}
                   onCustomDollarsChange={setCustomTipDollars}
                 />
-              ) : (
-                <InfoRow
-                  label="Optional tip"
-                  value={
-                    booking
-                      ? formatCurrency(booking.tipCents, booking.currency)
-                      : 'Not available'
-                  }
-                  styles={styles}
-                />
-              )}
+              ) : null}
+
+              <InfoRow
+                label={alreadyPaid ? 'Tip' : 'Selected tip'}
+                value={
+                  booking
+                    ? formatCurrency(
+                        alreadyPaid ? booking.tipCents : breakdown.tipCents,
+                        bookingCurrency,
+                      )
+                    : 'Not available'
+                }
+                styles={styles}
+              />
+
+              <InfoRow
+                label="Total before tax"
+                value={booking ? totalBeforeTaxLabel : 'Not available'}
+                styles={styles}
+                emphasize
+                pending={
+                  Boolean(booking) && breakdown.totalBeforeTaxCents === null
+                }
+              />
+
+              <Text style={styles.footnote}>
+                Sales tax is calculated by Stripe on the checkout page, so the
+                amount above is a pre-tax total rather than the final charge.
+              </Text>
+
+              {booking &&
+              (booking.additionalPetCents > 0 ||
+                booking.discountCents > 0 ||
+                booking.creditsCents > 0) ? (
+                <Text style={styles.footnote}>
+                  Already reflected in the service subtotal:{' '}
+                  {[
+                    booking.additionalPetCents > 0
+                      ? `${formatCurrency(
+                          booking.additionalPetCents,
+                          bookingCurrency,
+                        )} additional pet charges`
+                      : '',
+                    booking.discountCents > 0
+                      ? `${formatCurrency(
+                          booking.discountCents,
+                          bookingCurrency,
+                        )} discounts`
+                      : '',
+                    booking.creditsCents > 0
+                      ? `${formatCurrency(
+                          booking.creditsCents,
+                          bookingCurrency,
+                        )} credits`
+                      : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' • ')}
+                  .
+                </Text>
+              ) : null}
 
               <View style={styles.creditToggleCard}>
-                <Pressable
+                <BubblePressable
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: applyCredits }}
                   onPress={() => setApplyCredits((current) => !current)}
+                  scaleTo={0.88}
                   style={[
                     styles.checkbox,
                     applyCredits ? styles.checkboxActive : null,
@@ -2105,17 +2363,16 @@ export default function PaymentsScreen() {
                       strokeWidth={2.4}
                     />
                   ) : null}
-                </Pressable>
+                </BubblePressable>
                 <View style={styles.creditToggleCopy}>
                   <Text style={styles.creditToggleTitle}>
-                    Apply available SitGuru credits
+                    Request available SitGuru credits
                   </Text>
                   <Text style={styles.creditToggleText}>
-                    {formatCurrency(
-                      credits.availableCents,
-                      booking?.currency || 'usd',
-                    )}{' '}
+                    {formatCurrency(credits.availableCents, bookingCurrency)}{' '}
                     available across PawPerks, referral, and gift credits.
+                    Credit and promo requests are recorded with your booking
+                    and do not reduce the amount Stripe collects at checkout.
                   </Text>
                 </View>
               </View>
@@ -2137,47 +2394,6 @@ export default function PaymentsScreen() {
                 />
               </View>
 
-              <InfoRow
-                label="Service cost"
-                value={
-                  booking
-                    ? formatCurrency(booking.totalCents, booking.currency)
-                    : 'Not available'
-                }
-                styles={styles}
-              />
-              <InfoRow
-                label="Selected tip"
-                value={
-                  booking
-                    ? formatCurrency(selectedTipCents, booking.currency)
-                    : 'Not available'
-                }
-                styles={styles}
-              />
-              <InfoRow
-                label="Credits applied"
-                value={
-                  booking
-                    ? `-${formatCurrency(
-                        applyCredits ? credits.availableCents : 0,
-                        booking.currency,
-                      )}`
-                    : 'Not available'
-                }
-                styles={styles}
-              />
-              <InfoRow
-                label="Projected total"
-                value={
-                  booking
-                    ? formatCurrency(projectedTotalCents, booking.currency)
-                    : 'Not available'
-                }
-                styles={styles}
-                emphasize
-              />
-
               {!accepted && booking ? (
                 <Text style={styles.footnote}>
                   Checkout opens after the Guru accepts and SitGuru confirms
@@ -2190,7 +2406,6 @@ export default function PaymentsScreen() {
                 </Text>
               ) : (
                 <Text style={styles.footnote}>
-                  Service cost + tip = projected total before Stripe opens.
                   Tips go 100% to your Guru on the earnings ledger.
                 </Text>
               )}
@@ -2339,19 +2554,26 @@ export default function PaymentsScreen() {
               <View style={styles.buttonRow}>
                 <Button
                   label={
-                    payout.connected
-                      ? 'Manage payout account'
-                      : 'Set up payouts'
+                    openingPayoutSetup
+                      ? 'Opening Stripe…'
+                      : payout.connected
+                        ? 'Manage payout account'
+                        : 'Set up payouts'
                   }
-                  onPress={openPayoutSetup}
+                  onPress={() => void openPayoutSetup()}
                   styles={styles}
                   primary
+                  disabled={openingPayoutSetup}
                   icon={
-                    <Banknote
-                      color="#FFFFFF"
-                      size={18}
-                      strokeWidth={2.3}
-                    />
+                    openingPayoutSetup ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Banknote
+                        color="#FFFFFF"
+                        size={18}
+                        strokeWidth={2.3}
+                      />
+                    )
                   }
                 />
                 <Button
@@ -2517,12 +2739,7 @@ export default function PaymentsScreen() {
                   <StickyActionBar embedded aboveBottomNav>
                     <SitGuruButton
                       label={
-                        startingCheckout
-                          ? 'Opening checkout…'
-                          : `Pay ${formatCurrency(
-                              projectedTotalCents,
-                              booking?.currency || 'usd',
-                            )}`
+                        startingCheckout ? 'Opening checkout…' : payActionLabel
                       }
                       disabled={startingCheckout || !canOpenCheckout}
                       onPress={() => void startCheckout()}
@@ -2542,79 +2759,7 @@ export default function PaymentsScreen() {
                   </StickyActionBar>
                 ) : null}
 
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    label="Home"
-                    icon={
-                      <Home
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() =>
-                      router.push(
-                        activeRole === 'guru'
-                          ? '/guru-dashboard'
-                          : activeRole === 'ambassador'
-                            ? '/ambassador-dashboard'
-                            : activeRole === 'admin'
-                              ? '/admin-dashboard'
-                              : '/pet-parent-dashboard',
-                      )
-                    }
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    label="Explore"
-                    icon={
-                      <Search
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() => router.push('/find-care')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    active
-                    label="Bookings"
-                    icon={
-                      <CalendarDays
-                        color={theme.colors.primary}
-                        size={20}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    onPress={() => router.push('/booking-details')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    label="Messages"
-                    icon={
-                      <MessageCircle
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() => router.push('/conversation')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    label="Profile"
-                    icon={
-                      <UserRound
-                        color={theme.colors.textSecondary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    onPress={() => router.push('/account')}
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar active="profile" />
 
                 {isWebPreview ? <View style={styles.homeIndicator} /> : null}
               </View>
@@ -2669,40 +2814,6 @@ function HeaderAvatar({
         <Text style={styles.avatarInitials}>{fallback}</Text>
       )}
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.bottomNavItem,
-        pressed ? styles.pressed : null,
-      ]}>
-      {icon}
-      <Text
-        style={[
-          styles.bottomNavText,
-          active ? styles.bottomNavTextActive : null,
-        ]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -2841,7 +2952,7 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
       width: 2,
     },
     scrollContent: {
-      paddingBottom: 112,
+      paddingBottom: 24,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -2970,9 +3081,6 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
       fontSize: 11,
       fontFamily: AppFonts.extraBold,
       fontWeight: '900',
-    },
-    pressed: {
-      opacity: 0.76,
     },
     hero: {
       backgroundColor: dark ? '#0D2A1C' : '#0F563E',
@@ -3268,6 +3376,10 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
       gap: 9,
       padding: 14,
     },
+    noticeCardCaution: {
+      backgroundColor: dark ? 'rgba(243,170,31,0.14)' : '#FFF6E4',
+      borderColor: theme.colors.warning,
+    },
     noticeTitle: {
       color: theme.colors.text,
       fontSize: 15,
@@ -3307,6 +3419,12 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
     infoValueEmphasis: {
       color: theme.colors.primaryDark,
       fontSize: 17,
+    },
+    infoValuePending: {
+      color: theme.colors.muted,
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+      fontWeight: '800',
     },
     creditToggleCard: {
       alignItems: 'center',
@@ -3627,39 +3745,6 @@ function createStyles(theme: ReturnType<typeof getAppTheme>) {
       fontSize: 11,
       fontFamily: AppFonts.extraBold,
       fontWeight: '900',
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: theme.colors.elevatedCard,
-      borderColor: theme.colors.border,
-      borderRadius: 22,
-      borderWidth: 1,
-      bottom: 12,
-      flexDirection: 'row',
-      left: 12,
-      paddingHorizontal: 6,
-      paddingVertical: 8,
-      position: 'absolute',
-      right: 12,
-      shadowColor: '#000000',
-      shadowOffset: { width: 0, height: 5 },
-      shadowOpacity: dark ? 0.22 : 0.08,
-      shadowRadius: 10,
-    },
-    bottomNavItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-      minHeight: 49,
-    },
-    bottomNavText: {
-      color: theme.colors.textSecondary,
-      fontFamily: AppFonts.bold,
-      fontSize: 8,
-    },
-    bottomNavTextActive: {
-      color: theme.colors.primary,
     },
     homeIndicator: {
       alignSelf: 'center',

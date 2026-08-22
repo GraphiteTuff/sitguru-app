@@ -5,15 +5,10 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  CircleDollarSign,
   Clock3,
-  Home,
-  MapPin,
-  MessageCircle,
   Percent,
   Save,
   Sparkles,
-  UserRound,
   WalletCards,
 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
@@ -21,7 +16,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -30,12 +24,14 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import RoleGate from '@/components/RoleGate';
 import SaveFeedbackBanner, {
   useSaveFeedback,
 } from '@/components/SaveFeedbackBanner';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
 import {
   setThemePreference,
@@ -231,37 +227,19 @@ const services: ServiceConfig[] = [
   },
 ];
 
+const emptyServiceRate: ServiceRate = {
+  baseRate: '',
+  additionalPetRate: '',
+  enabled: false,
+};
+
 const defaultRates: Record<ServiceId, ServiceRate> = {
-  'dog-walking': {
-    baseRate: '25',
-    additionalPetRate: '10',
-    enabled: true,
-  },
-  'drop-in': {
-    baseRate: '22',
-    additionalPetRate: '8',
-    enabled: true,
-  },
-  'doggy-day-care': {
-    baseRate: '40',
-    additionalPetRate: '15',
-    enabled: false,
-  },
-  boarding: {
-    baseRate: '58',
-    additionalPetRate: '22',
-    enabled: false,
-  },
-  'house-sitting': {
-    baseRate: '72',
-    additionalPetRate: '20',
-    enabled: false,
-  },
-  'multi-day-care': {
-    baseRate: '45',
-    additionalPetRate: '15',
-    enabled: false,
-  },
+  'dog-walking': { ...emptyServiceRate },
+  'drop-in': { ...emptyServiceRate },
+  'doggy-day-care': { ...emptyServiceRate },
+  boarding: { ...emptyServiceRate },
+  'house-sitting': { ...emptyServiceRate },
+  'multi-day-care': { ...emptyServiceRate },
 };
 
 const weekdayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -330,8 +308,8 @@ export default function GuruPricingScreen() {
   const [displayMonth, setDisplayMonth] = useState(monthStart(new Date()));
   const [selectedDateId, setSelectedDateId] = useState(toDateId(new Date()));
   const [dayRules, setDayRules] = useState<Record<string, DayRule>>({});
-  const [weekendAdjustment, setWeekendAdjustment] = useState('8');
-  const [holidayAdjustment, setHolidayAdjustment] = useState('15');
+  const [weekendAdjustment, setWeekendAdjustment] = useState('');
+  const [holidayAdjustment, setHolidayAdjustment] = useState('');
   const [multiPetDiscountEnabled, setMultiPetDiscountEnabled] =
     useState(true);
   const [multiPetDiscountPercent, setMultiPetDiscountPercent] =
@@ -556,6 +534,8 @@ export default function GuruPricingScreen() {
 
     if (rule?.unavailable) return null;
 
+    if (!selectedRate.baseRate.trim()) return null;
+
     return toNumber(selectedRate.baseRate) + getDateAdjustment(day);
   }
 
@@ -649,11 +629,12 @@ export default function GuruPricingScreen() {
           const enabled = serviceRates[service.id].enabled;
 
           return (
-            <Pressable
+            <BubblePressable
               key={service.id}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               onPress={() => setSelectedServiceId(service.id)}
+              scaleTo={0.88}
               style={[
                 styles.servicePill,
                 active && styles.servicePillActive,
@@ -673,7 +654,7 @@ export default function GuruPricingScreen() {
               >
                 {service.shortTitle}
               </Text>
-            </Pressable>
+            </BubblePressable>
           );
         })}
       </ScrollView>
@@ -682,6 +663,8 @@ export default function GuruPricingScreen() {
 
   function renderPreviewCard() {
     const sampleUnits = selectedService.mode === 'single' ? 1 : 5;
+    const hasBaseRate = selectedRate.baseRate.trim().length > 0;
+    const hasAdditionalPetRate = selectedRate.additionalPetRate.trim().length > 0;
     const baseRate = toNumber(selectedRate.baseRate);
     const additionalPetRate = toNumber(
       selectedRate.additionalPetRate,
@@ -728,7 +711,9 @@ export default function GuruPricingScreen() {
             <Text style={styles.previewEyebrow}>
               PET PARENT ESTIMATE
             </Text>
-            <Text style={styles.previewTitle}>{currency(total)}</Text>
+            <Text style={styles.previewTitle}>
+              {hasBaseRate ? currency(total) : 'No rate set'}
+            </Text>
           </View>
 
           <View style={styles.previewServicePill}>
@@ -741,12 +726,12 @@ export default function GuruPricingScreen() {
         <View style={styles.previewRows}>
           <PreviewRow
             label={`${selectedService.title} × ${sampleUnits}`}
-            value={currency(baseTotal)}
+            value={hasBaseRate ? currency(baseTotal) : 'Not set'}
             styles={styles}
           />
           <PreviewRow
             label="Additional pet estimate"
-            value={currency(additionalPetTotal)}
+            value={hasAdditionalPetRate ? currency(additionalPetTotal) : 'Not set'}
             styles={styles}
           />
 
@@ -863,11 +848,12 @@ export default function GuruPricingScreen() {
             </View>
 
             <View style={styles.monthControls}>
-              <Pressable
+              <BubblePressable
                 accessibilityRole="button"
                 onPress={() =>
                   setDisplayMonth((month) => addMonths(month, -1))
                 }
+                scaleTo={0.88}
                 style={styles.monthButton}
               >
                 <ChevronLeft
@@ -875,13 +861,14 @@ export default function GuruPricingScreen() {
                   size={18}
                   strokeWidth={2.4}
                 />
-              </Pressable>
+              </BubblePressable>
 
-              <Pressable
+              <BubblePressable
                 accessibilityRole="button"
                 onPress={() =>
                   setDisplayMonth((month) => addMonths(month, 1))
                 }
+                scaleTo={0.88}
                 style={styles.monthButton}
               >
                 <ChevronRight
@@ -889,7 +876,7 @@ export default function GuruPricingScreen() {
                   size={18}
                   strokeWidth={2.4}
                 />
-              </Pressable>
+              </BubblePressable>
             </View>
           </View>
 
@@ -921,11 +908,12 @@ export default function GuruPricingScreen() {
                   const price = getDatePrice(day);
 
                   return (
-                    <Pressable
+                    <BubblePressable
                       key={day.id}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
                       onPress={() => setSelectedDateId(day.id)}
+                      scaleTo={0.88}
                       style={[
                         styles.dateCell,
                         outsideMonth && styles.dateOutsideMonth,
@@ -959,7 +947,7 @@ export default function GuruPricingScreen() {
                             ? currency(price)
                             : '—'}
                       </Text>
-                    </Pressable>
+                    </BubblePressable>
                   );
                 })}
               </View>
@@ -1186,7 +1174,7 @@ export default function GuruPricingScreen() {
               const active = bookingStatus === option.value;
 
               return (
-                <Pressable
+                <BubblePressable
                   key={option.value}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
@@ -1194,6 +1182,7 @@ export default function GuruPricingScreen() {
                     setBookingStatus(option.value);
                     setSaveState('idle');
                   }}
+                  scaleTo={0.97}
                   style={[
                     styles.statusOption,
                     active && styles.statusOptionActive,
@@ -1228,7 +1217,7 @@ export default function GuruPricingScreen() {
                       {option.description}
                     </Text>
                   </View>
-                </Pressable>
+                </BubblePressable>
               );
             })}
           </View>
@@ -1352,16 +1341,24 @@ export default function GuruPricingScreen() {
           />
           <SummaryRow
             label="Base rate"
-            value={`${currency(
-              toNumber(selectedRate.baseRate),
-            )} / ${selectedService.rateUnit}`}
+            value={
+              selectedRate.baseRate.trim()
+                ? `${currency(
+                    toNumber(selectedRate.baseRate),
+                  )} / ${selectedService.rateUnit}`
+                : 'Not set yet'
+            }
             styles={styles}
           />
           <SummaryRow
             label="Additional pet"
-            value={`${currency(
-              toNumber(selectedRate.additionalPetRate),
-            )} / ${selectedService.rateUnit}`}
+            value={
+              selectedRate.additionalPetRate.trim()
+                ? `${currency(
+                    toNumber(selectedRate.additionalPetRate),
+                  )} / ${selectedService.rateUnit}`
+                : 'Not set yet'
+            }
             styles={styles}
           />
           <SummaryRow
@@ -1386,9 +1383,10 @@ export default function GuruPricingScreen() {
           />
         </View>
 
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
           onPress={() => router.push('/guru-earnings')}
+          scaleTo={0.97}
           style={styles.linkCard}
         >
           <View style={styles.linkIcon}>
@@ -1413,7 +1411,7 @@ export default function GuruPricingScreen() {
             size={18}
             strokeWidth={2.3}
           />
-        </Pressable>
+        </BubblePressable>
 
         <View style={styles.saveStateCard}>
           <Save
@@ -1500,10 +1498,11 @@ export default function GuruPricingScreen() {
                   showsVerticalScrollIndicator={false}
                 >
                   <View style={styles.header}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityLabel="Back to Guru Dashboard"
                       onPress={() => router.push('/guru-dashboard')}
+                      scaleTo={0.88}
                       style={styles.headerIconButton}
                     >
                       <ChevronLeft
@@ -1511,7 +1510,7 @@ export default function GuruPricingScreen() {
                         size={20}
                         strokeWidth={2.4}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
                     <View style={styles.headerCopy}>
                       <Text style={styles.title}>Pricing & Availability</Text>
@@ -1527,7 +1526,7 @@ export default function GuruPricingScreen() {
                             themePreference === option.value;
 
                           return (
-                            <Pressable
+                            <BubblePressable
                               key={option.value}
                               accessibilityRole="button"
                               accessibilityState={{
@@ -1537,6 +1536,7 @@ export default function GuruPricingScreen() {
                               onPress={() =>
                                 setThemePreference(option.value)
                               }
+                              scaleTo={0.88}
                               style={[
                                 styles.modeButton,
                                 active &&
@@ -1555,15 +1555,16 @@ export default function GuruPricingScreen() {
                                 }
                                 strokeWidth={2.4}
                               />
-                            </Pressable>
+                            </BubblePressable>
                           );
                         })}
                       </View>
 
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         accessibilityLabel="Open Guru profile"
                         onPress={() => router.push('/guru-profile')}
+                        scaleTo={0.88}
                         style={styles.avatarButton}
                       >
                         <Avatar
@@ -1572,7 +1573,7 @@ export default function GuruPricingScreen() {
                           palette={palette}
                           size={40}
                         />
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   </View>
 
@@ -1624,7 +1625,7 @@ export default function GuruPricingScreen() {
                       const complete = step.step < currentStep;
 
                       return (
-                        <Pressable
+                        <BubblePressable
                           key={step.step}
                           accessibilityRole="button"
                           accessibilityState={{
@@ -1633,6 +1634,7 @@ export default function GuruPricingScreen() {
                           onPress={() =>
                             setCurrentStep(step.step)
                           }
+                          scaleTo={0.88}
                           style={[
                             styles.stepPill,
                             active && styles.stepPillActive,
@@ -1677,7 +1679,7 @@ export default function GuruPricingScreen() {
                           >
                             {step.shortTitle}
                           </Text>
-                        </Pressable>
+                        </BubblePressable>
                       );
                     })}
                   </ScrollView>
@@ -1690,7 +1692,7 @@ export default function GuruPricingScreen() {
                 </ScrollView>
 
                 <View style={styles.actionDock}>
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     onPress={goBack}
                     style={styles.secondaryDockButton}
@@ -1698,9 +1700,9 @@ export default function GuruPricingScreen() {
                     <Text style={styles.secondaryDockText}>
                       {currentStep === 1 ? 'Dashboard' : 'Previous'}
                     </Text>
-                  </Pressable>
+                  </BubblePressable>
 
-                  <Pressable
+                  <BubblePressable
                     accessibilityRole="button"
                     disabled={saving}
                     onPress={() => void goNext()}
@@ -1739,77 +1741,10 @@ export default function GuruPricingScreen() {
                         strokeWidth={2.4}
                       />
                     ) : null}
-                  </Pressable>
+                  </BubblePressable>
                 </View>
 
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    icon={
-                      <Home
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Dashboard"
-                    onPress={() => router.push('/guru-dashboard')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <MapPin
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Care Map"
-                    onPress={() => router.push('/guru-care-map')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    active
-                    icon={
-                      <CircleDollarSign
-                        color={palette.primary}
-                        size={21}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    label="Pricing"
-                    onPress={() => undefined}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <MessageCircle
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Messages"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/messages',
-                        params: { role: 'guru' },
-                      })
-                    }
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <UserRound
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Profile"
-                    onPress={() => router.push('/guru-profile')}
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar active="home" role="guru" />
               </View>
             </View>
 
@@ -1951,10 +1886,11 @@ function TogglePill({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       accessibilityState={{ checked: active }}
       onPress={onPress}
+      scaleTo={0.88}
       style={[
         styles.togglePill,
         active && styles.togglePillActive,
@@ -1974,7 +1910,7 @@ function TogglePill({
       >
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1994,10 +1930,11 @@ function SettingCard({
   title: string;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       accessibilityState={{ checked: active }}
       onPress={onPress}
+      scaleTo={0.97}
       style={[
         styles.settingCard,
         active && styles.settingCardActive,
@@ -2023,7 +1960,7 @@ function SettingCard({
           ]}
         />
       </View>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -2039,9 +1976,10 @@ function RuleButton({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
+      scaleTo={0.88}
       style={[
         styles.ruleButton,
         danger && styles.ruleButtonDanger,
@@ -2055,7 +1993,7 @@ function RuleButton({
       >
         {label}
       </Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -2176,36 +2114,6 @@ function Avatar({
         </Text>
       )}
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      {icon}
-      <Text
-        style={active ? styles.navLabelActive : styles.navLabel}
-      >
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -2362,17 +2270,12 @@ function normalizePricingPayload(record: RecordRow): PricingPayload {
       const rate = raw as RecordRow;
 
       normalizedRates[service.id] = {
-        baseRate:
-          firstString(rate, ['baseRate', 'base_rate']) ||
-          defaultRates[service.id].baseRate,
-        additionalPetRate:
-          firstString(rate, [
-            'additionalPetRate',
-            'additional_pet_rate',
-          ]) || defaultRates[service.id].additionalPetRate,
-        enabled:
-          firstBoolean(rate, ['enabled', 'is_enabled']) ||
-          defaultRates[service.id].enabled,
+        baseRate: firstString(rate, ['baseRate', 'base_rate']),
+        additionalPetRate: firstString(rate, [
+          'additionalPetRate',
+          'additional_pet_rate',
+        ]),
+        enabled: firstBoolean(rate, ['enabled', 'is_enabled']),
       };
     }
   }
@@ -2389,12 +2292,12 @@ function normalizePricingPayload(record: RecordRow): PricingPayload {
       firstString(record, [
         'weekendAdjustment',
         'weekend_adjustment',
-      ]) || '8',
+      ]),
     holidayAdjustment:
       firstString(record, [
         'holidayAdjustment',
         'holiday_adjustment',
-      ]) || '15',
+      ]),
     multiPetDiscountEnabled: firstBoolean(record, [
       'multiPetDiscountEnabled',
       'multi_pet_discount_enabled',
@@ -2848,7 +2751,7 @@ function createStyles(isDark: boolean) {
     },
     scrollContent: {
       gap: 13,
-      paddingBottom: 184,
+      paddingBottom: 80,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -3624,42 +3527,6 @@ function createStyles(isDark: boolean) {
       color: '#FFFFFF',
       fontFamily: AppFonts.extraBold,
       fontSize: 9,
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 68,
-      left: 9,
-      paddingBottom: 6,
-      paddingHorizontal: 5,
-      paddingTop: 6,
-      position: 'absolute',
-      right: 9,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: -7 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
     },
   });
 }

@@ -1,6 +1,5 @@
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
-import { router } from 'expo-router';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { Redirect, router } from 'expo-router';
 import {
   ArrowRight,
   CalendarCheck2,
@@ -16,12 +15,12 @@ import {
 import type { ComponentProps, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   ImageSourcePropType,
   Linking,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -29,8 +28,18 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SitGuruIcon } from '@/components/SitGuruIcon';
+import { StatusBar } from 'expo-status-bar';
+
+import BubblePressable from '@/components/BubblePressable';
+import HomeHeroMedia, {
+  HOME_HERO_VIDEO_LABELS,
+} from '@/components/HomeHeroMedia';
+import {
+  SitGuruIcon,
+  type SitGuruIconName,
+} from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { AppFonts } from '@/constants/fonts';
 import { BrandColors } from '@/constants/theme';
@@ -40,6 +49,8 @@ import {
   useThemePreference,
 } from '@/hooks/use-color-scheme';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
+import { useAuth } from '@/hooks/useAuth';
+import { roleDashboardPath } from '@/types/auth';
 
 type ThemeOption = {
   label: string;
@@ -69,24 +80,15 @@ type SocialLink = {
   url: string;
 };
 
-const heroCareVideoAsset = require(
-  '../assets/videos/sitguru-homepage-care.mp4'
-);
+const heroVideoAssets = [
+  require('../assets/videos/sitguru-homepage-hero.mp4'),
+  require('../assets/videos/sitguru-homepage-hero-2.mp4'),
+  require('../assets/videos/sitguru-homepage-hero-3-ambassadors.mp4'),
+] as const;
 
-const heroAppVideoAsset = require(
-  '../assets/videos/sitguru-homepage-app.mp4'
-);
-
-const heroCarePosterAsset = require(
-  '../assets/images/sitguru-homepage-care-poster.jpg'
+const heroVideoPosterAsset = require(
+  '../assets/images/sitguru-homepage-hero-poster.jpg'
 ) as ImageSourcePropType;
-
-const heroAppPosterAsset = require(
-  '../assets/images/sitguru-homepage-app-poster.jpg'
-) as ImageSourcePropType;
-
-const sitGuruLogoLight =
-  require('../assets/images/sitguru-logo-light.png') as ImageSourcePropType;
 
 const sitGuruLogoDark =
   require('../assets/images/sitguru-logo-dark.png') as ImageSourcePropType;
@@ -143,6 +145,19 @@ const serviceOptions = [
   'Custom Care',
 ];
 
+/* Visitors have no bookings or messages yet, so every destination here has to
+ * be something a signed-out person can actually use. */
+const navItems: {
+  icon: SitGuruIconName;
+  label: string;
+  href?: string;
+}[] = [
+  { icon: 'home', label: 'Home' },
+  { icon: 'explore', label: 'Explore', href: '/find-care' },
+  { icon: 'messages', label: 'Ask Rogue', href: '/ai-companion?id=rogue' },
+  { icon: 'profile', label: 'Log in', href: '/login' },
+];
+
 const services: ServiceCard[] = [
   {
     title: 'Walks',
@@ -166,8 +181,88 @@ const services: ServiceCard[] = [
   },
 ];
 
+/**
+ * `/` is the marketing hero for visitors and a router for signed-in users:
+ * everyone with a session belongs on their own role dashboard instead.
+ */
 export default function HomeScreen() {
-  const { width } = useWindowDimensions();
+  const { isAuthenticated, loading, primaryRole, profile, user } = useAuth();
+  const [expiredForUserId, setExpiredForUserId] = useState<string | null>(null);
+
+  const userId = user?.id ?? null;
+  const awaitingProfile = isAuthenticated && !profile;
+  const rolesTimedOut = Boolean(userId) && expiredForUserId === userId;
+
+  useEffect(() => {
+    if (!awaitingProfile || !userId) {
+      return;
+    }
+
+    /* A stalled profile query must never leave the user on a boot screen
+     * forever — fall through to the pet-parent dashboard instead. */
+    const timer = setTimeout(() => setExpiredForUserId(userId), 6000);
+    return () => clearTimeout(timer);
+  }, [awaitingProfile, userId]);
+
+  if (loading || (awaitingProfile && !rolesTimedOut)) {
+    return <HomeBootScreen />;
+  }
+
+  if (isAuthenticated) {
+    if (primaryRole) {
+      return <Redirect href={roleDashboardPath(primaryRole)} />;
+    }
+
+    return (
+      <Redirect href={rolesTimedOut ? '/pet-parent-dashboard' : '/role-selection'} />
+    );
+  }
+
+  return <MarketingHomeScreen />;
+}
+
+function HomeBootScreen() {
+  const isDark = useThemeMode() === 'dark';
+
+  return (
+    <View
+      style={[
+        bootStyles.screen,
+        { backgroundColor: isDark ? '#06140F' : '#FAF6EE' },
+      ]}
+    >
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <ActivityIndicator color={isDark ? '#58D58A' : '#1A4E37'} size="large" />
+      <Text
+        style={[
+          bootStyles.label,
+          { color: isDark ? '#AEB9B0' : '#79857B' },
+        ]}
+      >
+        Loading your SitGuru…
+      </Text>
+    </View>
+  );
+}
+
+const bootStyles = StyleSheet.create({
+  screen: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 14,
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  label: {
+    fontFamily: AppFonts.medium,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+});
+
+function MarketingHomeScreen() {
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const theme = useTheme();
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
@@ -177,50 +272,14 @@ export default function HomeScreen() {
   const isTablet = Platform.OS !== 'web' && width >= 768;
 
   const styles = createStyles(theme, isDark, isTablet);
-  const logoImage = isDark ? sitGuruLogoDark : sitGuruLogoLight;
+  const heroHeight = isWebPreview ? 780 : height;
 
   const [selectedService, setSelectedService] = useState('All services');
   const [zipCode, setZipCode] = useState('');
   const [serviceMenuOpen, setServiceMenuOpen] = useState(false);
-
-  const carePlayer = useVideoPlayer(heroCareVideoAsset, (player) => {
-    player.loop = true;
-    player.muted = true;
-    player.play();
-  });
-
-  const appPlayer = useVideoPlayer(heroAppVideoAsset, (player) => {
-    player.loop = true;
-    player.muted = true;
-    player.play();
-  });
-
-  useEffect(() => {
-    const startVideos = () => {
-      carePlayer.loop = true;
-      carePlayer.muted = true;
-      appPlayer.loop = true;
-      appPlayer.muted = true;
-
-      carePlayer.play();
-      appPlayer.play();
-    };
-
-    startVideos();
-
-    const retryTimer = setTimeout(startVideos, 500);
-
-    return () => {
-      clearTimeout(retryTimer);
-    };
-  }, [appPlayer, carePlayer]);
-
-  function resumeHeroVideos() {
-    carePlayer.muted = true;
-    appPlayer.muted = true;
-    carePlayer.play();
-    appPlayer.play();
-  }
+  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
+  const [heroTransitioning, setHeroTransitioning] = useState(false);
+  const [heroBehindStatusBar, setHeroBehindStatusBar] = useState(true);
 
   const roleCards = useMemo<RoleCard[]>(
     () => [
@@ -328,11 +387,16 @@ export default function HomeScreen() {
       scroll={false}
       center={isWebPreview || isTablet}
       maxWidth={isTablet ? 920 : 620}
+      edgeToEdge={!isWebPreview}
     >
+      {/* The hero video is dark in both themes, so the status bar has to stay
+        * light until it scrolls away. */}
+      <StatusBar style={heroBehindStatusBar || isDark ? 'light' : 'dark'} />
       <View
         style={[
           styles.previewCanvas,
           !isWebPreview && styles.previewCanvasNative,
+          !isWebPreview && { minHeight: heroHeight },
         ]}
       >
         <View
@@ -352,39 +416,51 @@ export default function HomeScreen() {
             <ScrollView
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled"
+              onScroll={(event) => {
+                const past =
+                  event.nativeEvent.contentOffset.y >
+                  heroHeight - insets.top - 24;
+
+                setHeroBehindStatusBar((current) =>
+                  current === !past ? current : !past,
+                );
+              }}
+              scrollEventThrottle={32}
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.scrollCanvas}>
-                <View
-                  pointerEvents="none"
-                  style={styles.backgroundPawLayer}
-                >
-                  {[
-                    { positionStyle: styles.backgroundPawOne, size: 46 },
-                    { positionStyle: styles.backgroundPawTwo, size: 29 },
-                    { positionStyle: styles.backgroundPawThree, size: 38 },
-                    { positionStyle: styles.backgroundPawFour, size: 25 },
-                    { positionStyle: styles.backgroundPawFive, size: 43 },
-                    { positionStyle: styles.backgroundPawSix, size: 30 },
-                    { positionStyle: styles.backgroundPawSeven, size: 36 },
-                    { positionStyle: styles.backgroundPawEight, size: 27 },
-                    { positionStyle: styles.backgroundPawNine, size: 35 },
-                  ].map(({ positionStyle, size }, index) => (
-                    <Image
-                      key={`background-paw-${index}`}
-                      resizeMode="contain"
-                      source={pawBackgroundAsset}
-                      style={[
-                        styles.backgroundPaw,
-                        positionStyle,
-                        {
-                          height: size,
-                          width: size,
-                        },
-                      ]}
-                    />
-                  ))}
-                </View>
+                {isWebPreview ? (
+                  <View
+                    pointerEvents="none"
+                    style={styles.backgroundPawLayer}
+                  >
+                    {[
+                      { positionStyle: styles.backgroundPawOne, size: 46 },
+                      { positionStyle: styles.backgroundPawTwo, size: 29 },
+                      { positionStyle: styles.backgroundPawThree, size: 38 },
+                      { positionStyle: styles.backgroundPawFour, size: 25 },
+                      { positionStyle: styles.backgroundPawFive, size: 43 },
+                      { positionStyle: styles.backgroundPawSix, size: 30 },
+                      { positionStyle: styles.backgroundPawSeven, size: 36 },
+                      { positionStyle: styles.backgroundPawEight, size: 27 },
+                      { positionStyle: styles.backgroundPawNine, size: 35 },
+                    ].map(({ positionStyle, size }, index) => (
+                      <Image
+                        key={`background-paw-${index}`}
+                        resizeMode="contain"
+                        source={pawBackgroundAsset}
+                        style={[
+                          styles.backgroundPaw,
+                          positionStyle,
+                          {
+                            height: size,
+                            width: size,
+                          },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                ) : null}
 
                 <View style={styles.contentLayer}>
           {isWebPreview ? (
@@ -410,183 +486,124 @@ export default function HomeScreen() {
             </View>
           ) : null}
 
-          <View style={styles.header}>
-            <Image
-              source={logoImage}
-              resizeMode="contain"
-              style={styles.logoImage}
+          <View style={[styles.heroViewport, { minHeight: heroHeight }]}>
+            <HomeHeroMedia
+              sources={[...heroVideoAssets]}
+              poster={heroVideoPosterAsset}
+              activeIndex={activeHeroIndex}
+              onActiveIndexChange={setActiveHeroIndex}
+              onTransitionChange={setHeroTransitioning}
+              topInset={isWebPreview ? 0 : insets.top}
+              bottomInset={isWebPreview ? 0 : insets.bottom}
             />
 
-            <View style={styles.modeToggle}>
-              {themeOptions.map((option) => {
-                const active = themePreference === option.value;
-
-                return (
-                  <Pressable
-                    key={option.value}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Switch to ${option.label} mode`}
-                    accessibilityState={{ selected: active }}
-                    onPress={() => setThemePreference(option.value)}
-                    style={[
-                      styles.modeButton,
-                      active && styles.modeButtonActive,
-                    ]}
-                  >
-                    <SitGuruIcon
-                      name={option.icon}
-                      size={17}
-                      color={
-                        active
-                          ? option.value === 'light'
-                            ? '#F3AA1F'
-                            : isDark
-                              ? '#F0CF62'
-                              : BrandColors.greenDark
-                          : styles.toggleInactive.color
-                      }
-                      strokeWidth={2.4}
-                    />
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.heroSection}>
-            <View style={styles.heroCopy}>
-              <Text style={styles.heroEyebrow}>LOCAL CARE • EASY BOOKING</Text>
-
-              <Text style={styles.heroTitle}>
-                Real care.{'\n'}Right from{' '}
-                <Text style={styles.heroTitleAccent}>your phone.</Text>
-              </Text>
-
-              <Text style={styles.heroSubtitle}>
-                Meet caring local Gurus who’ll treat your pet like family,
-                book with ease, and stay connected through every visit.
-              </Text>
-
-              <View style={styles.heroButtonRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => openFindCare()}
-                  style={({ pressed }) => [
-                    styles.heroPrimaryButton,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Text style={styles.heroPrimaryButtonText}>
-                  Find a Guru Near You
-                </Text>
-                  <ArrowRight color="#FFFFFF" size={18} strokeWidth={2.5} />
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => router.push('/login')}
-                  style={({ pressed }) => [
-                    styles.heroLoginButton,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Text style={styles.heroLoginButtonText}>Log in</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.heroMediaStage}>
-              <Pressable
-                accessibilityHint="Starts the homepage videos if autoplay is paused"
-                accessibilityLabel="Play SitGuru care videos"
-                accessibilityRole="button"
-                onPress={resumeHeroVideos}
-                style={styles.heroCareVideoCard}
-              >
+            <View
+              style={[
+                styles.heroOverlay,
+                {
+                  paddingTop: isWebPreview ? 10 : insets.top + 6,
+                  paddingBottom: isWebPreview
+                    ? 24
+                    : Math.max(insets.bottom, 18) + 64,
+                },
+              ]}
+            >
+              <View style={styles.header}>
                 <Image
-                  source={heroCarePosterAsset}
-                  resizeMode="cover"
-                  style={styles.heroPoster}
+                  source={sitGuruLogoDark}
+                  resizeMode="contain"
+                  style={styles.logoImage}
                 />
 
-                <VideoView
-                  contentFit="cover"
-                  nativeControls={false}
-                  player={carePlayer}
-                  playsInline
-                  pointerEvents="none"
-                  style={styles.heroVideo}
-                  surfaceType={
-                    Platform.OS === 'android' ? 'textureView' : undefined
-                  }
-                  useExoShutter={false}
-                />
+                <View style={styles.modeToggleOnVideo}>
+                  {themeOptions.map((option) => {
+                    const active = themePreference === option.value;
 
-                <View pointerEvents="none" style={styles.heroVideoShade} />
-
-                <View style={styles.heroVideoLabel}>
-                  <View style={styles.heroVideoLabelDot} />
-                  <Text style={styles.heroVideoLabelText}>Local Dog Walking</Text>
+                    return (
+                      <BubblePressable
+                        key={option.value}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Switch to ${option.label} mode`}
+                        accessibilityState={{ selected: active }}
+                        onPress={() => setThemePreference(option.value)}
+                        scaleTo={0.88}
+                        style={[
+                          styles.modeButtonOnVideo,
+                          active && styles.modeButtonOnVideoActive,
+                        ]}
+                      >
+                        <SitGuruIcon
+                          name={option.icon}
+                          size={17}
+                          color={
+                            active
+                              ? option.value === 'light'
+                                ? '#F3AA1F'
+                                : '#F0CF62'
+                              : 'rgba(255,255,255,0.72)'
+                          }
+                          strokeWidth={2.4}
+                        />
+                      </BubblePressable>
+                    );
+                  })}
                 </View>
+              </View>
 
-                <View style={styles.trustBadge}>
-                  <View style={styles.trustBadgeIcon}>
-                    <ShieldCheck
-                      color={styles.trustBadgeIconText.color}
-                      size={20}
-                      strokeWidth={2.4}
-                    />
-                  </View>
-
-                  <Text style={styles.trustBadgeText}>
-                    Trusted Local Pet Care{'\n'}Providers Near You
+              <View
+                style={[
+                  styles.heroCopyOnVideo,
+                  heroTransitioning && styles.heroCopyTransitioning,
+                ]}
+              >
+                <View style={styles.heroLabelPill}>
+                  <Text style={styles.heroLabelPillText}>
+                    {HOME_HERO_VIDEO_LABELS[activeHeroIndex]}
                   </Text>
                 </View>
-              </Pressable>
 
-              <Pressable
-                accessibilityHint="Starts the homepage videos if autoplay is paused"
-                accessibilityLabel="Play SitGuru app video"
-                accessibilityRole="button"
-                onPress={resumeHeroVideos}
-                style={styles.heroAppVideoCard}
-              >
-                <Image
-                  source={heroAppPosterAsset}
-                  resizeMode="cover"
-                  style={styles.heroPoster}
-                />
+                <Text style={styles.heroTitleOnVideo}>
+                  Find trusted pet care{'\n'}near you.
+                </Text>
 
-                <VideoView
-                  contentFit="cover"
-                  nativeControls={false}
-                  player={appPlayer}
-                  playsInline
-                  pointerEvents="none"
-                  style={styles.heroVideo}
-                  surfaceType={
-                    Platform.OS === 'android' ? 'textureView' : undefined
-                  }
-                  useExoShutter={false}
-                />
+                <Text style={styles.heroSubtitleOnVideo}>
+                  Book walks, drop-ins, sitting, boarding, and day care with
+                  local Pet Gurus.
+                </Text>
 
-                <View pointerEvents="none" style={styles.heroAppVideoShade} />
+                <View style={styles.heroButtonRow}>
+                  <BubblePressable
+                    accessibilityRole="button"
+                    onPress={() => openFindCare()}
+                    style={styles.heroPrimaryButton}
+                  >
+                    <Text style={styles.heroPrimaryButtonText}>
+                      Find a Guru Near You
+                    </Text>
+                    <ArrowRight color="#FFFFFF" size={18} strokeWidth={2.5} />
+                  </BubblePressable>
 
-                <View style={styles.heroAppLabel}>
-                  <Search color="#FFFFFF" size={13} strokeWidth={2.5} />
-                  <Text style={styles.heroAppLabelText}>Easily Book a Drop-in Visit</Text>
+                  <BubblePressable
+                    accessibilityRole="button"
+                    onPress={() => router.push('/login')}
+                    style={styles.heroLoginButtonOnVideo}
+                  >
+                    <Text style={styles.heroLoginButtonOnVideoText}>Log in</Text>
+                  </BubblePressable>
                 </View>
-              </Pressable>
+              </View>
             </View>
           </View>
 
+          <View style={styles.belowFold}>
           <View style={styles.searchCard}>
             <Text style={styles.searchLabel}>What service do you need?</Text>
 
-            <Pressable
+            <BubblePressable
               accessibilityRole="button"
               accessibilityState={{ expanded: serviceMenuOpen }}
               onPress={() => setServiceMenuOpen((current) => !current)}
+              scaleTo={0.97}
               style={styles.selectField}
             >
               <View style={styles.fieldIcon}>
@@ -604,7 +621,7 @@ export default function HomeScreen() {
                 size={19}
                 strokeWidth={2.35}
               />
-            </Pressable>
+            </BubblePressable>
 
             {serviceMenuOpen ? (
               <ScrollView
@@ -616,13 +633,14 @@ export default function HomeScreen() {
                   const selected = selectedService === service;
 
                   return (
-                    <Pressable
+                    <BubblePressable
                       key={service}
                       accessibilityRole="button"
                       onPress={() => {
                         setSelectedService(service);
                         setServiceMenuOpen(false);
                       }}
+                      scaleTo={0.88}
                       style={[
                         styles.serviceMenuItem,
                         index === serviceOptions.length - 1 &&
@@ -638,7 +656,7 @@ export default function HomeScreen() {
                       >
                         {service}
                       </Text>
-                    </Pressable>
+                    </BubblePressable>
                   );
                 })}
               </ScrollView>
@@ -674,29 +692,24 @@ export default function HomeScreen() {
                 </View>
               </View>
 
-              <Pressable
+              <BubblePressable
                 accessibilityRole="button"
                 onPress={() => openFindCare()}
-                style={({ pressed }) => [
-                  styles.searchButton,
-                  pressed && styles.pressed,
-                ]}
+                style={styles.searchButton}
               >
                 <Search color="#FFFFFF" size={19} strokeWidth={2.5} />
                 <Text style={styles.searchButtonText}>Search Gurus</Text>
-              </Pressable>
+              </BubblePressable>
             </View>
           </View>
 
-          <Pressable
+          <BubblePressable
             accessibilityHint="Opens PawReport Live"
             accessibilityLabel="Learn about PawReport Live"
             accessibilityRole="button"
             onPress={() => router.push('/pawreport-live' as never)}
-            style={({ pressed }) => [
-              styles.pawReportCard,
-              pressed && styles.pressed,
-            ]}
+            scaleTo={0.975}
+            style={styles.pawReportCard}
           >
             <View style={styles.pawReportIconWrap}>
               <PawPrint
@@ -729,20 +742,20 @@ export default function HomeScreen() {
               size={18}
               strokeWidth={2.5}
             />
-          </Pressable>
+          </BubblePressable>
 
           <View style={styles.roleGrid}>
             {roleCards.map((card) => (
-              <Pressable
+              <BubblePressable
                 key={card.title}
                 accessibilityRole="button"
                 onPress={() => openRole(card.action)}
-                style={({ pressed }) => [
+                scaleTo={0.955}
+                style={[
                   styles.roleCard,
                   card.tint === 'green' && styles.roleCardGreen,
                   card.tint === 'gold' && styles.roleCardGold,
                   card.tint === 'lavender' && styles.roleCardLavender,
-                  pressed && styles.pressed,
                 ]}
               >
                 {card.icon}
@@ -763,7 +776,7 @@ export default function HomeScreen() {
                     strokeWidth={2.5}
                   />
                 </View>
-              </Pressable>
+              </BubblePressable>
             ))}
           </View>
 
@@ -771,24 +784,22 @@ export default function HomeScreen() {
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Popular services</Text>
 
-              <Pressable
+              <BubblePressable
                 accessibilityRole="button"
                 onPress={() => openFindCare('All services')}
               >
                 <Text style={styles.viewAll}>View all</Text>
-              </Pressable>
+              </BubblePressable>
             </View>
 
             <View style={styles.servicesRow}>
               {services.map((service) => (
-                <Pressable
+                <BubblePressable
                   key={service.title}
                   accessibilityRole="button"
                   onPress={() => openFindCare(service.value)}
-                  style={({ pressed }) => [
-                    styles.serviceCard,
-                    pressed && styles.pressed,
-                  ]}
+                  scaleTo={0.93}
+                  style={styles.serviceCard}
                 >
                   <View style={styles.serviceIconBubble}>
                     {service.title === 'Walks' ? (
@@ -811,7 +822,7 @@ export default function HomeScreen() {
                   </View>
 
                   <Text style={styles.serviceText}>{service.title}</Text>
-                </Pressable>
+                </BubblePressable>
               ))}
             </View>
           </View>
@@ -871,97 +882,65 @@ export default function HomeScreen() {
 
             <View style={styles.socialIconRow}>
               {socialLinks.map((link) => (
-                <Pressable
+                <BubblePressable
                   key={link.label}
                   accessibilityHint={`Opens SitGuru on ${link.label}`}
                   accessibilityLabel={`Follow SitGuru on ${link.label}`}
                   accessibilityRole="link"
                   onPress={() => void openSocialProfile(link)}
-                  style={({ pressed }) => [
-                    styles.socialIconButton,
-                    pressed && styles.pressed,
-                  ]}>
+                  scaleTo={0.86}
+                  style={styles.socialIconButton}>
                   <FontAwesome6
                     color={styles.socialGlyph.color}
                     name={link.icon}
                     size={19}
                   />
-                </Pressable>
+                </BubblePressable>
               ))}
             </View>
           </View>
 
           <View style={styles.bottomSpacer} />
+          </View>
                 </View>
               </View>
         </ScrollView>
 
         <View style={styles.bottomNav}>
-          <Pressable accessibilityRole="button" style={styles.navItem}>
-            <SitGuruIcon
-              name="home"
-              size={22}
-              color={styles.navActive.color}
-              strokeWidth={2.6}
-            />
-            <Text style={styles.navLabelActive}>Home</Text>
-          </Pressable>
+          {navItems.map((item) => {
+            const active = item.icon === 'home';
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/find-care')}
-            style={styles.navItem}
-          >
-            <SitGuruIcon
-              name="explore"
-              size={22}
-              color={styles.navMuted.color}
-              strokeWidth={2.25}
-            />
-            <Text style={styles.navLabel}>Explore</Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/request-booking')}
-            style={styles.navItem}
-          >
-            <SitGuruIcon
-              name="bookings"
-              size={22}
-              color={styles.navMuted.color}
-              strokeWidth={2.25}
-            />
-            <Text style={styles.navLabel}>Bookings</Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/messages')}
-            style={styles.navItem}
-          >
-            <SitGuruIcon
-              name="messages"
-              size={22}
-              color={styles.navMuted.color}
-              strokeWidth={2.25}
-            />
-            <Text style={styles.navLabel}>Messages</Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/login')}
-            style={styles.navItem}
-          >
-            <SitGuruIcon
-              name="profile"
-              size={22}
-              color={styles.navMuted.color}
-              strokeWidth={2.25}
-            />
-            <Text style={styles.navLabel}>Profile</Text>
-          </Pressable>
+            return (
+              <BubblePressable
+                key={item.label}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
+                accessibilityState={{ selected: active }}
+                active={active}
+                bubble
+                bubbleColor={styles.navBubble.backgroundColor}
+                bubbleStyle={styles.navBubbleShape}
+                onPress={() => {
+                  if (item.href) {
+                    router.push(item.href as never);
+                  }
+                }}
+                style={styles.navItem}
+              >
+                <SitGuruIcon
+                  name={item.icon}
+                  size={22}
+                  color={
+                    active ? styles.navActive.color : styles.navMuted.color
+                  }
+                  strokeWidth={active ? 2.6 : 2.25}
+                />
+                <Text style={active ? styles.navLabelActive : styles.navLabel}>
+                  {item.label}
+                </Text>
+              </BubblePressable>
+            );
+          })}
             </View>
 
             {isWebPreview ? <View style={styles.homeIndicator} /> : null}
@@ -996,15 +975,17 @@ function createStyles(
 ) {
   const colors = 'colors' in theme ? theme.colors : theme;
 
-  const background = isDark ? '#06140F' : '#FFF9F2';
-  const shell = isDark ? '#081C14' : '#FFFBF7';
+  /* Light values follow the SitGuru design-system palette: Forest, Sage,
+   * Coral, Gold, Cream, Stone. */
+  const background = isDark ? '#06140F' : '#FAF6EE';
+  const shell = isDark ? '#081C14' : '#FFFDFA';
   const surface = isDark ? '#0B2118' : '#FFFFFF';
-  const surfaceSoft = isDark ? '#102D21' : '#FFF8EF';
-  const border = isDark ? '#244A39' : '#E9DDCD';
-  const title = isDark ? '#FFF4E2' : '#102C41';
-  const body = isDark ? '#D8E1DB' : '#334153';
-  const muted = isDark ? '#AEB9B0' : '#6C756E';
-  const primary = colors.primary ?? BrandColors.green;
+  const surfaceSoft = isDark ? '#102D21' : '#FAF2E5';
+  const border = isDark ? '#244A39' : '#E5DFD4';
+  const title = isDark ? '#FFF4E2' : '#14291F';
+  const body = isDark ? '#D8E1DB' : '#465349';
+  const muted = isDark ? '#AEB9B0' : '#79857B';
+  const accent = isDark ? '#58D58A' : '#1A4E37';
   const textSecondary = colors.textSecondary ?? muted;
 
   return StyleSheet.create({
@@ -1072,13 +1053,13 @@ function createStyles(
       color: textSecondary,
     },
     navActive: {
-      color: isDark ? '#58D58A' : primary,
+      color: accent,
     },
     navMuted: {
       color: textSecondary,
     },
     fieldIconText: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
     },
     fieldChevron: {
       color: muted,
@@ -1105,13 +1086,13 @@ function createStyles(
       color: isDark ? '#C8B6FF' : '#4F3D85',
     },
     serviceIconText: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
     },
     trustBadgeIconText: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
     },
     trustStripIconText: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
     },
 
     phoneShell: {
@@ -1201,8 +1182,10 @@ function createStyles(
     },
     scrollContent: {
       paddingBottom: 104,
-      paddingHorizontal: isTablet ? 24 : 0,
-      paddingTop: Platform.OS === 'web' ? 12 : 6,
+      /* Any inset here exposes the app background as a seam along the
+       * full-bleed hero, so native gets none. */
+      paddingHorizontal: Platform.OS === 'web' && isTablet ? 24 : 0,
+      paddingTop: Platform.OS === 'web' ? 12 : 0,
     },
 
     statusBar: {
@@ -1300,12 +1283,113 @@ function createStyles(
       gap: 16,
       paddingBottom: 2,
     },
+    heroViewport: {
+      backgroundColor: '#020807',
+      overflow: 'hidden',
+      position: 'relative',
+      width: '100%',
+    },
+    heroOverlay: {
+      bottom: 0,
+      justifyContent: 'space-between',
+      left: 0,
+      paddingHorizontal: isTablet ? 28 : 20,
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      zIndex: 2,
+    },
+    heroCopyOnVideo: {
+      maxWidth: isTablet ? 640 : 420,
+      paddingBottom: 8,
+      paddingTop: 18,
+    },
+    heroCopyTransitioning: {
+      opacity: 0.55,
+    },
+    heroLabelPill: {
+      alignSelf: 'flex-start',
+      backgroundColor: 'rgba(255,255,255,0.92)',
+      borderColor: 'rgba(255,255,255,0.3)',
+      borderRadius: 999,
+      borderWidth: 1,
+      marginBottom: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+    },
+    heroLabelPillText: {
+      color: BrandColors.greenDark,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 10,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+    },
+    heroTitleOnVideo: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: isTablet ? 46 : 38,
+      letterSpacing: -1.4,
+      lineHeight: isTablet ? 50 : 42,
+      textShadowColor: 'rgba(0,0,0,0.55)',
+      textShadowOffset: { width: 0, height: 3 },
+      textShadowRadius: 12,
+    },
+    heroSubtitleOnVideo: {
+      color: 'rgba(255,255,255,0.92)',
+      fontFamily: AppFonts.medium,
+      fontSize: isTablet ? 17 : 15,
+      lineHeight: isTablet ? 25 : 22,
+      marginTop: 14,
+      maxWidth: isTablet ? 560 : 360,
+      textShadowColor: 'rgba(0,0,0,0.35)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 6,
+    },
+    heroLoginButtonOnVideo: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.14)',
+      borderColor: 'rgba(255,255,255,0.42)',
+      borderRadius: 13,
+      borderWidth: 1,
+      flex: isTablet ? 1 : undefined,
+      justifyContent: 'center',
+      minHeight: 52,
+      paddingHorizontal: 18,
+    },
+    heroLoginButtonOnVideoText: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.bold,
+      fontSize: 15,
+    },
+    modeToggleOnVideo: {
+      backgroundColor: 'rgba(0,0,0,0.28)',
+      borderColor: 'rgba(255,255,255,0.22)',
+      borderRadius: 999,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 4,
+      padding: 4,
+    },
+    modeButtonOnVideo: {
+      alignItems: 'center',
+      borderRadius: 999,
+      height: 34,
+      justifyContent: 'center',
+      width: 34,
+    },
+    modeButtonOnVideoActive: {
+      backgroundColor: 'rgba(226,170,45,0.22)',
+    },
+    belowFold: {
+      backgroundColor: background,
+      paddingTop: 8,
+    },
     heroCopy: {
       paddingHorizontal: 22,
       paddingTop: 8,
     },
     heroEyebrow: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
       fontFamily: AppFonts.extraBold,
       fontSize: 8,
       letterSpacing: 1.1,
@@ -1319,7 +1403,7 @@ function createStyles(
       lineHeight: isTablet ? 50 : 42,
     },
     heroTitleAccent: {
-      color: isDark ? '#58D58A' : '#0A9B62',
+      color: accent,
     },
     heroSubtitle: {
       color: body,
@@ -1336,7 +1420,7 @@ function createStyles(
     },
     heroPrimaryButton: {
       alignItems: 'center',
-      backgroundColor: isDark ? '#159A61' : '#0A9B62',
+      backgroundColor: isDark ? '#159A61' : '#1A5C40',
       borderRadius: 13,
       flex: isTablet ? 1 : undefined,
       flexDirection: 'row',
@@ -1370,7 +1454,7 @@ function createStyles(
       shadowRadius: 10,
     },
     heroLoginButtonText: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
       fontFamily: AppFonts.bold,
       fontSize: 15,
     },
@@ -1597,7 +1681,7 @@ function createStyles(
       fontSize: 13,
     },
     serviceMenuTextSelected: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
       fontFamily: AppFonts.bold,
     },
     searchBottomRow: {
@@ -1630,7 +1714,7 @@ function createStyles(
     },
     searchButton: {
       alignItems: 'center',
-      backgroundColor: isDark ? '#159A61' : '#0A9B62',
+      backgroundColor: isDark ? '#159A61' : '#1A5C40',
       borderRadius: 13,
       flexDirection: 'row',
       gap: 8,
@@ -1674,7 +1758,7 @@ function createStyles(
       width: 44,
     },
     pawReportIconText: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
     },
     pawReportLiveDot: {
       backgroundColor: '#39D982',
@@ -1702,7 +1786,7 @@ function createStyles(
       paddingVertical: 4,
     },
     pawReportBadgeText: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
       fontFamily: AppFonts.extraBold,
       fontSize: 7,
       letterSpacing: 0.7,
@@ -1721,7 +1805,7 @@ function createStyles(
       lineHeight: 13,
     },
     pawReportArrow: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
     },
 
     roleGrid: {
@@ -1825,7 +1909,7 @@ function createStyles(
       fontSize: 17,
     },
     viewAll: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
       fontFamily: AppFonts.bold,
       fontSize: 12,
     },
@@ -1906,7 +1990,7 @@ function createStyles(
     },
 
     socialGlyph: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
     },
     socialSection: {
       gap: 10,
@@ -1934,7 +2018,7 @@ function createStyles(
       gap: 4,
     },
     socialHandle: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
       fontFamily: AppFonts.extraBold,
       fontSize: 8,
     },
@@ -1944,7 +2028,7 @@ function createStyles(
       fontSize: 8,
     },
     socialHashtag: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
       fontFamily: AppFonts.extraBold,
       fontSize: 8,
     },
@@ -2009,8 +2093,20 @@ function createStyles(
       gap: 4,
       justifyContent: 'center',
     },
+    navBubble: {
+      backgroundColor: isDark
+        ? 'rgba(88,213,138,0.16)'
+        : 'rgba(13,92,58,0.10)',
+    },
+    navBubbleShape: {
+      borderRadius: 18,
+      bottom: 8,
+      left: 10,
+      right: 10,
+      top: 8,
+    },
     navLabelActive: {
-      color: isDark ? '#58D58A' : BrandColors.greenDark,
+      color: accent,
       fontFamily: AppFonts.bold,
       fontSize: 11,
     },

@@ -1,6 +1,5 @@
 import { Heart, Star } from 'lucide-react-native';
 import {
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -8,6 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import FocusTextInput from '@/components/mobile/FocusTextInput';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
@@ -51,7 +51,7 @@ export default function VisitReviewControls({
           const active = star <= rating;
 
           return (
-            <Pressable
+            <BubblePressable
               key={star}
               accessibilityLabel={`${star} star rating`}
               accessibilityRole="button"
@@ -59,9 +59,9 @@ export default function VisitReviewControls({
               disabled={disabled}
               hitSlop={8}
               onPress={() => onRatingChange(star)}
-              style={({ pressed }) => [
+              scaleTo={0.88}
+              style={[
                 styles.starButton,
-                pressed && !disabled ? styles.pressed : null,
                 disabled ? styles.disabledControl : null,
               ]}
             >
@@ -71,7 +71,7 @@ export default function VisitReviewControls({
                 size={40}
                 strokeWidth={2}
               />
-            </Pressable>
+            </BubblePressable>
           );
         })}
       </View>
@@ -86,16 +86,16 @@ export default function VisitReviewControls({
           const active = selectedPraise.includes(tag);
 
           return (
-            <Pressable
+            <BubblePressable
               key={tag}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               disabled={disabled}
               onPress={() => onTogglePraise(tag)}
-              style={({ pressed }) => [
+              scaleTo={0.88}
+              style={[
                 styles.praiseChip,
                 active ? styles.praiseChipActive : null,
-                pressed && !disabled ? styles.pressed : null,
                 disabled ? styles.disabledControl : null,
               ]}
             >
@@ -113,7 +113,7 @@ export default function VisitReviewControls({
               >
                 {tag}
               </Text>
-            </Pressable>
+            </BubblePressable>
           );
         })}
       </View>
@@ -157,10 +157,6 @@ const styles = StyleSheet.create({
     height: TOUCH_MIN,
     justifyContent: 'center',
     minWidth: TOUCH_MIN,
-  },
-  pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.97 }],
   },
   disabledControl: {
     opacity: 0.55,

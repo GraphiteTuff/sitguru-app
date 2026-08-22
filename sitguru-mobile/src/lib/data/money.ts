@@ -11,11 +11,11 @@ const usdFormatter = new Intl.NumberFormat('en-US', {
 
 /** Always `$120.00` style — never drops cents for whole dollars. */
 export function formatUsd(amountDollars: number | null | undefined) {
-  const value =
-    typeof amountDollars === 'number' && Number.isFinite(amountDollars)
-      ? amountDollars
-      : 0;
-  return usdFormatter.format(value);
+  if (typeof amountDollars !== 'number' || !Number.isFinite(amountDollars)) {
+    return 'Not set';
+  }
+
+  return usdFormatter.format(amountDollars);
 }
 
 /** Convert cents → dollars safely. */

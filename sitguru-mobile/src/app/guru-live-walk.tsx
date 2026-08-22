@@ -1,19 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-  CalendarDays,
   Camera,
   CheckCircle2,
   ChevronLeft,
   Clock3,
   Droplets,
   Footprints,
-  Home,
   MessageCircle,
   Pause,
   PawPrint,
   Play,
   Square,
-  UserRound,
   Utensils
 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
@@ -21,7 +18,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -29,6 +25,7 @@ import {
   View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
 import CareQuickActions from '@/components/mobile/CareQuickActions';
 import CachedRemoteImage from '@/components/mobile/CachedRemoteImage';
 import LiveRouteHeader from '@/components/mobile/LiveRouteHeader';
@@ -37,6 +34,7 @@ import { GuruHeaderActions } from '@/components/GuruHeaderActions';
 import RoleGate from '@/components/RoleGate';
 import SitGuruButton from '@/components/SitGuruButton';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
 import { useWalkLocationStream } from '@/hooks/useWalkLocationStream';
 import { useThemeMode } from '@/hooks/use-theme';
@@ -604,10 +602,11 @@ export default function GuruLiveWalkScreen() {
                   showsVerticalScrollIndicator={false}
                 >
                   <View style={styles.header}>
-                    <Pressable
+                    <BubblePressable
                       accessibilityRole="button"
                       accessibilityLabel="Back to Bookings"
                       onPress={() => router.push('/guru-requests')}
+                      scaleTo={0.88}
                       style={styles.headerIconButton}
                     >
                       <ChevronLeft
@@ -615,7 +614,7 @@ export default function GuruLiveWalkScreen() {
                         size={20}
                         strokeWidth={2.4}
                       />
-                    </Pressable>
+                    </BubblePressable>
 
                     <View style={styles.headerCopy}>
                       <Text style={styles.title}>PawReport Live</Text>
@@ -734,7 +733,7 @@ export default function GuruLiveWalkScreen() {
                         </Text>
 
                         {status === 'not_started' ? (
-                          <Pressable
+                          <BubblePressable
                             accessibilityRole="button"
                             disabled={saving}
                             onPress={() => void startCare()}
@@ -748,11 +747,16 @@ export default function GuruLiveWalkScreen() {
                             <Text style={styles.startButtonText}>
                               {saving ? 'Starting...' : 'Start Care'}
                             </Text>
-                          </Pressable>
+                          </BubblePressable>
                         ) : status === 'completed' ? (
-                          <Pressable
+                          <BubblePressable
                             accessibilityRole="button"
-                            onPress={() => router.push('/booking-details')}
+                            onPress={() =>
+                              router.push({
+                                pathname: '/booking-details',
+                                params: { bookingId: booking.id },
+                              })
+                            }
                             style={styles.completedButton}
                           >
                             <CheckCircle2
@@ -763,10 +767,10 @@ export default function GuruLiveWalkScreen() {
                             <Text style={styles.completedButtonText}>
                               Review Final PawReport
                             </Text>
-                          </Pressable>
+                          </BubblePressable>
                         ) : (
                           <View style={styles.controlRow}>
-                            <Pressable
+                            <BubblePressable
                               accessibilityRole="button"
                               disabled={saving}
                               onPress={() =>
@@ -792,9 +796,9 @@ export default function GuruLiveWalkScreen() {
                               <Text style={styles.pauseButtonText}>
                                 {status === 'paused' ? 'Resume' : 'Pause'}
                               </Text>
-                            </Pressable>
+                            </BubblePressable>
 
-                            <Pressable
+                            <BubblePressable
                               accessibilityRole="button"
                               disabled={saving}
                               onPress={() => void changeStatus('completed')}
@@ -808,7 +812,7 @@ export default function GuruLiveWalkScreen() {
                               <Text style={styles.endButtonText}>
                                 Complete Care
                               </Text>
-                            </Pressable>
+                            </BubblePressable>
                           </View>
                         )}
                       </View>
@@ -912,7 +916,7 @@ export default function GuruLiveWalkScreen() {
                             'No special care instructions were included with this booking.'}
                         </Text>
 
-                        <Pressable
+                        <BubblePressable
                           accessibilityRole="button"
                           onPress={() =>
                             router.push({
@@ -930,7 +934,7 @@ export default function GuruLiveWalkScreen() {
                           <Text style={styles.messageButtonText}>
                             Message Pet Parent
                           </Text>
-                        </Pressable>
+                        </BubblePressable>
                       </View>
                     </>
                   ) : (
@@ -949,7 +953,7 @@ export default function GuruLiveWalkScreen() {
                         Open an accepted booking to prepare or start PawReport
                         Live.
                       </Text>
-                      <Pressable
+                      <BubblePressable
                         accessibilityRole="button"
                         onPress={() => router.push('/guru-requests')}
                         style={styles.startButton}
@@ -957,7 +961,7 @@ export default function GuruLiveWalkScreen() {
                         <Text style={styles.startButtonText}>
                           Open Bookings
                         </Text>
-                      </Pressable>
+                      </BubblePressable>
                     </View>
                   )}
                 </ScrollView>
@@ -977,74 +981,7 @@ export default function GuruLiveWalkScreen() {
                   </StickyActionBar>
                 ) : null}
 
-                <View style={styles.bottomNav}>
-                  <BottomNavItem
-                    icon={
-                      <Home
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Dashboard"
-                    onPress={() => router.push('/guru-dashboard')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <CalendarDays
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Bookings"
-                    onPress={() => router.push('/guru-requests')}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    active
-                    icon={
-                      <PawPrint
-                        color={palette.primary}
-                        size={21}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    label="PawReport"
-                    onPress={() => undefined}
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <MessageCircle
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Messages"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/messages',
-                        params: { role: 'guru' },
-                      })
-                    }
-                    styles={styles}
-                  />
-                  <BottomNavItem
-                    icon={
-                      <UserRound
-                        color={palette.navMuted}
-                        size={21}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Profile"
-                    onPress={() => router.push('/guru-profile')}
-                    styles={styles}
-                  />
-                </View>
+                <SitGuruTabBar active="careMap" role="guru" />
               </View>
             </View>
 
@@ -1085,14 +1022,14 @@ function QuickUpdate({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable
+    <BubblePressable
       accessibilityRole="button"
       onPress={onPress}
       style={styles.quickButton}
     >
       <View style={styles.quickIcon}>{icon}</View>
       <Text style={styles.quickLabel}>{label}</Text>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1164,34 +1101,6 @@ function UpdateRow({
 
       <Text style={styles.updateTime}>{formatTime(update.createdAt)}</Text>
     </View>
-  );
-}
-
-function BottomNavItem({
-  active = false,
-  icon,
-  label,
-  onPress,
-  styles,
-}: {
-  active?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={styles.navItem}
-    >
-      {icon}
-      <Text style={active ? styles.navLabelActive : styles.navLabel}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -1858,7 +1767,7 @@ function createStyles(isDark: boolean) {
     },
     scrollContent: {
       gap: 13,
-      paddingBottom: 110,
+      paddingBottom: 16,
       paddingHorizontal: 16,
       paddingTop: 10,
     },
@@ -2394,42 +2303,6 @@ function createStyles(isDark: boolean) {
       fontSize: 9,
       lineHeight: 14,
       textAlign: 'center',
-    },
-    bottomNav: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 23,
-      borderWidth: 1,
-      bottom: 8,
-      flexDirection: 'row',
-      height: 72,
-      left: 9,
-      paddingBottom: 7,
-      paddingHorizontal: 5,
-      paddingTop: 7,
-      position: 'absolute',
-      right: 9,
-      shadowColor: palette.shadow,
-      shadowOffset: { width: 0, height: -7 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 15,
-    },
-    navItem: {
-      alignItems: 'center',
-      flex: 1,
-      gap: 3,
-      justifyContent: 'center',
-    },
-    navLabelActive: {
-      color: palette.primary,
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    navLabel: {
-      color: palette.navMuted,
-      fontFamily: AppFonts.medium,
-      fontSize: 8,
     },
   });
 }

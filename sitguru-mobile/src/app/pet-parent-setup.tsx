@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-    Pressable,
     StyleSheet,
     Text,
     TextInput,
@@ -9,9 +8,19 @@ import {
     View,
 } from 'react-native';
 
+import BubblePressable from '@/components/BubblePressable';
+import SaveFeedbackBanner, {
+    useSaveFeedback,
+} from '@/components/SaveFeedbackBanner';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import { SitGuruColors } from '@/constants/colors';
+import {
+    usePetParentSetup,
+    type PetParentPetDraft,
+    type PetParentSetupDraft,
+} from '@/hooks/data/useRoleSetup';
+import { useThemeMode } from '@/hooks/use-theme';
 
 type StepNumber = 1 | 2 | 3 | 4 | 5 | 6;
 type PetType = 'Dog' | 'Cat' | 'Other';
@@ -186,18 +195,93 @@ function extractZipCode(value: string) {
 export default function PetParentSetupScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
+  const isDark = useThemeMode() === 'dark';
+  const { loading, saving, load, save } = usePetParentSetup();
+  const {
+    feedback,
+    showSaved,
+    showError,
+    dismissFeedback,
+  } = useSaveFeedback();
 
   const [currentStep, setCurrentStep] = useState<StepNumber>(1);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [streetAddress, setStreetAddress] = useState('');
   const [city, setCity] = useState('');
   const [stateValue, setStateValue] = useState('');
   const [zipCode, setZipCode] = useState('');
+  const [locationNotes, setLocationNotes] = useState('');
   const [locationMessage, setLocationMessage] = useState('');
 
   const [pets, setPets] = useState<PetForm[]>([createPet(1)]);
   const [activePetIndex, setActivePetIndex] = useState(0);
   const [breedDropdownOpen, setBreedDropdownOpen] = useState(false);
   const [ageDropdownOpen, setAgeDropdownOpen] = useState(false);
+  const [feedingRoutine, setFeedingRoutine] = useState('');
+  const [walkRoutine, setWalkRoutine] = useState('');
+  const [medicationNotes, setMedicationNotes] = useState('');
+  const [behaviorNotes, setBehaviorNotes] = useState('');
+  const [emergencyName, setEmergencyName] = useState('');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
+  const [emergencyRelationship, setEmergencyRelationship] = useState('');
+  const [veterinarian, setVeterinarian] = useState('');
+  const [emergencyNotes, setEmergencyNotes] = useState('');
+  const [notifyMessages, setNotifyMessages] = useState(true);
+  const [notifyBookings, setNotifyBookings] = useState(true);
+  const [notifyPawReport, setNotifyPawReport] = useState(true);
+  const [notifyPawPerks, setNotifyPawPerks] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  const applyDraft = useCallback((draft: PetParentSetupDraft, step: number) => {
+    setFirstName(draft.firstName);
+    setLastName(draft.lastName);
+    setEmail(draft.email);
+    setPhone(draft.phone);
+    setStreetAddress(draft.streetAddress);
+    setCity(draft.city);
+    setStateValue(draft.state);
+    setZipCode(draft.zipCode);
+    setLocationNotes(draft.locationNotes);
+    setPets(
+      draft.pets.length
+        ? draft.pets.map(petFromDraft)
+        : [createPet(1)],
+    );
+    setFeedingRoutine(draft.feedingRoutine);
+    setWalkRoutine(draft.walkRoutine);
+    setMedicationNotes(draft.medicationNotes);
+    setBehaviorNotes(draft.behaviorNotes);
+    setEmergencyName(draft.emergencyName);
+    setEmergencyPhone(draft.emergencyPhone);
+    setEmergencyRelationship(draft.emergencyRelationship);
+    setVeterinarian(draft.veterinarian);
+    setEmergencyNotes(draft.emergencyNotes);
+    setNotifyMessages(draft.notifyMessages);
+    setNotifyBookings(draft.notifyBookings);
+    setNotifyPawReport(draft.notifyPawReport);
+    setNotifyPawPerks(draft.notifyPawPerks);
+    setCurrentStep(clampPetParentStep(step));
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    void load().then((result) => {
+      if (!active) return;
+      applyDraft(result.draft, result.step);
+      setLoadError(result.error ?? '');
+      if (result.error) {
+        showError('Unable to load Pet Parent setup', result.error);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [applyDraft, load, showError]);
 
   const activeStep =
     setupSteps.find((step) => step.step === currentStep) || setupSteps[0];
@@ -272,6 +356,55 @@ export default function PetParentSetupScreen() {
     setAgeDropdownOpen(false);
   }
 
+  function buildDraft(): PetParentSetupDraft {
+    return {
+      firstName,
+      lastName,
+      email,
+      phone,
+      streetAddress,
+      city,
+      state: stateValue,
+      zipCode,
+      locationNotes,
+      pets,
+      feedingRoutine,
+      walkRoutine,
+      medicationNotes,
+      behaviorNotes,
+      emergencyName,
+      emergencyPhone,
+      emergencyRelationship,
+      veterinarian,
+      emergencyNotes,
+      notifyMessages,
+      notifyBookings,
+      notifyPawReport,
+      notifyPawPerks,
+    };
+  }
+
+  async function persistAndAdvance(nextStep: StepNumber, complete = false) {
+    const result = await save(buildDraft(), nextStep, { complete });
+
+    if (!result.persisted) {
+      showError(
+        'Pet Parent setup was not saved',
+        result.error || 'Your changes were not stored. Please try again.',
+      );
+      return false;
+    }
+
+    if (complete) {
+      showSaved(
+        'Pet Parent setup saved',
+        'Your profile, location, pets, care notes, and emergency details were saved to your account.',
+      );
+    }
+
+    return true;
+  }
+
   function goBack() {
     if (currentStep === 1) {
       router.push('/role-selection');
@@ -281,16 +414,37 @@ export default function PetParentSetupScreen() {
     setCurrentStep((currentStep - 1) as StepNumber);
   }
 
-  function goNext() {
+  async function goNext() {
+    if (saving || loading) return;
+
     if (currentStep < 6) {
-      setCurrentStep((currentStep + 1) as StepNumber);
+      const nextStep = (currentStep + 1) as StepNumber;
+      const saved = await persistAndAdvance(nextStep);
+      if (!saved) return;
+      setCurrentStep(nextStep);
       return;
     }
 
+    const saved = await persistAndAdvance(6, true);
+    if (!saved) return;
     router.push('/find-care');
   }
 
-  function goToDashboard() {
+  async function goToStep(step: StepNumber) {
+    if (step === currentStep || saving || loading) return;
+
+    if (step > currentStep) {
+      const saved = await persistAndAdvance(step);
+      if (!saved) return;
+    }
+
+    setCurrentStep(step);
+  }
+
+  async function goToDashboard() {
+    if (saving || loading) return;
+    const saved = await persistAndAdvance(currentStep, currentStep === 6);
+    if (!saved) return;
     router.push('/pet-parent-dashboard');
   }
 
@@ -311,17 +465,31 @@ export default function PetParentSetupScreen() {
           </View>
 
           <View style={[styles.formGrid, isWide && styles.formGridWide]}>
-            <Field label="First name" placeholder="Alex" />
-            <Field label="Last name" placeholder="Peterson" />
             <Field
-              label="Email address"
-              placeholder="alex@example.com"
-              keyboardType="email-address"
+              label="First name"
+              onChangeText={setFirstName}
+              placeholder="Alex"
+              value={firstName}
             />
             <Field
-              label="Phone number"
-              placeholder="555-555-5555"
+              label="Last name"
+              onChangeText={setLastName}
+              placeholder="Peterson"
+              value={lastName}
+            />
+            <Field
+              keyboardType="email-address"
+              label="Email address"
+              onChangeText={setEmail}
+              placeholder="alex@example.com"
+              value={email}
+            />
+            <Field
               keyboardType="phone-pad"
+              label="Phone number"
+              onChangeText={setPhone}
+              placeholder="555-555-5555"
+              value={phone}
             />
           </View>
         </View>
@@ -379,8 +547,10 @@ export default function PetParentSetupScreen() {
 
             <Field
               label="Care location notes"
-              placeholder="Gate code, parking, apartment entry, or helpful arrival notes"
               multiline
+              onChangeText={setLocationNotes}
+              placeholder="Gate code, parking, apartment entry, or helpful arrival notes"
+              value={locationNotes}
             />
           </View>
         </View>
@@ -398,13 +568,14 @@ export default function PetParentSetupScreen() {
               <Text style={styles.petTabsTitle}>Add one or more pets.</Text>
             </View>
 
-            <Pressable
+            <BubblePressable
               accessibilityRole="button"
               onPress={addPet}
+              scaleTo={0.88}
               style={styles.addPetButton}
             >
               <Text style={styles.addPetButtonText}>+ Add Pet</Text>
-            </Pressable>
+            </BubblePressable>
           </View>
 
           <View style={styles.petTabs}>
@@ -413,7 +584,7 @@ export default function PetParentSetupScreen() {
               const petLabel = pet.name.trim() || `Pet ${index + 1}`;
 
               return (
-                <Pressable
+                <BubblePressable
                   key={pet.id}
                   accessibilityRole="button"
                   onPress={() => {
@@ -421,6 +592,7 @@ export default function PetParentSetupScreen() {
                     setBreedDropdownOpen(false);
                     setAgeDropdownOpen(false);
                   }}
+                  scaleTo={0.88}
                   style={[styles.petTab, active && styles.petTabActive]}
                 >
                   <Text style={styles.petTabIcon}>
@@ -429,7 +601,7 @@ export default function PetParentSetupScreen() {
                   <Text style={[styles.petTabText, active && styles.petTabTextActive]}>
                     {petLabel}
                   </Text>
-                </Pressable>
+                </BubblePressable>
               );
             })}
           </View>
@@ -464,7 +636,7 @@ export default function PetParentSetupScreen() {
                 const selected = activePet.type === type;
 
                 return (
-                  <Pressable
+                  <BubblePressable
                     key={type}
                     accessibilityRole="button"
                     onPress={() => {
@@ -479,7 +651,7 @@ export default function PetParentSetupScreen() {
                     <Text style={[styles.petTypeText, selected && styles.petTypeTextActive]}>
                       {type}
                     </Text>
-                  </Pressable>
+                  </BubblePressable>
                 );
               })}
             </View>
@@ -524,10 +696,11 @@ export default function PetParentSetupScreen() {
                   const selected = activePet.size === size;
 
                   return (
-                    <Pressable
+                    <BubblePressable
                       key={size}
                       accessibilityRole="button"
                       onPress={() => updatePet(activePet.id, { size })}
+                      scaleTo={0.88}
                       style={[styles.sizeButton, selected && styles.sizeButtonActive]}
                     >
                       <Text
@@ -538,7 +711,7 @@ export default function PetParentSetupScreen() {
                       >
                         {size}
                       </Text>
-                    </Pressable>
+                    </BubblePressable>
                   );
                 })}
               </View>
@@ -553,13 +726,13 @@ export default function PetParentSetupScreen() {
             />
 
             {pets.length > 1 ? (
-              <Pressable
+              <BubblePressable
                 accessibilityRole="button"
                 onPress={removeActivePet}
                 style={styles.removePetButton}
               >
                 <Text style={styles.removePetButtonText}>Remove this pet</Text>
-              </Pressable>
+              </BubblePressable>
             ) : null}
           </View>
         </View>
@@ -572,26 +745,34 @@ export default function PetParentSetupScreen() {
           <View style={styles.formGrid}>
             <Field
               label="Feeding routine"
-              placeholder="Meal times, food amount, treats, water needs, or feeding instructions"
               multiline
+              onChangeText={setFeedingRoutine}
+              placeholder="Meal times, food amount, treats, water needs, or feeding instructions"
+              value={feedingRoutine}
             />
 
             <Field
               label="Walk and potty routine"
-              placeholder="Typical walk times, leash notes, potty habits, or yard instructions"
               multiline
+              onChangeText={setWalkRoutine}
+              placeholder="Typical walk times, leash notes, potty habits, or yard instructions"
+              value={walkRoutine}
             />
 
             <Field
               label="Medication or allergies"
-              placeholder="Medication, allergies, restrictions, or health notes"
               multiline
+              onChangeText={setMedicationNotes}
+              placeholder="Medication, allergies, restrictions, or health notes"
+              value={medicationNotes}
             />
 
             <Field
               label="Behavior and comfort notes"
-              placeholder="Anxiety, crate comfort, favorite spots, triggers, or handling preferences"
               multiline
+              onChangeText={setBehaviorNotes}
+              placeholder="Anxiety, crate comfort, favorite spots, triggers, or handling preferences"
+              value={behaviorNotes}
             />
           </View>
         </View>
@@ -602,20 +783,39 @@ export default function PetParentSetupScreen() {
       return (
         <View style={styles.stepBody}>
           <View style={[styles.formGrid, isWide && styles.formGridWide]}>
-            <Field label="Emergency contact name" placeholder="Emergency Contact" />
             <Field
-              label="Emergency contact phone"
-              placeholder="555-555-5555"
-              keyboardType="phone-pad"
+              label="Emergency contact name"
+              onChangeText={setEmergencyName}
+              placeholder="Emergency Contact"
+              value={emergencyName}
             />
-            <Field label="Relationship" placeholder="Family, friend, neighbor" />
-            <Field label="Veterinarian or clinic" placeholder="Clinic name" />
+            <Field
+              keyboardType="phone-pad"
+              label="Emergency contact phone"
+              onChangeText={setEmergencyPhone}
+              placeholder="555-555-5555"
+              value={emergencyPhone}
+            />
+            <Field
+              label="Relationship"
+              onChangeText={setEmergencyRelationship}
+              placeholder="Family, friend, neighbor"
+              value={emergencyRelationship}
+            />
+            <Field
+              label="Veterinarian or clinic"
+              onChangeText={setVeterinarian}
+              placeholder="Clinic name"
+              value={veterinarian}
+            />
           </View>
 
           <Field
             label="Emergency notes"
-            placeholder="Anything SitGuru or your Guru should know if urgent care is needed"
             multiline
+            onChangeText={setEmergencyNotes}
+            placeholder="Anything SitGuru or your Guru should know if urgent care is needed"
+            value={emergencyNotes}
           />
         </View>
       );
@@ -625,20 +825,28 @@ export default function PetParentSetupScreen() {
       <View style={styles.stepBody}>
         <View style={styles.notificationGrid}>
           <NotificationCard
-            title="Messages"
+            active={notifyMessages}
             detail="New Guru messages and support replies."
+            onPress={() => setNotifyMessages((value) => !value)}
+            title="Messages"
           />
           <NotificationCard
-            title="Booking updates"
+            active={notifyBookings}
             detail="Care requests, accepted bookings, changes, and reminders."
+            onPress={() => setNotifyBookings((value) => !value)}
+            title="Booking updates"
           />
           <NotificationCard
-            title="PawReport™"
+            active={notifyPawReport}
             detail="Photos, care notes, visit timing, and care summaries."
+            onPress={() => setNotifyPawReport((value) => !value)}
+            title="PawReport™"
           />
           <NotificationCard
-            title="PawPerks"
+            active={notifyPawPerks}
             detail="Referral rewards and Pet Parent invite updates."
+            onPress={() => setNotifyPawPerks((value) => !value)}
+            title="PawPerks"
           />
         </View>
 
@@ -650,21 +858,25 @@ export default function PetParentSetupScreen() {
           </Text>
 
           <View style={[styles.readyActions, isWide && styles.readyActionsWide]}>
-            <Pressable
+            <BubblePressable
               accessibilityRole="button"
-              onPress={() => router.push('/find-care')}
+              disabled={saving || loading}
+              onPress={() => void goNext()}
               style={styles.primaryButton}
             >
-              <Text style={styles.primaryButtonText}>Find Care</Text>
-            </Pressable>
+              <Text style={styles.primaryButtonText}>
+                {saving ? 'Saving...' : 'Find Care'}
+              </Text>
+            </BubblePressable>
 
-            <Pressable
+            <BubblePressable
               accessibilityRole="button"
-              onPress={goToDashboard}
+              disabled={saving || loading}
+              onPress={() => void goToDashboard()}
               style={styles.secondaryButton}
             >
               <Text style={styles.secondaryButtonText}>Go to Dashboard</Text>
-            </Pressable>
+            </BubblePressable>
           </View>
         </View>
       </View>
@@ -673,17 +885,24 @@ export default function PetParentSetupScreen() {
 
   return (
     <SitGuruScreen scroll center={false} maxWidth={860}>
+      <SaveFeedbackBanner
+        feedback={feedback}
+        isDark={isDark}
+        onDismiss={dismissFeedback}
+      />
+
       <View style={styles.page}>
         <View style={styles.topBar}>
           <SitGuruLogo size="small" variant="symbol" />
 
-          <Pressable
+          <BubblePressable
             accessibilityRole="button"
             onPress={() => router.push('/role-selection')}
+            scaleTo={0.88}
             style={styles.topLinkButton}
           >
             <Text style={styles.topLinkText}>Roles</Text>
-          </Pressable>
+          </BubblePressable>
         </View>
 
         <View style={[styles.heroPanel, isWide && styles.heroPanelWide]}>
@@ -737,10 +956,12 @@ export default function PetParentSetupScreen() {
             const complete = step.step < currentStep;
 
             return (
-              <Pressable
+              <BubblePressable
                 key={step.step}
                 accessibilityRole="button"
-                onPress={() => setCurrentStep(step.step)}
+                disabled={saving || loading}
+                onPress={() => void goToStep(step.step)}
+                scaleTo={0.88}
                 style={[
                   styles.stepPill,
                   active && styles.stepPillActive,
@@ -763,7 +984,7 @@ export default function PetParentSetupScreen() {
                 >
                   {step.shortTitle}
                 </Text>
-              </Pressable>
+              </BubblePressable>
             );
           })}
         </View>
@@ -783,6 +1004,20 @@ export default function PetParentSetupScreen() {
           </View>
 
           <Text style={styles.stepDescription}>{activeStep.description}</Text>
+
+          {loadError ? (
+            <View style={styles.locationMessage}>
+              <Text style={styles.locationMessageText}>{loadError}</Text>
+            </View>
+          ) : null}
+
+          {loading ? (
+            <View style={styles.locationMessage}>
+              <Text style={styles.locationMessageText}>
+                Loading your saved Pet Parent setup...
+              </Text>
+            </View>
+          ) : null}
 
           <View style={styles.usedForCard}>
             <Text style={styles.usedForLabel}>Used for</Text>
@@ -816,28 +1051,56 @@ export default function PetParentSetupScreen() {
       </View>
 
       <View style={styles.bottomDock}>
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
+          disabled={saving}
           onPress={goBack}
           style={styles.dockSecondaryAction}
         >
           <Text style={styles.dockSecondaryText}>
             {currentStep === 1 ? 'Roles' : 'Back'}
           </Text>
-        </Pressable>
+        </BubblePressable>
 
-        <Pressable
+        <BubblePressable
           accessibilityRole="button"
-          onPress={goNext}
+          disabled={saving || loading}
+          onPress={() => void goNext()}
           style={styles.dockPrimaryAction}
         >
           <Text style={styles.dockPrimaryText}>
-            {currentStep === 6 ? 'Find Care' : 'Continue'}
+            {saving
+              ? 'Saving...'
+              : currentStep === 6
+                ? 'Find Care'
+                : 'Continue'}
           </Text>
-        </Pressable>
+        </BubblePressable>
       </View>
     </SitGuruScreen>
   );
+}
+
+function clampPetParentStep(step: number): StepNumber {
+  if (step <= 1) return 1;
+  if (step >= 6) return 6;
+  return step as StepNumber;
+}
+
+function petFromDraft(pet: PetParentPetDraft): PetForm {
+  const size = petSizes.includes(pet.size as PetSize)
+    ? (pet.size as PetSize)
+    : '';
+
+  return {
+    id: pet.id,
+    name: pet.name,
+    type: pet.type,
+    breed: pet.breed,
+    age: pet.age,
+    size,
+    notes: pet.notes,
+  };
 }
 
 function Field({
@@ -905,7 +1168,7 @@ function DropdownField({
     <View style={styles.dropdownWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
 
-      <Pressable
+      <BubblePressable
         accessibilityRole="button"
         onPress={onToggle}
         style={styles.dropdownButton}
@@ -919,19 +1182,19 @@ function DropdownField({
           {value || placeholder}
         </Text>
         <Text style={styles.dropdownChevron}>{open ? '⌃' : '⌄'}</Text>
-      </Pressable>
+      </BubblePressable>
 
       {open ? (
         <View style={styles.dropdownMenu}>
           {options.map((option) => (
-            <Pressable
+            <BubblePressable
               key={option}
               accessibilityRole="button"
               onPress={() => onSelect(option)}
               style={styles.dropdownOption}
             >
               <Text style={styles.dropdownOptionText}>{option}</Text>
-            </Pressable>
+            </BubblePressable>
           ))}
         </View>
       ) : null}
@@ -939,18 +1202,37 @@ function DropdownField({
   );
 }
 
-function NotificationCard({ title, detail }: { title: string; detail: string }) {
+function NotificationCard({
+  active,
+  detail,
+  onPress,
+  title,
+}: {
+  active: boolean;
+  detail: string;
+  onPress: () => void;
+  title: string;
+}) {
   return (
-    <Pressable accessibilityRole="button" style={styles.notificationCard}>
+    <BubblePressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      scaleTo={0.97}
+      style={[
+        styles.notificationCard,
+        active && styles.notificationCardActive,
+      ]}
+    >
       <View style={styles.notificationIcon}>
-        <Text style={styles.notificationIconText}>✓</Text>
+        <Text style={styles.notificationIconText}>{active ? '✓' : '•'}</Text>
       </View>
 
       <View style={styles.notificationCopy}>
         <Text style={styles.notificationTitle}>{title}</Text>
         <Text style={styles.notificationDetail}>{detail}</Text>
       </View>
-    </Pressable>
+    </BubblePressable>
   );
 }
 
@@ -1585,6 +1867,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     padding: 14,
+  },
+  notificationCardActive: {
+    backgroundColor: SitGuruColors.surfaceSoft,
+    borderColor: SitGuruColors.primaryLight,
   },
   notificationIcon: {
     alignItems: 'center',
