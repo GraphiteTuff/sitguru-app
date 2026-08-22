@@ -1,5 +1,12 @@
 import { ReactNode } from 'react';
-import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/hooks/use-theme';
@@ -55,7 +62,9 @@ export default function SitGuruScreen({
             center ? styles.centered : styles.topAligned,
           ]}
           automaticallyAdjustKeyboardInsets
-          keyboardDismissMode="on-drag"
+          keyboardDismissMode={
+            Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+          }
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -74,18 +83,23 @@ export default function SitGuruScreen({
         edgeToEdge && styles.safeAreaEdgeToEdge,
       ]}
     >
-      <View
-        style={[
-          styles.content,
-          edgeToEdge && styles.contentEdgeToEdge,
-          {
-            paddingHorizontal: horizontalPadding,
-          },
-          center ? styles.centered : styles.topAligned,
-        ]}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardView}
       >
-        <View style={contentStyle}>{children}</View>
-      </View>
+        <View
+          style={[
+            styles.content,
+            edgeToEdge && styles.contentEdgeToEdge,
+            {
+              paddingHorizontal: horizontalPadding,
+            },
+            center ? styles.centered : styles.topAligned,
+          ]}
+        >
+          <View style={contentStyle}>{children}</View>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -93,6 +107,10 @@ export default function SitGuruScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+  },
+  keyboardView: {
+    flex: 1,
+    width: '100%',
   },
   safeAreaEdgeToEdge: {
     backgroundColor: '#020807',

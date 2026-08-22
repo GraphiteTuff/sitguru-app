@@ -10,7 +10,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
@@ -25,6 +24,8 @@ type BubblePressableProps = Omit<PressableProps, 'style'> & {
   scaleTo?: number;
   /** Renders an expanding tint behind the content, used by the tab bar. */
   bubble?: boolean;
+  /** `glyph` is the App Store tab pop — a circle behind the icon only. */
+  bubblePlacement?: 'fill' | 'glyph';
   bubbleColor?: string;
   bubbleStyle?: ViewStyle;
   active?: boolean;
@@ -43,6 +44,12 @@ const RELEASE_SPRING = {
   stiffness: 300,
 };
 
+const BUBBLE_SPRING = {
+  damping: 12,
+  mass: 0.38,
+  stiffness: 420,
+};
+
 /**
  * Tap target that compresses on press and springs back with a slight
  * overshoot, optionally revealing a tinted bubble behind its content.
@@ -52,6 +59,7 @@ export default function BubblePressable({
   style,
   scaleTo = 0.94,
   bubble = false,
+  bubblePlacement = 'fill',
   bubbleColor = 'rgba(13,92,58,0.12)',
   bubbleStyle,
   active = false,
@@ -71,7 +79,7 @@ export default function BubblePressable({
       ? active
         ? 1
         : 0
-      : withTiming(active ? 1 : 0, { duration: 220 });
+      : withSpring(active ? 1 : 0, BUBBLE_SPRING);
   }, [active, bubbleProgress, reduceMotion]);
 
   const contentStyle = useAnimatedStyle(() => ({
@@ -79,8 +87,8 @@ export default function BubblePressable({
   }));
 
   const bubbleAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: bubbleProgress.value,
-    transform: [{ scale: 0.6 + bubbleProgress.value * 0.4 }],
+    opacity: 0.2 + bubbleProgress.value * 0.8,
+    transform: [{ scale: 0.22 + bubbleProgress.value * 0.78 }],
   }));
 
   return (
@@ -96,7 +104,7 @@ export default function BubblePressable({
             : withSpring(scaleTo, PRESS_SPRING);
           bubbleProgress.value = reduceMotion
             ? 1
-            : withTiming(1, { duration: 140 });
+            : withSpring(1, BUBBLE_SPRING);
         }
         onPressIn?.(event);
       }}
@@ -105,7 +113,7 @@ export default function BubblePressable({
         if (!active) {
           bubbleProgress.value = reduceMotion
             ? 0
-            : withTiming(0, { duration: 220 });
+            : withSpring(0, BUBBLE_SPRING);
         }
         onPressOut?.(event);
       }}
@@ -116,6 +124,7 @@ export default function BubblePressable({
           pointerEvents="none"
           style={[
             styles.bubble,
+            bubblePlacement === 'glyph' ? styles.glyphBubble : null,
             { backgroundColor: bubbleColor },
             bubbleStyle,
             bubbleAnimatedStyle,
@@ -136,5 +145,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -6,
     top: -6,
+  },
+  glyphBubble: {
+    alignSelf: 'center',
+    bottom: undefined,
+    height: 46,
+    left: '50%',
+    marginLeft: -23,
+    right: undefined,
+    top: 0,
+    width: 46,
   },
 });

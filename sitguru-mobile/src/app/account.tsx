@@ -16,6 +16,7 @@ import {
   MessageCircle,
   PawPrint,
   RefreshCw,
+  ScanFace,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
@@ -49,7 +50,9 @@ import {
   type SitGuruThemePreference,
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
+import { useNotificationPreferences } from '@/hooks/data/useNotificationPreferences';
 import { useAuth } from '@/hooks/useAuth';
+import { confirmSensitiveAction } from '@/lib/security/biometrics';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { roleLabel, type AppRole } from '@/types/auth';
 
@@ -76,12 +79,6 @@ type AccountSectionKey =
   | 'support'
   | 'app';
 
-type NotificationPreference = {
-  enabled: boolean;
-  key: string;
-  label: string;
-};
-
 const THEME_OPTIONS: ThemeOption[] = [
   {
     icon: 'sun',
@@ -92,34 +89,6 @@ const THEME_OPTIONS: ThemeOption[] = [
     icon: 'moon',
     label: 'Dark',
     value: 'dark',
-  },
-];
-
-const INITIAL_NOTIFICATION_PREFERENCES: NotificationPreference[] = [
-  {
-    enabled: true,
-    key: 'bookings',
-    label: 'Booking alerts',
-  },
-  {
-    enabled: true,
-    key: 'messages',
-    label: 'Message alerts',
-  },
-  {
-    enabled: true,
-    key: 'pawreport',
-    label: 'PawReport Live alerts',
-  },
-  {
-    enabled: false,
-    key: 'payments',
-    label: 'Payment and payout alerts',
-  },
-  {
-    enabled: true,
-    key: 'rewards',
-    label: 'PawPoints and referral alerts',
   },
 ];
 
@@ -151,9 +120,13 @@ export default function AccountScreen() {
     useState<AccountSectionKey>('profile');
   const [refreshing, setRefreshing] = useState(false);
   const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
-  const [notificationPreferences, setNotificationPreferences] = useState(
-    INITIAL_NOTIFICATION_PREFERENCES,
-  );
+  const {
+    preferences: notificationPreferences,
+    options: notificationOptions,
+    savingKey: savingNotificationKey,
+    message: notificationMessage,
+    toggle: toggleNotificationPreference,
+  } = useNotificationPreferences();
 
   const profileRecord = useMemo(
     () => (profile ?? {}) as RecordRow,
@@ -287,22 +260,30 @@ export default function AccountScreen() {
     );
   }
 
-  function toggleNotification(key: string) {
-    setNotificationPreferences((current) =>
-      current.map((preference) =>
-        preference.key === key
-          ? {
-              ...preference,
-              enabled: !preference.enabled,
-            }
-          : preference,
-      ),
+  function toggleNotification(key: (typeof notificationOptions)[number]['key']) {
+    if (savingNotificationKey) return;
+    void toggleNotificationPreference(key);
+  }
+
+  async function confirmFaceIdForPayments() {
+    const gate = await confirmSensitiveAction(
+      'Confirm Face ID for SitGuru payments',
     );
 
-    Alert.alert(
-      'Preview only',
-      'This change is shown in the current app preview but has not been saved to your SitGuru account yet.',
-    );
+    if (gate.skipped) {
+      Alert.alert(
+        'Face ID unavailable',
+        'This device has no Face ID or fingerprint enrolled. Payments still use your signed-in SitGuru session.',
+      );
+      return;
+    }
+
+    if (gate.ok) {
+      Alert.alert(
+        'Face ID ready',
+        'SitGuru will ask for Face ID or your device passcode before opening checkout.',
+      );
+    }
   }
 
   function showPreviewWarning(label: string) {
@@ -775,14 +756,12 @@ export default function AccountScreen() {
                     styles={styles}
                     subtitle="Choose the updates you want to see"
                     title="Notifications">
-                    {notificationPreferences.map((preference) => (
+                    {notificationOptions.map((option) => (
                       <ToggleRow
-                        enabled={preference.enabled}
-                        key={preference.key}
-                        label={preference.label}
-                        onPress={() =>
-                          toggleNotification(preference.key)
-                        }
+                        enabled={notificationPreferences[option.key]}
+                        key={option.key}
+                        label={option.label}
+                        onPress={() => toggleNotification(option.key)}
                         styles={styles}
                       />
                     ))}
@@ -802,8 +781,10 @@ export default function AccountScreen() {
 
                     <InlineNotice
                       styles={styles}
-                      text="Notification switches are preview-only until account preference saving is connected."
-                      warning
+                      text={
+                        notificationMessage ||
+                        'These alerts save to your SitGuru account and stay in sync on this device.'
+                      }
                     />
                   </SectionCard>
 
@@ -832,6 +813,18 @@ export default function AccountScreen() {
                       onPress={() =>
                         showPreviewWarning('Password and sign-in')
                       }
+                      styles={styles}
+                    />
+                    <ActionRow
+                      icon={
+                        <ScanFace
+                          color={palette.primary}
+                          size={18}
+                          strokeWidth={2.3}
+                        />
+                      }
+                      label="Face ID for payments"
+                      onPress={() => void confirmFaceIdForPayments()}
                       styles={styles}
                     />
                     <ActionRow
@@ -1035,7 +1028,7 @@ export default function AccountScreen() {
                     <InfoRow
                       label="Accessibility"
                       styles={styles}
-                      value="Large touch targets and readable labels"
+                      value="Follows your phone text size. Letters grow; cards and tabs stay on screen."
                     />
                     <InfoRow
                       label="Theme"

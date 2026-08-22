@@ -203,6 +203,25 @@ function friendlyAuthError(
 
   if (
     normalized.includes(
+      'unacceptable audience',
+    ) ||
+    normalized.includes(
+      'audience',
+    )
+  ) {
+    return 'Apple sign-in is not fully enabled for this SitGuru app yet. Use email or try again.';
+  }
+
+  if (
+    normalized.includes(
+      'nonce',
+    )
+  ) {
+    return 'Apple sign-in could not be verified. Please try Continue with Apple again.';
+  }
+
+  if (
+    normalized.includes(
       'token has expired',
     ) ||
     normalized.includes(
@@ -1106,17 +1125,10 @@ export function AuthProvider({
             );
           }
 
-          const rawNonce =
+          // Apple and Supabase each SHA-256 this value. Pre-hashing it
+          // here makes the identity token fail verification.
+          const nonce =
             Crypto.randomUUID();
-
-          const hashedNonce =
-            await Crypto
-              .digestStringAsync(
-                Crypto
-                  .CryptoDigestAlgorithm
-                  .SHA256,
-                rawNonce,
-              );
 
           const credential =
             await AppleAuthentication
@@ -1129,9 +1141,7 @@ export function AuthProvider({
                     .AppleAuthenticationScope
                     .EMAIL,
                 ],
-                nonce: hashedNonce,
-                state:
-                  Crypto.randomUUID(),
+                nonce,
               });
 
           if (
@@ -1151,10 +1161,29 @@ export function AuthProvider({
                 provider: 'apple',
                 token:
                   credential.identityToken,
-                nonce: rawNonce,
+                nonce,
               });
 
           if (error) {
+            const details =
+              error.message.toLowerCase();
+
+            if (
+              details.includes(
+                'audience',
+              ) ||
+              details.includes(
+                'nonce',
+              ) ||
+              details.includes(
+                'provider is not enabled',
+              )
+            ) {
+              return performBrowserOAuth(
+                'apple',
+              );
+            }
+
             throw error;
           }
 

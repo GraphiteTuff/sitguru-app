@@ -1,7 +1,28 @@
 import { Platform } from 'react-native';
 
 import { getErrorMessage } from '@/lib/data/fields';
+import { PERF_BASELINES, markPerf } from '@/lib/perf/baselines';
 import { getSupabaseAccessToken } from '@/lib/supabase';
+
+const API_TIMEOUT_MS = 8_000;
+const GET_CACHE_TTL_MS = 20_000;
+
+type CacheEntry = {
+  expiresAt: number;
+  result: SitGuruApiResult<unknown>;
+};
+
+const getCache = new Map<string, CacheEntry>();
+
+function readGetCache(key: string): SitGuruApiResult<unknown> | null {
+  const entry = getCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    getCache.delete(key);
+    return null;
+  }
+  return entry.result;
+}
 
 function normalizeBaseUrl(value: string) {
   return value.trim().replace(/\/+$/, '');
@@ -90,15 +111,28 @@ export async function sitguruApiFetch<T = unknown>(
   const url = path.startsWith('http')
     ? path
     : `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+  const method = options.method ?? (options.body !== undefined ? 'POST' : 'GET');
+  const cacheKey =
+    method === 'GET' && options.body === undefined
+      ? `${headers.Authorization?.slice(-16) || 'anon'}:${url}`
+      : '';
+
+  if (cacheKey) {
+    const cached = readGetCache(cacheKey);
+    if (cached) return cached as SitGuruApiResult<T>;
+  }
+
+  const startedAt = Date.now();
 
   try {
     const response = await fetch(url, {
-      method: options.method ?? (options.body !== undefined ? 'POST' : 'GET'),
+      method,
       headers,
       body:
         options.body === undefined
           ? undefined
           : JSON.stringify(options.body),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
 
     const text = await response.text();
@@ -129,15 +163,36 @@ export async function sitguruApiFetch<T = unknown>(
       };
     }
 
-    return {
+    const result = {
       data: parsed as T,
       error: null,
       status: response.status,
     };
+
+    markPerf(`api ${method} ${path}`, startedAt, PERF_BASELINES.apiLatencyMs.warn);
+
+    if (cacheKey) {
+      getCache.set(cacheKey, {
+        expiresAt: Date.now() + GET_CACHE_TTL_MS,
+        result,
+      });
+    }
+
+    return result;
   } catch (error) {
+    markPerf(`api ${method} ${path}`, startedAt, PERF_BASELINES.apiLatencyMs.warn);
+    const timedOut =
+      error instanceof Error &&
+      (error.name === 'TimeoutError' || /timeout|aborted/i.test(error.message));
+
     return {
       data: null,
-      error: getErrorMessage(error, 'Network request failed.'),
+      error: getErrorMessage(
+        error,
+        timedOut
+          ? 'SitGuru took too long to respond. Try again in a moment.'
+          : 'Network request failed.',
+      ),
       status: 0,
     };
   }

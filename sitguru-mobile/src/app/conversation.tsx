@@ -18,7 +18,6 @@ import {
   Pause,
   PawPrint,
   Play,
-  Sparkles,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -51,6 +50,7 @@ import {
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { clearDraft, readDraft, writeDraft } from '@/lib/drafts';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import {
@@ -259,6 +259,19 @@ function formatMessageTime(value: string) {
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+const MESSAGE_CLUSTER_MS = 2 * 60 * 1000;
+
+function sameMessageCluster(first?: UiMessage, second?: UiMessage) {
+  if (!first || !second) return false;
+  if (first.senderId !== second.senderId) return false;
+
+  const firstTime = new Date(first.createdAt).getTime();
+  const secondTime = new Date(second.createdAt).getTime();
+  if (Number.isNaN(firstTime) || Number.isNaN(secondTime)) return false;
+
+  return Math.abs(firstTime - secondTime) < MESSAGE_CLUSTER_MS;
 }
 
 function formatDayLabel(value: string) {
@@ -816,6 +829,58 @@ export default function ConversationScreen() {
     requestedOtherUserId,
   ]);
 
+  const composerDraftKey = useMemo(() => {
+    const id =
+      conversation?.id ||
+      requestedConversationId ||
+      requestedOtherUserId ||
+      requestedBookingId;
+    return id ? `sitguru.chat-draft.v1:${id}` : '';
+  }, [
+    conversation?.id,
+    requestedBookingId,
+    requestedConversationId,
+    requestedOtherUserId,
+  ]);
+  const composerDraftHydratedRef = useRef('');
+
+  useEffect(() => {
+    if (!composerDraftKey) return;
+    if (composerDraftHydratedRef.current === composerDraftKey) return;
+
+    let active = true;
+
+    async function restoreComposerDraft() {
+      const draft = await readDraft<{ text?: string }>(composerDraftKey);
+      if (!active) return;
+      if (draft?.text) {
+        setDraftMessage((current) => current.trim() ? current : draft.text ?? '');
+      }
+      composerDraftHydratedRef.current = composerDraftKey;
+    }
+
+    void restoreComposerDraft();
+
+    return () => {
+      active = false;
+    };
+  }, [composerDraftKey]);
+
+  useEffect(() => {
+    if (!composerDraftKey) return;
+    if (composerDraftHydratedRef.current !== composerDraftKey) return;
+
+    const timer = setTimeout(() => {
+      if (draftMessage.trim()) {
+        void writeDraft(composerDraftKey, { text: draftMessage });
+        return;
+      }
+      void clearDraft(composerDraftKey);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [composerDraftKey, draftMessage]);
+
   const currentSenderIds = useMemo(
     () =>
       new Set(
@@ -1110,6 +1175,7 @@ export default function ConversationScreen() {
 
       setMessages((current) => mergeMessages(current, [localMessage]));
       setDraftMessage('');
+      if (composerDraftKey) void clearDraft(composerDraftKey);
       setNotice({
         tone: 'warning',
         text: 'Message added to this preview only. It was not saved or sent to another user.',
@@ -1172,6 +1238,7 @@ export default function ConversationScreen() {
 
       await updateConversationPreview(conversation.id, body);
       setDraftMessage('');
+      if (composerDraftKey) void clearDraft(composerDraftKey);
       setNotice({
         tone: 'success',
         text: photoUrl
@@ -1456,6 +1523,7 @@ export default function ConversationScreen() {
                 <ScrollView
                   ref={threadRef}
                   contentContainerStyle={styles.messageList}
+                  keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                   keyboardShouldPersistTaps="handled"
                   onContentSizeChange={() => threadRef.current?.scrollToEnd({ animated: false })}
                   showsVerticalScrollIndicator={false}
@@ -1479,6 +1547,7 @@ export default function ConversationScreen() {
                   ) : (
                     messages.map((message, index) => {
                       const previousMessage = messages[index - 1];
+                      const nextMessage = messages[index + 1];
                       const showDay =
                         !previousMessage ||
                         formatDayLabel(previousMessage.createdAt) !== formatDayLabel(message.createdAt);
@@ -1492,17 +1561,23 @@ export default function ConversationScreen() {
                       const senderAvatar = isOwn
                         ? currentUserAvatar
                         : profileAvatar(senderProfile) || otherAvatar;
-                      const showAvatar =
-                        !isOwn &&
-                        (index === messages.length - 1 || messages[index + 1]?.senderId !== message.senderId);
+                      const clusteredWithPrevious =
+                        !showDay && sameMessageCluster(previousMessage, message);
+                      const clusteredWithNext =
+                        nextMessage &&
+                        formatDayLabel(nextMessage.createdAt) === formatDayLabel(message.createdAt) &&
+                        sameMessageCluster(message, nextMessage);
+                      const isFirstInCluster = !clusteredWithPrevious;
+                      const isLastInCluster = !clusteredWithNext;
+                      const showAvatar = !isOwn && isLastInCluster;
 
                       return (
                         <View key={message.id}>
                           {showDay ? (
                             <View style={styles.dayDivider}>
-                              <View style={styles.dayLine} />
-                              <Text style={styles.dayText}>{formatDayLabel(message.createdAt)}</Text>
-                              <View style={styles.dayLine} />
+                              <Text style={styles.dayText}>
+                                {formatDayLabel(message.createdAt)} {formatMessageTime(message.createdAt)}
+                              </Text>
                             </View>
                           ) : null}
 
@@ -1510,6 +1585,7 @@ export default function ConversationScreen() {
                             style={[
                               styles.messageRow,
                               isOwn ? styles.messageRowOwn : styles.messageRowOther,
+                              isLastInCluster ? styles.messageRowClusterEnd : styles.messageRowCluster,
                             ]}
                           >
                             {!isOwn ? (
@@ -1532,7 +1608,7 @@ export default function ConversationScreen() {
                                 isOwn ? styles.messageGroupOwn : styles.messageGroupOther,
                               ]}
                             >
-                              {!isOwn && showAvatar ? (
+                              {!isOwn && isFirstInCluster ? (
                                 <Text style={styles.senderLabel}>{senderName}</Text>
                               ) : null}
 
@@ -1540,6 +1616,15 @@ export default function ConversationScreen() {
                                 style={[
                                   styles.messageBubble,
                                   isOwn ? styles.messageBubbleOwn : styles.messageBubbleOther,
+                                  isOwn
+                                    ? {
+                                        borderTopRightRadius: isFirstInCluster ? 18 : 6,
+                                        borderBottomRightRadius: isLastInCluster ? 5 : 6,
+                                      }
+                                    : {
+                                        borderTopLeftRadius: isFirstInCluster ? 18 : 6,
+                                        borderBottomLeftRadius: isLastInCluster ? 5 : 6,
+                                      },
                                 ]}
                               >
                                 <MessageBodyContent
@@ -1549,21 +1634,23 @@ export default function ConversationScreen() {
                                 />
                               </View>
 
-                              <View
-                                style={[
-                                  styles.messageMetaRow,
-                                  isOwn && styles.messageMetaRowOwn,
-                                ]}
-                              >
-                                <Text style={styles.messageTime}>
-                                  {formatMessageTime(message.createdAt)}
-                                </Text>
-                                {isOwn && message.id === latestOwnMessageId ? (
-                                  <Text style={styles.messageDelivery}>
-                                    {message.delivery === 'preview' ? 'Preview only' : 'Sent'}
+                              {isLastInCluster ? (
+                                <View
+                                  style={[
+                                    styles.messageMetaRow,
+                                    isOwn && styles.messageMetaRowOwn,
+                                  ]}
+                                >
+                                  <Text style={styles.messageTime}>
+                                    {formatMessageTime(message.createdAt)}
                                   </Text>
-                                ) : null}
-                              </View>
+                                  {isOwn && message.id === latestOwnMessageId ? (
+                                    <Text style={styles.messageDelivery}>
+                                      {message.delivery === 'preview' ? 'Preview only' : 'Delivered'}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                              ) : null}
                             </View>
                           </View>
                         </View>
@@ -1589,7 +1676,6 @@ export default function ConversationScreen() {
                         scaleTo={0.88}
                         style={styles.quickReply}
                       >
-                        <Sparkles color={palette.primary} size={13} strokeWidth={2.4} />
                         <Text style={styles.quickReplyText}>{reply}</Text>
                       </BubblePressable>
                     ))}
@@ -1599,7 +1685,7 @@ export default function ConversationScreen() {
                 <ChatComposerBar
                   value={draftMessage}
                   sending={sending}
-                  placeholder={`Message ${otherName}`}
+                  placeholder="Message"
                   onChangeText={(value) => {
                     setDraftMessage(value);
                     if (notice?.tone !== 'success') setNotice(null);
@@ -1913,8 +1999,8 @@ function getPalette(isDark: boolean) {
     primary: '#0B7A4B',
     primaryDark: '#075B3A',
     primaryBright: '#39D982',
-    ownBubble: isDark ? '#0B7A4B' : '#0B7A4B',
-    otherBubble: isDark ? '#123124' : '#FFFFFF',
+    ownBubble: isDark ? '#1F8A54' : '#0D5C3A',
+    otherBubble: isDark ? '#2C2C2E' : '#E9E9EB',
     frame: '#121714',
     frameBorder: '#2D3430',
   };
@@ -2319,8 +2405,9 @@ function createStyles(isDark: boolean) {
       marginTop: 7,
     },
     messageList: {
-      paddingBottom: 8,
-      paddingHorizontal: 2,
+      paddingBottom: 12,
+      paddingHorizontal: 8,
+      paddingTop: 6,
     },
     loadingState: {
       alignItems: 'center',
@@ -2351,37 +2438,36 @@ function createStyles(isDark: boolean) {
     emptyTitle: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 16,
+      fontSize: 20,
     },
     emptyText: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 11,
-      lineHeight: 17,
+      fontSize: 15,
+      lineHeight: 21,
       textAlign: 'center',
     },
     dayDivider: {
       alignItems: 'center',
-      flexDirection: 'row',
-      gap: 8,
-      marginVertical: 10,
-    },
-    dayLine: {
-      backgroundColor: palette.border,
-      flex: 1,
-      height: 1,
+      marginBottom: 12,
+      marginTop: 16,
     },
     dayText: {
       color: palette.soft,
-      fontFamily: AppFonts.bold,
-      fontSize: 8,
-      textTransform: 'uppercase',
+      fontFamily: AppFonts.semiBold,
+      fontSize: 12,
+      letterSpacing: 0.1,
     },
     messageRow: {
       alignItems: 'flex-end',
       flexDirection: 'row',
       gap: 6,
-      marginBottom: 6,
+    },
+    messageRowCluster: {
+      marginBottom: 2,
+    },
+    messageRowClusterEnd: {
+      marginBottom: 10,
     },
     messageRowOwn: {
       justifyContent: 'flex-end',
@@ -2390,11 +2476,11 @@ function createStyles(isDark: boolean) {
       justifyContent: 'flex-start',
     },
     messageAvatarSpacer: {
-      height: 30,
-      width: 30,
+      height: 32,
+      width: 32,
     },
     messageGroup: {
-      maxWidth: '80%',
+      maxWidth: '78%',
     },
     messageGroupOwn: {
       alignItems: 'flex-end',
@@ -2404,31 +2490,27 @@ function createStyles(isDark: boolean) {
     },
     senderLabel: {
       color: palette.muted,
-      fontFamily: AppFonts.bold,
-      fontSize: 8,
+      fontFamily: AppFonts.semiBold,
+      fontSize: 12,
       marginBottom: 3,
-      marginLeft: 4,
+      marginLeft: 10,
     },
     messageBubble: {
       borderRadius: 18,
-      paddingHorizontal: 11,
+      paddingHorizontal: 14,
       paddingVertical: 9,
     },
     messageBubbleOwn: {
       backgroundColor: palette.ownBubble,
-      borderBottomRightRadius: 6,
     },
     messageBubbleOther: {
       backgroundColor: palette.otherBubble,
-      borderBottomLeftRadius: 6,
-      borderColor: palette.border,
-      borderWidth: 1,
     },
     messageBody: {
-      color: palette.text,
-      fontFamily: AppFonts.medium,
-      fontSize: 11,
-      lineHeight: 16,
+      color: isDark ? '#F4F4F5' : '#111111',
+      fontFamily: AppFonts.regular,
+      fontSize: 17,
+      lineHeight: 22,
     },
     messageBodyOwn: {
       color: '#FFFFFF',
@@ -2470,8 +2552,8 @@ function createStyles(isDark: boolean) {
     },
     voiceNoteLabel: {
       color: palette.text,
-      fontFamily: AppFonts.bold,
-      fontSize: 11,
+      fontFamily: AppFonts.semiBold,
+      fontSize: 16,
     },
     voiceNoteLabelOwn: {
       color: '#FFFFFF',
@@ -2489,42 +2571,38 @@ function createStyles(isDark: boolean) {
     messageTime: {
       color: palette.soft,
       fontFamily: AppFonts.medium,
-      fontSize: 7,
+      fontSize: 11,
     },
     messageDelivery: {
-      color: palette.primary,
-      fontFamily: AppFonts.bold,
-      fontSize: 7,
+      color: palette.soft,
+      fontFamily: AppFonts.medium,
+      fontSize: 11,
     },
     threadBottomSpace: {
       height: 4,
     },
     quickRepliesWrap: {
-      borderTopColor: palette.border,
-      borderTopWidth: 1,
-      marginHorizontal: -10,
-      paddingTop: 6,
+      paddingBottom: 4,
+      paddingTop: 4,
     },
     quickRepliesContent: {
-      gap: 6,
-      paddingHorizontal: 10,
-      paddingRight: 20,
+      gap: 8,
+      paddingHorizontal: 8,
+      paddingRight: 16,
     },
     quickReply: {
       alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
+      backgroundColor: isDark ? '#1C2A23' : '#EEF6F1',
       borderRadius: 999,
-      borderWidth: 1,
       flexDirection: 'row',
-      gap: 4,
-      minHeight: 31,
-      paddingHorizontal: 10,
+      gap: 6,
+      minHeight: 36,
+      paddingHorizontal: 14,
     },
     quickReplyText: {
-      color: palette.text,
-      fontFamily: AppFonts.bold,
-      fontSize: 8,
+      color: isDark ? '#D7EEDF' : '#0D5C3A',
+      fontFamily: AppFonts.semiBold,
+      fontSize: 14,
     },
     composer: {
       alignItems: 'flex-end',
@@ -2595,16 +2673,16 @@ function createStyles(isDark: boolean) {
     },
     avatarMessage: {
       borderRadius: 999,
-      height: 30,
-      width: 30,
+      height: 32,
+      width: 32,
     },
     avatarHeaderImage: {
       height: 34,
       width: 34,
     },
     avatarMessageImage: {
-      height: 30,
-      width: 30,
+      height: 32,
+      width: 32,
     },
     avatarFallback: {
       alignItems: 'center',

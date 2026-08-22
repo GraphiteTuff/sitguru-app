@@ -1,8 +1,9 @@
 import { router, type Href } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
+import SitGuruBootScreen from '@/components/mobile/SitGuruBootScreen';
 import { SitGuruColors } from '@/constants/colors';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { roleLabel, type AppRole } from '@/types/auth';
@@ -58,12 +59,7 @@ export default function RoleGate({ requiredRole, title, children, previewAllowed
   }, [loading]);
 
   if (loading && !accessTimedOut) {
-    return (
-      <View style={styles.boot}>
-        <ActivityIndicator color="#FFFFFF" size="large" />
-        <Text style={styles.bootLabel}>{title ?? 'Loading your SitGuru…'}</Text>
-      </View>
-    );
+    return <SitGuruBootScreen label={title ?? 'Loading your SitGuru…'} />;
   }
 
   if (loading && accessTimedOut && !isAuthenticated) {
@@ -94,20 +90,6 @@ export default function RoleGate({ requiredRole, title, children, previewAllowed
 }
 
 const styles = StyleSheet.create({
-  boot: {
-    alignItems: 'center',
-    backgroundColor: '#0D5C3A',
-    flex: 1,
-    gap: 14,
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-  },
-  bootLabel: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
   card: { alignItems: 'center', backgroundColor: SitGuruColors.surface, borderColor: SitGuruColors.primaryLight, borderRadius: 30, borderWidth: 1, elevation: 3, gap: 12, padding: 22 },
   iconBadge: { alignItems: 'center', backgroundColor: SitGuruColors.surfaceSoft, borderColor: SitGuruColors.primaryLight, borderRadius: 24, borderWidth: 1, height: 64, justifyContent: 'center', width: 64 },
   icon: { fontSize: 30 },

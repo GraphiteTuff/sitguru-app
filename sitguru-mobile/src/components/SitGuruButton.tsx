@@ -3,6 +3,7 @@ import { StyleSheet, Text } from 'react-native';
 import BubblePressable from '@/components/BubblePressable';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
+import { MAX_FONT_SIZE_MULTIPLIER } from '@/lib/a11y/type-scale';
 
 type SitGuruButtonProps = {
   accessibilityLabel?: string;
@@ -46,6 +47,8 @@ export default function SitGuruButton({
       ]}
     >
       <Text
+        allowFontScaling
+        maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
         style={[
           styles.buttonText,
           size === 'compact' ? styles.compactText : null,
@@ -107,12 +110,10 @@ const styles = StyleSheet.create({
   buttonText: {
     fontFamily: AppFonts.extraBold,
     fontSize: 16,
-    lineHeight: 20,
     textAlign: 'center',
   },
   compactText: {
     fontSize: 14,
-    lineHeight: 18,
   },
   primaryText: {
     color: '#FFFFFF',

@@ -1,6 +1,9 @@
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 
+import { useKeyboardSafe } from '@/components/mobile/KeyboardSafeHost';
 import { SitGuruColors } from '@/constants/colors';
+import { MAX_FONT_SIZE_MULTIPLIER } from '@/lib/a11y/type-scale';
+import { playAppHaptic } from '@/lib/haptics';
 
 type SitGuruTextFieldProps = TextInputProps & {
   errorText?: string;
@@ -14,28 +17,47 @@ export default function SitGuruTextField({
   label,
   multiline = false,
   style,
+  onFocus,
   ...inputProps
 }: SitGuruTextFieldProps) {
   const supportText = errorText ?? helperText;
+  const { revealFocusedInput } = useKeyboardSafe();
 
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text
+        allowFontScaling
+        maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+        style={styles.label}
+      >
+        {label}
+      </Text>
 
       <TextInput
+        allowFontScaling
+        maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
         multiline={multiline}
         placeholderTextColor={SitGuruColors.textSoft}
+        {...inputProps}
         style={[
           styles.input,
           multiline ? styles.multiline : null,
           errorText ? styles.inputError : null,
           style,
         ]}
-        {...inputProps}
+        onFocus={(event) => {
+          playAppHaptic('selection');
+          revealFocusedInput();
+          onFocus?.(event);
+        }}
       />
 
       {supportText ? (
-        <Text style={[styles.supportText, errorText ? styles.errorText : null]}>
+        <Text
+          allowFontScaling
+          maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.supportText, errorText ? styles.errorText : null]}
+        >
           {supportText}
         </Text>
       ) : null}
@@ -51,7 +73,6 @@ const styles = StyleSheet.create({
     color: SitGuruColors.text,
     fontSize: 13,
     fontWeight: '900',
-    lineHeight: 17,
   },
   input: {
     minHeight: 56,
@@ -61,7 +82,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     color: SitGuruColors.text,
     fontSize: 16,
-    lineHeight: 22,
     paddingHorizontal: 16,
     paddingVertical: 14,
     elevation: 1,
@@ -77,7 +97,6 @@ const styles = StyleSheet.create({
     color: SitGuruColors.textSoft,
     fontSize: 12,
     fontWeight: '700',
-    lineHeight: 16,
   },
   errorText: {
     color: SitGuruColors.danger,

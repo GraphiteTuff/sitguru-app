@@ -559,7 +559,7 @@ function ConversationRow({
           fallback={getInitials(conversation.title)}
           imageUrl={conversation.avatarUrl}
           palette={palette}
-          size={48}
+          size={56}
         />
 
         {conversation.activeCare ? <View style={styles.activeCareDot} /> : null}
@@ -567,7 +567,13 @@ function ConversationRow({
 
       <View style={styles.conversationCopy}>
         <View style={styles.conversationTopLine}>
-          <Text style={styles.conversationTitle} numberOfLines={1}>
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.conversationTitle,
+              conversation.unreadCount > 0 && styles.conversationTitleUnread,
+            ]}
+          >
             {conversation.title}
           </Text>
           <Text style={styles.conversationTime}>
@@ -602,13 +608,7 @@ function ConversationRow({
             {formatBadge(conversation.unreadCount)}
           </Text>
         </View>
-      ) : (
-        <ChevronRight
-          color={palette.muted}
-          size={18}
-          strokeWidth={2.2}
-        />
-      )}
+      ) : null}
     </BubblePressable>
   );
 }
@@ -1378,12 +1378,12 @@ function createStyles(isDark: boolean) {
     conversationRow: {
       alignItems: 'center',
       borderBottomColor: palette.border,
-      borderBottomWidth: 1,
+      borderBottomWidth: StyleSheet.hairlineWidth,
       flexDirection: 'row',
-      gap: 10,
+      gap: 12,
       minHeight: 76,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
     },
     avatarWrap: {
       position: 'relative',
@@ -1412,28 +1412,31 @@ function createStyles(isDark: boolean) {
     conversationTitle: {
       color: palette.title,
       flex: 1,
+      fontFamily: AppFonts.semiBold,
+      fontSize: 17,
+    },
+    conversationTitleUnread: {
       fontFamily: AppFonts.extraBold,
-      fontSize: 12,
     },
     conversationTime: {
       color: palette.muted,
       fontFamily: AppFonts.medium,
-      fontSize: 8,
+      fontSize: 14,
     },
     lastMessage: {
       color: palette.muted,
-      fontFamily: AppFonts.medium,
-      fontSize: 9,
-      lineHeight: 13,
+      fontFamily: AppFonts.regular,
+      fontSize: 15,
+      lineHeight: 20,
     },
     lastMessageUnread: {
       color: palette.text,
-      fontFamily: AppFonts.bold,
+      fontFamily: AppFonts.semiBold,
     },
     contextText: {
       color: palette.primary,
-      fontFamily: AppFonts.bold,
-      fontSize: 8,
+      fontFamily: AppFonts.semiBold,
+      fontSize: 13,
     },
     unreadBadge: {
       alignItems: 'center',

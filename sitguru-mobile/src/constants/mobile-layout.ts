@@ -38,3 +38,9 @@ export const MobileType = {
   caption: 12,
   micro: 11,
 } as const;
+
+/**
+ * Phone text-size follow: RN scales these sizes up to
+ * MAX_FONT_SIZE_MULTIPLIER in `@/lib/a11y/type-scale`.
+ * Prefer minHeight over height so larger letters wrap instead of clipping.
+ */

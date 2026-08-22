@@ -9,17 +9,26 @@ import {
   useFonts,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { router, Stack } from 'expo-router';
+import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import KeyboardSafeHost from '@/components/mobile/KeyboardSafeHost';
+import SitGuruBootScreen from '@/components/mobile/SitGuruBootScreen';
 import MobileAlertHosts from '@/components/mobile/MobileAlertHosts';
 import RootErrorBoundary from '@/components/RootErrorBoundary';
 import SitGuruPaymentsProvider from '@/components/SitGuruPaymentsProvider';
 import { AuthProvider } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import {
+  openSitGuruDeepLink,
+  shouldRemapSitGuruUrl,
+} from '@/lib/navigation/deep-links';
+import { applyReadableTypeDefaults } from '@/lib/a11y/type-scale';
+import { PERF_BASELINES } from '@/lib/perf/baselines';
 import {
   ACCEPT_BOOKING_ACTION,
   DECLINE_BOOKING_ACTION,
@@ -29,11 +38,13 @@ import {
 // Ensure TaskManager.defineTask runs before any walk screen mounts.
 import '@/lib/location/background-walk-task';
 
+applyReadableTypeDefaults();
+
 void SplashScreen.preventAutoHideAsync().catch(() => {
   // Native splash may already be hidden in web / Expo Go.
 });
 
-const BOOT_TIMEOUT_MS = 8_000;
+const BOOT_TIMEOUT_MS = PERF_BASELINES.warmLaunchMs.target;
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -89,47 +100,55 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    function handleUrl(url: string | null) {
+      if (!url || !shouldRemapSitGuruUrl(url)) return;
+      openSitGuruDeepLink(url);
+    }
+
+    void Linking.getInitialURL().then(handleUrl);
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleUrl(url);
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   // Never return null after splash — that is a permanent white screen on device.
   if (!appReady) {
-    return (
-      <View style={styles.boot}>
-        <ActivityIndicator color="#FFFFFF" size="large" />
-      </View>
-    );
+    return <SitGuruBootScreen label="Opening SitGuru…" />;
   }
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <RootErrorBoundary>
-        <SitGuruPaymentsProvider>
-          <AuthProvider>
-            <StatusBar
-              style={colorScheme === 'dark' ? 'light' : 'dark'}
-            />
+      <KeyboardSafeHost>
+        <RootErrorBoundary>
+          <SitGuruPaymentsProvider>
+            <AuthProvider>
+              <StatusBar
+                style={colorScheme === 'dark' ? 'light' : 'dark'}
+              />
 
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: {
-                  backgroundColor: '#0D5C3A',
-                },
-              }}
-            />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: {
+                    backgroundColor: '#0D5C3A',
+                  },
+                }}
+              />
 
-            <MobileAlertHosts />
-          </AuthProvider>
-        </SitGuruPaymentsProvider>
-      </RootErrorBoundary>
+              <MobileAlertHosts />
+            </AuthProvider>
+          </SitGuruPaymentsProvider>
+        </RootErrorBoundary>
+      </KeyboardSafeHost>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { backgroundColor: '#0D5C3A', flex: 1 },
-  boot: {
-    alignItems: 'center',
-    backgroundColor: '#0D5C3A',
-    flex: 1,
-    justifyContent: 'center',
-  },
 });

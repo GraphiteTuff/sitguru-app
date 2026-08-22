@@ -219,6 +219,276 @@ function clean(value: unknown) {
   return String(value ?? "").trim();
 }
 
+/** Abbreviation keyed by lowercase name or 2-letter code. */
+const US_STATE_ALIASES: Record<string, string> = {
+  al: "AL",
+  alabama: "AL",
+  ak: "AK",
+  alaska: "AK",
+  az: "AZ",
+  arizona: "AZ",
+  ar: "AR",
+  arkansas: "AR",
+  ca: "CA",
+  california: "CA",
+  co: "CO",
+  colorado: "CO",
+  ct: "CT",
+  connecticut: "CT",
+  de: "DE",
+  delaware: "DE",
+  fl: "FL",
+  florida: "FL",
+  ga: "GA",
+  georgia: "GA",
+  hi: "HI",
+  hawaii: "HI",
+  id: "ID",
+  idaho: "ID",
+  il: "IL",
+  illinois: "IL",
+  in: "IN",
+  indiana: "IN",
+  ia: "IA",
+  iowa: "IA",
+  ks: "KS",
+  kansas: "KS",
+  ky: "KY",
+  kentucky: "KY",
+  la: "LA",
+  louisiana: "LA",
+  me: "ME",
+  maine: "ME",
+  md: "MD",
+  maryland: "MD",
+  ma: "MA",
+  massachusetts: "MA",
+  mi: "MI",
+  michigan: "MI",
+  mn: "MN",
+  minnesota: "MN",
+  ms: "MS",
+  mississippi: "MS",
+  mo: "MO",
+  missouri: "MO",
+  mt: "MT",
+  montana: "MT",
+  ne: "NE",
+  nebraska: "NE",
+  nv: "NV",
+  nevada: "NV",
+  nh: "NH",
+  newhampshire: "NH",
+  "new hampshire": "NH",
+  nj: "NJ",
+  newjersey: "NJ",
+  "new jersey": "NJ",
+  nm: "NM",
+  newmexico: "NM",
+  "new mexico": "NM",
+  ny: "NY",
+  newyork: "NY",
+  "new york": "NY",
+  nc: "NC",
+  northcarolina: "NC",
+  "north carolina": "NC",
+  nd: "ND",
+  northdakota: "ND",
+  "north dakota": "ND",
+  oh: "OH",
+  ohio: "OH",
+  ok: "OK",
+  oklahoma: "OK",
+  or: "OR",
+  oregon: "OR",
+  pa: "PA",
+  pennsylvania: "PA",
+  ri: "RI",
+  rhodeisland: "RI",
+  "rhode island": "RI",
+  sc: "SC",
+  southcarolina: "SC",
+  "south carolina": "SC",
+  sd: "SD",
+  southdakota: "SD",
+  "south dakota": "SD",
+  tn: "TN",
+  tennessee: "TN",
+  tx: "TX",
+  texas: "TX",
+  ut: "UT",
+  utah: "UT",
+  vt: "VT",
+  vermont: "VT",
+  va: "VA",
+  virginia: "VA",
+  wa: "WA",
+  washington: "WA",
+  wv: "WV",
+  westvirginia: "WV",
+  "west virginia": "WV",
+  wi: "WI",
+  wisconsin: "WI",
+  wy: "WY",
+  wyoming: "WY",
+  dc: "DC",
+  "washington dc": "DC",
+  "washington d c": "DC",
+};
+
+const STATE_NAME_BY_ABBR: Record<string, string> = {
+  AL: "alabama",
+  AK: "alaska",
+  AZ: "arizona",
+  AR: "arkansas",
+  CA: "california",
+  CO: "colorado",
+  CT: "connecticut",
+  DE: "delaware",
+  FL: "florida",
+  GA: "georgia",
+  HI: "hawaii",
+  ID: "idaho",
+  IL: "illinois",
+  IN: "indiana",
+  IA: "iowa",
+  KS: "kansas",
+  KY: "kentucky",
+  LA: "louisiana",
+  ME: "maine",
+  MD: "maryland",
+  MA: "massachusetts",
+  MI: "michigan",
+  MN: "minnesota",
+  MS: "mississippi",
+  MO: "missouri",
+  MT: "montana",
+  NE: "nebraska",
+  NV: "nevada",
+  NH: "new hampshire",
+  NJ: "new jersey",
+  NM: "new mexico",
+  NY: "new york",
+  NC: "north carolina",
+  ND: "north dakota",
+  OH: "ohio",
+  OK: "oklahoma",
+  OR: "oregon",
+  PA: "pennsylvania",
+  RI: "rhode island",
+  SC: "south carolina",
+  SD: "south dakota",
+  TN: "tennessee",
+  TX: "texas",
+  UT: "utah",
+  VT: "vermont",
+  VA: "virginia",
+  WA: "washington",
+  WV: "west virginia",
+  WI: "wisconsin",
+  WY: "wyoming",
+  DC: "district of columbia",
+};
+
+const GENERIC_NAME_TOKENS = new Set([
+  "a",
+  "any",
+  "available",
+  "care",
+  "guru",
+  "gurus",
+  "local",
+  "me",
+  "my",
+  "nearby",
+  "near",
+  "pet",
+  "pets",
+  "sitter",
+  "sitters",
+  "some",
+  "the",
+  "walker",
+  "walkers",
+]);
+
+function stateAliasKey(value?: string | null) {
+  return clean(value)
+    .toLowerCase()
+    .replace(/[.]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** `PA`, `pa`, and `Pennsylvania` all become `PA`. */
+export function normalizeUsState(value?: string | null): string {
+  const key = stateAliasKey(value);
+  if (!key) return "";
+  return (
+    US_STATE_ALIASES[key] ||
+    US_STATE_ALIASES[key.replace(/\s+/g, "")] ||
+    ""
+  );
+}
+
+export function isUsStateToken(value?: string | null) {
+  return Boolean(normalizeUsState(value));
+}
+
+export function usStateSearchTokens(value?: string | null): string[] {
+  const abbr = normalizeUsState(value);
+  if (!abbr) return [];
+  const full = STATE_NAME_BY_ABBR[abbr] || "";
+  return [abbr.toLowerCase(), full].filter(Boolean);
+}
+
+function splitCityState(raw: string): { city?: string; state?: string } {
+  const cleaned = clean(raw)
+    .replace(/\b(zip|area|my|the|please|thanks|gurus?|sitters?)\b/gi, " ")
+    .replace(/[.,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) return {};
+
+  if (isUsStateToken(cleaned)) {
+    return { state: normalizeUsState(cleaned) };
+  }
+
+  const words = cleaned.split(" ");
+  if (words.length >= 2) {
+    const lastTwo = words.slice(-2).join(" ");
+    if (isUsStateToken(lastTwo)) {
+      const city = words.slice(0, -2).join(" ").trim();
+      return {
+        city: city || undefined,
+        state: normalizeUsState(lastTwo),
+      };
+    }
+  }
+
+  const last = words[words.length - 1];
+  if (isUsStateToken(last)) {
+    const city = words.slice(0, -1).join(" ").trim();
+    return {
+      city: city || undefined,
+      state: normalizeUsState(last),
+    };
+  }
+
+  return { city: cleaned };
+}
+
+function looksLikeGuruName(value?: string | null) {
+  const name = clean(value);
+  if (!name || name.length < 2 || name.length > 40) return false;
+  const tokens = name.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return false;
+  if (tokens.some((token) => GENERIC_NAME_TOKENS.has(token))) return false;
+  if (isUsStateToken(name)) return false;
+  return !/\b(in|near|around|zip|find|any|gurus?)\b/i.test(name);
+}
+
 /** Heuristic parse of free-text chat into lookup filters (simulation / hints). */
 export function inferLookupParamsFromChat(
   rawText?: string | null,
@@ -230,32 +500,35 @@ export function inferLookupParamsFromChat(
   const zipMatch = text.match(/\b(\d{5})(?:-\d{4})?\b/);
   const zip = zipMatch?.[1];
 
-  const nameMatch =
-    text.match(
-      /\b(?:guru|sitter|walker|trainer)\s+(?:named|called)\s+([A-Za-z][A-Za-z' -]{1,40})/i,
-    ) ||
-    text.match(/\bfind\s+([A-Za-z][A-Za-z' -]{1,40})\b/i);
-  const name = nameMatch?.[1]?.trim();
+  const namedMatch = text.match(
+    /\b(?:guru|sitter|walker|trainer)\s+(?:named|called)\s+([A-Za-z][A-Za-z' -]{1,40})/i,
+  );
+  const findNameMatch = text.match(
+    /\bfind\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b/,
+  );
+  const name = [namedMatch?.[1], findNameMatch?.[1]]
+    .map((value) => clean(value))
+    .find(looksLikeGuruName);
 
   let city: string | undefined;
   let state: string | undefined;
   const nearMatch = text.match(
-    /\b(?:near|in|around|at)\s+([A-Za-z][A-Za-z .'-]{1,40}?)(?:,?\s*([A-Z]{2})\b)?/i,
+    /\b(?:near|in|around|at)\s+([A-Za-z][A-Za-z .'-]{1,40}?)(?:,?\s*([A-Za-z]{2})\b)?/i,
   );
   if (nearMatch?.[1]) {
-    const maybe = clean(nearMatch[1])
-      .replace(/\b(zip|area|my|the)\b/gi, "")
-      .trim();
-    if (
-      maybe &&
-      !/^(dog|pet|walks?|drop|overnight|boarding|care|home|town)$/i.test(maybe)
-    ) {
-      city = maybe;
-    }
-    if (nearMatch[2]) state = nearMatch[2].toUpperCase();
+    const parsed = splitCityState(
+      [nearMatch[1], nearMatch[2]].filter(Boolean).join(" "),
+    );
+    city = parsed.city;
+    state = parsed.state;
   }
-  const stateOnly = text.match(/\b(?:in|near)\s+([A-Z]{2})\b/);
-  if (!state && stateOnly?.[1]) state = stateOnly[1];
+  if (!state) {
+    const stateOnly = text.match(
+      /\b(?:in|near|around)\s+([A-Za-z]{2}|[A-Za-z][A-Za-z ]{2,20})\b/i,
+    );
+    const maybeState = normalizeUsState(stateOnly?.[1]);
+    if (maybeState) state = maybeState;
+  }
 
   let service: string | undefined;
   if (/\bwalk/.test(lowerText)) service = "Dog Walking";

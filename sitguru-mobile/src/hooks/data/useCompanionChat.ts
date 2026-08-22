@@ -101,7 +101,7 @@ function friendlyStreamError(error: unknown, companionName: string) {
     if (error.status === 0) {
       return `${companionName} could not be reached. Check your connection and try again.`;
     }
-    return `${companionName} hit a snag: ${error.message}`;
+    return `${companionName} hit a snag pulling that live Guru list. Open Explore and search the area, or ask again in a moment.`;
   }
 
   return `${companionName} could not answer just now. Try that again in a moment.`;

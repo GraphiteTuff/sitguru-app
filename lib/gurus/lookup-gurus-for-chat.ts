@@ -10,6 +10,9 @@
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import {
   encodeGuruCardMarker,
+  isUsStateToken,
+  normalizeUsState,
+  usStateSearchTokens,
   type GuruChatSnapshot,
   type LookupGurusParams,
   type LookupGurusResult,
@@ -125,17 +128,20 @@ function matchesLocation(
   params: { city?: string; state?: string; zip?: string },
 ) {
   const zip = clean(params.zip).replace(/\D/g, "").slice(0, 5);
-  const city = lower(params.city);
-  const state = lower(params.state);
+  const rawCity = lower(params.city);
+  const city = rawCity && !isUsStateToken(rawCity) ? rawCity : "";
+  const queryState = normalizeUsState(params.state || rawCity);
+  const stateTokens = usStateSearchTokens(queryState);
 
   const guruZip = clean(
     guru.service_zip || guru.service_zip_code || guru.zip_code,
   ).replace(/\D/g, "");
   const guruCity = lower(guru.service_city || guru.city);
-  const guruState = lower(guru.service_state || guru.state);
+  const guruState = normalizeUsState(guru.service_state || guru.state);
   const hay = [
     guruCity,
-    guruState,
+    lower(guru.service_state || guru.state),
+    guruState.toLowerCase(),
     guruZip,
     lower(guru.location_display),
     lower(guru.service_area),
@@ -143,19 +149,20 @@ function matchesLocation(
 
   if (zip) {
     if (guruZip.startsWith(zip) || hay.includes(zip)) return true;
-    // keep soft match if city/state also provided
-    if (!city && !state) return false;
+    if (!city && !queryState) return false;
   }
-  if (city && !hay.includes(city) && guruCity !== city) return false;
-  if (state) {
+
+  if (queryState) {
     const stateOk =
-      guruState === state ||
-      guruState.startsWith(state) ||
-      hay.includes(state);
+      guruState === queryState ||
+      stateTokens.some((token) => token && hay.includes(token));
     if (!stateOk) return false;
   }
-  if (!zip && !city && !state) return true;
-  if (city || state) return true;
+
+  if (city && !hay.includes(city) && guruCity !== city) return false;
+
+  if (!zip && !city && !queryState) return true;
+  if (city || queryState) return true;
   return Boolean(zip && (guruZip.startsWith(zip) || hay.includes(zip)));
 }
 
@@ -189,10 +196,17 @@ function truncate(value: string, max = 120) {
   return `${text.slice(0, max - 1)}…`;
 }
 
+function slugifyName(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function toSnapshot(guru: RawGuru): GuruChatSnapshot | null {
-  const slug = clean(guru.public_slug || guru.slug);
   const name = clean(guru.display_name || guru.full_name || guru.name);
-  if (!slug || !name) return null;
+  const slug = clean(guru.public_slug || guru.slug) || slugifyName(name);
+  if (!name || !slug) return null;
 
   const canBook = Boolean(
     guru.can_book === true ||
@@ -263,8 +277,10 @@ export async function lookupGurusForChat(
 ): Promise<LookupGurusResult> {
   const limit = Math.min(Math.max(Number(params.limit) || 3, 1), 5);
   const service = canonicalizeCareService(params.service || "") || undefined;
-  const city = clean(params.city) || undefined;
-  const state = clean(params.state) || undefined;
+  const cityRaw = clean(params.city);
+  const state = normalizeUsState(params.state || cityRaw) || undefined;
+  const city =
+    cityRaw && !isUsStateToken(cityRaw) ? cityRaw : undefined;
   const zip = clean(params.zip).replace(/\D/g, "").slice(0, 5) || undefined;
   const name = clean(params.name) || undefined;
 
@@ -303,7 +319,7 @@ export async function lookupGurusForChat(
     searchUrl: buildSearchUrl(query),
     note:
       matched.length === 0
-        ? "No public Guru matches for that filter yet — suggest browsing /search or widening the area."
+        ? "No public Guru matches for that filter yet — say SitGuru is growing there, then send them to Explore /search or a nearby ZIP. Append [[cta:parent]]."
         : undefined,
   };
 }

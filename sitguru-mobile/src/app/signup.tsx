@@ -24,6 +24,7 @@ import {
 import BubblePressable from '@/components/BubblePressable';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SocialAuthButton from '@/components/SocialAuthButton';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import { useAuth } from '@/hooks/useAuth';
@@ -79,7 +80,15 @@ function normalizeSignupError(message: string) {
 
 export default function SignupScreen() {
   const isWebPreview = Platform.OS === 'web';
-  const { signUp, loading, isConfigured, authError } = useAuth();
+  const {
+    signUp,
+    signInWithApple,
+    signInWithGoogle,
+    loading,
+    socialLoading,
+    isConfigured,
+    authError,
+  } = useAuth();
 
   const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
@@ -147,6 +156,42 @@ export default function SignupScreen() {
     setTimeout(() => {
       router.replace('/role-selection');
     }, 350);
+  }
+
+  async function handleSocialSignup(provider: 'google' | 'apple') {
+    if (loading || socialLoading || !isConfigured) return;
+
+    setMessage(null);
+    setSuccess(null);
+
+    const result =
+      provider === 'google'
+        ? await signInWithGoogle()
+        : await signInWithApple();
+
+    if (result.cancelled) {
+      setMessage(
+        `${provider === 'google' ? 'Google' : 'Apple'} sign-in was canceled.`,
+      );
+      return;
+    }
+
+    if (result.error) {
+      setMessage(normalizeSignupError(result.error));
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    setSuccess(
+      `${provider === 'google' ? 'Google' : 'Apple'} sign-in successful. Opening your SitGuru setup…`,
+    );
+
+    setTimeout(() => {
+      router.replace('/role-selection');
+    }, 300);
   }
 
   return (
@@ -260,6 +305,28 @@ export default function SignupScreen() {
                       </Text>
                     </View>
                   ) : null}
+
+                  <SocialAuthButton
+                    disabled={loading || !isConfigured}
+                    loading={socialLoading === 'google'}
+                    mode="signup"
+                    onPress={() => void handleSocialSignup('google')}
+                    provider="google"
+                  />
+
+                  <SocialAuthButton
+                    disabled={loading || !isConfigured}
+                    loading={socialLoading === 'apple'}
+                    mode="signup"
+                    onPress={() => void handleSocialSignup('apple')}
+                    provider="apple"
+                  />
+
+                  <View style={styles.dividerRow}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>or use email</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
 
                   <View style={styles.fieldGroup}>
                     <Text style={styles.fieldLabel}>First name</Text>
@@ -705,6 +772,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 13,
     padding: 16,
+  },
+  dividerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 9,
+  },
+  dividerLine: {
+    backgroundColor: SitGuruColors.border,
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    color: SitGuruColors.textSoft,
+    fontFamily: AppFonts.bold,
+    fontSize: 10,
+    textTransform: 'uppercase',
   },
   warningCard: {
     alignItems: 'center',

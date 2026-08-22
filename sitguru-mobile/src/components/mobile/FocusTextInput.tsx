@@ -16,9 +16,12 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { useKeyboardSafe } from '@/components/mobile/KeyboardSafeHost';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import { MobileSpace, MobileType } from '@/constants/mobile-layout';
+import { MAX_FONT_SIZE_MULTIPLIER } from '@/lib/a11y/type-scale';
+import { playAppHaptic } from '@/lib/haptics';
 
 type FocusTextInputProps = TextInputProps & {
   containerStyle?: StyleProp<ViewStyle>;
@@ -42,6 +45,7 @@ export default function FocusTextInput({
 }: FocusTextInputProps) {
   const [focused, setFocused] = useState(false);
   const pulse = useSharedValue(0);
+  const { revealFocusedInput } = useKeyboardSafe();
 
   useEffect(() => {
     if (!valid || !editable) {
@@ -89,10 +93,16 @@ export default function FocusTextInput({
     >
       <TextInput
         {...rest}
+        allowFontScaling
         editable={editable}
+        maxFontSizeMultiplier={
+          rest.maxFontSizeMultiplier ?? MAX_FONT_SIZE_MULTIPLIER
+        }
         placeholderTextColor={SitGuruColors.textSoft}
         onFocus={(event) => {
           setFocused(true);
+          playAppHaptic('selection');
+          revealFocusedInput();
           onFocus?.(event);
         }}
         onBlur={(event) => {

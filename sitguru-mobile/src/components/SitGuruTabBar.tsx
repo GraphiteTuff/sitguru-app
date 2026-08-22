@@ -17,6 +17,7 @@ import BubblePressable from '@/components/BubblePressable';
 import GlassChrome from '@/components/mobile/GlassChrome';
 import { AppFonts } from '@/constants/fonts';
 import { TOUCH_MIN } from '@/constants/mobile-layout';
+import { MAX_CHROME_FONT_MULTIPLIER } from '@/lib/a11y/type-scale';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import type { AppRole } from '@/types/auth';
@@ -133,7 +134,7 @@ export default function SitGuruTabBar({
         border: 'rgba(30,59,43,0.7)',
         activeColor: '#58D58A',
         mutedColor: '#8FA096',
-        bubble: 'rgba(88,213,138,0.16)',
+        bubble: 'rgba(88,213,138,0.28)',
         tint: '#081C14',
       }
     : {
@@ -141,7 +142,7 @@ export default function SitGuruTabBar({
         border: 'rgba(229,223,212,0.85)',
         activeColor: '#1A4E37',
         mutedColor: '#79857B',
-        bubble: 'rgba(26,78,55,0.10)',
+        bubble: 'rgba(26,78,55,0.16)',
         tint: '#FFFCF7',
       };
 
@@ -175,21 +176,21 @@ export default function SitGuruTabBar({
               active={isActive}
               bubble
               bubbleColor={palette.bubble}
-              bubbleStyle={styles.bubble}
+              bubblePlacement="glyph"
               haptic="selection"
               onPress={() => {
                 if (!isActive) {
                   router.navigate(tab.href as never);
                 }
               }}
-              scaleTo={0.9}
+              scaleTo={0.84}
               style={styles.tab}
             >
-              <View>
+              <View style={styles.iconWell}>
                 <Icon
                   color={color}
-                  size={22}
-                  strokeWidth={isActive ? 2.6 : 2.2}
+                  size={24}
+                  strokeWidth={isActive ? 2.6 : 2.15}
                 />
 
                 {badge ? (
@@ -201,7 +202,14 @@ export default function SitGuruTabBar({
                 ) : null}
               </View>
 
-              <Text style={[styles.label, { color }]} numberOfLines={1}>
+              <Text
+                adjustsFontSizeToFit
+                allowFontScaling
+                maxFontSizeMultiplier={MAX_CHROME_FONT_MULTIPLIER}
+                minimumFontScale={0.88}
+                numberOfLines={1}
+                style={[styles.label, { color }]}
+              >
                 {tab.label}
               </Text>
             </BubblePressable>
@@ -223,22 +231,24 @@ const styles = StyleSheet.create({
   tab: {
     alignItems: 'center',
     flex: 1,
-    gap: 3,
-    justifyContent: 'center',
+    gap: 2,
+    justifyContent: 'flex-start',
     minHeight: TOUCH_MIN,
-    paddingVertical: 4,
+    paddingTop: 2,
+    paddingVertical: 2,
   },
-  bubble: {
-    borderRadius: 18,
-    bottom: 2,
-    left: 8,
-    right: 8,
-    top: -2,
+  iconWell: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+    width: 46,
   },
   label: {
     fontFamily: AppFonts.bold,
     fontSize: 11,
-    lineHeight: 14,
+    paddingHorizontal: 2,
+    textAlign: 'center',
+    width: '100%',
   },
   badge: {
     alignItems: 'center',

@@ -12,7 +12,7 @@ import {
   Send,
   ShieldCheck,
 } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import {
   ActivityIndicator,
@@ -39,12 +39,33 @@ import {
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { clearDraft, readDraft, writeDraft } from '@/lib/drafts';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 type BookingStep = 1 | 2 | 3 | 4 | 5 | 6;
 type CareMode = 'single' | 'overnight' | 'multi-day';
 type DateStatus = 'available' | 'limited' | 'busy';
+
+type BookingDraft = {
+  guruKey: string;
+  currentStep: BookingStep;
+  selectedPetId: string;
+  selectedServiceId: string;
+  startDateId: string;
+  endDateId: string;
+  selectedTime: string;
+  additionalPets: number;
+  applyPawPerks: boolean;
+  applyReferralCredit: boolean;
+  careNotes: string;
+  accessNotes: string;
+  pawReportItems: string[];
+};
+
+function bookingDraftKey(guruId: string, guruSlug: string) {
+  return `sitguru.booking-draft.v1:${guruId || guruSlug || 'open'}`;
+}
 
 type RecordRow = Record<string, unknown>;
 
@@ -765,6 +786,84 @@ export default function RequestBookingScreen() {
     setSelectedTime(match.mode === 'single' ? 'Midday' : 'Flexible handoff');
   }, [paramServiceType]);
 
+  const draftKey = bookingDraftKey(guruTargetId, guruTargetSlug);
+  const draftHydratedRef = useRef('');
+
+  useEffect(() => {
+    if (draftHydratedRef.current === draftKey) return;
+
+    let active = true;
+
+    async function restoreDraft() {
+      const draft = await readDraft<BookingDraft>(draftKey);
+      if (!active) return;
+
+      if (draft && draft.guruKey === draftKey) {
+        setCurrentStep(draft.currentStep);
+        setSelectedPetId(draft.selectedPetId);
+        if (!paramServiceType) {
+          setSelectedServiceId(draft.selectedServiceId);
+          setSelectedTime(draft.selectedTime);
+          setEndDateId(draft.endDateId);
+        }
+        setStartDateId(draft.startDateId);
+        setAdditionalPets(draft.additionalPets);
+        setApplyPawPerks(draft.applyPawPerks);
+        setApplyReferralCredit(draft.applyReferralCredit);
+        setCareNotes(draft.careNotes);
+        setAccessNotes(draft.accessNotes);
+        setPawReportItems(draft.pawReportItems);
+      }
+
+      draftHydratedRef.current = draftKey;
+    }
+
+    void restoreDraft();
+
+    return () => {
+      active = false;
+    };
+  }, [draftKey, paramServiceType]);
+
+  useEffect(() => {
+    if (draftHydratedRef.current !== draftKey || submitOutcome) return;
+
+    const timer = setTimeout(() => {
+      void writeDraft(draftKey, {
+        guruKey: draftKey,
+        currentStep,
+        selectedPetId,
+        selectedServiceId,
+        startDateId,
+        endDateId,
+        selectedTime,
+        additionalPets,
+        applyPawPerks,
+        applyReferralCredit,
+        careNotes,
+        accessNotes,
+        pawReportItems,
+      } satisfies BookingDraft);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [
+    additionalPets,
+    applyPawPerks,
+    applyReferralCredit,
+    accessNotes,
+    careNotes,
+    currentStep,
+    draftKey,
+    endDateId,
+    pawReportItems,
+    selectedPetId,
+    selectedServiceId,
+    selectedTime,
+    startDateId,
+    submitOutcome,
+  ]);
+
   const selectedPet =
     petOptions.find((pet) => pet.id === selectedPetId) || petOptions[0];
   const selectedService =
@@ -964,6 +1063,7 @@ export default function RequestBookingScreen() {
       checkoutUrl: result.checkoutUrl,
     });
     setCurrentStep(6);
+    void clearDraft(draftKey);
   }
 
   async function openCheckout(checkoutUrl: string) {

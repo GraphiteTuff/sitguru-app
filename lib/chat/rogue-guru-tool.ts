@@ -26,8 +26,22 @@ export const lookupGurusTool = tool({
     limit: z.number().int().min(1).max(5).optional().describe("Max results (default 3)"),
   }),
   execute: async (params) => {
-    const result = await lookupGurusForChat(params);
-    // Return the digest string so Claude copies exact [[guru_card:...]] markers.
-    return formatGuruLookupForPrompt(result);
+    try {
+      const result = await lookupGurusForChat(params);
+      // Return the digest string so Claude copies exact [[guru_card:...]] markers.
+      return formatGuruLookupForPrompt(result);
+    } catch (error) {
+      console.warn(
+        "[lookupGurus] catalog lookup failed:",
+        error instanceof Error ? error.message : error,
+      );
+      return [
+        "# LIVE GURU LOOKUP RESULT",
+        `Query: ${JSON.stringify(params)}`,
+        "The live catalog could not be read on this turn. Do not invent Gurus.",
+        "Tell the visitor you can still help — open Explore / Find Care or /search for that area, and try again in a moment.",
+        "Browse: /search",
+      ].join("\n");
+    }
   },
 });

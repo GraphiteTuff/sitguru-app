@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   Image,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -20,9 +19,11 @@ import {
 } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
-import { SitGuruColors } from '@/constants/colors';
+import { useKeyboardSafe } from '@/components/mobile/KeyboardSafeHost';
 import { AppFonts } from '@/constants/fonts';
-import { MobileSpace, MobileType, TOUCH_MIN } from '@/constants/mobile-layout';
+import { MobileSpace, TOUCH_MIN } from '@/constants/mobile-layout';
+import { useThemeMode } from '@/hooks/use-theme';
+import { MAX_FONT_SIZE_MULTIPLIER } from '@/lib/a11y/type-scale';
 
 export type ChatAttachment = {
   uri: string;
@@ -43,18 +44,23 @@ type ChatComposerBarProps = {
 };
 
 /**
- * Mobile chat composer: quick photo bar, hold-style voice notes,
- * and a compact field that plays well with KeyboardAvoidingView.
+ * iMessage-style composer: compact media icons, a rounded field,
+ * and a send circle that replaces the mic once there is text.
  */
 export default function ChatComposerBar({
   value,
   onChangeText,
   onSend,
-  placeholder = 'Message',
+  placeholder = 'iMessage',
   sending = false,
   maxLength = 4000,
   onFocus,
 }: ChatComposerBarProps) {
+  const isDark = useThemeMode() === 'dark';
+  const palette = getComposerPalette(isDark);
+  const styles = createComposerStyles(palette);
+  const { revealFocusedInput } = useKeyboardSafe();
+  const inputRef = useRef<TextInput>(null);
   const [attachment, setAttachment] = useState<ChatAttachment | null>(null);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
@@ -102,6 +108,7 @@ export default function ChatComposerBar({
       fileName: asset.fileName,
       kind: 'photo',
     });
+    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   async function toggleVoiceNote() {
@@ -133,6 +140,7 @@ export default function ChatComposerBar({
       }
 
       setRecordingMs(0);
+      requestAnimationFrame(() => inputRef.current?.focus());
       return;
     }
 
@@ -160,15 +168,12 @@ export default function ChatComposerBar({
     }
   }
 
-  function clearAttachment() {
-    setAttachment(null);
-  }
-
   function handleSend() {
     const text = value.trim();
     if (sending || (!text && !attachment)) return;
     onSend({ text, attachment });
     setAttachment(null);
+    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   const recording = recorderState.isRecording;
@@ -176,57 +181,13 @@ export default function ChatComposerBar({
 
   return (
     <View style={styles.wrap}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.quickBar}
-        keyboardShouldPersistTaps="handled"
-      >
-        <BubblePressable
-          accessibilityRole="button"
-          accessibilityLabel="Take photo"
-          onPress={() => void pickPhoto(true)}
-          scaleTo={0.88}
-          style={styles.chip}
-        >
-          <Camera color={SitGuruColors.primary} size={16} strokeWidth={2.4} />
-          <Text style={styles.chipText}>Camera</Text>
-        </BubblePressable>
-        <BubblePressable
-          accessibilityRole="button"
-          accessibilityLabel="Choose photo"
-          onPress={() => void pickPhoto(false)}
-          scaleTo={0.88}
-          style={styles.chip}
-        >
-          <ImagePlus color={SitGuruColors.primary} size={16} strokeWidth={2.4} />
-          <Text style={styles.chipText}>Photo</Text>
-        </BubblePressable>
-        <BubblePressable
-          accessibilityRole="button"
-          accessibilityLabel={recording ? 'Stop voice note' : 'Record voice note'}
-          onPress={() => void toggleVoiceNote()}
-          scaleTo={0.88}
-          style={[styles.chip, recording && styles.chipRecording]}
-        >
-          {recording ? (
-            <Square color="#FFFFFF" size={14} fill="#FFFFFF" />
-          ) : (
-            <Mic color={SitGuruColors.primary} size={16} strokeWidth={2.4} />
-          )}
-          <Text style={[styles.chipText, recording && styles.chipTextRecording]}>
-            {recording ? formatMs(recordingMs) : 'Voice'}
-          </Text>
-        </BubblePressable>
-      </ScrollView>
-
       {attachment ? (
         <View style={styles.preview}>
           {attachment.kind === 'photo' ? (
             <Image source={{ uri: attachment.uri }} style={styles.previewImage} />
           ) : (
             <View style={styles.voicePreview}>
-              <Mic color={SitGuruColors.primary} size={18} strokeWidth={2.4} />
+              <Mic color={palette.accent} size={18} strokeWidth={2.4} />
               <Text style={styles.voicePreviewText}>
                 Voice note · {formatMs(attachment.durationMs ?? 0)}
               </Text>
@@ -235,47 +196,95 @@ export default function ChatComposerBar({
           <BubblePressable
             accessibilityLabel="Remove attachment"
             accessibilityRole="button"
-            onPress={clearAttachment}
+            haptic="selection"
+            onPress={() => setAttachment(null)}
             scaleTo={0.88}
             style={styles.clearAttachment}
           >
-            <X color={SitGuruColors.textMuted} size={16} strokeWidth={2.4} />
+            <X color={palette.muted} size={16} strokeWidth={2.4} />
           </BubblePressable>
         </View>
       ) : null}
 
-      <View style={styles.composer}>
+      <View style={styles.row}>
+        <BubblePressable
+          accessibilityLabel="Take photo"
+          accessibilityRole="button"
+          haptic="selection"
+          onPress={() => void pickPhoto(true)}
+          scaleTo={0.88}
+          style={styles.iconButton}
+        >
+          <Camera color={palette.accent} size={22} strokeWidth={2.2} />
+        </BubblePressable>
+        <BubblePressable
+          accessibilityLabel="Choose photo"
+          accessibilityRole="button"
+          haptic="selection"
+          onPress={() => void pickPhoto(false)}
+          scaleTo={0.88}
+          style={styles.iconButton}
+        >
+          <ImagePlus color={palette.accent} size={22} strokeWidth={2.2} />
+        </BubblePressable>
+
         <View style={styles.inputWrap}>
           <TextInput
+            ref={inputRef}
             accessibilityLabel="Message"
+            allowFontScaling
             editable={!sending && !recording}
+            maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
             maxLength={maxLength}
             multiline
             onChangeText={onChangeText}
-            onFocus={onFocus}
+            onFocus={() => {
+              revealFocusedInput();
+              onFocus?.();
+            }}
             placeholder={placeholder}
-            placeholderTextColor={SitGuruColors.textSoft}
+            placeholderTextColor={palette.placeholder}
             style={styles.input}
             value={value}
           />
         </View>
 
-        <BubblePressable
-          accessibilityLabel="Send message"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !canSend }}
-          disabled={!canSend}
-          onPress={handleSend}
-          scaleTo={0.88}
-          style={[styles.send, !canSend && styles.sendDisabled]}
-        >
-          {sending ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Send color="#FFFFFF" size={18} strokeWidth={2.6} />
-          )}
-        </BubblePressable>
+        {canSend ? (
+          <BubblePressable
+            accessibilityLabel="Send message"
+            accessibilityRole="button"
+            haptic="medium"
+            onPress={handleSend}
+            scaleTo={0.88}
+            style={styles.send}
+          >
+            {sending ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Send color="#FFFFFF" size={17} strokeWidth={2.6} />
+            )}
+          </BubblePressable>
+        ) : (
+          <BubblePressable
+            accessibilityLabel={recording ? 'Stop voice note' : 'Record voice note'}
+            accessibilityRole="button"
+            haptic="selection"
+            onPress={() => void toggleVoiceNote()}
+            scaleTo={0.88}
+            style={[styles.iconButton, recording && styles.iconRecording]}
+          >
+            {recording ? (
+              <Square color="#FFFFFF" size={14} fill="#FFFFFF" />
+            ) : (
+              <Mic color={palette.accent} size={22} strokeWidth={2.2} />
+            )}
+          </BubblePressable>
+        )}
       </View>
+
+      {recording ? (
+        <Text style={styles.recordingHint}>Recording {formatMs(recordingMs)}</Text>
+      ) : null}
     </View>
   );
 }
@@ -287,108 +296,112 @@ function formatMs(ms: number) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    backgroundColor: SitGuruColors.surface,
-    borderTopColor: SitGuruColors.border,
-    borderTopWidth: 1,
-    gap: MobileSpace.sm,
-    paddingBottom: MobileSpace.sm,
-    paddingHorizontal: MobileSpace.md,
-    paddingTop: MobileSpace.sm,
-    width: '100%',
-  },
-  quickBar: {
-    gap: MobileSpace.sm,
-    paddingVertical: 2,
-  },
-  chip: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderColor: SitGuruColors.primaryLight,
-    borderRadius: 999,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 6,
-    minHeight: 40,
-    paddingHorizontal: 12,
-  },
-  chipRecording: {
-    backgroundColor: '#B42318',
-    borderColor: '#B42318',
-  },
-  chipText: {
-    color: SitGuruColors.primary,
-    fontFamily: AppFonts.bold,
-    fontSize: MobileType.caption,
-  },
-  chipTextRecording: {
-    color: '#FFFFFF',
-  },
-  preview: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: MobileSpace.sm,
-  },
-  previewImage: {
-    borderRadius: 12,
-    height: 64,
-    width: 64,
-  },
-  voicePreview: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.surfaceSoft,
-    borderRadius: 14,
-    flex: 1,
-    flexDirection: 'row',
-    gap: MobileSpace.sm,
-    minHeight: TOUCH_MIN,
-    paddingHorizontal: MobileSpace.md,
-  },
-  voicePreviewText: {
-    color: SitGuruColors.text,
-    fontFamily: AppFonts.bold,
-    fontSize: MobileType.label,
-  },
-  clearAttachment: {
-    alignItems: 'center',
-    height: TOUCH_MIN,
-    justifyContent: 'center',
-    width: TOUCH_MIN,
-  },
-  composer: {
-    alignItems: 'flex-end',
-    flexDirection: 'row',
-    gap: MobileSpace.sm,
-  },
-  inputWrap: {
-    backgroundColor: SitGuruColors.background,
-    borderColor: SitGuruColors.border,
-    borderRadius: 18,
-    borderWidth: 1,
-    flex: 1,
-    maxHeight: 120,
-    minHeight: TOUCH_MIN,
-    paddingHorizontal: MobileSpace.md,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-  },
-  input: {
-    color: SitGuruColors.text,
-    fontFamily: AppFonts.medium,
-    fontSize: MobileType.body,
-    lineHeight: 22,
-    maxHeight: 96,
-    padding: 0,
-  },
-  send: {
-    alignItems: 'center',
-    backgroundColor: SitGuruColors.primary,
-    borderRadius: 16,
-    height: TOUCH_MIN,
-    justifyContent: 'center',
-    width: TOUCH_MIN,
-  },
-  sendDisabled: {
-    opacity: 0.45,
-  },
-});
+function getComposerPalette(isDark: boolean) {
+  return {
+    background: isDark ? 'rgba(8, 22, 16, 0.92)' : 'rgba(248, 248, 248, 0.94)',
+    field: isDark ? '#1C2A23' : '#FFFFFF',
+    border: isDark ? '#2A4034' : '#D8D8D8',
+    text: isDark ? '#F4F7F5' : '#111111',
+    muted: isDark ? '#8FA096' : '#8E8E93',
+    placeholder: isDark ? '#7F9187' : '#8E8E93',
+    accent: isDark ? '#30D158' : '#0D5C3A',
+    send: isDark ? '#30D158' : '#0D5C3A',
+  };
+}
+
+function createComposerStyles(palette: ReturnType<typeof getComposerPalette>) {
+  return StyleSheet.create({
+    wrap: {
+      backgroundColor: palette.background,
+      borderTopColor: palette.border,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      gap: 8,
+      paddingBottom: Platform.OS === 'ios' ? 6 : MobileSpace.sm,
+      paddingHorizontal: 8,
+      paddingTop: 8,
+      width: '100%',
+    },
+    row: {
+      alignItems: 'flex-end',
+      flexDirection: 'row',
+      gap: 6,
+    },
+    iconButton: {
+      alignItems: 'center',
+      height: TOUCH_MIN,
+      justifyContent: 'center',
+      width: 36,
+    },
+    iconRecording: {
+      backgroundColor: '#E5484D',
+      borderRadius: 999,
+      width: TOUCH_MIN,
+    },
+    inputWrap: {
+      backgroundColor: palette.field,
+      borderColor: palette.border,
+      borderRadius: 20,
+      borderWidth: StyleSheet.hairlineWidth,
+      flex: 1,
+      maxHeight: 120,
+      minHeight: 36,
+      paddingHorizontal: 14,
+      paddingVertical: Platform.OS === 'ios' ? 8 : 6,
+    },
+    input: {
+      color: palette.text,
+      fontFamily: AppFonts.regular,
+      fontSize: 17,
+      lineHeight: 22,
+      maxHeight: 96,
+      padding: 0,
+    },
+    send: {
+      alignItems: 'center',
+      backgroundColor: palette.send,
+      borderRadius: 999,
+      height: 36,
+      justifyContent: 'center',
+      marginBottom: 0,
+      width: 36,
+    },
+    preview: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      gap: MobileSpace.sm,
+      paddingHorizontal: 8,
+    },
+    previewImage: {
+      borderRadius: 14,
+      height: 72,
+      width: 72,
+    },
+    voicePreview: {
+      alignItems: 'center',
+      backgroundColor: palette.field,
+      borderRadius: 16,
+      flex: 1,
+      flexDirection: 'row',
+      gap: MobileSpace.sm,
+      minHeight: 44,
+      paddingHorizontal: MobileSpace.md,
+    },
+    voicePreviewText: {
+      color: palette.text,
+      fontFamily: AppFonts.semiBold,
+      fontSize: 15,
+    },
+    clearAttachment: {
+      alignItems: 'center',
+      height: TOUCH_MIN,
+      justifyContent: 'center',
+      width: TOUCH_MIN,
+    },
+    recordingHint: {
+      color: '#E5484D',
+      fontFamily: AppFonts.semiBold,
+      fontSize: 12,
+      paddingHorizontal: 12,
+    },
+  });
+}

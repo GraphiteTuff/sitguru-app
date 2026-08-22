@@ -73,8 +73,8 @@ export function useWalkLocationStream({
   const location = useLiveLocation({
     enabled,
     // Slightly slower watch; throttle still caps API traffic.
-    timeIntervalMs: Math.min(minPingIntervalMs, 8000),
-    distanceIntervalMeters: 12,
+    timeIntervalMs: minPingIntervalMs,
+    distanceIntervalMeters: 20,
     onUpdate: (coords) => {
       void streamCoords(coords);
     },

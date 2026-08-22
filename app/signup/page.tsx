@@ -1091,11 +1091,37 @@ function SignupPageContent() {
   }
 
   async function handleAppleSignup() {
-    setAppleLoading(true);
-    setError(
-      "Apple signup is almost ready. Please use email, phone, or Google for now.",
-    );
-    setAppleLoading(false);
+    try {
+      resetAlerts();
+      setAppleLoading(true);
+
+      const origin =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : "https://www.sitguru.com";
+
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "apple",
+        options: {
+          redirectTo: buildAuthCallbackUrl({
+            origin,
+            nextPath: redirectPath,
+            intent,
+            referralCode: normalizeReferralCode(referralCode),
+            tracking: signupTracking,
+          }),
+        },
+      });
+
+      if (oauthError) throw oauthError;
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Apple signup could not start. Please try again.",
+      );
+      setAppleLoading(false);
+    }
   }
 
   return (

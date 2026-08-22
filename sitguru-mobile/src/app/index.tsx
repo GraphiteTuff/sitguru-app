@@ -15,7 +15,6 @@ import {
 import type { ComponentProps, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Image,
   ImageSourcePropType,
@@ -35,6 +34,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 
 import BubblePressable from '@/components/BubblePressable';
+import SitGuruBootScreen from '@/components/mobile/SitGuruBootScreen';
 import {
   SitGuruIcon,
   type SitGuruIconName,
@@ -243,12 +243,8 @@ function HomeBootScreen({ onContinue }: { onContinue: () => void }) {
   }, []);
 
   return (
-    <View style={bootStyles.screen}>
+    <SitGuruBootScreen>
       <StatusBar style="light" />
-      <ActivityIndicator color="#FFFFFF" size="large" />
-      <Text style={bootStyles.label}>
-        Loading your SitGuru…
-      </Text>
       {showContinue ? (
         <BubblePressable
           accessibilityRole="button"
@@ -258,25 +254,11 @@ function HomeBootScreen({ onContinue }: { onContinue: () => void }) {
           <Text style={bootStyles.continueLabel}>Continue</Text>
         </BubblePressable>
       ) : null}
-    </View>
+    </SitGuruBootScreen>
   );
 }
 
 const bootStyles = StyleSheet.create({
-  screen: {
-    alignItems: 'center',
-    backgroundColor: '#0D5C3A',
-    flex: 1,
-    gap: 14,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  label: {
-    color: '#FFFFFF',
-    fontFamily: AppFonts.medium,
-    fontSize: 14,
-    textAlign: 'center',
-  },
   continueButton: {
     backgroundColor: '#FFFFFF',
     borderRadius: 999,

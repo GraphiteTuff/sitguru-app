@@ -59,6 +59,7 @@ import {
 } from '@/hooks/data/useBookings';
 import { sitguruApiFetch } from '@/lib/data/api';
 import { computeTipCents, type TipChoice } from '@/lib/payments/tipping';
+import { confirmSensitiveAction } from '@/lib/security/biometrics';
 import {
   setThemePreference,
   useColorScheme,
@@ -1527,6 +1528,19 @@ export default function PaymentsScreen() {
         title: 'Payment already confirmed',
         message:
           'This booking already has a confirmed successful payment.',
+      });
+      return;
+    }
+
+    const biometricGate = await confirmSensitiveAction(
+      'Confirm this SitGuru payment',
+    );
+    if (!biometricGate.ok) {
+      setFeedback({
+        tone: 'warning',
+        title: 'Payment not confirmed',
+        message:
+          'Face ID or your device passcode is required before SitGuru Checkout opens.',
       });
       return;
     }

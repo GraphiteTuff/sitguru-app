@@ -14,7 +14,7 @@ export type LiveCoords = {
 type UseLiveLocationOptions = {
   /** When false, watch stops and last coords are kept. */
   enabled?: boolean;
-  /** High-accuracy GPS for active care routes. */
+  /** Balanced by default so live care stays under the battery budget. */
   accuracy?: Location.Accuracy;
   distanceIntervalMeters?: number;
   timeIntervalMs?: number;
@@ -27,9 +27,9 @@ type UseLiveLocationOptions = {
  */
 export function useLiveLocation({
   enabled = false,
-  accuracy = Location.Accuracy.High,
-  distanceIntervalMeters = 8,
-  timeIntervalMs = 4000,
+  accuracy = Location.Accuracy.Balanced,
+  distanceIntervalMeters = 20,
+  timeIntervalMs = 12_000,
   onUpdate,
 }: UseLiveLocationOptions = {}) {
   const [coords, setCoords] = useState<LiveCoords | null>(null);

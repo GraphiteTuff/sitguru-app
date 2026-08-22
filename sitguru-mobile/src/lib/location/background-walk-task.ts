@@ -155,14 +155,15 @@ export async function startBackgroundWalkUpdates(bookingId: string) {
       accuracy: Location.Accuracy.Balanced,
       timeInterval: WALK_PING_MIN_INTERVAL_MS,
       distanceInterval: 20,
-      deferredUpdatesInterval: WALK_PING_MIN_INTERVAL_MS,
+      deferredUpdatesInterval: WALK_PING_MIN_INTERVAL_MS * 2,
       showsBackgroundLocationIndicator: true,
       foregroundService: {
         notificationTitle: 'SitGuru live care',
         notificationBody: 'Sharing your route with the Pet Parent during this visit.',
         notificationColor: '#0D5C3A',
       },
-      pausesUpdatesAutomatically: false,
+      pausesUpdatesAutomatically: true,
+      activityType: Location.ActivityType.Fitness,
     });
   }
 

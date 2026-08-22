@@ -1,5 +1,6 @@
 import { Asset } from "expo-asset";
 import { router, useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import {
   ArrowUpDown,
   Check,
@@ -13,12 +14,15 @@ import {
   SlidersHorizontal,
   Star,
   X,
+  Zap,
 } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
   type ImageStyle,
+  Keyboard,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -26,10 +30,13 @@ import {
   type StyleProp,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BubblePressable from "@/components/BubblePressable";
+import { useKeyboardSafe } from "@/components/mobile/KeyboardSafeHost";
 import { SitGuruIcon } from "@/components/SitGuruIcon";
 import SitGuruScreen from "@/components/SitGuruScreen";
 import SitGuruTabBar from "@/components/SitGuruTabBar";
@@ -49,6 +56,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import {
   getGuruBookingStatusLabel,
   getGuruDisplayName,
+  getGuruFirstName,
   getGuruLocationLabel,
   getGuruPhotoUrl,
   getGuruRateLabel,
@@ -282,7 +290,15 @@ const SEARCH_PREFERENCES_STORAGE_KEY = "sitguru.findCareSearchPrefs.v1";
 const DEFAULT_SITGURU_FEE_PERCENT = 15;
 const MIN_SITGURU_FEE_PERCENT = 15;
 const MAX_SITGURU_FEE_PERCENT = 20;
-const SELECT_FIELDS = "*";
+const SELECT_FIELDS =
+  "id, user_id, full_name, display_name, first_name, last_name, slug, username, handle, bio, title, city, state, service_city, service_state, service_area, zip_code, service_zip, service_zip_code, service_radius_miles, service_radius, radius_miles, avatar_url, profile_photo_url, photo_url, image_url, hourly_rate, starting_rate, rate, rating_avg, rating, review_count, is_verified, is_bookable, accepting_bookings, is_accepting_bookings, is_public_visible, admin_status, profile_quality_status, role, services, experience_years, latitude, longitude, lat, lng, service_latitude, service_longitude, completed_bookings";
+const SELECT_FIELDS_FALLBACK = "*";
+const GURU_CATALOG_TTL_MS = 45_000;
+
+let guruCatalogCache: {
+  expiresAt: number;
+  gurus: PublicGuruProfile[];
+} | null = null;
 const LOCAL_DISCOVERY_RADIUS_MILES = 75;
 const MAX_MAP_GURUS = 60;
 const MAX_NEARBY_MAP_GURUS = 20;
@@ -603,6 +619,10 @@ const localZipHints: Record<string, string[]> = {
 async function loadPublicGurus(): Promise<PublicGuruProfile[]> {
   if (!isSupabaseConfigured) return [];
 
+  if (guruCatalogCache && guruCatalogCache.expiresAt > Date.now()) {
+    return guruCatalogCache.gurus;
+  }
+
   const sources: Array<{ table: string; profiles?: boolean }> = [
     { table: "public_guru_search_profiles" },
     { table: "guru_profiles" },
@@ -611,7 +631,25 @@ async function loadPublicGurus(): Promise<PublicGuruProfile[]> {
   ];
 
   for (const source of sources) {
-    let query = supabase.from(source.table).select(SELECT_FIELDS).limit(60);
+    const gurus = await loadGurusFromSource(source);
+    if (gurus.length) {
+      guruCatalogCache = {
+        expiresAt: Date.now() + GURU_CATALOG_TTL_MS,
+        gurus,
+      };
+      return gurus;
+    }
+  }
+
+  return [];
+}
+
+async function loadGurusFromSource(source: {
+  table: string;
+  profiles?: boolean;
+}): Promise<PublicGuruProfile[]> {
+  for (const columns of [SELECT_FIELDS, SELECT_FIELDS_FALLBACK]) {
+    let query = supabase.from(source.table).select(columns).limit(60);
 
     if (source.profiles) {
       query = query.in("role", [
@@ -634,6 +672,68 @@ async function loadPublicGurus(): Promise<PublicGuruProfile[]> {
   }
 
   return [];
+}
+
+function certificationStatusMeansComplete(value?: string | null) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+
+  return [
+    "awarded",
+    "certified",
+    "complete",
+    "completed",
+    "graduate",
+    "graduated",
+    "issued",
+    "passed",
+  ].includes(normalized);
+}
+
+async function loadCertifiedGuruUserIds(
+  userIds: string[],
+): Promise<Set<string>> {
+  const safeUserIds = Array.from(
+    new Set(userIds.map((id) => String(id || "").trim()).filter(Boolean)),
+  );
+
+  if (!isSupabaseConfigured || safeUserIds.length === 0) {
+    return new Set();
+  }
+
+  try {
+    const result = await supabase
+      .from("academy_certifications")
+      .select("user_id, badge_status, certificate_status, issued_at")
+      .eq("academy_type", "guru")
+      .in("user_id", safeUserIds);
+
+    if (result.error || !result.data) return new Set();
+
+    return new Set(
+      result.data
+        .filter((row) => {
+          const record = row as {
+            user_id?: string | null;
+            badge_status?: string | null;
+            certificate_status?: string | null;
+            issued_at?: string | null;
+          };
+
+          return Boolean(
+            record.issued_at ||
+              certificationStatusMeansComplete(record.badge_status) ||
+              certificationStatusMeansComplete(record.certificate_status),
+          );
+        })
+        .map((row) => String((row as { user_id?: string | null }).user_id || "").trim())
+        .filter(Boolean),
+    );
+  } catch {
+    return new Set();
+  }
 }
 
 /**
@@ -667,9 +767,18 @@ export default function FindCareScreen() {
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
   const isDark = themeMode === "dark";
-  const palette = getPalette(isDark);
-  const styles = createStyles(isDark);
+  const isWebPreview = Platform.OS === "web";
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const palette = useMemo(() => getPalette(isDark), [isDark]);
+  const styles = useMemo(() => createStyles(isDark), [isDark]);
   const scrollRef = useRef<ScrollView | null>(null);
+  const searchFieldRef = useRef<View>(null);
+  const homeZipFieldRef = useRef<View>(null);
+  const scrollOffsetRef = useRef(0);
+  const keyboardHeightRef = useRef(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const { revealFocusedInput } = useKeyboardSafe();
   const routeParams = useLocalSearchParams<{
     service?: string | string[];
     zip?: string | string[];
@@ -735,6 +844,9 @@ export default function FindCareScreen() {
   );
   const [openSheet, setOpenSheet] = useState<"sort" | "filters" | null>(null);
   const [feeRules, setFeeRules] = useState<MarketplaceFeeRule[]>([]);
+  const [certifiedGuruUserIds, setCertifiedGuruUserIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const cleanZip = searchQuery.replace(/\D/g, "").slice(0, 5);
   const hasValidZip = cleanZip.length === 5;
@@ -1001,13 +1113,20 @@ export default function FindCareScreen() {
     let mounted = true;
 
     loadPublicGurus()
-      .then((gurus) => {
+      .then(async (gurus) => {
         if (!mounted) return;
         setDynamicGurus(gurus);
+
+        const certifiedIds = await loadCertifiedGuruUserIds(
+          gurus.map(getGuruUserId),
+        );
+
+        if (mounted) setCertifiedGuruUserIds(certifiedIds);
       })
       .catch(() => {
         if (!mounted) return;
         setDynamicGurus([]);
+        setCertifiedGuruUserIds(new Set());
       })
       .finally(() => {
         if (mounted) setIsLoadingGurus(false);
@@ -1025,6 +1144,62 @@ export default function FindCareScreen() {
 
     return () => clearTimeout(timeout);
   }, []);
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const show = Keyboard.addListener(showEvent, (event) => {
+      const nextHeight = event.endCoordinates.height;
+      keyboardHeightRef.current = nextHeight;
+      setKeyboardHeight(nextHeight);
+    });
+
+    const hide = Keyboard.addListener(hideEvent, () => {
+      keyboardHeightRef.current = 0;
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  function scrollFieldAboveKeyboard(field: View | null) {
+    if (!field || isWebPreview) return;
+
+    const liftField = () => {
+      field.measureInWindow((_x, y, _width, height) => {
+        const coveredBy = keyboardHeightRef.current + 16;
+        const visibleBottom = windowHeight - coveredBy;
+        const fieldBottom = y + height;
+
+        if (fieldBottom <= visibleBottom && y >= insets.top + 8) return;
+
+        const overlap = fieldBottom - visibleBottom;
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, scrollOffsetRef.current + overlap),
+          animated: true,
+        });
+      });
+    };
+
+    requestAnimationFrame(liftField);
+    setTimeout(liftField, Platform.OS === "ios" ? 280 : 80);
+  }
+
+  useEffect(() => {
+    if (!isEditingHomeZip) return;
+
+    const timeout = setTimeout(() => {
+      scrollFieldAboveKeyboard(homeZipFieldRef.current);
+    }, 80);
+
+    return () => clearTimeout(timeout);
+  }, [isEditingHomeZip, keyboardHeight]);
 
   useEffect(() => {
     setFavoriteGuruIds(readFavoriteGuruIds());
@@ -1305,7 +1480,14 @@ export default function FindCareScreen() {
     }
 
     if (isGuruBookable(guru)) {
-      router.push("/request-booking");
+      const slug = getGuruSlug(guru);
+
+      router.push({
+        pathname: "/request-booking",
+        params: slug
+          ? { guruId: guru.id, guruSlug: slug }
+          : { guruId: guru.id },
+      });
       return;
     }
 
@@ -1341,45 +1523,93 @@ export default function FindCareScreen() {
   }
 
   return (
-    <SitGuruScreen scroll center maxWidth={560}>
-      <View style={styles.previewCanvas}>
-        <View style={styles.deviceFrame}>
-          <View style={styles.deviceTopSpeaker} />
+    <SitGuruScreen
+      scroll={false}
+      center={isWebPreview}
+      maxWidth={560}
+      edgeToEdge={!isWebPreview}
+    >
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <View
+        style={[
+          styles.previewCanvas,
+          !isWebPreview && styles.previewCanvasNative,
+        ]}
+      >
+        <View
+          style={[
+            styles.deviceFrame,
+            !isWebPreview && styles.deviceFrameNative,
+          ]}
+        >
+          {isWebPreview ? <View style={styles.deviceTopSpeaker} /> : null}
 
-          <View style={styles.phoneShell}>
+          <View
+            style={[
+              styles.phoneShell,
+              !isWebPreview && styles.phoneShellNative,
+            ]}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              keyboardVerticalOffset={
+                isWebPreview ? 0 : 68 + Math.max(insets.bottom, 10)
+              }
+              style={styles.keyboardView}
+            >
             <ScrollView
               ref={scrollRef}
+              keyboardDismissMode={
+                Platform.OS === "ios" ? "interactive" : "on-drag"
+              }
+              keyboardShouldPersistTaps="handled"
               style={styles.scrollView}
               contentContainerStyle={[
                 styles.scrollContent,
+                !isWebPreview && styles.scrollContentNative,
                 activeView === "map" && styles.mapScrollContent,
+                activeView === "map" &&
+                  !isWebPreview &&
+                  styles.mapScrollContentNative,
+                keyboardHeight > 0 && styles.scrollContentKeyboard,
               ]}
+              onScroll={(event) => {
+                scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+              }}
+              scrollEventThrottle={16}
               showsVerticalScrollIndicator={false}
               scrollEnabled={activeView === "list"}
               bounces={activeView === "list"}
             >
-              <View style={styles.statusBar}>
-                <Text style={styles.statusTime}>9:41</Text>
+              {isWebPreview ? (
+                <View style={styles.statusBar}>
+                  <Text style={styles.statusTime}>9:41</Text>
 
-                <View style={styles.statusIcons}>
-                  <View style={styles.signalBars}>
-                    <View style={[styles.signalBar, { height: 6 }]} />
-                    <View style={[styles.signalBar, { height: 8 }]} />
-                    <View style={[styles.signalBar, { height: 10 }]} />
-                  </View>
-
-                  <Text style={styles.wifiText}>⌁</Text>
-
-                  <View style={styles.batteryWrap}>
-                    <View style={styles.batteryBody}>
-                      <View style={styles.batteryFill} />
+                  <View style={styles.statusIcons}>
+                    <View style={styles.signalBars}>
+                      <View style={[styles.signalBar, { height: 6 }]} />
+                      <View style={[styles.signalBar, { height: 8 }]} />
+                      <View style={[styles.signalBar, { height: 10 }]} />
                     </View>
-                    <View style={styles.batteryCap} />
+
+                    <Text style={styles.wifiText}>⌁</Text>
+
+                    <View style={styles.batteryWrap}>
+                      <View style={styles.batteryBody}>
+                        <View style={styles.batteryFill} />
+                      </View>
+                      <View style={styles.batteryCap} />
+                    </View>
                   </View>
                 </View>
-              </View>
+              ) : null}
 
-              <View style={styles.header}>
+              <View
+                style={[
+                  styles.header,
+                  !isWebPreview && { paddingTop: insets.top + 6 },
+                ]}
+              >
                 <BubblePressable
                   accessibilityRole="button"
                   accessibilityLabel="Go back home"
@@ -1445,7 +1675,7 @@ export default function FindCareScreen() {
               </View>
 
               <View style={styles.searchPanel}>
-                <View style={styles.searchInputRow}>
+                <View ref={searchFieldRef} style={styles.searchInputRow}>
                   <SitGuruIcon
                     name="explore"
                     size={18}
@@ -1458,6 +1688,10 @@ export default function FindCareScreen() {
                     onChangeText={(value) => {
                       setSearchQuery(value);
                       setNoticeMessage("");
+                    }}
+                    onFocus={() => {
+                      scrollFieldAboveKeyboard(searchFieldRef.current);
+                      revealFocusedInput();
                     }}
                     onSubmitEditing={handleSearch}
                     placeholder="Search zip, city, state, or service"
@@ -1748,7 +1982,7 @@ export default function FindCareScreen() {
                         </Text>
                       </View>
 
-                      <View style={styles.homeZipEditorRow}>
+                      <View ref={homeZipFieldRef} style={styles.homeZipEditorRow}>
                         <TextInput
                           accessibilityLabel="Home ZIP code"
                           autoFocus
@@ -1759,6 +1993,10 @@ export default function FindCareScreen() {
                               value.replace(/\D/g, "").slice(0, 5),
                             )
                           }
+                          onFocus={() => {
+                            scrollFieldAboveKeyboard(homeZipFieldRef.current);
+                            revealFocusedInput();
+                          }}
                           onSubmitEditing={handleSaveHomeZip}
                           placeholder="18951"
                           placeholderTextColor={palette.placeholder}
@@ -1877,8 +2115,11 @@ export default function FindCareScreen() {
                           favoriteGuruIds={favoriteGuruIds}
                           feeRules={feeRules}
                           guru={guru}
-                          homeLocation={homeLocation}
+                          distanceOrigin={distanceOrigin}
                           index={index}
+                          isAcademyCertified={certifiedGuruUserIds.has(
+                            getGuruUserId(guru),
+                          )}
                           key={String(guru.id)}
                           onBook={handleBookingAction}
                           onFavorite={handleToggleFavorite}
@@ -1891,7 +2132,12 @@ export default function FindCareScreen() {
                   )}
                 </>
               ) : (
-                <View style={styles.mapExplorerStage}>
+                <View
+                  style={[
+                    styles.mapExplorerStage,
+                    !isWebPreview && styles.mapExplorerStageNative,
+                  ]}
+                >
                   <CoverageMap
                     fillScreen
                     highlightedGuruId={highlightedGuruId}
@@ -1988,7 +2234,10 @@ export default function FindCareScreen() {
                       favoriteGuruIds={favoriteGuruIds}
                       feeRules={feeRules}
                       guru={selectedGuru}
-                      homeLocation={homeLocation}
+                      distanceOrigin={distanceOrigin}
+                      isAcademyCertified={certifiedGuruUserIds.has(
+                        getGuruUserId(selectedGuru),
+                      )}
                       onBook={handleBookingAction}
                       onCollapse={() => setIsMapPreviewExpanded(false)}
                       onExpand={() => setIsMapPreviewExpanded(true)}
@@ -2005,8 +2254,9 @@ export default function FindCareScreen() {
                 <View style={styles.bottomSpacer} />
               ) : null}
             </ScrollView>
+            </KeyboardAvoidingView>
 
-            {activeView === "list" ? (
+            {activeView === "list" && keyboardHeight === 0 ? (
               <BubblePressable
                 accessibilityRole="button"
                 accessibilityLabel="View Guru map"
@@ -2068,7 +2318,7 @@ export default function FindCareScreen() {
             ) : null}
           </View>
 
-          <View style={styles.homeIndicator} />
+          {isWebPreview ? <View style={styles.homeIndicator} /> : null}
         </View>
       </View>
     </SitGuruScreen>
@@ -2416,8 +2666,9 @@ function GuruDiscoveryCard({
   favoriteGuruIds,
   feeRules,
   guru,
-  homeLocation,
+  distanceOrigin,
   index,
+  isAcademyCertified,
   onBook,
   onFavorite,
   onView,
@@ -2427,8 +2678,9 @@ function GuruDiscoveryCard({
   favoriteGuruIds: string[];
   feeRules: MarketplaceFeeRule[];
   guru: PublicGuruProfile;
-  homeLocation: HomeLocation | null;
+  distanceOrigin: MapCoordinate | null;
   index: number;
+  isAcademyCertified: boolean;
   onBook: (guru: PublicGuruProfile) => void;
   onFavorite: (guru: PublicGuruProfile) => void;
   onView: (guru: PublicGuruProfile) => void;
@@ -2436,12 +2688,15 @@ function GuruDiscoveryCard({
   styles: ReturnType<typeof createStyles>;
 }) {
   const name = getGuruDisplayName(guru);
+  const firstName = getGuruFirstName(guru);
   const photoUrl = resolveSupabaseStorageUrl(getGuruPhotoUrl(guru));
   const isFavorite = favoriteGuruIds.includes(String(guru.id));
   const preview = isKnownPreviewGuru(guru);
   const bookable = isGuruBookable(guru);
-  const chips = getGuruServices(guru).slice(0, 4);
-  const distanceLabel = getGuruDistanceLabel(guru, homeLocation, index);
+  const services = getGuruServices(guru);
+  const visibleServices = services.slice(0, 4);
+  const extraServiceCount = Math.max(services.length - visibleServices.length, 0);
+  const distanceLabel = getGuruDistanceLabel(guru, distanceOrigin, index);
   const locationLabel = getGuruCityStateLabel(guru);
   const ratingLabel = getGuruCardRatingLabel(guru);
   const reviewCount = getGuruReviewCount(guru);
@@ -2449,14 +2704,23 @@ function GuruDiscoveryCard({
     guru as Record<string, unknown>,
   );
   const price = getGuruPriceDisplay(guru, feeRules);
-  const badgeLabel = getGuruCardBadgeLabel(guru);
   const trustLabel = getGuruCardTrustLabel(guru);
   const bio = getGuruCardBio(guru);
-  const actionLabel = preview
-    ? "View Profile Preview"
+  const title = getGuruTitle(guru);
+  const experienceYears = getGuruExperienceYears(guru);
+  const serviceMiles = getGuruServiceRadiusMiles(guru);
+  const mapReady = guruHasExactMapLocation(guru);
+  const founding = isFoundingGuruRecord(guru);
+  const verified = getGuruVerification(guru as Record<string, unknown>);
+  const identityLabel = verified.identityVerified || verified.backgroundChecked
+    ? verified.label || "Verified"
+    : "Trusted";
+  const meetLabel = `Meet ${firstName}`;
+  const bookLabel = preview
+    ? "Preview only"
     : bookable
-      ? "Request Booking"
-      : "Message Guru";
+      ? `Book with ${firstName}`
+      : "Bookings opening soon";
 
   return (
     <View style={styles.guruProfileCard}>
@@ -2470,6 +2734,19 @@ function GuruDiscoveryCard({
         <GuruCardHeroImage photoUrl={photoUrl} styles={styles} />
         <View pointerEvents="none" style={styles.guruProfilePhotoShade} />
       </BubblePressable>
+
+      {bookable && !preview ? (
+        <BubblePressable
+          accessibilityLabel={`Quick book ${firstName}`}
+          accessibilityRole="button"
+          onPress={() => onBook(guru)}
+          scaleTo={0.88}
+          style={styles.guruProfileQuickBook}
+        >
+          <Zap color="#FFFFFF" size={12} strokeWidth={2.6} />
+          <Text style={styles.guruProfileQuickBookText}>Quick Book</Text>
+        </BubblePressable>
+      ) : null}
 
       <BubblePressable
         accessibilityLabel={
@@ -2496,8 +2773,56 @@ function GuruDiscoveryCard({
       </BubblePressable>
 
       <View style={styles.guruProfilePanel}>
-        <View style={styles.guruProfileBadge}>
-          <Text style={styles.guruProfileBadgeText}>{badgeLabel}</Text>
+        <View style={styles.guruProfileChipRow}>
+          {founding ? (
+            <View style={[styles.guruProfileChip, styles.guruProfileChipFounding]}>
+              <Text style={styles.guruProfileChipFoundingText}>Founding Guru</Text>
+            </View>
+          ) : null}
+
+          <View
+            style={[
+              styles.guruProfileChip,
+              verified.identityVerified || verified.backgroundChecked
+                ? styles.guruProfileChipVerified
+                : styles.guruProfileChipMuted,
+            ]}
+          >
+            <Text
+              style={
+                verified.identityVerified || verified.backgroundChecked
+                  ? styles.guruProfileChipVerifiedText
+                  : styles.guruProfileChipMutedText
+              }
+            >
+              {identityLabel}
+            </Text>
+          </View>
+
+          {isAcademyCertified ? (
+            <View style={[styles.guruProfileChip, styles.guruProfileChipAcademy]}>
+              <Text style={styles.guruProfileChipAcademyText}>Academy Grad</Text>
+            </View>
+          ) : null}
+
+          <View
+            style={[
+              styles.guruProfileChip,
+              mapReady
+                ? styles.guruProfileChipMap
+                : styles.guruProfileChipArea,
+            ]}
+          >
+            <Text
+              style={
+                mapReady
+                  ? styles.guruProfileChipMapText
+                  : styles.guruProfileChipAreaText
+              }
+            >
+              {mapReady ? "Map ready" : "Local care area"}
+            </Text>
+          </View>
         </View>
 
         <BubblePressable
@@ -2512,30 +2837,48 @@ function GuruDiscoveryCard({
               <Text numberOfLines={1} style={styles.guruProfileName}>
                 {name}
               </Text>
+              <Text numberOfLines={1} style={styles.guruProfileTitle}>
+                {title}
+              </Text>
               <Text numberOfLines={1} style={styles.guruProfileLocation}>
-                {locationLabel} • {distanceLabel}
+                {locationLabel}
+                {distanceLabel ? ` · ${distanceLabel}` : ""}
+              </Text>
+              <Text numberOfLines={1} style={styles.guruProfileRadius}>
+                {serviceMiles}-mile service radius
               </Text>
             </View>
           </View>
 
-          <View style={styles.guruProfileRatingRow}>
-            <Star
-              color={palette.gold}
-              fill={palette.gold}
-              size={13}
-              strokeWidth={2.1}
-            />
-            <Text style={styles.guruProfileRatingValue}>{ratingLabel}</Text>
-            <Text style={styles.guruProfileReviewText}>
-              {reviewCount > 0
-                ? `${reviewCount.toLocaleString()} ${
-                    reviewCount === 1 ? "review" : "reviews"
-                  }`
-                : "New to SitGuru"}
-              {completedBookings
-                ? ` · ${completedBookings.toLocaleString()} completed`
-                : ""}
-            </Text>
+          <View style={styles.guruProfileStatRow}>
+            <View style={styles.guruProfileStatBox}>
+              <Text style={styles.guruProfileStatLabel}>Rating</Text>
+              <View style={styles.guruProfileStatValueRow}>
+                <Star
+                  color={palette.gold}
+                  fill={palette.gold}
+                  size={12}
+                  strokeWidth={2.1}
+                />
+                <Text style={styles.guruProfileStatValue}>{ratingLabel}</Text>
+              </View>
+            </View>
+
+            <View style={styles.guruProfileStatBox}>
+              <Text style={styles.guruProfileStatLabel}>Reviews</Text>
+              <Text style={styles.guruProfileStatValue}>
+                {reviewCount > 0 ? reviewCount.toLocaleString() : "New"}
+              </Text>
+            </View>
+
+            {completedBookings ? (
+              <View style={styles.guruProfileStatBox}>
+                <Text style={styles.guruProfileStatLabel}>Completed</Text>
+                <Text style={styles.guruProfileStatValue}>
+                  {completedBookings.toLocaleString()}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.guruProfilePriceRow}>
@@ -2553,23 +2896,43 @@ function GuruDiscoveryCard({
             </Text>
           </View>
 
-          <View style={styles.guruProfileServices}>
-            {chips.map((chip, chipIndex) => (
-              <View
-                key={`${String(guru.id)}-${chip}-${chipIndex}`}
-                style={styles.guruProfileServicePill}
-              >
-                <PawPrint
-                  color="#D7EEDF"
-                  size={9}
-                  strokeWidth={2.5}
-                />
-                <Text numberOfLines={1} style={styles.guruProfileServiceText}>
-                  {shortenServiceLabel(chip)}
-                </Text>
-              </View>
-            ))}
+          <View style={styles.guruProfileMetaRow}>
+            <View style={styles.guruProfileMetaPill}>
+              <Text numberOfLines={1} style={styles.guruProfileMetaPillText}>
+                {experienceYears
+                  ? `${experienceYears}+ years experience`
+                  : "Experience on profile"}
+              </Text>
+            </View>
+            <View style={styles.guruProfileMetaPill}>
+              <Text numberOfLines={1} style={styles.guruProfileMetaPillText}>
+                Accepts care within {serviceMiles} mi
+              </Text>
+            </View>
           </View>
+
+          {visibleServices.length > 0 ? (
+            <View style={styles.guruProfileServices}>
+              {visibleServices.map((chip, chipIndex) => (
+                <View
+                  key={`${String(guru.id)}-${chip}-${chipIndex}`}
+                  style={styles.guruProfileServicePill}
+                >
+                  <PawPrint color="#D7EEDF" size={9} strokeWidth={2.5} />
+                  <Text numberOfLines={1} style={styles.guruProfileServiceText}>
+                    {shortenServiceLabel(chip)}
+                  </Text>
+                </View>
+              ))}
+              {extraServiceCount > 0 ? (
+                <View style={styles.guruProfileServicePill}>
+                  <Text numberOfLines={1} style={styles.guruProfileServiceText}>
+                    +{extraServiceCount} more
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
 
           <View style={styles.guruProfileAboutBlock}>
             <Text style={styles.guruProfileAboutLabel}>About</Text>
@@ -2579,35 +2942,42 @@ function GuruDiscoveryCard({
           </View>
 
           <View style={styles.guruProfileTrustRow}>
-            <ShieldCheck
-              color="#78D990"
-              size={15}
-              strokeWidth={2.5}
-            />
+            <ShieldCheck color="#78D990" size={15} strokeWidth={2.5} />
             <Text style={styles.guruProfileTrustText}>{trustLabel}</Text>
           </View>
         </BubblePressable>
 
-        <BubblePressable
-          accessibilityLabel={`${actionLabel} with ${name}`}
-          accessibilityRole="button"
-          onPress={() => onBook(guru)}
-          style={[
-            styles.guruProfileRequestButton,
-            !bookable && !preview && styles.guruProfileRequestButtonSecondary,
-          ]}
-        >
-          <Text
+        <View style={styles.guruProfileActionRow}>
+          <BubblePressable
+            accessibilityLabel={meetLabel}
+            accessibilityRole="button"
+            onPress={() => onView(guru)}
+            style={styles.guruProfileMeetButton}
+          >
+            <Text style={styles.guruProfileMeetButtonText}>{meetLabel}</Text>
+          </BubblePressable>
+
+          <BubblePressable
+            accessibilityLabel={bookLabel}
+            accessibilityRole="button"
+            disabled={!bookable || preview}
+            onPress={() => onBook(guru)}
             style={[
-              styles.guruProfileRequestButtonText,
-              !bookable &&
-                !preview &&
-                styles.guruProfileRequestButtonTextSecondary,
+              styles.guruProfileRequestButton,
+              (!bookable || preview) && styles.guruProfileRequestButtonSecondary,
             ]}
           >
-            {actionLabel}
-          </Text>
-        </BubblePressable>
+            <Text
+              style={[
+                styles.guruProfileRequestButtonText,
+                (!bookable || preview) &&
+                  styles.guruProfileRequestButtonTextSecondary,
+              ]}
+            >
+              {bookLabel}
+            </Text>
+          </BubblePressable>
+        </View>
 
         <Text style={styles.guruProfileBookNote}>
           Nothing charged until they accept · Cancel free before accept
@@ -2622,7 +2992,8 @@ function MapGuruPreviewCard({
   favoriteGuruIds,
   feeRules,
   guru,
-  homeLocation,
+  distanceOrigin,
+  isAcademyCertified,
   onBook,
   onCollapse,
   onExpand,
@@ -2635,7 +3006,8 @@ function MapGuruPreviewCard({
   favoriteGuruIds: string[];
   feeRules: MarketplaceFeeRule[];
   guru: PublicGuruProfile;
-  homeLocation: HomeLocation | null;
+  distanceOrigin: MapCoordinate | null;
+  isAcademyCertified: boolean;
   onBook: (guru: PublicGuruProfile) => void;
   onCollapse: () => void;
   onExpand: () => void;
@@ -2645,14 +3017,18 @@ function MapGuruPreviewCard({
   styles: ReturnType<typeof createStyles>;
 }) {
   const name = getGuruDisplayName(guru);
+  const firstName = getGuruFirstName(guru);
   const photoUrl = resolveSupabaseStorageUrl(getGuruPhotoUrl(guru));
   const isFavorite = favoriteGuruIds.includes(String(guru.id));
   const preview = isKnownPreviewGuru(guru);
+  const bookable = isGuruBookable(guru);
   const serviceMiles = getGuruServiceRadiusMiles(guru);
   const chips = getGuruServices(guru).slice(0, 3);
   const price = getGuruPriceDisplay(guru, feeRules);
-  const distanceLabel = getGuruDistanceLabel(guru, homeLocation, 0);
+  const distanceLabel = getGuruDistanceLabel(guru, distanceOrigin, 0);
   const locationLabel = getGuruCityStateLabel(guru);
+  const title = getGuruTitle(guru);
+  const reviewCount = getGuruReviewCount(guru);
 
   if (!expanded) {
     return (
@@ -2687,11 +3063,13 @@ function MapGuruPreviewCard({
             </View>
 
             <Text style={styles.mapGuruPreviewLocation} numberOfLines={1}>
-              {locationLabel}
+              {title} · {locationLabel}
             </Text>
 
             <Text style={styles.mapGuruPreviewMeta} numberOfLines={1}>
-              {distanceLabel} • Serves up to {serviceMiles} mi
+              {distanceLabel ? `${distanceLabel} · ` : ""}
+              Serves up to {serviceMiles} mi
+              {isAcademyCertified ? " · Academy Grad" : ""}
             </Text>
           </View>
         </BubblePressable>
@@ -2754,10 +3132,18 @@ function MapGuruPreviewCard({
             </Text>
             <View style={styles.topGuruBadge}>
               <Text style={styles.topGuruBadgeText}>
-                {preview ? "Preview" : "Top Guru"}
+                {preview
+                  ? "Preview"
+                  : isAcademyCertified
+                    ? "Academy"
+                    : getGuruCardBadgeLabel(guru)}
               </Text>
             </View>
           </View>
+
+          <Text style={styles.mapGuruPreviewLocation} numberOfLines={1}>
+            {title}
+          </Text>
 
           <View style={styles.ratingRow}>
             <Text style={styles.mapExpandedRating}>
@@ -2769,6 +3155,11 @@ function MapGuruPreviewCard({
               fill={palette.gold}
               strokeWidth={2.1}
             />
+            {reviewCount > 0 ? (
+              <Text style={styles.mapGuruPreviewMeta}>
+                {reviewCount.toLocaleString()} reviews
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.mapExpandedLocationRow}>
@@ -2778,9 +3169,9 @@ function MapGuruPreviewCard({
             </Text>
           </View>
 
-          <Text style={styles.mapExpandedDistance}>
-            {distanceLabel} from you
-          </Text>
+          {distanceLabel ? (
+            <Text style={styles.mapExpandedDistance}>{distanceLabel}</Text>
+          ) : null}
         </View>
 
         <BubblePressable
@@ -2836,16 +3227,23 @@ function MapGuruPreviewCard({
           onPress={() => onView(guru)}
           style={styles.mapExpandedViewButton}
         >
-          <Text style={styles.mapExpandedViewButtonText}>View Profile</Text>
+          <Text style={styles.mapExpandedViewButtonText}>Meet {firstName}</Text>
         </BubblePressable>
       </View>
 
       <BubblePressable
         accessibilityRole="button"
+        disabled={!bookable || preview}
         onPress={() => onBook(guru)}
         style={styles.mapExpandedRequestButton}
       >
-        <Text style={styles.mapExpandedRequestButtonText}>Request Care</Text>
+        <Text style={styles.mapExpandedRequestButtonText}>
+          {preview
+            ? "Preview only"
+            : bookable
+              ? `Book with ${firstName}`
+              : "Bookings opening soon"}
+        </Text>
       </BubblePressable>
     </View>
   );
@@ -3749,28 +4147,65 @@ function degreesToRadians(value: number) {
 
 function getGuruDistanceLabel(
   guru: PublicGuruProfile,
-  homeLocation: HomeLocation | null,
+  origin: MapCoordinate | null,
   index: number,
 ) {
-  if (
-    homeLocation?.latitude !== null &&
-    homeLocation?.latitude !== undefined &&
-    homeLocation?.longitude !== null &&
-    homeLocation?.longitude !== undefined
-  ) {
-    const distance = getDistanceMiles(
-      {
-        latitude: homeLocation.latitude,
-        longitude: homeLocation.longitude,
-      },
-      getGuruCoordinate(guru, index),
-    );
+  if (!origin) return "";
 
-    if (distance < 1) return "Less than 1 mi away";
-    return `${Math.max(1, Math.round(distance))} mi away`;
-  }
+  const distance = getDistanceMiles(origin, getGuruCoordinate(guru, index));
 
-  return "Distance unknown";
+  if (distance < 1) return "Less than 1 mi away";
+  if (distance < 10) return `${distance.toFixed(1)} mi away`;
+  return `${Math.round(distance)} mi away`;
+}
+
+function getGuruUserId(guru: PublicGuruProfile) {
+  return String(guru.user_id || "").trim();
+}
+
+function getGuruTitle(guru: PublicGuruProfile) {
+  const title = getFirstString(guru as Record<string, unknown>, [
+    "title",
+    "role_title",
+    "professional_title",
+    "headline",
+  ]);
+
+  if (title) return title;
+
+  const firstService = getGuruServices(guru)[0];
+  return firstService ? `${firstService} Guru` : "Pet Care Guru";
+}
+
+function getGuruExperienceYears(guru: PublicGuruProfile) {
+  const years = getFirstNumber(guru as Record<string, unknown>, [
+    "experience_years",
+    "years_experience",
+    "years_of_experience",
+    "experience",
+  ]);
+
+  return years !== null && years > 0 ? Math.round(years) : null;
+}
+
+function guruHasExactMapLocation(guru: PublicGuruProfile) {
+  return getGuruCoordinateDetails(guru, 0).quality === "exact";
+}
+
+function isFoundingGuruRecord(guru: PublicGuruProfile) {
+  const record = guru as Record<string, unknown>;
+
+  return [
+    record.is_founding_guru,
+    record.founding_guru,
+    record.is_founding,
+    record.founding,
+  ].some(
+    (value) =>
+      value === true ||
+      value === 1 ||
+      String(value || "").toLowerCase() === "true",
+  );
 }
 
 
@@ -4090,17 +4525,16 @@ function getGuruCardTrustLabel(guru: PublicGuruProfile) {
 
 function getGuruCardBio(guru: PublicGuruProfile) {
   const record = guru as Record<string, unknown>;
+  const written = getFirstString(record, [
+    "bio",
+    "about",
+    "description",
+    "profile_summary",
+  ]);
 
-  return (
-    getFirstString(record, [
-      "bio",
-      "about",
-      "description",
-      "profile_summary",
-      "headline",
-    ]) ||
-    "Reliable local pet care with thoughtful updates, clear communication, and routines tailored to each pet."
-  );
+  if (written) return written;
+
+  return `Hi, I'm ${getGuruFirstName(guru)}! I'm adding the finishing touches to my profile and can't wait to meet local pets and their people.`;
 }
 
 function readFavoriteGuruIds() {
@@ -4261,7 +4695,7 @@ function getGuruServices(guru: PublicGuruProfile) {
     .map((value) => String(value).trim())
     .filter(Boolean);
 
-  return cleaned.length > 0 ? cleaned : ["Walks", "Drop-ins", "Sitting"];
+  return Array.from(new Set(cleaned));
 }
 
 function getRecordText(record: Record<string, unknown>, keys: string[]) {
@@ -4676,6 +5110,12 @@ function createStyles(isDark: boolean) {
       paddingVertical: 24,
       width: "100%",
     },
+    previewCanvasNative: {
+      flex: 1,
+      minHeight: 0,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+    },
 
     deviceFrame: {
       backgroundColor: palette.frame,
@@ -4692,6 +5132,18 @@ function createStyles(isDark: boolean) {
       shadowOpacity: 0.28,
       shadowRadius: 28,
       width: "100%",
+    },
+    deviceFrameNative: {
+      backgroundColor: "transparent",
+      borderRadius: 0,
+      borderWidth: 0,
+      flex: 1,
+      maxWidth: "100%",
+      overflow: "visible",
+      paddingBottom: 0,
+      paddingHorizontal: 0,
+      paddingTop: 0,
+      shadowOpacity: 0,
     },
     deviceTopSpeaker: {
       alignSelf: "center",
@@ -4712,6 +5164,16 @@ function createStyles(isDark: boolean) {
       overflow: "hidden",
       width: "100%",
     },
+    phoneShellNative: {
+      borderRadius: 0,
+      borderWidth: 0,
+      flex: 1,
+      height: "100%",
+      overflow: "hidden",
+    },
+    keyboardView: {
+      flex: 1,
+    },
     scrollView: {
       flex: 1,
     },
@@ -4719,6 +5181,13 @@ function createStyles(isDark: boolean) {
       paddingBottom: 84,
       paddingHorizontal: 18,
       paddingTop: 14,
+    },
+    scrollContentNative: {
+      paddingBottom: 108,
+      paddingTop: 4,
+    },
+    scrollContentKeyboard: {
+      paddingBottom: 32,
     },
 
     statusBar: {
@@ -5794,7 +6263,11 @@ function createStyles(isDark: boolean) {
     },
 
     mapScrollContent: {
+      flexGrow: 1,
       paddingBottom: 16,
+    },
+    mapScrollContentNative: {
+      flexGrow: 1,
     },
     recommendedSection: {
       gap: 7,
@@ -5971,6 +6444,176 @@ function createStyles(isDark: boolean) {
       letterSpacing: 0.15,
       textTransform: "uppercase",
     },
+    guruProfileQuickBook: {
+      alignItems: "center",
+      backgroundColor: "#0D5C3A",
+      borderRadius: 999,
+      flexDirection: "row",
+      gap: 5,
+      left: 11,
+      minHeight: 32,
+      paddingHorizontal: 11,
+      position: "absolute",
+      top: 11,
+      zIndex: 10,
+    },
+    guruProfileQuickBookText: {
+      color: "#FFFFFF",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 10,
+      letterSpacing: 0.2,
+    },
+    guruProfileChipRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    guruProfileChip: {
+      alignItems: "center",
+      borderRadius: 999,
+      flexDirection: "row",
+      gap: 4,
+      minHeight: 22,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    guruProfileChipFounding: {
+      backgroundColor: "#FFF4D4",
+    },
+    guruProfileChipFoundingText: {
+      color: "#7A4E08",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 9,
+      letterSpacing: 0.2,
+      textTransform: "uppercase",
+    },
+    guruProfileChipVerified: {
+      backgroundColor: "#DFF6E8",
+    },
+    guruProfileChipVerifiedText: {
+      color: "#0B4C38",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 9,
+    },
+    guruProfileChipMuted: {
+      backgroundColor: "rgba(255, 255, 255, 0.12)",
+    },
+    guruProfileChipMutedText: {
+      color: "rgba(255, 255, 255, 0.82)",
+      fontFamily: AppFonts.bold,
+      fontSize: 9,
+    },
+    guruProfileChipAcademy: {
+      backgroundColor: "#E8F8EE",
+    },
+    guruProfileChipAcademyText: {
+      color: "#0B4C38",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 9,
+    },
+    guruProfileChipMap: {
+      backgroundColor: "#E4F2FF",
+    },
+    guruProfileChipMapText: {
+      color: "#185A8A",
+      fontFamily: AppFonts.bold,
+      fontSize: 9,
+    },
+    guruProfileChipArea: {
+      backgroundColor: "#FFF3D8",
+    },
+    guruProfileChipAreaText: {
+      color: "#7A4E08",
+      fontFamily: AppFonts.bold,
+      fontSize: 9,
+    },
+    guruProfileTitle: {
+      color: "#9BE4B8",
+      fontFamily: AppFonts.bold,
+      fontSize: 11,
+      lineHeight: 14,
+    },
+    guruProfileRadius: {
+      color: "#78D990",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 10,
+      letterSpacing: 0.3,
+      lineHeight: 13,
+      textTransform: "uppercase",
+    },
+    guruProfileStatRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    guruProfileStatBox: {
+      backgroundColor: "rgba(255, 255, 255, 0.08)",
+      borderColor: "rgba(255, 255, 255, 0.14)",
+      borderRadius: 12,
+      borderWidth: 1,
+      flex: 1,
+      minWidth: 0,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+    },
+    guruProfileStatLabel: {
+      color: "rgba(255, 255, 255, 0.58)",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 8,
+      letterSpacing: 0.5,
+      textTransform: "uppercase",
+    },
+    guruProfileStatValueRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 4,
+      marginTop: 3,
+    },
+    guruProfileStatValue: {
+      color: "#FFFFFF",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 14,
+      letterSpacing: -0.3,
+      lineHeight: 18,
+      marginTop: 3,
+    },
+    guruProfileMetaRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    guruProfileMetaPill: {
+      backgroundColor: "rgba(216, 246, 226, 0.14)",
+      borderColor: "rgba(216, 246, 226, 0.28)",
+      borderRadius: 999,
+      borderWidth: 1,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+    },
+    guruProfileMetaPillText: {
+      color: "#D7EEDF",
+      fontFamily: AppFonts.bold,
+      fontSize: 10,
+    },
+    guruProfileActionRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    guruProfileMeetButton: {
+      alignItems: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.08)",
+      borderColor: "rgba(255, 255, 255, 0.28)",
+      borderRadius: 999,
+      borderWidth: 1,
+      flex: 1,
+      justifyContent: "center",
+      minHeight: 42,
+      paddingHorizontal: 10,
+    },
+    guruProfileMeetButtonText: {
+      color: "#FFFFFF",
+      fontFamily: AppFonts.extraBold,
+      fontSize: 11,
+    },
     guruProfileContentButton: {
       gap: 8,
     },
@@ -6112,11 +6755,12 @@ function createStyles(isDark: boolean) {
       alignItems: "center",
       backgroundColor: "#2B8C5E",
       borderColor: "#43A874",
-      borderRadius: 10,
+      borderRadius: 999,
       borderWidth: 1,
+      flex: 1,
       justifyContent: "center",
       minHeight: 42,
-      paddingHorizontal: 14,
+      paddingHorizontal: 10,
       shadowColor: "#000000",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.16,
@@ -6327,6 +6971,11 @@ function createStyles(isDark: boolean) {
       marginHorizontal: -18,
       overflow: "hidden",
       position: "relative",
+    },
+    mapExplorerStageNative: {
+      flex: 1,
+      height: undefined,
+      minHeight: 360,
     },
     listMapStage: {
       backgroundColor: palette.mapWater,

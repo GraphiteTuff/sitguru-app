@@ -101,6 +101,7 @@
     "android": {
       "package": "com.sitguru.mobile",
       "versionCode": 1,
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#0D5C3A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
