@@ -7,7 +7,7 @@ export default function GuruDashboardLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#f7fffb] text-slate-950">
+    <div className="platform-light-surface min-h-screen bg-[#f7fffb] text-slate-950">
       <GuruDashboardHeader />
       <main>{children}</main>
     </div>

@@ -174,10 +174,10 @@ export default function GuruLinkShareCard({
               <Gift className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#07132f]/80">
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] !text-[#07132f]">
                 Your referral toolkit
               </p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight text-[#07132f] sm:text-3xl">
+              <h2 className="mt-1 text-2xl font-black tracking-tight !text-[#07132f] sm:text-3xl">
                 Share SitGuru. Earn rewards.
               </h2>
               {rewardLabel ? (
@@ -212,7 +212,7 @@ export default function GuruLinkShareCard({
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
               Tracking link
             </p>
-            <p className="mt-1 truncate font-mono text-xs font-bold text-slate-900 sm:text-sm">
+            <p className="mt-1 truncate font-mono text-xs font-bold !text-slate-950 sm:text-sm">
               {referralUrl || "Generating link…"}
             </p>
           </div>

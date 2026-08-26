@@ -2189,7 +2189,7 @@ function NearbyGurusCarousel({
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
 
   const updateScrollState = useCallback(() => {
     const el = scrollerRef.current;
@@ -2198,19 +2198,28 @@ function NearbyGurusCarousel({
       setCanScrollRight(false);
       return;
     }
+    const maxScroll = el.scrollWidth - el.clientWidth;
     setCanScrollLeft(el.scrollLeft > 8);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 8);
+    setCanScrollRight(maxScroll > 8 && el.scrollLeft < maxScroll - 8);
   }, []);
 
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
     updateScrollState();
+    const frame = window.requestAnimationFrame(updateScrollState);
     el.addEventListener("scroll", updateScrollState, { passive: true });
     window.addEventListener("resize", updateScrollState);
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => updateScrollState())
+        : null;
+    observer?.observe(el);
     return () => {
+      window.cancelAnimationFrame(frame);
       el.removeEventListener("scroll", updateScrollState);
       window.removeEventListener("resize", updateScrollState);
+      observer?.disconnect();
     };
   }, [gurus.length, updateScrollState]);
 
@@ -2226,18 +2235,49 @@ function NearbyGurusCarousel({
 
   const showScrollControls = gurus.length > 1;
 
+  const scrollButtonClass = (enabled: boolean) =>
+    `inline-flex h-11 w-11 items-center justify-center rounded-full border-2 text-white shadow-sm transition ${
+      enabled
+        ? "border-emerald-700 bg-emerald-600 hover:bg-emerald-700"
+        : "cursor-not-allowed border-emerald-200 bg-emerald-200"
+    }`;
+
   return (
     <section className="mt-4 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
-      <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#dff7ef_100%)] p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
+      <div className="min-w-0 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#dff7ef_100%)] p-6">
+        <div className="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0 max-w-3xl">
             <p className="text-sm font-black uppercase tracking-[0.22em] text-emerald-700">
               Nearby Gurus
             </p>
 
-            <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-              Gurus Near Me
-            </h2>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h2 className="text-3xl font-black tracking-tight text-slate-950">
+                Gurus Near Me
+              </h2>
+              {showScrollControls ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="Previous Gurus"
+                    disabled={!canScrollLeft}
+                    onClick={() => scrollGurus(-1)}
+                    className={scrollButtonClass(canScrollLeft)}
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next Gurus"
+                    disabled={!canScrollRight}
+                    onClick={() => scrollGurus(1)}
+                    className={scrollButtonClass(canScrollRight)}
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </button>
+                </div>
+              ) : null}
+            </div>
 
             <p className="mt-3 text-sm leading-6 text-slate-700">
               Trusted care around {careLocationLabel || (careZip ? `ZIP ${careZip}` : "your area")}.
@@ -2278,29 +2318,6 @@ function NearbyGurusCarousel({
                 {loading ? "Checking..." : "Update"}
               </button>
             </form>
-
-            {showScrollControls ? (
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  aria-label="Scroll nearby Gurus left"
-                  disabled={!canScrollLeft}
-                  onClick={() => scrollGurus(-1)}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Scroll nearby Gurus right"
-                  disabled={!canScrollRight}
-                  onClick={() => scrollGurus(1)}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            ) : null}
           </div>
         </div>
 
@@ -2311,37 +2328,45 @@ function NearbyGurusCarousel({
         ) : null}
 
         {gurus.length > 0 ? (
-          <div className="relative mt-6">
+          <div className="relative mt-6 min-w-0">
             {showScrollControls ? (
               <>
                 <button
                   type="button"
-                  aria-label="Scroll nearby Gurus left"
+                  aria-label="Previous Gurus"
                   disabled={!canScrollLeft}
                   onClick={() => scrollGurus(-1)}
-                  className="absolute left-0 top-1/2 z-10 hidden h-11 w-11 -translate-x-1 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-900 shadow-md transition hover:border-emerald-300 hover:bg-emerald-50 disabled:opacity-0 sm:inline-flex"
+                  className={`absolute left-2 top-[88px] z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border-2 text-white shadow-lg ${
+                    canScrollLeft
+                      ? "border-emerald-700 bg-emerald-600 hover:bg-emerald-700"
+                      : "cursor-not-allowed border-emerald-200 bg-emerald-200"
+                  }`}
                 >
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronLeft className="h-6 w-6" />
                 </button>
                 <button
                   type="button"
-                  aria-label="Scroll nearby Gurus right"
+                  aria-label="Next Gurus"
                   disabled={!canScrollRight}
                   onClick={() => scrollGurus(1)}
-                  className="absolute right-0 top-1/2 z-10 hidden h-11 w-11 translate-x-1 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-900 shadow-md transition hover:border-emerald-300 hover:bg-emerald-50 disabled:opacity-0 sm:inline-flex"
+                  className={`absolute right-2 top-[88px] z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border-2 text-white shadow-lg ${
+                    canScrollRight
+                      ? "border-emerald-700 bg-emerald-600 hover:bg-emerald-700"
+                      : "cursor-not-allowed border-emerald-200 bg-emerald-200"
+                  }`}
                 >
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-6 w-6" />
                 </button>
               </>
             ) : null}
             <div
               ref={scrollerRef}
-              className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 scroll-smooth [scrollbar-width:thin]"
+              className="flex min-w-0 w-full snap-x snap-mandatory gap-4 overflow-x-auto pb-3 scroll-smooth [scrollbar-width:thin]"
             >
             {gurus.map((guru) => (
               <article
                 key={guru.id}
-                className="min-w-[280px] max-w-[280px] snap-start overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl sm:min-w-[320px] sm:max-w-[320px]"
+                className="w-[280px] min-w-[280px] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl sm:w-[320px] sm:min-w-[320px] sm:max-w-[320px]"
               >
                 <Link href={getGuruSearchHref(guru, careZip)} className="block">
                   <div className="relative h-48 overflow-hidden bg-white">

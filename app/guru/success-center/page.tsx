@@ -855,7 +855,7 @@ export default function GuruSuccessCenterPage() {
   }
 
   return (
-    <main className="sgsc-page">
+    <main className="sgsc-page platform-light-surface">
       <section className="sgsc-shell">
         <div className="sgsc-topbar">
           <div>
@@ -1308,14 +1308,16 @@ export default function GuruSuccessCenterPage() {
           border: 1px solid #e2e8f0;
           border-radius: 18px;
           padding: 0 18px;
-          color: #0f172a;
+          background: #ffffff;
+          color: #0f172a !important;
+          caret-color: #0f172a;
           font-size: 16px;
           font-weight: 650;
           outline: none;
         }
 
         .sgsc-search-input::placeholder {
-          color: #94a3b8;
+          color: #64748b !important;
         }
 
         .sgsc-search-input:focus {

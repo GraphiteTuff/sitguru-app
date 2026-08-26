@@ -37,3 +37,112 @@
 .platform-dark-surface textarea::placeholder {
   color: #94a3b8 !important;
 }
+
+/*
+ * Light Guru surfaces (dashboard, Success Center, referrals, public profiles).
+ * Must beat platform-dark-surface when nested, so headings and inputs stay readable
+ * on white / mint cards.
+ */
+.platform-light-surface,
+.platform-dark-surface .platform-light-surface {
+  color: #0f172a;
+}
+
+.platform-light-surface h1,
+.platform-light-surface h2,
+.platform-light-surface h3,
+.platform-light-surface h4,
+.platform-light-surface h5,
+.platform-light-surface h6,
+.platform-dark-surface .platform-light-surface h1,
+.platform-dark-surface .platform-light-surface h2,
+.platform-dark-surface .platform-light-surface h3,
+.platform-dark-surface .platform-light-surface h4,
+.platform-dark-surface .platform-light-surface h5,
+.platform-dark-surface .platform-light-surface h6 {
+  color: #0f172a !important;
+}
+
+.platform-light-surface p,
+.platform-dark-surface .platform-light-surface p {
+  color: inherit;
+}
+
+.platform-light-surface .text-slate-950,
+.platform-dark-surface .platform-light-surface .text-slate-950 {
+  color: #020617 !important;
+}
+
+.platform-light-surface .text-slate-900,
+.platform-dark-surface .platform-light-surface .text-slate-900 {
+  color: #0f172a !important;
+}
+
+.platform-light-surface .text-slate-800,
+.platform-dark-surface .platform-light-surface .text-slate-800 {
+  color: #1e293b !important;
+}
+
+.platform-light-surface .text-slate-700,
+.platform-dark-surface .platform-light-surface .text-slate-700 {
+  color: #334155 !important;
+}
+
+.platform-light-surface .text-slate-600,
+.platform-dark-surface .platform-light-surface .text-slate-600 {
+  color: #475569 !important;
+}
+
+.platform-light-surface .text-slate-500,
+.platform-dark-surface .platform-light-surface .text-slate-500 {
+  color: #64748b !important;
+}
+
+.platform-light-surface .text-slate-400,
+.platform-dark-surface .platform-light-surface .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+.platform-light-surface label,
+.platform-dark-surface .platform-light-surface label {
+  color: #334155 !important;
+}
+
+.platform-light-surface input,
+.platform-light-surface textarea,
+.platform-light-surface select,
+.platform-dark-surface .platform-light-surface input,
+.platform-dark-surface .platform-light-surface textarea,
+.platform-dark-surface .platform-light-surface select {
+  color: #0f172a !important;
+}
+
+.platform-light-surface input::placeholder,
+.platform-light-surface textarea::placeholder,
+.platform-dark-surface .platform-light-surface input::placeholder,
+.platform-dark-surface .platform-light-surface textarea::placeholder {
+  color: #64748b !important;
+}
+
+.platform-light-surface .text-white,
+.platform-light-surface .public-dark-section,
+.platform-light-surface .public-dark-section h1,
+.platform-light-surface .public-dark-section h2,
+.platform-light-surface .public-dark-section h3,
+.platform-light-surface .public-dark-section h4,
+.platform-light-surface .public-dark-section h5,
+.platform-light-surface .public-dark-section h6,
+.platform-light-surface [data-brand-green],
+.platform-light-surface [data-brand-green] h1,
+.platform-light-surface [data-brand-green] h2,
+.platform-light-surface [data-brand-green] h3,
+.platform-light-surface [data-brand-green] h4,
+.platform-light-surface [data-brand-green] h5,
+.platform-light-surface [data-brand-green] h6 {
+  color: #ffffff !important;
+}
+
+.platform-light-surface .public-dark-section p,
+.platform-light-surface [data-brand-green] p {
+  color: #ecfdf5 !important;
+}

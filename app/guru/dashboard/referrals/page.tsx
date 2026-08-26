@@ -603,7 +603,7 @@ export default function GuruDashboardReferralsPage() {
                 <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#07132f]/80">
                   Guru Growth Studio
                 </p>
-                <h1 className="mt-2 text-4xl font-black tracking-[-0.045em] text-[#07132f] sm:text-5xl">
+                <h1 className="mt-2 text-4xl font-black tracking-[-0.045em] !text-[#07132f] sm:text-5xl">
                   Referrals, {firstName}
                 </h1>
                 <p className="mt-3 max-w-2xl text-base font-semibold leading-7 text-slate-800/90 sm:text-lg">
@@ -693,10 +693,10 @@ export default function GuruDashboardReferralsPage() {
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#0D5C3A] text-sm font-black text-white">
                       {item.step}
                     </span>
-                    <h3 className="mt-3 text-base font-black text-slate-950">
+                    <h3 className="mt-3 text-base font-black !text-slate-950">
                       {item.title}
                     </h3>
-                    <p className="mt-1.5 text-sm font-semibold leading-6 text-slate-600">
+                    <p className="mt-1.5 text-sm font-semibold leading-6 !text-slate-700">
                       {item.body}
                     </p>
                   </article>
