@@ -7,6 +7,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import Link from "next/link";
@@ -14,6 +15,8 @@ import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Clock3,
   CreditCard,
@@ -2184,6 +2187,45 @@ function NearbyGurusCarousel({
   onCareZipInputChange: (value: string) => void;
   onCareZipSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) {
+      setCanScrollLeft(false);
+      setCanScrollRight(false);
+      return;
+    }
+    setCanScrollLeft(el.scrollLeft > 8);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 8);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    updateScrollState();
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    window.addEventListener("resize", updateScrollState);
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      window.removeEventListener("resize", updateScrollState);
+    };
+  }, [gurus.length, updateScrollState]);
+
+  function scrollGurus(direction: -1 | 1) {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const card = el.querySelector("article");
+    const amount = card
+      ? card.getBoundingClientRect().width + 16
+      : el.clientWidth * 0.85;
+    el.scrollBy({ left: direction * amount, behavior: "smooth" });
+  }
+
+  const showScrollControls = gurus.length > 1;
+
   return (
     <section className="mt-4 overflow-hidden rounded-[2rem] border border-emerald-200 bg-white shadow-sm">
       <div className="bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#dff7ef_100%)] p-6">
@@ -2214,27 +2256,52 @@ function NearbyGurusCarousel({
             </div>
           </div>
 
-          <form
-            onSubmit={onCareZipSubmit}
-            className="flex w-full flex-col gap-2 rounded-[1.4rem] bg-white p-3 shadow-sm ring-1 ring-emerald-100 sm:w-auto sm:min-w-[320px] sm:flex-row"
-          >
-            <input
-              value={careZipInput}
-              onChange={(event) => onCareZipInputChange(event.target.value)}
-              inputMode="numeric"
-              maxLength={5}
-              placeholder="Care ZIP"
-              className="min-h-[46px] flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
-            />
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="min-h-[46px] rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          <div className="flex w-full flex-col gap-3 sm:w-auto">
+            <form
+              onSubmit={onCareZipSubmit}
+              className="flex w-full flex-col gap-2 rounded-[1.4rem] bg-white p-3 shadow-sm ring-1 ring-emerald-100 sm:min-w-[320px] sm:flex-row"
             >
-              {loading ? "Checking..." : "Update"}
-            </button>
-          </form>
+              <input
+                value={careZipInput}
+                onChange={(event) => onCareZipInputChange(event.target.value)}
+                inputMode="numeric"
+                maxLength={5}
+                placeholder="Care ZIP"
+                className="min-h-[46px] flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
+              />
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="min-h-[46px] rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? "Checking..." : "Update"}
+              </button>
+            </form>
+
+            {showScrollControls ? (
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  aria-label="Scroll nearby Gurus left"
+                  disabled={!canScrollLeft}
+                  onClick={() => scrollGurus(-1)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Scroll nearby Gurus right"
+                  disabled={!canScrollRight}
+                  onClick={() => scrollGurus(1)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {message ? (
@@ -2244,20 +2311,46 @@ function NearbyGurusCarousel({
         ) : null}
 
         {gurus.length > 0 ? (
-          <div className="mt-6 flex gap-4 overflow-x-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="relative mt-6">
+            {showScrollControls ? (
+              <>
+                <button
+                  type="button"
+                  aria-label="Scroll nearby Gurus left"
+                  disabled={!canScrollLeft}
+                  onClick={() => scrollGurus(-1)}
+                  className="absolute left-0 top-1/2 z-10 hidden h-11 w-11 -translate-x-1 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-900 shadow-md transition hover:border-emerald-300 hover:bg-emerald-50 disabled:opacity-0 sm:inline-flex"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Scroll nearby Gurus right"
+                  disabled={!canScrollRight}
+                  onClick={() => scrollGurus(1)}
+                  className="absolute right-0 top-1/2 z-10 hidden h-11 w-11 translate-x-1 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-900 shadow-md transition hover:border-emerald-300 hover:bg-emerald-50 disabled:opacity-0 sm:inline-flex"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </>
+            ) : null}
+            <div
+              ref={scrollerRef}
+              className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 scroll-smooth [scrollbar-width:thin]"
+            >
             {gurus.map((guru) => (
               <article
                 key={guru.id}
-                className="min-w-[280px] max-w-[280px] overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl sm:min-w-[320px] sm:max-w-[320px]"
+                className="min-w-[280px] max-w-[280px] snap-start overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl sm:min-w-[320px] sm:max-w-[320px]"
               >
                 <Link href={getGuruSearchHref(guru, careZip)} className="block">
-                  <div className="relative h-48 overflow-hidden bg-emerald-50">
+                  <div className="relative h-48 overflow-hidden bg-white">
                     {guru.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={guru.image_url}
                         alt={guru.name}
-                        className="h-full w-full object-cover object-center"
+                        className="sg-face-photo h-full w-full"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-5xl">
@@ -2350,6 +2443,7 @@ function NearbyGurusCarousel({
                 </div>
               </article>
             ))}
+            </div>
           </div>
         ) : (
           <div className="mt-6 rounded-[1.5rem] border border-dashed border-emerald-200 bg-white/70 p-6 text-center">

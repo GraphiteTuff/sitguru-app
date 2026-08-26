@@ -130,7 +130,7 @@ const toolkit = [
   {
     title: "Guru Academy",
     description:
-      "Level up with onboarding guidance, readiness steps, and SitGuru learning tools.",
+      "Optional SitGuru University. Earn a Certified Guru badge — not required to go bookable.",
     icon: <GraduationCap size={20} />,
   },
   {
@@ -243,7 +243,7 @@ const faqs = [
   {
     question: "What happens after I apply?",
     answer:
-      "You will complete your profile, services, pricing, availability, trust requirements, and payout setup. Your profile must be approved and active before Pet Parents can fully book you.",
+      "You will complete your profile, services, pricing, availability, trust requirements, and payout setup. Your profile must be approved and active before Pet Parents can fully book you. Guru Academy is optional and unlocks a Certified Guru badge.",
   },
 ];
 

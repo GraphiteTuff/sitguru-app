@@ -607,7 +607,7 @@ function getActionDescription(action: AdminAction) {
     case "verification_pending":
       return "Moves the Guru into identity/background verification.";
     case "approved":
-      return "Approves the Guru and emails them to complete Guru Academy before becoming bookable.";
+      return "Approves the Guru. Guru Academy is optional — it earns the Certified Guru badge and is not required to make them bookable.";
     case "bookable":
       return "Final switch. Makes Guru active and visible to Pet Parents.";
     case "rejected":
@@ -796,8 +796,8 @@ function getGuruStatusEmailContent({
       return {
         subject: "Your SitGuru Guru application is pre-approved",
         preview:
-          "You are pre-approved. Next steps include verification and Guru Academy.",
-        body: `Hi ${firstName},\n\nGood news — your SitGuru Guru application has been pre-approved.\n\nThis means your application is moving forward, but your profile is not bookable yet. Next steps may include verification, payout readiness, profile completion, and Guru Academy completion.\n\nYou can continue preparing your Guru account here:\n${dashboardUrl}\n\nSincerely,\nThe SitGuru Team`,
+          "You are pre-approved. Next steps include verification and payout setup.",
+        body: `Hi ${firstName},\n\nGood news — your SitGuru Guru application has been pre-approved.\n\nThis means your application is moving forward, but your profile is not bookable yet. Next steps may include verification, payout readiness, and finishing your profile. Guru Academy is optional and unlocks your Certified Guru badge when you want it.\n\nYou can continue preparing your Guru account here:\n${dashboardUrl}\n\nSincerely,\nThe SitGuru Team`,
       };
     case "verification_pending":
       return {
@@ -807,11 +807,10 @@ function getGuruStatusEmailContent({
       };
     case "approved":
       return {
-        subject:
-          "Your SitGuru Guru application has been approved — complete Guru Academy next",
+        subject: "Your SitGuru Guru application has been approved",
         preview:
-          "You are approved. Please complete Guru Academy before becoming bookable.",
-        body: `Hi ${firstName},\n\nCongratulations — your SitGuru Guru application has been approved.\n\nBefore your Guru profile can become bookable, please complete Guru Academy in SitGuru University. The academy explains profile expectations, bookings, communication, safety standards, payouts, and how to provide trusted care through SitGuru.\n\nComplete Guru Academy here:\n${academyUrl}\n\nOnce your Guru Academy is complete and your payout/verification requirements are finished, SitGuru Admin will complete the final review and make your profile bookable.\n\nSincerely,\nThe SitGuru Team`,
+          "You are approved. Finish profile, payout, and trust steps to go bookable — Guru Academy is optional.",
+        body: `Hi ${firstName},\n\nCongratulations — your SitGuru Guru application has been approved.\n\nGuru Academy is optional. You can go bookable after your profile, payout, and trust steps are ready. If you want the Certified Guru badge, take Guru Academy anytime here:\n${academyUrl}\n\nSitGuru Admin will complete the final review and make your profile bookable when those required steps are finished.\n\nSincerely,\nThe SitGuru Team`,
       };
     case "bookable":
       return {
@@ -1845,8 +1844,9 @@ export default async function AdminGuruDetailPage({
               <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
                 Review this Guru’s application, profile readiness, trust checks,
                 and Admin status. Each Admin status change sends a formal email
-                to the Guru’s email on file. Approval directs the Guru to
-                complete Guru Academy before you make them bookable.
+                to the Guru’s email on file. Approval does not require Guru
+                Academy. Make them bookable when profile, payout, and trust
+                steps are ready. Academy is optional for the Certified Guru badge.
               </p>
             </div>
           </div>
@@ -2023,10 +2023,11 @@ export default async function AdminGuruDetailPage({
               Bookable is the final switch
             </p>
             <p className="mt-2 text-sm font-semibold leading-6 text-emerald-700">
-              Approve only means this Guru can move to Guru Academy and final
-              readiness. Make a Guru bookable only after SitGuru is comfortable
-              with their public profile, verification progress, payout setup,
-              academy completion, and customer trust readiness.
+              Approve means this Guru can finish profile, payout, and trust
+              steps. Make them bookable when SitGuru is comfortable with their
+              public profile, verification progress, payout setup, and customer
+              trust readiness. Guru Academy is optional and only required for
+              the Certified Guru badge.
             </p>
           </div>
         </div>
@@ -2045,8 +2046,8 @@ export default async function AdminGuruDetailPage({
           <p className="mt-3 text-sm font-semibold leading-7 text-slate-600">
             Use these actions to move a Guru through review. Each action emails
             the Guru. The final bookable action should only be used when
-            profile, payout, Guru Academy, verification, and trust readiness are
-            complete.
+            profile, payout, verification, and trust readiness are complete.
+            Guru Academy is optional.
           </p>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">

@@ -121,7 +121,7 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "how do i become bookable",
     ],
     answer:
-      "You will complete your profile, services, pricing, availability, trust requirements, and payout setup. Your profile must be approved and active before Pet Parents can fully book you.",
+      "You will complete your profile, services, pricing, availability, trust requirements, and payout setup. Your profile must be approved and active before Pet Parents can fully book you. Guru Academy is optional and unlocks a Certified Guru badge.",
   },
   {
     question: "How do I start my free Guru profile?",
@@ -139,6 +139,8 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "2. Add services, rates, availability, experience, photos, and your local area.",
       "3. Finish required identity, safety, account, and payout setup (Stripe or PayPal).",
       "4. Stay approved and active so Pet Parents can fully book you.",
+      "",
+      "Guru Academy is optional. Take it anytime for your Certified Guru badge — it is not required to go bookable.",
       "",
       "You choose services, rates, availability, service area, and which booking requests to accept. Tap **Start Free Guru Profile** on /become-a-guru when you’re ready. [[cta:guru]]",
     ].join("\n"),

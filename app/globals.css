@@ -1384,7 +1384,7 @@ p {
 .guru-search-card-photo img,
 .provider-card-photo img {
   object-fit: cover;
-  object-position: center;
+  object-position: 50% 22%;
 }
 
 /* Works for Next/Image fill wrappers too */
@@ -1401,7 +1401,7 @@ p {
 .guru-search-card-photo [data-nimg],
 .provider-card-photo [data-nimg] {
   object-fit: cover !important;
-  object-position: center !important;
+  object-position: 50% 22% !important;
 }
 
 /* Content column: equal-height cards with button row anchored */
@@ -2349,4 +2349,14 @@ div.homepage-chat-panel__header,
 
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+/*
+ * People photos: white fill + face-biased crop so heads stay in frame
+ * (portrait uploads into landscape/square cards).
+ */
+.sg-face-photo {
+  background-color: #fff;
+  object-fit: cover;
+  object-position: 50% 22%;
 }

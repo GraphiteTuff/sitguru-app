@@ -185,7 +185,7 @@ export default function UniversalRoleDashboard({
                 <img
                   src={avatarUrl}
                   alt=""
-                  className="h-full w-full object-cover object-center"
+                  className="sg-face-photo h-full w-full"
                   style={{ backgroundColor: "#fff" }}
                 />
               ) : (

@@ -480,7 +480,7 @@ export default function GuruDashboardHeader({
             src={guruPhoto}
             alt={`${guruName} profile photo`}
             onError={() => setPhotoFailed(true)}
-            className="h-full w-full object-cover"
+            className="sg-face-photo h-full w-full"
           />
         ) : (
           guruInitials

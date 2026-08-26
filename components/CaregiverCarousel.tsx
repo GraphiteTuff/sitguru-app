@@ -436,7 +436,7 @@ export default function CaregiverCarousel({
                       <img
                         src={item.image}
                         alt={`${item.name}, ${item.role}`}
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        className="h-full w-full sg-face-photo transition-transform duration-700 group-hover:scale-105"
                         loading="lazy"
                         onError={(event) => {
                           event.currentTarget.src = getSafeImageForItem(item);

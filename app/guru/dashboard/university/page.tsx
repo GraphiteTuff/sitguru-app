@@ -954,11 +954,11 @@ export default async function GuruUniversityPage({ searchParams }: PageProps) {
                 Learn SitGuru. Easy as 1, 2, 3.
               </h1>
               <p className="mt-4 max-w-3xl text-base font-semibold leading-8 !!text-slate-900/75 md:text-lg">
-                Hi {firstName}, learn the basics of SitGuru, how to complete your Guru
-                profile, manage bookings professionally, provide safe pet care,
-                set up payouts, and build trust with Pet Parents. Review the
-                video and guide, then acknowledge completion to earn your
-                Certified Guru badge.
+                Hi {firstName}, Guru Academy is optional — it is not required to
+                go bookable. Take it anytime to earn your Certified Guru badge.
+                Learn SitGuru basics, bookings, safe pet care, payouts, and how
+                to build trust with Pet Parents. Review the video and guide,
+                then acknowledge completion to unlock the badge.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">

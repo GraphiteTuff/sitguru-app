@@ -25,8 +25,7 @@ export function GuruProfileSnapshotCard({ guru }: { guru: GuruChatSnapshot }) {
             <img
               src={guru.photoUrl}
               alt=""
-              className="absolute inset-0 h-full w-full object-cover"
-              style={{ objectPosition: "50% 28%" }}
+              className="sg-face-photo absolute inset-0 h-full w-full"
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-lg font-black text-[#0D5C3A]">

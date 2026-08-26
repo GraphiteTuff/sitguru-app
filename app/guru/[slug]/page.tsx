@@ -1046,7 +1046,7 @@ function getGuruTier(
     label: "Rising Guru",
     shortLabel: "Rising",
     description:
-      "You are on the path to becoming bookable. Finish your profile, complete Guru Academy, and keep building trust so pet families can choose you with confidence.",
+      "You are on the path to becoming bookable. Finish your profile, payout, and trust steps so pet families can choose you with confidence. Guru Academy is optional and unlocks your Certified Guru badge.",
     icon: "🐾",
     stars: 2,
     badgeClassName: "border-cyan-200 bg-cyan-50 text-cyan-800",
@@ -2576,7 +2576,7 @@ async function getGuruUniversityProgress(
     certificationLabel: "Certified Guru: Not started",
     badgeStatus: "Locked",
     progressHelper:
-      "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion.",
+      "Optional — not required to go bookable. Watch the intro, review the Guru Success Guide, and acknowledge completion to earn your badge.",
     academyButtonLabel: "Start Guru Academy",
   };
 
@@ -2716,7 +2716,7 @@ async function getGuruUniversityProgress(
         ? "Certified Guru badge issued"
         : isStarted
           ? `${acknowledgedMaterials} of ${normalizedRequiredMaterials} required materials acknowledged`
-          : "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion.",
+          : "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion. Optional — not required to go bookable.",
       academyButtonLabel: isComplete
         ? "Review Guru Academy"
         : isStarted
@@ -2747,7 +2747,7 @@ function GuruAvatar({
             <img
               src={imageUrl}
               alt={name}
-              className="h-full w-full object-cover object-center"
+              className="sg-face-photo h-full w-full"
             />
           </div>
         ) : (
@@ -2790,7 +2790,7 @@ function PublicGuruHeroImage({
         <img
           src={imageUrl}
           alt={name}
-          className="h-full w-full object-cover object-center"
+          className="sg-face-photo h-full w-full"
         />
 
         {isAcademyGraduate ? (
@@ -3386,7 +3386,7 @@ function GuruAcademyCard({ progress }: { progress: GuruUniversityProgress }) {
               <p className="mt-1 text-xs font-bold !text-slate-600">
                 {progress.isComplete
                   ? "Certified Guru badge issued"
-                  : "Issued after academy completion"}
+                  : "Optional badge — take Academy anytime"}
               </p>
             </div>
 
@@ -4165,7 +4165,7 @@ async function GuruDashboardView({
             <p className="mt-2 max-w-4xl text-sm font-bold leading-7 !text-slate-700">
               {universityProgress.isComplete
                 ? "Your Guru Academy Graduate badge is active. Keep your profile polished, respond quickly, and deliver trusted care to move toward Elite Guru."
-                : "Complete Guru Academy to unlock your Guru Academy Graduate badge. This badge helps Pet Parents understand that you completed SitGuru University onboarding."}
+                : "Guru Academy is optional. Take it anytime to unlock your Guru Academy Graduate badge — it is not required to go bookable."}
             </p>
 
             <div className="mt-6 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -4207,7 +4207,7 @@ async function GuruDashboardView({
                   icon="🧹"
                 />
                 <EliteProgressRow
-                  label="Complete Guru Academy"
+                  label="Earn Guru Academy badge (optional)"
                   value={
                     universityProgress.isComplete
                       ? "Graduate"
@@ -4282,8 +4282,9 @@ async function GuruDashboardView({
                 Stay ready to book
               </h2>
               <p className="mt-2 text-sm font-bold leading-6 !text-slate-700">
-                Keep your calendar current, finish Guru Academy, and make it
-                easy for Pet Parents to trust and choose you.
+                Keep your calendar current and make it easy for Pet Parents to
+                trust and choose you. Guru Academy is optional if you want the
+                Certified Guru badge.
               </p>
             </div>
             <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 p-4">
@@ -4385,7 +4386,7 @@ export default async function GuruSlugPage({ params }: PageProps) {
           certificationLabel: "Certified Guru: Not started",
           badgeStatus: "Locked",
           progressHelper:
-            "Watch the Guru intro video, review the Guru Success Guide, and acknowledge completion.",
+            "Optional — not required to go bookable. Watch the intro, review the Guru Success Guide, and acknowledge completion to earn your badge.",
           academyButtonLabel: "Start Guru Academy",
         } satisfies GuruUniversityProgress),
     getPublicGuruReviews(publicGuruProfile),

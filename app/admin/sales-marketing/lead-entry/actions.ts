@@ -113,7 +113,7 @@ function getThankYouMessage({
   const normalized = `${leadType} ${relationshipCategory}`.toLowerCase();
 
   if (normalized.includes("guru")) {
-    return `Hi ${displayName}, thank you for your interest in becoming a SitGuru Guru. Your next step is to start your Guru application, complete your profile, choose your services, and complete SitGuru’s Trust & Safety steps before becoming bookable. Start here: ${signupLink}. Questions? Visit SitGuru.com or call (855) 474-8738.`;
+    return `Hi ${displayName}, thank you for your interest in becoming a SitGuru Guru. Your next step is to start your Guru application, complete your profile, choose your services, and finish SitGuru’s Trust & Safety and payout steps before becoming bookable. Guru Academy is optional. Start here: ${signupLink}. Questions? Visit SitGuru.com or call (855) 474-8738.`;
   }
 
   if (normalized.includes("ambassador")) {

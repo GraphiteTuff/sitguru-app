@@ -7,7 +7,7 @@
  * lg: 3-col inside max-w-7xl
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -101,6 +101,8 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
   const [traitTab, setTraitTab] = useState<PetTraitTabId>("basics");
   const [form, setForm] = useState<CanonicalPetForm>(EMPTY_CANONICAL_PET_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const breedOptions = useMemo(
     () => getPetBreedOptions(form.species === "cat" ? "cat" : "dog"),
@@ -135,12 +137,24 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parent.userId]);
 
+  function scrollToPassportEditor() {
+    editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => nameInputRef.current?.focus(), 280);
+    if (typeof window !== "undefined") {
+      const nextHash = "#new-pet-passport";
+      if (window.location.hash !== nextHash) {
+        window.history.replaceState(null, "", nextHash);
+      }
+    }
+  }
+
   function startCreate() {
     setEditingId(null);
     setForm(EMPTY_CANONICAL_PET_FORM);
     setTraitTab("basics");
     setMessage("");
     setError("");
+    scrollToPassportEditor();
   }
 
   function startEdit(pet: CanonicalPet) {
@@ -320,14 +334,17 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
                 Canonical fields: species · size · medical_notes · routines
               </p>
             </div>
-            <button
-              type="button"
-              onClick={startCreate}
+            <a
+              href="#new-pet-passport"
+              onClick={(event) => {
+                event.preventDefault();
+                startCreate();
+              }}
               className="inline-flex min-h-[42px] items-center gap-2 rounded-2xl bg-emerald-600 px-4 text-xs font-black text-white hover:bg-emerald-700"
             >
               <Plus className="h-4 w-4" />
               Add pet
-            </button>
+            </a>
           </div>
 
           {loading ? (
@@ -335,14 +352,18 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
               <Loader2 className="h-4 w-4 animate-spin" /> Loading pets…
             </div>
           ) : pets.length === 0 ? (
-            <div className="mt-6 rounded-[1.4rem] border border-dashed border-emerald-200 bg-emerald-50/70 p-6 text-center">
+            <button
+              type="button"
+              onClick={startCreate}
+              className="mt-6 w-full rounded-[1.4rem] border border-dashed border-emerald-200 bg-emerald-50/70 p-6 text-center transition hover:border-emerald-400 hover:bg-emerald-50"
+            >
               <PawPrint className="mx-auto h-8 w-8 text-emerald-600" />
               <p className="mt-3 font-black text-slate-950">Add your first pet</p>
               <p className="mt-1 text-sm font-semibold text-slate-600">
-                Behavior, feeding, potty, and medical notes live on each pet row
-                (linked by user_id).
+                Opens the New pet passport form below. Add name, species, and
+                care notes, then save.
               </p>
-            </div>
+            </button>
           ) : (
             <div className="mt-5 flex gap-3 overflow-x-auto pb-2 scrollbar-none md:grid md:grid-cols-2 md:overflow-visible lg:grid-cols-3">
               {pets.map((pet) => {
@@ -401,7 +422,11 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
         </div>
 
         {/* Editor */}
-        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm md:col-span-2 lg:col-span-3">
+        <div
+          id="new-pet-passport"
+          ref={editorRef}
+          className="scroll-mt-24 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm md:col-span-2 lg:col-span-3"
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-black text-slate-950">
@@ -459,10 +484,13 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <Field label="Name *">
                   <input
+                    ref={nameInputRef}
                     required
                     className={inputClass}
                     value={form.name}
                     onChange={(e) => patchForm("name", e.target.value)}
+                    placeholder="Pet name"
+                    autoComplete="off"
                   />
                 </Field>
                 <Field label="Species">

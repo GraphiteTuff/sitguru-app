@@ -75,7 +75,7 @@ const setupSteps: SetupStep[] = [
     description:
       'Review SitGuru expectations, care standards, PawReport™ basics, booking flow, and professional conduct.',
     usedFor:
-      'Guru Academy, onboarding progress, booking readiness, care standards, and profile review.',
+      'Guru Academy (optional badge), onboarding progress, care standards, and profile review.',
   },
   {
     step: 6,

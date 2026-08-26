@@ -94,7 +94,7 @@ export default function SitGuruProfilePhotoFrame({
             }}
             resizeMode="cover"
             source={{ uri: resolvedUrl }}
-            style={styles.image}
+            style={[styles.image, { top: Math.round(dim.height * -0.1), height: Math.round(dim.height * 1.22) }]}
           />
         ) : (
           <View style={styles.fallback}>
@@ -141,7 +141,8 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
   },
   image: {
-    height: '100%',
+    position: 'absolute',
+    left: 0,
     width: '100%',
   },
   fallback: {

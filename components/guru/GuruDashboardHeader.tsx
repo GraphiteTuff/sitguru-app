@@ -71,7 +71,7 @@ function MiniAvatar({
         <img
           src={imageUrl}
           alt={`${displayName || "Guru"} avatar`}
-          className="h-full w-full object-cover"
+          className="sg-face-photo h-full w-full"
         />
       </div>
     );

@@ -219,7 +219,7 @@ export default function GuruMediaUploader({
               <img
                 src={photoUrl}
                 alt={`${displayName} avatar preview`}
-                className="h-full w-full object-cover"
+                className="sg-face-photo h-full w-full"
               />
             ) : (
               displayName.charAt(0).toUpperCase()

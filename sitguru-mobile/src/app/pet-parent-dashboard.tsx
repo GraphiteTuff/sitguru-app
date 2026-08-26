@@ -1616,7 +1616,7 @@ function Avatar({
           onError={() => setImageFailed(true)}
           resizeMode="cover"
           source={{ uri: imageUrl as string }}
-          style={{ height: '100%', width: '100%' }}
+          style={{ height: size * 1.22, marginTop: size * -0.1, width: '100%' }}
         />
       ) : (
         <Text

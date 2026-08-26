@@ -830,7 +830,7 @@ export default function Header({ user = null }: HeaderProps) {
             fill
             priority
             sizes="96px"
-            className="object-cover"
+            className="sg-face-photo"
           />
         </span>
       );
@@ -845,7 +845,7 @@ export default function Header({ user = null }: HeaderProps) {
             alt={`${userName} profile photo`}
             width={64}
             height={64}
-            className="h-full w-full object-cover"
+            className="sg-face-photo h-full w-full"
             unoptimized
           />
         ) : (

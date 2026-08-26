@@ -1315,7 +1315,7 @@ function GuruResultPhoto({
         <img
           src={photoUrl}
           alt={guruName}
-          className="h-full w-full object-cover object-center"
+          className="sg-face-photo h-full w-full"
           onError={() => setImageFailed(true)}
         />
       ) : (
