@@ -2235,9 +2235,14 @@ function SearchPageContent() {
         const guruBio = normalizeText(guru.bio);
         const guruTitle = normalizeText(guru.title);
         const guruServices = (guru.services || []).join(" ").toLowerCase();
+        const textQuery = query.replace(
+          /\b((pet|dog|cat|house)\s*[- ]?)?(sitters?|gurus?|walkers?|caregivers?|handlers?)\b/g,
+          " ",
+        ).replace(/\s+/g, " ").trim();
 
         const matchesText =
           !query ||
+          !textQuery ||
           [
             guruName,
             guruCity,
@@ -2248,7 +2253,7 @@ function SearchPageContent() {
             guruServices,
           ]
             .join(" ")
-            .includes(query);
+            .includes(textQuery);
 
         const matchesCareRadius = guruServesSearchLocation(
           guru,

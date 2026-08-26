@@ -22,10 +22,14 @@ import {
   ROGUE_PUBLIC_MARKETING_FAQS,
 } from "@/lib/ai/officer-marketing-faqs";
 import {
-  extractGuruCardsFromText,
   inferLookupParamsFromChat,
 } from "@/lib/gurus/guru-chat-snapshot";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
+import {
+  buildCareMatchingAsk,
+  joinRecentUserTexts,
+  needsCareMatchingAsk,
+} from "@/lib/chat/care-matching-intake";
 
 function safeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -67,27 +71,27 @@ function ensureGuruCardsInAssistantText(
   let out = String(text || "").trim();
   if (!markers.length) return out;
 
-  const existing = extractGuruCardsFromText(out).cards;
-  if (existing.length > 0) return out;
-
-  out = `${out} ${markers.join(" ")}`.trim();
+  const missing = markers.filter((marker) => !out.includes(marker));
+  if (missing.length) {
+    out = `${out} ${missing.join(" ")}`.trim();
+  }
   if (!/\[\[\s*cta:parent\s*\]\]/i.test(out)) {
     out = `${out} [[cta:parent]]`;
   }
   return out;
 }
 
-function shouldForceGuruLookup(lastUserText: string) {
-  const params = inferLookupParamsFromChat(lastUserText);
+function shouldForceGuruLookup(threadText: string) {
+  if (needsCareMatchingAsk(threadText)) return false;
+  const params = inferLookupParamsFromChat(threadText);
   if (!params) return false;
-  return Boolean(
-    params.city || params.state || params.zip || params.name || params.service,
-  );
+  return Boolean(params.city || params.state || params.zip || params.name);
 }
 
 async function buildSimulationReply(opts: {
   clientFirstName?: string;
   lastUserText?: string;
+  careThread?: string;
 }): Promise<string> {
   return buildHomepageSimulationReplyWithGurus(opts);
 }
@@ -289,12 +293,14 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     const lastUserMessage = messages[messages.length - 1];
     const lastUserText = messageContent(lastUserMessage);
     parsedLastUserText = lastUserText;
+    const careThread = joinRecentUserTexts(messages, lastUserText);
 
     const simulationPayload = async () =>
       simulationDataStreamResponse(
         await buildSimulationReply({
           clientFirstName,
           lastUserText,
+          careThread,
         }),
       );
 
@@ -337,6 +343,11 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       void recordChatInsight(lastUserText, insightChannel, "General Inquiry", insightMeta);
     }
 
+    const matchingAsk = buildCareMatchingAsk(careThread, clientFirstName);
+    if (matchingAsk) {
+      return simulationDataStreamResponse(matchingAsk);
+    }
+
     const exactParentFaq = matchMarketingFaq(
       ROGUE_PUBLIC_MARKETING_FAQS,
       lastUserText,
@@ -348,7 +359,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     const systemPrompt = buildRogueSystemPrompt({
       clientFirstName,
       userRole: userTypeLabel,
-      lastUserText,
+      lastUserText: careThread,
       walkId: walkId || undefined,
     });
 
@@ -367,10 +378,10 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
 
       // Care searches: generate fully so we can append exact [[guru_card:]]
       // markers from the tool digest when the model omits/truncates them.
-      if (shouldForceGuruLookup(lastUserText)) {
+      if (shouldForceGuruLookup(careThread)) {
         const generated = await generateText({
           ...sharedModelConfig,
-          maxTokens: 1400,
+          maxTokens: 2800,
         });
 
         let assistantText = ensureGuruCardsInAssistantText(
@@ -392,6 +403,7 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
           assistantText = await buildSimulationReply({
             clientFirstName,
             lastUserText,
+            careThread,
           });
         }
 

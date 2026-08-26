@@ -53,6 +53,10 @@ import {
   OPEN_COMPANION_CHAT_EVENT,
   type OpenCompanionChatDetail,
 } from "@/lib/companions/open-companion-chat";
+import {
+  CARE_MATCHING_CHIPS,
+  hasMatchingIntakeMarker,
+} from "@/lib/chat/care-matching-intake";
 
 const BRAND_GREEN = "#0D5C3A";
 const STORAGE_KEY = "sitguru-homepage-lead-chat";
@@ -566,6 +570,14 @@ export default function HomepageChatBubble() {
     [clientFirstName, awaitingName, isLoading],
   );
 
+  const showMatchingChips = useMemo(() => {
+    if (!showIntentChips) return false;
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((message) => message.role === "assistant");
+    return hasMatchingIntakeMarker(lastAssistant?.content);
+  }, [messages, showIntentChips]);
+
   function openPanel() {
     setOpen(true);
     setHasUnread(false);
@@ -855,7 +867,25 @@ export default function HomepageChatBubble() {
             ) : null}
           </div>
 
-          {showIntentChips ? (
+          {showMatchingChips ? (
+            <div
+              className="flex shrink-0 flex-row items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-gray-50 p-2 scrollbar-none"
+              role="toolbar"
+              aria-label="Matching details"
+            >
+              {CARE_MATCHING_CHIPS.map((chip) => (
+                <button
+                  key={`${chip.group}-${chip.label}`}
+                  type="button"
+                  disabled={streaming}
+                  onClick={() => void sendChip(chip.content)}
+                  className={INTENT_CHIP_CLASS}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          ) : showIntentChips ? (
             <div
               className="flex shrink-0 flex-row items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-gray-50 p-2 scrollbar-none"
               role="toolbar"

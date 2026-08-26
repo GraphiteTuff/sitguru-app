@@ -26,12 +26,23 @@ export type LookupGurusParams = {
   zip?: string;
   name?: string;
   limit?: number;
+  /** Return the full public directory (optionally still filtered by location). */
+  listAll?: boolean;
+};
+
+export type GuruDirectoryGroup = {
+  stateCode: string;
+  stateLabel: string;
+  zip: string;
+  count: number;
+  names: string[];
 };
 
 export type LookupGurusResult = {
   query: LookupGurusParams;
   count: number;
   gurus: GuruChatSnapshot[];
+  groups: GuruDirectoryGroup[];
   searchUrl: string;
   note?: string;
 };
@@ -412,6 +423,36 @@ const GENERIC_NAME_TOKENS = new Set([
   "walkers",
 ]);
 
+const LOCATION_NOISE_TOKENS = new Set([
+  "morning",
+  "midday",
+  "afternoon",
+  "evening",
+  "overnight",
+  "flexible",
+  "today",
+  "tomorrow",
+  "tonight",
+  "walks",
+  "walking",
+  "visits",
+  "boarding",
+  "sitting",
+  "training",
+  "medication",
+  "puppy",
+  "matching",
+]);
+
+function looksLikePlaceName(value?: string | null) {
+  const place = clean(value).toLowerCase();
+  if (!place || place.length < 3) return false;
+  if (LOCATION_NOISE_TOKENS.has(place)) return false;
+  if (GENERIC_NAME_TOKENS.has(place)) return false;
+  const last = place.split(/\s+/).pop() || "";
+  return !LOCATION_NOISE_TOKENS.has(last) && !GENERIC_NAME_TOKENS.has(last);
+}
+
 function stateAliasKey(value?: string | null) {
   return clean(value)
     .toLowerCase()
@@ -440,6 +481,18 @@ export function usStateSearchTokens(value?: string | null): string[] {
   if (!abbr) return [];
   const full = STATE_NAME_BY_ABBR[abbr] || "";
   return [abbr.toLowerCase(), full].filter(Boolean);
+}
+
+export function usStateDisplayName(value?: string | null): string {
+  const abbr = normalizeUsState(value);
+  if (!abbr) return clean(value);
+  const full = STATE_NAME_BY_ABBR[abbr] || "";
+  if (!full) return abbr;
+  const spaced = full
+    .replace(/^(new|north|south|west|rhode)\s*/i, "$1 ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return spaced.replace(/\b[a-z]/g, (char) => char.toUpperCase());
 }
 
 function splitCityState(raw: string): { city?: string; state?: string } {
@@ -489,6 +542,42 @@ function looksLikeGuruName(value?: string | null) {
   return !/\b(in|near|around|zip|find|any|gurus?)\b/i.test(name);
 }
 
+const BECOME_GURU_INTENT =
+  /\b(become|apply as|sign up as|start my|free to apply|guru profile|how do i (become|apply)|is it free)\b/i;
+
+/** True when the visitor wants a live Guru directory (all / by state / by ZIP). */
+export function looksLikeGuruDirectoryQuery(rawText?: string | null): boolean {
+  const text = clean(rawText);
+  if (!text) return false;
+  const lowerText = text.toLowerCase();
+  const hasLocationCue =
+    Boolean(text.match(/\b\d{5}\b/)) ||
+    /\b(in|near|around|by state|by zip|zip code)\b/i.test(text) ||
+    Boolean(normalizeUsState(text));
+
+  if (BECOME_GURU_INTENT.test(lowerText) && !hasLocationCue) return false;
+
+  if (
+    /\b((list|show|see|who are|which|all|any|find|search|browse).{0,48}gurus?|gurus?.{0,40}(in|near|around|by (state|zip)|listed|nearby)|local gurus?|every guru)\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+
+  const inferred = inferLookupParamsFromChat(text);
+  if (inferred?.listAll) return true;
+  if (
+    inferred &&
+    (inferred.state || inferred.zip || inferred.city) &&
+    /\b(gurus?|sitters?|walkers?|care|sitguru|book)\b/i.test(lowerText)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 /** Heuristic parse of free-text chat into lookup filters (simulation / hints). */
 export function inferLookupParamsFromChat(
   rawText?: string | null,
@@ -496,6 +585,10 @@ export function inferLookupParamsFromChat(
   const text = clean(rawText);
   if (!text) return null;
   const lowerText = text.toLowerCase();
+
+  const listAll = /\b(all gurus?|list (the |all )?gurus?|every guru|show (me )?(the |all )?gurus?|who are (the |all )?gurus?|which gurus?)\b/i.test(
+    text,
+  );
 
   const zipMatch = text.match(/\b(\d{5})(?:-\d{4})?\b/);
   const zip = zipMatch?.[1];
@@ -513,13 +606,13 @@ export function inferLookupParamsFromChat(
   let city: string | undefined;
   let state: string | undefined;
   const nearMatch = text.match(
-    /\b(?:near|in|around|at)\s+([A-Za-z][A-Za-z .'-]{1,40}?)(?:,?\s*([A-Za-z]{2})\b)?/i,
+    /\b(?:near|in|around|at)\s+([A-Za-z][A-Za-z .'-]{2,40}?)(?:,?\s*([A-Za-z]{2})\b)?/i,
   );
   if (nearMatch?.[1]) {
     const parsed = splitCityState(
       [nearMatch[1], nearMatch[2]].filter(Boolean).join(" "),
     );
-    city = parsed.city;
+    city = parsed.city && looksLikePlaceName(parsed.city) ? parsed.city : undefined;
     state = parsed.state;
   }
   if (!state) {
@@ -528,6 +621,13 @@ export function inferLookupParamsFromChat(
     );
     const maybeState = normalizeUsState(stateOnly?.[1]);
     if (maybeState) state = maybeState;
+  }
+  if (!state) {
+    const bareState = text.match(
+      /\b(alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming)\b/i,
+    );
+    const maybeBare = normalizeUsState(bareState?.[1]);
+    if (maybeBare) state = maybeBare;
   }
 
   let service: string | undefined;
@@ -541,6 +641,14 @@ export function inferLookupParamsFromChat(
     service = "Doggy Day Care";
   }
 
-  if (!service && !city && !state && !zip && !name) return null;
-  return { service, city, state, zip, name, limit: 3 };
+  if (!service && !city && !state && !zip && !name && !listAll) return null;
+  return {
+    service,
+    city,
+    state,
+    zip,
+    name,
+    listAll,
+    limit: name ? 8 : 60,
+  };
 }

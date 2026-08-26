@@ -13,6 +13,7 @@ import {
   sanitizePreferredName,
 } from "@/lib/chat/homepage-name";
 import { buildKnowledgeAwareSimulationBeat } from "@/lib/chat/rogue-knowledge";
+import { buildCareMatchingAsk } from "@/lib/chat/care-matching-intake";
 
 export const SIMULATION_NAME_PROMPT =
   "hi! i'm Rogue 🦴 your adorable SitGuru assistant — so happy you're here. what should i call you? first name or nickname works!";
@@ -63,6 +64,7 @@ function pickWellbeingReply(preferred: string): string {
 export type HomepageSimulationOpts = {
   clientFirstName?: string;
   lastUserText?: string;
+  careThread?: string;
 };
 
 /**
@@ -93,42 +95,11 @@ export function buildHomepageSimulationReply(
     return pickWellbeingReply(preferred);
   }
 
-  if (
-    text.includes("looking for dog walks") ||
-    text === "dog walks" ||
-    /\bdog walks?\b/.test(text)
-  ) {
-    const dogWalkCopy =
-      "great choice! we match you with Pet Gurus and you book everything through SitGuru — find your favorite walker, then rebook anytime. 🐕 walks include live map tracking, potty alerts, and phone updates. share a city or ZIP and i'll pull live profiles!";
-    const lead = preferred ? `hey ${formatDisplayName(preferred)}! ` : "";
-    return `${lead}${dogWalkCopy} [[cta:parent]]`;
-  }
-
-  if (
-    text.includes("looking for drop-in") ||
-    text.includes("drop-in visits") ||
-    text.includes("drop in visits")
-  ) {
-    return `${named(
-      "great choice! SitGuru matches you fast — you book on the platform and can keep your favorite Guru for next time. drop-ins cover feeding, potty, play, and photo updates. drop a city or ZIP and i'll show live snapshots!",
-    )} [[cta:parent]]`;
-  }
-
-  if (
-    text.includes("looking for overnight") ||
-    text.includes("overnight stays") ||
-    text === "overnight"
-  ) {
-    return `${named(
-      "great choice! overnight care is booked through SitGuru — find a trusted Guru who stays close overnight, then rebook your favorite anytime. share a city or ZIP for live matches!",
-    )} [[cta:parent]]`;
-  }
-
-  if (text.includes("looking for boarding") || text === "boarding") {
-    return `${named(
-      "great choice! boarding is home-style care booked on SitGuru — not a kennel vibe — so you can find and keep your favorite Boarding Guru. share a city or ZIP and i'll fetch live profiles!",
-    )} [[cta:parent]]`;
-  }
+  const matchingAsk = buildCareMatchingAsk(
+    opts.careThread || opts.lastUserText,
+    preferred || undefined,
+  );
+  if (matchingAsk) return matchingAsk;
 
   if (
     text.includes("register as a sitter") ||

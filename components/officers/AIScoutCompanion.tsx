@@ -22,6 +22,8 @@ import { useGuruAuth, type GuruAuthUser } from "@/hooks/useGuruAuth";
 import AITacoCompanion from "@/components/officers/AITacoCompanion";
 import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
 import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
+import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
+import { extractGuruCardsFromText } from "@/lib/gurus/guru-chat-snapshot";
 import {
   COMPANION_DOCK_CLASS,
   SCOUT_AVATAR,
@@ -124,6 +126,27 @@ export type AIScoutCompanionProps = {
 
 function buildWorkspaceGreeting(firstName: string) {
   return `Hi ${firstName}! I'm your Scout AI Companion. How can I assist you with your dashboard schedule today?`;
+}
+
+function ScoutAssistantBody({ text }: { text: string }) {
+  const extracted = extractGuruCardsFromText(text);
+  const cleaned = extracted.text
+    .replace(/\[\[\s*cta:[^\]]+\]\]/gi, " ")
+    .replace(/\[\[\s*matching_intake\s*\]\]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (
+    <div className="space-y-1">
+      {cleaned ? <RogueMarkdownText text={cleaned} /> : null}
+      {extracted.cards.length > 0 ? (
+        <div className="grid grid-cols-1 gap-2 pt-1.5">
+          {extracted.cards.map((guru) => (
+            <GuruProfileSnapshotCard key={guru.slug} guru={guru} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 type ScoutShellProps = {
@@ -363,7 +386,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                     }`}
                   >
                     {isAssistant ? (
-                      <RogueMarkdownText text={message.content} />
+                      <ScoutAssistantBody text={message.content} />
                     ) : (
                       message.content
                     )}

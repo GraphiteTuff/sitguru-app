@@ -8,12 +8,15 @@
  */
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { lookupZipLocation } from "@/lib/location/zip-lookup";
 import {
   encodeGuruCardMarker,
   isUsStateToken,
   normalizeUsState,
+  usStateDisplayName,
   usStateSearchTokens,
   type GuruChatSnapshot,
+  type GuruDirectoryGroup,
   type LookupGurusParams,
   type LookupGurusResult,
 } from "@/lib/gurus/guru-chat-snapshot";
@@ -76,6 +79,19 @@ function normalizeServiceKey(value: string) {
 export function canonicalizeCareService(raw?: string | null): string | null {
   const key = normalizeServiceKey(raw || "");
   if (!key) return null;
+  // Role nouns (pet sitters / dog sitters / walkers) are Gurus — not a care-type filter.
+  if (
+    /(^|_)(pet|dog|cat|house)?_?sitters?$/.test(key) ||
+    /(^|_)(dog_?)?walkers?$/.test(key) ||
+    key === "sitters" ||
+    key === "sitter" ||
+    key === "gurus" ||
+    key === "guru" ||
+    key === "walkers" ||
+    key === "walker"
+  ) {
+    return null;
+  }
   if (key.includes("walk")) return "Dog Walking";
   if (key.includes("drop") || key.includes("visit")) return "Drop-In Visits";
   if (key.includes("overnight") || key.includes("house_sit")) {
@@ -123,9 +139,87 @@ function matchesService(guru: RawGuru, selectedService: string) {
   });
 }
 
+function guruZipCode(guru: RawGuru) {
+  return clean(
+    guru.service_zip || guru.service_zip_code || guru.zip_code || guru.postal_code,
+  ).replace(/\D/g, "").slice(0, 5);
+}
+
+function guruStateCode(guru: RawGuru) {
+  return normalizeUsState(clean(guru.service_state || guru.state));
+}
+
+function guruCoordinates(guru: RawGuru) {
+  const latitude = Number(
+    guru.service_latitude || guru.latitude || guru.lat || guru.map_latitude,
+  );
+  const longitude = Number(
+    guru.service_longitude || guru.longitude || guru.lng || guru.map_longitude,
+  );
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude === 0 ||
+    longitude === 0
+  ) {
+    return null;
+  }
+  return { latitude, longitude };
+}
+
+function guruRadiusMiles(guru: RawGuru) {
+  const radius = Number(guru.service_radius_miles || guru.radius_miles || 25);
+  if (!Number.isFinite(radius) || radius <= 0) return 25;
+  return Math.min(Math.round(radius), 100);
+}
+
+function distanceMiles(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+) {
+  const earthRadiusMiles = 3958.8;
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latDelta = toRadians(toLat - fromLat);
+  const lngDelta = toRadians(toLng - fromLng);
+  const a =
+    Math.sin(latDelta / 2) ** 2 +
+    Math.cos(toRadians(fromLat)) *
+      Math.cos(toRadians(toLat)) *
+      Math.sin(lngDelta / 2) ** 2;
+  return earthRadiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function isPublicDirectoryGuru(guru: RawGuru) {
+  if (guru.is_archived === true || guru.is_demo === true || guru.is_test_account === true) {
+    return false;
+  }
+  if (guru.is_public === false && guru.is_public_visible === false) {
+    return false;
+  }
+  const status = lower(guru.status || guru.application_status);
+  if (
+    ["rejected", "suspended", "deleted", "archived", "inactive", "hidden"].includes(
+      status,
+    )
+  ) {
+    return false;
+  }
+  return Boolean(clean(guru.display_name || guru.full_name || guru.name));
+}
+
 function matchesLocation(
   guru: RawGuru,
-  params: { city?: string; state?: string; zip?: string },
+  params: {
+    city?: string;
+    state?: string;
+    zip?: string;
+    zipCity?: string;
+    zipState?: string;
+    zipLatitude?: number | null;
+    zipLongitude?: number | null;
+  },
 ) {
   const zip = clean(params.zip).replace(/\D/g, "").slice(0, 5);
   const rawCity = lower(params.city);
@@ -133,13 +227,9 @@ function matchesLocation(
   const queryState = normalizeUsState(params.state || rawCity);
   const stateTokens = usStateSearchTokens(queryState);
 
-  const guruZip = clean(
-    guru.service_zip || guru.service_zip_code || guru.zip_code,
-  ).replace(/\D/g, "");
+  const guruZip = guruZipCode(guru);
   const guruCity = lower(guru.service_city || guru.city);
-  const guruState = normalizeUsState(
-    clean(guru.service_state || guru.state),
-  );
+  const guruState = guruStateCode(guru);
   const hay = [
     guruCity,
     lower(guru.service_state || guru.state),
@@ -150,8 +240,41 @@ function matchesLocation(
   ].join(" ");
 
   if (zip) {
-    if (guruZip.startsWith(zip) || hay.includes(zip)) return true;
-    if (!city && !queryState) return false;
+    if (guruZip === zip || guruZip.startsWith(zip) || hay.includes(zip)) {
+      return true;
+    }
+
+    const zipCity = lower(params.zipCity);
+    const zipState = normalizeUsState(params.zipState);
+    if (zipCity && guruCity === zipCity && (!zipState || guruState === zipState)) {
+      return true;
+    }
+
+    const coords = guruCoordinates(guru);
+    if (
+      coords &&
+      typeof params.zipLatitude === "number" &&
+      typeof params.zipLongitude === "number"
+    ) {
+      const miles = distanceMiles(
+        params.zipLatitude,
+        params.zipLongitude,
+        coords.latitude,
+        coords.longitude,
+      );
+      const reachMiles = Math.max(guruRadiusMiles(guru), 60);
+      if (miles <= reachMiles) return true;
+    }
+
+    if (
+      zip.length === 5 &&
+      guruZip.length === 5 &&
+      guruZip.slice(0, 3) === zip.slice(0, 3)
+    ) {
+      return true;
+    }
+
+    return false;
   }
 
   if (queryState) {
@@ -164,8 +287,7 @@ function matchesLocation(
   if (city && !hay.includes(city) && guruCity !== city) return false;
 
   if (!zip && !city && !queryState) return true;
-  if (city || queryState) return true;
-  return Boolean(zip && (guruZip.startsWith(zip) || hay.includes(zip)));
+  return Boolean(city || queryState);
 }
 
 function matchesName(guru: RawGuru, name: string) {
@@ -242,6 +364,34 @@ function toSnapshot(guru: RawGuru): GuruChatSnapshot | null {
   };
 }
 
+function groupDirectory(gurus: RawGuru[]): GuruDirectoryGroup[] {
+  const buckets = new Map<string, GuruDirectoryGroup>();
+  for (const guru of gurus) {
+    const stateCode = guruStateCode(guru) || "NA";
+    const zip = guruZipCode(guru) || "00000";
+    const key = `${stateCode}:${zip}`;
+    const existing = buckets.get(key);
+    const name = clean(guru.display_name || guru.full_name || guru.name);
+    if (existing) {
+      existing.count += 1;
+      if (name && existing.names.length < 8) existing.names.push(name);
+      continue;
+    }
+    buckets.set(key, {
+      stateCode,
+      stateLabel: usStateDisplayName(stateCode) || stateCode,
+      zip,
+      count: 1,
+      names: name ? [name] : [],
+    });
+  }
+  return Array.from(buckets.values()).sort((a, b) => {
+    const state = a.stateLabel.localeCompare(b.stateLabel);
+    if (state !== 0) return state;
+    return a.zip.localeCompare(b.zip);
+  });
+}
+
 function buildSearchUrl(params: LookupGurusParams) {
   const qs = new URLSearchParams();
   const service = canonicalizeCareService(params.service || "") || "";
@@ -277,7 +427,11 @@ async function loadPublicGuruRows(): Promise<RawGuru[]> {
 export async function lookupGurusForChat(
   params: LookupGurusParams,
 ): Promise<LookupGurusResult> {
-  const limit = Math.min(Math.max(Number(params.limit) || 3, 1), 5);
+  const wantsDirectory = Boolean(params.listAll) || !clean(params.name);
+  const limit = Math.min(
+    Math.max(Number(params.limit) || (wantsDirectory ? 60 : 8), 1),
+    wantsDirectory ? 80 : 12,
+  );
   const service = canonicalizeCareService(params.service || "") || undefined;
   const cityRaw = clean(params.city);
   const state = normalizeUsState(params.state || cityRaw) || undefined;
@@ -293,31 +447,61 @@ export async function lookupGurusForChat(
     zip,
     name,
     limit,
+    listAll: Boolean(params.listAll) || wantsDirectory,
   };
 
-  if (!service && !city && !state && !zip && !name) {
+  if (!service && !city && !state && !zip && !name && !params.listAll) {
     return {
       query,
       count: 0,
       gurus: [],
+      groups: [],
       searchUrl: "/search",
-      note: "Ask for a care type and a city, state, or ZIP — or a Guru name — so I can fetch live matches.",
+      note: "Ask for a ZIP code or city/state — plus every service type and time of care — so I can fetch live matches.",
     };
   }
 
+  let zipCity: string | undefined;
+  let zipState: string | undefined;
+  let zipLatitude: number | null = null;
+  let zipLongitude: number | null = null;
+  if (zip) {
+    const zipPlace = await lookupZipLocation(zip);
+    zipCity = zipPlace?.city || undefined;
+    zipState = zipPlace?.state || undefined;
+    zipLatitude = zipPlace?.latitude ?? null;
+    zipLongitude = zipPlace?.longitude ?? null;
+  }
+
   const rows = await loadPublicGuruRows();
-  const matched = rows
+  const matchedRows = rows
+    .filter(isPublicDirectoryGuru)
     .filter((guru) => matchesService(guru, service || ""))
-    .filter((guru) => matchesLocation(guru, { city, state, zip }))
-    .filter((guru) => matchesName(guru, name || ""))
+    .filter((guru) =>
+      matchesLocation(guru, {
+        city,
+        state,
+        zip,
+        zipCity,
+        zipState,
+        zipLatitude,
+        zipLongitude,
+      }),
+    )
+    .filter((guru) => matchesName(guru, name || ""));
+
+  const matched = matchedRows
     .map(toSnapshot)
     .filter((row): row is GuruChatSnapshot => Boolean(row))
     .slice(0, limit);
+
+  const groups = groupDirectory(matchedRows.slice(0, limit));
 
   return {
     query,
     count: matched.length,
     gurus: matched,
+    groups,
     searchUrl: buildSearchUrl(query),
     note:
       matched.length === 0
@@ -336,12 +520,24 @@ export function formatGuruLookupForPrompt(result: LookupGurusResult): string {
     ].join("\n");
   }
 
+  const groupLines =
+    result.groups.length > 0
+      ? [
+          "Grouped by state / ZIP:",
+          ...result.groups.map(
+            (group) =>
+              `- ${group.stateLabel} / ${group.zip} (${group.count}): ${group.names.join(", ")}`,
+          ),
+        ]
+      : [];
+
   return [
     "# LIVE GURU LOOKUP RESULT (authoritative for this turn)",
     `Query: ${JSON.stringify(result.query)}`,
     `Browse more: ${result.searchUrl}`,
-    "Recommend 1–3 matches in under 3 sentences. Stress they book through SitGuru and can rebook their favorite Guru anytime.",
+    "Show ALL matches grouped by state / ZIP. One short intro, then every card. Pet sitters / dog sitters / cat sitters are Gurus. Stress they book through SitGuru.",
     "REQUIRED: After your short prose, append EVERY marker line below EXACTLY (copy-paste) — one [[guru_card:...]] per Guru — then [[cta:parent]]. Never invent markers.",
+    ...groupLines,
     ...result.gurus.map((guru, index) => {
       const marker = encodeGuruCardMarker(guru);
       return [

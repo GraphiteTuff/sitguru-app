@@ -18,6 +18,7 @@ import {
   inferLookupParamsFromChat,
 } from "@/lib/gurus/guru-chat-snapshot";
 import { lookupGurusForChat } from "@/lib/gurus/lookup-gurus-for-chat";
+import { needsCareMatchingAsk } from "@/lib/chat/care-matching-intake";
 
 function appendGuruCards(base: string, markers: string[]) {
   if (!markers.length) return base;
@@ -29,7 +30,10 @@ export async function buildHomepageSimulationReplyWithGurus(
   opts: HomepageSimulationOpts,
 ): Promise<string> {
   const base = buildHomepageSimulationReply(opts);
-  const lookupParams = inferLookupParamsFromChat(opts.lastUserText);
+  const thread = opts.careThread || opts.lastUserText;
+  if (needsCareMatchingAsk(thread)) return base;
+
+  const lookupParams = inferLookupParamsFromChat(thread);
   if (
     !lookupParams ||
     !(
@@ -68,7 +72,7 @@ export async function buildHomepageSimulationReplyWithGurus(
 
     if (
       /\b(walk|drop|overnight|board|sit|zip|\d{5}|near|in )\b/i.test(
-        String(opts.lastUserText || ""),
+        String(thread || ""),
       )
     ) {
       return appendGuruCards(`${lead}${intro} [[cta:parent]]`, markers);

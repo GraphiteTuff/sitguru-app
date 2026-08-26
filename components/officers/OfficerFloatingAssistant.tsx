@@ -20,6 +20,8 @@ import { Maximize2, Minimize2, Sparkles, X } from "lucide-react";
 import type { GuestOfficerId } from "@/lib/ai/officer-prompts";
 import { AMBASSADOR_VIDEO_CARD_MARKER } from "@/lib/ai/officer-marketing-faqs";
 import AmbassadorVideoCard from "@/components/officers/AmbassadorVideoCard";
+import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
+import { extractGuruCardsFromText } from "@/lib/gurus/guru-chat-snapshot";
 
 export type OfficerTheme = {
   brand: string;
@@ -244,13 +246,15 @@ function OfficerAssistantBody({
   theme: OfficerTheme;
 }) {
   const raw = String(text || "");
+  const extracted = extractGuruCardsFromText(raw);
   const hasVideoCard =
     raw.includes(AMBASSADOR_VIDEO_CARD_MARKER) ||
     /\[\[\s*ambassador_video_card\s*\]\]/i.test(raw);
-  const cleaned = raw
+  const cleaned = extracted.text
     .replaceAll(AMBASSADOR_VIDEO_CARD_MARKER, " ")
     .replace(/\[\[\s*ambassador_video_card\s*\]\]/gi, " ")
     .replace(/\[\[\s*cta:[^\]]+\]\]/gi, " ")
+    .replace(/\[\[\s*matching_intake\s*\]\]/gi, " ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -258,6 +262,13 @@ function OfficerAssistantBody({
   return (
     <div className="space-y-1">
       {cleaned ? <OfficerMarkdown text={cleaned} theme={theme} /> : null}
+      {extracted.cards.length > 0 ? (
+        <div className="grid grid-cols-1 gap-2 pt-1.5">
+          {extracted.cards.map((guru) => (
+            <GuruProfileSnapshotCard key={guru.slug} guru={guru} />
+          ))}
+        </div>
+      ) : null}
       {hasVideoCard ? <AmbassadorVideoCard /> : null}
     </div>
   );

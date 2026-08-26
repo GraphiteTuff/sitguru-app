@@ -6,7 +6,7 @@
  */
 
 import { anthropic } from "@ai-sdk/anthropic";
-import { streamText, type CoreMessage } from "ai";
+import { generateText, streamText, type CoreMessage } from "ai";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin, getBearerToken } from "@/lib/supabase/admin";
 import {
@@ -30,6 +30,16 @@ import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
 } from "@/lib/messaging/ai-model";
+import { lookupGurusTool } from "@/lib/chat/rogue-guru-tool";
+import {
+  inferLookupParamsFromChat,
+  looksLikeGuruDirectoryQuery,
+} from "@/lib/gurus/guru-chat-snapshot";
+import {
+  buildCareMatchingAsk,
+  joinRecentUserTexts,
+  needsCareMatchingAsk,
+} from "@/lib/chat/care-matching-intake";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -379,6 +389,17 @@ export async function POST(req: Request) {
 
     const lastUserText = messageContent(messages[messages.length - 1]);
     const preset = asString(body?.preset);
+    const careThread = joinRecentUserTexts(messages, lastUserText);
+    const scoutMatchingAsk =
+      officer === "scout"
+        ? buildCareMatchingAsk(careThread)
+        : null;
+    const lookupHint = inferLookupParamsFromChat(careThread);
+    const scoutNeedsDirectory =
+      officer === "scout" &&
+      !scoutMatchingAsk &&
+      (looksLikeGuruDirectoryQuery(careThread) ||
+        Boolean(lookupHint?.zip || lookupHint?.city || lookupHint?.state));
 
     if (lastUserText) {
       try {
@@ -396,12 +417,19 @@ export async function POST(req: Request) {
       }
     }
 
+    if (scoutMatchingAsk) {
+      return simulationDataStreamResponse(scoutMatchingAsk);
+    }
+
     // Instant FAQ layer (public + dashboard) — same responsiveness pattern as Rogue.
-    const instantFaq = resolveOfficerInstantFaqAnswer({
-      officer,
-      question: lastUserText,
-      surface,
-    });
+    const instantFaq =
+      scoutNeedsDirectory || needsCareMatchingAsk(careThread)
+        ? null
+        : resolveOfficerInstantFaqAnswer({
+            officer,
+            question: lastUserText,
+            surface,
+          });
     if (instantFaq) {
       return simulationDataStreamResponse(instantFaq);
     }
@@ -459,12 +487,66 @@ export async function POST(req: Request) {
     }
 
     try {
+      if (officer === "scout" && scoutNeedsDirectory) {
+        const generated = await generateText({
+          model: anthropic(getSitGuruAiModel()),
+          system,
+          messages: messages.slice(-16),
+          temperature: 0.45,
+          maxTokens: 2800,
+          maxSteps: 3,
+          tools: { lookupGurus: lookupGurusTool },
+        });
+        let assistantText = String(generated.text || "").trim();
+        const markers: string[] = [];
+        const seen = new Set<string>();
+        const steps = [
+          {
+            toolResults: (generated.toolResults || []) as Array<{
+              toolName?: string;
+              result?: unknown;
+            }>,
+          },
+          ...((generated.steps || []) as Array<{
+            toolResults?: Array<{ toolName?: string; result?: unknown }>;
+          }>),
+        ];
+        for (const step of steps) {
+          for (const toolResult of step.toolResults || []) {
+            if (toolResult.toolName !== "lookupGurus") continue;
+            const raw =
+              typeof toolResult.result === "string"
+                ? toolResult.result
+                : JSON.stringify(toolResult.result ?? "");
+            const matches = raw.match(/\[\[\s*guru_card\s*:[^\]]+\]\]/gi) || [];
+            for (const marker of matches) {
+              if (seen.has(marker)) continue;
+              seen.add(marker);
+              markers.push(marker);
+            }
+          }
+        }
+        const missing = markers.filter((marker) => !assistantText.includes(marker));
+        if (missing.length) {
+          assistantText = `${assistantText} ${missing.join(" ")}`.trim();
+        }
+        if (assistantText) {
+          return simulationDataStreamResponse(assistantText);
+        }
+      }
+
       const result = streamText({
         model: anthropic(getSitGuruAiModel()),
         system,
         messages: messages.slice(-16),
         temperature: 0.45,
         maxTokens: 1800,
+        ...(officer === "scout"
+          ? {
+              tools: { lookupGurus: lookupGurusTool },
+              maxSteps: 3 as const,
+            }
+          : {}),
       });
 
       return result.toDataStreamResponse({
