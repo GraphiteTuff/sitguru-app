@@ -134,7 +134,7 @@ async function safeSelect(table: string, columns: string) {
       return [] as AnyRow[];
     }
 
-    return Array.isArray(data) ? (data as AnyRow[]) : [];
+    return Array.isArray(data) ? (data as unknown as AnyRow[]) : [];
   } catch (error) {
     console.warn(`Market density ${table} query crashed:`, error);
     return [] as AnyRow[];
