@@ -34,6 +34,7 @@ import {
   VETERANS_MILITARY_FAMILIES_PROGRAM,
 } from "@/lib/programs/veterans-military-families";
 import { supabase } from "@/lib/supabase";
+import { getPetParentSetupStatus } from "@/lib/pet-parent-readiness";
 
 type PhotoColumn = "avatar_url" | "profile_photo_url" | "photo_url" | "image_url";
 
@@ -390,29 +391,7 @@ async function fetchSetupStatus(userId: string): Promise<SetupStatus> {
     .eq("owner_id", userId)
     .limit(1);
 
-  return {
-    basicInfoComplete: Boolean(
-      profile && (profile.full_name || profile.first_name) && profile.phone,
-    ),
-    serviceLocationComplete: Boolean(
-      profile &&
-        profile.service_address &&
-        profile.service_city &&
-        profile.service_state &&
-        profile.service_zip,
-    ),
-    petPassportsComplete: Boolean(pets && pets.length > 0),
-    careNotesComplete: Boolean(profile?.care_preferences),
-    emergencyContactComplete: Boolean(
-      profile?.emergency_contact ||
-        (profile?.emergency_contact_name && profile?.emergency_contact_phone),
-    ),
-    notificationsComplete: Boolean(
-      profile?.email_notifications ||
-        profile?.push_notifications ||
-        profile?.text_notifications,
-    ),
-  };
+  return getPetParentSetupStatus(profile, pets?.length ?? 0);
 }
 
 async function updateProfileWithPayload(
@@ -623,8 +602,8 @@ export default function CustomerBasicInfoPage() {
   const phoneComplete = Boolean(form.phone.trim());
 
   const basicInfoComplete = useMemo(() => {
-    return Boolean(fullNameComplete && emailComplete && phoneComplete);
-  }, [fullNameComplete, emailComplete, phoneComplete]);
+    return Boolean(fullNameComplete && emailComplete);
+  }, [fullNameComplete, emailComplete]);
 
   const statusLabel = basicInfoComplete ? "Complete" : "Required";
   const statusTone = basicInfoComplete
@@ -759,13 +738,7 @@ export default function CustomerBasicInfoPage() {
       return false;
     }
 
-    if (!form.phone.trim()) {
-      setErrorMessage("Please enter your phone number.");
-      setSaving(false);
-      return false;
-    }
-
-    if (!isValidInternationalPhone(form.phone)) {
+    if (form.phone.trim() && !isValidInternationalPhone(form.phone)) {
       setErrorMessage(
         "Enter a valid phone number (international formats with + and spaces are welcome).",
       );
@@ -874,8 +847,8 @@ export default function CustomerBasicInfoPage() {
             </h1>
 
             <p className="mt-3 max-w-3xl text-base font-semibold leading-7 text-slate-800/75">
-              Add the key contact details SitGuru uses for bookings, messages,
-              support, and Guru care coordination.
+              Add your name to start. Phone is optional and helps your Guru
+              reach you about care.
             </p>
           </div>
 
@@ -1007,7 +980,10 @@ export default function CustomerBasicInfoPage() {
 
                   <label htmlFor="phone" className="grid gap-2">
                     <span className="text-sm font-black text-slate-950">
-                      Phone Number
+                      Phone Number{" "}
+                      <span className="font-semibold text-slate-500">
+                        (optional)
+                      </span>
                     </span>
                     <input
                       id="phone"

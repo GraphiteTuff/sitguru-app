@@ -49,6 +49,7 @@ import {
   readStoredPetPerksRef,
 } from "@/lib/rewards/perks-broker";
 import { buildPetParentBookUrl } from "@/lib/booking/pet-parent-booking";
+import { getPetParentReadiness } from "@/lib/pet-parent-readiness";
 
 type CustomerProfile = {
   first_name: string | null;
@@ -2789,19 +2790,17 @@ export default function CustomerDashboardPage() {
     [referralProfile],
   );
 
-  const profileCompletion = useMemo(() => {
-    const fields = [
-      customerProfile?.full_name || customerProfile?.first_name,
-      customerProfile?.email,
-      customerProfile?.phone,
-      customerProfile?.service_address,
-      customerProfile?.emergency_contact,
-      customerProfile?.care_preferences,
-    ];
+  const petParentReadiness = useMemo(
+    () =>
+      getPetParentReadiness({
+        ...(customerProfile ?? {}),
+        zip_code: customerProfile?.zip_code || careZip || null,
+        petCount: pets.length,
+      }),
+    [customerProfile, careZip, pets.length],
+  );
 
-    const completedFields = fields.filter((field) => field?.trim()).length;
-    return Math.round((completedFields / fields.length) * 100);
-  }, [customerProfile]);
+  const profileCompletion = petParentReadiness.bookingReadyPercent;
 
   const loadDashboard = useCallback(async () => {
     setFormError("");
@@ -3374,16 +3373,26 @@ export default function CustomerDashboardPage() {
       });
     }
 
-    if (profileCompletion < 100) {
+    if (!petParentReadiness.readyToBook) {
       updates.push({
-        label: "Profile update",
-        detail: `${profileCompletion}% complete`,
+        label: pets.length === 0 ? "Add a pet to book" : "Finish booking setup",
+        detail: `${profileCompletion}% ready · name, ZIP, and one pet`,
+        href: pets.length === 0 ? routes.pets : routes.profile,
+        tone: "slate",
+      });
+    } else if (!petParentReadiness.guruReady) {
+      updates.push({
+        label: "Help your Guru",
+        detail: "Add care notes or an emergency contact",
         href: routes.profile,
         tone: "slate",
       });
     }
 
-    if (!universityProgress.isComplete) {
+    if (
+      !universityProgress.isComplete &&
+      universityProgress.completedSteps > 0
+    ) {
       updates.push({
         label: "Academy progress",
         detail: `${universityProgress.completedSteps}/${universityProgress.totalSteps} steps`,
@@ -3408,6 +3417,8 @@ export default function CustomerDashboardPage() {
     stats.nextBooking,
     pets,
     pawPerksState.pendingReferrals,
+    petParentReadiness.guruReady,
+    petParentReadiness.readyToBook,
     profileCompletion,
     universityProgress.completedSteps,
     universityProgress.isComplete,
@@ -3498,7 +3509,7 @@ export default function CustomerDashboardPage() {
           <UniversityExpress
             variant="banner"
             progressPercent={universityProgress.progressPercent}
-            petProfileDone={pets.length > 0 && profileCompletion >= 60}
+            petProfileDone={pets.length > 0}
             guruVibeDone={Boolean(stats.nextBooking) || bookings.length > 0}
             safeBookingDone={
               universityProgress.isComplete ||
@@ -3521,7 +3532,9 @@ export default function CustomerDashboardPage() {
             avatarFallback={customerInitials}
             tags={[
               "Pet Parent",
-              `${profileCompletion}% ready`,
+              petParentReadiness.readyToBook
+                ? "Booking ready"
+                : `${profileCompletion}% ready to book`,
               getCustomerLocationLabel(customerProfile) || "Add care location",
             ]}
             metaExtra={
@@ -3885,7 +3898,9 @@ export default function CustomerDashboardPage() {
               },
               {
                 label: "My Profile",
-                helper: `${profileCompletion}% ready`,
+                helper: petParentReadiness.readyToBook
+                  ? "Booking ready"
+                  : `${profileCompletion}% to book`,
                 href: routes.profile,
                 icon: <ShieldCheck className="h-5 w-5" />,
               },
@@ -4077,10 +4092,15 @@ export default function CustomerDashboardPage() {
                     My Profile
                   </p>
                   <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
-                    My Profile · {profileCompletion}% ready
+                    My Profile ·{" "}
+                    {petParentReadiness.readyToBook
+                      ? "Booking ready"
+                      : `${profileCompletion}% ready to book`}
                   </h2>
                   <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                    Keep contact and care details current.
+                    {petParentReadiness.readyToBook
+                      ? "You can book now. Extra care details help your Guru know your pet."
+                      : "Name, care ZIP, and one pet are enough to book. Extra details help your Guru."}
                   </p>
                 </div>
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.3rem] bg-emerald-50 text-lg font-black text-emerald-700 ring-1 ring-emerald-100">
@@ -4264,7 +4284,7 @@ export default function CustomerDashboardPage() {
               <UniversityExpress
                 variant="sidebar"
                 progressPercent={universityProgress.progressPercent}
-                petProfileDone={pets.length > 0 && profileCompletion >= 60}
+                petProfileDone={pets.length > 0}
                 guruVibeDone={Boolean(stats.nextBooking) || bookings.length > 0}
                 safeBookingDone={
                   universityProgress.isComplete ||

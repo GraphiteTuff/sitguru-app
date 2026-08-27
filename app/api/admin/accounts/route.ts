@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminUser } from "@/lib/supabase/admin";
+import { getPetParentReadiness } from "@/lib/pet-parent-readiness";
 
 type AuthUserSummary = {
   email: string;
@@ -124,48 +125,22 @@ function getDisplayName(
 }
 
 function calculateCustomerSetupPercent(profile: AnyRow, petCount: number) {
-  const basicInfoComplete = Boolean(
-    (profile.full_name || profile.first_name) && profile.phone,
-  );
-
-  const serviceLocationComplete = Boolean(
-    profile.service_address &&
-      profile.service_city &&
-      profile.service_state &&
-      profile.service_zip,
-  );
-
-  const petPassportsComplete = petCount > 0;
-  const careNotesComplete = Boolean(profile.care_preferences);
-  const emergencyContactComplete = Boolean(
-    profile.emergency_contact ||
-      (profile.emergency_contact_name && profile.emergency_contact_phone),
-  );
-  const notificationsComplete = Boolean(
-    profile.email_notifications ||
-      profile.push_notifications ||
-      profile.text_notifications,
-  );
-
-  const completed = [
-    basicInfoComplete,
-    serviceLocationComplete,
-    petPassportsComplete,
-    careNotesComplete,
-    emergencyContactComplete,
-    notificationsComplete,
-  ].filter(Boolean).length;
+  const readiness = getPetParentReadiness({
+    ...profile,
+    petCount,
+  });
 
   return {
-    completed,
-    total: 6,
-    percent: Math.round((completed / 6) * 100),
-    basicInfoComplete,
-    serviceLocationComplete,
-    petPassportsComplete,
-    careNotesComplete,
-    emergencyContactComplete,
-    notificationsComplete,
+    completed: readiness.bookingReadyCompleted,
+    total: readiness.bookingReadyTotal,
+    percent: readiness.bookingReadyPercent,
+    basicInfoComplete: readiness.basicInfoComplete,
+    serviceLocationComplete: readiness.serviceLocationComplete,
+    petPassportsComplete: readiness.petPassportsComplete,
+    careNotesComplete: readiness.careNotesComplete,
+    emergencyContactComplete: readiness.emergencyContactComplete,
+    notificationsComplete: readiness.notificationsComplete,
+    readyToBook: readiness.readyToBook,
   };
 }
 

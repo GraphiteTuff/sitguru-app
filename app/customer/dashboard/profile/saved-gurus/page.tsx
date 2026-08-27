@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
+import { getPetParentSetupStatus } from "@/lib/pet-parent-readiness";
 
 type SetupStatus = {
   basicInfoComplete: boolean;
@@ -118,29 +119,7 @@ async function fetchSetupStatus(userId: string): Promise<SetupStatus> {
     .eq("owner_id", userId)
     .limit(1);
 
-  return {
-    basicInfoComplete: Boolean(
-      profile && (profile.full_name || profile.first_name) && profile.phone,
-    ),
-    serviceLocationComplete: Boolean(
-      profile &&
-        profile.service_address &&
-        profile.service_city &&
-        profile.service_state &&
-        profile.service_zip,
-    ),
-    petPassportsComplete: Boolean(pets && pets.length > 0),
-    careNotesComplete: Boolean(profile?.care_preferences),
-    emergencyContactComplete: Boolean(
-      profile?.emergency_contact ||
-        (profile?.emergency_contact_name && profile?.emergency_contact_phone),
-    ),
-    notificationsComplete: Boolean(
-      profile?.email_notifications ||
-        profile?.push_notifications ||
-        profile?.text_notifications,
-    ),
-  };
+  return getPetParentSetupStatus(profile, pets?.length ?? 0);
 }
 
 function SetupNavigation({ setupStatus }: { setupStatus: SetupStatus }) {

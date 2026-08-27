@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
+import { getPetParentReadiness } from "@/lib/pet-parent-readiness";
 
 type CustomerProfile = {
   id: string;
@@ -560,59 +561,52 @@ export default function CustomerProfileSetupPage() {
     };
   }, [loadPage, router]);
 
-  const setupBooleans = useMemo(() => {
-    const basicInfoComplete = Boolean(
-      (profile?.full_name || profile?.first_name) &&
-      profile?.email &&
-      profile?.phone,
-    );
+  const readiness = useMemo(
+    () =>
+      getPetParentReadiness({
+        ...(profile ?? {}),
+        petCount,
+      }),
+    [profile, petCount],
+  );
 
-    const serviceLocationComplete = Boolean(
-      profile?.service_address &&
-      profile?.service_city &&
-      profile?.service_state &&
-      profile?.service_zip,
-    );
-
-    const petPassportsComplete = petCount > 0;
-    const careNotesComplete = Boolean(profile?.care_preferences);
-    const emergencyContactComplete = Boolean(
-      profile?.emergency_contact ||
-      (profile?.emergency_contact_name && profile?.emergency_contact_phone),
-    );
-    const notificationsComplete = Boolean(
-      profile?.email_notifications ||
-      profile?.push_notifications ||
-      profile?.text_notifications,
-    );
-
-    return {
-      basicInfoComplete,
-      serviceLocationComplete,
-      petPassportsComplete,
-      careNotesComplete,
-      emergencyContactComplete,
-      notificationsComplete,
-    };
-  }, [profile, petCount]);
+  const setupBooleans = useMemo(
+    () => ({
+      basicInfoComplete: readiness.basicInfoComplete,
+      serviceLocationComplete: readiness.serviceLocationComplete,
+      petPassportsComplete: readiness.petPassportsComplete,
+      careNotesComplete: readiness.careNotesComplete,
+      emergencyContactComplete: readiness.emergencyContactComplete,
+      notificationsComplete: readiness.notificationsComplete,
+    }),
+    [readiness],
+  );
 
   const setupSteps = useMemo<PetParentSetupStep[]>(() => {
-    const basic = getCompletionStatus(setupBooleans.basicInfoComplete);
-    const location = getCompletionStatus(setupBooleans.serviceLocationComplete);
-    const pets = getCompletionStatus(setupBooleans.petPassportsComplete);
-    const careNotes = getCompletionStatus(setupBooleans.careNotesComplete);
+    const basic = getCompletionStatus(setupBooleans.basicInfoComplete, true);
+    const location = getCompletionStatus(
+      setupBooleans.serviceLocationComplete,
+      true,
+    );
+    const pets = getCompletionStatus(setupBooleans.petPassportsComplete, true);
+    const careNotes = getCompletionStatus(
+      setupBooleans.careNotesComplete,
+      false,
+    );
     const emergency = getCompletionStatus(
       setupBooleans.emergencyContactComplete,
+      false,
     );
     const notifications = getCompletionStatus(
       setupBooleans.notificationsComplete,
+      false,
     );
 
     return [
       {
         number: 1,
         title: "Basic Info",
-        body: "Add your name, login email, phone number, and profile photo so SitGuru and your Guru can contact you about care.",
+        body: "Add your name so SitGuru can greet you. Phone and photo help your Guru reach you, but they are not required to book.",
         status: basic.status,
         statusLabel: basic.label,
         actionLabel: setupBooleans.basicInfoComplete
@@ -626,7 +620,7 @@ export default function CustomerProfileSetupPage() {
       {
         number: 2,
         title: "Service Location",
-        body: "Add your street address, city, state, and ZIP so SitGuru can match you with Gurus who serve your area.",
+        body: "A care ZIP is enough to find nearby Gurus. Street address helps your Guru arrive — add it when you can.",
         status: location.status,
         statusLabel: location.label,
         actionLabel: setupBooleans.serviceLocationComplete
@@ -640,7 +634,7 @@ export default function CustomerProfileSetupPage() {
       {
         number: 3,
         title: "Pet Passports",
-        body: "Create at least one Pet Passport so Gurus understand who they are caring for before a booking starts.",
+        body: "Add one pet name and whether they are a dog or cat. Extra passport details help your Guru prepare.",
         status: pets.status,
         statusLabel: pets.label,
         actionLabel: setupBooleans.petPassportsComplete
@@ -654,7 +648,7 @@ export default function CustomerProfileSetupPage() {
       {
         number: 4,
         title: "Care Notes",
-        body: "Share routines, feeding notes, medication details, anxiety triggers, access notes, and anything your Guru should know.",
+        body: "Recommended: share routines, feeding, meds, and house notes so your Guru is ready. Not required to book.",
         status: careNotes.status,
         statusLabel: careNotes.label,
         actionLabel: setupBooleans.careNotesComplete
@@ -668,7 +662,7 @@ export default function CustomerProfileSetupPage() {
       {
         number: 5,
         title: "Emergency Contact",
-        body: "Add a backup contact so SitGuru and your Guru have another way to help if something urgent comes up.",
+        body: "Recommended: add a backup contact so SitGuru and your Guru can help if something urgent comes up.",
         status: emergency.status,
         statusLabel: emergency.label,
         actionLabel: setupBooleans.emergencyContactComplete
@@ -682,7 +676,7 @@ export default function CustomerProfileSetupPage() {
       {
         number: 6,
         title: "Notifications",
-        body: "Choose email, text, or push updates so you do not miss booking messages, reminders, or care updates.",
+        body: "Recommended: choose email, text, or push so you do not miss booking messages. You can book without this step.",
         status: notifications.status,
         statusLabel: notifications.label,
         actionLabel: setupBooleans.notificationsComplete
@@ -696,18 +690,7 @@ export default function CustomerProfileSetupPage() {
     ];
   }, [setupBooleans]);
 
-  const completedSteps = setupSteps.filter(
-    (step) => step.status === "complete",
-  ).length;
-
-  const completionPercent = Math.round(
-    (completedSteps / setupSteps.length) * 100,
-  );
-
-  const isBookingReady =
-    setupBooleans.basicInfoComplete &&
-    setupBooleans.serviceLocationComplete &&
-    setupBooleans.petPassportsComplete;
+  const isBookingReady = readiness.readyToBook;
 
   const avatarSrc = profile?.avatar_url || "";
   const displayName = getCustomerDisplayName(profile);
@@ -835,31 +818,36 @@ export default function CustomerProfileSetupPage() {
               </div>
             </div>
 
-            <section className="mt-6 overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#047857_0%,#059669_42%,#10b981_100%)] text-white shadow-[0_22px_60px_rgba(5,150,105,0.24)]">
+            <section
+              className="public-dark-section mt-6 overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#0D5C3A_0%,#047857_42%,#10b981_100%)] text-white shadow-[0_22px_60px_rgba(5,150,105,0.24)]"
+              data-brand-green
+            >
               <div className="grid gap-6 p-6 md:p-8 lg:grid-cols-[1fr_190px] lg:items-center">
                 <div>
                   <p className="text-sm font-black uppercase tracking-[0.26em] text-emerald-100">
                     Pet Parent Setup Hub
                   </p>
 
-                  <h2 className="mt-3 text-4xl font-black tracking-[-0.055em] md:text-5xl">
-                    Complete your 6-step care profile
+                  <h2 className="mt-3 text-4xl font-black tracking-[-0.055em] !text-white md:text-5xl">
+                    Book with 3 things, then help your Guru
                   </h2>
 
                   <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-emerald-50">
-                    Each step captures information SitGuru uses throughout the
-                    platform: matching, bookings, maps, Guru preparation,
-                    safety, messaging, reminders, and rebooking.
+                    Name, care ZIP, and one pet are enough to find care and
+                    send a booking. Extra steps are recommended so your Guru
+                    knows routines, safety contacts, and how to reach you.
                   </p>
                 </div>
 
                 <div className="rounded-[1.75rem] border border-white/20 bg-white/15 p-5 text-center shadow-sm backdrop-blur">
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-50">
-                    Setup Progress
+                    Booking Ready
                   </p>
-                  <p className="mt-2 text-5xl font-black">{completedSteps}/6</p>
+                  <p className="mt-2 text-5xl font-black !text-white">
+                    {readiness.bookingReadyCompleted}/3
+                  </p>
                   <p className="mt-1 text-sm font-black text-emerald-50">
-                    {completionPercent}% complete
+                    {readiness.bookingReadyPercent}% ready to book
                   </p>
                 </div>
               </div>
@@ -868,7 +856,7 @@ export default function CustomerProfileSetupPage() {
                 <div className="h-3 overflow-hidden rounded-full bg-white/20">
                   <div
                     className="h-full rounded-full bg-white transition-all"
-                    style={{ width: `${completionPercent}%` }}
+                    style={{ width: `${readiness.bookingReadyPercent}%` }}
                   />
                 </div>
               </div>
@@ -883,12 +871,14 @@ export default function CustomerProfileSetupPage() {
                   <h3 className="mt-2 text-2xl font-black text-slate-950">
                     {isBookingReady
                       ? "You are ready to book trusted care"
-                      : "Finish the required setup steps"}
+                      : "Add name, ZIP, and one pet to book"}
                   </h3>
                   <p className="mt-1 text-sm font-semibold leading-6 text-slate-700">
                     {isBookingReady
-                      ? "Your required Pet Parent details are in place. You can still improve your profile by completing recommended steps."
-                      : "Complete Basic Info, Service Location, and Pet Passports so SitGuru can support matching and booking."}
+                      ? readiness.guruReady
+                        ? "Your booking details and Guru-ready notes are in place."
+                        : "You can book now. Care notes and an emergency contact help your Guru know your pet."
+                      : "Find Gurus anytime. Booking is fastest once your name, care ZIP, and one Pet Passport are saved."}
                   </p>
                 </div>
 
@@ -926,9 +916,9 @@ export default function CustomerProfileSetupPage() {
                     Explore more with SitGuru
                   </h2>
                   <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
-                    These actions are not required for profile completion. Use
-                    them to find trusted Gurus, view PawPerks, invite more Pet
-                    Parents, or start earning as a Guru.
+                    These actions are not required to book. Use them to find
+                    trusted Gurus, view PawPerks, invite more Pet Parents, or
+                    start earning as a Guru.
                   </p>
                 </div>
 
@@ -1005,12 +995,12 @@ export default function CustomerProfileSetupPage() {
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                   {setupBooleans.emergencyContactComplete
                     ? "Emergency contact is ready."
-                    : "Emergency contact still needs attention."}
+                    : "Emergency contact is recommended for Guru confidence."}
                 </p>
                 <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
                   {setupBooleans.notificationsComplete
                     ? "Notifications are enabled."
-                    : "Choose at least one notification channel."}
+                    : "Notifications are optional — add them so you do not miss booking messages."}
                 </p>
               </div>
             </section>
@@ -1022,14 +1012,13 @@ export default function CustomerProfileSetupPage() {
                     Setup Summary
                   </p>
                   <h3 className="mt-2 text-2xl font-black text-slate-950">
-                    {completionPercent === 100
-                      ? "Your 6-step Pet Parent profile is complete."
-                      : "Keep going to complete your 6-step profile."}
+                    {isBookingReady
+                      ? "You can book. Extra details help your Guru."
+                      : "Name, ZIP, and one pet are enough to book."}
                   </h3>
                   <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
-                    Saved Gurus, PawPerks, invites, and becoming a Guru are
-                    optional growth actions. They should not reduce your Pet
-                    Parent setup completion score.
+                    Saved Gurus, PawPerks, invites, University, and becoming a
+                    Guru are optional. They do not block booking.
                   </p>
                 </div>
 

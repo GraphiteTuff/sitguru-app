@@ -4,7 +4,6 @@ import {
   isHardcodedSuperUserEmail,
   normalizeAdminEmail,
 } from "@/lib/admin/super-users";
-import { isAdminRole, isSuperUserRole } from "@/lib/admin/access";
 
 type SafeFormData = {
   get(name: string): unknown;
@@ -36,7 +35,7 @@ function redirectWithMessage(
 
   url.searchParams.set(type, message);
 
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(url, 303);
 }
 
 export async function POST(request: NextRequest) {
@@ -107,42 +106,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    await supabase.auth.signOut();
-
-    return redirectWithMessage(
-      request,
-      "error",
-      `Unable to verify admin profile: ${profileError.message}`,
-    );
-  }
-
-  // Hardcoded HQ emails are allowed even without a profile role.
-  // If a role is set, it must still be an admin/super role.
-  const profileRole = String(profile?.role || "")
-    .trim()
-    .toLowerCase();
-  if (
-    profileRole &&
-    !isAdminRole(profileRole) &&
-    !isSuperUserRole(profileRole)
-  ) {
-    await supabase.auth.signOut();
-
-    return redirectWithMessage(
-      request,
-      "error",
-      "This account is not authorized for admin access.",
-    );
-  }
-
+  // jason@ / nette@ are HQ Super Users. The same Jason account is also a
+  // Pet Parent (profiles.role = customer). Proxy already allows Admin by
+  // email; do not sign out after a successful password check.
   const baseUrl = getBaseUrl(request);
 
-  return NextResponse.redirect(new URL("/admin", baseUrl));
+  return NextResponse.redirect(new URL("/admin", baseUrl), 303);
 }

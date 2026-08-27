@@ -29,6 +29,7 @@ import {
   parseCustomerIntelligenceMetric,
   type CustomerIntelligenceMetricId,
 } from "@/lib/admin/customer-intelligence/metrics";
+import { getPetParentReadiness } from "@/lib/pet-parent-readiness";
 import CustomerInsightsTable from "./CustomerInsightsTable";
 
 export const dynamic = "force-dynamic";
@@ -601,7 +602,7 @@ function getCustomerSignupQuality(customer: CustomerInsight) {
     };
   }
 
-  if (!hasEmail || !hasLocation || customer.petCount === 0) {
+  if (!hasEmail || !hasLocation) {
     return {
       signupQuality: "needs_review" as const,
       signupQualityLabel: "Incomplete Signup",
@@ -626,32 +627,15 @@ function hasCustomerLocation(customer: CustomerInsight) {
   return Boolean(customer.city || customer.state || customer.zipCode);
 }
 
-function hasContactSignal(customer: CustomerInsight) {
-  /*
-   * Customer Intelligence does not currently load Supabase Auth confirmation
-   * timestamps. Until this page is wired to Auth metadata directly, a usable
-   * email is treated as the contact signal so the registry does not calculate
-   * a different completion percentage than the admin cleanup/profile preview
-   * pages for the same visible record.
-   */
-  return Boolean(customer.email);
-}
-
 function getCustomerProfileCompletion(customer: CustomerInsight) {
-  const checks = [
-    Boolean(customer.id),
-    hasUsableCustomerName(customer),
-    Boolean(customer.email),
-    hasContactSignal(customer),
-    false,
-    hasCustomerLocation(customer),
-    customer.petCount > 0,
-    customer.bookingCount > 0 || customer.messageCount > 0,
-  ];
-
-  const completed = checks.filter(Boolean).length;
-
-  return Math.round((completed / checks.length) * 100);
+  return getPetParentReadiness({
+    name: customer.name,
+    email: customer.email,
+    city: customer.city,
+    state: customer.state,
+    zipCode: customer.zipCode,
+    petCount: customer.petCount,
+  }).bookingReadyPercent;
 }
 
 function normalizeAdminStatus(value: string) {
@@ -872,7 +856,6 @@ function getCustomerMissingRequirements(customer: CustomerInsight) {
   if (!hasUsableCustomerEmail(customer.email)) missing.push("Email");
   if (!hasCustomerLocation(customer)) missing.push("Location");
   if (customer.petCount <= 0) missing.push("Pet profile");
-  if (customer.bookingCount <= 0) missing.push("First booking");
 
   return missing;
 }
@@ -913,10 +896,10 @@ function getCustomerNextAction(customer: CustomerInsight) {
   ) {
     return "Complete profile details";
   }
-  if (completion < 50) return "Complete profile details";
+  if (customer.petCount === 0) return "Ask for pet profile setup";
+  if (completion < 100) return "Add ZIP or name to finish booking-ready setup";
   if (customer.bookingCount === 0) return "Encourage first booking";
   if (customer.paidBookingCount === 0) return "Review unpaid booking activity";
-  if (customer.petCount === 0) return "Ask for pet profile setup";
   return "Open Pet Parent review";
 }
 

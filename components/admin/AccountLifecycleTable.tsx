@@ -591,7 +591,7 @@ export default function AccountLifecycleTable({
                           {setupPercent}% complete
                         </span>
                         <p className="mt-2 text-xs font-semibold text-slate-600">
-                          {setupCompleted}/{setupTotal} setup steps
+                          {setupCompleted}/{setupTotal} booking-ready steps
                         </p>
                         <div className="mt-2 h-2 w-28 overflow-hidden rounded-full bg-slate-100">
                           <div
@@ -799,11 +799,11 @@ export default function AccountLifecycleTable({
                 <>
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">
-                      Customer Setup
+                      Booking Ready
                     </p>
                     <p className="mt-1 text-sm font-black text-slate-950">
                       {numberValue(selectedAccount.setup_completion_percent)}%
-                      complete
+                      ready to book
                     </p>
                   </div>
 

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
+import { getPetParentSetupStatus } from "@/lib/pet-parent-readiness";
 
 type ServiceLocationProfile = {
   id: string;
@@ -271,29 +272,7 @@ async function fetchSetupStatus(userId: string): Promise<SetupStatus> {
     .eq("owner_id", userId)
     .limit(1);
 
-  return {
-    basicInfoComplete: Boolean(
-      profile && (profile.full_name || profile.first_name) && profile.phone,
-    ),
-    serviceLocationComplete: Boolean(
-      profile &&
-        profile.service_address &&
-        profile.service_city &&
-        profile.service_state &&
-        profile.service_zip,
-    ),
-    petPassportsComplete: Boolean(pets && pets.length > 0),
-    careNotesComplete: Boolean(profile?.care_preferences),
-    emergencyContactComplete: Boolean(
-      profile?.emergency_contact ||
-        (profile?.emergency_contact_name && profile?.emergency_contact_phone),
-    ),
-    notificationsComplete: Boolean(
-      profile?.email_notifications ||
-        profile?.push_notifications ||
-        profile?.text_notifications,
-    ),
-  };
+  return getPetParentSetupStatus(profile, pets?.length ?? 0);
 }
 
 async function updateProfileWithPayload(
@@ -481,10 +460,8 @@ export default function CustomerServiceLocationPage() {
   const stateComplete = Boolean(form.service_state.trim());
 
   const serviceLocationComplete = useMemo(() => {
-    return Boolean(
-      streetComplete && zipComplete && cityComplete && stateComplete,
-    );
-  }, [streetComplete, zipComplete, cityComplete, stateComplete]);
+    return zipComplete;
+  }, [zipComplete]);
 
   const statusLabel = serviceLocationComplete ? "Complete" : "Required";
   const statusTone = serviceLocationComplete
@@ -585,26 +562,8 @@ export default function CustomerServiceLocationPage() {
     setMessage("");
     setErrorMessage("");
 
-    if (!form.service_address.trim()) {
-      setErrorMessage("Please enter your street address.");
-      setSaving(false);
-      return false;
-    }
-
     if (cleanZip(form.service_zip).length !== 5) {
       setErrorMessage("Please enter a valid 5-digit ZIP code.");
-      setSaving(false);
-      return false;
-    }
-
-    if (!form.service_city.trim()) {
-      setErrorMessage("Please enter your city.");
-      setSaving(false);
-      return false;
-    }
-
-    if (!form.service_state.trim()) {
-      setErrorMessage("Please enter your state.");
       setSaving(false);
       return false;
     }
@@ -695,8 +654,8 @@ export default function CustomerServiceLocationPage() {
             </h1>
 
             <p className="mt-3 max-w-3xl text-base font-semibold leading-7 text-slate-800/75">
-              Add the primary care location SitGuru uses for Guru matching,
-              booking details, radius filtering, maps, and local availability.
+              A care ZIP is enough to find nearby Gurus. Street address helps
+              your Guru arrive — add it when you can.
             </p>
           </div>
 
