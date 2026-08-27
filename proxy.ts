@@ -333,6 +333,13 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Native form POST to /api/admin/login can 302/307 onto /admin/login and
+  // keep POST. App Router pages only accept GET, so Chrome shows HTTP 405
+  // ("this page isn't working") instead of the login form. Force GET.
+  if (request.method === "POST" && isAdminLoginPath(pathname)) {
+    return NextResponse.redirect(request.nextUrl, 303);
+  }
+
   if (isPasswordRecoveryPath(pathname)) {
     return NextResponse.next();
   }
