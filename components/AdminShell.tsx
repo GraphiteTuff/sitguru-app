@@ -23,6 +23,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  MapPin,
   Users,
   WalletCards,
 } from "lucide-react";
@@ -50,6 +51,12 @@ const primaryNav: AdminNavItem[] = [
     href: "/admin/programs",
     icon: Sparkles,
     pageTitle: "Growth & Referral Dashboard",
+  },
+  {
+    label: "Market Growth",
+    href: "/admin/market-growth",
+    icon: MapPin,
+    pageTitle: "SitGuru Market Density",
   },
   {
     label: "Partner Network",

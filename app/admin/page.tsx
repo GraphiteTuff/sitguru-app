@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { loadMarketDensity } from "@/lib/admin/load-market-density";
+import MarketGrowthBoard from "@/components/admin/MarketGrowthBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -170,6 +172,7 @@ export default async function AdminOperationsDashboard() {
     totalReviews,
     publishedReviews,
     pendingReviewModeration,
+    marketDensity,
   ] = await Promise.all([
     safeCount("profiles", [
       { column: "role", operator: "eq", value: "customer" },
@@ -234,6 +237,7 @@ export default async function AdminOperationsDashboard() {
         value: ["pending_review", "hidden", "removed"],
       },
     ]),
+    loadMarketDensity(),
   ]);
 
   const attentionItems = [
@@ -399,6 +403,13 @@ export default async function AdminOperationsDashboard() {
       priority: "Review",
     },
     {
+      title: "Spend where density exists",
+      description:
+        "Open Market Density before buying ads. Launch Ready markets convert; red markets do not.",
+      href: "/admin/market-growth",
+      priority: "High",
+    },
+    {
       title: "Programs & growth",
       description: "Student, community, veterans pathways, SkillBridge, and ambassadors.",
       href: "/admin/programs",
@@ -444,6 +455,7 @@ export default async function AdminOperationsDashboard() {
         ["Programs", "/admin/programs"],
         ["Referrals", "/admin/referrals"],
         ["Sales & Marketing", "/admin/sales-marketing"],
+        ["Market Growth Map", "/admin/market-growth"],
         ["Partners", "/admin/partners"],
         ["Analytics", "/admin/analytics"],
         ["Insights", "/admin/insights"],
@@ -467,7 +479,8 @@ export default async function AdminOperationsDashboard() {
               <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-emerald-50 sm:text-base">
                 Daily dashboard for marketplace operations, people queues,
                 bookings, messages, reviews, payouts, readiness, Trust & Safety,
-                and growth work.
+                and growth work. Use Market Density to decide where marketing
+                dollars can actually convert.
               </p>
             </div>
 
@@ -509,6 +522,12 @@ export default async function AdminOperationsDashboard() {
               className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
             >
               User Directory
+            </Link>
+            <Link
+              href="/admin/market-growth"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
+            >
+              Market Growth Map
             </Link>
             <Link
               href="/admin/customers"
@@ -555,6 +574,25 @@ export default async function AdminOperationsDashboard() {
               <MetricCardView key={card.label} card={card} />
             ))}
           </div>
+        </Section>
+
+        <Section
+          title="SitGuru Market Density"
+          description="Launch readiness by city and ZIP — Gurus, bookable supply, Pet Parents, Ambassadors, and bookings. Spend where both sides of the marketplace exist."
+          action={
+            <Link
+              href="/admin/market-growth"
+              className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black text-white"
+            >
+              Open full map
+            </Link>
+          }
+        >
+          <MarketGrowthBoard
+            markets={marketDensity.markets}
+            summary={marketDensity.summary}
+            compact
+          />
         </Section>
 
         <Section

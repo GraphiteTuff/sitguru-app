@@ -22,6 +22,7 @@ import {
   LifeBuoy,
   LineChart,
   Link2,
+  MapPin,
   Mail,
   Megaphone,
   MessageCircle,
@@ -81,6 +82,7 @@ const adminRoutes = {
   auditTrail: "/admin/audit-trail",
   referrals: "/admin/referrals",
   salesMarketing: "/admin/sales-marketing",
+  marketGrowth: "/admin/market-growth",
   emailUpdates: "/admin/email-updates",
   programs: "/admin/programs",
   partners: "/admin/partners",
@@ -130,6 +132,11 @@ const navSections = [
         label: "Sales & Marketing",
         href: adminRoutes.salesMarketing,
         icon: Megaphone,
+      },
+      {
+        label: "Market Growth Map",
+        href: adminRoutes.marketGrowth,
+        icon: MapPin,
       },
       {
         label: "Email Updates",
@@ -297,6 +304,11 @@ const mobileGrowthLinks = [
     label: "Sales & Marketing",
     href: adminRoutes.salesMarketing,
     icon: Megaphone,
+  },
+  {
+    label: "Market Growth Map",
+    href: adminRoutes.marketGrowth,
+    icon: MapPin,
   },
   {
     label: "Email Updates",
