@@ -11,17 +11,20 @@ import {
 } from "@/lib/community/format";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 import { getPublicEventPath } from "@/lib/community/slug";
+import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
 
 type EventCardProps = {
   event: CommunityEventWithPartner;
   showPartner?: boolean;
   className?: string;
+  previewMode?: boolean;
 };
 
 export default function EventCard({
   event,
   showPartner = true,
   className = "",
+  previewMode = false,
 }: EventCardProps) {
   const imageUrl = getEventCardImage(event);
   const { compactDate, timeLabel } = formatEventDateRange(
@@ -30,7 +33,8 @@ export default function EventCard({
     event.timezone,
   );
   const partnerName = event.partners?.business_name || "SitGuru Partner";
-  const href = getPublicEventPath(event.slug);
+  const isPreview = previewMode || isHomepageDemoEvent(event.id);
+  const href = isPreview ? "/community/events" : getPublicEventPath(event.slug);
 
   return (
     <article
@@ -101,7 +105,7 @@ export default function EventCard({
               <MapPin className="h-4 w-4 text-emerald-700" />
               {formatEventLocationInline(event)}
             </p>
-            <EventAttendanceBadge eventId={event.id} />
+            <EventAttendanceBadge eventId={isPreview ? undefined : event.id} />
           </div>
         </div>
       </Link>
@@ -111,7 +115,7 @@ export default function EventCard({
           href={href}
           className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-emerald-700 px-4 text-sm font-black text-white transition hover:bg-emerald-800"
         >
-          View Event
+          {isPreview ? "Explore Events" : "View Event"}
         </Link>
       </div>
     </article>

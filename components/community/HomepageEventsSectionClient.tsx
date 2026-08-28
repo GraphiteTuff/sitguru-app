@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import HomepageEventsSection from "@/components/community/HomepageEventsSection";
+import { getHomepageDemoEvents } from "@/lib/community/homepage-demo-events";
 import {
   formatCommunityLocationLabel,
   readCommunityLocationPreference,
@@ -14,6 +15,7 @@ type FeaturedPayload = {
   featured: CommunityEventWithPartner | null;
   upcoming: CommunityEventWithPartner[];
   locationLabel?: string;
+  previewMode?: boolean;
 };
 
 export default function HomepageEventsSectionClient() {
@@ -51,6 +53,9 @@ export default function HomepageEventsSectionClient() {
         }
       } catch (error) {
         console.warn("Homepage events load skipped:", error);
+        if (!cancelled) {
+          setData(getHomepageDemoEvents());
+        }
       }
     }
 
@@ -61,15 +66,21 @@ export default function HomepageEventsSectionClient() {
     };
   }, []);
 
-  if (!data || (!data.featured && data.upcoming.length === 0)) {
+  if (!data) {
     return null;
   }
 
+  const hasLiveEvents = Boolean(data.featured) || data.upcoming.length > 0;
+  const payload = hasLiveEvents
+    ? data
+    : getHomepageDemoEvents(data.locationLabel);
+
   return (
     <HomepageEventsSection
-      featured={data.featured}
-      upcoming={data.upcoming}
-      locationLabel={data.locationLabel}
+      featured={payload.featured}
+      upcoming={payload.upcoming}
+      locationLabel={payload.locationLabel}
+      previewMode={payload.previewMode}
     />
   );
 }

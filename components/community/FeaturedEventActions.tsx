@@ -7,20 +7,24 @@ import EventShareDrawer, {
 } from "@/components/community/EventShareDrawer";
 import CommunityJoinOptions from "@/components/community/CommunityJoinOptions";
 import { getPublicEventPath } from "@/lib/community/slug";
+import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
 
 type FeaturedEventActionsProps = {
   event: EventShareDrawerEvent;
   searchCity?: string;
   searchState?: string;
+  previewMode?: boolean;
 };
 
 export default function FeaturedEventActions({
   event,
   searchCity = "",
   searchState = "",
+  previewMode = false,
 }: FeaturedEventActionsProps) {
   const [shareOpen, setShareOpen] = useState(false);
-  const href = getPublicEventPath(event.slug);
+  const isPreview = previewMode || isHomepageDemoEvent(event.id);
+  const href = isPreview ? "/community/events" : getPublicEventPath(event.slug);
 
   return (
     <>
@@ -29,10 +33,10 @@ export default function FeaturedEventActions({
           href={href}
           className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800"
         >
-          View Event Details
+          {isPreview ? "Explore Community Events" : "View Event Details"}
         </Link>
 
-        {event.id ? (
+        {!isPreview && event.id ? (
           <CommunityJoinOptions
             slug={event.slug}
             eventId={event.id}

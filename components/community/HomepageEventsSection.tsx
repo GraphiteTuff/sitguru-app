@@ -9,15 +9,22 @@ import {
   getEventHeroImage,
 } from "@/lib/community/format";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
-import { getPublicEventPath } from "@/lib/community/slug";
+import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
 
 type HomepageEventsSectionProps = {
   featured: CommunityEventWithPartner | null;
   upcoming: CommunityEventWithPartner[];
   locationLabel?: string;
+  previewMode?: boolean;
 };
 
-function FeaturedEventHero({ event }: { event: CommunityEventWithPartner }) {
+function FeaturedEventHero({
+  event,
+  previewMode = false,
+}: {
+  event: CommunityEventWithPartner;
+  previewMode?: boolean;
+}) {
   const imageUrl = getEventHeroImage(event);
   const { dateLabel, timeLabel } = formatEventDateRange(
     event.start_at,
@@ -25,7 +32,6 @@ function FeaturedEventHero({ event }: { event: CommunityEventWithPartner }) {
     event.timezone,
   );
   const partnerName = event.partners?.business_name || "SitGuru Partner";
-  const href = getPublicEventPath(event.slug);
 
   return (
     <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)]">
@@ -121,6 +127,7 @@ function FeaturedEventHero({ event }: { event: CommunityEventWithPartner }) {
           }}
           searchCity={event.city || ""}
           searchState={event.state || ""}
+          previewMode={previewMode || isHomepageDemoEvent(event.id)}
         />
       </div>
     </div>
@@ -131,6 +138,7 @@ export default function HomepageEventsSection({
   featured,
   upcoming,
   locationLabel,
+  previewMode = false,
 }: HomepageEventsSectionProps) {
   const cards = upcoming.filter((event) => event.id !== featured?.id).slice(0, 4);
 
@@ -146,12 +154,21 @@ export default function HomepageEventsSection({
             <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
               Community
             </p>
-            <h2 className="mt-2 text-3xl font-black tracking-[-0.035em] text-slate-950 sm:text-4xl">
-              Happening Near You
-            </h2>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h2 className="text-3xl font-black tracking-[-0.035em] text-slate-950 sm:text-4xl">
+                Happening Near You
+              </h2>
+              {previewMode ? (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-amber-900">
+                  Preview examples
+                </span>
+              ) : null}
+            </div>
             <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-600 sm:text-base">
-              Pet-friendly events and activities in your community
-              {locationLabel ? ` — ${locationLabel}` : ""}.
+              {previewMode
+                ? "Sample partner events from the SitGuru Community mockups — live listings appear here as partners publish."
+                : "Pet-friendly events and activities in your community"}
+              {!previewMode && locationLabel ? ` — ${locationLabel}` : previewMode && locationLabel ? ` — ${locationLabel}` : ""}.
             </p>
           </div>
           <Link
@@ -165,7 +182,7 @@ export default function HomepageEventsSection({
 
         {featured ? (
           <div className="mt-8">
-            <FeaturedEventHero event={featured} />
+            <FeaturedEventHero event={featured} previewMode={previewMode} />
           </div>
         ) : null}
 
@@ -176,7 +193,11 @@ export default function HomepageEventsSection({
             </h3>
             <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
               {cards.map((event) => (
-                <EventCard key={event.id} event={event} />
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  previewMode={previewMode || isHomepageDemoEvent(event.id)}
+                />
               ))}
             </div>
           </div>

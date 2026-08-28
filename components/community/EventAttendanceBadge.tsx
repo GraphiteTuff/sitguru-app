@@ -8,12 +8,13 @@ export default function EventAttendanceBadge({
   eventId,
   className = "",
 }: {
-  eventId: string;
+  eventId?: string;
   className?: string;
 }) {
   const [counts, setCounts] = useState<EventAttendanceCounts | null>(null);
 
   useEffect(() => {
+    if (!eventId) return;
     let cancelled = false;
     async function load() {
       try {
@@ -32,7 +33,7 @@ export default function EventAttendanceBadge({
     };
   }, [eventId]);
 
-  if (!counts || counts.totalGoing <= 0) return null;
+  if (!eventId || !counts || counts.totalGoing <= 0) return null;
 
   return (
     <p
