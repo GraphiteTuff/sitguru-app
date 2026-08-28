@@ -25,7 +25,10 @@ async function runSync(request: NextRequest) {
   }
 
   try {
-    const result = await syncGoogleCommunityEventDiscoveries();
+    const result = await syncGoogleCommunityEventDiscoveries({
+      respectSchedule: true,
+      forceRefresh: false,
+    });
     return NextResponse.json(result, { status: result.ok ? 200 : 500 });
   } catch (error) {
     const message =

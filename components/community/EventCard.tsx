@@ -13,6 +13,7 @@ import {
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 import { getPublicEventPath } from "@/lib/community/slug";
 import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
+import { isGoogleDiscoveryEvent } from "@/lib/community/event-preview";
 
 type EventCardProps = {
   event: CommunityEventWithPartner;
@@ -33,7 +34,13 @@ export default function EventCard({
     event.end_at,
     event.timezone,
   );
-  const partnerName = event.partners?.business_name || "SitGuru Partner";
+  const googleDiscovery = isGoogleDiscoveryEvent(event);
+  const sourceLabel = googleDiscovery
+    ? "Community Event"
+    : "SitGuru Partner Event";
+  const partnerName = googleDiscovery
+    ? "Community Event"
+    : event.partners?.business_name || "SitGuru Partner";
   const isPreview = previewMode || isHomepageDemoEvent(event.id);
   const href = isPreview ? "/community/events" : getPublicEventPath(event.slug);
 
@@ -63,6 +70,15 @@ export default function EventCard({
             <p className="text-lg font-black leading-none text-slate-950">
               {compactDate.split(" ")[1]}
             </p>
+          </div>
+          <div
+            className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] shadow-sm ${
+              googleDiscovery
+                ? "bg-slate-900/90 text-white"
+                : "bg-[#0D5C3A] text-white"
+            }`}
+          >
+            {sourceLabel}
           </div>
         </div>
 

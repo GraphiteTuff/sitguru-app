@@ -36,6 +36,9 @@ export async function PATCH(request: NextRequest) {
     radiusMiles?: number;
     searchTerms?: string[];
     eventCategories?: string[];
+    cityAnchors?: string[];
+    marketTier?: "core" | "growth" | "expansion" | "seasonal" | "paused";
+    syncFrequencyHours?: number;
     enabled?: boolean;
     sortOrder?: number;
     serpCacheTtlHours?: number;

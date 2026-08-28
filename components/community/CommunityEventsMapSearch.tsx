@@ -320,7 +320,7 @@ export default function CommunityEventsMapSearch({
                   <>
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
                       {compactDate}
-                      {isGoogleDiscoveryEvent(event) ? " · Around town" : ""}
+                      {isGoogleDiscoveryEvent(event) ? " · Community Event" : " · SitGuru Partner Event"}
                     </p>
                     <h3 className="mt-1 line-clamp-2 text-base font-black text-slate-950">
                       {event.title}

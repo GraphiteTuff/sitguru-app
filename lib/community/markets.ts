@@ -1,9 +1,28 @@
+import { DEFAULT_PET_SEARCH_INTENTS } from "@/lib/community/pet-relevance";
+
 export type CommunityMarketSyncStatus =
   | "success"
   | "partial"
   | "failed"
   | "skipped"
-  | "cached";
+  | "cached"
+  | "budget_deferred";
+
+export type CommunityMarketTier =
+  | "core"
+  | "growth"
+  | "expansion"
+  | "seasonal"
+  | "paused";
+
+export type CommunityMarketHealth =
+  | "excellent"
+  | "healthy"
+  | "low_yield"
+  | "needs_review"
+  | "budget_deferred"
+  | "api_error"
+  | "paused";
 
 export type CommunityMarketRow = {
   id: string;
@@ -21,6 +40,23 @@ export type CommunityMarketRow = {
   event_categories: string[];
   enabled: boolean;
   sort_order: number;
+  market_tier: CommunityMarketTier;
+  city_anchors: string[];
+  city_anchor_index: number;
+  sync_frequency_hours: number;
+  market_health: CommunityMarketHealth;
+  searches_performed_total: number;
+  events_discovered_total: number;
+  pet_relevant_events_total: number;
+  events_rejected_total: number;
+  events_inserted_total: number;
+  events_updated_total: number;
+  duplicates_detected_total: number;
+  zero_result_searches_total: number;
+  consecutive_zero_yield_syncs: number;
+  last_pet_yield_per_search: number;
+  avg_pet_yield_per_search: number;
+  pet_relevant_events_count: number;
   last_successful_sync_at: string | null;
   last_sync_attempt_at: string | null;
   last_sync_status: CommunityMarketSyncStatus | null;
@@ -46,6 +82,9 @@ export type CommunityMarketUpdateInput = {
   radiusMiles?: number;
   searchTerms?: string[];
   eventCategories?: string[];
+  cityAnchors?: string[];
+  marketTier?: CommunityMarketTier;
+  syncFrequencyHours?: number;
   enabled?: boolean;
   sortOrder?: number;
   serpCacheTtlHours?: number;
@@ -54,31 +93,34 @@ export type CommunityMarketUpdateInput = {
 
 /**
  * Build SerpApi Google Search queries for a market.
- * Prefer county-level "in …" phrasing (broader events block hits).
- * Put the precise place in SerpApi `location`, not state abbreviations in `q`.
- * (Google's dedicated Events vertical was retired Aug 2026; we use engine=google.)
+ * Rotate city anchors + pet intents rather than blasting every city each sync.
  */
 export function buildMarketSearchQueries(market: CommunityMarketRow) {
   const county = market.county_name?.trim() || null;
-  const city = market.city?.trim() || null;
-  const fallbackPlace =
-    market.location_query
-      .replace(/,\s*(PA|Pennsylvania)\b/gi, "")
-      .trim() || market.name;
+  const anchors = (market.city_anchors || [])
+    .map((a) => a.trim())
+    .filter(Boolean);
+  const fallbackCity = market.city?.trim() || null;
+  const anchorIndex = Math.max(0, market.city_anchor_index || 0);
 
-  const primaryPlace = county || city || fallbackPlace;
-  const secondaryPlace =
-    city && county && city.toLowerCase() !== county.toLowerCase()
-      ? city
-      : null;
+  const activeAnchor =
+    anchors.length > 0
+      ? anchors[anchorIndex % anchors.length]
+      : fallbackCity;
 
-  const maxQueries = Math.max(1, market.max_queries_per_sync || 2);
-  const terms = (market.search_terms || [])
+  const primaryPlace = county || activeAnchor || market.name;
+  const maxQueries = Math.max(1, market.max_queries_per_sync || 1);
+
+  const customTerms = (market.search_terms || [])
     .map((term) => term.trim())
     .filter(Boolean);
-  const effectiveTerms = terms.length
-    ? terms
-    : ["pet friendly events", "dog adoption events"];
+  const intentPool =
+    customTerms.length > 0
+      ? customTerms
+      : [...DEFAULT_PET_SEARCH_INTENTS];
+
+  // Rotate intents with anchor index so consecutive syncs diversify.
+  const rotatedIntents = rotateArray(intentPool, anchorIndex);
 
   const queries: string[] = [];
   const push = (q: string) => {
@@ -86,37 +128,100 @@ export function buildMarketSearchQueries(market: CommunityMarketRow) {
     if (!queries.includes(q)) queries.push(q);
   };
 
-  // Slot 1: broad county / primary
-  push(
-    /\bin\b|\bnear\b/i.test(effectiveTerms[0])
-      ? effectiveTerms[0]
-      : `${effectiveTerms[0]} in ${primaryPlace}`,
-  );
-
-  // Slot 2+: mix city "near" (better local hits) then remaining terms
-  if (secondaryPlace) {
-    const term = effectiveTerms[1] || effectiveTerms[0];
-    push(`${term} near ${secondaryPlace}`);
+  const first = rotatedIntents[0] || "pet events";
+  if (activeAnchor && county) {
+    push(
+      /\bin\b|\bnear\b/i.test(first)
+        ? first
+        : `${first} near ${activeAnchor}`,
+    );
+    if (maxQueries > 1) {
+      const second = rotatedIntents[1] || first;
+      push(`${second} in ${county}`);
+    }
+  } else {
+    push(
+      /\bin\b|\bnear\b/i.test(first)
+        ? first
+        : `${first} in ${primaryPlace}`,
+    );
   }
 
-  for (const term of effectiveTerms.slice(secondaryPlace ? 2 : 1)) {
-    push(/\bin\b|\bnear\b/i.test(term) ? term : `${term} in ${primaryPlace}`);
+  for (const term of rotatedIntents.slice(queries.length)) {
+    if (queries.length >= maxQueries) break;
+    const place = activeAnchor || primaryPlace;
+    push(/\bin\b|\bnear\b/i.test(term) ? term : `${term} near ${place}`);
   }
 
-  return queries.length ? queries : [`pet friendly events in ${primaryPlace}`];
+  return queries.length
+    ? queries
+    : [`pet events in ${primaryPlace}`];
+}
+
+function rotateArray<T>(items: T[], offset: number) {
+  if (!items.length) return items;
+  const start = ((offset % items.length) + items.length) % items.length;
+  return [...items.slice(start), ...items.slice(0, start)];
+}
+
+/** Advance city anchor rotation after a sync attempt. */
+export function nextCityAnchorIndex(market: CommunityMarketRow) {
+  const anchors = (market.city_anchors || []).filter((a) => a.trim());
+  if (anchors.length <= 1) return 0;
+  return ((market.city_anchor_index || 0) + 1) % anchors.length;
 }
 
 /** SerpApi `location` value — city/county level, United States. */
 export function buildMarketSerpLocation(market: CommunityMarketRow) {
+  const anchors = (market.city_anchors || [])
+    .map((a) => a.trim())
+    .filter(Boolean);
+  const activeAnchor =
+    anchors.length > 0
+      ? anchors[(market.city_anchor_index || 0) % anchors.length]
+      : market.city?.trim() || null;
+
+  if (activeAnchor) {
+    const stateName =
+      market.state === "NJ"
+        ? "New Jersey"
+        : market.state === "PA"
+          ? "Pennsylvania"
+          : market.state;
+    return `${activeAnchor}, ${stateName}, United States`;
+  }
+
   const raw = market.location_query?.trim() || market.name;
   if (/united states/i.test(raw)) return raw;
   return `${raw}, United States`;
 }
 
+export function nextScheduledSyncAt(
+  market: Pick<CommunityMarketRow, "market_tier" | "sync_frequency_hours">,
+  from = new Date(),
+) {
+  if (market.market_tier === "paused") {
+    const far = new Date(from);
+    far.setUTCFullYear(far.getUTCFullYear() + 1);
+    return far.toISOString();
+  }
+
+  const hours = Math.max(6, market.sync_frequency_hours || 24);
+  const next = new Date(from.getTime() + hours * 3_600_000);
+  return next.toISOString();
+}
+
+/** @deprecated Prefer nextScheduledSyncAt — kept for older callers. */
 export function nextDailySyncAt(from = new Date()) {
   const next = new Date(from);
-  // Daily cron is 06:30 UTC — schedule next day at that time.
   next.setUTCDate(next.getUTCDate() + 1);
   next.setUTCHours(6, 30, 0, 0);
   return next.toISOString();
+}
+
+export function dailySerpBudget() {
+  const configured = Number(process.env.SERPAPI_DAILY_BUDGET || 40);
+  return Number.isFinite(configured) && configured > 0
+    ? Math.floor(configured)
+    : 40;
 }

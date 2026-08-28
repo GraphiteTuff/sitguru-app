@@ -96,11 +96,14 @@ function EventBannerCard({
           <p className="text-xl font-black leading-none">{badgeDay}</p>
         </div>
         {googleDiscovery ? (
-          <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-slate-700 shadow-sm">
-            <ExternalLink className="h-3 w-3" />
-            Around town
+          <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-slate-900/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm">
+            Community Event
           </div>
-        ) : null}
+        ) : (
+          <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#0D5C3A] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm">
+            SitGuru Partner Event
+          </div>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-5">

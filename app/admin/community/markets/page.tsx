@@ -2,7 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import AdminCommunityMarketsClient from "@/components/admin/community/AdminCommunityMarketsClient";
+import { dailySerpBudget } from "@/lib/community/markets";
 import {
+  countDiscoveriesFoundToday,
+  countPartnerEventsPublished,
+  countPetRelevantFoundToday,
   getSerpUsageToday,
   listCommunityMarkets,
 } from "@/lib/community/market-queries";
@@ -15,10 +19,14 @@ export default async function AdminCommunityMarketsPage() {
     redirect("/admin/login");
   }
 
-  const [markets, usage] = await Promise.all([
-    listCommunityMarkets(),
-    getSerpUsageToday(),
-  ]);
+  const [markets, usage, partnerEvents, communityEventsToday, petRelevantToday] =
+    await Promise.all([
+      listCommunityMarkets(),
+      getSerpUsageToday(),
+      countPartnerEventsPublished(),
+      countDiscoveriesFoundToday(),
+      countPetRelevantFoundToday(),
+    ]);
 
   return (
     <div className="space-y-6">
@@ -37,9 +45,8 @@ export default async function AdminCommunityMarketsPage() {
             Community Markets
           </h1>
           <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-600">
-            Enable geographic markets for SerpApi discovery. Bucks, Montgomery, Lehigh, and
-            Northampton County PA ship enabled by default. Partner-published SitGuru events stay
-            separate and keep visual priority.
+            Smart geographic growth for SerpApi discovery across PA/NJ. Partner-published
+            SitGuru events stay separate and always keep visual priority.
           </p>
         </div>
         <Link
@@ -50,7 +57,16 @@ export default async function AdminCommunityMarketsPage() {
         </Link>
       </div>
 
-      <AdminCommunityMarketsClient markets={markets} usage={usage} />
+      <AdminCommunityMarketsClient
+        markets={markets}
+        usage={usage}
+        summary={{
+          partnerEvents,
+          communityEventsToday,
+          petRelevantToday,
+          dailyBudget: dailySerpBudget(),
+        }}
+      />
     </div>
   );
 }

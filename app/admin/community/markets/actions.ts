@@ -7,7 +7,10 @@ import {
   updateCommunityMarket,
 } from "@/lib/community/market-queries";
 import type { CommunityMarketUpdateInput } from "@/lib/community/markets";
-import { syncGoogleCommunityEventDiscoveries } from "@/lib/community/google-events-sync";
+import {
+  previewCommunityMarketSync,
+  syncGoogleCommunityEventDiscoveries,
+} from "@/lib/community/google-events-sync";
 
 async function requireAdminAction() {
   const admin = await getAdminIdentity();
@@ -34,6 +37,17 @@ export async function saveCommunityMarketAction(
   return result;
 }
 
+export async function previewCommunityMarketSyncAction(marketId?: string) {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+
+  const plan = await previewCommunityMarketSync({
+    marketId,
+    forceRefresh: true,
+  });
+  return { ok: true as const, plan };
+}
+
 export async function syncCommunityMarketNowAction(marketId?: string) {
   const gate = await requireAdminAction();
   if (!gate.ok) return gate;
@@ -48,6 +62,19 @@ export async function syncCommunityMarketNowAction(marketId?: string) {
   revalidatePath("/");
   revalidatePath("/community/events");
 
+  return result;
+}
+
+export async function pauseCommunityMarketAction(marketId: string) {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+
+  const result = await updateCommunityMarket(marketId, {
+    marketTier: "paused",
+  });
+  if (result.ok) {
+    revalidatePath("/admin/community/markets");
+  }
   return result;
 }
 

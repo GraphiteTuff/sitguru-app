@@ -1,5 +1,8 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { GOOGLE_DISCOVERY_EVENT_TYPE } from "@/lib/community/event-preview";
+import {
+  effectivePetRelevanceScore,
+} from "@/lib/community/pet-relevance";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 
 export type CommunityEventDiscoveryRow = {
@@ -22,6 +25,9 @@ export type CommunityEventDiscoveryRow = {
   event_url: string;
   is_free: boolean;
   pet_friendly: boolean;
+  pet_relevance_score?: number | null;
+  pet_relevance_override?: number | null;
+  qualifying_pet_event?: boolean | null;
   status?: string;
   synced_at: string;
   created_at?: string;
@@ -52,7 +58,6 @@ function discoveryCountyLabel(row: CommunityEventDiscoveryRow) {
     return row.community_markets.county_name.trim();
   }
   if (row.community_markets?.name?.trim()) {
-    // "Bucks County, PA" → "Bucks County"
     return row.community_markets.name.split(",")[0]?.trim() || null;
   }
   if (row.county === "bucks") return "Bucks County";
@@ -71,6 +76,11 @@ export function mapDiscoveryToCommunityEvent(
   row: CommunityEventDiscoveryRow,
 ): CommunityEventWithPartner {
   const label = marketLabel(row);
+  const petScore = effectivePetRelevanceScore(row);
+
+  // Priority 3: highly relevant SerpApi pet events (lower number = higher in DB featured,
+  // but discoveries never enter partner featured query — used for discovery sort only).
+  const featuredPriority = petScore >= 90 ? 30 : petScore >= 70 ? 40 : 55;
 
   return {
     id: row.id,
@@ -105,7 +115,7 @@ export function mapDiscoveryToCommunityEvent(
     country: "US",
     latitude: row.community_markets?.latitude ?? null,
     longitude: row.community_markets?.longitude ?? null,
-    pet_friendly: row.pet_friendly,
+    pet_friendly: row.pet_friendly || petScore >= 40,
     family_friendly: true,
     outdoor: true,
     is_free: row.is_free,
@@ -115,7 +125,7 @@ export function mapDiscoveryToCommunityEvent(
     contact_email: null,
     status: "published",
     featured_status: "homepage",
-    featured_priority: 50,
+    featured_priority: featuredPriority,
     featured_start_at: null,
     featured_end_at: null,
     featured_market_city: discoveryCountyLabel(row),
@@ -129,7 +139,7 @@ export function mapDiscoveryToCommunityEvent(
     updated_at: row.updated_at || row.synced_at,
     partners: {
       id: "00000000-0000-0000-0000-000000000001",
-      business_name: `Google • ${label}`,
+      business_name: "Community Event",
       slug: null,
       city: discoveryCountyLabel(row) || row.city,
       state: row.state || "PA",
@@ -139,15 +149,28 @@ export function mapDiscoveryToCommunityEvent(
   };
 }
 
+function sortDiscoveriesForDisplay(rows: CommunityEventDiscoveryRow[]) {
+  return [...rows].sort((a, b) => {
+    const scoreDiff =
+      effectivePetRelevanceScore(b) - effectivePetRelevanceScore(a);
+    if (scoreDiff !== 0) return scoreDiff;
+    return String(a.start_at).localeCompare(String(b.start_at));
+  });
+}
+
 export async function fetchDiscoveredHomepageEvents(opts?: {
   limit?: number;
   marketId?: string;
   marketSlug?: string;
+  /** Minimum effective pet relevance (default 40 for public surfaces). */
+  minPetScore?: number;
 }) {
   const limit = opts?.limit ?? 12;
+  const minPetScore = opts?.minPetScore ?? 40;
 
   try {
     const now = new Date().toISOString();
+    // Fetch extra then sort by pet relevance (PostgREST can't easily express override).
     let query = supabaseAdmin
       .from("community_event_discoveries")
       .select(
@@ -166,7 +189,7 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
       .eq("status", "active")
       .gte("start_at", now)
       .order("start_at", { ascending: true })
-      .limit(limit);
+      .limit(Math.max(limit * 3, 36));
 
     if (opts?.marketId) {
       query = query.eq("market_id", opts.marketId);
@@ -175,7 +198,6 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
     const { data, error } = await query;
 
     if (error) {
-      // Fallback without join if migration not applied yet
       console.warn("fetchDiscoveredHomepageEvents:", error.message);
       const fallback = await supabaseAdmin
         .from("community_event_discoveries")
@@ -184,9 +206,11 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
         .order("start_at", { ascending: true })
         .limit(limit);
 
-      const rows = (fallback.data || []) as CommunityEventDiscoveryRow[];
+      const rows = sortDiscoveriesForDisplay(
+        (fallback.data || []) as CommunityEventDiscoveryRow[],
+      ).filter((row) => effectivePetRelevanceScore(row) >= minPetScore);
       return {
-        events: rows.map(mapDiscoveryToCommunityEvent),
+        events: rows.slice(0, limit).map(mapDiscoveryToCommunityEvent),
         lastSyncedAt: rows[0]?.synced_at || null,
       };
     }
@@ -200,6 +224,10 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
       );
     }
 
+    rows = sortDiscoveriesForDisplay(rows).filter(
+      (row) => effectivePetRelevanceScore(row) >= minPetScore,
+    );
+
     const lastSyncedAt =
       rows.reduce<string | null>((latest, row) => {
         if (!latest || row.synced_at > latest) return row.synced_at;
@@ -209,7 +237,7 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
       null;
 
     return {
-      events: rows.map(mapDiscoveryToCommunityEvent),
+      events: rows.slice(0, limit).map(mapDiscoveryToCommunityEvent),
       lastSyncedAt,
     };
   } catch (error) {
