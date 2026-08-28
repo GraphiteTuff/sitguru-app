@@ -21,9 +21,40 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/**",
       },
+      // Google / SerpApi discovery thumbnails (tbn0–tbn3 + archived serpapi hosts)
       {
         protocol: "https",
         hostname: "encrypted-tbn0.gstatic.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "encrypted-tbn1.gstatic.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "encrypted-tbn2.gstatic.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "encrypted-tbn3.gstatic.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "serpapi.com",
         port: "",
         pathname: "/**",
       },

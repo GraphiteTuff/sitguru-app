@@ -52,8 +52,8 @@ export default function HomepageEventsSection({
       lastSyncedAt={lastSyncedAt}
       viewAllHref="/community/events"
       adminHref={adminHref}
-      eyebrow="Community events"
-      title="More upcoming events."
+      eyebrow="Out with the pack"
+      title="Where good dogs gather."
     />
   );
 }

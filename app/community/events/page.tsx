@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import CommunityEventsExplorer from "@/components/community/CommunityEventsExplorer";
 import CommunityEventsBannerSection from "@/components/community/CommunityEventsBannerSection";
 import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
+import DiscoveryReturnOpener from "@/components/community/DiscoveryReturnOpener";
 import { fetchPublicEvents } from "@/lib/community/queries";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +15,7 @@ type PageProps = {
     category?: string;
     petFriendly?: string;
     isFree?: string;
+    welcome?: string;
   }>;
 };
 
@@ -38,16 +41,21 @@ export default async function CommunityEventsPage({ searchParams }: PageProps) {
       <section className="border-b border-slate-100 bg-white py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-            Community • Events
+            Out with the pack
           </p>
           <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">
-            Upcoming community events
+            Where good dogs gather.
           </h1>
           <p className="mt-3 max-w-2xl text-sm font-semibold text-slate-600 sm:text-base">
-            Search pet-friendly events near you — adoption days, social meetups, training,
-            fundraisers, and partner gatherings.
+            Adoption days, pup meetups, training, fundraisers, and partner hangs near you.
           </p>
         </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+        <Suspense fallback={null}>
+          <DiscoveryReturnOpener />
+        </Suspense>
       </section>
 
       <CommunityEventsBannerSection />

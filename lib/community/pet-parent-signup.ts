@@ -176,6 +176,78 @@ export function buildCommunityJoinHref(input?: {
   return `/signup?${params.toString()}`;
 }
 
+/** Pending Google-discovery event to reopen after Pet Parent signup. */
+export const PENDING_DISCOVERY_OPEN_KEY = "sitguru_pending_discovery_open";
+
+export type PendingDiscoveryOpen = {
+  eventId: string;
+  title: string;
+  eventUrl: string;
+  savedAt: number;
+};
+
+export function savePendingDiscoveryOpen(pending: PendingDiscoveryOpen) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      PENDING_DISCOVERY_OPEN_KEY,
+      JSON.stringify(pending),
+    );
+  } catch {
+    // private browsing
+  }
+}
+
+export function readPendingDiscoveryOpen(): PendingDiscoveryOpen | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(PENDING_DISCOVERY_OPEN_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingDiscoveryOpen;
+    if (!parsed?.eventUrl || !parsed?.eventId) return null;
+    if (Date.now() - Number(parsed.savedAt || 0) > 7 * 86400000) {
+      window.localStorage.removeItem(PENDING_DISCOVERY_OPEN_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingDiscoveryOpen() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(PENDING_DISCOVERY_OPEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** One-tap Pet Parent capture from a Google discovery banner card. */
+export function buildDiscoveryPetParentSignupHref(input: {
+  eventId: string;
+  title: string;
+  source?: string;
+  campaign?: string;
+}) {
+  const campaign = input.campaign || "google_discovery_banner";
+  const params = new URLSearchParams({
+    role: "pet_parent",
+    intent: "pet_parent",
+    next: "/community/events?welcome=1",
+    source: input.source || "homepage_events_banner",
+    platform: "web",
+    campaign,
+    utm_source: "sitguru",
+    utm_medium: "community_events",
+    utm_campaign: campaign,
+    utm_content: input.eventId,
+    event_id: input.eventId,
+  });
+  return `/signup?${params.toString()}`;
+}
+
 export function savePendingEventRsvp(pending: PendingEventRsvp) {
   if (typeof window === "undefined") return;
   try {

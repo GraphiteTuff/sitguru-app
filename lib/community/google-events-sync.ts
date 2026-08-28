@@ -27,6 +27,8 @@ type SerpEventResult = {
   address?: string[] | string;
   link?: string;
   thumbnail?: string;
+  /** Fuller image when Google Search events_results provides it. */
+  image?: string;
   description?: string;
   source?: string;
   venue?: { name?: string } | string;
@@ -167,7 +169,7 @@ function normalizeSerpEvent(
     state: location.state || market.state,
     start_at: startAt,
     end_at: parseEventEndAt(startAt, when),
-    image_url: event.thumbnail || null,
+    image_url: event.image || event.thumbnail || null,
     event_url: eventUrl,
     is_free: inferIsFree(title, description),
     raw_payload: event as Record<string, unknown>,
