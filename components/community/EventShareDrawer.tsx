@@ -72,6 +72,7 @@ export default function EventShareDrawer({
 }: EventShareDrawerProps) {
   const [copied, setCopied] = useState<"link" | "caption" | null>(null);
   const [caption, setCaption] = useState("");
+  const [hint, setHint] = useState("");
 
   const url = useMemo(() => {
     if (!event) return "";
@@ -88,14 +89,18 @@ export default function EventShareDrawer({
 
   const assets = useMemo(() => {
     if (!event) return [];
-    return getEventSocialAssets({
-      social_square_url: event.social_square_url,
-      social_story_url: event.social_story_url,
-      social_landscape_url: event.social_landscape_url,
-      image_hero_url: event.image_hero_url || event.imageUrl,
-      image_card_url: event.image_card_url,
-      image_original_url: event.image_original_url,
-    });
+    return getEventSocialAssets(
+      {
+        slug: event.slug,
+        social_square_url: event.social_square_url,
+        social_story_url: event.social_story_url,
+        social_landscape_url: event.social_landscape_url,
+        image_hero_url: event.image_hero_url || event.imageUrl,
+        image_card_url: event.image_card_url,
+        image_original_url: event.image_original_url,
+      },
+      { preferBranded: true },
+    );
   }, [event]);
 
   useEffect(() => {
@@ -123,6 +128,8 @@ export default function EventShareDrawer({
 
   if (!open || !event) return null;
 
+  const current = event;
+
   async function copyValue(value: string, kind: "link" | "caption") {
     try {
       await navigator.clipboard.writeText(value);
@@ -131,7 +138,7 @@ export default function EventShareDrawer({
         eventName: kind === "caption" ? "event_share" : "event_link_copy",
         eventType: "community",
         source,
-        metadata: { slug: event?.slug, kind, eventId: event?.id },
+        metadata: { slug: current.slug, kind, eventId: current.id },
       });
       window.setTimeout(() => setCopied(null), 1600);
     } catch {
@@ -139,15 +146,35 @@ export default function EventShareDrawer({
     }
   }
 
+  async function prepareInstagramShare() {
+    const story = assets.find((asset) => asset.id === "story") || assets[0];
+    if (story?.url) {
+      try {
+        await downloadEventGraphic(story.url, `${current.slug}-instagram.png`);
+      } catch {
+        // continue with caption copy even if download fails
+      }
+    }
+    await copyValue(caption, "caption");
+    setHint("Instagram: graphic saved + caption copied — open Instagram to post");
+    window.setTimeout(() => setHint(""), 2800);
+    void trackEvent({
+      eventName: "event_share",
+      eventType: "community",
+      source,
+      metadata: { slug: current.slug, channel: "instagram", eventId: current.id },
+    });
+  }
+
   async function nativeShare() {
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
-        await navigator.share({ title: event?.title, text: caption, url });
+        await navigator.share({ title: current.title, text: caption, url });
         void trackEvent({
           eventName: "event_share",
           eventType: "community",
           source,
-          metadata: { slug: event?.slug, channel: "native", eventId: event?.id },
+          metadata: { slug: current.slug, channel: "native", eventId: current.id },
         });
         return;
       } catch {
@@ -216,6 +243,16 @@ export default function EventShareDrawer({
               </span>
               <span className="text-xs font-bold text-slate-700">Share</span>
             </button>
+            <button
+              type="button"
+              onClick={() => void prepareInstagramShare()}
+              className="flex w-[72px] flex-col items-center gap-2"
+            >
+              <span className="grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-amber-400 via-pink-500 to-violet-600 text-white">
+                <Download className="h-5 w-5" />
+              </span>
+              <span className="text-xs font-bold text-slate-700">Instagram</span>
+            </button>
             {socialPlatforms.map((platform) => (
               <a
                 key={platform.id}
@@ -257,7 +294,13 @@ export default function EventShareDrawer({
               <div key={asset.id} className="overflow-hidden rounded-2xl border border-slate-200">
                 <div className={`relative ${asset.aspectClass} bg-emerald-50`}>
                   {asset.url ? (
-                    <Image src={asset.url} alt={asset.label} fill className="object-cover" />
+                    <Image
+                      src={asset.url}
+                      alt={asset.label}
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
                   ) : null}
                 </div>
                 <div className="space-y-2 p-3">
@@ -305,12 +348,17 @@ export default function EventShareDrawer({
           <p className="mt-2 text-right text-xs font-semibold text-slate-500">
             {caption.length} characters
           </p>
+          {hint ? <p className="mt-2 text-xs font-black text-emerald-800">{hint}</p> : null}
         </div>
 
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
           <Heart className="mb-1 inline h-4 w-4 text-emerald-700" /> Thanks for helping spread the
           word. Sharing events helps build a stronger pet-loving community.
         </div>
+        <p className="text-xs font-semibold text-slate-500">
+          Instagram does not allow direct browser posting — use Save Graphic + Copy Caption, then
+          open Instagram.
+        </p>
       </div>
     </div>
   );

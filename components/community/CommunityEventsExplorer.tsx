@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import EventCard from "@/components/community/EventCard";
+import {
+  readCommunityLocationPreference,
+  saveCommunityLocationPreference,
+} from "@/lib/community/location-preference";
 import { COMMUNITY_EVENT_CATEGORIES } from "@/lib/community/types";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 
@@ -24,6 +28,30 @@ export default function CommunityEventsExplorer({
 }) {
   const router = useRouter();
   const [filters, setFilters] = useState(initialFilters);
+  const [hydratedLocation, setHydratedLocation] = useState(false);
+
+  useEffect(() => {
+    if (hydratedLocation) return;
+    if (initialFilters.city || initialFilters.state) {
+      setHydratedLocation(true);
+      return;
+    }
+
+    const preference = readCommunityLocationPreference();
+    if (preference.city || preference.state) {
+      const next = {
+        ...initialFilters,
+        city: preference.city || "",
+        state: preference.state || "",
+      };
+      setFilters(next);
+      const params = new URLSearchParams();
+      if (next.city) params.set("city", next.city);
+      if (next.state) params.set("state", next.state);
+      router.replace(`/community/events?${params.toString()}`);
+    }
+    setHydratedLocation(true);
+  }, [hydratedLocation, initialFilters, router]);
 
   const filtered = useMemo(() => {
     return events.filter((event) => {
@@ -50,6 +78,13 @@ export default function CommunityEventsExplorer({
 
   function apply(next: Filters) {
     setFilters(next);
+    if (next.city || next.state) {
+      saveCommunityLocationPreference({
+        city: next.city || undefined,
+        state: next.state || undefined,
+        source: "manual",
+      });
+    }
     const params = new URLSearchParams();
     if (next.q) params.set("q", next.q);
     if (next.city) params.set("city", next.city);
@@ -62,6 +97,15 @@ export default function CommunityEventsExplorer({
 
   return (
     <div className="space-y-6">
+      {(filters.city || filters.state) && (
+        <p className="text-sm font-semibold text-slate-600">
+          Showing events near{" "}
+          <span className="font-black text-slate-900">
+            {[filters.city, filters.state].filter(Boolean).join(", ")}
+          </span>
+        </p>
+      )}
+
       <div className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-6">
         <input
           defaultValue={filters.q}
@@ -70,12 +114,14 @@ export default function CommunityEventsExplorer({
           className="min-h-11 rounded-2xl border border-slate-200 px-4 text-sm font-semibold xl:col-span-2"
         />
         <input
+          key={`city-${filters.city}`}
           defaultValue={filters.city}
           onBlur={(event) => apply({ ...filters, city: event.target.value })}
           placeholder="City"
           className="min-h-11 rounded-2xl border border-slate-200 px-4 text-sm font-semibold"
         />
         <input
+          key={`state-${filters.state}`}
           defaultValue={filters.state}
           onBlur={(event) => apply({ ...filters, state: event.target.value })}
           placeholder="State"

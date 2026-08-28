@@ -1829,6 +1829,17 @@ export default function HomePage() {
           city: result.city,
           state: result.stateAbbreviation || result.state,
         }));
+        try {
+          window.localStorage.setItem("sitguru_home_zip", normalizedZip);
+          window.localStorage.setItem("sitguru_home_city", result.city);
+          window.localStorage.setItem(
+            "sitguru_home_state",
+            result.stateAbbreviation || result.state,
+          );
+          window.localStorage.setItem("sitguru_home_location_source", "search");
+        } catch {
+          // ignore storage failures
+        }
         setZipLookupStatus("found");
         setZipLookupMessage(
           `${result.city}, ${result.stateAbbreviation || result.state}`,

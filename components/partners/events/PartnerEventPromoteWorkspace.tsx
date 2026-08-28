@@ -103,7 +103,10 @@ export default function PartnerEventPromoteWorkspace({
       ? `${window.location.origin}${publicPath}`
       : `https://www.sitguru.com${publicPath}`;
 
-  const assets = useMemo(() => getEventSocialAssets(selectedEvent), [selectedEvent]);
+  const assets = useMemo(
+    () => getEventSocialAssets(selectedEvent, { preferBranded: true }),
+    [selectedEvent],
+  );
 
   useEffect(() => {
     setCaption(
@@ -245,7 +248,7 @@ export default function PartnerEventPromoteWorkspace({
 
         <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <p className="text-sm font-black text-slate-900">Share to Social Media</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             {[
               { id: "facebook", label: "Facebook", tone: "bg-[#1877F2] text-white" },
               { id: "email", label: "Email", tone: "bg-sky-600 text-white" },
@@ -267,6 +270,23 @@ export default function PartnerEventPromoteWorkspace({
                 {platform.label}
               </a>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                const story = assets.find((asset) => asset.id === "story");
+                if (story?.url) {
+                  void downloadEventGraphic(
+                    story.url,
+                    `${selectedEvent.slug}-instagram.png`,
+                  );
+                }
+                void copyValue(caption, "caption");
+              }}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-amber-400 via-pink-500 to-violet-600 px-4 text-sm font-black text-white"
+            >
+              <Download className="h-4 w-4" />
+              Instagram
+            </button>
             <button
               type="button"
               onClick={() => void copyValue(publicUrl, "link")}
@@ -292,7 +312,13 @@ export default function PartnerEventPromoteWorkspace({
               <div key={asset.id} className="overflow-hidden rounded-2xl border border-slate-200">
                 <div className={`relative ${asset.aspectClass} bg-emerald-50`}>
                   {asset.url ? (
-                    <Image src={asset.url} alt={asset.label} fill className="object-cover" />
+                    <Image
+                      src={asset.url}
+                      alt={asset.label}
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
                   ) : null}
                 </div>
                 <div className="space-y-2 p-3">
@@ -304,7 +330,7 @@ export default function PartnerEventPromoteWorkspace({
                       onClick={() =>
                         void downloadEventGraphic(
                           asset.url!,
-                          `${selectedEvent.slug}-${asset.id}.jpg`,
+                          `${selectedEvent.slug}-${asset.id}.png`,
                         )
                       }
                       className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-black"
@@ -337,7 +363,7 @@ export default function PartnerEventPromoteWorkspace({
                   onClick={() =>
                     void downloadEventGraphic(
                       assets[0].url!,
-                      `${selectedEvent.slug}-square.jpg`,
+                      `${selectedEvent.slug}-square.png`,
                     )
                   }
                   className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black"

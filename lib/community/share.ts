@@ -1,6 +1,7 @@
 import { formatEventDateRange, formatEventLocationInline } from "@/lib/community/format";
 import type { CommunityEventRow } from "@/lib/community/types";
 import { getPublicEventUrl } from "@/lib/community/slug";
+import { getBrandedSocialGraphicUrl } from "@/lib/community/social-assets";
 
 export function buildEventShareCaption(
   event: Pick<
@@ -43,6 +44,7 @@ export function buildEventShareMeta(
     "title" | "slug" | "short_description" | "start_at" | "city" | "state" | "image_hero_url" | "image_original_url" | "image_card_url"
   >,
   partnerName?: string | null,
+  origin?: string,
 ) {
   const { compactDate } = formatEventDateRange(event.start_at, null, null);
   const cityState = [event.city, event.state].filter(Boolean).join(", ");
@@ -53,12 +55,8 @@ export function buildEventShareMeta(
     description:
       event.short_description?.trim() ||
       `${compactDate}${cityState ? ` • ${cityState}` : ""} — Hosted by ${host}. Pet-friendly community event on SitGuru.`,
-    url: getPublicEventUrl(event.slug),
-    image:
-      event.image_hero_url ||
-      event.image_original_url ||
-      event.image_card_url ||
-      "https://www.sitguru.com/apple-touch-icon.png",
+    url: getPublicEventUrl(event.slug, origin),
+    image: getBrandedSocialGraphicUrl(event.slug, "landscape", origin),
   };
 }
 

@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react";
 import HomepageEventsSection from "@/components/community/HomepageEventsSection";
+import {
+  formatCommunityLocationLabel,
+  readCommunityLocationPreference,
+  resolveCommunityLocationFromZip,
+  saveCommunityLocationPreference,
+} from "@/lib/community/location-preference";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 
 type FeaturedPayload = {
@@ -18,20 +24,31 @@ export default function HomepageEventsSectionClient() {
 
     async function loadEvents() {
       try {
+        let preference = readCommunityLocationPreference();
+
+        if (!preference.city && preference.zip) {
+          const resolved = await resolveCommunityLocationFromZip(preference.zip);
+          if (resolved?.city) {
+            preference = resolved;
+            saveCommunityLocationPreference(resolved);
+          }
+        }
+
         const params = new URLSearchParams();
-        const savedZip = window.localStorage.getItem("sitguru_home_zip");
-        const savedCity = window.localStorage.getItem("sitguru_home_city");
-        const savedState = window.localStorage.getItem("sitguru_home_state");
-
-        if (savedCity) params.set("city", savedCity);
-        if (savedState) params.set("state", savedState);
-
-        void savedZip;
+        if (preference.city) params.set("city", preference.city);
+        if (preference.state) params.set("state", preference.state);
+        if (preference.zip) params.set("zip", preference.zip);
 
         const response = await fetch(`/api/community/events/featured?${params.toString()}`);
         const payload = (await response.json()) as FeaturedPayload;
 
-        if (!cancelled) setData(payload);
+        if (!cancelled) {
+          setData({
+            ...payload,
+            locationLabel:
+              payload.locationLabel || formatCommunityLocationLabel(preference),
+          });
+        }
       } catch (error) {
         console.warn("Homepage events load skipped:", error);
       }
