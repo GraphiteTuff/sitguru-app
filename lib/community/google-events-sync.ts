@@ -174,6 +174,36 @@ function normalizeSerpEvent(
   };
 }
 
+const MAX_EVENT_HORIZON_MS = 400 * 86_400_000; // ~13 months
+
+function clampEventStart(date: Date, now = new Date()) {
+  const min = now.getTime() - 86_400_000;
+  const max = now.getTime() + MAX_EVENT_HORIZON_MS;
+  let t = date.getTime();
+  if (Number.isNaN(t)) {
+    const fallback = new Date(now);
+    fallback.setDate(fallback.getDate() + 14);
+    fallback.setHours(11, 0, 0, 0);
+    return fallback;
+  }
+  // Year-less Google cards sometimes parse into far-future junk — pull into window.
+  while (t > max) {
+    date.setFullYear(date.getFullYear() - 1);
+    t = date.getTime();
+  }
+  while (t < min) {
+    date.setFullYear(date.getFullYear() + 1);
+    t = date.getTime();
+    if (t > max) {
+      const fallback = new Date(now);
+      fallback.setDate(fallback.getDate() + 21);
+      fallback.setHours(11, 0, 0, 0);
+      return fallback;
+    }
+  }
+  return date;
+}
+
 function parseEventStartAt(when?: string, startDate?: string) {
   const now = new Date();
   const text = `${when || ""} ${startDate || ""}`.trim();
@@ -185,22 +215,31 @@ function parseEventStartAt(when?: string, startDate?: string) {
     return fallback.toISOString();
   }
 
-  const parsed = Date.parse(text);
-  if (!Number.isNaN(parsed) && parsed > now.getTime() - 86_400_000) {
-    return new Date(parsed).toISOString();
-  }
-
   const monthDay = text.match(
     /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{1,2})/i,
   );
+
+  // Prefer Month+Day (Google often omits year). Avoid Date.parse year hallucinations.
   if (monthDay) {
-    const candidate = Date.parse(`${monthDay[0]} ${now.getFullYear()}`);
-    const date = new Date(candidate);
-    if (date.getTime() < now.getTime()) {
+    const yearMatch = text.match(/\b(20\d{2})\b/);
+    let year = yearMatch ? Number(yearMatch[1]) : now.getFullYear();
+    if (year > now.getFullYear() + 1) year = now.getFullYear();
+
+    let date = new Date(Date.parse(`${monthDay[0]} ${year}`));
+    if (Number.isNaN(date.getTime())) {
+      date = new Date(now);
+      date.setDate(date.getDate() + 14);
+    }
+    if (!yearMatch && date.getTime() < now.getTime() - 86_400_000) {
       date.setFullYear(date.getFullYear() + 1);
     }
     date.setHours(11, 0, 0, 0);
-    return date.toISOString();
+    return clampEventStart(date, now).toISOString();
+  }
+
+  const parsed = Date.parse(text);
+  if (!Number.isNaN(parsed)) {
+    return clampEventStart(new Date(parsed), now).toISOString();
   }
 
   const fallback = new Date(now);
@@ -339,6 +378,8 @@ async function fetchSerpGoogleEvents(
 
 async function expirePastDiscoveries() {
   const cutoff = new Date(Date.now() - 24 * 86_400_000).toISOString();
+  const tooFar = new Date(Date.now() + MAX_EVENT_HORIZON_MS).toISOString();
+
   await supabaseAdmin
     .from("community_event_discoveries")
     .update({
@@ -346,6 +387,16 @@ async function expirePastDiscoveries() {
       updated_at: new Date().toISOString(),
     })
     .lt("start_at", cutoff)
+    .neq("status", "expired");
+
+  // Drop hallucinated far-future dates from bad year parsing / recurring cards
+  await supabaseAdmin
+    .from("community_event_discoveries")
+    .update({
+      status: "expired",
+      updated_at: new Date().toISOString(),
+    })
+    .gt("start_at", tooFar)
     .neq("status", "expired");
 
   // Hard-delete very old rows to keep table lean

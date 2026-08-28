@@ -54,31 +54,56 @@ export type CommunityMarketUpdateInput = {
 
 /**
  * Build SerpApi Google Search queries for a market.
- * Prefer "term in City" / "term in County" without state in `q` —
- * put the precise place in the SerpApi `location` parameter instead.
+ * Prefer county-level "in …" phrasing (broader events block hits).
+ * Put the precise place in SerpApi `location`, not state abbreviations in `q`.
  * (Google's dedicated Events vertical was retired Aug 2026; we use engine=google.)
  */
 export function buildMarketSearchQueries(market: CommunityMarketRow) {
-  const place =
-    market.city?.trim() ||
-    market.county_name?.trim() ||
+  const county = market.county_name?.trim() || null;
+  const city = market.city?.trim() || null;
+  const fallbackPlace =
     market.location_query
       .replace(/,\s*(PA|Pennsylvania)\b/gi, "")
-      .trim() ||
-    market.name;
+      .trim() || market.name;
 
+  const primaryPlace = county || city || fallbackPlace;
+  const secondaryPlace =
+    city && county && city.toLowerCase() !== county.toLowerCase()
+      ? city
+      : null;
+
+  const maxQueries = Math.max(1, market.max_queries_per_sync || 2);
   const terms = (market.search_terms || [])
     .map((term) => term.trim())
-    .filter(Boolean)
-    .slice(0, Math.max(1, market.max_queries_per_sync || 2));
+    .filter(Boolean);
+  const effectiveTerms = terms.length
+    ? terms
+    : ["pet friendly events", "dog adoption events"];
 
-  if (!terms.length) {
-    return [`pet friendly events in ${place}`];
+  const queries: string[] = [];
+  const push = (q: string) => {
+    if (queries.length >= maxQueries) return;
+    if (!queries.includes(q)) queries.push(q);
+  };
+
+  // Slot 1: broad county / primary
+  push(
+    /\bin\b|\bnear\b/i.test(effectiveTerms[0])
+      ? effectiveTerms[0]
+      : `${effectiveTerms[0]} in ${primaryPlace}`,
+  );
+
+  // Slot 2+: mix city "near" (better local hits) then remaining terms
+  if (secondaryPlace) {
+    const term = effectiveTerms[1] || effectiveTerms[0];
+    push(`${term} near ${secondaryPlace}`);
   }
 
-  return terms.map((term) =>
-    /\bin\b/i.test(term) ? term : `${term} in ${place}`,
-  );
+  for (const term of effectiveTerms.slice(secondaryPlace ? 2 : 1)) {
+    push(/\bin\b|\bnear\b/i.test(term) ? term : `${term} in ${primaryPlace}`);
+  }
+
+  return queries.length ? queries : [`pet friendly events in ${primaryPlace}`];
 }
 
 /** SerpApi `location` value — city/county level, United States. */
