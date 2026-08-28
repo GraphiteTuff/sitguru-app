@@ -1,9 +1,14 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import {
+  notifyAttendeesEventCancelled,
+  notifyPartnerChangesRequested,
+  notifyPartnerEventPublished,
+} from "@/lib/community/event-notifications";
 import { requireAdminApi } from "@/lib/admin/access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { CommunityEventStatus } from "@/lib/community/types";
+import { revalidatePath } from "next/cache";
 
 type ModerationAction =
   | "approve"
@@ -124,6 +129,38 @@ export async function moderateCommunityEvent(input: {
   if (error) {
     console.error("moderateCommunityEvent:", error);
     return { ok: false as const, error: error.message || "Unable to update event." };
+  }
+
+  try {
+    if (input.action === "publish") {
+      await notifyPartnerEventPublished({
+        id: data.id,
+        title: data.title,
+        slug: data.slug,
+        partner_id: data.partner_id,
+      });
+    }
+
+    if (input.action === "request_changes") {
+      await notifyPartnerChangesRequested({
+        id: data.id,
+        title: data.title,
+        slug: data.slug,
+        partner_id: data.partner_id,
+        moderation_note: data.moderation_note,
+      });
+    }
+
+    if (input.action === "cancel") {
+      await notifyAttendeesEventCancelled({
+        id: data.id,
+        title: data.title,
+        slug: data.slug,
+        partner_id: data.partner_id,
+      });
+    }
+  } catch (notifyError) {
+    console.warn("Community event notification skipped:", notifyError);
   }
 
   revalidatePath("/admin/community/events");

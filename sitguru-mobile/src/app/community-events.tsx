@@ -59,6 +59,13 @@ export default function CommunityEventsScreen() {
           placeholderTextColor="#64748b"
         />
 
+        <Pressable
+          style={styles.partnerLink}
+          onPress={() => router.push("/partner-community-events")}
+        >
+          <Text style={styles.partnerLinkText}>Partners: manage your events</Text>
+        </Pressable>
+
         {loading ? <ActivityIndicator color="#0D5C3A" style={{ marginTop: 24 }} /> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -149,6 +156,15 @@ const styles = StyleSheet.create({
     fontFamily: AppFonts.semiBold,
     fontSize: 16,
     backgroundColor: "#fff",
+  },
+  partnerLink: {
+    alignSelf: "flex-start",
+    paddingVertical: 4,
+  },
+  partnerLinkText: {
+    fontFamily: AppFonts.bold,
+    color: "#0D5C3A",
+    fontSize: 14,
   },
   error: {
     color: "#b91c1c",

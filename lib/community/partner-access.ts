@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { resolveRequestUser } from "@/lib/supabase/request-auth";
 
 export type PartnerAccount = {
   id: string;
@@ -26,9 +27,7 @@ export async function getAuthenticatedUserId() {
 }
 
 export async function getPartnerForUser(userId: string) {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("partners")
     .select(
       "id, owner_user_id, business_name, contact_name, email, phone, website, city, state, zip_code, slug, status",
@@ -49,6 +48,28 @@ export async function getPartnerForUser(userId: string) {
 
 export async function requirePartnerAccount() {
   const userId = await getAuthenticatedUserId();
+
+  if (!userId) {
+    return { ok: false as const, error: "Authentication required.", userId: null, partner: null };
+  }
+
+  const partner = await getPartnerForUser(userId);
+
+  if (!partner) {
+    return {
+      ok: false as const,
+      error: "Active partner account required.",
+      userId,
+      partner: null,
+    };
+  }
+
+  return { ok: true as const, userId, partner, error: null };
+}
+
+export async function requirePartnerAccountFromRequest(request: Request) {
+  const resolved = await resolveRequestUser(request);
+  const userId = resolved?.user.id || null;
 
   if (!userId) {
     return { ok: false as const, error: "Authentication required.", userId: null, partner: null };

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CalendarDays, MapPin, PawPrint, Ticket } from "lucide-react";
+import EventAttendanceBadge from "@/components/community/EventAttendanceBadge";
 import {
   formatEventDateRange,
   formatEventLocationInline,
@@ -100,6 +101,7 @@ export default function EventCard({
               <MapPin className="h-4 w-4 text-emerald-700" />
               {formatEventLocationInline(event)}
             </p>
+            <EventAttendanceBadge eventId={event.id} />
           </div>
         </div>
       </Link>

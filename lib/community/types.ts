@@ -88,6 +88,11 @@ export type CommunityEventRow = {
   moderated_at: string | null;
   published_at: string | null;
   cancelled_at: string | null;
+  series_id?: string | null;
+  parent_event_id?: string | null;
+  recurrence_rule?: string | null;
+  recurrence_count?: number | null;
+  is_series_parent?: boolean | null;
   created_at: string;
   updated_at: string;
 };

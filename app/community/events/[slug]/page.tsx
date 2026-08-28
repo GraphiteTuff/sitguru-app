@@ -10,7 +10,9 @@ import {
   Ticket,
 } from "lucide-react";
 import EventDetailShare from "@/components/community/EventDetailShare";
+import EventGoingButton from "@/components/community/EventGoingButton";
 import EventViewTracker from "@/components/community/EventViewTracker";
+import { getEventAttendanceCounts } from "@/lib/community/attendance";
 import {
   formatEventDateRange,
   formatEventLocation,
@@ -68,6 +70,8 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
   if (!event) {
     notFound();
   }
+
+  const attendanceCounts = await getEventAttendanceCounts(event.id);
 
   const partnerName = event.partners?.business_name || "SitGuru Partner";
   const partnerSlug = event.partners?.slug;
@@ -185,12 +189,16 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
               ) : null}
 
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <EventGoingButton
+                  eventId={event.id}
+                  initialCounts={attendanceCounts}
+                />
                 {event.ticket_url ? (
                   <a
                     href={event.ticket_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-6 text-sm font-black text-white"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-900"
                   >
                     Register / Tickets
                     <ExternalLink className="h-4 w-4" />

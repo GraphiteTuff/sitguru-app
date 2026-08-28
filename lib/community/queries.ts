@@ -1,5 +1,4 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import type {
   CommunityEventRow,
   CommunityEventStatus,
@@ -155,10 +154,9 @@ export async function fetchFeaturedHomepageEvents(filters: FeaturedEventQuery = 
 }
 
 export async function fetchPartnerEvents(partnerId: string, tab: PartnerEventTab) {
-  const supabase = await createClient();
   const now = new Date().toISOString();
 
-  let query = supabase
+  let query = supabaseAdmin
     .from("community_events")
     .select("*")
     .eq("partner_id", partnerId)

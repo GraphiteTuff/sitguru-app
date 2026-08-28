@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   autosavePartnerEvent,
+  createPartnerEventSeries,
   submitPartnerEventForReview,
 } from "@/app/partners/dashboard/community/events/actions";
 import EventSharePanel from "@/components/community/EventSharePanel";
@@ -27,6 +28,7 @@ import type { CommunityEventRow } from "@/lib/community/types";
 import type { PartnerAccount } from "@/lib/community/partner-access";
 import { EVENT_IMAGE_ACCEPT } from "@/lib/community/event-images";
 import { getPublicEventPath } from "@/lib/community/slug";
+import type { RecurrenceRule } from "@/lib/community/recurring";
 
 type PartnerEventEditorProps = {
   event: CommunityEventRow;
@@ -89,6 +91,8 @@ export default function PartnerEventEditor({ event, partner }: PartnerEventEdito
   const [saveMessage, setSaveMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [submitting, startSubmit] = useTransition();
+  const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule>("none");
+  const [recurrenceCount, setRecurrenceCount] = useState(4);
   const skipAutosaveRef = useRef(true);
 
   const startDate = useMemo(() => toLocalDateInput(draft.start_at), [draft.start_at]);
@@ -434,6 +438,71 @@ export default function PartnerEventEditor({ event, partner }: PartnerEventEdito
               />
             </div>
           ) : null}
+
+          {!draft.parent_event_id && !draft.is_series_parent ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-black text-slate-800">Recurring series (optional)</p>
+              <p className="mt-1 text-xs font-semibold text-slate-600">
+                Create additional draft occurrences from this event. Each one is reviewed/published
+                separately.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <select
+                  value={recurrenceRule}
+                  onChange={(event) =>
+                    setRecurrenceRule(event.target.value as RecurrenceRule)
+                  }
+                  className="min-h-11 rounded-2xl border border-slate-200 px-3 text-sm font-semibold"
+                >
+                  <option value="none">Does not repeat</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="biweekly">Every 2 weeks</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+                <input
+                  type="number"
+                  min={2}
+                  max={26}
+                  value={recurrenceCount}
+                  onChange={(event) =>
+                    setRecurrenceCount(Number(event.target.value) || 2)
+                  }
+                  disabled={recurrenceRule === "none"}
+                  className="min-h-11 rounded-2xl border border-slate-200 px-3 text-sm font-semibold disabled:opacity-50"
+                  placeholder="Occurrences"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={recurrenceRule === "none" || submitting}
+                onClick={() =>
+                  startSubmit(async () => {
+                    const result = await createPartnerEventSeries(
+                      draft.id,
+                      recurrenceRule,
+                      recurrenceCount,
+                    );
+                    if (!result.ok) {
+                      setSaveState("error");
+                      setSaveMessage(result.error || "Unable to create series");
+                      return;
+                    }
+                    setSaveMessage(
+                      `Created ${result.createdCount} additional draft occurrence(s)`,
+                    );
+                    router.refresh();
+                  })
+                }
+                className="mt-3 inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black text-emerald-900 disabled:opacity-50"
+              >
+                Create series drafts
+              </button>
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
+              This event is part of a recurring series.
+            </p>
+          )}
         </section>
 
       <section className={step === "preview" || step === "publish" ? "block space-y-4" : "hidden space-y-4 lg:block"}>
