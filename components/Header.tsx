@@ -875,14 +875,14 @@ export default function Header({ user = null }: HeaderProps) {
           />
         </Link>
 
-        <nav className="hidden flex-1 items-center justify-center gap-3 xl:flex 2xl:gap-5">
+        <nav className="hidden flex-1 items-center justify-center gap-2 lg:flex xl:gap-3 2xl:gap-5">
           {navLinks.map((link) => {
             const active = isActive(link.href);
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`relative pb-5 text-[13px] font-semibold tracking-[-0.015em] transition 2xl:text-[15px] ${active ? "text-slate-950" : "text-slate-700 hover:text-emerald-700"}`}
+                className={`relative pb-5 text-[12px] font-semibold tracking-[-0.015em] transition xl:text-[13px] 2xl:text-[15px] ${active ? "text-slate-950" : "text-slate-700 hover:text-emerald-700"}`}
               >
                 {link.label}
                 {active ? (
@@ -893,7 +893,7 @@ export default function Header({ user = null }: HeaderProps) {
           })}
         </nav>
 
-        <div className="hidden items-center gap-3 xl:flex">
+        <div className="hidden items-center gap-3 lg:flex">
           {loadingUser ? (
             <div className="h-11 w-48 animate-pulse rounded-full bg-slate-100" />
           ) : isLoggedIn ? (
@@ -901,7 +901,7 @@ export default function Header({ user = null }: HeaderProps) {
               {isGuru ? (
                 <Link
                   href={resourcesHref}
-                  className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 xl:inline-flex"
+                  className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 lg:inline-flex"
                 >
                   <BookOpen className="h-4 w-4 text-sky-500" />
                   Guru Success Center
@@ -911,7 +911,7 @@ export default function Header({ user = null }: HeaderProps) {
               {isCustomer ? (
                 <Link
                   href={bookingsHref}
-                  className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 xl:inline-flex"
+                  className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold tracking-[-0.01em] text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 lg:inline-flex"
                 >
                   <CalendarDays className="h-4 w-4 text-emerald-600" />
                   My Care
