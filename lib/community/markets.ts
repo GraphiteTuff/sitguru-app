@@ -52,18 +52,40 @@ export type CommunityMarketUpdateInput = {
   maxQueriesPerSync?: number;
 };
 
+/**
+ * Build SerpApi Google Search queries for a market.
+ * Prefer "term in City" / "term in County" without state in `q` —
+ * put the precise place in the SerpApi `location` parameter instead.
+ * (Google's dedicated Events vertical was retired Aug 2026; we use engine=google.)
+ */
 export function buildMarketSearchQueries(market: CommunityMarketRow) {
-  const location = market.location_query.trim();
+  const place =
+    market.city?.trim() ||
+    market.county_name?.trim() ||
+    market.location_query
+      .replace(/,\s*(PA|Pennsylvania)\b/gi, "")
+      .trim() ||
+    market.name;
+
   const terms = (market.search_terms || [])
     .map((term) => term.trim())
     .filter(Boolean)
     .slice(0, Math.max(1, market.max_queries_per_sync || 2));
 
   if (!terms.length) {
-    return [`pet friendly events ${location}`];
+    return [`pet friendly events in ${place}`];
   }
 
-  return terms.map((term) => `${term} ${location}`);
+  return terms.map((term) =>
+    /\bin\b/i.test(term) ? term : `${term} in ${place}`,
+  );
+}
+
+/** SerpApi `location` value — city/county level, United States. */
+export function buildMarketSerpLocation(market: CommunityMarketRow) {
+  const raw = market.location_query?.trim() || market.name;
+  if (/united states/i.test(raw)) return raw;
+  return `${raw}, United States`;
 }
 
 export function nextDailySyncAt(from = new Date()) {

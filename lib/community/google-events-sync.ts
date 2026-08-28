@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   buildMarketSearchQueries,
+  buildMarketSerpLocation,
   type CommunityMarketRow,
 } from "@/lib/community/markets";
 import {
@@ -15,14 +16,20 @@ import {
 
 type SerpEventResult = {
   title?: string;
-  date?: {
-    start_date?: string;
-    when?: string;
-  };
-  address?: string[];
+  /** Legacy google_events shape or Google Search events_results object/string. */
+  date?:
+    | {
+        start_date?: string;
+        when?: string;
+      }
+    | string;
+  time?: string;
+  address?: string[] | string;
   link?: string;
   thumbnail?: string;
   description?: string;
+  source?: string;
+  venue?: { name?: string } | string;
 };
 
 type ParsedDiscovery = {
@@ -73,10 +80,20 @@ function inferIsFree(title: string, description: string) {
   return true;
 }
 
-function parseLocation(addressParts: string[] | undefined, fallbackState: string) {
-  const joined = (addressParts || []).filter(Boolean).join(", ");
-  const venue = addressParts?.[0]?.trim() || null;
-  const cityState = addressParts?.[addressParts.length - 1] || joined;
+function parseLocation(
+  addressParts: string[] | string | undefined,
+  fallbackState: string,
+  venueHint?: string | null,
+) {
+  const parts = Array.isArray(addressParts)
+    ? addressParts.filter(Boolean)
+    : String(addressParts || "")
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+  const joined = parts.join(", ");
+  const venue = venueHint || parts[0]?.trim() || null;
+  const cityState = parts[parts.length - 1] || joined;
   const cityMatch = cityState.match(/^([^,]+),\s*([A-Z]{2})$/i);
 
   return {
@@ -84,6 +101,76 @@ function parseLocation(addressParts: string[] | undefined, fallbackState: string
     address_line: joined || null,
     city: cityMatch?.[1]?.trim() || null,
     state: cityMatch?.[2]?.toUpperCase() || fallbackState || "PA",
+  };
+}
+
+function eventDateParts(event: SerpEventResult) {
+  if (typeof event.date === "string") {
+    const when = [event.date, event.time].filter(Boolean).join(", ");
+    return { startDate: event.date, when };
+  }
+  return {
+    startDate: event.date?.start_date,
+    when: event.date?.when || [event.date?.start_date, event.time].filter(Boolean).join(", "),
+  };
+}
+
+function eventVenueName(event: SerpEventResult) {
+  if (typeof event.venue === "string") return event.venue.trim() || null;
+  return event.venue?.name?.trim() || null;
+}
+
+function fallbackEventUrl(title: string, market: CommunityMarketRow, venue?: string | null) {
+  const q = [title, venue, market.city || market.county_name || market.name]
+    .filter(Boolean)
+    .join(" ");
+  return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+}
+
+function normalizeSerpEvent(
+  event: SerpEventResult,
+  market: CommunityMarketRow,
+  searchQuery: string,
+): ParsedDiscovery | null {
+  const title = String(event.title || "").trim();
+  if (!title) return null;
+
+  const description = String(event.description || "").trim();
+  // Prefer pet/rescue signals; still keep clearly local event cards with empty descriptions.
+  if (description && !inferPetFriendly(title, description) && !inferPetFriendly(title, searchQuery)) {
+    return null;
+  }
+  if (!description && !inferPetFriendly(title, searchQuery)) {
+    // Search query already includes pet terms — keep titled cards from those queries.
+    if (!/pet|dog|cat|adoption|animal|rescue|paw/i.test(searchQuery)) {
+      return null;
+    }
+  }
+
+  const venueHint = eventVenueName(event);
+  const location = parseLocation(event.address, market.state, venueHint);
+  const { startDate, when } = eventDateParts(event);
+  const startAt = parseEventStartAt(when, startDate);
+  const eventUrl = String(event.link || "").trim() || fallbackEventUrl(title, market, location.venue_name);
+  const external_id = hashExternalId(`${eventUrl}|${title}|${startAt}|${market.id}`);
+
+  return {
+    external_id,
+    market_id: market.id,
+    county: market.slug,
+    search_query: searchQuery,
+    title,
+    short_description: description || null,
+    venue_name: location.venue_name,
+    address_line: location.address_line,
+    city: location.city || market.city,
+    state: location.state || market.state,
+    start_at: startAt,
+    end_at: parseEventEndAt(startAt, when),
+    image_url: event.thumbnail || null,
+    event_url: eventUrl,
+    is_free: inferIsFree(title, description),
+    raw_payload: event as Record<string, unknown>,
   };
 }
 
@@ -145,42 +232,6 @@ function parseEventEndAt(startAt: string, when?: string) {
   return end.toISOString();
 }
 
-function normalizeSerpEvent(
-  event: SerpEventResult,
-  market: CommunityMarketRow,
-  searchQuery: string,
-): ParsedDiscovery | null {
-  const title = String(event.title || "").trim();
-  const eventUrl = String(event.link || "").trim();
-  if (!title || !eventUrl) return null;
-
-  const description = String(event.description || "").trim();
-  if (!inferPetFriendly(title, description)) return null;
-
-  const location = parseLocation(event.address, market.state);
-  const startAt = parseEventStartAt(event.date?.when, event.date?.start_date);
-  const external_id = hashExternalId(`${eventUrl}|${title}|${startAt}`);
-
-  return {
-    external_id,
-    market_id: market.id,
-    county: market.slug,
-    search_query: searchQuery,
-    title,
-    short_description: description || null,
-    venue_name: location.venue_name,
-    address_line: location.address_line,
-    city: location.city || market.city,
-    state: location.state || market.state,
-    start_at: startAt,
-    end_at: parseEventEndAt(startAt, event.date?.when),
-    image_url: event.thumbnail || null,
-    event_url: eventUrl,
-    is_free: inferIsFree(title, description),
-    raw_payload: event as Record<string, unknown>,
-  };
-}
-
 async function readSerpCache(marketId: string, queryHash: string) {
   const now = new Date().toISOString();
   const { data } = await supabaseAdmin
@@ -219,8 +270,12 @@ async function writeSerpCache(opts: {
   );
 }
 
-async function fetchSerpGoogleEvents(query: string) {
-  const apiKey = process.env.SERPAPI_API_KEY?.trim();
+async function fetchSerpGoogleEvents(
+  query: string,
+  location: string,
+) {
+  // Strip accidental quotes/whitespace from Vercel env paste.
+  const apiKey = process.env.SERPAPI_API_KEY?.trim().replace(/^["']|["']$/g, "");
   if (!apiKey) {
     return {
       ok: false as const,
@@ -230,37 +285,46 @@ async function fetchSerpGoogleEvents(query: string) {
     };
   }
 
+  // Google retired the dedicated Events vertical (ibp=htl;events) in Aug 2026.
+  // Use standard Google Search and read the events_results block instead.
   const url = new URL("https://serpapi.com/search.json");
-  url.searchParams.set("engine", "google_events");
+  url.searchParams.set("engine", "google");
   url.searchParams.set("q", query);
+  url.searchParams.set("location", location);
   url.searchParams.set("hl", "en");
   url.searchParams.set("gl", "us");
+  url.searchParams.set("google_domain", "google.com");
   url.searchParams.set("api_key", apiKey);
 
   const response = await fetch(url.toString(), {
     cache: "no-store",
   });
 
-  if (!response.ok) {
+  let payload: {
+    events_results?: SerpEventResult[];
+    error?: string;
+    search_information?: { events_results_state?: string };
+  } = {};
+
+  try {
+    payload = (await response.json()) as typeof payload;
+  } catch {
     return {
       ok: false as const,
       skipped: false,
       events: [] as SerpEventResult[],
-      error: `SerpAPI request failed (${response.status}).`,
+      error: `SerpAPI returned non-JSON (${response.status}).`,
     };
   }
 
-  const payload = (await response.json()) as {
-    events_results?: SerpEventResult[];
-    error?: string;
-  };
-
-  if (payload.error) {
+  if (!response.ok || payload.error) {
     return {
       ok: false as const,
       skipped: false,
       events: [] as SerpEventResult[],
-      error: payload.error,
+      error:
+        payload.error ||
+        `SerpAPI request failed (${response.status}).`,
     };
   }
 
@@ -297,6 +361,7 @@ async function syncOneMarket(
 ) {
   const syncedAt = new Date().toISOString();
   const queries = buildMarketSearchQueries(market);
+  const serpLocation = buildMarketSerpLocation(market);
   const deduped = new Map<string, ParsedDiscovery>();
   const errors: string[] = [];
   let cacheHits = 0;
@@ -307,7 +372,7 @@ async function syncOneMarket(
   const budget = dailySerpBudget();
 
   for (const q of queries) {
-    const queryHash = hashQuery(q);
+    const queryHash = hashQuery(`${q}|${serpLocation}`);
 
     if (!opts?.forceRefresh) {
       const cached = await readSerpCache(market.id, queryHash);
@@ -328,7 +393,7 @@ async function syncOneMarket(
       break;
     }
 
-    const result = await fetchSerpGoogleEvents(q);
+    const result = await fetchSerpGoogleEvents(q, serpLocation);
     if (result.skipped) {
       skippedApi = true;
       errors.push(result.error || "SerpAPI skipped.");

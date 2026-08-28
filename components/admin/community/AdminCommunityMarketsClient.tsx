@@ -164,8 +164,8 @@ export default function AdminCommunityMarketsClient({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-semibold text-slate-600">
-          SerpApi runs server-side only. Partner-published SitGuru events stay separate and keep
-          homepage priority.
+          SerpApi Google Search (events block) runs server-side only. Partner-published
+          SitGuru events stay separate and keep homepage priority.
         </p>
         <button
           type="button"
