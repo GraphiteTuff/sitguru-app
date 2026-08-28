@@ -1,4 +1,5 @@
 import CommunityEventsExplorer from "@/components/community/CommunityEventsExplorer";
+import CommunityEventsBannerSection from "@/components/community/CommunityEventsBannerSection";
 import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
 import { fetchPublicEvents } from "@/lib/community/queries";
 
@@ -48,6 +49,8 @@ export default async function CommunityEventsPage({ searchParams }: PageProps) {
           </p>
         </div>
       </section>
+
+      <CommunityEventsBannerSection />
 
       <section className="mx-auto max-w-7xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
         <CommunityPetParentCta

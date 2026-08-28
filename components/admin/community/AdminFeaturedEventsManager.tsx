@@ -266,9 +266,10 @@ export default function AdminFeaturedEventsManager({
 
         <div className="space-y-4">
           <div className="rounded-[2rem] border border-emerald-100 bg-emerald-50/40 p-4">
-            <p className="text-sm font-black text-emerald-900">Homepage live preview</p>
+            <p className="text-sm font-black text-emerald-900">Homepage banner preview</p>
             <p className="mt-1 text-xs font-semibold text-emerald-800">
-              Shows how &quot;Happening Near You&quot; renders with current featured settings.
+              Shows how the &quot;More Upcoming Events&quot; carousel renders on the homepage and
+              community page with current featured settings.
             </p>
           </div>
           <div className="-mx-4 overflow-hidden rounded-[2rem] border border-slate-200 sm:mx-0">
@@ -278,6 +279,7 @@ export default function AdminFeaturedEventsManager({
               locationLabel={
                 previewCity && previewState ? `${previewCity}, ${previewState}` : undefined
               }
+              adminHref="/admin/community/events/featured"
             />
           </div>
         </div>

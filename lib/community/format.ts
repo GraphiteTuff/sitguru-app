@@ -33,6 +33,23 @@ export function formatEventDateRange(
       day: "numeric",
       timeZone: timezone || undefined,
     }).format(start),
+    bannerDate: new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: timezone || undefined,
+    }).format(start),
+    badgeMonth: new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      timeZone: timezone || undefined,
+    })
+      .format(start)
+      .toUpperCase(),
+    badgeDay: new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      timeZone: timezone || undefined,
+    }).format(start),
   };
 }
 

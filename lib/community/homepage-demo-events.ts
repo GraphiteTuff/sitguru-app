@@ -6,11 +6,23 @@ export function isHomepageDemoEvent(eventId: string | null | undefined) {
   return String(eventId || "").startsWith(HOMEPAGE_DEMO_EVENT_ID_PREFIX);
 }
 
-function daysFromNow(days: number, hour = 11, minute = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  date.setHours(hour, minute, 0, 0);
-  return date.toISOString();
+/** Align demo event dates forward so banner badges stay upcoming. */
+function alignDemoDateToFuture(month: number, day: number, hour = 11) {
+  const now = new Date();
+  let year = now.getFullYear();
+  let candidate = new Date(year, month - 1, day, hour, 0, 0, 0);
+  if (candidate.getTime() < now.getTime()) {
+    year += 1;
+    candidate = new Date(year, month - 1, day, hour, 0, 0, 0);
+  }
+  const end = new Date(candidate);
+  end.setHours(end.getHours() + 3);
+  return { startAt: candidate.toISOString(), endAt: end.toISOString() };
+}
+
+function fixedDemoDate(month: number, day: number, _year = 2026, hour = 11) {
+  const { startAt, endAt } = alignDemoDateToFuture(month, day, hour);
+  return { startAt, endAt };
 }
 
 function demoEvent(
@@ -23,19 +35,14 @@ function demoEvent(
     venueName: string;
     city: string;
     state: string;
-    startDaysFromNow: number;
-    endDaysFromNow?: number;
+    startAt: string;
+    endAt: string;
     imageUrl?: string;
     categories?: string[];
     isFree?: boolean;
     featuredStatus?: "homepage" | "community" | "market";
   },
 ): CommunityEventWithPartner {
-  const startAt = daysFromNow(input.startDaysFromNow, 11, 0);
-  const endAt = input.endDaysFromNow
-    ? daysFromNow(input.endDaysFromNow, 15, 0)
-    : daysFromNow(input.startDaysFromNow, 15, 0);
-
   return {
     id: `${HOMEPAGE_DEMO_EVENT_ID_PREFIX}${id}`,
     partner_id: `${HOMEPAGE_DEMO_EVENT_ID_PREFIX}partner-${id}`,
@@ -55,15 +62,15 @@ function demoEvent(
     social_landscape_url: null,
     image_storage_bucket: null,
     image_storage_path: null,
-    start_at: startAt,
-    end_at: endAt,
+    start_at: input.startAt,
+    end_at: input.endAt,
     timezone: "America/New_York",
     venue_name: input.venueName,
     address_line_1: null,
     address_line_2: null,
     city: input.city,
     state: input.state,
-    postal_code: "18018",
+    postal_code: "18901",
     country: "US",
     latitude: null,
     longitude: null,
@@ -101,81 +108,89 @@ function demoEvent(
   };
 }
 
-/** Marketing mockups shown until live partner events are published. */
-export function getHomepageDemoEvents(locationLabel = "Lehigh Valley, PA") {
-  const featured = demoEvent("adoption-day", {
-    title: "Adoption Day at the Park",
-    slug: "preview-adoption-day-at-the-park",
-    partnerName: "Outcast 2nd Chance Rescue",
-    shortDescription:
-      "Meet adoptable dogs, talk with rescue volunteers, and connect with local Pet Gurus who love community outreach.",
-    venueName: "Sand Island Park",
-    city: "Bethlehem",
-    state: "PA",
-    startDaysFromNow: 12,
-    imageUrl: "/images/partners/outcast-rescue.webp",
-    categories: ["Adoption", "Community"],
-    featuredStatus: "homepage",
-  });
+/** Marketing mockups aligned to homepage/community banner designs. */
+export function getHomepageDemoEvents(locationLabel = "Bucks County, PA") {
+  const adoptionSaturday = alignDemoDateToFuture(9, 18, 11);
+  const adoptionEnd = new Date(adoptionSaturday.startAt);
+  adoptionEnd.setHours(adoptionEnd.getHours() + 3);
 
   const upcoming = [
-    demoEvent("pints-and-pups", {
-      title: "Pints & Pups Social",
-      slug: "preview-pints-and-pups-social",
-      partnerName: "Zeppa Studios",
+    demoEvent("adoption-saturday", {
+      title: "Adoption Saturday",
+      slug: "preview-adoption-saturday",
+      partnerName: "Bucks County Animal Rescue",
       shortDescription:
-        "Bring your pup for a relaxed patio hang, local pet-parent intros, and SitGuru community swag.",
-      venueName: "Downtown Social Patio",
-      city: "Allentown",
+        "Meet adoptable dogs and cats, talk with rescue volunteers, and connect with local pet families.",
+      venueName: "Bucks County Animal Rescue",
+      city: "Doylestown",
       state: "PA",
-      startDaysFromNow: 19,
-      imageUrl: "/images/partners/zeppa-studios.png",
-      categories: ["Social"],
+      startAt: adoptionSaturday.startAt,
+      endAt: adoptionEnd.toISOString(),
+      imageUrl:
+        "https://images.unsplash.com/photo-1587300003388-59208cc962cb?auto=format&fit=crop&w=900&q=80",
+      categories: ["Adoption"],
+      isFree: true,
+      featuredStatus: "homepage",
     }),
-    demoEvent("portrait-pop-up", {
-      title: "Pet Portrait Pop-Up",
-      slug: "preview-pet-portrait-pop-up",
-      partnerName: "Crimson Cat Studios",
+    demoEvent("paws-and-yoga", {
+      title: "Paws & Yoga",
+      slug: "preview-paws-and-yoga",
+      partnerName: "Peaceful Poses Yoga",
       shortDescription:
-        "Mini pet photo sessions, print previews, and tips for camera-shy pups and cats.",
-      venueName: "Riverfront Arts Walk",
-      city: "Bethlehem",
+        "Outdoor yoga with leashed pups, guided breathing, and a relaxed community social after class.",
+      venueName: "Peaceful Poses Yoga, Doylestown",
+      city: "Doylestown",
       state: "PA",
-      startDaysFromNow: 26,
-      imageUrl: "/images/partners/crimson-cat-studios-light.png",
-      categories: ["Pet Business"],
+      startAt: fixedDemoDate(9, 20, 2026, 9).startAt,
+      endAt: fixedDemoDate(9, 20, 2026, 10).endAt,
+      imageUrl:
+        "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=900&q=80",
+      categories: ["Wellness", "Social"],
+      isFree: false,
     }),
-    demoEvent("muttz-meetup", {
-      title: "Mostly Muttz Community Meetup",
-      slug: "preview-mostly-muttz-meetup",
-      partnerName: "Mostly Muttz Rescue",
+    demoEvent("dock-diving", {
+      title: "Dog Dock Diving",
+      slug: "preview-dog-dock-diving",
+      partnerName: "Lake Nockamixon Events",
       shortDescription:
-        "Volunteer meet-and-greet, foster info, and a pack walk for friendly, leashed dogs.",
-      venueName: "Community Green",
+        "Watch dock-diving demos, try beginner lanes with your dog, and meet local adventure pet parents.",
+      venueName: "Lake Nockamixon",
       city: "Quakertown",
       state: "PA",
-      startDaysFromNow: 33,
-      categories: ["Rescue", "Community"],
+      startAt: fixedDemoDate(9, 26, 2026, 10).startAt,
+      endAt: fixedDemoDate(9, 26, 2026, 16).endAt,
+      imageUrl:
+        "https://images.unsplash.com/photo-1551717743-49959806b965?auto=format&fit=crop&w=900&q=80",
+      categories: ["Festival", "Community"],
+      isFree: false,
     }),
-    demoEvent("boarding-open-house", {
-      title: "Partner Open House & Playdate",
-      slug: "preview-partner-open-house",
-      partnerName: "Acorn Valley Pet Boarding",
+    demoEvent("howl-o-ween", {
+      title: "Howl-O-Ween Festival",
+      slug: "preview-howl-o-ween-festival",
+      partnerName: "Peddler's Village",
       shortDescription:
-        "Tour the facility, meet the care team, and see how SitGuru partners support local pet families.",
-      venueName: "Acorn Valley Pet Boarding",
-      city: "Bethlehem",
+        "Costume parade, pet-friendly vendors, treat stations, and SitGuru partner booths.",
+      venueName: "Peddler's Village, Lahaska",
+      city: "Lahaska",
       state: "PA",
-      startDaysFromNow: 40,
-      imageUrl: "/images/partners/acorn-valley-pet-boarding-light.png",
-      categories: ["Pet Business"],
+      startAt: fixedDemoDate(10, 2, 2026, 12).startAt,
+      endAt: fixedDemoDate(10, 2, 2026, 17).endAt,
+      imageUrl:
+        "https://images.unsplash.com/photo-1530281700549-e82e7bf110d6?auto=format&fit=crop&w=900&q=80",
+      categories: ["Festival"],
+      isFree: true,
     }),
   ];
 
   return {
-    featured,
-    upcoming,
+    featured: upcoming[0],
+    upcoming: upcoming.slice(1),
     locationLabel,
     previewMode: true as const,
   };
+}
+
+export function getCommunityBannerDemoEvents() {
+  const { featured, upcoming } = getHomepageDemoEvents();
+  return featured ? [featured, ...upcoming] : upcoming;
 }
