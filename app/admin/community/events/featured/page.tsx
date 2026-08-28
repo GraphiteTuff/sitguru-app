@@ -46,12 +46,20 @@ export default async function AdminFeaturedCommunityEventsPage() {
             you save.
           </p>
         </div>
-        <Link
-          href="/admin/community/events/new"
-          className="inline-flex min-h-11 items-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white"
-        >
-          Create event
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/community/events/new"
+            className="inline-flex min-h-11 items-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white"
+          >
+            Create event
+          </Link>
+          <Link
+            href="/admin/community/markets"
+            className="inline-flex min-h-11 items-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-800"
+          >
+            Discovery markets
+          </Link>
+        </div>
       </div>
 
       <AdminFeaturedEventsManager events={pool} previewUpcoming={upcoming} />

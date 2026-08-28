@@ -6,7 +6,8 @@ export type CommunityEventDiscoveryRow = {
   id: string;
   external_id: string;
   source: string;
-  county: "bucks" | "montgomery";
+  market_id?: string | null;
+  county: string | null;
   search_query: string | null;
   title: string;
   short_description: string | null;
@@ -21,16 +22,30 @@ export type CommunityEventDiscoveryRow = {
   event_url: string;
   is_free: boolean;
   pet_friendly: boolean;
+  status?: string;
   synced_at: string;
   created_at?: string;
   updated_at?: string;
+  community_markets?: {
+    id: string;
+    name: string;
+    slug: string;
+    county_name: string | null;
+  } | null;
 };
+
+function marketLabel(row: CommunityEventDiscoveryRow) {
+  if (row.community_markets?.name) return row.community_markets.name;
+  if (row.county === "bucks") return "Bucks County, PA";
+  if (row.county === "montgomery") return "Montgomery County, PA";
+  if (row.county) return row.county;
+  return "Community Market";
+}
 
 export function mapDiscoveryToCommunityEvent(
   row: CommunityEventDiscoveryRow,
 ): CommunityEventWithPartner {
-  const countyLabel =
-    row.county === "bucks" ? "Bucks County" : "Montgomery County";
+  const label = marketLabel(row);
 
   return {
     id: row.id,
@@ -40,7 +55,7 @@ export function mapDiscoveryToCommunityEvent(
     slug: `google-${row.external_id.slice(0, 48)}`,
     short_description:
       row.short_description ||
-      `Discovered pet-friendly event in ${countyLabel}, PA.`,
+      `Discovered pet-friendly event in ${label}.`,
     description: row.short_description,
     event_type: GOOGLE_DISCOVERY_EVENT_TYPE,
     categories: ["Community"],
@@ -75,7 +90,7 @@ export function mapDiscoveryToCommunityEvent(
     contact_email: null,
     status: "published",
     featured_status: "homepage",
-    featured_priority: row.county === "bucks" ? 80 : 70,
+    featured_priority: 50,
     featured_start_at: null,
     featured_end_at: null,
     featured_market_city: row.city,
@@ -89,7 +104,7 @@ export function mapDiscoveryToCommunityEvent(
     updated_at: row.updated_at || row.synced_at,
     partners: {
       id: "00000000-0000-0000-0000-000000000001",
-      business_name: `Google • ${countyLabel}`,
+      business_name: `Google • ${label}`,
       slug: null,
       city: row.city,
       state: row.state || "PA",
@@ -99,22 +114,65 @@ export function mapDiscoveryToCommunityEvent(
   };
 }
 
-export async function fetchDiscoveredHomepageEvents(limit = 12) {
+export async function fetchDiscoveredHomepageEvents(opts?: {
+  limit?: number;
+  marketId?: string;
+  marketSlug?: string;
+}) {
+  const limit = opts?.limit ?? 12;
+
   try {
     const now = new Date().toISOString();
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("community_event_discoveries")
-      .select("*")
+      .select(
+        `
+        *,
+        community_markets:market_id (
+          id,
+          name,
+          slug,
+          county_name
+        )
+      `,
+      )
+      .eq("status", "active")
       .gte("start_at", now)
       .order("start_at", { ascending: true })
       .limit(limit);
 
-    if (error) {
-      console.warn("fetchDiscoveredHomepageEvents:", error.message);
-      return { events: [] as CommunityEventWithPartner[], lastSyncedAt: null };
+    if (opts?.marketId) {
+      query = query.eq("market_id", opts.marketId);
     }
 
-    const rows = (data || []) as CommunityEventDiscoveryRow[];
+    const { data, error } = await query;
+
+    if (error) {
+      // Fallback without join if migration not applied yet
+      console.warn("fetchDiscoveredHomepageEvents:", error.message);
+      const fallback = await supabaseAdmin
+        .from("community_event_discoveries")
+        .select("*")
+        .gte("start_at", now)
+        .order("start_at", { ascending: true })
+        .limit(limit);
+
+      const rows = (fallback.data || []) as CommunityEventDiscoveryRow[];
+      return {
+        events: rows.map(mapDiscoveryToCommunityEvent),
+        lastSyncedAt: rows[0]?.synced_at || null,
+      };
+    }
+
+    let rows = (data || []) as CommunityEventDiscoveryRow[];
+    if (opts?.marketSlug) {
+      rows = rows.filter(
+        (row) =>
+          row.community_markets?.slug === opts.marketSlug ||
+          row.county === opts.marketSlug,
+      );
+    }
+
     const lastSyncedAt =
       rows.reduce<string | null>((latest, row) => {
         if (!latest || row.synced_at > latest) return row.synced_at;

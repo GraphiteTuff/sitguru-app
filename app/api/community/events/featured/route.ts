@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   const [featuredEvents, partnerUpcoming, discovered] = await Promise.all([
     fetchFeaturedHomepageEvents({ city, state, limit: 1 }),
     fetchPublicEvents({ city, state, limit: 8 }),
-    fetchDiscoveredHomepageEvents(16),
+    fetchDiscoveredHomepageEvents({ limit: 16 }),
   ]);
 
   let featured = featuredEvents[0] || null;
@@ -67,22 +67,19 @@ export async function GET(req: NextRequest) {
     12,
   );
 
-  let bannerEvents = partnerEvents;
-  let source: "live" | "google" | "demo" = partnerEvents.length ? "live" : "google";
-  let previewMode = false;
+  // Partner SitGuru events always lead; Google discoveries fill remaining slots only.
+  let bannerEvents = mergeUniqueEvents(partnerEvents, discovered.events, 16);
+  let source: "live" | "google" | "demo" = partnerEvents.length
+    ? "live"
+    : discovered.events.length
+      ? "google"
+      : "demo";
+  let previewMode = !partnerEvents.length && discovered.events.length > 0;
   let lastSyncedAt = discovered.lastSyncedAt;
-
-  if (partnerEvents.length < 4 && discovered.events.length) {
-    bannerEvents = mergeUniqueEvents(partnerEvents, discovered.events, 16);
-    if (!partnerEvents.length) {
-      source = "google";
-      previewMode = true;
-    }
-  }
 
   if (bannerEvents.length === 0) {
     const demo = getHomepageDemoEvents(
-      city && state ? `${city}, ${state}` : "Bucks & Montgomery County, PA",
+      city && state ? `${city}, ${state}` : "Bucks, Montgomery, Lehigh & Northampton County, PA",
     );
     bannerEvents = mergeUniqueEvents(
       demo.featured ? [demo.featured, ...demo.upcoming] : demo.upcoming,

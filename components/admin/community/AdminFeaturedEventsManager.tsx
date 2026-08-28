@@ -95,6 +95,14 @@ export default function AdminFeaturedEventsManager({
           errors?: string[];
         };
 
+        if (payload.skipped) {
+          setSyncMessage(
+            payload.errors?.join(" ") ||
+              "Google sync skipped — SERPAPI_API_KEY is not configured yet.",
+          );
+          return;
+        }
+
         if (!response.ok || !payload.ok) {
           setSyncMessage(
             payload.error ||
@@ -104,12 +112,9 @@ export default function AdminFeaturedEventsManager({
           return;
         }
 
-        if (payload.skipped) {
-          setSyncMessage("Google sync skipped — SERPAPI_API_KEY is not configured yet.");
-          return;
-        }
-
-        setSyncMessage(`Synced ${payload.upserted || 0} Google pet events for Bucks & Montgomery County.`);
+        setSyncMessage(
+          `Synced ${payload.upserted || 0} Google pet events across enabled Community Markets.`,
+        );
       } catch {
         setSyncMessage("Google sync failed.");
       }
@@ -153,18 +158,27 @@ export default function AdminFeaturedEventsManager({
                   Google daily sync
                 </p>
                 <p className="mt-1 text-xs font-semibold text-slate-600">
-                  Pull pet events for Bucks & Montgomery County into homepage previews.
+                  Sync enabled Community Markets (Bucks, Montgomery, Lehigh, Northampton by default).
+                  Manage markets for scalable discovery.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={syncGoogleDiscoveries}
-                disabled={syncPending}
-                className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black text-white disabled:opacity-60"
-              >
-                <RefreshCw className={`h-4 w-4 ${syncPending ? "animate-spin" : ""}`} />
-                Sync Google now
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/admin/community/markets"
+                  className="inline-flex min-h-10 items-center rounded-2xl border border-slate-200 px-4 text-sm font-black text-slate-800"
+                >
+                  Manage markets
+                </Link>
+                <button
+                  type="button"
+                  onClick={syncGoogleDiscoveries}
+                  disabled={syncPending}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black text-white disabled:opacity-60"
+                >
+                  <RefreshCw className={`h-4 w-4 ${syncPending ? "animate-spin" : ""}`} />
+                  Sync Google now
+                </button>
+              </div>
             </div>
             {syncMessage ? (
               <p className="mt-3 text-xs font-semibold text-emerald-800">{syncMessage}</p>

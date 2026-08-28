@@ -74,6 +74,12 @@ export default async function AdminCommunityEventsPage({ searchParams }: PagePro
             Featured manager
           </Link>
           <Link
+            href="/admin/community/markets"
+            className="inline-flex min-h-11 items-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-800"
+          >
+            Discovery markets
+          </Link>
+          <Link
             href="/admin/messages?filter=event-admin"
             className="inline-flex min-h-11 items-center rounded-2xl border border-teal-200 bg-teal-50 px-5 text-sm font-black text-teal-900"
           >

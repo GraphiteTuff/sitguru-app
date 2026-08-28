@@ -25,7 +25,7 @@ export default async function CommunityEventsBannerSection() {
   const [featuredEvents, partnerUpcoming, discovered] = await Promise.all([
     fetchFeaturedHomepageEvents({ limit: 1 }),
     fetchPublicEvents({ limit: 8 }),
-    fetchDiscoveredHomepageEvents(16),
+    fetchDiscoveredHomepageEvents({ limit: 16 }),
   ]);
 
   const featured = featuredEvents[0] || null;
@@ -34,17 +34,14 @@ export default async function CommunityEventsBannerSection() {
     [],
   );
 
-  let events = partnerEvents;
-  let source: "live" | "google" | "demo" = partnerEvents.length ? "live" : "google";
-  let previewMode = false;
-
-  if (partnerEvents.length < 4 && discovered.events.length) {
-    events = mergeEvents(partnerEvents, discovered.events);
-    if (!partnerEvents.length) {
-      source = "google";
-      previewMode = true;
-    }
-  }
+  // Partner-published SitGuru events always lead; Google discoveries fill remaining slots.
+  let events = mergeEvents(partnerEvents, discovered.events).slice(0, 16);
+  let source: "live" | "google" | "demo" = partnerEvents.length
+    ? "live"
+    : discovered.events.length
+      ? "google"
+      : "demo";
+  let previewMode = !partnerEvents.length && Boolean(discovered.events.length);
 
   if (!events.length) {
     events = getCommunityBannerDemoEvents();

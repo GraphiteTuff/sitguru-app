@@ -87,6 +87,7 @@ const adminRoutes = {
   programs: "/admin/programs",
   partners: "/admin/partners",
   communityEvents: "/admin/community/events",
+  communityMarkets: "/admin/community/markets",
   analytics: "/admin/analytics",
   insights: "/admin/insights",
 };
@@ -155,6 +156,11 @@ const navSections = [
         label: "Community Events",
         href: adminRoutes.communityEvents,
         icon: CalendarDays,
+      },
+      {
+        label: "Community Markets",
+        href: adminRoutes.communityMarkets,
+        icon: MapPin,
       },
       { label: "Analytics", href: adminRoutes.analytics, icon: Gauge },
       {
