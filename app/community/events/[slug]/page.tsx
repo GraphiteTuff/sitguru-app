@@ -24,7 +24,6 @@ import {
 } from "@/lib/community/format";
 import { fetchPublicEventBySlug } from "@/lib/community/queries";
 import { buildEventShareMeta } from "@/lib/community/share";
-import { buildEventReturnPath } from "@/lib/community/pet-parent-signup";
 
 export const dynamic = "force-dynamic";
 
@@ -232,7 +231,8 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
 
                 <CommunityPetParentCta
                   compact
-                  nextPath={buildEventReturnPath(event.slug, { rsvp: true })}
+                  slug={event.slug}
+                  eventId={event.id}
                   source="community_event_detail"
                   campaign="community_event_detail_cta"
                 />

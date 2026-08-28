@@ -1,14 +1,10 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import Link from "next/link";
-import { PawPrint, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import type { EventAttendanceCounts } from "@/lib/community/attendance";
-import {
-  buildCommunityPetParentLoginHref,
-  buildCommunityPetParentSignupHref,
-  savePendingEventRsvp,
-} from "@/lib/community/pet-parent-signup";
+import CommunityJoinOptions from "@/components/community/CommunityJoinOptions";
+import { savePendingEventRsvp } from "@/lib/community/pet-parent-signup";
 
 type EventGoingButtonProps = {
   eventId: string;
@@ -37,14 +33,6 @@ export default function EventGoingButton({
   const [authed, setAuthed] = useState(true);
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
-
-  const signupHref = buildCommunityPetParentSignupHref({
-    slug: eventSlug,
-    eventId,
-    source: "community_event_im_going",
-    campaign: "community_event_im_going",
-  });
-  const loginHref = buildCommunityPetParentLoginHref({ slug: eventSlug });
 
   useEffect(() => {
     async function load() {
@@ -83,7 +71,7 @@ export default function EventGoingButton({
       if (response.status === 401) {
         setAuthed(false);
         rememberPending();
-        setMessage("Join free as a Pet Parent — then you're going in one tap.");
+        setMessage("Join free — pick Pet Parent, Guru, or Ambassador below.");
         return;
       }
 
@@ -103,26 +91,13 @@ export default function EventGoingButton({
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       {!authed ? (
-        <div className="space-y-2">
-          <Link
-            href={signupHref}
-            onClick={rememberPending}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800 sm:w-auto"
-          >
-            <PawPrint className="h-4 w-4" />
-            Join free &amp; say I&apos;m Going
-          </Link>
-          <p className="text-xs font-semibold text-slate-600">
-            Quick Pet Parent signup — we&apos;ll bring you right back to this event.
-          </p>
-          <Link
-            href={loginHref}
-            onClick={rememberPending}
-            className="inline-flex text-xs font-black text-emerald-800 underline-offset-2 hover:underline"
-          >
-            Already have an account? Log in
-          </Link>
-        </div>
+        <CommunityJoinOptions
+          slug={eventSlug}
+          eventId={eventId}
+          source="community_event_im_going"
+          variant="event"
+          onBeforeNavigate={rememberPending}
+        />
       ) : (
         <button
           type="button"

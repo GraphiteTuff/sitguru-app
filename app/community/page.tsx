@@ -27,16 +27,28 @@ export default function CommunityPage() {
             Discover events near you, meet local Gurus, and connect with SitGuru partners
             who love pets as much as you do.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap gap-2">
             <Link
               href="/signup?role=pet_parent&intent=pet_parent&next=%2Fcommunity%2Fevents&source=community_hub&campaign=community_hub_join&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_join"
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-6 text-sm font-black text-emerald-900"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-emerald-900"
             >
-              Join free as a Pet Parent
+              Pet Parent
+            </Link>
+            <Link
+              href="/signup?role=guru&intent=guru&next=%2Fcommunity%2Fevents&source=community_hub&campaign=community_hub_guru&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_guru"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/40 bg-white/10 px-5 text-sm font-black !text-white"
+            >
+              Pet Guru
+            </Link>
+            <Link
+              href="/signup?role=ambassador&intent=ambassador&next=%2Fcommunity%2Fevents&source=community_hub&campaign=community_hub_ambassador&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_ambassador"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/40 bg-white/10 px-5 text-sm font-black !text-white"
+            >
+              Ambassador
             </Link>
             <Link
               href="/community/events"
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-white/40 bg-transparent px-6 text-sm font-black !text-white"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/40 bg-transparent px-5 text-sm font-black !text-white"
             >
               Browse events
             </Link>

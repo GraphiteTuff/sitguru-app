@@ -96,6 +96,8 @@ function isAudienceCompatiblePath(
   if (audience === "ambassador") {
     return (
       path.startsWith("/ambassador/") ||
+      path.startsWith("/community/") ||
+      path === "/community" ||
       path === "/login/route?preferred=ambassador"
     );
   }
@@ -103,6 +105,8 @@ function isAudienceCompatiblePath(
   if (audience === "guru") {
     return (
       path.startsWith("/guru/") ||
+      path.startsWith("/community/") ||
+      path === "/community" ||
       path === "/login/route?preferred=guru"
     );
   }

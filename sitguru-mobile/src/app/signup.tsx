@@ -104,6 +104,9 @@ export default function SignupScreen() {
   const [signupIntent, setSignupIntent] = useState<SignupIntent>(
     resolveIntent(params.intent),
   );
+  useEffect(() => {
+    setSignupIntent(resolveIntent(params.intent));
+  }, [params.intent]);
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -112,6 +115,7 @@ export default function SignupScreen() {
   const fromCommunity =
     returnNext.includes('community-event') ||
     String(params.source || '').includes('community');
+  const communityIntent = resolveIntent(params.intent);
 
   const emailLooksValid = useMemo(
     () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail),
@@ -255,7 +259,11 @@ export default function SignupScreen() {
 
                   <Text style={styles.title}>
                     {fromCommunity
-                      ? 'Join free as a Pet Parent.'
+                      ? communityIntent === 'guru'
+                        ? 'Join as a Pet Guru.'
+                        : communityIntent === 'ambassador'
+                          ? 'Join as an Ambassador.'
+                          : 'Join free as a Pet Parent.'
                       : 'Join SitGuru.'}
                   </Text>
 

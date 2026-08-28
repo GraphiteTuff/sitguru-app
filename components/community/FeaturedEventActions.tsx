@@ -5,6 +5,8 @@ import { useState } from "react";
 import EventShareDrawer, {
   type EventShareDrawerEvent,
 } from "@/components/community/EventShareDrawer";
+import CommunityJoinOptions from "@/components/community/CommunityJoinOptions";
+import { getPublicEventPath } from "@/lib/community/slug";
 
 type FeaturedEventActionsProps = {
   event: EventShareDrawerEvent;
@@ -18,7 +20,7 @@ export default function FeaturedEventActions({
   searchState = "",
 }: FeaturedEventActionsProps) {
   const [shareOpen, setShareOpen] = useState(false);
-  const href = `/community/events/${event.slug}`;
+  const href = getPublicEventPath(event.slug);
 
   return (
     <>
@@ -29,12 +31,16 @@ export default function FeaturedEventActions({
         >
           View Event Details
         </Link>
-        <Link
-          href={`/signup?role=pet_parent&intent=pet_parent&next=${encodeURIComponent(`/community/events/${event.slug}?rsvp=1`)}&source=homepage_featured_event&campaign=homepage_im_going&utm_source=sitguru&utm_medium=community_events&utm_campaign=homepage_im_going`}
-          className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-black text-emerald-900 transition hover:bg-emerald-100"
-        >
-          I&apos;m Going — join free
-        </Link>
+
+        {event.id ? (
+          <CommunityJoinOptions
+            slug={event.slug}
+            eventId={event.id}
+            source="homepage_featured_event"
+            variant="compact"
+          />
+        ) : null}
+
         <Link
           href={`/search?city=${encodeURIComponent(searchCity)}&state=${encodeURIComponent(searchState)}`}
           className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-900 transition hover:bg-slate-50"

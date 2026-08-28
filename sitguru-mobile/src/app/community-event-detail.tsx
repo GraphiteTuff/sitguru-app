@@ -100,7 +100,9 @@ export default function CommunityEventDetailScreen() {
     });
   }
 
-  async function goToPetParentSignup() {
+  async function goToCommunitySignup(
+    intent: "pet-parent" | "guru" | "ambassador" = "pet-parent",
+  ) {
     if (!event) return;
     await AsyncStorage.setItem(
       PENDING_RSVP_KEY,
@@ -114,7 +116,7 @@ export default function CommunityEventDetailScreen() {
     router.push({
       pathname: "/signup",
       params: {
-        intent: "pet-parent",
+        intent,
         next: `/community-event-detail?slug=${encodeURIComponent(event.slug)}&rsvp=1`,
         source: "community_event_im_going",
       },
@@ -130,7 +132,7 @@ export default function CommunityEventDetailScreen() {
     if (!result.ok) {
       if (result.error.toLowerCase().includes("sign in")) {
         setNeedsSignup(true);
-        setRsvpMessage("Join free as a Pet Parent — then you're going in one tap.");
+        setRsvpMessage("Join free — pick Pet Parent, Guru, or Ambassador below.");
         return;
       }
       setRsvpMessage(result.error);
@@ -207,10 +209,31 @@ export default function CommunityEventDetailScreen() {
       ) : null}
 
       {needsSignup ? (
-        <Pressable style={styles.primaryButton} onPress={() => void goToPetParentSignup()}>
-          <PawPrint color="#fff" size={18} />
-          <Text style={styles.primaryButtonText}>Join free & say I&apos;m Going</Text>
-        </Pressable>
+        <View style={styles.joinOptions}>
+          <Text style={styles.joinTitle}>Join free & say I&apos;m Going</Text>
+          <Text style={styles.joinSubtitle}>
+            Pick your path — we&apos;ll bring you right back to this event.
+          </Text>
+          <Pressable
+            style={styles.primaryButton}
+            onPress={() => void goToCommunitySignup("pet-parent")}
+          >
+            <PawPrint color="#fff" size={18} />
+            <Text style={styles.primaryButtonText}>Pet Parent</Text>
+          </Pressable>
+          <Pressable
+            style={styles.roleButton}
+            onPress={() => void goToCommunitySignup("guru")}
+          >
+            <Text style={styles.roleButtonText}>Pet Guru</Text>
+          </Pressable>
+          <Pressable
+            style={styles.roleButton}
+            onPress={() => void goToCommunitySignup("ambassador")}
+          >
+            <Text style={styles.roleButtonText}>Ambassador</Text>
+          </Pressable>
+        </View>
       ) : (
         <Pressable
           style={[styles.primaryButton, going ? styles.goingButton : null]}
@@ -234,11 +257,19 @@ export default function CommunityEventDetailScreen() {
 
       {rsvpMessage ? <Text style={styles.rsvpMessage}>{rsvpMessage}</Text> : null}
 
-      <Pressable style={styles.joinHint} onPress={() => void goToPetParentSignup()}>
-        <Text style={styles.joinHintText}>
-          New here? Create a free Pet Parent account in minutes.
-        </Text>
-      </Pressable>
+      <View style={styles.joinHintRow}>
+        <Pressable onPress={() => void goToCommunitySignup("pet-parent")}>
+          <Text style={styles.joinHintText}>Pet Parent</Text>
+        </Pressable>
+        <Text style={styles.joinHintDivider}>·</Text>
+        <Pressable onPress={() => void goToCommunitySignup("guru")}>
+          <Text style={styles.joinHintText}>Guru</Text>
+        </Pressable>
+        <Text style={styles.joinHintDivider}>·</Text>
+        <Pressable onPress={() => void goToCommunitySignup("ambassador")}>
+          <Text style={styles.joinHintText}>Ambassador</Text>
+        </Pressable>
+      </View>
 
       <Pressable style={styles.shareButton} onPress={() => void shareEvent()}>
         <Share2 color="#0D5C3A" size={18} />
@@ -345,13 +376,54 @@ const styles = StyleSheet.create({
     color: "#0D5C3A",
     fontSize: 13,
   },
-  joinHint: {
+  joinHintRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
     paddingVertical: 4,
   },
   joinHintText: {
     fontFamily: AppFonts.semiBold,
     color: "#0D5C3A",
     fontSize: 13,
+  },
+  joinHintDivider: {
+    fontFamily: AppFonts.bold,
+    color: "#94a3b8",
+  },
+  joinOptions: {
+    gap: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    backgroundColor: "#ecfdf5",
+    padding: 14,
+  },
+  joinTitle: {
+    fontFamily: AppFonts.extraBold,
+    color: "#065f46",
+    fontSize: 16,
+  },
+  joinSubtitle: {
+    fontFamily: AppFonts.medium,
+    color: "#047857",
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  roleButton: {
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roleButtonText: {
+    fontFamily: AppFonts.bold,
+    color: "#0D5C3A",
+    fontSize: 15,
   },
   shareButton: {
     minHeight: 48,

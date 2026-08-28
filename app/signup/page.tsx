@@ -293,7 +293,6 @@ function getRedirectPath(intent: AccountIntent) {
 
 function getSafeSignupNextPath(nextValue: string | null, intent: AccountIntent) {
   if (!nextValue) return null;
-  if (intent !== "pet_parent" && intent !== "both") return null;
 
   try {
     const decoded = decodeURIComponent(nextValue).trim();
@@ -304,14 +303,29 @@ function getSafeSignupNextPath(nextValue: string | null, intent: AccountIntent) 
     if (decoded.startsWith("/auth/")) return null;
     if (decoded.startsWith("/signup")) return null;
 
-    if (
-      decoded.startsWith("/community/") ||
-      decoded === "/community" ||
-      decoded.startsWith("/customer/") ||
-      decoded.startsWith("/search") ||
-      decoded.startsWith("/find-care")
-    ) {
+    const isCommunityReturn =
+      decoded.startsWith("/community/") || decoded === "/community";
+
+    if (isCommunityReturn) {
       return decoded;
+    }
+
+    if (intent === "pet_parent" || intent === "both") {
+      if (
+        decoded.startsWith("/customer/") ||
+        decoded.startsWith("/search") ||
+        decoded.startsWith("/find-care")
+      ) {
+        return decoded;
+      }
+    }
+
+    if (intent === "guru" || intent === "both") {
+      if (decoded.startsWith("/guru/")) return decoded;
+    }
+
+    if (intent === "ambassador") {
+      if (decoded.startsWith("/ambassador/")) return decoded;
     }
 
     return null;
@@ -1094,7 +1108,13 @@ function SignupPageContent() {
             <Link
               href={
                 communitySignup
-                  ? `/login?role=pet_parent&next=${encodeURIComponent(redirectPath)}`
+                  ? `/login?role=${
+                      intent === "guru"
+                        ? "guru"
+                        : intent === "ambassador"
+                          ? "ambassador"
+                          : "pet_parent"
+                    }&next=${encodeURIComponent(redirectPath)}`
                   : "/login"
               }
               className="text-sm font-semibold text-[#0f7f60] transition hover:text-[#0b6049]"
@@ -1114,13 +1134,21 @@ function SignupPageContent() {
 
               <h1 className="text-4xl font-black leading-tight tracking-tight text-[#1f1f1f] sm:text-5xl lg:text-6xl">
                 {communitySignup
-                  ? "Create your free Pet Parent account in minutes."
+                  ? intent === "guru"
+                    ? "Create your Pet Guru account in minutes."
+                    : intent === "ambassador"
+                      ? "Create your Ambassador account in minutes."
+                      : "Create your free Pet Parent account in minutes."
                   : "Create your SitGuru account in minutes."}
               </h1>
 
               <p className="mt-5 max-w-xl text-lg leading-8 text-[#5f5648]">
                 {communitySignup
-                  ? "RSVP to community events, meet local Gurus, and keep pet care in one place. After you join, we'll take you right back to your event."
+                  ? intent === "guru"
+                    ? "Show up at community events, connect with local pet parents, and grow your Guru presence. After you join, we'll take you right back to your event."
+                    : intent === "ambassador"
+                      ? "RSVP at local events, grow the SitGuru community, and earn while you connect. After you join, we'll take you right back to your event."
+                      : "RSVP to community events, meet local Gurus, and keep pet care in one place. After you join, we'll take you right back to your event."
                   : "Sign up as a Pet Parent, Future Guru, or Ambassador. Referral codes and tracked QR links stay connected while you finish your profile from the dashboard."}
               </p>
 
