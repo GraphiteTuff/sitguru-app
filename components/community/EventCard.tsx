@@ -6,6 +6,7 @@ import { CalendarDays, MapPin, PawPrint, Ticket } from "lucide-react";
 import EventAttendanceBadge from "@/components/community/EventAttendanceBadge";
 import {
   formatEventDateRange,
+  formatEventCountyState,
   formatEventLocationInline,
   getEventCardImage,
 } from "@/lib/community/format";
@@ -89,6 +90,9 @@ export default function EventCard({
             <h3 className="text-xl font-black tracking-tight text-slate-950">
               {event.title}
             </h3>
+            <p className="mt-1 text-sm font-bold text-emerald-800">
+              {formatEventCountyState(event)}
+            </p>
             {showPartner ? (
               <p className="mt-1 text-sm font-semibold text-slate-600">
                 {partnerName}

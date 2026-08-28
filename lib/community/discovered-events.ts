@@ -36,10 +36,33 @@ export type CommunityEventDiscoveryRow = {
 
 function marketLabel(row: CommunityEventDiscoveryRow) {
   if (row.community_markets?.name) return row.community_markets.name;
+  if (row.community_markets?.county_name) {
+    return `${row.community_markets.county_name}, ${row.state || "PA"}`;
+  }
   if (row.county === "bucks") return "Bucks County, PA";
   if (row.county === "montgomery") return "Montgomery County, PA";
   if (row.county) return row.county;
   return "Community Market";
+}
+
+function discoveryCountyLabel(row: CommunityEventDiscoveryRow) {
+  if (row.community_markets?.county_name?.trim()) {
+    return row.community_markets.county_name.trim();
+  }
+  if (row.community_markets?.name?.trim()) {
+    // "Bucks County, PA" → "Bucks County"
+    return row.community_markets.name.split(",")[0]?.trim() || null;
+  }
+  if (row.county === "bucks") return "Bucks County";
+  if (row.county === "montgomery") return "Montgomery County";
+  if (row.county?.includes("county") || row.county?.includes("-")) {
+    return row.county
+      .replace(/-/g, " ")
+      .replace(/\bpa\b/gi, "")
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  return row.city?.trim() || null;
 }
 
 export function mapDiscoveryToCommunityEvent(
@@ -93,7 +116,7 @@ export function mapDiscoveryToCommunityEvent(
     featured_priority: 50,
     featured_start_at: null,
     featured_end_at: null,
-    featured_market_city: row.city,
+    featured_market_city: discoveryCountyLabel(row),
     featured_market_state: row.state || "PA",
     moderation_note: null,
     moderated_by: null,
@@ -106,7 +129,7 @@ export function mapDiscoveryToCommunityEvent(
       id: "00000000-0000-0000-0000-000000000001",
       business_name: `Google • ${label}`,
       slug: null,
-      city: row.city,
+      city: discoveryCountyLabel(row) || row.city,
       state: row.state || "PA",
       website: row.event_url,
       email: null,

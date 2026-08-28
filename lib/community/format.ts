@@ -75,6 +75,30 @@ export function formatEventLocationInline(event: Pick<
   return venue || cityState || "Location TBA";
 }
 
+/** County (or city fallback), State — shown under event titles on cards. */
+export function formatEventCountyState(
+  event: Pick<
+    CommunityEventRow,
+    "city" | "state" | "featured_market_city" | "featured_market_state"
+  > & {
+    partners?: { city?: string | null; state?: string | null } | null;
+  },
+) {
+  const countyOrCity =
+    event.featured_market_city?.trim() ||
+    event.partners?.city?.trim() ||
+    event.city?.trim() ||
+    null;
+  const state =
+    event.featured_market_state?.trim() ||
+    event.partners?.state?.trim() ||
+    event.state?.trim() ||
+    null;
+
+  if (countyOrCity && state) return `${countyOrCity}, ${state}`;
+  return countyOrCity || state || "Location TBA";
+}
+
 export function isUpcomingEvent(event: Pick<CommunityEventRow, "start_at" | "status" | "cancelled_at">) {
   if (event.status === "cancelled" || event.cancelled_at) return false;
   return new Date(event.start_at).getTime() >= Date.now() - 6 * 60 * 60 * 1000;

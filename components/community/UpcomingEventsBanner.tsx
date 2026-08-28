@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   formatEventDateRange,
+  formatEventCountyState,
   getEventCardImage,
 } from "@/lib/community/format";
 import { fallbackEventCardImage } from "@/lib/community/event-card-fallbacks";
@@ -79,6 +80,7 @@ function EventBannerCard({
     event.partners?.business_name ||
     [event.city, event.state].filter(Boolean).join(", ") ||
     "Location TBA";
+  const countyStateLabel = formatEventCountyState(event);
   const href = getEventBannerHref(event);
   const external = isExternalEventLink(event);
   const googleDiscovery = isGoogleDiscoveryEvent(event);
@@ -101,10 +103,15 @@ function EventBannerCard({
         ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 p-5">
-        <h3 className="line-clamp-2 min-h-[3.5rem] text-xl font-black leading-snug tracking-tight text-slate-950">
-          {event.title}
-        </h3>
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-5">
+        <div>
+          <h3 className="line-clamp-2 text-xl font-black leading-snug tracking-tight text-slate-950">
+            {event.title}
+          </h3>
+          <p className="mt-1 line-clamp-1 text-sm font-bold text-emerald-800">
+            {countyStateLabel}
+          </p>
+        </div>
 
         <div className="space-y-1.5 text-sm font-semibold text-slate-600">
           <p className="inline-flex items-center gap-2">
@@ -140,7 +147,7 @@ function EventBannerCard({
   );
 
   const className =
-    "group flex h-[440px] w-[280px] shrink-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:w-[300px]";
+    "group flex h-[460px] w-[280px] shrink-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:w-[300px]";
 
   if (googleDiscovery && external) {
     return (
