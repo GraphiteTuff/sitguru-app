@@ -47,6 +47,12 @@ export function selectRelevantHelpSnippets(
     if (q.includes("pawreport") && hay.includes("pawreport")) score += 8;
     if (q.includes("pawperk") && hay.includes("pawperk")) score += 8;
     if (q.includes("ambassador") && hay.includes("ambassador")) score += 8;
+    if (
+      (q.includes("event") || q.includes("rsvp") || q.includes("community")) &&
+      (hay.includes("community") || hay.includes("event"))
+    ) {
+      score += 6;
+    }
     if (q.includes("refund") && hay.includes("refund")) score += 6;
     if (q.includes("cancel") && hay.includes("cancel")) score += 6;
     if ((q.includes("guru") || q.includes("sitter")) && hay.includes("guru")) {

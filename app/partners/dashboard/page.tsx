@@ -45,6 +45,14 @@ const partnerStats = [
 
 const actionCards = [
   {
+    title: "Community Events",
+    description:
+      "Create and manage pet-friendly community events — SitGuru handles the polished presentation everywhere.",
+    href: "/partners/dashboard/community/events",
+    icon: Megaphone,
+    cta: "Manage events",
+  },
+  {
     title: "Share your partner link",
     description:
       "Use your SitGuru Network link to invite Gurus, pet parents, partners, and local pet-care communities.",

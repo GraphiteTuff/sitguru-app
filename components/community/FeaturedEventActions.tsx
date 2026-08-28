@@ -1,0 +1,67 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import EventShareDrawer, {
+  type EventShareDrawerEvent,
+} from "@/components/community/EventShareDrawer";
+import CommunityJoinOptions from "@/components/community/CommunityJoinOptions";
+import { getPublicEventPath } from "@/lib/community/slug";
+
+type FeaturedEventActionsProps = {
+  event: EventShareDrawerEvent;
+  searchCity?: string;
+  searchState?: string;
+};
+
+export default function FeaturedEventActions({
+  event,
+  searchCity = "",
+  searchState = "",
+}: FeaturedEventActionsProps) {
+  const [shareOpen, setShareOpen] = useState(false);
+  const href = getPublicEventPath(event.slug);
+
+  return (
+    <>
+      <div className="flex flex-col justify-center gap-3 border-t border-slate-100 p-6 sm:p-8 lg:border-l lg:border-t-0">
+        <Link
+          href={href}
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800"
+        >
+          View Event Details
+        </Link>
+
+        {event.id ? (
+          <CommunityJoinOptions
+            slug={event.slug}
+            eventId={event.id}
+            source="homepage_featured_event"
+            variant="compact"
+          />
+        ) : null}
+
+        <Link
+          href={`/search?city=${encodeURIComponent(searchCity)}&state=${encodeURIComponent(searchState)}`}
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-900 transition hover:bg-slate-50"
+        >
+          Meet Local Gurus
+        </Link>
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-black text-emerald-900 transition hover:bg-emerald-100"
+        >
+          Share Event
+        </button>
+      </div>
+
+      <EventShareDrawer
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        event={event}
+        source="homepage_featured_event"
+      />
+    </>
+  );
+}

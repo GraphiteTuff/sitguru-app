@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
+import HomepageEventsSectionClient from "@/components/community/HomepageEventsSectionClient";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { PawIcon } from "@/components/ui/PawIcon";
 import { trackEvent } from "@/lib/analytics/track";
@@ -1849,6 +1850,17 @@ export default function HomePage() {
           city: result.city,
           state: result.stateAbbreviation || result.state,
         }));
+        try {
+          window.localStorage.setItem("sitguru_home_zip", normalizedZip);
+          window.localStorage.setItem("sitguru_home_city", result.city);
+          window.localStorage.setItem(
+            "sitguru_home_state",
+            result.stateAbbreviation || result.state,
+          );
+          window.localStorage.setItem("sitguru_home_location_source", "search");
+        } catch {
+          // ignore storage failures
+        }
         setZipLookupStatus("found");
         setZipLookupMessage(
           `${result.city}, ${result.stateAbbreviation || result.state}`,
@@ -2426,6 +2438,7 @@ export default function HomePage() {
       </section>
 
       <CompactPartnerSection onTrack={trackHomepageClick} />
+      <HomepageEventsSectionClient />
     </main>
   );
 }

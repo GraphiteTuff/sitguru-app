@@ -322,6 +322,49 @@ function getRedirectPath(intent: AccountIntent) {
   return "/customer/dashboard";
 }
 
+function getSafeSignupNextPath(nextValue: string | null, intent: AccountIntent) {
+  if (!nextValue) return null;
+
+  try {
+    const decoded = decodeURIComponent(nextValue).trim();
+    if (!decoded.startsWith("/")) return null;
+    if (decoded.startsWith("//")) return null;
+    if (decoded.includes("://")) return null;
+    if (decoded.startsWith("/admin")) return null;
+    if (decoded.startsWith("/auth/")) return null;
+    if (decoded.startsWith("/signup")) return null;
+
+    const isCommunityReturn =
+      decoded.startsWith("/community/") || decoded === "/community";
+
+    if (isCommunityReturn) {
+      return decoded;
+    }
+
+    if (intent === "pet_parent" || intent === "both") {
+      if (
+        decoded.startsWith("/customer/") ||
+        decoded.startsWith("/search") ||
+        decoded.startsWith("/find-care")
+      ) {
+        return decoded;
+      }
+    }
+
+    if (intent === "guru" || intent === "both") {
+      if (decoded.startsWith("/guru/")) return decoded;
+    }
+
+    if (intent === "ambassador") {
+      if (decoded.startsWith("/ambassador/")) return decoded;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function getIntentLabel(intent: AccountIntent) {
   if (intent === "guru") return "Future Guru";
   if (intent === "both") return "Pet Parent + Future Guru";
@@ -586,21 +629,49 @@ function SignupPageContent() {
     }
   }, [referralCode]);
 
-  const redirectPath = getRedirectPath(intent);
+  const redirectPath =
+    getSafeSignupNextPath(
+      searchParams.get("next") || searchParams.get("redirect"),
+      intent,
+    ) || getRedirectPath(intent);
   const intentLabel = getIntentLabel(intent);
   const selectedAccount =
     accountOptions.find((option) => option.key === intent) || accountOptions[0];
+  const communitySignup =
+    redirectPath.startsWith("/community/") || redirectPath === "/community";
+  const communityPanelTitle = communitySignup
+    ? intent === "guru"
+      ? "Create your Pet Guru account in minutes."
+      : intent === "ambassador"
+        ? "Create your Ambassador account in minutes."
+        : "Create your free Pet Parent account in minutes."
+    : selectedAccount.panelTitle;
+  const communityPanelCopy = communitySignup
+    ? intent === "guru"
+      ? "Show up at community events, connect with local pet parents, and grow your Guru presence. After you join, we'll take you right back to your event."
+      : intent === "ambassador"
+        ? "RSVP at local events, grow the SitGuru community, and earn while you connect. After you join, we'll take you right back to your event."
+        : "RSVP to community events, meet local Gurus, and keep pet care in one place. After you join, we'll take you right back to your event."
+    : selectedAccount.panelCopy;
   const needsServiceArea =
     intent === "guru" || intent === "both" || intent === "ambassador";
   const emailSignupSource = signupTracking.source || "sitguru_signup_page";
   const phoneSignupSource = signupTracking.source || "sitguru_phone_signup";
-  const loginHref = `/login?role=${
-    intent === "guru"
-      ? "guru"
-      : intent === "ambassador"
-        ? "ambassador"
-        : "pet_parent"
-  }`;
+  const loginHref = communitySignup
+    ? `/login?role=${
+        intent === "guru"
+          ? "guru"
+          : intent === "ambassador"
+            ? "ambassador"
+            : "pet_parent"
+      }&next=${encodeURIComponent(redirectPath)}`
+    : `/login?role=${
+        intent === "guru"
+          ? "guru"
+          : intent === "ambassador"
+            ? "ambassador"
+            : "pet_parent"
+      }`;
 
   useEffect(() => {
     if (referralCode && !showReferralField) {
@@ -1152,7 +1223,9 @@ function SignupPageContent() {
           >
             <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] !text-white">
               <Sparkles className="h-4 w-4" />
-              SitGuru signup
+              {communitySignup
+                ? "Join free — then finish saying I'm Going"
+                : "SitGuru signup"}
             </div>
 
             <Image
@@ -1165,11 +1238,11 @@ function SignupPageContent() {
             />
 
             <h1 className="text-4xl font-black leading-[1.05] tracking-[-0.045em] !text-white xl:text-5xl">
-              {selectedAccount.panelTitle}
+              {communityPanelTitle}
             </h1>
 
             <p className="max-w-md text-base font-semibold leading-7 text-emerald-50">
-              {selectedAccount.panelCopy}
+              {communityPanelCopy}
             </p>
           </div>
 

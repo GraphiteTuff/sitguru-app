@@ -86,6 +86,7 @@ const adminRoutes = {
   emailUpdates: "/admin/email-updates",
   programs: "/admin/programs",
   partners: "/admin/partners",
+  communityEvents: "/admin/community/events",
   analytics: "/admin/analytics",
   insights: "/admin/insights",
 };
@@ -150,6 +151,11 @@ const navSections = [
       },
       { label: "Programs", href: adminRoutes.programs, icon: ShieldCheck },
       { label: "Partners", href: adminRoutes.partners, icon: HandCoins },
+      {
+        label: "Community Events",
+        href: adminRoutes.communityEvents,
+        icon: CalendarDays,
+      },
       { label: "Analytics", href: adminRoutes.analytics, icon: Gauge },
       {
         label: "Insights",

@@ -77,7 +77,8 @@ export function mobileCorsHeaders(req: Request): Record<string, string> {
   headers["Access-Control-Allow-Credentials"] = "true";
   headers["Access-Control-Allow-Headers"] =
     "Authorization, Content-Type, X-Requested-With, Idempotency-Key";
-  headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+  headers["Access-Control-Allow-Methods"] =
+    "GET, POST, PATCH, DELETE, OPTIONS";
   headers["Access-Control-Allow-Origin"] = origin;
 
   return headers;

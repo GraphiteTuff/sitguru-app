@@ -18,12 +18,15 @@ import { buildHomepageSimulationReplyWithGurus } from "@/lib/chat/homepage-simul
 import { buildRogueSystemPrompt } from "@/lib/chat/rogue-system-prompt";
 import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
 import {
+  isCommunityCompanionPath,
+  matchCommunityEventsFaq,
+  parseCommunityEventSlugFromPath,
+} from "@/lib/ai/community-events-faqs";
+import {
   matchMarketingFaq,
   ROGUE_PUBLIC_MARKETING_FAQS,
 } from "@/lib/ai/officer-marketing-faqs";
-import {
-  inferLookupParamsFromChat,
-} from "@/lib/gurus/guru-chat-snapshot";
+import { inferLookupParamsFromChat } from "@/lib/gurus/guru-chat-snapshot";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
 import {
   buildCareMatchingAsk,
@@ -257,6 +260,11 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       companion?: string;
       pagePath?: string;
       page_path?: string;
+      community_event_slug?: string;
+      community_event_id?: string;
+      community_event_title?: string;
+      community_event_city?: string;
+      community_event_state?: string;
     };
 
     const messages = Array.isArray(body?.messages) ? body.messages : [];
@@ -343,9 +351,41 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       void recordChatInsight(lastUserText, insightChannel, "General Inquiry", insightMeta);
     }
 
+    const communityEventSlug =
+      safeString(body?.community_event_slug) ||
+      parseCommunityEventSlugFromPath(pagePath) ||
+      undefined;
+    const communityEvent = isCommunityCompanionPath(pagePath)
+      ? {
+          slug: communityEventSlug,
+          id: safeString(body?.community_event_id) || undefined,
+          title: safeString(body?.community_event_title) || undefined,
+          city: safeString(body?.community_event_city) || undefined,
+          state: safeString(body?.community_event_state) || undefined,
+        }
+      : undefined;
+
     const matchingAsk = buildCareMatchingAsk(careThread, clientFirstName);
     if (matchingAsk) {
       return simulationDataStreamResponse(matchingAsk);
+    }
+
+    if (isCommunityCompanionPath(pagePath) && lastUserText) {
+      const faqHit = matchCommunityEventsFaq(lastUserText);
+      if (faqHit?.answer) {
+        void supabaseAdmin.from("analytics_events").insert({
+          event_name: "community_rogue_faq",
+          event_type: "community",
+          source: "web_rogue_companion",
+          page_path: pagePath,
+          metadata: {
+            question: faqHit.question,
+            matched: true,
+            communityEventSlug: communityEventSlug || null,
+          },
+        });
+        return simulationDataStreamResponse(faqHit.answer);
+      }
     }
 
     const exactParentFaq = matchMarketingFaq(
@@ -361,6 +401,8 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       userRole: userTypeLabel,
       lastUserText: careThread,
       walkId: walkId || undefined,
+      pagePath,
+      communityEvent,
     });
 
     let result;
