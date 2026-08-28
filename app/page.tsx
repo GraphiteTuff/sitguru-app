@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
+import HomepageEventsSectionClient from "@/components/community/HomepageEventsSectionClient";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { PawIcon } from "@/components/ui/PawIcon";
 import { trackEvent } from "@/lib/analytics/track";
@@ -2348,6 +2349,7 @@ export default function HomePage() {
       </section>
 
       <CompactPartnerSection onTrack={trackHomepageClick} />
+      <HomepageEventsSectionClient />
     </main>
   );
 }
