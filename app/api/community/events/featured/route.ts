@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchDiscoveredHomepageEvents } from "@/lib/community/discovered-events";
+import { getHomepageDemoEvents } from "@/lib/community/homepage-demo-events";
 import { fetchFeaturedHomepageEvents, fetchPublicEvents } from "@/lib/community/queries";
 import { lookupZipLocation, cleanZipCode } from "@/lib/location/zip-lookup";
+import type { CommunityEventWithPartner } from "@/lib/community/types";
 
 export const dynamic = "force-dynamic";
+
+function mergeUniqueEvents(
+  primary: CommunityEventWithPartner[],
+  secondary: CommunityEventWithPartner[],
+  limit = 16,
+) {
+  const seen = new Set<string>();
+  const merged: CommunityEventWithPartner[] = [];
+
+  for (const event of [...primary, ...secondary]) {
+    const key = `${event.title}|${event.start_at}|${event.event_url || event.slug}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(event);
+    if (merged.length >= limit) break;
+  }
+
+  return merged;
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -18,27 +40,58 @@ export async function GET(req: NextRequest) {
         state = state || location.state;
       }
     } catch {
-      // fall through to national/default featured events
+      // fall through
     }
   }
 
-  const featuredEvents = await fetchFeaturedHomepageEvents({ city, state, limit: 1 });
-  let featured = featuredEvents[0] || null;
+  const [featuredEvents, partnerUpcoming, discovered] = await Promise.all([
+    fetchFeaturedHomepageEvents({ city, state, limit: 1 }),
+    fetchPublicEvents({ city, state, limit: 8 }),
+    fetchDiscoveredHomepageEvents(16),
+  ]);
 
-  // Graceful fallback: if no market-matched featured event, show any featured/upcoming
+  let featured = featuredEvents[0] || null;
   if (!featured) {
     const nationalFeatured = await fetchFeaturedHomepageEvents({ limit: 1 });
     featured = nationalFeatured[0] || null;
   }
 
-  let upcoming = await fetchPublicEvents({
-    city,
-    state,
-    limit: 5,
-  });
-
+  let upcoming = partnerUpcoming;
   if (upcoming.length === 0) {
-    upcoming = await fetchPublicEvents({ limit: 5 });
+    upcoming = await fetchPublicEvents({ limit: 8 });
+  }
+
+  const partnerEvents = mergeUniqueEvents(
+    featured ? [featured, ...upcoming] : upcoming,
+    [],
+    12,
+  );
+
+  let bannerEvents = partnerEvents;
+  let source: "live" | "google" | "demo" = partnerEvents.length ? "live" : "google";
+  let previewMode = false;
+  let lastSyncedAt = discovered.lastSyncedAt;
+
+  if (partnerEvents.length < 4 && discovered.events.length) {
+    bannerEvents = mergeUniqueEvents(partnerEvents, discovered.events, 16);
+    if (!partnerEvents.length) {
+      source = "google";
+      previewMode = true;
+    }
+  }
+
+  if (bannerEvents.length === 0) {
+    const demo = getHomepageDemoEvents(
+      city && state ? `${city}, ${state}` : "Bucks & Montgomery County, PA",
+    );
+    bannerEvents = mergeUniqueEvents(
+      demo.featured ? [demo.featured, ...demo.upcoming] : demo.upcoming,
+      [],
+      16,
+    );
+    source = "demo";
+    previewMode = true;
+    lastSyncedAt = null;
   }
 
   const locationLabel =
@@ -46,7 +99,11 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     featured,
-    upcoming,
+    upcoming: bannerEvents.slice(featured ? 1 : 0),
+    bannerEvents,
     locationLabel,
+    source,
+    previewMode,
+    lastSyncedAt,
   });
 }

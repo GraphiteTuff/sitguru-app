@@ -1,20 +1,26 @@
 import UpcomingEventsBanner from "@/components/community/UpcomingEventsBanner";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
+import type { EventsBannerSource } from "@/components/community/UpcomingEventsBanner";
 
 type HomepageEventsSectionProps = {
   featured: CommunityEventWithPartner | null;
   upcoming: CommunityEventWithPartner[];
+  bannerEvents?: CommunityEventWithPartner[];
   locationLabel?: string;
   previewMode?: boolean;
+  source?: EventsBannerSource;
+  lastSyncedAt?: string | null;
   adminHref?: string;
 };
 
 function mergeBannerEvents(
   featured: CommunityEventWithPartner | null,
   upcoming: CommunityEventWithPartner[],
+  bannerEvents?: CommunityEventWithPartner[],
 ) {
-  const merged: CommunityEventWithPartner[] = [];
+  if (bannerEvents?.length) return bannerEvents;
 
+  const merged: CommunityEventWithPartner[] = [];
   if (featured) merged.push(featured);
 
   for (const event of upcoming) {
@@ -22,16 +28,19 @@ function mergeBannerEvents(
     merged.push(event);
   }
 
-  return merged.slice(0, 8);
+  return merged;
 }
 
 export default function HomepageEventsSection({
   featured,
   upcoming,
+  bannerEvents,
   previewMode = false,
+  source = "demo",
+  lastSyncedAt = null,
   adminHref,
 }: HomepageEventsSectionProps) {
-  const events = mergeBannerEvents(featured, upcoming);
+  const events = mergeBannerEvents(featured, upcoming, bannerEvents);
 
   if (!events.length) return null;
 
@@ -39,6 +48,8 @@ export default function HomepageEventsSection({
     <UpcomingEventsBanner
       events={events}
       previewMode={previewMode}
+      source={source}
+      lastSyncedAt={lastSyncedAt}
       viewAllHref="/community/events"
       adminHref={adminHref}
       eyebrow="Community events"

@@ -1,0 +1,134 @@
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { GOOGLE_DISCOVERY_EVENT_TYPE } from "@/lib/community/event-preview";
+import type { CommunityEventWithPartner } from "@/lib/community/types";
+
+export type CommunityEventDiscoveryRow = {
+  id: string;
+  external_id: string;
+  source: string;
+  county: "bucks" | "montgomery";
+  search_query: string | null;
+  title: string;
+  short_description: string | null;
+  venue_name: string | null;
+  address_line: string | null;
+  city: string | null;
+  state: string | null;
+  start_at: string;
+  end_at: string | null;
+  timezone: string | null;
+  image_url: string | null;
+  event_url: string;
+  is_free: boolean;
+  pet_friendly: boolean;
+  synced_at: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export function mapDiscoveryToCommunityEvent(
+  row: CommunityEventDiscoveryRow,
+): CommunityEventWithPartner {
+  const countyLabel =
+    row.county === "bucks" ? "Bucks County" : "Montgomery County";
+
+  return {
+    id: row.id,
+    partner_id: "00000000-0000-0000-0000-000000000000",
+    created_by: null,
+    title: row.title,
+    slug: `google-${row.external_id.slice(0, 48)}`,
+    short_description:
+      row.short_description ||
+      `Discovered pet-friendly event in ${countyLabel}, PA.`,
+    description: row.short_description,
+    event_type: GOOGLE_DISCOVERY_EVENT_TYPE,
+    categories: ["Community"],
+    image_original_url: row.image_url,
+    image_hero_url: row.image_url,
+    image_card_url: row.image_url,
+    image_mobile_url: row.image_url,
+    social_square_url: null,
+    social_story_url: null,
+    social_landscape_url: null,
+    image_storage_bucket: null,
+    image_storage_path: null,
+    start_at: row.start_at,
+    end_at: row.end_at,
+    timezone: row.timezone || "America/New_York",
+    venue_name: row.venue_name,
+    address_line_1: row.address_line,
+    address_line_2: null,
+    city: row.city,
+    state: row.state || "PA",
+    postal_code: null,
+    country: "US",
+    latitude: null,
+    longitude: null,
+    pet_friendly: row.pet_friendly,
+    family_friendly: true,
+    outdoor: true,
+    is_free: row.is_free,
+    registration_required: false,
+    ticket_url: null,
+    event_url: row.event_url,
+    contact_email: null,
+    status: "published",
+    featured_status: "homepage",
+    featured_priority: row.county === "bucks" ? 80 : 70,
+    featured_start_at: null,
+    featured_end_at: null,
+    featured_market_city: row.city,
+    featured_market_state: row.state || "PA",
+    moderation_note: null,
+    moderated_by: null,
+    moderated_at: null,
+    published_at: row.synced_at,
+    cancelled_at: null,
+    created_at: row.created_at || row.synced_at,
+    updated_at: row.updated_at || row.synced_at,
+    partners: {
+      id: "00000000-0000-0000-0000-000000000001",
+      business_name: `Google • ${countyLabel}`,
+      slug: null,
+      city: row.city,
+      state: row.state || "PA",
+      website: row.event_url,
+      email: null,
+    },
+  };
+}
+
+export async function fetchDiscoveredHomepageEvents(limit = 12) {
+  try {
+    const now = new Date().toISOString();
+    const { data, error } = await supabaseAdmin
+      .from("community_event_discoveries")
+      .select("*")
+      .gte("start_at", now)
+      .order("start_at", { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      console.warn("fetchDiscoveredHomepageEvents:", error.message);
+      return { events: [] as CommunityEventWithPartner[], lastSyncedAt: null };
+    }
+
+    const rows = (data || []) as CommunityEventDiscoveryRow[];
+    const lastSyncedAt =
+      rows.reduce<string | null>((latest, row) => {
+        if (!latest || row.synced_at > latest) return row.synced_at;
+        return latest;
+      }, null) ||
+      rows[0]?.synced_at ||
+      null;
+
+    return {
+      events: rows.map(mapDiscoveryToCommunityEvent),
+      lastSyncedAt,
+    };
+  } catch (error) {
+    console.warn("fetchDiscoveredHomepageEvents crashed:", error);
+    return { events: [] as CommunityEventWithPartner[], lastSyncedAt: null };
+  }
+}

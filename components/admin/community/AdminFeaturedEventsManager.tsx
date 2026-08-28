@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useMemo, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Star } from "lucide-react";
+import { ArrowDown, ArrowUp, RefreshCw, Star } from "lucide-react";
 import HomepageEventsSection from "@/components/community/HomepageEventsSection";
 import { saveCommunityEventFeaturedSettings } from "@/app/admin/community/events/actions";
 import {
@@ -33,6 +33,8 @@ export default function AdminFeaturedEventsManager({
   const [pending, startTransition] = useTransition();
   const [previewCity, setPreviewCity] = useState("");
   const [previewState, setPreviewState] = useState("");
+  const [syncMessage, setSyncMessage] = useState("");
+  const [syncPending, startSync] = useTransition();
 
   const previewFeatured = useMemo(() => {
     const filtered = rows.filter((event) => {
@@ -78,6 +80,42 @@ export default function AdminFeaturedEventsManager({
     });
   }
 
+  function syncGoogleDiscoveries() {
+    startSync(async () => {
+      setSyncMessage("");
+      try {
+        const response = await fetch("/api/admin/community/events/sync-discoveries", {
+          method: "POST",
+        });
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          upserted?: number;
+          skipped?: boolean;
+          error?: string;
+          errors?: string[];
+        };
+
+        if (!response.ok || !payload.ok) {
+          setSyncMessage(
+            payload.error ||
+              payload.errors?.join(" ") ||
+              "Google sync failed. Add SERPAPI_API_KEY in Vercel env.",
+          );
+          return;
+        }
+
+        if (payload.skipped) {
+          setSyncMessage("Google sync skipped — SERPAPI_API_KEY is not configured yet.");
+          return;
+        }
+
+        setSyncMessage(`Synced ${payload.upserted || 0} Google pet events for Bucks & Montgomery County.`);
+      } catch {
+        setSyncMessage("Google sync failed.");
+      }
+    });
+  }
+
   function saveRow(event: CommunityEventWithPartner) {
     startTransition(async () => {
       const result = await saveCommunityEventFeaturedSettings({
@@ -108,6 +146,31 @@ export default function AdminFeaturedEventsManager({
     <div className="space-y-8">
       <div className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
         <div className="space-y-4">
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Google daily sync
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-600">
+                  Pull pet events for Bucks & Montgomery County into homepage previews.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={syncGoogleDiscoveries}
+                disabled={syncPending}
+                className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black text-white disabled:opacity-60"
+              >
+                <RefreshCw className={`h-4 w-4 ${syncPending ? "animate-spin" : ""}`} />
+                Sync Google now
+              </button>
+            </div>
+            {syncMessage ? (
+              <p className="mt-3 text-xs font-semibold text-emerald-800">{syncMessage}</p>
+            ) : null}
+          </div>
+
           <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
               Preview market

@@ -10,12 +10,16 @@ import {
   saveCommunityLocationPreference,
 } from "@/lib/community/location-preference";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
+import type { EventsBannerSource } from "@/components/community/UpcomingEventsBanner";
 
 type FeaturedPayload = {
   featured: CommunityEventWithPartner | null;
   upcoming: CommunityEventWithPartner[];
+  bannerEvents?: CommunityEventWithPartner[];
   locationLabel?: string;
   previewMode?: boolean;
+  source?: EventsBannerSource;
+  lastSyncedAt?: string | null;
 };
 
 export default function HomepageEventsSectionClient() {
@@ -70,17 +74,34 @@ export default function HomepageEventsSectionClient() {
     return null;
   }
 
-  const hasLiveEvents = Boolean(data.featured) || data.upcoming.length > 0;
-  const payload = hasLiveEvents
-    ? data
-    : getHomepageDemoEvents(data.locationLabel);
+  const events =
+    data.bannerEvents ||
+    (data.featured ? [data.featured, ...data.upcoming] : data.upcoming);
+
+  if (!events.length) {
+    const demo = getHomepageDemoEvents(data.locationLabel);
+    return (
+      <HomepageEventsSection
+        featured={demo.featured}
+        upcoming={demo.upcoming}
+        bannerEvents={
+          demo.featured ? [demo.featured, ...demo.upcoming] : demo.upcoming
+        }
+        previewMode
+        source="demo"
+      />
+    );
+  }
 
   return (
     <HomepageEventsSection
-      featured={payload.featured}
-      upcoming={payload.upcoming}
-      locationLabel={payload.locationLabel}
-      previewMode={payload.previewMode}
+      featured={data.featured}
+      upcoming={data.upcoming}
+      bannerEvents={events}
+      locationLabel={data.locationLabel}
+      previewMode={Boolean(data.previewMode)}
+      source={data.source || "live"}
+      lastSyncedAt={data.lastSyncedAt}
     />
   );
 }
