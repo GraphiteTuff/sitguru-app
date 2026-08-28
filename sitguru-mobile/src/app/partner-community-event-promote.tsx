@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 
+import PartnerEventMessageButton from "@/components/community/PartnerEventMessageButton";
 import SitGuruScreen from "@/components/SitGuruScreen";
 import { AppFonts } from "@/constants/fonts";
 import { fetchPartnerEvent } from "@/hooks/data/usePartnerCommunityEvents";
@@ -112,6 +113,8 @@ export default function PartnerCommunityEventPromoteScreen() {
           view and share.
         </Text>
       </View>
+
+      <PartnerEventMessageButton eventId={eventId} eventTitle={title || "Event"} />
 
       <Pressable style={styles.primaryButton} onPress={() => void shareEvent()}>
         <Share2 color="#fff" size={18} />

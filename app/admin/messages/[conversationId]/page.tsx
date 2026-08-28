@@ -36,6 +36,7 @@ type ConversationRow = {
   customer_id?: string | null;
   guru_id?: string | null;
   booking_id?: string | null;
+  community_event_id?: string | null;
   started_by_user_id?: string | null;
   subject?: string | null;
   status?: string | null;
@@ -1425,6 +1426,24 @@ export default async function AdminMessageThreadPage({
   const participantRows = (participants || []) as ParticipantRow[];
   const messageRows = (messages || []) as MessageRow[];
 
+  let linkedCommunityEvent: { id: string; title: string; slug: string } | null = null;
+
+  if (conversation.community_event_id) {
+    const { data: linkedEvent } = await supabaseAdmin
+      .from("community_events")
+      .select("id, title, slug")
+      .eq("id", conversation.community_event_id)
+      .maybeSingle();
+
+    if (linkedEvent?.id) {
+      linkedCommunityEvent = {
+        id: String(linkedEvent.id),
+        title: safeString(linkedEvent.title) || "Community Event",
+        slug: safeString(linkedEvent.slug),
+      };
+    }
+  }
+
   const profileIds = Array.from(
     new Set(
       [
@@ -1541,7 +1560,9 @@ export default async function AdminMessageThreadPage({
   const replyRecipientFallback = getReplyRecipientFallbackFromMessages(messageRows);
   const unreadCount = messageRows.filter(isUnreadMessage).length;
   const threadType =
-    participantCards.some((participant) => participant.role === "ambassador") &&
+    linkedCommunityEvent
+      ? "Community Event"
+      : participantCards.some((participant) => participant.role === "ambassador") &&
     participantCards.some((participant) => participant.role === "admin")
       ? "Ambassador → Admin"
       : participantCards.some((participant) => participant.role === "guru") &&
@@ -1599,6 +1620,28 @@ export default async function AdminMessageThreadPage({
             </div>
           </div>
         </section>
+
+        {linkedCommunityEvent ? (
+          <section className="rounded-[24px] border border-teal-200 bg-teal-50 px-5 py-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-teal-800">
+              Linked Community Event
+            </p>
+            <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-lg font-black text-teal-950">{linkedCommunityEvent.title}</p>
+                <p className="text-sm font-semibold text-teal-900/80">
+                  Partner coordination thread for this event listing.
+                </p>
+              </div>
+              <Link
+                href={`/admin/community/events/${linkedCommunityEvent.id}`}
+                className="inline-flex min-h-11 items-center rounded-2xl bg-teal-800 px-4 text-sm font-black text-white"
+              >
+                Open event dashboard
+              </Link>
+            </div>
+          </section>
+        ) : null}
 
         <DeliveryBanner
           sent={resolvedSearchParams.sent}

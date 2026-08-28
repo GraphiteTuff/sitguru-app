@@ -80,6 +80,7 @@ type ConversationRow = {
   customer_id?: string | null;
   guru_id?: string | null;
   booking_id?: string | null;
+  community_event_id?: string | null;
   started_by_user_id?: string | null;
   subject?: string | null;
   status?: string | null;
@@ -203,7 +204,7 @@ type AdminThreadCard = {
   subject: string;
   preview: string;
   href: string;
-  type: "guru-customer" | "guru-admin" | "customer-admin" | "ambassador-admin" | "homepage-visitor" | "internal" | "general";
+  type: "guru-customer" | "guru-admin" | "customer-admin" | "ambassador-admin" | "homepage-visitor" | "event-admin" | "internal" | "general";
   inquiryType: InquiryKey;
   inquiryLabel: string;
   lastActivity: string | null;
@@ -224,6 +225,8 @@ type AdminThreadCard = {
   status: string;
   messageCount: number;
   topic: string;
+  communityEventId?: string | null;
+  communityEventTitle?: string | null;
 };
 
 type SafeAdminQueryResponse = {
@@ -274,6 +277,11 @@ const filterLinks = [
     key: "ambassador-admin",
     label: "Ambassador ↔ Admin",
     href: "/admin/messages?filter=ambassador-admin",
+  },
+  {
+    key: "event-admin",
+    label: "Community Events",
+    href: "/admin/messages?filter=event-admin",
   },
   {
     key: "homepage-visitor",
@@ -954,7 +962,9 @@ function classifyInquiryType(
     search.includes("referral") ||
     search.includes("campaign") ||
     search.includes("reward") ||
-    search.includes("network program")
+    search.includes("network program") ||
+    search.includes("community_event") ||
+    search.includes("community event")
   ) {
     return "partner";
   }
@@ -1037,6 +1047,7 @@ function getThreadTypeLabel(type: AdminThreadCard["type"]) {
   if (type === "guru-customer") return "Guru ↔ Pet Parent";
   if (type === "customer-admin") return "Pet Parent ↔ Admin";
   if (type === "ambassador-admin") return "Ambassador ↔ Admin";
+  if (type === "event-admin") return "Community Event";
   if (type === "homepage-visitor") return "Homepage Visitor";
   return "General";
 }
@@ -1060,6 +1071,10 @@ function getThreadTypeClasses(type: AdminThreadCard["type"]) {
 
   if (type === "ambassador-admin") {
     return "border-cyan-200 bg-cyan-100 text-cyan-900";
+  }
+
+  if (type === "event-admin") {
+    return "border-teal-200 bg-teal-100 text-teal-900";
   }
 
   if (type === "homepage-visitor") {
@@ -1094,6 +1109,7 @@ function getThreadKeyFromMessage(message: MessageRow) {
 function buildThreadTypeChart(threads: AdminThreadCard[]) {
   const types: Array<AdminThreadCard["type"]> = [
     "internal",
+    "event-admin",
     "guru-customer",
     "guru-admin",
     "customer-admin",
@@ -3018,6 +3034,12 @@ function MessageBubblePreview({ thread }: { thread: AdminThreadCard }) {
               {thread.inquiryLabel}
             </span>
 
+            {thread.communityEventTitle ? (
+              <span className="inline-flex rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-black text-teal-900">
+                {thread.communityEventTitle}
+              </span>
+            ) : null}
+
             {thread.topic ? (
               <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
                 {thread.topic}
@@ -3344,6 +3366,37 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
     profileMap.set(adminProfile.id, adminProfile);
   }
 
+  const communityEventIds = Array.from(
+    new Set(
+      safeConversations
+        .map((conversation) => asString(conversation.community_event_id))
+        .filter(Boolean),
+    ),
+  );
+
+  const communityEventMap = new Map<string, { title: string; slug: string }>();
+
+  if (communityEventIds.length > 0) {
+    const eventsResult = await safeAdminQuery(
+      supabaseAdmin
+        .from("community_events")
+        .select("id, title, slug")
+        .in("id", communityEventIds),
+      "community_events_for_threads",
+    );
+
+    ((eventsResult.data || []) as Array<{ id?: string; title?: string; slug?: string }>).forEach(
+      (event) => {
+        const id = asString(event.id);
+        if (!id) return;
+        communityEventMap.set(id, {
+          title: asString(event.title) || "Community Event",
+          slug: asString(event.slug),
+        });
+      },
+    );
+  }
+
   const allThreads: AdminThreadCard[] = allThreadKeys.map((threadKey) => {
     const conversation = conversationMap.get(threadKey) || null;
     const messages = (threadMessageMap.get(threadKey) || []).sort((a, b) => {
@@ -3483,10 +3536,19 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
           )?.recipient_email_snapshot,
       );
     const subject = conversation?.subject || (isHomepageThread ? "Homepage Messenger" : "SitGuru Message Thread");
+    const communityEventId = asString(conversation?.community_event_id) || "";
+    const communityEventTitle = communityEventId
+      ? communityEventMap.get(communityEventId)?.title || null
+      : null;
 
     let type: AdminThreadCard["type"] = "general";
 
-    if (isHomepageThread) {
+    if (
+      normalizedTopic.includes("community_event") ||
+      communityEventId
+    ) {
+      type = "event-admin";
+    } else if (isHomepageThread) {
       type = "homepage-visitor";
     } else if (
       normalizedTopic.includes("internal") ||
@@ -3604,6 +3666,8 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       status,
       messageCount: messages.length,
       topic,
+      communityEventId: communityEventId || null,
+      communityEventTitle,
     };
   });
 
@@ -3621,7 +3685,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
       if (activeFilter === "read") return thread.unreadCount === 0;
       if (activeFilter === "escalations") return isEscalationThread(thread);
       if (
-        ["internal", "guru-customer", "guru-admin", "customer-admin", "ambassador-admin", "homepage-visitor", "general"].includes(
+        ["internal", "event-admin", "guru-customer", "guru-admin", "customer-admin", "ambassador-admin", "homepage-visitor", "general"].includes(
           activeFilter,
         )
       ) {
@@ -3648,6 +3712,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
         thread.inquiryLabel,
         thread.status,
         thread.topic,
+        thread.communityEventTitle,
       ]
         .filter(Boolean)
         .join(" ")

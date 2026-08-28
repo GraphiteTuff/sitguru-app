@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import AdminCommunityEventsClient from "@/components/admin/community/AdminCommunityEventsClient";
 import { fetchAdminEvents } from "@/lib/community/queries";
+import { countUnreadEventThreadsForAdmin } from "@/lib/messaging/event-conversation-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,8 @@ export default async function AdminCommunityEventsPage({ searchParams }: PagePro
     total: events.length,
   };
 
+  const unreadEventMessages = await countUnreadEventThreadsForAdmin();
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -69,6 +72,12 @@ export default async function AdminCommunityEventsPage({ searchParams }: PagePro
             className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-white px-5 text-sm font-black text-emerald-800"
           >
             Featured manager
+          </Link>
+          <Link
+            href="/admin/messages?filter=event-admin"
+            className="inline-flex min-h-11 items-center rounded-2xl border border-teal-200 bg-teal-50 px-5 text-sm font-black text-teal-900"
+          >
+            Event messages{unreadEventMessages ? ` (${unreadEventMessages})` : ""}
           </Link>
         </div>
       </div>

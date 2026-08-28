@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 
+import PartnerEventMessageButton from "@/components/community/PartnerEventMessageButton";
 import SitGuruScreen from "@/components/SitGuruScreen";
 import { AppFonts } from "@/constants/fonts";
 import {
@@ -351,6 +352,7 @@ export default function PartnerCommunityEventEditScreen() {
 
       {!isCreate ? (
         <>
+          <PartnerEventMessageButton eventId={eventId} eventTitle={form.title || "Event"} />
           <Pressable
             style={styles.secondaryButton}
             disabled={saving || status === "pending_review"}
