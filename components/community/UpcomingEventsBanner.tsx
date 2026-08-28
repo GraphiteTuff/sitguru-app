@@ -202,14 +202,14 @@ function DiscoveryCaptureSheet({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/45 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 p-4 pb-28 sm:pb-20"
       role="dialog"
       aria-modal="true"
       aria-labelledby="discovery-capture-title"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+        className="w-full max-w-md -translate-y-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl sm:-translate-y-8"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
