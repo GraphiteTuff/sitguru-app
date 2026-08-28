@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { CalendarDays, MapPin, PawPrint, Search, Ticket } from "lucide-react";
 import EventCard from "@/components/community/EventCard";
+import FeaturedEventActions from "@/components/community/FeaturedEventActions";
 import {
   formatEventDateRange,
   formatEventLocationInline,
@@ -98,26 +99,29 @@ function FeaturedEventHero({ event }: { event: CommunityEventWithPartner }) {
           </div>
         </div>
 
-        <div className="flex flex-col justify-center gap-3 border-t border-slate-100 p-6 sm:p-8 lg:border-l lg:border-t-0">
-          <Link
-            href={href}
-            className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800"
-          >
-            View Event Details
-          </Link>
-          <Link
-            href={`/search?city=${encodeURIComponent(event.city || "")}&state=${encodeURIComponent(event.state || "")}`}
-            className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-900 transition hover:bg-slate-50"
-          >
-            Meet Local Gurus
-          </Link>
-          <Link
-            href={`${href}#share`}
-            className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-black text-emerald-900 transition hover:bg-emerald-100"
-          >
-            Share Event
-          </Link>
-        </div>
+        <FeaturedEventActions
+          event={{
+            id: event.id,
+            title: event.title,
+            slug: event.slug,
+            startAt: event.start_at,
+            endAt: event.end_at,
+            timezone: event.timezone,
+            city: event.city,
+            state: event.state,
+            shortDescription: event.short_description,
+            partnerName,
+            imageUrl: imageUrl || undefined,
+            social_square_url: event.social_square_url,
+            social_story_url: event.social_story_url,
+            social_landscape_url: event.social_landscape_url,
+            image_hero_url: event.image_hero_url,
+            image_card_url: event.image_card_url,
+            image_original_url: event.image_original_url,
+          }}
+          searchCity={event.city || ""}
+          searchState={event.state || ""}
+        />
       </div>
     </div>
   );

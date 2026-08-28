@@ -174,7 +174,7 @@ export default function PartnerEventsListClient({
                       </Link>
                     ) : null}
                     <Link
-                      href={`/partners/dashboard/community/events/${event.id}/edit?promote=1`}
+                      href={`/partners/dashboard/community/events/${event.id}/promote`}
                       className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black"
                     >
                       <Share2 className="h-4 w-4" />

@@ -20,6 +20,23 @@ export function buildEventShareCaption(
   return `Join us for ${event.title} on ${dateLabel} at ${location}. Hosted by ${host}. Bring your pup and meet local pet lovers, businesses, and members of the SitGuru community.`;
 }
 
+export function buildEventShareCaptionSocial(
+  event: Pick<
+    CommunityEventRow,
+    "title" | "start_at" | "end_at" | "timezone" | "city" | "state" | "short_description"
+  >,
+) {
+  const { compactDate } = formatEventDateRange(event.start_at, event.end_at, event.timezone);
+  const cityState = [event.city, event.state].filter(Boolean).join(", ");
+  const teaser = event.short_description?.trim();
+
+  if (teaser) {
+    return `Join us for ${event.title} on ${compactDate}${cityState ? ` in ${cityState}` : ""}! ${teaser}`;
+  }
+
+  return `Join us for ${event.title} on ${compactDate}${cityState ? ` in ${cityState}` : ""}! Bring your pup and meet local pet lovers on SitGuru.`;
+}
+
 export function buildEventShareMeta(
   event: Pick<
     CommunityEventRow,

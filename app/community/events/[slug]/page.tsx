@@ -9,7 +9,7 @@ import {
   PawPrint,
   Ticket,
 } from "lucide-react";
-import EventSharePanel from "@/components/community/EventSharePanel";
+import EventDetailShare from "@/components/community/EventDetailShare";
 import EventViewTracker from "@/components/community/EventViewTracker";
 import {
   formatEventDateRange,
@@ -214,21 +214,7 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          <div id="share" className="mt-8">
-            <EventSharePanel
-              title={event.title}
-              slug={event.slug}
-              startAt={event.start_at}
-              endAt={event.end_at}
-              timezone={event.timezone}
-              venueName={event.venue_name}
-              city={event.city}
-              state={event.state}
-              shortDescription={event.short_description}
-              partnerName={partnerName}
-              source="public_event_detail"
-            />
-          </div>
+          <EventDetailShare event={event} partnerName={partnerName} />
         </div>
       </section>
     </main>
