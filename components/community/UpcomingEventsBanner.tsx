@@ -202,7 +202,7 @@ function DiscoveryCaptureSheet({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-4 sm:items-center"
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/45 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:items-center sm:pb-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="discovery-capture-title"
