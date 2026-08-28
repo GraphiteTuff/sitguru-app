@@ -110,6 +110,10 @@ function isAudienceCompatiblePath(
   if (audience === "pet_parent") {
     return (
       path.startsWith("/customer/") ||
+      path.startsWith("/community/") ||
+      path === "/community" ||
+      path.startsWith("/search") ||
+      path.startsWith("/find-care") ||
       path === "/login/route?preferred=pet_parent"
     );
   }

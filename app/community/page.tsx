@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CalendarDays, MapPin, PawPrint, Users } from "lucide-react";
+import { CalendarDays, PawPrint, Users } from "lucide-react";
+import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +27,32 @@ export default function CommunityPage() {
             Discover events near you, meet local Gurus, and connect with SitGuru partners
             who love pets as much as you do.
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/signup?role=pet_parent&intent=pet_parent&next=%2Fcommunity%2Fevents&source=community_hub&campaign=community_hub_join&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_join"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-6 text-sm font-black text-emerald-900"
+            >
+              Join free as a Pet Parent
+            </Link>
+            <Link
+              href="/community/events"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-white/40 bg-transparent px-6 text-sm font-black !text-white"
+            >
+              Browse events
+            </Link>
+          </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <CommunityPetParentCta
+            nextPath="/community/events"
+            source="community_hub"
+            campaign="community_hub_cta"
+          />
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {communityLinks.map((item) => (
             <Link
@@ -65,9 +88,21 @@ export default function CommunityPage() {
 
         <div className="mt-10 grid gap-4 md:grid-cols-3">
           {[
-            { icon: CalendarDays, title: "Local events", text: "Find adoption days, social meetups, and partner-hosted gatherings." },
-            { icon: PawPrint, title: "Pet-friendly by design", text: "Filter for pet-friendly, free, and family-friendly experiences." },
-            { icon: Users, title: "Meet your community", text: "Connect with Gurus, partners, and pet parents near you." },
+            {
+              icon: CalendarDays,
+              title: "Local events",
+              text: "Find adoption days, social meetups, and partner-hosted gatherings.",
+            },
+            {
+              icon: PawPrint,
+              title: "Pet-friendly by design",
+              text: "Filter for pet-friendly, free, and family-friendly experiences.",
+            },
+            {
+              icon: Users,
+              title: "Meet your community",
+              text: "Connect with Gurus, partners, and pet parents near you.",
+            },
           ].map(({ icon: Icon, title, text }) => (
             <div key={title} className="rounded-3xl border border-slate-200 bg-white p-5">
               <Icon className="h-5 w-5 text-emerald-700" />

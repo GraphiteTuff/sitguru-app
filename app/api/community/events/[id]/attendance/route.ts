@@ -32,7 +32,11 @@ export async function GET(req: NextRequest, context: RouteContext) {
     : null;
 
   return NextResponse.json(
-    { counts, mine },
+    {
+      counts,
+      mine,
+      authenticated: Boolean(resolved?.user.id),
+    },
     { headers: mobileCorsHeaders(req) },
   );
 }

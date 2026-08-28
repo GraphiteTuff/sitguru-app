@@ -1,4 +1,5 @@
 import CommunityEventsExplorer from "@/components/community/CommunityEventsExplorer";
+import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
 import { fetchPublicEvents } from "@/lib/community/queries";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,12 @@ export default async function CommunityEventsPage({ searchParams }: PageProps) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-7xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
+        <CommunityPetParentCta
+          nextPath="/community/events"
+          source="community_events_list"
+          campaign="community_events_list_cta"
+        />
         <CommunityEventsExplorer
           events={events}
           initialFilters={{

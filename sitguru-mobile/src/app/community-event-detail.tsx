@@ -1,5 +1,6 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
-import { CalendarDays, ChevronLeft, MapPin, Share2, Users } from "lucide-react-native";
+import { CalendarDays, ChevronLeft, MapPin, PawPrint, Share2, Users } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,19 +21,19 @@ import {
 } from "@/hooks/data/useCommunityEvents";
 import { getSitGuruApiBaseUrl } from "@/lib/data/api";
 
+const PENDING_RSVP_KEY = "sitguru_pending_event_rsvp";
+
 export default function CommunityEventDetailScreen() {
-  const params = useLocalSearchParams<{ slug?: string }>();
+  const params = useLocalSearchParams<{ slug?: string; rsvp?: string }>();
   const slug = String(params.slug || "");
+  const autoRsvp = String(params.rsvp || "") === "1";
   const [event, setEvent] = useState<MobileCommunityEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [rsvpMessage, setRsvpMessage] = useState("");
   const [rsvpPending, setRsvpPending] = useState(false);
+  const [needsSignup, setNeedsSignup] = useState(false);
 
-  const {
-    counts,
-    going,
-    setAttendance,
-  } = useEventAttendance(event?.id);
+  const { counts, going, setAttendance, reload } = useEventAttendance(event?.id);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +54,38 @@ export default function CommunityEventDetailScreen() {
     };
   }, [slug]);
 
+  useEffect(() => {
+    if (!event?.id || !autoRsvp || going) return;
+
+    let cancelled = false;
+
+    async function finishRsvp() {
+      setRsvpPending(true);
+      const result = await setAttendance("going");
+      if (cancelled) return;
+      setRsvpPending(false);
+      if (!result.ok) {
+        if (result.error.toLowerCase().includes("sign in")) {
+          setNeedsSignup(true);
+          setRsvpMessage("Join free as a Pet Parent to finish saying you're going.");
+          return;
+        }
+        setRsvpMessage(result.error);
+        return;
+      }
+      await AsyncStorage.removeItem(PENDING_RSVP_KEY).catch(() => undefined);
+      setNeedsSignup(false);
+      setRsvpMessage("You're going! Welcome to the SitGuru community.");
+      void reload();
+    }
+
+    void finishRsvp();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [autoRsvp, event?.id, going, reload, setAttendance]);
+
   async function shareEvent() {
     if (!event) return;
 
@@ -67,6 +100,27 @@ export default function CommunityEventDetailScreen() {
     });
   }
 
+  async function goToPetParentSignup() {
+    if (!event) return;
+    await AsyncStorage.setItem(
+      PENDING_RSVP_KEY,
+      JSON.stringify({
+        eventId: event.id,
+        slug: event.slug,
+        savedAt: Date.now(),
+      }),
+    ).catch(() => undefined);
+
+    router.push({
+      pathname: "/signup",
+      params: {
+        intent: "pet-parent",
+        next: `/community-event-detail?slug=${encodeURIComponent(event.slug)}&rsvp=1`,
+        source: "community_event_im_going",
+      },
+    });
+  }
+
   async function toggleGoing() {
     setRsvpPending(true);
     setRsvpMessage("");
@@ -74,9 +128,15 @@ export default function CommunityEventDetailScreen() {
     const result = await setAttendance(next);
     setRsvpPending(false);
     if (!result.ok) {
+      if (result.error.toLowerCase().includes("sign in")) {
+        setNeedsSignup(true);
+        setRsvpMessage("Join free as a Pet Parent — then you're going in one tap.");
+        return;
+      }
       setRsvpMessage(result.error);
       return;
     }
+    setNeedsSignup(false);
     setRsvpMessage(next === "going" ? "You're going!" : "RSVP cancelled");
   }
 
@@ -146,16 +206,25 @@ export default function CommunityEventDetailScreen() {
         <Text style={styles.description}>{event.short_description}</Text>
       ) : null}
 
-      <Pressable
-        style={[styles.primaryButton, going ? styles.goingButton : null]}
-        disabled={rsvpPending}
-        onPress={() => void toggleGoing()}
-      >
-        <Users color={going ? "#0D5C3A" : "#fff"} size={18} />
-        <Text style={[styles.primaryButtonText, going ? styles.goingButtonText : null]}>
-          {rsvpPending ? "Saving…" : going ? "You're Going" : "I'm Going"}
-        </Text>
-      </Pressable>
+      {needsSignup ? (
+        <Pressable style={styles.primaryButton} onPress={() => void goToPetParentSignup()}>
+          <PawPrint color="#fff" size={18} />
+          <Text style={styles.primaryButtonText}>Join free & say I&apos;m Going</Text>
+        </Pressable>
+      ) : (
+        <Pressable
+          style={[styles.primaryButton, going ? styles.goingButton : null]}
+          disabled={rsvpPending}
+          onPress={() => void toggleGoing()}
+        >
+          <Users color={going ? "#0D5C3A" : "#fff"} size={18} />
+          <Text
+            style={[styles.primaryButtonText, going ? styles.goingButtonText : null]}
+          >
+            {rsvpPending ? "Saving…" : going ? "You're Going" : "I'm Going"}
+          </Text>
+        </Pressable>
+      )}
 
       <View style={styles.countRow}>
         <Text style={styles.countChip}>{counts.petParents} Pet Parents</Text>
@@ -164,6 +233,12 @@ export default function CommunityEventDetailScreen() {
       </View>
 
       {rsvpMessage ? <Text style={styles.rsvpMessage}>{rsvpMessage}</Text> : null}
+
+      <Pressable style={styles.joinHint} onPress={() => void goToPetParentSignup()}>
+        <Text style={styles.joinHintText}>
+          New here? Create a free Pet Parent account in minutes.
+        </Text>
+      </Pressable>
 
       <Pressable style={styles.shareButton} onPress={() => void shareEvent()}>
         <Share2 color="#0D5C3A" size={18} />
@@ -267,6 +342,14 @@ const styles = StyleSheet.create({
   },
   rsvpMessage: {
     fontFamily: AppFonts.bold,
+    color: "#0D5C3A",
+    fontSize: 13,
+  },
+  joinHint: {
+    paddingVertical: 4,
+  },
+  joinHintText: {
+    fontFamily: AppFonts.semiBold,
     color: "#0D5C3A",
     fontSize: 13,
   },

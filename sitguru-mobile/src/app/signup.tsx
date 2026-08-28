@@ -1,4 +1,4 @@
-import { Link, router } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import {
   ArrowRight,
   Check,
@@ -77,20 +77,41 @@ function normalizeSignupError(message: string) {
   return 'SitGuru could not create your account. Please try again.';
 }
 
+function resolveIntent(value?: string): SignupIntent {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, '-');
+  if (normalized === 'guru') return 'guru';
+  if (normalized === 'ambassador') return 'ambassador';
+  if (normalized === 'multiple' || normalized === 'both') return 'multiple';
+  return 'pet-parent';
+}
+
 export default function SignupScreen() {
   const isWebPreview = Platform.OS === 'web';
   const { signUp, loading, isConfigured, authError } = useAuth();
+  const params = useLocalSearchParams<{
+    intent?: string;
+    next?: string;
+    source?: string;
+  }>();
 
   const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [signupIntent, setSignupIntent] =
-    useState<SignupIntent>('pet-parent');
+  const [signupIntent, setSignupIntent] = useState<SignupIntent>(
+    resolveIntent(params.intent),
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const cleanEmail = email.trim().toLowerCase();
+  const returnNext = String(params.next || '').trim();
+  const fromCommunity =
+    returnNext.includes('community-event') ||
+    String(params.source || '').includes('community');
 
   const emailLooksValid = useMemo(
     () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail),
@@ -142,9 +163,28 @@ export default function SignupScreen() {
       return;
     }
 
-    setSuccess('Account created. Opening your SitGuru setup…');
+    setSuccess(
+      fromCommunity
+        ? 'Account created. Taking you back to finish saying I’m Going…'
+        : 'Account created. Opening your SitGuru setup…',
+    );
 
     setTimeout(() => {
+      if (returnNext.includes('community-event-detail')) {
+        try {
+          const url = new URL(returnNext, 'https://sitguru.local');
+          router.replace({
+            pathname: '/community-event-detail',
+            params: {
+              slug: url.searchParams.get('slug') || '',
+              rsvp: url.searchParams.get('rsvp') || '1',
+            },
+          });
+          return;
+        } catch {
+          // fall through
+        }
+      }
       router.replace('/role-selection');
     }, 350);
   }
@@ -213,11 +253,16 @@ export default function SignupScreen() {
                     <Text style={styles.eyebrowText}>Create account</Text>
                   </View>
 
-                  <Text style={styles.title}>Join SitGuru.</Text>
+                  <Text style={styles.title}>
+                    {fromCommunity
+                      ? 'Join free as a Pet Parent.'
+                      : 'Join SitGuru.'}
+                  </Text>
 
                   <Text style={styles.subtitle}>
-                    Create one account for pet care, Guru services,
-                    Ambassador referrals, or multiple roles.
+                    {fromCommunity
+                      ? 'Quick signup — then we’ll take you back to finish saying I’m Going.'
+                      : 'Create one account for pet care, Guru services, Ambassador referrals, or multiple roles.'}
                   </Text>
                 </View>
 

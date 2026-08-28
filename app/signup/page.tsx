@@ -291,6 +291,35 @@ function getRedirectPath(intent: AccountIntent) {
   return "/customer/dashboard";
 }
 
+function getSafeSignupNextPath(nextValue: string | null, intent: AccountIntent) {
+  if (!nextValue) return null;
+  if (intent !== "pet_parent" && intent !== "both") return null;
+
+  try {
+    const decoded = decodeURIComponent(nextValue).trim();
+    if (!decoded.startsWith("/")) return null;
+    if (decoded.startsWith("//")) return null;
+    if (decoded.includes("://")) return null;
+    if (decoded.startsWith("/admin")) return null;
+    if (decoded.startsWith("/auth/")) return null;
+    if (decoded.startsWith("/signup")) return null;
+
+    if (
+      decoded.startsWith("/community/") ||
+      decoded === "/community" ||
+      decoded.startsWith("/customer/") ||
+      decoded.startsWith("/search") ||
+      decoded.startsWith("/find-care")
+    ) {
+      return decoded;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function getIntentLabel(intent: AccountIntent) {
   if (intent === "guru") return "Future Guru";
   if (intent === "both") return "Pet Parent + Future Guru";
@@ -543,8 +572,14 @@ function SignupPageContent() {
     }
   }, [referralCode]);
 
-  const redirectPath = getRedirectPath(intent);
+  const redirectPath =
+    getSafeSignupNextPath(
+      searchParams.get("next") || searchParams.get("redirect"),
+      intent,
+    ) || getRedirectPath(intent);
   const intentLabel = getIntentLabel(intent);
+  const communitySignup =
+    redirectPath.startsWith("/community/") || redirectPath === "/community";
   const needsServiceArea =
     intent === "guru" || intent === "both" || intent === "ambassador";
   const emailSignupSource = signupTracking.source || "sitguru_signup_page";
@@ -1057,7 +1092,11 @@ function SignupPageContent() {
             </Link>
 
             <Link
-              href="/login"
+              href={
+                communitySignup
+                  ? `/login?role=pet_parent&next=${encodeURIComponent(redirectPath)}`
+                  : "/login"
+              }
               className="text-sm font-semibold text-[#0f7f60] transition hover:text-[#0b6049]"
             >
               Already have an account?
@@ -1068,17 +1107,21 @@ function SignupPageContent() {
             <div className="max-w-2xl">
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#0f7f60]/20 bg-white/70 px-4 py-2 text-sm font-semibold text-[#0f7f60] shadow-sm">
                 <Sparkles className="h-4 w-4" />
-                Join the trusted local pet care network
+                {communitySignup
+                  ? "Join free — then finish saying I'm Going"
+                  : "Join the trusted local pet care network"}
               </div>
 
               <h1 className="text-4xl font-black leading-tight tracking-tight text-[#1f1f1f] sm:text-5xl lg:text-6xl">
-                Create your SitGuru account in minutes.
+                {communitySignup
+                  ? "Create your free Pet Parent account in minutes."
+                  : "Create your SitGuru account in minutes."}
               </h1>
 
               <p className="mt-5 max-w-xl text-lg leading-8 text-[#5f5648]">
-                Sign up as a Pet Parent, Future Guru, or Ambassador. Referral
-                codes and tracked QR links stay connected while you finish your
-                profile from the dashboard.
+                {communitySignup
+                  ? "RSVP to community events, meet local Gurus, and keep pet care in one place. After you join, we'll take you right back to your event."
+                  : "Sign up as a Pet Parent, Future Guru, or Ambassador. Referral codes and tracked QR links stay connected while you finish your profile from the dashboard."}
               </p>
 
               <div className="mt-8 grid gap-3 sm:grid-cols-3">

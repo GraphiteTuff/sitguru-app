@@ -2,11 +2,17 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { Users } from "lucide-react";
+import { PawPrint, Users } from "lucide-react";
 import type { EventAttendanceCounts } from "@/lib/community/attendance";
+import {
+  buildCommunityPetParentLoginHref,
+  buildCommunityPetParentSignupHref,
+  savePendingEventRsvp,
+} from "@/lib/community/pet-parent-signup";
 
 type EventGoingButtonProps = {
   eventId: string;
+  eventSlug: string;
   initialCounts?: EventAttendanceCounts | null;
   compact?: boolean;
 };
@@ -20,6 +26,7 @@ const emptyCounts: EventAttendanceCounts = {
 
 export default function EventGoingButton({
   eventId,
+  eventSlug,
   initialCounts = null,
   compact = false,
 }: EventGoingButtonProps) {
@@ -31,6 +38,14 @@ export default function EventGoingButton({
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
 
+  const signupHref = buildCommunityPetParentSignupHref({
+    slug: eventSlug,
+    eventId,
+    source: "community_event_im_going",
+    campaign: "community_event_im_going",
+  });
+  const loginHref = buildCommunityPetParentLoginHref({ slug: eventSlug });
+
   useEffect(() => {
     async function load() {
       try {
@@ -38,13 +53,23 @@ export default function EventGoingButton({
         const payload = await response.json();
         if (payload.counts) setCounts(payload.counts);
         if (payload.mine?.status === "going") setGoing(true);
-        if (response.status === 401) setAuthed(false);
+        if (typeof payload.authenticated === "boolean") {
+          setAuthed(payload.authenticated);
+        }
       } catch {
         // optional
       }
     }
     void load();
   }, [eventId]);
+
+  function rememberPending() {
+    savePendingEventRsvp({
+      eventId,
+      slug: eventSlug,
+      savedAt: Date.now(),
+    });
+  }
 
   function toggle() {
     startTransition(async () => {
@@ -57,7 +82,8 @@ export default function EventGoingButton({
 
       if (response.status === 401) {
         setAuthed(false);
-        setMessage("Sign in to say you're going.");
+        rememberPending();
+        setMessage("Join free as a Pet Parent — then you're going in one tap.");
         return;
       }
 
@@ -68,6 +94,7 @@ export default function EventGoingButton({
       }
 
       setGoing(nextStatus === "going");
+      setAuthed(true);
       if (payload.counts) setCounts(payload.counts);
       setMessage(nextStatus === "going" ? "You're going!" : "RSVP cancelled");
     });
@@ -76,12 +103,26 @@ export default function EventGoingButton({
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       {!authed ? (
-        <Link
-          href="/login"
-          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-black text-emerald-900 sm:w-auto"
-        >
-          Sign in to say I'm Going
-        </Link>
+        <div className="space-y-2">
+          <Link
+            href={signupHref}
+            onClick={rememberPending}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800 sm:w-auto"
+          >
+            <PawPrint className="h-4 w-4" />
+            Join free &amp; say I&apos;m Going
+          </Link>
+          <p className="text-xs font-semibold text-slate-600">
+            Quick Pet Parent signup — we&apos;ll bring you right back to this event.
+          </p>
+          <Link
+            href={loginHref}
+            onClick={rememberPending}
+            className="inline-flex text-xs font-black text-emerald-800 underline-offset-2 hover:underline"
+          >
+            Already have an account? Log in
+          </Link>
+        </div>
       ) : (
         <button
           type="button"

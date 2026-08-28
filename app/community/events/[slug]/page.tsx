@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import {
   CalendarDays,
@@ -9,8 +10,10 @@ import {
   PawPrint,
   Ticket,
 } from "lucide-react";
+import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
 import EventDetailShare from "@/components/community/EventDetailShare";
 import EventGoingButton from "@/components/community/EventGoingButton";
+import EventRsvpReturnHandler from "@/components/community/EventRsvpReturnHandler";
 import EventViewTracker from "@/components/community/EventViewTracker";
 import { getEventAttendanceCounts } from "@/lib/community/attendance";
 import {
@@ -21,6 +24,7 @@ import {
 } from "@/lib/community/format";
 import { fetchPublicEventBySlug } from "@/lib/community/queries";
 import { buildEventShareMeta } from "@/lib/community/share";
+import { buildEventReturnPath } from "@/lib/community/pet-parent-signup";
 
 export const dynamic = "force-dynamic";
 
@@ -188,36 +192,50 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
                 </div>
               ) : null}
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <EventGoingButton
-                  eventId={event.id}
-                  initialCounts={attendanceCounts}
-                />
-                {event.ticket_url ? (
-                  <a
-                    href={event.ticket_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-900"
-                  >
-                    Register / Tickets
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                ) : null}
-                {partnerSlug ? (
+              <div className="flex flex-col gap-3">
+                <Suspense fallback={null}>
+                  <EventRsvpReturnHandler eventId={event.id} slug={event.slug} />
+                </Suspense>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <EventGoingButton
+                    eventId={event.id}
+                    eventSlug={event.slug}
+                    initialCounts={attendanceCounts}
+                  />
+                  {event.ticket_url ? (
+                    <a
+                      href={event.ticket_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-900"
+                    >
+                      Register / Tickets
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  ) : null}
+                  {partnerSlug ? (
+                    <Link
+                      href={`/p/${partnerSlug}`}
+                      className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-900"
+                    >
+                      View Partner
+                    </Link>
+                  ) : null}
                   <Link
-                    href={`/p/${partnerSlug}`}
+                    href={`/search?city=${encodeURIComponent(event.city || "")}&state=${encodeURIComponent(event.state || "")}`}
                     className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-900"
                   >
-                    View Partner
+                    Meet Local Gurus
                   </Link>
-                ) : null}
-                <Link
-                  href={`/search?city=${encodeURIComponent(event.city || "")}&state=${encodeURIComponent(event.state || "")}`}
-                  className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-900"
-                >
-                  Meet Local Gurus
-                </Link>
+                </div>
+
+                <CommunityPetParentCta
+                  compact
+                  nextPath={buildEventReturnPath(event.slug, { rsvp: true })}
+                  source="community_event_detail"
+                  campaign="community_event_detail_cta"
+                />
               </div>
             </div>
           </div>
