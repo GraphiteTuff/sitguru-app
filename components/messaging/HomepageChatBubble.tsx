@@ -16,8 +16,14 @@ import { SocialFollowPack } from "@/components/messaging/SocialFollowPack";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 import {
   parseHomepageChatContent,
+  type HomepageCtaContext,
   type HomepageCtaDef,
 } from "@/lib/chat/homepage-cta";
+import {
+  COMMUNITY_EVENT_FAQ_CHIPS,
+  isCommunityCompanionPath,
+} from "@/lib/ai/community-events-faqs";
+import { readStoredCommunityEventCompanion } from "@/components/community/CommunityEventCompanionSeed";
 import {
   SIMULATION_NAME_PROMPT,
   buildHomepageSimulationReply,
@@ -112,7 +118,20 @@ const AMBASSADOR_CHIPS = [
   },
 ] as const;
 
-type IntentChipTone = "care" | "provider" | "ambassador";
+const COMMUNITY_INTENT_CHIPS = [
+  ...COMMUNITY_EVENT_FAQ_CHIPS.map((chip) => ({
+    label: chip.label,
+    content: chip.question,
+    tone: "community" as const,
+  })),
+  {
+    label: ROGUE_BENEFITS_CHIP.label,
+    content: ROGUE_BENEFITS_CHIP.prompt,
+    tone: "community" as const,
+  },
+] as const;
+
+type IntentChipTone = "care" | "provider" | "ambassador" | "community";
 
 const ALL_INTENT_CHIPS: ReadonlyArray<{
   label: string;
@@ -247,13 +266,19 @@ function CtaActionButton({ cta }: { cta: HomepageCtaDef }) {
   );
 }
 
-function AssistantBubbleBody({ content }: { content: string }) {
+function AssistantBubbleBody({
+  content,
+  ctaContext,
+}: {
+  content: string;
+  ctaContext?: HomepageCtaContext;
+}) {
   let text = "";
   let ctas: HomepageCtaDef[] = [];
   let guruCards: ReturnType<typeof parseHomepageChatContent>["guruCards"] = [];
 
   try {
-    const parsed = parseHomepageChatContent(content);
+    const parsed = parseHomepageChatContent(content, ctaContext);
     text = parsed.text;
     ctas = parsed.ctas;
     guruCards = parsed.guruCards;
@@ -340,18 +365,36 @@ async function auditTranscriptToBackend(params: {
 
 export default function HomepageChatBubble() {
   const pathname = usePathname();
+  const isCommunityPage = isCommunityCompanionPath(pathname);
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const [clientFirstName, setClientFirstName] = useState("");
   const [awaitingName, setAwaitingName] = useState(false);
   const [userType, setUserType] = useState<RogueUserTypeLabel>("Guest Pet Parent");
+  const [eventCompanion, setEventCompanion] = useState(
+    () => readStoredCommunityEventCompanion(),
+  );
   const [activeCompanion] = useState<typeof ACTIVE_COMPANION>(ACTIVE_COMPANION);
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const clientFirstNameRef = useRef("");
   const userTypeRef = useRef<RogueUserTypeLabel>("Guest Pet Parent");
   const benefitsChip = getCompanionBenefitsChip(activeCompanion);
+
+  const ctaContext = useMemo<HomepageCtaContext>(
+    () => ({
+      pagePath: pathname || "/",
+      eventSlug: eventCompanion?.slug,
+      eventId: eventCompanion?.id,
+    }),
+    [eventCompanion?.id, eventCompanion?.slug, pathname],
+  );
+
+  const intentChips = useMemo(
+    () => (isCommunityPage ? COMMUNITY_INTENT_CHIPS : ALL_INTENT_CHIPS),
+    [isCommunityPage],
+  );
 
   const {
     messages,
@@ -421,6 +464,7 @@ export default function HomepageChatBubble() {
       (typeof window !== "undefined"
         ? `${window.location.pathname}${window.location.search}`
         : "/");
+    const storedEvent = readStoredCommunityEventCompanion();
     return {
       body: {
         channel: "HOMEPAGE_LEAD",
@@ -430,9 +474,22 @@ export default function HomepageChatBubble() {
         user_role: role,
         user_type: role,
         userRole: role,
+        ...(isCommunityCompanionPath(pagePath) && storedEvent
+          ? {
+              community_event_slug: storedEvent.slug,
+              community_event_id: storedEvent.id,
+              community_event_title: storedEvent.title,
+              community_event_city: storedEvent.city || undefined,
+              community_event_state: storedEvent.state || undefined,
+            }
+          : {}),
       },
     };
   }
+
+  useEffect(() => {
+    setEventCompanion(readStoredCommunityEventCompanion());
+  }, [pathname]);
 
   useEffect(() => {
     setMounted(true);
@@ -736,8 +793,9 @@ export default function HomepageChatBubble() {
         >
           <span className="homepage-chat-tip__pulse" aria-hidden />
           <span className="homepage-chat-tip__text">
-            Hi! I&apos;m Rogue 🦴 Tap to chat — I&apos;m your adorable assistant
-            for the SitGuru journey!
+            {isCommunityPage
+              ? "Woof! I'm Rogue 🦴 — ask me about events, RSVP, or joining SitGuru!"
+              : "Hi! I'm Rogue 🦴 Tap to chat — I'm your adorable assistant for the SitGuru journey!"}
           </span>
         </button>
       ) : null}
@@ -761,8 +819,9 @@ export default function HomepageChatBubble() {
                   Rogue, Your Chief Treat Officer 🦴
                 </p>
                 <p className="homepage-chat-panel__sub">
-                  I&apos;m your adorable assistant here during your SitGuru
-                  journey 🐾
+                  {isCommunityPage
+                    ? "Community Events expert — RSVP help & free signup paths 🐾"
+                    : "I'm your adorable assistant here during your SitGuru journey 🐾"}
                 </p>
               </div>
             </div>
@@ -800,7 +859,10 @@ export default function HomepageChatBubble() {
                 <AssistantRow key={m.id}>
                   <div className="homepage-chat-bubble homepage-chat-bubble--ai">
                     <SafeAssistantBubble contentHint={m.content}>
-                      <AssistantBubbleBody content={m.content} />
+                      <AssistantBubbleBody
+                        content={m.content}
+                        ctaContext={ctaContext}
+                      />
                     </SafeAssistantBubble>
                   </div>
                 </AssistantRow>
@@ -827,7 +889,7 @@ export default function HomepageChatBubble() {
               role="toolbar"
               aria-label="Quick intents"
             >
-              {ALL_INTENT_CHIPS.map((chip) => (
+              {intentChips.map((chip) => (
                 <button
                   key={`${chip.tone}-${chip.label}`}
                   type="button"
@@ -852,7 +914,9 @@ export default function HomepageChatBubble() {
               placeholder={
                 awaitingName
                   ? "Type the name you go by…"
-                  : "Ask about care, Gurus, or joining the pack…"
+                  : isCommunityPage
+                    ? "Ask about events, I'm Going, or joining as Pet Parent / Guru / Ambassador…"
+                    : "Ask about care, Gurus, or joining the pack…"
               }
               onChange={handleInputChange}
               onKeyDown={(e) => {

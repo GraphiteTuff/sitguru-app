@@ -3,9 +3,14 @@
  * while keeping SitGuru knowledge, name safety, and CTA markers.
  */
 
-import { HOMEPAGE_CTO_VOICE_RULES } from "@/lib/chat/homepage-cta";
+import { HOMEPAGE_CTO_VOICE_RULES, COMMUNITY_EVENTS_ROGUE_VOICE_RULES } from "@/lib/chat/homepage-cta";
 import { buildRogueKnowledgeBlock } from "@/lib/chat/rogue-knowledge";
 import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
+import {
+  buildCommunityEventsFaqSnapshot,
+  isCommunityCompanionPath,
+  parseCommunityEventSlugFromPath,
+} from "@/lib/ai/community-events-faqs";
 
 /** Core Rogue behavior rules (mascot + conversion engine). */
 export const ROGUE_CORE_SYSTEM_PROMPT = `
@@ -53,6 +58,14 @@ export function buildRogueSystemPrompt(opts: {
   userRole?: string | null;
   lastUserText?: string;
   walkId?: string;
+  pagePath?: string;
+  communityEvent?: {
+    slug?: string;
+    title?: string;
+    id?: string;
+    city?: string;
+    state?: string;
+  };
 }): string {
   let systemPrompt = ROGUE_CORE_SYSTEM_PROMPT;
 
@@ -79,6 +92,24 @@ If they say "Hi Rogue", they greeted YOU — reply warmly, then ask what to call
   }
 
   systemPrompt += `\n\n${HOMEPAGE_CTO_VOICE_RULES}`;
+
+  const pagePath = String(opts.pagePath || "").trim();
+  if (isCommunityCompanionPath(pagePath)) {
+    const slug =
+      opts.communityEvent?.slug ||
+      parseCommunityEventSlugFromPath(pagePath) ||
+      undefined;
+
+    systemPrompt += `\n\n${COMMUNITY_EVENTS_ROGUE_VOICE_RULES}`;
+    systemPrompt += `\n\n${buildCommunityEventsFaqSnapshot({
+      slug,
+      eventId: opts.communityEvent?.id,
+      title: opts.communityEvent?.title,
+      city: opts.communityEvent?.city,
+      state: opts.communityEvent?.state,
+    })}`;
+  }
+
   systemPrompt += `\n\n${buildRogueKnowledgeBlock({
     lastUserText: opts.lastUserText,
     maxChars: 18000,

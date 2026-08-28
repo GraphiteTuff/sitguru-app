@@ -2,13 +2,21 @@ import {
   extractGuruCardsFromText,
   type GuruChatSnapshot,
 } from "@/lib/gurus/guru-chat-snapshot";
+import {
+  buildCommunityEventSignupHref,
+  buildCommunityJoinHref,
+} from "@/lib/community/pet-parent-signup";
+import { isCommunityCompanionPath } from "@/lib/ai/community-events-faqs";
 
 export type HomepageCtaId =
   | "guru"
   | "parent"
   | "ambassador"
   | "ambassador_video"
-  | "social";
+  | "social"
+  | "community_parent"
+  | "community_guru"
+  | "community_ambassador";
 
 export type HomepageCtaDef = {
   id: HomepageCtaId;
@@ -18,6 +26,12 @@ export type HomepageCtaDef = {
   patterns: RegExp[];
   /** When true, AssistantBubbleBody renders SocialFollowPack instead of a single Link */
   socialPack?: boolean;
+};
+
+export type HomepageCtaContext = {
+  pagePath?: string;
+  eventSlug?: string;
+  eventId?: string;
 };
 
 export const HOMEPAGE_CTA_DEFS: readonly HomepageCtaDef[] = [
@@ -79,6 +93,70 @@ export const HOMEPAGE_CTA_DEFS: readonly HomepageCtaDef[] = [
   },
 ] as const;
 
+function buildCommunityCtaDefs(context?: HomepageCtaContext): HomepageCtaDef[] {
+  const slug = context?.eventSlug;
+  const eventId = context?.eventId;
+
+  return [
+    {
+      id: "community_parent",
+      href: slug
+        ? buildCommunityEventSignupHref({
+            slug,
+            eventId,
+            role: "pet_parent",
+            campaign: "community_rogue_companion",
+          })
+        : buildCommunityJoinHref({
+            role: "pet_parent",
+            campaign: "community_rogue_companion",
+          }),
+      label: "Join free as Pet Parent",
+      patterns: [/\[\[cta:community_parent\]\]/gi],
+    },
+    {
+      id: "community_guru",
+      href: slug
+        ? buildCommunityEventSignupHref({
+            slug,
+            eventId,
+            role: "guru",
+            campaign: "community_rogue_companion_guru",
+          })
+        : buildCommunityJoinHref({
+            role: "guru",
+            campaign: "community_rogue_companion_guru",
+          }),
+      label: "Join as Pet Guru",
+      patterns: [/\[\[cta:community_guru\]\]/gi],
+    },
+    {
+      id: "community_ambassador",
+      href: slug
+        ? buildCommunityEventSignupHref({
+            slug,
+            eventId,
+            role: "ambassador",
+            campaign: "community_rogue_companion_ambassador",
+          })
+        : buildCommunityJoinHref({
+            role: "ambassador",
+            campaign: "community_rogue_companion_ambassador",
+          }),
+      label: "Join as Ambassador",
+      patterns: [/\[\[cta:community_ambassador\]\]/gi],
+    },
+  ];
+}
+
+export function resolveHomepageCtaDefs(context?: HomepageCtaContext): HomepageCtaDef[] {
+  const defs: HomepageCtaDef[] = [...HOMEPAGE_CTA_DEFS];
+  if (isCommunityCompanionPath(context?.pagePath)) {
+    defs.push(...buildCommunityCtaDefs(context));
+  }
+  return defs;
+}
+
 export type ParsedHomepageChatContent = {
   text: string;
   ctas: HomepageCtaDef[];
@@ -90,18 +168,19 @@ export type ParsedHomepageChatContent = {
  */
 export function parseHomepageChatContent(
   raw: string,
+  context?: HomepageCtaContext,
 ): ParsedHomepageChatContent {
   const extracted = extractGuruCardsFromText(raw);
   let text = extracted.text;
   const guruCards = extracted.cards;
   const found = new Map<HomepageCtaId, HomepageCtaDef>();
+  const defs = resolveHomepageCtaDefs(context);
 
-  for (const def of HOMEPAGE_CTA_DEFS) {
+  for (const def of defs) {
     for (const pattern of def.patterns) {
       if (pattern.test(text)) {
         found.set(def.id, def);
       }
-      // reset lastIndex for global regex reuse
       pattern.lastIndex = 0;
       text = text.replace(pattern, " ");
     }
@@ -115,10 +194,31 @@ export function parseHomepageChatContent(
 
   return {
     text,
-    ctas: HOMEPAGE_CTA_DEFS.filter((d) => found.has(d.id)),
+    ctas: defs.filter((d) => found.has(d.id)),
     guruCards,
   };
 }
+
+/** Community Events voice addendum when Rogue is mounted on /community/* */
+export const COMMUNITY_EVENTS_ROGUE_VOICE_RULES = `
+# COMMUNITY EVENTS MODE (when visitor is browsing SitGuru Community / Events)
+
+You are helping with **SitGuru Community Events** — local pet-friendly listings, I'm Going RSVPs, and pack meetups.
+
+PRIORITIES:
+1. Answer event FAQs accurately using the Community Events FAQ database when matched.
+2. Encourage **free signup** — Pet Parent (RSVP + care), Pet Guru (local presence), or Ambassador (grow the pack).
+3. Keep under 3 sentences unless quoting an exact FAQ answer.
+
+COMMUNITY CTA MARKERS (required when signup fits):
+- Pet Parent / RSVP / book care later → [[cta:community_parent]]
+- Pet Guru / sitter / walker / provider → [[cta:community_guru]]
+- Ambassador / community growth → [[cta:community_ambassador]]
+- Social / follow pack / event hype → [[cta:social]]
+
+When on a specific event page, reference the event naturally if context is provided.
+Never send users off-platform to RSVP — I'm Going stays on SitGuru.
+`.trim();
 
 /** Injected into the homepage lead Claude system prompt */
 export const HOMEPAGE_CTO_VOICE_RULES = `

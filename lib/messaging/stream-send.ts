@@ -17,6 +17,11 @@ import {
 import { buildHomepageSimulationReplyWithGurus } from "@/lib/chat/homepage-simulation-gurus";
 import { buildRogueSystemPrompt } from "@/lib/chat/rogue-system-prompt";
 import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
+import {
+  isCommunityCompanionPath,
+  matchCommunityEventsFaq,
+  parseCommunityEventSlugFromPath,
+} from "@/lib/ai/community-events-faqs";
 import { getSitGuruAiModel } from "@/lib/messaging/ai-model";
 
 function safeString(value: unknown) {
@@ -191,6 +196,11 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       companion?: string;
       pagePath?: string;
       page_path?: string;
+      community_event_slug?: string;
+      community_event_id?: string;
+      community_event_title?: string;
+      community_event_city?: string;
+      community_event_state?: string;
     };
 
     const messages = Array.isArray(body?.messages) ? body.messages : [];
@@ -275,11 +285,34 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       void recordChatInsight(lastUserText, insightChannel, "General Inquiry", insightMeta);
     }
 
+    const communityEventSlug =
+      safeString(body?.community_event_slug) ||
+      parseCommunityEventSlugFromPath(pagePath) ||
+      undefined;
+    const communityEvent = isCommunityCompanionPath(pagePath)
+      ? {
+          slug: communityEventSlug,
+          id: safeString(body?.community_event_id) || undefined,
+          title: safeString(body?.community_event_title) || undefined,
+          city: safeString(body?.community_event_city) || undefined,
+          state: safeString(body?.community_event_state) || undefined,
+        }
+      : undefined;
+
+    if (isCommunityCompanionPath(pagePath) && lastUserText) {
+      const faqHit = matchCommunityEventsFaq(lastUserText);
+      if (faqHit?.answer) {
+        return simulationDataStreamResponse(faqHit.answer);
+      }
+    }
+
     const systemPrompt = buildRogueSystemPrompt({
       clientFirstName,
       userRole: userTypeLabel,
       lastUserText,
       walkId: walkId || undefined,
+      pagePath,
+      communityEvent,
     });
 
     let result;

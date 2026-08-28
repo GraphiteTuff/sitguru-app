@@ -10,6 +10,7 @@ import {
   PawPrint,
   Ticket,
 } from "lucide-react";
+import CommunityEventCompanionSeed from "@/components/community/CommunityEventCompanionSeed";
 import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
 import EventDetailShare from "@/components/community/EventDetailShare";
 import EventGoingButton from "@/components/community/EventGoingButton";
@@ -85,6 +86,13 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-[#f8fcfd]">
       <EventViewTracker eventId={event.id} slug={event.slug} />
+      <CommunityEventCompanionSeed
+        id={event.id}
+        slug={event.slug}
+        title={event.title}
+        city={event.city}
+        state={event.state}
+      />
 
       <section className="border-b border-slate-100 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
