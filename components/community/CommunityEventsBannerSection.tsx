@@ -56,8 +56,8 @@ export default async function CommunityEventsBannerSection() {
       source={source}
       lastSyncedAt={discovered.lastSyncedAt}
       viewAllHref="/community/events"
-      eyebrow="Out with the pack"
-      title="Where good dogs gather."
+      eyebrow="Local pet life"
+      title="Where good pets gather."
     />
   );
 }
