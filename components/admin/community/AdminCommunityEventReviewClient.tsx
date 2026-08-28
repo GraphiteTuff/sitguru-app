@@ -5,7 +5,10 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { CalendarDays, MapPin, PawPrint } from "lucide-react";
-import { moderateCommunityEvent } from "@/app/admin/community/events/actions";
+import {
+  moderateCommunityEvent,
+  saveCommunityEventFeaturedSettings,
+} from "@/app/admin/community/events/actions";
 import EventSharePanel from "@/components/community/EventSharePanel";
 import {
   formatEventDateRange,
@@ -26,6 +29,12 @@ export default function AdminCommunityEventReviewClient({
   const [featuredPriority, setFeaturedPriority] = useState(String(event.featured_priority || 0));
   const [featuredMarketCity, setFeaturedMarketCity] = useState(event.featured_market_city || "");
   const [featuredMarketState, setFeaturedMarketState] = useState(event.featured_market_state || "");
+  const [featuredStartAt, setFeaturedStartAt] = useState(
+    event.featured_start_at ? new Date(event.featured_start_at).toISOString().slice(0, 16) : "",
+  );
+  const [featuredEndAt, setFeaturedEndAt] = useState(
+    event.featured_end_at ? new Date(event.featured_end_at).toISOString().slice(0, 16) : "",
+  );
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -52,6 +61,9 @@ export default function AdminCommunityEventReviewClient({
         featuredPriority: Number(featuredPriority) || 0,
         featuredMarketCity: featuredMarketCity || null,
         featuredMarketState: featuredMarketState || null,
+        featuredStartAt: featuredStartAt ? new Date(featuredStartAt).toISOString() : null,
+        featuredEndAt: featuredEndAt ? new Date(featuredEndAt).toISOString() : null,
+        publishSeries: true,
       });
 
       if (!result.ok) {
@@ -60,6 +72,28 @@ export default function AdminCommunityEventReviewClient({
       }
 
       setMessage(`Event ${action.replace(/_/g, " ")}`);
+      router.refresh();
+    });
+  }
+
+  function saveFeaturedOnly() {
+    startTransition(async () => {
+      const result = await saveCommunityEventFeaturedSettings({
+        eventId: event.id,
+        featuredStatus,
+        featuredPriority: Number(featuredPriority) || 0,
+        featuredStartAt: featuredStartAt ? new Date(featuredStartAt).toISOString() : null,
+        featuredEndAt: featuredEndAt ? new Date(featuredEndAt).toISOString() : null,
+        featuredMarketCity: featuredMarketCity || null,
+        featuredMarketState: featuredMarketState || null,
+      });
+
+      if (!result.ok) {
+        setMessage(result.error || "Featured save failed");
+        return;
+      }
+
+      setMessage("Featured settings saved");
       router.refresh();
     });
   }
@@ -82,6 +116,12 @@ export default function AdminCommunityEventReviewClient({
             View public page
           </Link>
         ) : null}
+        <Link
+          href={`/admin/community/events/${event.id}/edit`}
+          className="inline-flex min-h-11 items-center rounded-2xl bg-emerald-700 px-4 text-sm font-black text-white"
+        >
+          Edit event
+        </Link>
       </div>
 
       {message ? <p className="text-sm font-black text-emerald-800">{message}</p> : null}
@@ -224,6 +264,22 @@ export default function AdminCommunityEventReviewClient({
               </label>
               <div className="grid gap-3 sm:grid-cols-2">
                 <input
+                  type="datetime-local"
+                  value={featuredStartAt}
+                  onChange={(event) => setFeaturedStartAt(event.target.value)}
+                  className="min-h-11 rounded-2xl border border-slate-200 px-3 text-sm font-semibold"
+                  aria-label="Featured start"
+                />
+                <input
+                  type="datetime-local"
+                  value={featuredEndAt}
+                  onChange={(event) => setFeaturedEndAt(event.target.value)}
+                  className="min-h-11 rounded-2xl border border-slate-200 px-3 text-sm font-semibold"
+                  aria-label="Featured end"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <input
                   value={featuredMarketCity}
                   onChange={(event) => setFeaturedMarketCity(event.target.value)}
                   placeholder="Market city"
@@ -236,14 +292,28 @@ export default function AdminCommunityEventReviewClient({
                   className="min-h-11 rounded-2xl border border-slate-200 px-3 text-sm font-semibold"
                 />
               </div>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => runAction("publish")}
-                className="min-h-11 w-full rounded-2xl bg-emerald-700 px-4 text-sm font-black text-white disabled:opacity-60"
-              >
-                Save featured settings & publish
-              </button>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={saveFeaturedOnly}
+                  className="min-h-11 rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black text-emerald-900 disabled:opacity-60"
+                >
+                  Save featured only
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => runAction("publish")}
+                  className="min-h-11 rounded-2xl bg-emerald-700 px-4 text-sm font-black text-white disabled:opacity-60"
+                >
+                  Publish + series sync
+                </button>
+              </div>
+              <p className="text-xs font-semibold text-slate-500">
+                Publishing a series parent also publishes all child occurrences in reviewable
+                states.
+              </p>
             </div>
           </section>
         </div>

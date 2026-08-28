@@ -112,6 +112,19 @@ export default function PartnerCommunityEventsScreen() {
               "Location TBD"}
           </Text>
           <Text style={styles.status}>{event.status.replace(/_/g, " ")}</Text>
+          {event.status === "published" ? (
+            <Pressable
+              style={styles.promoteLink}
+              onPress={() =>
+                router.push({
+                  pathname: "/partner-community-event-promote",
+                  params: { id: event.id },
+                })
+              }
+            >
+              <Text style={styles.promoteLinkText}>Promote & stats</Text>
+            </Pressable>
+          ) : null}
         </Pressable>
       ))}
 
@@ -216,6 +229,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
+  },
+  promoteLink: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+  promoteLinkText: {
+    fontFamily: AppFonts.bold,
+    color: "#0D5C3A",
+    fontSize: 13,
   },
   empty: {
     fontFamily: AppFonts.semiBold,

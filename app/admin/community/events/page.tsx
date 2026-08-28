@@ -57,12 +57,20 @@ export default async function AdminCommunityEventsPage({ searchParams }: PagePro
           </p>
           <h1 className="text-3xl font-black tracking-tight text-slate-950">Events</h1>
         </div>
-        <Link
-          href="/admin/website"
-          className="text-sm font-black text-emerald-800 hover:underline"
-        >
-          Homepage manager →
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/community/events/new"
+            className="inline-flex min-h-11 items-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white"
+          >
+            Create event
+          </Link>
+          <Link
+            href="/admin/community/events/featured"
+            className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-white px-5 text-sm font-black text-emerald-800"
+          >
+            Featured manager
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

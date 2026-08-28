@@ -302,6 +302,17 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     if (isCommunityCompanionPath(pagePath) && lastUserText) {
       const faqHit = matchCommunityEventsFaq(lastUserText);
       if (faqHit?.answer) {
+        void supabaseAdmin.from("analytics_events").insert({
+          event_name: "community_rogue_faq",
+          event_type: "community",
+          source: "web_rogue_companion",
+          page_path: pagePath,
+          metadata: {
+            question: faqHit.question,
+            matched: true,
+            communityEventSlug: communityEventSlug || null,
+          },
+        });
         return simulationDataStreamResponse(faqHit.answer);
       }
     }

@@ -5,9 +5,21 @@ import {
   notifyPartnerChangesRequested,
   notifyPartnerEventPublished,
 } from "@/lib/community/event-notifications";
+import {
+  autosaveAdminCommunityEvent,
+  createAdminCommunityEvent,
+  createAdminEventSeries,
+  publishAdminCommunityEvent,
+  saveAdminFeaturedSettings,
+} from "@/lib/community/admin-event-mutations";
+import {
+  cancelRecurringSeriesChildren,
+  publishRecurringSeriesChildren,
+} from "@/lib/community/recurring";
 import { requireAdminApi } from "@/lib/admin/access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { CommunityEventStatus } from "@/lib/community/types";
+import type { CommunityEventStatus, CommunityEventDraftInput } from "@/lib/community/types";
+import type { RecurrenceRule } from "@/lib/community/recurring";
 import { revalidatePath } from "next/cache";
 
 type ModerationAction =
@@ -24,6 +36,131 @@ function cleanText(value: unknown, max = 2000) {
   return value.trim().slice(0, max);
 }
 
+function revalidateCommunityEventPaths(eventId: string, slug?: string) {
+  revalidatePath("/admin/community/events");
+  revalidatePath("/admin/community/events/featured");
+  revalidatePath(`/admin/community/events/${eventId}`);
+  revalidatePath(`/admin/community/events/${eventId}/edit`);
+  revalidatePath("/partners/dashboard/community/events");
+  revalidatePath("/community/events");
+  revalidatePath("/community");
+  revalidatePath("/");
+  if (slug) {
+    revalidatePath(`/community/events/${slug}`);
+  }
+}
+
+export async function createAdminEventDraft(input: {
+  partnerId: string;
+  draft?: CommunityEventDraftInput;
+}) {
+  const admin = await requireAdminApi();
+
+  if (!admin.identity) {
+    return { ok: false as const, error: "Admin access required." };
+  }
+
+  const result = await createAdminCommunityEvent({
+    partnerId: input.partnerId,
+    createdBy: admin.identity.id,
+    draft: input.draft,
+  });
+
+  if (result.ok) {
+    revalidateCommunityEventPaths(result.event.id, result.event.slug);
+  }
+
+  return result;
+}
+
+export async function autosaveAdminEvent(eventId: string, input: CommunityEventDraftInput) {
+  const admin = await requireAdminApi();
+
+  if (!admin.identity) {
+    return { ok: false as const, error: "Admin access required." };
+  }
+
+  const result = await autosaveAdminCommunityEvent(eventId, input);
+
+  if (result.ok) {
+    revalidateCommunityEventPaths(eventId, result.event.slug);
+  }
+
+  return result;
+}
+
+export async function publishAdminEvent(input: {
+  eventId: string;
+  note?: string;
+  publishSeries?: boolean;
+}) {
+  const admin = await requireAdminApi();
+
+  if (!admin.identity) {
+    return { ok: false as const, error: "Admin access required." };
+  }
+
+  const result = await publishAdminCommunityEvent({
+    eventId: input.eventId,
+    adminUserId: admin.identity.id,
+    note: input.note,
+    publishSeries: input.publishSeries,
+  });
+
+  if (result.ok) {
+    revalidateCommunityEventPaths(input.eventId, result.event.slug);
+  }
+
+  return result;
+}
+
+export async function createAdminEventSeriesAction(
+  eventId: string,
+  rule: RecurrenceRule,
+  count: number,
+) {
+  const admin = await requireAdminApi();
+
+  if (!admin.identity) {
+    return { ok: false as const, error: "Admin access required." };
+  }
+
+  const result = await createAdminEventSeries(eventId, rule, count);
+
+  if (result.ok) {
+    revalidateCommunityEventPaths(eventId);
+  }
+
+  return result;
+}
+
+export async function saveCommunityEventFeaturedSettings(input: {
+  eventId: string;
+  featuredStatus: string;
+  featuredPriority: number;
+  featuredStartAt?: string | null;
+  featuredEndAt?: string | null;
+  featuredMarketCity?: string | null;
+  featuredMarketState?: string | null;
+}) {
+  const admin = await requireAdminApi();
+
+  if (!admin.identity) {
+    return { ok: false as const, error: "Admin access required." };
+  }
+
+  const result = await saveAdminFeaturedSettings({
+    ...input,
+    adminUserId: admin.identity.id,
+  });
+
+  if (result.ok) {
+    revalidateCommunityEventPaths(input.eventId, result.event.slug);
+  }
+
+  return result;
+}
+
 export async function moderateCommunityEvent(input: {
   eventId: string;
   action: ModerationAction;
@@ -34,6 +171,7 @@ export async function moderateCommunityEvent(input: {
   featuredEndAt?: string | null;
   featuredMarketCity?: string | null;
   featuredMarketState?: string | null;
+  publishSeries?: boolean;
 }) {
   const admin = await requireAdminApi();
 
@@ -131,6 +269,14 @@ export async function moderateCommunityEvent(input: {
     return { ok: false as const, error: error.message || "Unable to update event." };
   }
 
+  if (input.action === "publish" && data.is_series_parent && input.publishSeries !== false) {
+    await publishRecurringSeriesChildren(data.id, admin.identity.id);
+  }
+
+  if (input.action === "cancel" && data.is_series_parent) {
+    await cancelRecurringSeriesChildren(data.id);
+  }
+
   try {
     if (input.action === "publish") {
       await notifyPartnerEventPublished({
@@ -163,12 +309,7 @@ export async function moderateCommunityEvent(input: {
     console.warn("Community event notification skipped:", notifyError);
   }
 
-  revalidatePath("/admin/community/events");
-  revalidatePath(`/admin/community/events/${input.eventId}`);
-  revalidatePath("/partners/dashboard/community/events");
-  revalidatePath(`/community/events/${data.slug}`);
-  revalidatePath("/");
-  revalidatePath("/community/events");
+  revalidateCommunityEventPaths(input.eventId, data.slug);
 
   return { ok: true as const, event: data };
 }
@@ -194,10 +335,7 @@ export async function adminUpdateCommunityEvent(
     return { ok: false as const, error: error.message || "Unable to update event." };
   }
 
-  revalidatePath("/admin/community/events");
-  revalidatePath(`/admin/community/events/${eventId}`);
-  revalidatePath(`/community/events/${data.slug}`);
-  revalidatePath("/");
+  revalidateCommunityEventPaths(eventId, data.slug);
 
   return { ok: true as const, event: data };
 }

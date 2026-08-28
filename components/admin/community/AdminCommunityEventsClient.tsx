@@ -188,12 +188,20 @@ export default function AdminCommunityEventsClient({
                     )}
                   </td>
                   <td className="px-4 py-4">
-                    <Link
-                      href={`/admin/community/events/${event.id}`}
-                      className="font-black text-emerald-800 hover:underline"
-                    >
-                      Manage
-                    </Link>
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/admin/community/events/${event.id}`}
+                        className="font-black text-emerald-800 hover:underline"
+                      >
+                        Review
+                      </Link>
+                      <Link
+                        href={`/admin/community/events/${event.id}/edit`}
+                        className="font-black text-slate-700 hover:underline"
+                      >
+                        Edit
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               );
@@ -229,12 +237,20 @@ export default function AdminCommunityEventsClient({
                 <MapPin className="h-4 w-4" />
                 {formatEventLocationInline(event)}
               </p>
-              <Link
-                href={`/admin/community/events/${event.id}`}
-                className="mt-4 inline-flex min-h-11 items-center rounded-2xl bg-emerald-700 px-4 text-sm font-black text-white"
-              >
-                Manage
-              </Link>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  href={`/admin/community/events/${event.id}`}
+                  className="inline-flex min-h-11 items-center rounded-2xl bg-emerald-700 px-4 text-sm font-black text-white"
+                >
+                  Review
+                </Link>
+                <Link
+                  href={`/admin/community/events/${event.id}/edit`}
+                  className="inline-flex min-h-11 items-center rounded-2xl border border-slate-200 px-4 text-sm font-black"
+                >
+                  Edit
+                </Link>
+              </div>
             </article>
           );
         })}

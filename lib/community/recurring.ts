@@ -109,3 +109,56 @@ export async function createRecurringEventOccurrences(input: {
 
   return { ok: true as const, created };
 }
+
+const SERIES_PUBLISH_STATUSES = [
+  "draft",
+  "pending_review",
+  "changes_requested",
+  "approved",
+] as const;
+
+/** When a series parent is published, publish all child occurrences in reviewable states. */
+export async function publishRecurringSeriesChildren(parentId: string, moderatedBy: string) {
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabaseAdmin
+    .from("community_events")
+    .update({
+      status: "published",
+      published_at: now,
+      moderated_by: moderatedBy,
+      moderated_at: now,
+    })
+    .eq("parent_event_id", parentId)
+    .in("status", [...SERIES_PUBLISH_STATUSES])
+    .select("id");
+
+  if (error) {
+    console.error("publishRecurringSeriesChildren:", error);
+    return { ok: false as const, publishedCount: 0 };
+  }
+
+  return { ok: true as const, publishedCount: data?.length || 0 };
+}
+
+/** Cancel all future unpublished/published children when parent series is cancelled. */
+export async function cancelRecurringSeriesChildren(parentId: string) {
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabaseAdmin
+    .from("community_events")
+    .update({
+      status: "cancelled",
+      cancelled_at: now,
+    })
+    .eq("parent_event_id", parentId)
+    .neq("status", "cancelled")
+    .select("id");
+
+  if (error) {
+    console.error("cancelRecurringSeriesChildren:", error);
+    return { ok: false as const, cancelledCount: 0 };
+  }
+
+  return { ok: true as const, cancelledCount: data?.length || 0 };
+}

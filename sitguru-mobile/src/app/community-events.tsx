@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { CalendarDays, ChevronLeft, MapPin, PawPrint } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -17,6 +17,7 @@ import {
   useCommunityEvents,
   type MobileCommunityEvent,
 } from "@/hooks/data/useCommunityEvents";
+import { trackMobileEvent } from "@/lib/analytics/track";
 
 function formatWhen(event: MobileCommunityEvent) {
   const start = new Date(event.start_at);
@@ -41,6 +42,15 @@ export default function CommunityEventsScreen() {
     () => [...events].sort((a, b) => a.start_at.localeCompare(b.start_at)),
     [events],
   );
+
+  useEffect(() => {
+    void trackMobileEvent({
+      eventName: "community_events_list_view",
+      source: "mobile_community_events",
+      pagePath: "/community/events",
+      metadata: { query, count: sorted.length },
+    });
+  }, [query, sorted.length]);
 
   return (
     <SitGuruScreen scroll center={false}>

@@ -153,6 +153,53 @@ export async function fetchFeaturedHomepageEvents(filters: FeaturedEventQuery = 
   return marketFiltered.slice(0, limit);
 }
 
+export async function fetchFeaturedCommunityPageEvents(filters: FeaturedEventQuery = {}) {
+  const now = new Date().toISOString();
+  const limit = filters.limit ?? 3;
+
+  const { data, error } = await supabaseAdmin
+    .from("community_events")
+    .select(PUBLIC_EVENT_SELECT)
+    .eq("status", "published")
+    .is("cancelled_at", null)
+    .in("featured_status", ["community", "homepage", "market"])
+    .gte("start_at", now)
+    .or(`featured_end_at.is.null,featured_end_at.gte.${now}`)
+    .or(`featured_start_at.is.null,featured_start_at.lte.${now}`)
+    .order("featured_priority", { ascending: false })
+    .order("start_at", { ascending: true })
+    .limit(Math.max(limit * 2, 8));
+
+  if (error) {
+    console.error("fetchFeaturedCommunityPageEvents:", error);
+    return [];
+  }
+
+  return ((data || []) as CommunityEventWithPartner[]).slice(0, limit);
+}
+
+export async function fetchFeaturedEventsForAdmin() {
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabaseAdmin
+    .from("community_events")
+    .select(PUBLIC_EVENT_SELECT)
+    .eq("status", "published")
+    .is("cancelled_at", null)
+    .neq("featured_status", "none")
+    .gte("start_at", now)
+    .order("featured_priority", { ascending: false })
+    .order("start_at", { ascending: true })
+    .limit(50);
+
+  if (error) {
+    console.error("fetchFeaturedEventsForAdmin:", error);
+    return [];
+  }
+
+  return (data || []) as CommunityEventWithPartner[];
+}
+
 export async function fetchPartnerEvents(partnerId: string, tab: PartnerEventTab) {
   const now = new Date().toISOString();
 

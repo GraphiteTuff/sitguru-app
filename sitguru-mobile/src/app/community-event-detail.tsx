@@ -13,12 +13,14 @@ import {
 } from "react-native";
 
 import SitGuruScreen from "@/components/SitGuruScreen";
+import CommunityRoguePanel from "@/components/community/CommunityRoguePanel";
 import { AppFonts } from "@/constants/fonts";
 import {
   fetchCommunityEventBySlug,
   useEventAttendance,
   type MobileCommunityEvent,
 } from "@/hooks/data/useCommunityEvents";
+import { trackMobileEvent } from "@/lib/analytics/track";
 import { getSitGuruApiBaseUrl } from "@/lib/data/api";
 
 const PENDING_RSVP_KEY = "sitguru_pending_event_rsvp";
@@ -53,6 +55,16 @@ export default function CommunityEventDetailScreen() {
       cancelled = true;
     };
   }, [slug]);
+
+  useEffect(() => {
+    if (!event?.id) return;
+    void trackMobileEvent({
+      eventName: "event_view",
+      source: "mobile_community_event_detail",
+      pagePath: `/community/events/${event.slug}`,
+      metadata: { eventId: event.id, slug: event.slug },
+    });
+  }, [event?.id, event?.slug]);
 
   useEffect(() => {
     if (!event?.id || !autoRsvp || going) return;
@@ -97,6 +109,12 @@ export default function CommunityEventDetailScreen() {
       title: event.title,
       message,
       url,
+    });
+
+    void trackMobileEvent({
+      eventName: "event_share",
+      source: "mobile_community_event_detail",
+      metadata: { eventId: event.id, slug: event.slug },
     });
   }
 
@@ -256,6 +274,8 @@ export default function CommunityEventDetailScreen() {
       </View>
 
       {rsvpMessage ? <Text style={styles.rsvpMessage}>{rsvpMessage}</Text> : null}
+
+      <CommunityRoguePanel eventSlug={event.slug} eventTitle={event.title} />
 
       <View style={styles.joinHintRow}>
         <Pressable onPress={() => void goToCommunitySignup("pet-parent")}>

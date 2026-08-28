@@ -350,13 +350,28 @@ export default function PartnerCommunityEventEditScreen() {
       </Pressable>
 
       {!isCreate ? (
-        <Pressable
-          style={styles.secondaryButton}
-          disabled={saving || status === "pending_review"}
-          onPress={() => void submitForReview()}
-        >
-          <Text style={styles.secondaryButtonText}>Submit for review</Text>
-        </Pressable>
+        <>
+          <Pressable
+            style={styles.secondaryButton}
+            disabled={saving || status === "pending_review"}
+            onPress={() => void submitForReview()}
+          >
+            <Text style={styles.secondaryButtonText}>Submit for review</Text>
+          </Pressable>
+          {status === "published" ? (
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() =>
+                router.push({
+                  pathname: "/partner-community-event-promote",
+                  params: { id: eventId },
+                })
+              }
+            >
+              <Text style={styles.secondaryButtonText}>Promote & share</Text>
+            </Pressable>
+          ) : null}
+        </>
       ) : null}
     </SitGuruScreen>
   );

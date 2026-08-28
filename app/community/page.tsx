@@ -1,18 +1,48 @@
 import Link from "next/link";
 import { CalendarDays, PawPrint, Users } from "lucide-react";
+import CommunityFeaturedSection from "@/components/community/CommunityFeaturedSection";
 import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
+import { fetchFeaturedCommunityPageEvents } from "@/lib/community/queries";
 
 export const dynamic = "force-dynamic";
 
 const communityLinks = [
-  { href: "/community/events", label: "Events", ready: true },
-  { href: "/partners", label: "Partners", ready: false },
-  { href: "/search", label: "Local Gurus", ready: false },
-  { href: "/find-care", label: "Pet-Friendly Places", ready: false },
-  { href: "/ambassadors", label: "Community Groups", ready: false },
+  {
+    href: "/community/events",
+    label: "Events",
+    ready: true,
+    description:
+      "Browse upcoming pet-friendly events, festivals, adoption days, and partner gatherings.",
+  },
+  {
+    href: "/partners",
+    label: "Partners",
+    ready: true,
+    description: "Discover SitGuru partners — pet businesses, rescues, and local pet-friendly venues.",
+  },
+  {
+    href: "/search",
+    label: "Local Gurus",
+    ready: true,
+    description: "Find trusted pet Gurus near you for walks, sitting, training, and more.",
+  },
+  {
+    href: "/find-care",
+    label: "Pet-Friendly Places",
+    ready: true,
+    description: "Explore pet-friendly destinations and care options in your area.",
+  },
+  {
+    href: "/ambassadors",
+    label: "Community Groups",
+    ready: true,
+    description: "Meet SitGuru Ambassadors growing the local pet community.",
+  },
 ];
 
-export default function CommunityPage() {
+export default async function CommunityPage() {
+  const featuredEvents = await fetchFeaturedCommunityPageEvents({ limit: 3 });
+
   return (
     <main className="min-h-screen bg-[#f8fcfd]">
       <section className="public-dark-section border-b border-emerald-900/20 bg-[#0D5C3A] py-14 text-white">
@@ -24,8 +54,8 @@ export default function CommunityPage() {
             Pet-friendly community, events, and local connections
           </h1>
           <p className="mt-4 max-w-2xl text-base font-semibold text-emerald-50">
-            Discover events near you, meet local Gurus, and connect with SitGuru partners
-            who love pets as much as you do.
+            Discover events near you, meet local Gurus, and connect with SitGuru partners who love
+            pets as much as you do.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <Link
@@ -56,6 +86,8 @@ export default function CommunityPage() {
         </div>
       </section>
 
+      <CommunityFeaturedSection events={featuredEvents} />
+
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="mb-8">
           <CommunityPetParentCta
@@ -65,12 +97,12 @@ export default function CommunityPage() {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {communityLinks.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -79,20 +111,12 @@ export default function CommunityPage() {
                   </p>
                   <h2 className="mt-2 text-2xl font-black text-slate-950">{item.label}</h2>
                 </div>
-                {item.ready ? (
-                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
-                    Live
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
-                    Coming soon
-                  </span>
-                )}
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
+                  Live
+                </span>
               </div>
-              <p className="mt-3 text-sm font-semibold text-slate-600">
-                {item.label === "Events"
-                  ? "Browse upcoming pet-friendly events, festivals, adoption days, and partner gatherings."
-                  : "More community features are on the way across SitGuru web and mobile."}
+              <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-600">
+                {item.description}
               </p>
             </Link>
           ))}
