@@ -1,10 +1,35 @@
 import Link from "next/link";
 import { CalendarDays, PawPrint, Users } from "lucide-react";
+import CommunityEventsMapSearch from "@/components/community/CommunityEventsMapSearch";
 import CommunityFeaturedSection from "@/components/community/CommunityFeaturedSection";
 import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
-import { fetchFeaturedCommunityPageEvents } from "@/lib/community/queries";
+import { fetchDiscoveredHomepageEvents } from "@/lib/community/discovered-events";
+import {
+  fetchFeaturedCommunityPageEvents,
+  fetchPublicEvents,
+} from "@/lib/community/queries";
+import type { CommunityEventWithPartner } from "@/lib/community/types";
 
 export const dynamic = "force-dynamic";
+
+function mergeUniqueEvents(
+  primary: CommunityEventWithPartner[],
+  secondary: CommunityEventWithPartner[],
+  limit = 48,
+) {
+  const seen = new Set<string>();
+  const merged: CommunityEventWithPartner[] = [];
+
+  for (const event of [...primary, ...secondary]) {
+    const key = `${event.title}|${event.start_at}|${event.city || ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(event);
+    if (merged.length >= limit) break;
+  }
+
+  return merged;
+}
 
 const communityLinks = [
   {
@@ -12,25 +37,28 @@ const communityLinks = [
     label: "Events",
     ready: true,
     description:
-      "Browse upcoming pet-friendly events, festivals, adoption days, and partner gatherings.",
+      "Browse upcoming pet friendly events, festivals, adoption days, and partner gatherings.",
   },
   {
     href: "/partners",
     label: "Partners",
     ready: true,
-    description: "Discover SitGuru partners — pet businesses, rescues, and local pet-friendly venues.",
+    description:
+      "Discover SitGuru partners — pet businesses, rescues, and local pet friendly venues.",
   },
   {
     href: "/search",
     label: "Local Gurus",
     ready: true,
-    description: "Find trusted pet Gurus near you for walks, sitting, training, and more.",
+    description:
+      "Find trusted pet Gurus near you for walks, sitting, training, and more.",
   },
   {
     href: "/find-care",
-    label: "Pet-Friendly Places",
+    label: "Pet Friendly Places",
     ready: true,
-    description: "Explore pet-friendly destinations and care options in your area.",
+    description:
+      "Explore pet friendly destinations and care options in your area.",
   },
   {
     href: "/ambassadors",
@@ -41,7 +69,13 @@ const communityLinks = [
 ];
 
 export default async function CommunityPage() {
-  const featuredEvents = await fetchFeaturedCommunityPageEvents({ limit: 3 });
+  const [featuredEvents, partnerEvents, discovered] = await Promise.all([
+    fetchFeaturedCommunityPageEvents({ limit: 3 }),
+    fetchPublicEvents({ limit: 40 }),
+    fetchDiscoveredHomepageEvents({ limit: 24 }),
+  ]);
+
+  const mapEvents = mergeUniqueEvents(partnerEvents, discovered.events, 48);
 
   return (
     <main className="min-h-screen bg-[#f8fcfd]">
@@ -51,47 +85,43 @@ export default async function CommunityPage() {
             SitGuru Community
           </p>
           <h1 className="mt-3 text-4xl font-black tracking-tight !text-white sm:text-5xl">
-            Pet-friendly community, events, and local connections
+            Pet friendly community, events, and local connections
           </h1>
           <p className="mt-4 max-w-2xl text-base font-semibold text-emerald-50">
-            Discover events near you, meet local Gurus, and connect with SitGuru partners who love
-            pets as much as you do.
+            Discover events near you on the map, meet local Gurus, and connect with
+            SitGuru partners who love pets as much as you do.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <Link
-              href="/signup?role=pet_parent&intent=pet_parent&next=%2Fcommunity%2Fevents&source=community_hub&campaign=community_hub_join&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_join"
+              href="/signup?role=pet_parent&intent=pet_parent&next=%2Fcommunity&source=community_hub&campaign=community_hub_join&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_join"
               className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-emerald-900"
             >
               Pet Parent
             </Link>
             <Link
-              href="/signup?role=guru&intent=guru&next=%2Fcommunity%2Fevents&source=community_hub&campaign=community_hub_guru&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_guru"
+              href="/signup?role=guru&intent=guru&next=%2Fcommunity&source=community_hub&campaign=community_hub_guru&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_guru"
               className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/40 bg-white/10 px-5 text-sm font-black !text-white"
             >
               Pet Guru
             </Link>
             <Link
-              href="/signup?role=ambassador&intent=ambassador&next=%2Fcommunity%2Fevents&source=community_hub&campaign=community_hub_ambassador&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_ambassador"
+              href="/signup?role=ambassador&intent=ambassador&next=%2Fcommunity&source=community_hub&campaign=community_hub_ambassador&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_ambassador"
               className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/40 bg-white/10 px-5 text-sm font-black !text-white"
             >
               Ambassador
             </Link>
-            <Link
-              href="/community/events"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/40 bg-transparent px-5 text-sm font-black !text-white"
-            >
-              Browse events
-            </Link>
           </div>
         </div>
       </section>
+
+      <CommunityEventsMapSearch events={mapEvents} />
 
       <CommunityFeaturedSection events={featuredEvents} />
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="mb-8">
           <CommunityPetParentCta
-            nextPath="/community/events"
+            nextPath="/community"
             source="community_hub"
             campaign="community_hub_cta"
           />
@@ -109,7 +139,9 @@ export default async function CommunityPage() {
                   <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
                     Community
                   </p>
-                  <h2 className="mt-2 text-2xl font-black text-slate-950">{item.label}</h2>
+                  <h2 className="mt-2 text-2xl font-black text-slate-950">
+                    {item.label}
+                  </h2>
                 </div>
                 <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
                   Live
@@ -131,16 +163,19 @@ export default async function CommunityPage() {
             },
             {
               icon: PawPrint,
-              title: "Pet-friendly by design",
-              text: "Filter for pet-friendly, free, and family-friendly experiences.",
+              title: "Pet friendly by design",
+              text: "Filter for pet friendly, free, and family friendly experiences.",
             },
             {
               icon: Users,
               title: "Meet your community",
-              text: "Connect with Gurus, partners, and pet parents near you.",
+              text: "Connect with Gurus, partners, and Pet Parents near you.",
             },
           ].map(({ icon: Icon, title, text }) => (
-            <div key={title} className="rounded-3xl border border-slate-200 bg-white p-5">
+            <div
+              key={title}
+              className="rounded-3xl border border-slate-200 bg-white p-5"
+            >
               <Icon className="h-5 w-5 text-emerald-700" />
               <h3 className="mt-3 text-lg font-black text-slate-950">{title}</h3>
               <p className="mt-2 text-sm font-semibold text-slate-600">{text}</p>
@@ -151,9 +186,12 @@ export default async function CommunityPage() {
         <div className="mt-10 rounded-[2rem] border border-emerald-100 bg-emerald-50 p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-black text-emerald-900">Partners can host events too</p>
+              <p className="text-sm font-black text-emerald-900">
+                Partners can host events too
+              </p>
               <p className="mt-1 text-sm font-semibold text-emerald-950/80">
-                Create polished community events from the Partner Dashboard in minutes.
+                Create polished community events from the Partner Dashboard in
+                minutes.
               </p>
             </div>
             <Link

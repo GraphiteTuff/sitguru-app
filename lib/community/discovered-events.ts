@@ -31,6 +31,8 @@ export type CommunityEventDiscoveryRow = {
     name: string;
     slug: string;
     county_name: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
   } | null;
 };
 
@@ -78,7 +80,7 @@ export function mapDiscoveryToCommunityEvent(
     slug: `google-${row.external_id.slice(0, 48)}`,
     short_description:
       row.short_description ||
-      `Discovered pet-friendly event in ${label}.`,
+      `Discovered pet friendly event in ${label}.`,
     description: row.short_description,
     event_type: GOOGLE_DISCOVERY_EVENT_TYPE,
     categories: ["Community"],
@@ -101,8 +103,8 @@ export function mapDiscoveryToCommunityEvent(
     state: row.state || "PA",
     postal_code: null,
     country: "US",
-    latitude: null,
-    longitude: null,
+    latitude: row.community_markets?.latitude ?? null,
+    longitude: row.community_markets?.longitude ?? null,
     pet_friendly: row.pet_friendly,
     family_friendly: true,
     outdoor: true,
@@ -155,7 +157,9 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
           id,
           name,
           slug,
-          county_name
+          county_name,
+          latitude,
+          longitude
         )
       `,
       )
