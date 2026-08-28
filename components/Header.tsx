@@ -1035,7 +1035,7 @@ export default function Header({ user = null }: HeaderProps) {
           {!loadingUser && !isLoggedIn ? (
             <Link
               href="/login?mode=phone"
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold tracking-[-0.01em] text-emerald-900 shadow-sm transition hover:bg-emerald-50 xl:hidden"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold tracking-[-0.01em] text-emerald-900 shadow-sm transition hover:bg-emerald-50 lg:hidden"
             >
               Sign in
             </Link>
@@ -1044,7 +1044,7 @@ export default function Header({ user = null }: HeaderProps) {
           <button
             type="button"
             onClick={() => setMobileOpen((value) => !value)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 xl:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 lg:hidden"
             aria-label="Toggle menu"
             aria-expanded={mobileOpen}
           >
@@ -1058,7 +1058,7 @@ export default function Header({ user = null }: HeaderProps) {
       </div>
 
       {mobileOpen ? (
-        <div className="border-t border-slate-200 bg-white px-4 py-4 xl:hidden">
+        <div className="border-t border-slate-200 bg-white px-4 py-4 lg:hidden">
           <div className="mx-auto grid max-w-[1440px] gap-2">
             {isLoggedIn ? (
               <div className="mb-2 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
