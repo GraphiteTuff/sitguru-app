@@ -15,7 +15,7 @@ type CommunityPetParentCtaProps = {
 
 /** Community join CTA — Pet Parent, Guru, or Ambassador. */
 export default function CommunityPetParentCta({
-  nextPath = "/community",
+  nextPath = "/events",
   source = "community",
   campaign = "community_join_cta",
   compact = false,

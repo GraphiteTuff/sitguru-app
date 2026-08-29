@@ -625,7 +625,7 @@ export default function CommunityEventsMapSearch({
                 {filtered.length} event{filtered.length === 1 ? "" : "s"}
               </p>
               <Link
-                href="/community/host"
+                href="/events/host"
                 className="text-sm font-black text-emerald-800"
               >
                 Host an event
@@ -648,7 +648,7 @@ export default function CommunityEventsMapSearch({
                     Show all events
                   </button>
                   <Link
-                    href="/community/host"
+                    href="/events/host"
                     className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800"
                   >
                     Host a pet event

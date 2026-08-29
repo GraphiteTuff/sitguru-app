@@ -74,7 +74,7 @@ export default function CommunityHostSurfaceCtas({
         {manage}
       </Link>
       <Link
-        href="/community"
+        href="/events"
         className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-white/30 px-6 text-sm font-black !text-white sm:w-auto"
       >
         {map}

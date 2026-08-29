@@ -28,7 +28,7 @@ export default function CommunityRoguePanel({
     void trackMobileEvent({
       eventName: "community_rogue_faq",
       source: "mobile_community_event",
-      pagePath: eventSlug ? `/community/events/${eventSlug}` : "/community",
+      pagePath: eventSlug ? `/events/${eventSlug}` : "/events",
       metadata: {
         question,
         eventSlug,

@@ -149,12 +149,21 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
 
 export function isCommunityCompanionPath(pagePath?: string | null) {
   const path = String(pagePath || "").split("?")[0] || "";
-  return path === "/community" || path.startsWith("/community/");
+  return (
+    path === "/events" ||
+    path.startsWith("/events/") ||
+    path === "/community" ||
+    path.startsWith("/community/")
+  );
 }
 
 export function parseCommunityEventSlugFromPath(pagePath?: string | null) {
   const path = String(pagePath || "").split("?")[0] || "";
-  const match = path.match(/^\/community\/events\/([^/]+)$/);
+  const match =
+    path.match(/^\/events\/([^/]+)$/) ||
+    path.match(/^\/community\/events\/([^/]+)$/);
+  // Hub/host are not event slugs
+  if (match?.[1] === "host") return null;
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 

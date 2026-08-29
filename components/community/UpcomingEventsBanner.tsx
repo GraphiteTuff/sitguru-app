@@ -324,7 +324,7 @@ export default function UpcomingEventsBanner({
   previewMode = false,
   source = "demo",
   lastSyncedAt: _lastSyncedAt = null,
-  viewAllHref = "/community",
+  viewAllHref = "/events",
   eyebrow = "Local pet life",
   title = "Where good pets gather.",
   subtitle,
@@ -346,14 +346,15 @@ export default function UpcomingEventsBanner({
       id: event.id,
       title: event.title,
       slug: event.slug,
-      sharePath: discovery ? "/community" : undefined,
+      sharePath: discovery ? "/events" : undefined,
       startAt: event.start_at,
       endAt: event.end_at,
       timezone: event.timezone,
       city: event.city,
       state: event.state,
       shortDescription: event.short_description,
-      partnerName: event.partners?.business_name || event.venue_name,
+      partnerName: event.partners?.business_name || null,
+      venueName: event.venue_name || null,
       imageUrl: getEventCardImage(event),
       social_square_url: event.social_square_url,
       social_story_url: event.social_story_url,
@@ -486,7 +487,7 @@ export default function UpcomingEventsBanner({
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
-                href="/community/host"
+                href="/events/host"
                 className="inline-flex min-h-11 items-center rounded-full bg-[#0D5C3A] px-5 text-sm font-black text-white transition hover:bg-emerald-900"
               >
                 Host / manage events

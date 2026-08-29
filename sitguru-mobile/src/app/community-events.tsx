@@ -68,7 +68,7 @@ export default function CommunityEventsScreen() {
     void trackMobileEvent({
       eventName: "community_events_list_view",
       source: "mobile_community_events",
-      pagePath: "/community",
+      pagePath: "/events",
       metadata: { query, count: sorted.length },
     });
   }, [query, sorted.length]);

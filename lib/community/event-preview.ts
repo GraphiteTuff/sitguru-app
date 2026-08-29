@@ -27,7 +27,7 @@ export function getEventBannerHref(
   }
 
   if (isHomepageDemoEvent(event.id)) {
-    return "/community";
+    return "/events";
   }
 
   return getPublicEventPath(event.slug);

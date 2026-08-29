@@ -79,6 +79,26 @@ const nextConfig: NextConfig = {
         destination: "/help",
         permanent: true,
       },
+      {
+        source: "/community",
+        destination: "/events",
+        permanent: true,
+      },
+      {
+        source: "/community/host",
+        destination: "/events/host",
+        permanent: true,
+      },
+      {
+        source: "/community/events",
+        destination: "/events",
+        permanent: true,
+      },
+      {
+        source: "/community/events/:slug",
+        destination: "/events/:slug",
+        permanent: true,
+      },
     ];
   },
 

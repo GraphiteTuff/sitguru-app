@@ -157,7 +157,12 @@ export function getBotConfig(options: {
   if (currentPath === "/contact" || currentPath.startsWith("/contact/")) {
     return { shouldRender: true, variant: "rogue", surface: "public-parent" };
   }
-  if (currentPath === "/community" || currentPath.startsWith("/community/")) {
+  if (
+    currentPath === "/events" ||
+    currentPath.startsWith("/events/") ||
+    currentPath === "/community" ||
+    currentPath.startsWith("/community/")
+  ) {
     return { shouldRender: true, variant: "rogue", surface: "public-parent" };
   }
   if (

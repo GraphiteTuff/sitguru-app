@@ -697,7 +697,7 @@ export default function EventManagerDashboardClient({
               </button>
             )}
             <Link
-              href="/community"
+              href="/events"
               className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-800"
             >
               Preview Pet Events map

@@ -335,7 +335,10 @@ function getSafeSignupNextPath(nextValue: string | null, intent: AccountIntent) 
     if (decoded.startsWith("/signup")) return null;
 
     const isCommunityReturn =
-      decoded.startsWith("/community/") || decoded === "/community";
+      decoded.startsWith("/events/") ||
+      decoded === "/events" ||
+      decoded.startsWith("/community/") ||
+      decoded === "/community";
 
     if (isCommunityReturn) {
       return decoded;
@@ -638,7 +641,10 @@ function SignupPageContent() {
   const selectedAccount =
     accountOptions.find((option) => option.key === intent) || accountOptions[0];
   const communitySignup =
-    redirectPath.startsWith("/community/") || redirectPath === "/community";
+    redirectPath.startsWith("/events/") ||
+    redirectPath === "/events" ||
+    redirectPath.startsWith("/community/") ||
+    redirectPath === "/community";
   const communityPanelTitle = communitySignup
     ? intent === "guru"
       ? "Create your Pet Guru account in minutes."

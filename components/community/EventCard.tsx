@@ -42,7 +42,7 @@ export default function EventCard({
     ? "Pet Event"
     : event.partners?.business_name || "SitGuru Partner";
   const isPreview = previewMode || isHomepageDemoEvent(event.id);
-  const href = isPreview ? "/community" : getPublicEventPath(event.slug);
+  const href = isPreview ? "/events" : getPublicEventPath(event.slug);
   const showAttending = !isPreview && !googleDiscovery;
 
   return (
