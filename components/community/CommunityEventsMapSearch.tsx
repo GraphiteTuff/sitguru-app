@@ -388,9 +388,9 @@ export default function CommunityEventsMapSearch({
     setFilters(next);
     if (next.county || next.city || next.state) {
       saveCommunityLocationPreference({
-        county: next.county || undefined,
-        city: next.city || undefined,
-        state: next.state || undefined,
+        county: next.county,
+        city: next.city,
+        state: next.state,
         source: "manual",
       });
     }
