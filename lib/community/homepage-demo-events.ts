@@ -37,6 +37,38 @@ function rangeEastern(
   };
 }
 
+/** Approximate map pins for curated Bucks / Montgomery (and nearby) cities. */
+const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+  bensalem: { lat: 40.1043, lng: -74.9516 },
+  warminster: { lat: 40.2068, lng: -75.0999 },
+  langhorne: { lat: 40.1746, lng: -74.9227 },
+  horsham: { lat: 40.1784, lng: -75.1285 },
+  southampton: { lat: 40.1801, lng: -75.0138 },
+  jamison: { lat: 40.249, lng: -75.091 },
+  feasterville: { lat: 40.1462, lng: -75.0024 },
+  quakertown: { lat: 40.4418, lng: -75.3416 },
+  germantown: { lat: 39.1732, lng: -77.2717 },
+  conshohocken: { lat: 40.0723, lng: -75.3016 },
+  "hunlock creek": { lat: 41.202, lng: -76.068 },
+  "new hope": { lat: 40.3643, lng: -74.9513 },
+  elysburg: { lat: 40.8645, lng: -76.5525 },
+  bethlehem: { lat: 40.6259, lng: -75.3705 },
+  sharpsburg: { lat: 40.4945, lng: -79.9262 },
+  doylestown: { lat: 40.31, lng: -75.1299 },
+  "east greenville": { lat: 40.4057, lng: -75.5057 },
+};
+
+function coordsForCity(city: string, state: string) {
+  const key = city.trim().toLowerCase();
+  const hit = CITY_COORDS[key];
+  if (hit) return hit;
+  // Bucks / Montgomery PA fallback so curated cards still pin near the map.
+  if (state.toUpperCase() === "PA") {
+    return { lat: 40.3368, lng: -75.1113 };
+  }
+  return null;
+}
+
 function demoEvent(
   id: string,
   input: {
@@ -60,6 +92,7 @@ function demoEvent(
     outdoor?: boolean;
   },
 ): CommunityEventWithPartner {
+  const coords = coordsForCity(input.city, input.state);
   return {
     id: `${HOMEPAGE_DEMO_EVENT_ID_PREFIX}${id}`,
     partner_id: `${HOMEPAGE_DEMO_EVENT_ID_PREFIX}partner-${id}`,
@@ -89,8 +122,8 @@ function demoEvent(
     state: input.state,
     postal_code: input.postalCode || null,
     country: "US",
-    latitude: null,
-    longitude: null,
+    latitude: coords?.lat ?? null,
+    longitude: coords?.lng ?? null,
     pet_friendly: true,
     family_friendly: true,
     outdoor: input.outdoor ?? true,

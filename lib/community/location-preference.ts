@@ -43,12 +43,20 @@ export function saveCommunityLocationPreference(
     }
   }
 
-  if (preference.city) {
-    window.localStorage.setItem(CITY_KEY, preference.city);
+  if (preference.city !== undefined) {
+    if (preference.city) {
+      window.localStorage.setItem(CITY_KEY, preference.city);
+    } else {
+      window.localStorage.removeItem(CITY_KEY);
+    }
   }
 
-  if (preference.state) {
-    window.localStorage.setItem(STATE_KEY, preference.state);
+  if (preference.state !== undefined) {
+    if (preference.state) {
+      window.localStorage.setItem(STATE_KEY, preference.state);
+    } else {
+      window.localStorage.removeItem(STATE_KEY);
+    }
   }
 
   if (preference.source) {
