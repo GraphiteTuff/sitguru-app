@@ -4,12 +4,10 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   Check,
-  Copy,
-  Download,
+  ImageIcon,
   Link2,
   Mail,
   MessageCircle,
-  Share2,
   X,
 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
@@ -24,7 +22,6 @@ import {
   downloadEventGraphic,
   getEventSocialAssets,
 } from "@/lib/community/social-assets";
-import { SITGURU_OFFICIAL_SOCIAL_LINKS } from "@/lib/chat/sitguru-social";
 
 export type EventShareDrawerEvent = {
   id?: string;
@@ -56,15 +53,21 @@ type EventShareDrawerProps = {
   source?: string;
 };
 
-const socialPlatforms: Array<{
-  id: SharePlatform;
+/** Mockup-aligned row: Messages · Facebook · Instagram · X · Email */
+const SHARE_ACTIONS: Array<{
+  id: SharePlatform | "instagram";
   label: string;
   tone: string;
 }> = [
-  { id: "sms", label: "Messages", tone: "bg-emerald-600 text-white" },
+  { id: "sms", label: "Messages", tone: "bg-[#34C759] text-white" },
   { id: "facebook", label: "Facebook", tone: "bg-[#1877F2] text-white" },
-  { id: "x", label: "X", tone: "bg-slate-900 text-white" },
-  { id: "email", label: "Email", tone: "bg-sky-600 text-white" },
+  {
+    id: "instagram",
+    label: "Instagram",
+    tone: "bg-gradient-to-br from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] text-white",
+  },
+  { id: "x", label: "X", tone: "bg-slate-950 text-white" },
+  { id: "email", label: "Email", tone: "bg-[#0A84FF] text-white" },
 ];
 
 function displayShareHost(url: string) {
@@ -76,13 +79,43 @@ function displayShareHost(url: string) {
   }
 }
 
+function PlatformGlyph({ id }: { id: SharePlatform | "instagram" }) {
+  if (id === "email") return <Mail className="h-5 w-5" strokeWidth={2.25} />;
+  if (id === "x") {
+    return (
+      <span className="text-[15px] font-black leading-none tracking-tight">𝕏</span>
+    );
+  }
+  if (id === "facebook") {
+    return <span className="text-[18px] font-black leading-none">f</span>;
+  }
+  if (id === "instagram") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
+        <rect
+          x="3.5"
+          y="3.5"
+          width="17"
+          height="17"
+          rx="5"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+        <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
+        <circle cx="17.2" cy="6.8" r="1.2" fill="currentColor" />
+      </svg>
+    );
+  }
+  return <MessageCircle className="h-5 w-5" strokeWidth={2.25} />;
+}
+
 export default function EventShareDrawer({
   event,
   open,
   onClose,
   source = "community_event_share_drawer",
 }: EventShareDrawerProps) {
-  const [copied, setCopied] = useState<"link" | "caption" | null>(null);
+  const [copied, setCopied] = useState(false);
   const [caption, setCaption] = useState("");
   const [hint, setHint] = useState("");
 
@@ -155,27 +188,32 @@ export default function EventShareDrawer({
     if (!open) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, onClose]);
 
   if (!open || !event) return null;
 
   const current = event;
   const square = assets.find((asset) => asset.id === "square") || assets[0];
 
-  async function copyValue(value: string, kind: "link" | "caption") {
+  async function copyLink() {
     try {
-      await navigator.clipboard.writeText(value);
-      setCopied(kind);
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
       void trackEvent({
-        eventName: kind === "caption" ? "event_share" : "event_link_copy",
+        eventName: "event_link_copy",
         eventType: "community",
         source,
-        metadata: { slug: current.slug, kind, eventId: current.id },
+        metadata: { slug: current.slug, eventId: current.id },
       });
-      window.setTimeout(() => setCopied(null), 1600);
+      window.setTimeout(() => setCopied(false), 1600);
     } catch {
       // ignore
     }
@@ -187,10 +225,14 @@ export default function EventShareDrawer({
       try {
         await downloadEventGraphic(story.url, `${current.slug}-instagram.png`);
       } catch {
-        // continue with caption copy even if download fails
+        // continue with caption copy
       }
     }
-    await copyValue(caption, "caption");
+    try {
+      await navigator.clipboard.writeText(`${caption}\n\n${url}`);
+    } catch {
+      // ignore
+    }
     setHint("Graphic saved + caption copied — open Instagram to post");
     window.setTimeout(() => setHint(""), 2800);
     void trackEvent({
@@ -199,24 +241,6 @@ export default function EventShareDrawer({
       source,
       metadata: { slug: current.slug, channel: "instagram", eventId: current.id },
     });
-  }
-
-  async function nativeShare() {
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: current.title, text: caption, url });
-        void trackEvent({
-          eventName: "event_share",
-          eventType: "community",
-          source,
-          metadata: { slug: current.slug, channel: "native", eventId: current.id },
-        });
-        return;
-      } catch {
-        // cancelled
-      }
-    }
-    await copyValue(url, "link");
   }
 
   async function savePrimaryGraphic() {
@@ -247,27 +271,28 @@ export default function EventShareDrawer({
         type="button"
         aria-label="Close share overlay"
         onClick={onClose}
-        className="absolute inset-0 bg-slate-950/50 backdrop-blur-[1px]"
+        className="absolute inset-0 bg-slate-950/45"
       />
 
+      {/*
+        Mobile web: bottom sheet (mockup).
+        Desktop web: compact centered modal — not a full-height drawer.
+      */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="sitguru-share-title"
-        className="relative z-[81] flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.75rem] border border-slate-200 bg-white shadow-2xl sm:rounded-[1.75rem]"
+        className="relative z-[81] w-full max-w-[420px] overflow-hidden rounded-t-[1.5rem] bg-white shadow-[0_-8px_40px_rgba(15,23,42,0.18)] sm:rounded-[1.5rem] sm:shadow-2xl"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
-          <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
-              SitGuru Community
-            </p>
+        <div className="flex items-start justify-between gap-3 px-5 pb-1 pt-5">
+          <div className="min-w-0 pr-2">
             <h2
               id="sitguru-share-title"
-              className="mt-1 truncate text-xl font-black text-slate-950"
+              className="truncate text-[1.35rem] font-black leading-tight tracking-tight text-slate-950"
             >
               Share &ldquo;{event.title}&rdquo;
             </h2>
-            <p className="mt-1 text-sm font-semibold text-slate-600">
+            <p className="mt-1 text-[15px] font-medium text-slate-500">
               Help pet parents discover this event!
             </p>
           </div>
@@ -275,16 +300,16 @@ export default function EventShareDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close share panel"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-600"
+            className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" strokeWidth={2.5} />
           </button>
         </div>
 
-        <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-5">
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-            <div className="flex gap-3 p-3">
-              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-emerald-50">
+        <div className="px-5 pb-4 pt-3">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="flex gap-3 p-3.5">
+              <div className="relative h-[4.75rem] w-[4.75rem] shrink-0 overflow-hidden rounded-xl bg-slate-100">
                 {previewImage ? (
                   <Image
                     src={previewImage}
@@ -295,150 +320,54 @@ export default function EventShareDrawer({
                   />
                 ) : null}
                 {timing ? (
-                  <div className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-1.5 py-1 text-center text-[9px] font-black uppercase tracking-wide text-white">
-                    {timing.compactDate}
+                  <div className="absolute inset-x-0 bottom-0 bg-slate-950/75 px-1 py-1 text-center text-[9px] font-black uppercase tracking-wide text-white">
+                    {timing.timeLabel || timing.compactDate}
                   </div>
                 ) : null}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="line-clamp-3 text-sm font-semibold leading-snug text-slate-800">
+                <p className="line-clamp-3 text-[13px] font-semibold leading-snug text-slate-800">
                   {caption}
                 </p>
-                <p className="mt-2 truncate text-xs font-black text-emerald-700">
+                <p
+                  className="mt-2 truncate text-[12px] font-bold"
+                  style={{ color: "#E85D04" }}
+                >
                   {displayShareHost(url)}
                 </p>
               </div>
             </div>
           </div>
 
-          <div>
-            <p className="text-sm font-black text-slate-900">Share to</p>
-            <div className="mt-3 flex flex-wrap justify-between gap-2 sm:justify-start sm:gap-3">
-              <button
-                type="button"
-                onClick={() => void nativeShare()}
-                className="flex w-[64px] flex-col items-center gap-1.5 sm:w-[72px]"
-              >
-                <span className="grid h-12 w-12 place-items-center rounded-full bg-[#0D5C3A] text-white sm:h-14 sm:w-14">
-                  <Share2 className="h-5 w-5" />
-                </span>
-                <span className="text-[11px] font-bold text-slate-700">Share</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => void prepareInstagramShare()}
-                className="flex w-[64px] flex-col items-center gap-1.5 sm:w-[72px]"
-              >
-                <span className="grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-amber-400 via-pink-500 to-violet-600 text-white sm:h-14 sm:w-14">
-                  <Download className="h-5 w-5" />
-                </span>
-                <span className="text-[11px] font-bold text-slate-700">
-                  Instagram
-                </span>
-              </button>
-              {socialPlatforms.map((platform) => (
-                <a
-                  key={platform.id}
-                  href={buildEventShareHref(platform.id, url, caption)}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() =>
-                    void trackEvent({
-                      eventName: "event_share",
-                      eventType: "community",
-                      source,
-                      metadata: {
-                        slug: event.slug,
-                        channel: platform.id,
-                        eventId: event.id,
-                      },
-                    })
-                  }
-                  className="flex w-[64px] flex-col items-center gap-1.5 sm:w-[72px]"
-                >
-                  <span
-                    className={`grid h-12 w-12 place-items-center rounded-full sm:h-14 sm:w-14 ${platform.tone}`}
+          <div className="mt-5 flex items-start justify-between gap-1 px-0.5 sm:px-2">
+            {SHARE_ACTIONS.map((action) => {
+              const commonClass =
+                "flex w-[4.25rem] flex-col items-center gap-1.5 sm:w-[4.5rem]";
+              const iconClass = `grid h-[3.25rem] w-[3.25rem] place-items-center rounded-full shadow-sm ${action.tone}`;
+
+              if (action.id === "instagram") {
+                return (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => void prepareInstagramShare()}
+                    className={commonClass}
                   >
-                    {platform.id === "email" ? (
-                      <Mail className="h-5 w-5" />
-                    ) : (
-                      <MessageCircle className="h-5 w-5" />
-                    )}
-                  </span>
-                  <span className="text-[11px] font-bold text-slate-700">
-                    {platform.label}
-                  </span>
-                </a>
-              ))}
-            </div>
-          </div>
+                    <span className={iconClass}>
+                      <PlatformGlyph id={action.id} />
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-700">
+                      {action.label}
+                    </span>
+                  </button>
+                );
+              }
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => void copyValue(url, "link")}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-900"
-            >
-              {copied === "link" ? (
-                <Check className="h-4 w-4 text-emerald-700" />
-              ) : (
-                <Link2 className="h-4 w-4 text-emerald-700" />
-              )}
-              {copied === "link" ? "Copied" : "Copy Link"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void savePrimaryGraphic()}
-              disabled={!square?.url}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-900 disabled:opacity-50"
-            >
-              <Download className="h-4 w-4 text-emerald-700" />
-              Save Graphic
-            </button>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-black text-slate-900">Suggested caption</p>
-              <button
-                type="button"
-                onClick={() => void copyValue(caption, "caption")}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[#0D5C3A] px-3 text-xs font-black text-white"
-              >
-                {copied === "caption" ? (
-                  <Check className="h-3.5 w-3.5" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5" />
-                )}
-                {copied === "caption" ? "Copied" : "Copy"}
-              </button>
-            </div>
-            <textarea
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              rows={3}
-              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium leading-relaxed text-slate-700"
-            />
-            {hint ? (
-              <p className="mt-2 text-xs font-black text-emerald-800">{hint}</p>
-            ) : null}
-          </div>
-
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-800">
-              SitGuru Community
-            </p>
-            <p className="mt-1 text-sm font-semibold text-emerald-950/90">
-              Tag{" "}
-              <span className="font-black text-emerald-900">@SitGuruOfficial</span>{" "}
-              so the pack can amplify your post.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {SITGURU_OFFICIAL_SOCIAL_LINKS.map((platform) => (
+              return (
                 <a
-                  key={platform.id}
-                  href={platform.href}
-                  target="_blank"
+                  key={action.id}
+                  href={buildEventShareHref(action.id, url, caption)}
+                  target={action.id === "sms" || action.id === "email" ? undefined : "_blank"}
                   rel="noreferrer"
                   onClick={() =>
                     void trackEvent({
@@ -447,18 +376,53 @@ export default function EventShareDrawer({
                       source,
                       metadata: {
                         slug: event.slug,
-                        channel: `sitguru_${platform.id}`,
+                        channel: action.id,
                         eventId: event.id,
                       },
                     })
                   }
-                  className="inline-flex min-h-8 items-center rounded-full border border-emerald-200 bg-white px-3 text-[11px] font-black text-emerald-900"
+                  className={commonClass}
                 >
-                  {platform.label}
+                  <span className={iconClass}>
+                    <PlatformGlyph id={action.id} />
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-700">
+                    {action.label}
+                  </span>
                 </a>
-              ))}
-            </div>
+              );
+            })}
           </div>
+
+          {hint ? (
+            <p className="mt-3 text-center text-xs font-semibold text-[#0D5C3A]">
+              {hint}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4">
+          <button
+            type="button"
+            onClick={() => void copyLink()}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-50"
+          >
+            {copied ? (
+              <Check className="h-4 w-4 text-[#0D5C3A]" strokeWidth={2.5} />
+            ) : (
+              <Link2 className="h-4 w-4 text-slate-600" strokeWidth={2.25} />
+            )}
+            {copied ? "Copied" : "Copy Link"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void savePrimaryGraphic()}
+            disabled={!square?.url}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ImageIcon className="h-4 w-4 text-slate-600" strokeWidth={2.25} />
+            Save Graphic
+          </button>
         </div>
       </div>
     </div>
