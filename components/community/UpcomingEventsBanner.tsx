@@ -93,8 +93,7 @@ function EventBannerCard({
   const href = getEventBannerHref(event);
   const external = isExternalEventLink(event);
   const googleDiscovery = isGoogleDiscoveryEvent(event);
-  const canShareSitGuru = !isHomepageDemoEvent(event.id);
-  const canAttend = !isHomepageDemoEvent(event.id);
+  const curatedDemo = isHomepageDemoEvent(event.id);
 
   const mediaAndDetails = (
     <>
@@ -106,7 +105,7 @@ function EventBannerCard({
           </p>
           <p className="text-xl font-black leading-none">{badgeDay}</p>
         </div>
-        {googleDiscovery ? (
+        {googleDiscovery || curatedDemo ? (
           <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-slate-900/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm">
             Pet Event
           </div>
@@ -162,23 +161,19 @@ function EventBannerCard({
 
   const cardFooter = (
     <div className="mt-auto space-y-3 border-t border-slate-100 px-5 py-4">
-      {canAttend ? (
-        <EventAttendingButtons
-          eventId={event.id}
-          eventSlug={event.slug}
-          compact
-        />
-      ) : null}
-      {canShareSitGuru ? (
-        <button
-          type="button"
-          onClick={() => onShare(event)}
-          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
-        >
-          <Share2 className="h-3.5 w-3.5" />
-          Share from SitGuru
-        </button>
-      ) : null}
+      <EventAttendingButtons
+        eventId={event.id}
+        eventSlug={event.slug}
+        compact
+      />
+      <button
+        type="button"
+        onClick={() => onShare(event)}
+        className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+      >
+        <Share2 className="h-3.5 w-3.5" />
+        Share from SitGuru
+      </button>
     </div>
   );
 
@@ -352,11 +347,12 @@ export default function UpcomingEventsBanner({
 
   function openSitGuruShare(event: CommunityEventWithPartner) {
     const discovery = isGoogleDiscoveryEvent(event);
+    const curatedDemo = isHomepageDemoEvent(event.id);
     setShareEvent({
       id: event.id,
       title: event.title,
       slug: event.slug,
-      sharePath: discovery ? "/events" : undefined,
+      sharePath: discovery || curatedDemo ? "/events" : undefined,
       startAt: event.start_at,
       endAt: event.end_at,
       timezone: event.timezone,
@@ -372,7 +368,7 @@ export default function UpcomingEventsBanner({
       image_hero_url: event.image_hero_url,
       image_card_url: event.image_card_url,
       image_original_url: event.image_original_url,
-      preferBrandedGraphics: !discovery,
+      preferBrandedGraphics: !discovery && !curatedDemo,
     });
   }
 
