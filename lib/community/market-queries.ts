@@ -137,6 +137,94 @@ export async function listCommunityMarkets(opts?: {
   return (data || []).map((row) => mapMarket(row as Record<string, unknown>));
 }
 
+/**
+ * Upsert the canonical PA/NJ market catalog so SerpApi has markets to sync into.
+ * Safe to call repeatedly — does not delete existing markets.
+ */
+export async function ensureCommunityMarketsSeeded() {
+  const existing = await listCommunityMarkets();
+  if (existing.length > 0) {
+    return { ok: true as const, seeded: 0, total: existing.length, error: null };
+  }
+
+  const { COMMUNITY_MARKET_SEEDS } = await import(
+    "@/lib/community/market-seed"
+  );
+  const now = new Date().toISOString();
+  const rows = COMMUNITY_MARKET_SEEDS.map((seed) => ({
+    ...seed,
+    enabled: true,
+    event_categories: [
+      "Adoption",
+      "Social",
+      "Rescue",
+      "Festival",
+      "Community",
+    ],
+    city_anchor_index: 0,
+    market_health: "healthy",
+    next_scheduled_sync_at: now,
+    serp_cache_ttl_hours: 20,
+    updated_at: now,
+  }));
+
+  const { error } = await supabaseAdmin.from("community_markets").upsert(rows, {
+    onConflict: "slug",
+  });
+
+  if (error) {
+    // Retry without smart-growth columns if migration not applied yet
+    const legacyRows = COMMUNITY_MARKET_SEEDS.map((seed) => ({
+      slug: seed.slug,
+      name: seed.name,
+      county_name: seed.county_name,
+      city: seed.city,
+      state: seed.state,
+      region: seed.region,
+      location_query: seed.location_query,
+      latitude: seed.latitude,
+      longitude: seed.longitude,
+      radius_miles: seed.radius_miles,
+      search_terms: seed.search_terms,
+      event_categories: [
+        "Adoption",
+        "Social",
+        "Rescue",
+        "Festival",
+        "Community",
+      ],
+      enabled: true,
+      sort_order: seed.sort_order,
+      max_queries_per_sync: seed.max_queries_per_sync,
+      serp_cache_ttl_hours: 20,
+      next_scheduled_sync_at: now,
+      updated_at: now,
+    }));
+
+    const fallback = await supabaseAdmin
+      .from("community_markets")
+      .upsert(legacyRows, { onConflict: "slug" });
+
+    if (fallback.error) {
+      console.warn("ensureCommunityMarketsSeeded:", fallback.error.message);
+      return {
+        ok: false as const,
+        seeded: 0,
+        total: 0,
+        error: fallback.error.message,
+      };
+    }
+  }
+
+  const after = await listCommunityMarkets();
+  return {
+    ok: true as const,
+    seeded: rows.length,
+    total: after.length,
+    error: null,
+  };
+}
+
 export async function getCommunityMarketById(marketId: string) {
   const { data, error } = await supabaseAdmin
     .from("community_markets")

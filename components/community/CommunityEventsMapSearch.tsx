@@ -2,12 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { MapPin, Search } from "lucide-react";
+import Image from "next/image";
+import {
+  CalendarDays,
+  MapPin,
+  PawPrint,
+  Search,
+} from "lucide-react";
 import ProviderMap from "@/components/ProviderMap";
-import EventCard from "@/components/community/EventCard";
 import {
   formatEventCountyState,
   formatEventDateRange,
+  getEventCardImage,
 } from "@/lib/community/format";
 import {
   getEventBannerHref,
@@ -28,7 +34,7 @@ type Filters = {
   category: string;
 };
 
-const DEFAULT_CENTER: [number, number] = [40.3368, -75.1113]; // Greater Philly / Bucks
+const DEFAULT_CENTER: [number, number] = [40.3368, -75.1113];
 
 function eventToMapMarker(event: CommunityEventWithPartner) {
   const href = getEventBannerHref(event);
@@ -47,6 +53,154 @@ function eventToMapMarker(event: CommunityEventWithPartner) {
     href,
     avatar_url: event.image_card_url || event.image_hero_url || null,
   };
+}
+
+function EventListCard({
+  event,
+  highlighted,
+  onHighlight,
+}: {
+  event: CommunityEventWithPartner;
+  highlighted: boolean;
+  onHighlight: () => void;
+}) {
+  const imageUrl = getEventCardImage(event);
+  const { compactDate, timeLabel } = formatEventDateRange(
+    event.start_at,
+    event.end_at,
+    event.timezone,
+  );
+  const href = getEventBannerHref(event);
+  const external = isExternalEventLink(event);
+  const googleDiscovery = isGoogleDiscoveryEvent(event);
+  const sourceLabel = googleDiscovery
+    ? "Community Event"
+    : "SitGuru Partner Event";
+
+  const body = (
+    <>
+      <div className="relative h-[112px] w-[112px] shrink-0 overflow-hidden rounded-2xl bg-emerald-50 sm:h-[128px] sm:w-[128px]">
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt={event.title}
+            fill
+            className="object-cover"
+            sizes="128px"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-emerald-700">
+            <PawPrint className="h-8 w-8 opacity-50" />
+          </div>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate text-lg font-black text-slate-950 sm:text-xl">
+                {event.title}
+              </h3>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] ${
+                  googleDiscovery
+                    ? "bg-slate-100 text-slate-700"
+                    : "bg-emerald-50 text-emerald-800"
+                }`}
+              >
+                {sourceLabel}
+              </span>
+            </div>
+            <p className="mt-1 text-sm font-bold text-emerald-800">
+              {formatEventCountyState(event)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+              {compactDate.split(" ")[0]}
+            </p>
+            <p className="text-base font-black leading-none text-slate-950">
+              {compactDate.split(" ")[1]}
+            </p>
+          </div>
+        </div>
+
+        <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600">
+          <CalendarDays className="h-4 w-4 text-emerald-700" />
+          {timeLabel}
+        </p>
+        <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600">
+          <MapPin className="h-4 w-4 text-emerald-700" />
+          {event.venue_name ||
+            [event.city, event.state].filter(Boolean).join(", ") ||
+            "Location TBA"}
+        </p>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {event.is_free ? (
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
+              Free
+            </span>
+          ) : null}
+          {event.pet_friendly ? (
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
+              Pet Friendly
+            </span>
+          ) : null}
+          {(event.categories || []).slice(0, 2).map((category) => (
+            <span
+              key={category}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-700"
+            >
+              {category}
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800">
+            View details
+          </span>
+          <span className="inline-flex min-h-10 items-center justify-center rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white">
+            {googleDiscovery ? "Open event" : "I'm Going"}
+          </span>
+        </div>
+      </div>
+    </>
+  );
+
+  const className = `flex gap-4 rounded-[28px] border bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:p-5 ${
+    highlighted
+      ? "border-emerald-400 ring-4 ring-emerald-100"
+      : "border-slate-200"
+  }`;
+
+  if (external) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+        onMouseEnter={onHighlight}
+        onFocus={onHighlight}
+      >
+        {body}
+      </a>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className={className}
+      onMouseEnter={onHighlight}
+      onFocus={onHighlight}
+    >
+      {body}
+    </Link>
+  );
 }
 
 export default function CommunityEventsMapSearch({
@@ -131,9 +285,15 @@ export default function CommunityEventsMapSearch({
     if (withCoords?.latitude != null && withCoords?.longitude != null) {
       return [Number(withCoords.latitude), Number(withCoords.longitude)];
     }
-    if (filters.city || filters.state) return DEFAULT_CENTER;
     return DEFAULT_CENTER;
-  }, [filtered, filters.city, filters.state]);
+  }, [filtered]);
+
+  const activeFilterCount = [
+    filters.q,
+    filters.city,
+    filters.state,
+    filters.category,
+  ].filter(Boolean).length;
 
   function applySearch(next: Filters = draft) {
     setFilters(next);
@@ -146,237 +306,211 @@ export default function CommunityEventsMapSearch({
     }
   }
 
+  function clearFilters() {
+    const cleared = { q: "", city: "", state: "", category: "" };
+    setDraft(cleared);
+    applySearch(cleared);
+  }
+
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mb-5">
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-          Local pet life
-        </p>
-        <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-          Find events near you.
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-600 sm:text-base">
-          Search by city or state — same map vibe as Find Care, built for pet
-          friendly gatherings.
-        </p>
-      </div>
-
-      <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
-        <div className="relative">
-          <div className="absolute inset-x-0 top-0 z-20 p-3 sm:p-4">
-            <form
-              className="rounded-3xl border border-white/70 bg-white/95 p-3 shadow-lg shadow-slate-900/10 backdrop-blur"
-              onSubmit={(e) => {
-                e.preventDefault();
-                applySearch(draft);
-              }}
-            >
-              <div className="grid gap-2 sm:grid-cols-[1.4fr_0.9fr_0.55fr_auto] sm:items-end">
-                <label className="block min-w-0">
-                  <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-                    Search
-                  </span>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      value={draft.q}
-                      onChange={(e) =>
-                        setDraft((current) => ({ ...current, q: e.target.value }))
-                      }
-                      placeholder="Adoption, meetup, festival…"
-                      className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-                    />
-                  </div>
-                </label>
-                <label className="block min-w-0">
-                  <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-                    City
-                  </span>
-                  <input
-                    value={draft.city}
-                    onChange={(e) =>
-                      setDraft((current) => ({
-                        ...current,
-                        city: e.target.value,
-                      }))
-                    }
-                    placeholder="Doylestown"
-                    className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-                  />
-                </label>
-                <label className="block min-w-0">
-                  <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-                    State
-                  </span>
-                  <input
-                    value={draft.state}
-                    onChange={(e) =>
-                      setDraft((current) => ({
-                        ...current,
-                        state: e.target.value.toUpperCase().slice(0, 2),
-                      }))
-                    }
-                    placeholder="PA"
-                    maxLength={2}
-                    className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold uppercase text-slate-900 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
-                  />
-                </label>
-                <button
-                  type="submit"
-                  className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800"
-                >
-                  Search
-                </button>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <select
-                  value={draft.category}
-                  onChange={(e) =>
-                    setDraft((current) => ({
-                      ...current,
-                      category: e.target.value,
-                    }))
-                  }
-                  className="min-h-10 rounded-full border border-slate-200 bg-white px-3 text-xs font-black text-slate-700"
-                >
-                  <option value="">All categories</option>
-                  {COMMUNITY_EVENT_CATEGORIES.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-                {(filters.q || filters.city || filters.state || filters.category) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const cleared = {
-                        q: "",
-                        city: "",
-                        state: "",
-                        category: "",
-                      };
-                      setDraft(cleared);
-                      applySearch(cleared);
-                    }}
-                    className="min-h-10 rounded-full border border-slate-200 bg-white px-3 text-xs font-black text-slate-600"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            </form>
-          </div>
-
-          <div className="h-[460px] pt-[9.5rem] sm:h-[540px] sm:pt-[7.5rem]">
-            <ProviderMap
-              markers={markers as unknown as Record<string, unknown>[]}
-              center={mapCenter}
-              highlightedMarkerId={
-                highlightedId ? `event:${highlightedId}` : undefined
-              }
-            />
-          </div>
+    <section className="pb-4">
+      <div className="mx-auto max-w-[1500px] px-5 pt-8 sm:px-6 sm:pt-10 lg:px-8">
+        <div className="mb-6 max-w-3xl">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+            Local pet life
+          </p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+            Find events near you
+          </h2>
+          <p className="mt-2 text-base font-semibold text-slate-600">
+            Search the map like Find Care — events on the left, map on the right.
+          </p>
         </div>
 
-        <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-4 sm:px-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-black text-slate-800">
-              {filtered.length} event{filtered.length === 1 ? "" : "s"}
-              {filters.city || filters.state
-                ? ` near ${[filters.city, filters.state].filter(Boolean).join(", ")}`
-                : ""}
-            </p>
+        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
+          <form
+            className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr_0.7fr_1.2fr_auto]"
+            onSubmit={(e) => {
+              e.preventDefault();
+              applySearch(draft);
+            }}
+          >
+            <label className="block min-w-0">
+              <span className="mb-2 block text-sm font-semibold text-slate-800">
+                Category
+              </span>
+              <select
+                value={draft.category}
+                onChange={(e) =>
+                  setDraft((current) => ({
+                    ...current,
+                    category: e.target.value,
+                  }))
+                }
+                className="min-h-12 w-full appearance-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+              >
+                <option value="">All categories</option>
+                {COMMUNITY_EVENT_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block min-w-0">
+              <span className="mb-2 block text-sm font-semibold text-slate-800">
+                City
+              </span>
+              <input
+                value={draft.city}
+                onChange={(e) =>
+                  setDraft((current) => ({ ...current, city: e.target.value }))
+                }
+                placeholder="Quakertown"
+                className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+              />
+            </label>
+
+            <label className="block min-w-0">
+              <span className="mb-2 block text-sm font-semibold text-slate-800">
+                State
+              </span>
+              <input
+                value={draft.state}
+                onChange={(e) =>
+                  setDraft((current) => ({
+                    ...current,
+                    state: e.target.value.toUpperCase().slice(0, 2),
+                  }))
+                }
+                placeholder="PA"
+                maxLength={2}
+                className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base uppercase text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+              />
+            </label>
+
+            <label className="block min-w-0">
+              <span className="mb-2 block text-sm font-semibold text-slate-800">
+                Search events
+              </span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={draft.q}
+                  onChange={(e) =>
+                    setDraft((current) => ({ ...current, q: e.target.value }))
+                  }
+                  placeholder="Adoption, meetup, festival…"
+                  className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+                />
+              </div>
+            </label>
+
+            <div className="flex items-end gap-2">
+              <button
+                type="submit"
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white transition hover:bg-emerald-800"
+              >
+                Search
+              </button>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+              >
+                Clear
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
+              {filtered.length} event{filtered.length === 1 ? "" : "s"} nearby
+            </span>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
+              {activeFilterCount} active filter
+              {activeFilterCount === 1 ? "" : "s"}
+            </span>
             <Link
               href="/community/events"
-              className="text-sm font-black text-emerald-800 hover:underline"
+              className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-800 hover:underline"
             >
-              Open full list →
+              Full calendar →
             </Link>
           </div>
-
-          {filtered.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-6 text-sm font-semibold text-slate-600">
-              No events match that search yet. Try another city/state, or browse
-              the full calendar.
-            </div>
-          ) : (
-            <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {filtered.slice(0, 12).map((event) => {
-                const { compactDate } = formatEventDateRange(
-                  event.start_at,
-                  event.end_at,
-                  event.timezone,
-                );
-                const href = getEventBannerHref(event);
-                const external = isExternalEventLink(event);
-                const className = `w-[240px] shrink-0 rounded-3xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md ${
-                  highlightedId === event.id
-                    ? "border-emerald-400 ring-4 ring-emerald-100"
-                    : "border-slate-200"
-                }`;
-
-                const body = (
-                  <>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
-                      {compactDate}
-                      {isGoogleDiscoveryEvent(event) ? " · Community Event" : " · SitGuru Partner Event"}
-                    </p>
-                    <h3 className="mt-1 line-clamp-2 text-base font-black text-slate-950">
-                      {event.title}
-                    </h3>
-                    <p className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-emerald-800">
-                      <MapPin className="h-3.5 w-3.5" />
-                      {formatEventCountyState(event)}
-                    </p>
-                  </>
-                );
-
-                if (external) {
-                  return (
-                    <a
-                      key={event.id}
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={className}
-                      onMouseEnter={() => setHighlightedId(event.id)}
-                      onFocus={() => setHighlightedId(event.id)}
-                    >
-                      {body}
-                    </a>
-                  );
-                }
-
-                return (
-                  <Link
-                    key={event.id}
-                    href={href}
-                    className={className}
-                    onMouseEnter={() => setHighlightedId(event.id)}
-                    onFocus={() => setHighlightedId(event.id)}
-                  >
-                    {body}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
 
-      {filtered.length > 0 ? (
-        <div className="mt-8 hidden gap-5 md:grid md:grid-cols-2 xl:grid-cols-3">
-          {filtered.slice(0, 6).map((event) => (
-            <div
-              key={`card-${event.id}`}
-              onMouseEnter={() => setHighlightedId(event.id)}
-            >
-              <EventCard event={event} />
+      <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-6 sm:py-10 lg:px-8">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_460px]">
+          <div className="order-1 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)] xl:order-2 xl:sticky xl:top-28 xl:self-start">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h3 className="text-lg font-bold text-slate-900">
+                Events are closer with SitGuru
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Pet friendly gatherings near you — partners first, community next.
+              </p>
+              {(filters.city || filters.state) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
+                    Centered on{" "}
+                    {[filters.city, filters.state].filter(Boolean).join(", ")}
+                  </span>
+                </div>
+              )}
             </div>
-          ))}
+            <div className="h-[420px] sm:h-[520px] xl:h-[calc(100vh-9rem)] xl:min-h-[520px] xl:max-h-[720px]">
+              <ProviderMap
+                markers={markers as unknown as Record<string, unknown>[]}
+                center={mapCenter}
+                highlightedMarkerId={
+                  highlightedId ? `event:${highlightedId}` : undefined
+                }
+              />
+            </div>
+          </div>
+
+          <div className="order-2 space-y-5 xl:order-1">
+            {filtered.length === 0 ? (
+              <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
+                <h3 className="text-xl font-bold text-slate-900">
+                  No events match just yet
+                </h3>
+                <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
+                  Try another city or category. Partner events and SerpApi
+                  community discoveries show here once markets are syncing.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="inline-flex items-center justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                  >
+                    Show all events
+                  </button>
+                  <Link
+                    href="/community/events"
+                    className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800"
+                  >
+                    Browse calendar
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              filtered.map((event) => (
+                <EventListCard
+                  key={event.id}
+                  event={event}
+                  highlighted={highlightedId === event.id}
+                  onHighlight={() => setHighlightedId(event.id)}
+                />
+              ))
+            )}
+          </div>
         </div>
-      ) : null}
+      </div>
     </section>
   );
 }

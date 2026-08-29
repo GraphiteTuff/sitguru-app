@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getAdminIdentity } from "@/lib/admin/access";
 import {
+  ensureCommunityMarketsSeeded,
   listCommunityMarkets,
   updateCommunityMarket,
 } from "@/lib/community/market-queries";
@@ -52,6 +53,12 @@ export async function syncCommunityMarketNowAction(marketId?: string) {
   const gate = await requireAdminAction();
   if (!gate.ok) return gate;
 
+  // If markets were wiped, restore catalog first so SerpApi has targets.
+  const existing = await listCommunityMarkets({ enabledOnly: true });
+  if (!existing.length && !marketId) {
+    await ensureCommunityMarketsSeeded();
+  }
+
   const result = await syncGoogleCommunityEventDiscoveries({
     marketId,
     forceRefresh: true,
@@ -62,6 +69,15 @@ export async function syncCommunityMarketNowAction(marketId?: string) {
   revalidatePath("/");
   revalidatePath("/community/events");
 
+  return result;
+}
+
+export async function restoreCommunityMarketsAction() {
+  const gate = await requireAdminAction();
+  if (!gate.ok) return gate;
+
+  const result = await ensureCommunityMarketsSeeded();
+  revalidatePath("/admin/community/markets");
   return result;
 }
 

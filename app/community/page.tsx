@@ -79,38 +79,18 @@ export default async function CommunityPage() {
 
   return (
     <main className="min-h-screen bg-[#f8fcfd]">
-      <section className="public-dark-section border-b border-emerald-900/20 bg-[#0D5C3A] py-14 text-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <section className="public-dark-section border-b border-emerald-900/20 bg-[#0D5C3A] py-10 text-white sm:py-12">
+        <div className="mx-auto max-w-[1500px] px-5 sm:px-6 lg:px-8">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100">
             SitGuru Community
           </p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight !text-white sm:text-5xl">
-            Pet friendly community, events, and local connections
+          <h1 className="mt-3 text-3xl font-black tracking-tight !text-white sm:text-4xl lg:text-5xl">
+            Pet friendly community events near you
           </h1>
-          <p className="mt-4 max-w-2xl text-base font-semibold text-emerald-50">
-            Discover events near you on the map, meet local Gurus, and connect with
-            SitGuru partners who love pets as much as you do.
+          <p className="mt-3 max-w-2xl text-base font-semibold text-emerald-50">
+            Search like Find Care — events on the left, map on the right. Partner
+            events always lead.
           </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Link
-              href="/signup?role=pet_parent&intent=pet_parent&next=%2Fcommunity&source=community_hub&campaign=community_hub_join&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_join"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-emerald-900"
-            >
-              Pet Parent
-            </Link>
-            <Link
-              href="/signup?role=guru&intent=guru&next=%2Fcommunity&source=community_hub&campaign=community_hub_guru&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_guru"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/40 bg-white/10 px-5 text-sm font-black !text-white"
-            >
-              Pet Guru
-            </Link>
-            <Link
-              href="/signup?role=ambassador&intent=ambassador&next=%2Fcommunity&source=community_hub&campaign=community_hub_ambassador&utm_source=sitguru&utm_medium=community_events&utm_campaign=community_hub_ambassador"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/40 bg-white/10 px-5 text-sm font-black !text-white"
-            >
-              Ambassador
-            </Link>
-          </div>
         </div>
       </section>
 

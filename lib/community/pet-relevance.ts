@@ -89,7 +89,10 @@ export function effectivePetRelevanceScore(row: {
   ) {
     return Math.max(0, Math.min(100, Math.round(row.pet_relevance_override)));
   }
-  return Math.max(0, Math.min(100, Math.round(row.pet_relevance_score || 0)));
+  return Math.max(
+    0,
+    Math.min(100, Math.round(row.pet_relevance_score ?? 50)),
+  );
 }
 
 /** Qualifying pet events for homepage / yield (70+ or override). */

@@ -20,6 +20,7 @@ import {
 import {
   pauseCommunityMarketAction,
   previewCommunityMarketSyncAction,
+  restoreCommunityMarketsAction,
   saveCommunityMarketAction,
   syncCommunityMarketNowAction,
 } from "@/app/admin/community/markets/actions";
@@ -295,16 +296,48 @@ export default function AdminCommunityMarketsClient({
           Discovery markets power SerpApi only. SitGuru Partner Events stay
           separate and always keep visual priority on the homepage.
         </p>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={requestSyncAll}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black text-white disabled:opacity-60"
-        >
-          <RefreshCw className={`h-4 w-4 ${pending ? "animate-spin" : ""}`} />
-          Sync all enabled markets
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {markets.length === 0 ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                startTransition(async () => {
+                  const result = await restoreCommunityMarketsAction();
+                  if (!result.ok) {
+                    setMessage(result.error || "Could not restore markets");
+                    return;
+                  }
+                  setMessage(
+                    `Restored ${result.total} PA/NJ markets. Sync now to pull events via SerpApi.`,
+                  );
+                  window.location.reload();
+                });
+              }}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-black text-emerald-900 disabled:opacity-60"
+            >
+              Restore PA/NJ markets
+            </button>
+          ) : null}
+          <button
+            type="button"
+            disabled={pending}
+            onClick={requestSyncAll}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black text-white disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${pending ? "animate-spin" : ""}`} />
+            Sync all enabled markets
+          </button>
+        </div>
       </div>
+
+      {markets.length === 0 ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-semibold text-amber-950">
+          No discovery markets found. Restore the PA/NJ catalog, then Sync —
+          SerpApi pulls pet events into those markets (it does not create the
+          markets themselves).
+        </div>
+      ) : null}
 
       {budgetConfirm ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">

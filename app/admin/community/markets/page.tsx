@@ -7,6 +7,7 @@ import {
   countDiscoveriesFoundToday,
   countPartnerEventsPublished,
   countPetRelevantFoundToday,
+  ensureCommunityMarketsSeeded,
   getSerpUsageToday,
   listCommunityMarkets,
 } from "@/lib/community/market-queries";
@@ -19,9 +20,14 @@ export default async function AdminCommunityMarketsPage() {
     redirect("/admin/login");
   }
 
-  const [markets, usage, partnerEvents, communityEventsToday, petRelevantToday] =
+  let markets = await listCommunityMarkets();
+  if (markets.length === 0) {
+    await ensureCommunityMarketsSeeded();
+    markets = await listCommunityMarkets();
+  }
+
+  const [usage, partnerEvents, communityEventsToday, petRelevantToday] =
     await Promise.all([
-      listCommunityMarkets(),
       getSerpUsageToday(),
       countPartnerEventsPublished(),
       countDiscoveriesFoundToday(),
