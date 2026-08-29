@@ -1,5 +1,8 @@
 -- Extend public attendance counts for Attending? Yes / Maybe / No on event cards.
-CREATE OR REPLACE FUNCTION public.get_community_event_attendance_counts(p_event_id uuid)
+-- Must DROP first: Postgres cannot change OUT/return columns via CREATE OR REPLACE.
+DROP FUNCTION IF EXISTS public.get_community_event_attendance_counts(uuid);
+
+CREATE FUNCTION public.get_community_event_attendance_counts(p_event_id uuid)
 RETURNS TABLE (
   pet_parents bigint,
   gurus bigint,
