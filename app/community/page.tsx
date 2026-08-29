@@ -34,10 +34,10 @@ function mergeUniqueEvents(
 const communityLinks = [
   {
     href: "/community/events",
-    label: "All Events",
+    label: "Event list",
     ready: true,
     description:
-      "Full list with filters — adoption days, festivals, training, and partner gatherings.",
+      "Full filterable list of upcoming events — no map. Best for scanning many listings.",
   },
   {
     href: "/community/host",
@@ -115,7 +115,7 @@ export default async function CommunityPage() {
               href="/community/events"
               className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/30 px-5 text-sm font-black !text-white"
             >
-              Browse all events
+              Event list (no map)
             </Link>
           </div>
         </div>

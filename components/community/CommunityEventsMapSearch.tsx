@@ -483,7 +483,7 @@ export default function CommunityEventsMapSearch({
               href="/community/events"
               className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-800 hover:underline"
             >
-              Browse all events →
+              Open full event list →
             </Link>
           </div>
         </div>
