@@ -4,6 +4,7 @@ import CommunityEventsMapSearch from "@/components/community/CommunityEventsMapS
 import CommunityFeaturedSection from "@/components/community/CommunityFeaturedSection";
 import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
 import { fetchDiscoveredHomepageEvents } from "@/lib/community/discovered-events";
+import { getUpcomingCuratedBucksMontgomeryPetEvents } from "@/lib/community/homepage-demo-events";
 import {
   fetchFeaturedCommunityPageEvents,
   fetchPublicEvents,
@@ -75,7 +76,13 @@ export default async function CommunityPage() {
     fetchDiscoveredHomepageEvents({ limit: 24 }),
   ]);
 
-  const mapEvents = mergeUniqueEvents(partnerEvents, discovered.events, 48);
+  // Lift curated Bucks & Montgomery listings into the map/search (same set as homepage).
+  const curated = getUpcomingCuratedBucksMontgomeryPetEvents();
+  const mapEvents = mergeUniqueEvents(
+    mergeUniqueEvents(partnerEvents, curated, 80),
+    discovered.events,
+    80,
+  );
 
   return (
     <main className="min-h-screen bg-[#f8fcfd]">

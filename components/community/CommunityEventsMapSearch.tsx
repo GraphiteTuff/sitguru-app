@@ -23,6 +23,7 @@ import {
   isExternalEventLink,
   isGoogleDiscoveryEvent,
 } from "@/lib/community/event-preview";
+import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
 import {
   readCommunityLocationPreference,
   saveCommunityLocationPreference,
@@ -58,10 +59,11 @@ function eventToMapMarker(event: CommunityEventWithPartner) {
     .trim()
     .slice(0, 140);
   const googleDiscovery = isGoogleDiscoveryEvent(event);
+  const curated = isHomepageDemoEvent(event.id);
   const badges = [
     event.is_free ? "Free" : null,
     event.pet_friendly ? "Pet Friendly" : null,
-    googleDiscovery ? "Pet Event" : "SitGuru Partner Event",
+    googleDiscovery || curated ? "Pet Event" : "SitGuru Partner Event",
   ].filter(Boolean) as string[];
 
   return {
@@ -108,9 +110,9 @@ function EventListCard({
   const href = getEventBannerHref(event);
   const external = isExternalEventLink(event);
   const googleDiscovery = isGoogleDiscoveryEvent(event);
-  const sourceLabel = googleDiscovery
-    ? "Pet Event"
-    : "SitGuru Partner Event";
+  const curated = isHomepageDemoEvent(event.id);
+  const sourceLabel =
+    googleDiscovery || curated ? "Pet Event" : "SitGuru Partner Event";
   const description = (
     event.short_description ||
     event.description ||
@@ -150,7 +152,7 @@ function EventListCard({
               </h3>
               <span
                 className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] ${
-                  googleDiscovery
+                  googleDiscovery || curated
                     ? "bg-slate-100 text-slate-700"
                     : "bg-emerald-50 text-emerald-800"
                 }`}
@@ -551,9 +553,12 @@ export default function CommunityEventsMapSearch({
                   key={`${option.county}-${option.state}`}
                   type="button"
                   onClick={() => {
+                    // County-wide search: clear city so a saved town (e.g. Quakertown)
+                    // does not hide the rest of Bucks / Montgomery listings.
                     const next = {
                       ...draft,
                       county: option.county,
+                      city: "",
                       state: option.state,
                     };
                     setDraft(next);
