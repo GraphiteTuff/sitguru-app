@@ -1,5 +1,43 @@
--- Elevate Montgomery County, PA as a Core major market + add other major PA counties.
--- Safe to re-run. Uses `enabled` (not is_active) to match community_markets schema.
+-- 1) Add smart-growth columns if missing (fixes: column "market_tier" does not exist)
+-- 2) Upsert Montgomery County + other major PA markets
+
+ALTER TABLE public.community_markets
+  ADD COLUMN IF NOT EXISTS market_tier text NOT NULL DEFAULT 'expansion',
+  ADD COLUMN IF NOT EXISTS city_anchors text[] NOT NULL DEFAULT '{}'::text[],
+  ADD COLUMN IF NOT EXISTS city_anchor_index integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS sync_frequency_hours integer NOT NULL DEFAULT 24,
+  ADD COLUMN IF NOT EXISTS market_health text NOT NULL DEFAULT 'healthy',
+  ADD COLUMN IF NOT EXISTS searches_performed_total integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS events_discovered_total integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pet_relevant_events_total integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS events_rejected_total integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS events_inserted_total integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS events_updated_total integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS duplicates_detected_total integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS zero_result_searches_total integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS consecutive_zero_yield_syncs integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_pet_yield_per_search numeric(8,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS avg_pet_yield_per_search numeric(8,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pet_relevant_events_count integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS max_queries_per_sync integer NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS county_name text,
+  ADD COLUMN IF NOT EXISTS region text,
+  ADD COLUMN IF NOT EXISTS location_query text,
+  ADD COLUMN IF NOT EXISTS next_scheduled_sync_at timestamptz;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'community_markets_market_tier_check'
+  ) THEN
+    ALTER TABLE public.community_markets
+      ADD CONSTRAINT community_markets_market_tier_check
+      CHECK (market_tier IN ('core', 'growth', 'expansion', 'seasonal', 'paused'));
+  END IF;
+EXCEPTION
+  WHEN others THEN
+    RAISE NOTICE 'market_tier check skipped: %', SQLERRM;
+END $$;
 
 INSERT INTO public.community_markets (
   slug, name, county_name, city, state, region, location_query,
