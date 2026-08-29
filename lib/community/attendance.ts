@@ -17,7 +17,8 @@ export type EventAttendanceCounts = {
 export type EventAttendanceRow = {
   id: string;
   event_id: string;
-  user_id: string;
+  user_id: string | null;
+  guest_key?: string | null;
   attendance_role: AttendanceRole;
   status: AttendanceStatus;
 };
@@ -30,6 +31,12 @@ const emptyCounts = (): EventAttendanceCounts => ({
   totalMaybe: 0,
   totalNo: 0,
 });
+
+const GUEST_KEY_RE = /^[a-zA-Z0-9_-]{8,64}$/;
+
+export function isValidGuestKey(value: unknown): value is string {
+  return typeof value === "string" && GUEST_KEY_RE.test(value.trim());
+}
 
 export async function resolveAttendanceRole(userId: string): Promise<AttendanceRole> {
   const [{ data: roles }, { data: guru }, { data: ambassador }] = await Promise.all([
@@ -107,27 +114,78 @@ export async function getUserEventAttendance(eventId: string, userId: string) {
   return (data as EventAttendanceRow | null) || null;
 }
 
+export async function getGuestEventAttendance(eventId: string, guestKey: string) {
+  const { data } = await supabaseAdmin
+    .from("community_event_attendance")
+    .select("*")
+    .eq("event_id", eventId)
+    .eq("guest_key", guestKey.trim())
+    .maybeSingle();
+
+  return (data as EventAttendanceRow | null) || null;
+}
+
 export async function setEventAttendance(input: {
   eventId: string;
-  userId: string;
+  userId?: string | null;
+  guestKey?: string | null;
   status: AttendanceStatus;
   role?: AttendanceRole;
 }) {
-  const role = input.role || (await resolveAttendanceRole(input.userId));
+  const userId = input.userId?.trim() || null;
+  const guestKey = input.guestKey?.trim() || null;
+
+  if (!userId && !guestKey) {
+    return { ok: false as const, error: "Sign-in or guest key required." };
+  }
+  if (userId && guestKey) {
+    return { ok: false as const, error: "Provide either user or guest, not both." };
+  }
+  if (guestKey && !isValidGuestKey(guestKey)) {
+    return { ok: false as const, error: "Invalid guest key." };
+  }
+
+  const role =
+    input.role ||
+    (userId ? await resolveAttendanceRole(userId) : "pet_parent");
   const now = new Date().toISOString();
 
-  const { data, error } = await supabaseAdmin
-    .from("community_event_attendance")
-    .upsert(
-      {
-        event_id: input.eventId,
-        user_id: input.userId,
+  // Upsert by unique partial indexes — look up existing row first for guests/users
+  const existing = userId
+    ? await getUserEventAttendance(input.eventId, userId)
+    : await getGuestEventAttendance(input.eventId, guestKey!);
+
+  if (existing?.id) {
+    const { data, error } = await supabaseAdmin
+      .from("community_event_attendance")
+      .update({
         attendance_role: role,
         status: input.status,
         updated_at: now,
-      },
-      { onConflict: "event_id,user_id" },
-    )
+      })
+      .eq("id", existing.id)
+      .select("*")
+      .single();
+
+    if (error) {
+      return {
+        ok: false as const,
+        error: error.message || "Unable to update attendance.",
+      };
+    }
+    return { ok: true as const, attendance: data as EventAttendanceRow };
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("community_event_attendance")
+    .insert({
+      event_id: input.eventId,
+      user_id: userId,
+      guest_key: guestKey,
+      attendance_role: role,
+      status: input.status,
+      updated_at: now,
+    })
     .select("*")
     .single();
 
@@ -143,14 +201,16 @@ export async function getEventAttendeeUserIds(eventId: string) {
     .from("community_event_attendance")
     .select("user_id")
     .eq("event_id", eventId)
-    .eq("status", "going");
+    .eq("status", "going")
+    .not("user_id", "is", null);
 
   return (data || []).map((row) => String(row.user_id)).filter(Boolean);
 }
 
 export type EventAttendanceAdminRow = {
   id: string;
-  userId: string;
+  userId: string | null;
+  guestKey: string | null;
   status: AttendanceStatus;
   role: AttendanceRole;
   updatedAt: string | null;
@@ -175,13 +235,17 @@ export async function listEventAttendanceForAdmin(eventId: string): Promise<{
 
   const { data: attendanceRows } = await supabaseAdmin
     .from("community_event_attendance")
-    .select("id, user_id, attendance_role, status, updated_at, created_at")
+    .select("id, user_id, guest_key, attendance_role, status, updated_at, created_at")
     .eq("event_id", eventId)
     .order("updated_at", { ascending: false });
 
   const list = attendanceRows || [];
   const userIds = Array.from(
-    new Set(list.map((row) => String(row.user_id || "")).filter(Boolean)),
+    new Set(
+      list
+        .map((row) => (row.user_id ? String(row.user_id) : ""))
+        .filter(Boolean),
+    ),
   );
 
   const profileById = new Map<
@@ -201,16 +265,19 @@ export async function listEventAttendanceForAdmin(eventId: string): Promise<{
   }
 
   const rows: EventAttendanceAdminRow[] = list.map((row) => {
-    const userId = String(row.user_id);
-    const profile = profileById.get(userId);
-    const name =
-      String(profile?.full_name || "").trim() ||
-      String(profile?.display_name || "").trim() ||
-      "SitGuru member";
+    const userId = row.user_id ? String(row.user_id) : null;
+    const guestKey = row.guest_key ? String(row.guest_key) : null;
+    const profile = userId ? profileById.get(userId) : null;
+    const name = userId
+      ? String(profile?.full_name || "").trim() ||
+        String(profile?.display_name || "").trim() ||
+        "SitGuru member"
+      : "Guest";
 
     return {
       id: String(row.id),
       userId,
+      guestKey,
       status: row.status as AttendanceStatus,
       role: row.attendance_role as AttendanceRole,
       updatedAt: row.updated_at || row.created_at || null,
