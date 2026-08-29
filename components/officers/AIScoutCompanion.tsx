@@ -20,6 +20,7 @@ import { usePathname } from "next/navigation";
 import { useChat } from "ai/react";
 import { useGuruAuth, type GuruAuthUser } from "@/hooks/useGuruAuth";
 import AITacoCompanion from "@/components/officers/AITacoCompanion";
+import AIDelilahCompanion from "@/components/officers/AIDelilahCompanion";
 import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
 import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
 import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
@@ -575,6 +576,11 @@ function AIScoutCompanion({
         }
       />
     );
+  }
+
+  // Pet Events → Delilah (Pet Event Coordinator).
+  if (variant === "delilah") {
+    return <AIDelilahCompanion />;
   }
 
   // public-parent → Rogue at the standard bottom-right body portal.

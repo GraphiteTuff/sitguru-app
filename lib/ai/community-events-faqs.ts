@@ -217,7 +217,7 @@ export function buildCommunityEventsFaqSnapshot(
       : "";
 
   const base = buildMarketingFaqSnapshot({
-    officerLabel: "Rogue — Pet Events",
+    officerLabel: "Delilah — Pet Event Coordinator",
     faqs: COMMUNITY_EVENTS_MARKETING_FAQS,
     signupPath: signupParent,
   });
@@ -237,16 +237,21 @@ export function buildCommunityEventsFaqSnapshot(
     `- Ambassador / community growth interest → append ${cta("ambassador")}`,
     "- Social / follow pack → append [[cta:social]]",
     "",
-    "VOICE: Under 3 sentences unless FAQ answer is exact copy above. Zoomies welcome. Point at exciting events like a good GSP.",
+    "VOICE: Under 3 sentences unless FAQ answer is exact copy above. Warm Cocker Spaniel energy — organized, helpful, ready for the pack gather.",
   ]
     .filter(Boolean)
     .join("\n")
     .trim();
 }
 
-export function buildCommunityRogueOpeningHint(ctx: CommunityEventCompanionContext) {
+export function buildCommunityDelilahOpeningHint(ctx: CommunityEventCompanionContext) {
   if (ctx.title) {
-    return `Ask me anything about **${ctx.title}** — RSVP, pet-friendly details, or how to join SitGuru as a Pet Parent, Guru, or Ambassador!`;
+    return `Ask me anything about **${ctx.title}** — RSVP, pet-friendly details, hosting tips, or how to join SitGuru as a Pet Parent, Guru, or Ambassador!`;
   }
-  return "Ask me about SitGuru Pet Events — RSVP, pet-friendly tips, or joining as a Pet Parent, Guru, or Ambassador!";
+  return "Ask me about SitGuru Pet Events — RSVP, hosting Partner Events, or joining as a Pet Parent, Guru, or Ambassador!";
+}
+
+/** @deprecated Prefer buildCommunityDelilahOpeningHint — Delilah owns Pet Events chat. */
+export function buildCommunityRogueOpeningHint(ctx: CommunityEventCompanionContext) {
+  return buildCommunityDelilahOpeningHint(ctx);
 }

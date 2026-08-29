@@ -1,8 +1,9 @@
 /**
  * Canonical AI Pet Companion avatar assets.
  * Role map (locked):
- * - Scout → Guru companion (`/images/scout-avatar.png`)
- * - Taco  → Ambassador companion (`/images/taco-avatar.png`)
+ * - Scout   → Guru companion (`/images/scout-avatar.png`)
+ * - Taco    → Ambassador companion (`/images/taco-avatar.png`)
+ * - Delilah → Pet Event Coordinator (`/images/delilah-avatar.png`)
  */
 
 export const SCOUT_AVATAR = {
@@ -20,6 +21,14 @@ export const TACO_AVATAR = {
   /** Official circular Meet-the-Pack Taco portrait (Ambassador Advocate). */
   src: "/images/taco-avatar.png",
   alt: "Taco, Ambassador Advocate",
+  /** Match Rogue launcher face crop. */
+  objectPosition: "50% 28%",
+} as const;
+
+export const DELILAH_AVATAR = {
+  /** Official circular Delilah portrait (golden Cocker Spaniel / Pet Event Coordinator). */
+  src: "/images/delilah-avatar.png",
+  alt: "Delilah, Pet Event Coordinator",
   /** Match Rogue launcher face crop. */
   objectPosition: "50% 28%",
 } as const;

@@ -27,6 +27,10 @@ import {
   resolveOfficerInstantFaqAnswer,
 } from "@/lib/ai/officer-marketing-faqs";
 import {
+  buildCommunityEventsFaqSnapshot,
+  matchCommunityEventsFaq,
+} from "@/lib/ai/community-events-faqs";
+import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
 } from "@/lib/messaging/ai-model";
@@ -240,6 +244,16 @@ function fallbackReport(
   surface: OfficerSurface = "dashboard",
 ) {
   const profile = getOfficerPrompt(officer);
+  if (officer === "delilah") {
+    const communityHit = matchCommunityEventsFaq(question);
+    if (communityHit?.answer) return communityHit.answer;
+    return [
+      `**${profile.displayName} here.**`,
+      ``,
+      `I couldn't reach the live model kennel just now — tap a FAQ chip or ask about pet events, RSVPs, or hosting, and I'll answer from SitGuru's Pet Events copy.`,
+    ].join("\n");
+  }
+
   if (surface === "public") {
     const instant = resolveOfficerInstantFaqAnswer({
       officer,
@@ -266,12 +280,12 @@ function fallbackReport(
     ``,
     `I couldn't reach the live model kennel just now, so here's your personal snapshot for: _${question || "sync"}_.`,
     ``,
-    snapshotMarkdown.slice(0, 6000) || "_No snapshot rows available._",
+    snapshotMarkdown.slice(0, 6000) || "_No live snapshot rows available._",
   ].join("\n");
 }
 
 function officerFaqSnapshot(
-  officer: GuestOfficerId,
+  officer: "taco" | "scout",
   surface: OfficerSurface,
 ) {
   if (officer === "scout") {
@@ -317,17 +331,25 @@ export async function POST(req: Request) {
       return Response.json(
         {
           error:
-            "officer must be 'taco' or 'scout'. Rogue remains on /api/admin/rogue-ai.",
+            "officer must be 'taco', 'scout', or 'delilah'. Rogue remains on /api/admin/rogue-ai.",
         },
         { status: 400 },
       );
     }
     const officer: GuestOfficerId = officerRaw;
     let surface = normalizeOfficerSurface(body?.surface || body?.mode);
+    // Delilah is public Pet Events only — never require a dashboard session.
+    if (officer === "delilah") {
+      surface = "public";
+    }
     const pagePath =
       asString(body?.pagePath) ||
       asString(body?.page_path) ||
-      (officer === "scout" ? "/become-a-guru" : "/ambassadors");
+      (officer === "scout"
+        ? "/become-a-guru"
+        : officer === "delilah"
+          ? "/events"
+          : "/ambassadors");
     const companionKey = asString(body?.companion) || officer;
     const bodyGuruName = asString(body?.guruName);
     const bodyGuruEmail = asString(body?.guruEmail);
@@ -361,20 +383,25 @@ export async function POST(req: Request) {
     let providerId: string | null = null;
 
     if (session?.id && surface !== "public") {
-      const access = await assertOfficerAccess(officer, session.id);
-      if (!access.ok) {
-        return Response.json({ error: access.error }, { status: access.status });
+      if (officer === "delilah") {
+        // Defensive — Delilah is forced public above.
+        surface = "public";
+      } else {
+        const access = await assertOfficerAccess(officer, session.id);
+        if (!access.ok) {
+          return Response.json({ error: access.error }, { status: access.status });
+        }
+        const personalizedName =
+          officer === "scout" && bodyGuruName ? bodyGuruName : null;
+        actorLabel = personalizedName
+          ? `${personalizedName} (guru)${
+              bodyGuruEmail || session.email
+                ? ` · ${bodyGuruEmail || session.email}`
+                : ""
+            }`
+          : `${access.actorLabel}${session.email ? ` · ${session.email}` : ""}`;
+        providerId = access.providerId ?? null;
       }
-      const personalizedName =
-        officer === "scout" && bodyGuruName ? bodyGuruName : null;
-      actorLabel = personalizedName
-        ? `${personalizedName} (guru)${
-            bodyGuruEmail || session.email
-              ? ` · ${bodyGuruEmail || session.email}`
-              : ""
-          }`
-        : `${access.actorLabel}${session.email ? ` · ${session.email}` : ""}`;
-      providerId = access.providerId ?? null;
     } else if (session?.id) {
       actorLabel = `Signed-in guest${session.email ? ` · ${session.email}` : ""}`;
     }
@@ -422,11 +449,20 @@ export async function POST(req: Request) {
     }
 
     // Instant FAQ layer (public + dashboard) — same responsiveness pattern as Rogue.
+    if (officer === "delilah" && lastUserText) {
+      const communityHit = matchCommunityEventsFaq(lastUserText);
+      if (communityHit?.answer) {
+        return simulationDataStreamResponse(communityHit.answer);
+      }
+    }
+
     const instantFaq =
-      scoutNeedsDirectory || needsCareMatchingAsk(careThread)
+      officer === "delilah" ||
+      scoutNeedsDirectory ||
+      needsCareMatchingAsk(careThread)
         ? null
         : resolveOfficerInstantFaqAnswer({
-            officer,
+            officer: officer as "scout" | "taco",
             question: lastUserText,
             surface,
           });
@@ -436,38 +472,42 @@ export async function POST(req: Request) {
 
     // Public surface: FAQ database for the model. Dashboard: live snapshot + FAQ layer.
     let snapshotMarkdown: string;
-    const faqLayer = officerFaqSnapshot(officer, surface);
-    if (surface === "public") {
-      snapshotMarkdown = faqLayer;
+    if (officer === "delilah") {
+      snapshotMarkdown = buildCommunityEventsFaqSnapshot({});
     } else {
-      const snapshot =
-        officer === "taco"
-          ? await compileTacoSnapshot(session!.id).catch(() => null)
-          : await compileScoutSnapshot(
-              session!.id,
-              asString(body?.providerId) || providerId || null,
-            ).catch(() => null);
+      const faqLayer = officerFaqSnapshot(officer, surface);
+      if (surface === "public") {
+        snapshotMarkdown = faqLayer;
+      } else {
+        const snapshot =
+          officer === "taco"
+            ? await compileTacoSnapshot(session!.id).catch(() => null)
+            : await compileScoutSnapshot(
+                session!.id,
+                asString(body?.providerId) || providerId || null,
+              ).catch(() => null);
 
-      snapshotMarkdown =
-        snapshot?.markdownContext ||
-        `# ${getOfficerPrompt(officer).displayName} Snapshot\n- No live module data available.`;
+        snapshotMarkdown =
+          snapshot?.markdownContext ||
+          `# ${getOfficerPrompt(officer).displayName} Snapshot\n- No live module data available.`;
 
-      if (officer === "scout" && (bodyGuruName || bodyGuruEmail || providerId || asString(body?.providerId))) {
-        snapshotMarkdown = [
-          `# Scout · Personalized Guru Context`,
-          bodyGuruName ? `- Guru name: ${bodyGuruName}` : null,
-          bodyGuruEmail ? `- Guru email: ${bodyGuruEmail}` : null,
-          asString(body?.providerId) || providerId
-            ? `- Provider id: ${asString(body?.providerId) || providerId}`
-            : null,
-          ``,
-          snapshotMarkdown,
-        ]
-          .filter((line) => line !== null)
-          .join("\n");
+        if (officer === "scout" && (bodyGuruName || bodyGuruEmail || providerId || asString(body?.providerId))) {
+          snapshotMarkdown = [
+            `# Scout · Personalized Guru Context`,
+            bodyGuruName ? `- Guru name: ${bodyGuruName}` : null,
+            bodyGuruEmail ? `- Guru email: ${bodyGuruEmail}` : null,
+            asString(body?.providerId) || providerId
+              ? `- Provider id: ${asString(body?.providerId) || providerId}`
+              : null,
+            ``,
+            snapshotMarkdown,
+          ]
+            .filter((line) => line !== null)
+            .join("\n");
+        }
+
+        snapshotMarkdown = `${snapshotMarkdown}\n\n${faqLayer}`;
       }
-
-      snapshotMarkdown = `${snapshotMarkdown}\n\n${faqLayer}`;
     }
 
     const nowIso = new Date().toISOString();

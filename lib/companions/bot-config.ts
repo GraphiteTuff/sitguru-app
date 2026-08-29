@@ -11,12 +11,12 @@ import {
   SCOUT_WORKSPACE_ROUTE_PREFIXES,
 } from "@/lib/companions/scout-routes";
 
-export type CompanionBotVariant = "scout" | "taco" | "rogue";
+export type CompanionBotVariant = "scout" | "taco" | "rogue" | "delilah";
 
 export type CompanionBotConfig = {
   shouldRender: boolean;
   variant: CompanionBotVariant | null;
-  /** Scout / Taco / Rogue surface keys. */
+  /** Scout / Taco / Rogue / Delilah surface keys. */
   surface: "public-guru" | "public-parent" | "workspace" | "onboarding" | null;
 };
 
@@ -63,7 +63,9 @@ export function resolvePublicFormVariant(
 ): CompanionBotVariant | null {
   if (mode === "public-guru") return "scout";
   if (mode === "public-ambassador") return "taco";
-  if (mode === "public-parent" || mode === "public-investor") return "rogue";
+  // public-parent / public-investor resolve from path in getBotConfig
+  // (Delilah on /events, Rogue elsewhere) — do not force Rogue here.
+  if (mode === "public-parent" || mode === "public-investor") return null;
   return null;
 }
 
@@ -82,6 +84,15 @@ export function getBotConfig(options: {
     return { shouldRender: true, variant: "taco", surface: "onboarding" };
   }
   if (mode === "public-parent" || mode === "public-investor") {
+    // Pet Events hub uses Delilah even when layout mode is public-parent.
+    if (
+      currentPath === "/events" ||
+      currentPath.startsWith("/events/") ||
+      currentPath === "/community" ||
+      currentPath.startsWith("/community/")
+    ) {
+      return { shouldRender: true, variant: "delilah", surface: "public-parent" };
+    }
     return { shouldRender: true, variant: "rogue", surface: "public-parent" };
   }
   if (mode === "guru-workspace" || mode === "workspace") {
@@ -163,7 +174,7 @@ export function getBotConfig(options: {
     currentPath === "/community" ||
     currentPath.startsWith("/community/")
   ) {
-    return { shouldRender: true, variant: "rogue", surface: "public-parent" };
+    return { shouldRender: true, variant: "delilah", surface: "public-parent" };
   }
   if (
     (currentPath === "/partners" ||
