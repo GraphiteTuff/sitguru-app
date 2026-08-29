@@ -9,6 +9,8 @@ export type PendingEventRsvp = {
   eventId: string;
   slug: string;
   savedAt: number;
+  /** Yes / Maybe / No — defaults to going when omitted */
+  status?: "going" | "interested" | "cancelled";
 };
 
 export type CommunitySignupRole = "pet_parent" | "guru" | "ambassador";

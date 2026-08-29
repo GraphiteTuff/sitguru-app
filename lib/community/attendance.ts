@@ -147,3 +147,77 @@ export async function getEventAttendeeUserIds(eventId: string) {
 
   return (data || []).map((row) => String(row.user_id)).filter(Boolean);
 }
+
+export type EventAttendanceAdminRow = {
+  id: string;
+  userId: string;
+  status: AttendanceStatus;
+  role: AttendanceRole;
+  updatedAt: string | null;
+  name: string;
+  email: string | null;
+};
+
+function statusLabel(status: AttendanceStatus) {
+  if (status === "going") return "Yes";
+  if (status === "interested") return "Maybe";
+  return "No";
+}
+
+export { statusLabel as attendanceStatusLabel };
+
+/** Admin roster: who answered Yes / Maybe / No for an event. */
+export async function listEventAttendanceForAdmin(eventId: string): Promise<{
+  counts: EventAttendanceCounts;
+  rows: EventAttendanceAdminRow[];
+}> {
+  const counts = await getEventAttendanceCounts(eventId);
+
+  const { data: attendanceRows } = await supabaseAdmin
+    .from("community_event_attendance")
+    .select("id, user_id, attendance_role, status, updated_at, created_at")
+    .eq("event_id", eventId)
+    .order("updated_at", { ascending: false });
+
+  const list = attendanceRows || [];
+  const userIds = Array.from(
+    new Set(list.map((row) => String(row.user_id || "")).filter(Boolean)),
+  );
+
+  const profileById = new Map<
+    string,
+    { full_name?: string | null; email?: string | null; display_name?: string | null }
+  >();
+
+  if (userIds.length) {
+    const { data: profiles } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, display_name, email")
+      .in("id", userIds);
+
+    for (const profile of profiles || []) {
+      profileById.set(String(profile.id), profile);
+    }
+  }
+
+  const rows: EventAttendanceAdminRow[] = list.map((row) => {
+    const userId = String(row.user_id);
+    const profile = profileById.get(userId);
+    const name =
+      String(profile?.full_name || "").trim() ||
+      String(profile?.display_name || "").trim() ||
+      "SitGuru member";
+
+    return {
+      id: String(row.id),
+      userId,
+      status: row.status as AttendanceStatus,
+      role: row.attendance_role as AttendanceRole,
+      updatedAt: row.updated_at || row.created_at || null,
+      name,
+      email: profile?.email ? String(profile.email) : null,
+    };
+  });
+
+  return { counts, rows };
+}
