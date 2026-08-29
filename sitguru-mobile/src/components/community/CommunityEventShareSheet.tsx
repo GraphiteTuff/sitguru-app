@@ -132,7 +132,7 @@ export default function CommunityEventShareSheet({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View style={styles.headerText}>
-              <Text style={styles.eyebrow}>SitGuru Community</Text>
+              <Text style={styles.eyebrow}>SitGuru Pet Events</Text>
               <Text style={styles.title} numberOfLines={2}>
                 Share &ldquo;{event.title}&rdquo;
               </Text>
@@ -228,7 +228,7 @@ export default function CommunityEventShareSheet({
             {hint ? <Text style={styles.hint}>{hint}</Text> : null}
 
             <View style={styles.sitguruBox}>
-              <Text style={styles.sitguruEyebrow}>SitGuru Community</Text>
+              <Text style={styles.sitguruEyebrow}>SitGuru Pet Events</Text>
               <Text style={styles.sitguruCopy}>
                 Tag @SitGuruOfficial so the pack can amplify your post.
               </Text>
