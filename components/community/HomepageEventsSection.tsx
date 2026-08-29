@@ -18,17 +18,21 @@ function mergeBannerEvents(
   upcoming: CommunityEventWithPartner[],
   bannerEvents?: CommunityEventWithPartner[],
 ) {
-  if (bannerEvents?.length) return bannerEvents;
+  const base = bannerEvents?.length
+    ? [...bannerEvents]
+    : (() => {
+        const merged: CommunityEventWithPartner[] = [];
+        if (featured) merged.push(featured);
+        for (const event of upcoming) {
+          if (event.id === featured?.id) continue;
+          merged.push(event);
+        }
+        return merged;
+      })();
 
-  const merged: CommunityEventWithPartner[] = [];
-  if (featured) merged.push(featured);
-
-  for (const event of upcoming) {
-    if (event.id === featured?.id) continue;
-    merged.push(event);
-  }
-
-  return merged;
+  return base.sort(
+    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
+  );
 }
 
 export default function HomepageEventsSection({

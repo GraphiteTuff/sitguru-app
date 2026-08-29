@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchDiscoveredHomepageEvents } from "@/lib/community/discovered-events";
+import { isGoogleDiscoveryEvent } from "@/lib/community/event-preview";
 import { getHomepageDemoEvents } from "@/lib/community/homepage-demo-events";
 import { fetchFeaturedHomepageEvents, fetchPublicEvents } from "@/lib/community/queries";
 import { lookupZipLocation, cleanZipCode } from "@/lib/location/zip-lookup";
@@ -24,6 +25,20 @@ function mergeUniqueEvents(
   }
 
   return merged;
+}
+
+/** Homepage carousel: soonest first (partners still preferred when filling slots). */
+function sortEventsChronologically(events: CommunityEventWithPartner[]) {
+  return [...events].sort((a, b) => {
+    const byStart =
+      new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
+    if (byStart !== 0) return byStart;
+    // Same start: Partner events before Community (discovery) events.
+    const aDiscovery = isGoogleDiscoveryEvent(a) ? 1 : 0;
+    const bDiscovery = isGoogleDiscoveryEvent(b) ? 1 : 0;
+    if (aDiscovery !== bDiscovery) return aDiscovery - bDiscovery;
+    return a.title.localeCompare(b.title);
+  });
 }
 
 export async function GET(req: NextRequest) {
@@ -92,8 +107,10 @@ export async function GET(req: NextRequest) {
     12,
   );
 
-  // Partner SitGuru events always lead; Google discoveries fill remaining slots only.
-  let bannerEvents = mergeUniqueEvents(partnerEvents, discovered.events, 16);
+  // Fill with partners first, then discoveries; display soonest → later.
+  let bannerEvents = sortEventsChronologically(
+    mergeUniqueEvents(partnerEvents, discovered.events, 16),
+  );
   let source: "live" | "google" | "demo" = partnerEvents.length
     ? "live"
     : discovered.events.length
@@ -106,10 +123,12 @@ export async function GET(req: NextRequest) {
     const demo = getHomepageDemoEvents(
       city && state ? `${city}, ${state}` : "Bucks, Montgomery, Lehigh & Northampton County, PA",
     );
-    bannerEvents = mergeUniqueEvents(
-      demo.featured ? [demo.featured, ...demo.upcoming] : demo.upcoming,
-      [],
-      16,
+    bannerEvents = sortEventsChronologically(
+      mergeUniqueEvents(
+        demo.featured ? [demo.featured, ...demo.upcoming] : demo.upcoming,
+        [],
+        16,
+      ),
     );
     source = "demo";
     previewMode = true;
