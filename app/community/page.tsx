@@ -198,7 +198,7 @@ export default async function CommunityPage() {
               </p>
               <p className="mt-1 text-sm font-semibold text-emerald-950/80">
                 Publish and update events manually as SitGuru Partner Events.
-                Social/Google discoveries fill gaps — partners always stay first.
+                Social listings fill gaps — Partner Events always stay first.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

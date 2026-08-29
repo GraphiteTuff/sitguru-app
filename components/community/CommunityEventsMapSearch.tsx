@@ -610,8 +610,8 @@ export default function CommunityEventsMapSearch({
                   No events match just yet
                 </h3>
                 <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
-                  Try another county, city, or category. Partner events and SerpApi
-                  community discoveries show here once markets are syncing.
+                  Try another county, city, or category. Partner Events and local
+                  community listings show here when markets are syncing.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <button

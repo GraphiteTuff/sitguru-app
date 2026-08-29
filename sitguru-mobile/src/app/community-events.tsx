@@ -83,8 +83,8 @@ export default function CommunityEventsScreen() {
       <Text style={styles.eyebrow}>SitGuru Community</Text>
       <Text style={styles.title}>Pet friendly events near you</Text>
       <Text style={styles.subtitle}>
-        Partner events lead. Community discoveries fill the map. Planners can
-        publish and update listings manually.
+        Partner Events lead the list. Browse nearby pet gatherings, or host your
+        own with Event Manager.
       </Text>
 
       <TextInput
@@ -98,16 +98,16 @@ export default function CommunityEventsScreen() {
       <View style={[styles.ctaRow, isWide && styles.ctaRowWide]}>
         <Pressable
           style={[styles.ctaPrimary, isWide && styles.ctaHalf]}
-          onPress={() => router.push("/partner-community-events")}
+          onPress={() => router.push("/community-host")}
         >
           <ClipboardList color="#fff" size={18} />
-          <Text style={styles.ctaPrimaryText}>Pet Event Managers</Text>
+          <Text style={styles.ctaPrimaryText}>Host an event</Text>
         </Pressable>
         <Pressable
           style={[styles.ctaSecondary, isWide && styles.ctaHalf]}
           onPress={() => router.push("/partner-community-events")}
         >
-          <Text style={styles.ctaSecondaryText}>Manage / publish events</Text>
+          <Text style={styles.ctaSecondaryText}>Manage my events</Text>
         </Pressable>
       </View>
 
