@@ -297,7 +297,8 @@ export default function AdminCommunityMarketsClient({
           separate and always keep visual priority on the homepage.
         </p>
         <div className="flex flex-wrap gap-2">
-          {markets.length === 0 ? (
+          {markets.length === 0 ||
+          markets.every((m) => m.market_tier === "expansion") ? (
             <button
               type="button"
               disabled={pending}
@@ -309,14 +310,18 @@ export default function AdminCommunityMarketsClient({
                     return;
                   }
                   setMessage(
-                    `Restored ${result.total} PA/NJ markets. Sync now to pull events via SerpApi.`,
+                    `Applied Core/Growth/Expansion tiers to ${result.total} markets${
+                      "petScoresUpdated" in result && result.petScoresUpdated
+                        ? ` · rescored ${result.petScoresUpdated} discoveries`
+                        : ""
+                    }.`,
                   );
                   window.location.reload();
                 });
               }}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-black text-emerald-900 disabled:opacity-60"
             >
-              Restore PA/NJ markets
+              Apply Core / Growth tiers
             </button>
           ) : null}
           <button
@@ -333,9 +338,17 @@ export default function AdminCommunityMarketsClient({
 
       {markets.length === 0 ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-semibold text-amber-950">
-          No discovery markets found. Restore the PA/NJ catalog, then Sync —
+          No discovery markets found. Apply the PA/NJ catalog, then Sync —
           SerpApi pulls pet events into those markets (it does not create the
           markets themselves).
+        </div>
+      ) : markets.every((m) => m.market_tier === "expansion") ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-semibold text-amber-950">
+          All markets are still Expansion. Click <strong>Apply Core / Growth
+          tiers</strong> (or run the restore SQL) so Bucks/Montgomery/Philly/etc.
+          get the right tier and multi-city anchors. Public{" "}
+          <code>/community</code> shows events from these markets — tiers control
+          SerpApi budget priority, not a separate event list.
         </div>
       ) : null}
 

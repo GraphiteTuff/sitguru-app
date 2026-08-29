@@ -4,12 +4,14 @@ import { getAdminIdentity } from "@/lib/admin/access";
 import AdminCommunityMarketsClient from "@/components/admin/community/AdminCommunityMarketsClient";
 import { dailySerpBudget } from "@/lib/community/markets";
 import {
+  backfillDiscoveryPetRelevance,
   countDiscoveriesFoundToday,
   countPartnerEventsPublished,
   countPetRelevantFoundToday,
   ensureCommunityMarketsSeeded,
   getSerpUsageToday,
   listCommunityMarkets,
+  refreshMarketDiscoveryCount,
 } from "@/lib/community/market-queries";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +23,18 @@ export default async function AdminCommunityMarketsPage() {
   }
 
   let markets = await listCommunityMarkets();
-  if (markets.length === 0) {
-    await ensureCommunityMarketsSeeded();
+  const needsCatalogFix =
+    markets.length === 0 ||
+    markets.every((m) => m.market_tier === "expansion") ||
+    markets.some((m) => !(m.city_anchors || []).length);
+
+  if (needsCatalogFix) {
+    await ensureCommunityMarketsSeeded({ forceCatalogSync: true });
+    await backfillDiscoveryPetRelevance(500);
+    markets = await listCommunityMarkets();
+    await Promise.all(
+      markets.map((market) => refreshMarketDiscoveryCount(market.id)),
+    );
     markets = await listCommunityMarkets();
   }
 

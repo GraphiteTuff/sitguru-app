@@ -138,12 +138,17 @@ export async function listCommunityMarkets(opts?: {
 }
 
 /**
- * Upsert the canonical PA/NJ market catalog so SerpApi has markets to sync into.
- * Safe to call repeatedly — does not delete existing markets.
+ * Upsert the canonical PA/NJ market catalog (tiers, anchors, search terms).
+ * Safe to call repeatedly — does not delete markets or wipe sync stats.
+ * Pass force=false to only seed when the table is empty.
  */
-export async function ensureCommunityMarketsSeeded() {
+export async function ensureCommunityMarketsSeeded(opts?: {
+  forceCatalogSync?: boolean;
+}) {
   const existing = await listCommunityMarkets();
-  if (existing.length > 0) {
+  const force = opts?.forceCatalogSync !== false;
+
+  if (!force && existing.length > 0) {
     return { ok: true as const, seeded: 0, total: existing.length, error: null };
   }
 
@@ -152,8 +157,17 @@ export async function ensureCommunityMarketsSeeded() {
   );
   const now = new Date().toISOString();
   const rows = COMMUNITY_MARKET_SEEDS.map((seed) => ({
-    ...seed,
-    enabled: true,
+    slug: seed.slug,
+    name: seed.name,
+    county_name: seed.county_name,
+    city: seed.city,
+    state: seed.state,
+    region: seed.region,
+    location_query: seed.location_query,
+    latitude: seed.latitude,
+    longitude: seed.longitude,
+    radius_miles: seed.radius_miles,
+    search_terms: seed.search_terms,
     event_categories: [
       "Adoption",
       "Social",
@@ -161,11 +175,21 @@ export async function ensureCommunityMarketsSeeded() {
       "Festival",
       "Community",
     ],
+    enabled: true,
+    sort_order: seed.sort_order,
+    market_tier: seed.market_tier,
+    city_anchors: seed.city_anchors,
+    sync_frequency_hours: seed.sync_frequency_hours,
+    max_queries_per_sync: seed.max_queries_per_sync,
     city_anchor_index: 0,
-    market_health: "healthy",
-    next_scheduled_sync_at: now,
     serp_cache_ttl_hours: 20,
     updated_at: now,
+    ...(existing.length === 0
+      ? {
+          market_health: "healthy",
+          next_scheduled_sync_at: now,
+        }
+      : {}),
   }));
 
   const { error } = await supabaseAdmin.from("community_markets").upsert(rows, {
@@ -197,7 +221,6 @@ export async function ensureCommunityMarketsSeeded() {
       sort_order: seed.sort_order,
       max_queries_per_sync: seed.max_queries_per_sync,
       serp_cache_ttl_hours: 20,
-      next_scheduled_sync_at: now,
       updated_at: now,
     }));
 
@@ -210,10 +233,18 @@ export async function ensureCommunityMarketsSeeded() {
       return {
         ok: false as const,
         seeded: 0,
-        total: 0,
+        total: existing.length,
         error: fallback.error.message,
       };
     }
+
+    return {
+      ok: true as const,
+      seeded: legacyRows.length,
+      total: legacyRows.length,
+      error:
+        "Smart-growth columns missing — applied legacy fields only. Run 20260829_community_markets_restore.sql",
+    };
   }
 
   const after = await listCommunityMarkets();
@@ -223,6 +254,54 @@ export async function ensureCommunityMarketsSeeded() {
     total: after.length,
     error: null,
   };
+}
+
+/** Re-score active discoveries that still have default/zero pet relevance. */
+export async function backfillDiscoveryPetRelevance(limit = 400) {
+  const { data, error } = await supabaseAdmin
+    .from("community_event_discoveries")
+    .select(
+      "id, title, short_description, venue_name, search_query, pet_relevance_score, pet_relevance_override",
+    )
+    .eq("status", "active")
+    .limit(limit);
+
+  if (error || !data?.length) {
+    return { updated: 0, error: error?.message || null };
+  }
+
+  const { scorePetRelevance, isQualifyingPetEvent } = await import(
+    "@/lib/community/pet-relevance"
+  );
+
+  let updated = 0;
+  for (const row of data) {
+    if (typeof row.pet_relevance_override === "number") continue;
+    const current = Number(row.pet_relevance_score || 0);
+    // Only rewrite defaults / zeros left by pre-score syncs
+    if (current > 0 && current !== 50) continue;
+
+    const score = scorePetRelevance({
+      title: String(row.title || ""),
+      description: row.short_description,
+      searchQuery: row.search_query,
+      venueName: row.venue_name,
+    });
+
+    const { error: updateError } = await supabaseAdmin
+      .from("community_event_discoveries")
+      .update({
+        pet_relevance_score: score,
+        qualifying_pet_event: isQualifyingPetEvent(score),
+        pet_friendly: score >= 40,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
+
+    if (!updateError) updated += 1;
+  }
+
+  return { updated, error: null };
 }
 
 export async function getCommunityMarketById(marketId: string) {

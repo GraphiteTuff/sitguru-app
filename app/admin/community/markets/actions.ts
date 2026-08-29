@@ -76,9 +76,18 @@ export async function restoreCommunityMarketsAction() {
   const gate = await requireAdminAction();
   if (!gate.ok) return gate;
 
-  const result = await ensureCommunityMarketsSeeded();
+  const result = await ensureCommunityMarketsSeeded({ forceCatalogSync: true });
+  const { backfillDiscoveryPetRelevance, listCommunityMarkets, refreshMarketDiscoveryCount } =
+    await import("@/lib/community/market-queries");
+  const scored = await backfillDiscoveryPetRelevance(500);
+  const markets = await listCommunityMarkets();
+  await Promise.all(markets.map((m) => refreshMarketDiscoveryCount(m.id)));
+
   revalidatePath("/admin/community/markets");
-  return result;
+  return {
+    ...result,
+    petScoresUpdated: scored.updated,
+  };
 }
 
 export async function pauseCommunityMarketAction(marketId: string) {
