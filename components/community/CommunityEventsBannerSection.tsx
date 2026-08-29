@@ -21,6 +21,12 @@ function mergeEvents(
   return merged;
 }
 
+function sortByStartAt(events: CommunityEventWithPartner[]) {
+  return [...events].sort(
+    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
+  );
+}
+
 export default async function CommunityEventsBannerSection() {
   const [featuredEvents, partnerUpcoming, discovered] = await Promise.all([
     fetchFeaturedHomepageEvents({ limit: 1 }),
@@ -34,8 +40,10 @@ export default async function CommunityEventsBannerSection() {
     [],
   );
 
-  // Partner-published SitGuru events always lead; Google discoveries fill remaining slots.
-  let events = mergeEvents(partnerEvents, discovered.events).slice(0, 16);
+  // Fill with partners first, then discoveries; display soonest → later.
+  let events = sortByStartAt(
+    mergeEvents(partnerEvents, discovered.events).slice(0, 16),
+  );
   let source: "live" | "google" | "demo" = partnerEvents.length
     ? "live"
     : discovered.events.length
@@ -44,7 +52,7 @@ export default async function CommunityEventsBannerSection() {
   let previewMode = !partnerEvents.length && Boolean(discovered.events.length);
 
   if (!events.length) {
-    events = getCommunityBannerDemoEvents();
+    events = sortByStartAt(getCommunityBannerDemoEvents());
     source = "demo";
     previewMode = true;
   }
