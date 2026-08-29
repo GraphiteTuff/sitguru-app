@@ -33,6 +33,7 @@ import EventShareDrawer, {
   type EventShareDrawerEvent,
 } from "@/components/community/EventShareDrawer";
 import EventAttendingButtons from "@/components/community/EventAttendingButtons";
+import DelilahEventCompanionIntro from "@/components/community/DelilahEventCompanionIntro";
 import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
 
 function BannerCardImage({
@@ -482,6 +483,8 @@ export default function UpcomingEventsBanner({
             </button>
           ) : null}
         </div>
+
+        <DelilahEventCompanionIntro className="mt-8" />
 
         <div className="mt-8 rounded-[2rem] border border-emerald-100 bg-emerald-50 p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

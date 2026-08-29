@@ -90,6 +90,16 @@ const aiPetCompanions = [
       "Scout reporting for duty. I'm here to help seamlessly match our local Pet Gurus to the perfect Pet Parents.",
     ctaLabel: "Chat with Scout",
   },
+  {
+    id: "delilah" as const,
+    name: "Delilah",
+    role: "Pet Event Coordinator",
+    avatarSrc: "/images/delilah-avatar.png",
+    objectPosition: "50% 28%",
+    statement:
+      "I'm your Pet Event Coordinator — helping planners, hosts, and pet parents with listings, RSVPs, and pack gathers near you!",
+    ctaLabel: "Chat with Delilah",
+  },
 ] as const;
 
 type FeaturedHomepageGuruTarget = {
@@ -2243,11 +2253,11 @@ export default function HomePage() {
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-600 sm:text-base">
               Tap a companion to chat — Rogue for Pet Parents, Taco for
-              Ambassadors, Scout for Gurus.
+              Ambassadors, Scout for Gurus, Delilah for Pet Events.
             </p>
           </div>
 
-          <div className="mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
+          <div className="mt-10 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 md:gap-8">
             {aiPetCompanions.map((companion) => (
               <div
                 key={companion.name}

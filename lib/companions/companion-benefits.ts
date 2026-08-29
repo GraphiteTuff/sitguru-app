@@ -1,8 +1,8 @@
 /**
- * Companion benefits pill labels + exact markdown replies for Scout / Taco / Rogue.
+ * Companion benefits pill labels + exact markdown replies for Scout / Taco / Rogue / Delilah.
  */
 
-export type CompanionId = "scout" | "taco" | "rogue";
+export type CompanionId = "scout" | "taco" | "rogue" | "delilah";
 
 export const COMPANION_BENEFITS_CHIP_ID = "companion_benefits" as const;
 
@@ -10,6 +10,7 @@ export const COMPANION_BENEFITS_LABEL: Record<CompanionId, string> = {
   scout: "Guru Benefits",
   taco: "Ambassador Benefits",
   rogue: "Pet Parent Benefits",
+  delilah: "Event Host Benefits",
 };
 
 /** User-facing chip prompt shown in the transcript when the benefits pill is tapped. */
@@ -17,6 +18,7 @@ export const COMPANION_BENEFITS_USER_PROMPT: Record<CompanionId, string> = {
   scout: "Tell me about Guru Benefits",
   taco: "Tell me about Ambassador Benefits",
   rogue: "Tell me about Pet Parent Benefits",
+  delilah: "Tell me about Event Host Benefits",
 };
 
 export const SCOUT_GURU_BENEFITS_RESPONSE = `You tapped it, now let's unlock it! 🚀 Choosing **Guru Benefits** is your ticket to scaling up your brand and stacking your revenue. Here is exactly what you get when you finish your quick verification profile:
@@ -53,10 +55,23 @@ I don't do fluff, so let me give you the straight facts on what this profile set
 
 Your pet deserves the best crew in town. Let's make it official—tap that **'Start Free Profile'** button below and welcome to the pack! 🐕💼`;
 
+export const DELILAH_EVENT_HOST_BENEFITS_RESPONSE = `Let’s get your pack gather on the calendar! 🐾📅 Choosing **Event Host Benefits** means you’re stepping into SitGuru Partner Events — the listings that always stay first.
+
+Here’s what hosts and Pet Event Planners & Managers unlock:
+
+* 📌 **Partner Event priority** – Your manually published events lead the feed; social discovery listings fill the gaps behind you.
+* 🙋 **Live attendance** – Yes / Maybe / No counts so you know who’s coming before the day of.
+* 📣 **SitGuru share tools** – Branded graphics and share links ready for Instagram, Facebook, TikTok, X, and more.
+* 🗺️ **Local discovery** – Pet parents, Gurus, and Ambassadors find you on the Pet Events map and homepage.
+* 🤝 **Pack conversion** – Guests can join as Pet Parents, Gurus, or Ambassadors right from your listing energy.
+
+Ready to publish? Head to **/events/host** — or tap **Host / manage events** — and let’s fill the yard!`;
+
 export const COMPANION_BENEFITS_RESPONSE: Record<CompanionId, string> = {
   scout: SCOUT_GURU_BENEFITS_RESPONSE,
   taco: TACO_AMBASSADOR_BENEFITS_RESPONSE,
   rogue: ROGUE_PET_PARENT_BENEFITS_RESPONSE,
+  delilah: DELILAH_EVENT_HOST_BENEFITS_RESPONSE,
 };
 
 export function getCompanionBenefitsChip(companion: CompanionId) {
