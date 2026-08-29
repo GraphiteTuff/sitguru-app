@@ -7,11 +7,9 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  ClipboardList,
   Clock3,
   ExternalLink,
   PawPrint,
-  Sparkles,
   X,
 } from "lucide-react";
 import {
@@ -415,45 +413,38 @@ export default function UpcomingEventsBanner({
           ) : null}
         </div>
 
-        <div className="mt-8 grid grid-cols-1 gap-3 sm:mt-10 sm:gap-4 md:grid-cols-2">
-          <article className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50 p-5 text-left sm:rounded-[1.75rem] sm:p-6">
-            <div className="inline-flex items-center gap-2 text-emerald-900">
-              <ClipboardList className="h-5 w-5" aria-hidden />
-              <p className="text-[11px] font-black uppercase tracking-[0.12em] sm:text-xs">
-                SitGuru Partner Event
+        <div className="mt-8 rounded-[2rem] border border-emerald-100 bg-emerald-50 p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-left">
+              <p className="text-sm font-black text-emerald-900">
+                Pet Event Planners & Managers
+              </p>
+              <p className="mt-1 text-sm font-semibold text-emerald-950/80">
+                Publish and update events manually as SitGuru Partner Events.
+                Social listings fill gaps — Partner Events always stay first.
               </p>
             </div>
-            <p className="mt-3 text-sm font-semibold leading-relaxed text-emerald-950/90 sm:text-base">
-              You create and update the listing — photos, time, venue, and
-              interest buttons. Partner Events always show first on Community.
-            </p>
-            <Link
-              href="/partners/dashboard/community/events"
-              className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#0D5C3A] px-5 text-sm font-black text-white transition hover:bg-emerald-900 sm:w-auto"
-            >
-              Open Event Manager
-            </Link>
-          </article>
-
-          <article className="rounded-[1.5rem] border border-slate-200 bg-white p-5 text-left sm:rounded-[1.75rem] sm:p-6">
-            <div className="inline-flex items-center gap-2 text-slate-800">
-              <Sparkles className="h-5 w-5 text-emerald-700" aria-hidden />
-              <p className="text-[11px] font-black uppercase tracking-[0.12em] sm:text-xs">
-                Community Event
-              </p>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/community/host"
+                className="inline-flex min-h-11 items-center rounded-full bg-[#0D5C3A] px-5 text-sm font-black text-white transition hover:bg-emerald-900"
+              >
+                Host / manage events
+              </Link>
+              <Link
+                href="/partners/apply?intent=community_events&source=homepage_events_banner"
+                className="inline-flex min-h-11 items-center rounded-full border border-emerald-300 bg-white px-5 text-sm font-black text-emerald-900 transition hover:bg-emerald-100/60"
+              >
+                Apply to host
+              </Link>
+              <Link
+                href={viewAllHref}
+                className="inline-flex min-h-11 items-center rounded-full border border-transparent px-4 text-sm font-black text-emerald-800 underline-offset-2 transition hover:underline"
+              >
+                Browse Community map
+              </Link>
             </div>
-            <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-600 sm:text-base">
-              Extra local pet gatherings SitGuru surfaces so the map stays full.
-              If one of those is yours, claim it as a Partner Event for full
-              control and top placement.
-            </p>
-            <Link
-              href={viewAllHref}
-              className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-black text-slate-800 transition hover:border-emerald-300 hover:bg-emerald-50 sm:w-auto"
-            >
-              Browse Community map
-            </Link>
-          </article>
+          </div>
         </div>
 
         {adminHref ? (
