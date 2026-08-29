@@ -5,7 +5,6 @@ import { useState } from "react";
 import EventShareDrawer, {
   type EventShareDrawerEvent,
 } from "@/components/community/EventShareDrawer";
-import CommunityJoinOptions from "@/components/community/CommunityJoinOptions";
 import { getPublicEventPath } from "@/lib/community/slug";
 import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
 
@@ -35,15 +34,6 @@ export default function FeaturedEventActions({
         >
           {isPreview ? "Explore Pet Events" : "View Event Details"}
         </Link>
-
-        {!isPreview && event.id ? (
-          <CommunityJoinOptions
-            slug={event.slug}
-            eventId={event.id}
-            source="homepage_featured_event"
-            variant="compact"
-          />
-        ) : null}
 
         <Link
           href={`/search?city=${encodeURIComponent(searchCity)}&state=${encodeURIComponent(searchState)}`}

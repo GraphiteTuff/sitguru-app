@@ -5,8 +5,7 @@ import type {
   AttendanceStatus,
   EventAttendanceCounts,
 } from "@/lib/community/attendance";
-import CommunityJoinOptions from "@/components/community/CommunityJoinOptions";
-import { savePendingEventRsvp } from "@/lib/community/pet-parent-signup";
+import { getOrCreateEventGuestKey } from "@/lib/community/guest-key";
 
 type EventAttendingButtonsProps = {
   eventId: string;
@@ -72,7 +71,7 @@ function normalizeCounts(raw: Partial<EventAttendanceCounts> | null | undefined)
 
 export default function EventAttendingButtons({
   eventId,
-  eventSlug,
+  eventSlug: _eventSlug,
   initialCounts = null,
   compact = false,
   className = "",
@@ -81,16 +80,25 @@ export default function EventAttendingButtons({
     normalizeCounts(initialCounts),
   );
   const [mine, setMine] = useState<AttendanceStatus | null>(null);
-  const [authed, setAuthed] = useState(true);
-  const [showJoin, setShowJoin] = useState(false);
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
+  const [guestKey, setGuestKey] = useState("");
 
   useEffect(() => {
+    setGuestKey(getOrCreateEventGuestKey());
+  }, []);
+
+  useEffect(() => {
+    if (!guestKey && typeof window !== "undefined") return;
+
     async function load() {
       try {
+        const key = guestKey || getOrCreateEventGuestKey();
         const response = await fetch(
           `/api/community/events/${eventId}/attendance`,
+          {
+            headers: key ? { "x-sitguru-guest-key": key } : undefined,
+          },
         );
         const payload = await response.json();
         if (payload.counts) {
@@ -98,53 +106,37 @@ export default function EventAttendingButtons({
         }
         const status = payload.mine?.status as AttendanceStatus | undefined;
         setMine(status && status.length ? status : null);
-        if (typeof payload.authenticated === "boolean") {
-          setAuthed(payload.authenticated);
-        }
       } catch {
         // optional
       }
     }
     void load();
-  }, [eventId]);
-
-  function rememberPending(status: AttendanceStatus) {
-    savePendingEventRsvp({
-      eventId,
-      slug: eventSlug,
-      savedAt: Date.now(),
-      status,
-    });
-  }
+  }, [eventId, guestKey]);
 
   function choose(status: AttendanceStatus) {
     startTransition(async () => {
+      const key = guestKey || getOrCreateEventGuestKey();
+      if (!guestKey) setGuestKey(key);
+
       const response = await fetch(
         `/api/community/events/${eventId}/attendance`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status }),
+          headers: {
+            "Content-Type": "application/json",
+            "x-sitguru-guest-key": key,
+          },
+          body: JSON.stringify({ status, guestKey: key }),
         },
       );
 
-      if (response.status === 401) {
-        setAuthed(false);
-        setShowJoin(true);
-        rememberPending(status);
-        setMessage("Join free to save your RSVP.");
-        return;
-      }
-
-      const payload = await response.json();
+      const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         setMessage(payload.error || "Unable to update RSVP.");
         return;
       }
 
       setMine(status);
-      setAuthed(true);
-      setShowJoin(false);
       if (payload.counts) {
         setCounts(normalizeCounts(payload.counts));
       }
@@ -172,7 +164,6 @@ export default function EventAttendingButtons({
         Attending?
       </p>
 
-      {/* Always show Yes / Maybe / No with live counts inside each button */}
       <div className="grid grid-cols-3 gap-1.5">
         {OPTIONS.map((option) => {
           const active = mine === option.status;
@@ -213,16 +204,6 @@ export default function EventAttendingButtons({
           );
         })}
       </div>
-
-      {!authed || showJoin ? (
-        <CommunityJoinOptions
-          slug={eventSlug}
-          eventId={eventId}
-          source="community_event_im_going"
-          variant="event"
-          onBeforeNavigate={() => rememberPending(mine || "going")}
-        />
-      ) : null}
 
       {message ? (
         <p className="text-[11px] font-bold text-emerald-800">{message}</p>

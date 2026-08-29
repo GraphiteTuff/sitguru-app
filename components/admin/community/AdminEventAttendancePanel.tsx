@@ -13,7 +13,8 @@ const emptyCounts: EventAttendanceCounts = {
   totalNo: 0,
 };
 
-function roleLabel(role: EventAttendanceAdminRow["role"]) {
+function roleLabel(role: EventAttendanceAdminRow["role"], isGuest: boolean) {
+  if (isGuest) return "Guest";
   if (role === "guru") return "Guru";
   if (role === "ambassador") return "Ambassador";
   return "Pet Parent";
@@ -147,7 +148,7 @@ export default function AdminEventAttendancePanel({
                     <div>
                       <p className="text-sm font-black text-slate-950">{row.name}</p>
                       <p className="text-xs font-semibold text-slate-600">
-                        {roleLabel(row.role)}
+                        {roleLabel(row.role, !row.userId)}
                         {row.email ? ` · ${row.email}` : ""}
                       </p>
                     </div>
