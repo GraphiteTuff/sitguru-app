@@ -38,19 +38,48 @@ const DEFAULT_CENTER: [number, number] = [40.3368, -75.1113];
 
 function eventToMapMarker(event: CommunityEventWithPartner) {
   const href = getEventBannerHref(event);
+  const { compactDate, timeLabel } = formatEventDateRange(
+    event.start_at,
+    event.end_at,
+    event.timezone,
+  );
+  const description = (
+    event.short_description ||
+    event.description ||
+    ""
+  )
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 140);
+  const googleDiscovery = isGoogleDiscoveryEvent(event);
+  const badges = [
+    event.is_free ? "Free" : null,
+    event.pet_friendly ? "Pet Friendly" : null,
+    googleDiscovery ? "Community Event" : "SitGuru Partner Event",
+  ].filter(Boolean) as string[];
+
   return {
     id: event.id,
     __sitguruMapMarkerId: `event:${event.id}`,
-    title: event.title,
+    __sitguruMapKind: "event",
+    __sitguruCanBook: true,
+    kind: "event",
+    title: formatEventCountyState(event),
     name: event.title,
-    headline: formatEventCountyState(event),
+    headline: description,
+    short_description: description,
+    description,
+    whenLabel: [compactDate, timeLabel].filter(Boolean).join(" · "),
+    venue_name: event.venue_name || "",
     city: event.city || event.featured_market_city || "",
     state: event.state || event.featured_market_state || "",
     latitude: event.latitude,
     longitude: event.longitude,
-    radius_miles: 4,
+    radius_miles: 1,
     profileHref: href,
     href,
+    ctaLabel: googleDiscovery ? "Open event" : "View event",
+    badges,
     avatar_url: event.image_card_url || event.image_hero_url || null,
   };
 }
@@ -76,17 +105,28 @@ function EventListCard({
   const sourceLabel = googleDiscovery
     ? "Community Event"
     : "SitGuru Partner Event";
+  const description = (
+    event.short_description ||
+    event.description ||
+    ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  const blurb =
+    description.length > 110
+      ? `${description.slice(0, 107).trim()}…`
+      : description;
 
   const body = (
     <>
-      <div className="relative h-[112px] w-[112px] shrink-0 overflow-hidden rounded-2xl bg-emerald-50 sm:h-[128px] sm:w-[128px]">
+      <div className="relative h-40 w-full shrink-0 overflow-hidden rounded-2xl bg-emerald-50 sm:h-[128px] sm:w-[128px]">
         {imageUrl ? (
           <Image
             src={imageUrl}
             alt={event.title}
             fill
             className="object-cover"
-            sizes="128px"
+            sizes="(max-width: 640px) 100vw, 128px"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-emerald-700">
@@ -96,10 +136,10 @@ function EventListCard({
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-lg font-black text-slate-950 sm:text-xl">
+              <h3 className="text-lg font-black leading-snug text-slate-950 sm:text-xl">
                 {event.title}
               </h3>
               <span
@@ -115,26 +155,33 @@ function EventListCard({
             <p className="mt-1 text-sm font-bold text-emerald-800">
               {formatEventCountyState(event)}
             </p>
+            {blurb ? (
+              <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-slate-600">
+                {blurb}
+              </p>
+            ) : null}
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-center">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+          <div className="min-w-[76px] rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-center sm:min-w-[88px]">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
               {compactDate.split(" ")[0]}
             </p>
-            <p className="text-base font-black leading-none text-slate-950">
+            <p className="mt-0.5 text-2xl font-black leading-none text-slate-950 sm:text-3xl">
               {compactDate.split(" ")[1]}
             </p>
           </div>
         </div>
 
         <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600">
-          <CalendarDays className="h-4 w-4 text-emerald-700" />
-          {timeLabel}
+          <CalendarDays className="h-4 w-4 shrink-0 text-emerald-700" />
+          <span className="min-w-0 break-words">{timeLabel}</span>
         </p>
-        <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600">
-          <MapPin className="h-4 w-4 text-emerald-700" />
-          {event.venue_name ||
-            [event.city, event.state].filter(Boolean).join(", ") ||
-            "Location TBA"}
+        <p className="mt-1 inline-flex items-start gap-1.5 text-sm font-semibold text-slate-600">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+          <span className="min-w-0 break-words">
+            {event.venue_name ||
+              [event.city, event.state].filter(Boolean).join(", ") ||
+              "Location TBA"}
+          </span>
         </p>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -158,11 +205,11 @@ function EventListCard({
           ))}
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800">
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <span className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 sm:w-auto">
             View details
           </span>
-          <span className="inline-flex min-h-10 items-center justify-center rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white">
+          <span className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white sm:w-auto">
             {googleDiscovery ? "Open event" : "I'm Going"}
           </span>
         </div>
@@ -170,7 +217,7 @@ function EventListCard({
     </>
   );
 
-  const className = `flex gap-4 rounded-[28px] border bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:p-5 ${
+  const className = `flex flex-col gap-4 rounded-[24px] border bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:flex-row sm:rounded-[28px] sm:p-5 ${
     highlighted
       ? "border-emerald-400 ring-4 ring-emerald-100"
       : "border-slate-200"
@@ -322,14 +369,14 @@ export default function CommunityEventsMapSearch({
           <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
             Find events near you
           </h2>
-          <p className="mt-2 text-base font-semibold text-slate-600">
-            Search the map like Find Care — events on the left, map on the right.
+          <p className="mt-2 text-sm font-semibold text-slate-600 sm:text-base">
+            Search nearby pet friendly events — map on top on phones, side-by-side on desktop.
           </p>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-6">
+        <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:rounded-[28px] sm:p-6">
           <form
-            className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr_0.7fr_1.2fr_auto]"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-[1.1fr_0.9fr_0.7fr_1.2fr_auto]"
             onSubmit={(e) => {
               e.preventDefault();
               applySearch(draft);
@@ -407,7 +454,7 @@ export default function CommunityEventsMapSearch({
               </div>
             </label>
 
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-2 sm:col-span-2 xl:col-span-1">
               <button
                 type="submit"
                 className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white transition hover:bg-emerald-800"
@@ -436,7 +483,7 @@ export default function CommunityEventsMapSearch({
               href="/community/events"
               className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-800 hover:underline"
             >
-              Full calendar →
+              Browse all events →
             </Link>
           </div>
         </div>
@@ -461,7 +508,7 @@ export default function CommunityEventsMapSearch({
                 </div>
               )}
             </div>
-            <div className="h-[420px] sm:h-[520px] xl:h-[calc(100vh-9rem)] xl:min-h-[520px] xl:max-h-[720px]">
+            <div className="h-[300px] sm:h-[420px] md:h-[520px] xl:h-[calc(100vh-9rem)] xl:min-h-[520px] xl:max-h-[720px]">
               <ProviderMap
                 markers={markers as unknown as Record<string, unknown>[]}
                 center={mapCenter}
@@ -472,8 +519,18 @@ export default function CommunityEventsMapSearch({
             </div>
           </div>
 
-          <div className="order-2 space-y-5 xl:order-1">
-            {filtered.length === 0 ? (
+          <div className="order-2 space-y-4 sm:space-y-5 xl:order-1">
+            <div className="flex items-center justify-between gap-2 xl:hidden">
+              <p className="text-sm font-black text-slate-800">
+                {filtered.length} event{filtered.length === 1 ? "" : "s"}
+              </p>
+              <Link
+                href="/community/host"
+                className="text-sm font-black text-emerald-800"
+              >
+                Host an event
+              </Link>
+            </div>            {filtered.length === 0 ? (
               <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
                 <h3 className="text-xl font-bold text-slate-900">
                   No events match just yet

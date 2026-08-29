@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import CommunityEventsExplorer from "@/components/community/CommunityEventsExplorer";
 import CommunityEventsBannerSection from "@/components/community/CommunityEventsBannerSection";
 import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
@@ -44,11 +45,26 @@ export default async function CommunityEventsPage({ searchParams }: PageProps) {
             Local pet life
           </p>
           <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">
-            Where good pets gather.
+            All community events
           </h1>
           <p className="mt-3 max-w-2xl text-sm font-semibold text-slate-600 sm:text-base">
-            Adoption days, meetups, training, fundraisers, and partner hangs near you.
+            Full list with filters for adoption days, meetups, training, fundraisers,
+            and partner hangs. Map search lives on the Community hub.
           </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/community"
+              className="inline-flex text-sm font-black text-emerald-800 hover:underline"
+            >
+              ← Back to map search
+            </Link>
+            <Link
+              href="/community/host"
+              className="inline-flex min-h-10 items-center rounded-full bg-[#0D5C3A] px-4 text-sm font-black text-white"
+            >
+              Pet Event Planners & Managers
+            </Link>
+          </div>
         </div>
       </section>
 

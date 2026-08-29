@@ -34,10 +34,17 @@ function mergeUniqueEvents(
 const communityLinks = [
   {
     href: "/community/events",
-    label: "Events",
+    label: "All Events",
     ready: true,
     description:
-      "Browse upcoming pet friendly events, festivals, adoption days, and partner gatherings.",
+      "Full list with filters — adoption days, festivals, training, and partner gatherings.",
+  },
+  {
+    href: "/community/host",
+    label: "Host an Event",
+    ready: true,
+    description:
+      "Pet event planners and managers: publish and update SitGuru Partner Events manually.",
   },
   {
     href: "/partners",
@@ -91,6 +98,26 @@ export default async function CommunityPage() {
             Search like Find Care — events on the left, map on the right. Partner
             events always lead.
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/community/host"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-emerald-900"
+            >
+              Pet Event Planners & Managers
+            </Link>
+            <Link
+              href="/partners/dashboard/community/events"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/40 bg-white/10 px-5 text-sm font-black !text-white"
+            >
+              Manage events
+            </Link>
+            <Link
+              href="/community/events"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/30 px-5 text-sm font-black !text-white"
+            >
+              Browse all events
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -167,19 +194,27 @@ export default async function CommunityPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-black text-emerald-900">
-                Partners can host events too
+                Pet Event Planners & Managers
               </p>
               <p className="mt-1 text-sm font-semibold text-emerald-950/80">
-                Create polished community events from the Partner Dashboard in
-                minutes.
+                Publish and update events manually as SitGuru Partner Events.
+                Social/Google discoveries fill gaps — partners always stay first.
               </p>
             </div>
-            <Link
-              href="/partners/dashboard/community/events"
-              className="inline-flex min-h-11 items-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white"
-            >
-              Partner Events
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/community/host"
+                className="inline-flex min-h-11 items-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white"
+              >
+                Host / manage events
+              </Link>
+              <Link
+                href="/partners/apply?intent=community_events&source=community_hub"
+                className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-300 bg-white px-5 text-sm font-black text-emerald-900"
+              >
+                Apply to host
+              </Link>
+            </div>
           </div>
         </div>
       </section>

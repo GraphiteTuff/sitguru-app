@@ -1,5 +1,11 @@
 import { router } from "expo-router";
-import { CalendarDays, ChevronLeft, MapPin, PawPrint } from "lucide-react-native";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ClipboardList,
+  MapPin,
+  PawPrint,
+} from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -8,6 +14,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -19,23 +26,37 @@ import {
 } from "@/hooks/data/useCommunityEvents";
 import { trackMobileEvent } from "@/lib/analytics/track";
 
-function formatWhen(event: MobileCommunityEvent) {
+function formatParts(event: MobileCommunityEvent) {
   const start = new Date(event.start_at);
-  return start.toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return {
+    month: start.toLocaleString(undefined, { month: "short" }).toUpperCase(),
+    day: String(start.getDate()),
+    when: start.toLocaleString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }),
+  };
 }
 
 function getImage(event: MobileCommunityEvent) {
   return event.image_card_url || event.image_hero_url || event.image_original_url;
 }
 
+function getBlurb(event: MobileCommunityEvent) {
+  const text = (event.short_description || event.description || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "";
+  return text.length > 110 ? `${text.slice(0, 107).trim()}…` : text;
+}
+
 export default function CommunityEventsScreen() {
   const [query, setQuery] = useState("");
+  const { width } = useWindowDimensions();
+  const isWide = width >= 768;
   const { events, loading, error } = useCommunityEvents({ q: query });
 
   const sorted = useMemo(
@@ -60,35 +81,60 @@ export default function CommunityEventsScreen() {
       </Pressable>
 
       <Text style={styles.eyebrow}>SitGuru Community</Text>
-        <Text style={styles.title}>Pet-friendly events near you</Text>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search events"
-          style={styles.search}
-          placeholderTextColor="#64748b"
-        />
+      <Text style={styles.title}>Pet friendly events near you</Text>
+      <Text style={styles.subtitle}>
+        Partner events lead. Community discoveries fill the map. Planners can
+        publish and update listings manually.
+      </Text>
 
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search events"
+        style={styles.search}
+        placeholderTextColor="#64748b"
+      />
+
+      <View style={[styles.ctaRow, isWide && styles.ctaRowWide]}>
         <Pressable
-          style={styles.partnerLink}
+          style={[styles.ctaPrimary, isWide && styles.ctaHalf]}
           onPress={() => router.push("/partner-community-events")}
         >
-          <Text style={styles.partnerLinkText}>Partners: manage your events</Text>
+          <ClipboardList color="#fff" size={18} />
+          <Text style={styles.ctaPrimaryText}>Pet Event Managers</Text>
         </Pressable>
+        <Pressable
+          style={[styles.ctaSecondary, isWide && styles.ctaHalf]}
+          onPress={() => router.push("/partner-community-events")}
+        >
+          <Text style={styles.ctaSecondaryText}>Manage / publish events</Text>
+        </Pressable>
+      </View>
 
-        {loading ? <ActivityIndicator color="#0D5C3A" style={{ marginTop: 24 }} /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+      {loading ? (
+        <ActivityIndicator color="#0D5C3A" style={{ marginTop: 24 }} />
+      ) : null}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {!loading && sorted.length === 0 ? (
-          <Text style={styles.empty}>No upcoming events yet. Check back soon.</Text>
-        ) : null}
+      {!loading && sorted.length === 0 ? (
+        <Text style={styles.empty}>No upcoming events yet. Check back soon.</Text>
+      ) : null}
 
+      <View style={[styles.list, isWide && styles.listWide]}>
         {sorted.map((event) => {
           const imageUrl = getImage(event);
+          const parts = formatParts(event);
+          const blurb = getBlurb(event);
+          const sourceLabel =
+            event.partners?.business_name === "Community Event" ||
+            (event.partners?.business_name || "").startsWith("Google")
+              ? "Community Event"
+              : "SitGuru Partner Event";
+
           return (
             <Pressable
               key={event.id}
-              style={styles.card}
+              style={[styles.card, isWide && styles.cardWide]}
               onPress={() =>
                 router.push({
                   pathname: "/community-event-detail",
@@ -105,40 +151,52 @@ export default function CommunityEventsScreen() {
               )}
 
               <View style={styles.cardBody}>
-                <View style={styles.tagRow}>
-                  {event.is_free ? <Text style={styles.tag}>Free</Text> : null}
-                  {event.pet_friendly ? <Text style={styles.tag}>Pet Friendly</Text> : null}
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardHeaderText}>
+                    <View style={styles.tagRow}>
+                      <Text style={styles.sourceTag}>{sourceLabel}</Text>
+                      {event.is_free ? <Text style={styles.tag}>Free</Text> : null}
+                      {event.pet_friendly ? (
+                        <Text style={styles.tag}>Pet Friendly</Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.cardTitle}>{event.title}</Text>
+                    {blurb ? <Text style={styles.blurb}>{blurb}</Text> : null}
+                  </View>
+                  <View style={styles.dateBadge}>
+                    <Text style={styles.dateMonth}>{parts.month}</Text>
+                    <Text style={styles.dateDay}>{parts.day}</Text>
+                  </View>
                 </View>
-                <Text style={styles.cardTitle}>{event.title}</Text>
-                <Text style={styles.cardPartner}>{event.partners?.business_name || "Partner"}</Text>
+
                 <View style={styles.metaRow}>
                   <CalendarDays color="#0D5C3A" size={16} />
-                  <Text style={styles.metaText}>{formatWhen(event)}</Text>
+                  <Text style={styles.metaText}>{parts.when}</Text>
                 </View>
                 <View style={styles.metaRow}>
                   <MapPin color="#0D5C3A" size={16} />
                   <Text style={styles.metaText}>
-                    {[event.venue_name, event.city, event.state].filter(Boolean).join(", ")}
+                    {[event.venue_name, event.city, event.state]
+                      .filter(Boolean)
+                      .join(", ")}
                   </Text>
                 </View>
               </View>
             </Pressable>
           );
         })}
+      </View>
     </SitGuruScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    gap: 12,
-    paddingBottom: 40,
-  },
   backRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     marginBottom: 8,
+    minHeight: 44,
   },
   backText: {
     fontFamily: AppFonts.bold,
@@ -156,6 +214,15 @@ const styles = StyleSheet.create({
     fontFamily: AppFonts.extraBold,
     fontSize: 28,
     color: "#0f172a",
+    marginTop: 4,
+  },
+  subtitle: {
+    fontFamily: AppFonts.semiBold,
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#64748b",
+    marginTop: 6,
+    marginBottom: 8,
   },
   search: {
     minHeight: 48,
@@ -166,24 +233,66 @@ const styles = StyleSheet.create({
     fontFamily: AppFonts.semiBold,
     fontSize: 16,
     backgroundColor: "#fff",
+    marginTop: 8,
   },
-  partnerLink: {
-    alignSelf: "flex-start",
-    paddingVertical: 4,
+  ctaRow: {
+    gap: 8,
+    marginTop: 12,
   },
-  partnerLinkText: {
+  ctaRowWide: {
+    flexDirection: "row",
+  },
+  ctaHalf: {
+    flex: 1,
+  },
+  ctaPrimary: {
+    minHeight: 48,
+    borderRadius: 16,
+    backgroundColor: "#0D5C3A",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+  },
+  ctaPrimaryText: {
     fontFamily: AppFonts.bold,
-    color: "#0D5C3A",
+    color: "#fff",
+    fontSize: 14,
+  },
+  ctaSecondary: {
+    minHeight: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  ctaSecondaryText: {
+    fontFamily: AppFonts.bold,
+    color: "#0f172a",
     fontSize: 14,
   },
   error: {
     color: "#b91c1c",
     fontFamily: AppFonts.semiBold,
+    marginTop: 12,
   },
   empty: {
     color: "#64748b",
     fontFamily: AppFonts.semiBold,
     marginTop: 12,
+  },
+  list: {
+    gap: 12,
+    marginTop: 12,
+    paddingBottom: 40,
+  },
+  listWide: {
+    flexDirection: "row",
+    flexWrap: "wrap",
   },
   card: {
     borderRadius: 24,
@@ -191,10 +300,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    width: "100%",
+  },
+  cardWide: {
+    width: "48.5%",
   },
   cardImage: {
     width: "100%",
-    height: 180,
+    height: 168,
   },
   cardImageFallback: {
     alignItems: "center",
@@ -205,10 +318,51 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
+  cardHeader: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "flex-start",
+  },
+  cardHeaderText: {
+    flex: 1,
+    gap: 6,
+  },
+  dateBadge: {
+    minWidth: 64,
+    borderRadius: 16,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    alignItems: "center",
+  },
+  dateMonth: {
+    fontFamily: AppFonts.bold,
+    fontSize: 11,
+    letterSpacing: 1,
+    color: "#047857",
+  },
+  dateDay: {
+    fontFamily: AppFonts.extraBold,
+    fontSize: 26,
+    lineHeight: 28,
+    color: "#0f172a",
+  },
   tagRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+  },
+  sourceTag: {
+    backgroundColor: "#0f172a",
+    color: "#fff",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: "hidden",
+    fontFamily: AppFonts.bold,
+    fontSize: 11,
   },
   tag: {
     backgroundColor: "#ecfdf5",
@@ -222,12 +376,14 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontFamily: AppFonts.extraBold,
-    fontSize: 22,
+    fontSize: 20,
     color: "#0f172a",
   },
-  cardPartner: {
+  blurb: {
     fontFamily: AppFonts.semiBold,
-    color: "#475569",
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#64748b",
   },
   metaRow: {
     flexDirection: "row",

@@ -16,6 +16,7 @@ type MapContentProps = {
 
 type NormalizedMarker = {
   id: string;
+  kind: "guru" | "event";
   name: string;
   title: string;
   city: string;
@@ -30,6 +31,11 @@ type NormalizedMarker = {
   serviceRadiusMiles: number;
   canBook: boolean;
   source: "zip" | "city" | "service_coordinates" | "coordinates";
+  description: string;
+  whenLabel: string;
+  venueName: string;
+  ctaLabel: string;
+  badges: string[];
 };
 
 const MAP_HEIGHT = 420;
@@ -266,6 +272,58 @@ function getAvatarUrl(marker: RawMarker) {
   );
 }
 
+function getMarkerKind(marker: RawMarker): "guru" | "event" {
+  const explicit =
+    asString(marker.__sitguruMapKind) ||
+    asString(marker.mapKind) ||
+    asString(marker.kind);
+  if (explicit === "event") return "event";
+  const id = getId(marker);
+  if (id.startsWith("event:")) return "event";
+  return "guru";
+}
+
+function getMarkerDescription(marker: RawMarker) {
+  return (
+    asString(marker.short_description) ||
+    asString(marker.shortDescription) ||
+    asString(marker.description) ||
+    asString(marker.headline) ||
+    ""
+  );
+}
+
+function getMarkerWhenLabel(marker: RawMarker) {
+  return (
+    asString(marker.whenLabel) ||
+    asString(marker.when_label) ||
+    asString(marker.dateLabel) ||
+    ""
+  );
+}
+
+function getMarkerVenueName(marker: RawMarker) {
+  return (
+    asString(marker.venue_name) ||
+    asString(marker.venueName) ||
+    asString(marker.venue) ||
+    ""
+  );
+}
+
+function getMarkerCtaLabel(marker: RawMarker, kind: "guru" | "event") {
+  const explicit =
+    asString(marker.ctaLabel) ||
+    asString(marker.cta_label) ||
+    asString(marker.buttonLabel);
+  if (explicit) return explicit;
+  return kind === "event" ? "View event" : "View Guru Profile";
+}
+
+function getMarkerBadges(marker: RawMarker) {
+  return asStringArray(marker.badges || marker.tags || marker.labels);
+}
+
 function getMarkerCanBook(marker: RawMarker) {
   if (marker.__sitguruCanBook === true || marker.can_book === true) return true;
   if (marker.__sitguruCanBook === false || marker.can_book === false) return false;
@@ -490,6 +548,7 @@ function normalizeMarker(marker: RawMarker): NormalizedMarker | null {
 
   return {
     id,
+    kind: getMarkerKind(marker),
     name,
     title: getTitle(marker),
     city,
@@ -504,6 +563,11 @@ function normalizeMarker(marker: RawMarker): NormalizedMarker | null {
     serviceRadiusMiles: radius,
     canBook: getMarkerCanBook(marker),
     source,
+    description: getMarkerDescription(marker),
+    whenLabel: getMarkerWhenLabel(marker),
+    venueName: getMarkerVenueName(marker),
+    ctaLabel: getMarkerCtaLabel(marker, getMarkerKind(marker)),
+    badges: getMarkerBadges(marker),
   };
 }
 
@@ -539,6 +603,94 @@ function createAvatarIcon(marker: NormalizedMarker, highlighted: boolean) {
 function createPopupHtml(marker: NormalizedMarker) {
   const location = [marker.city, marker.state].filter(Boolean).join(", ");
   const zipText = marker.zipCode ? ` ${marker.zipCode}` : "";
+  const avatarHtml = marker.avatarUrl
+    ? `<img src="${escapeHtml(marker.avatarUrl)}" alt="${escapeHtml(
+        marker.name,
+      )} avatar" class="h-full w-full object-cover" />`
+    : escapeHtml(marker.initials);
+
+  if (marker.kind === "event") {
+    const badges = [
+      ...marker.badges,
+      ...marker.services,
+    ]
+      .filter(Boolean)
+      .slice(0, 4)
+      .map(
+        (badge) =>
+          `<span class="rounded-full border border-emerald-100 bg-white px-2.5 py-1 text-[11px] font-black text-emerald-800">${escapeHtml(
+            badge,
+          )}</span>`,
+      )
+      .join("");
+
+    const metaBits = [
+      marker.whenLabel,
+      marker.venueName,
+      location || marker.zipCode ? `${location}${zipText}` : "",
+    ].filter(Boolean);
+
+    return `
+      <div class="p-4">
+        <div class="flex items-start gap-3">
+          <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50 text-sm font-black text-emerald-800">
+            ${avatarHtml}
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+              Community Event
+            </p>
+            <p class="mt-0.5 line-clamp-2 text-base font-black tracking-tight text-slate-950">
+              ${escapeHtml(marker.name)}
+            </p>
+            ${
+              marker.title
+                ? `<p class="mt-0.5 text-xs font-bold text-slate-600">${escapeHtml(
+                    marker.title,
+                  )}</p>`
+                : ""
+            }
+          </div>
+        </div>
+
+        ${
+          marker.description
+            ? `<p class="mt-3 text-sm font-semibold leading-5 text-slate-600">${escapeHtml(
+                marker.description,
+              )}</p>`
+            : ""
+        }
+
+        ${
+          metaBits.length
+            ? `<div class="mt-3 space-y-1 text-xs font-bold text-slate-600">
+                ${metaBits
+                  .map((bit) => `<p>${escapeHtml(bit)}</p>`)
+                  .join("")}
+              </div>`
+            : ""
+        }
+
+        ${
+          badges
+            ? `<div class="mt-3 flex flex-wrap gap-1.5">${badges}</div>`
+            : ""
+        }
+
+        <a
+          href="${escapeHtml(marker.profileHref)}"
+          ${marker.profileHref.startsWith("http") ? 'target="_blank" rel="noopener noreferrer"' : ""}
+          style="color:#ffffff !important; -webkit-text-fill-color:#ffffff !important; text-decoration:none !important;"
+          class="sitguru-map-profile-cta mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700"
+        >
+          <span style="color:#ffffff !important; -webkit-text-fill-color:#ffffff !important;">${escapeHtml(
+            marker.ctaLabel || "View event",
+          )}</span>
+        </a>
+      </div>
+    `;
+  }
+
   const servicesHtml = marker.services
     .slice(0, 4)
     .map(
@@ -548,12 +700,6 @@ function createPopupHtml(marker: NormalizedMarker) {
         )}</span>`,
     )
     .join("");
-
-  const avatarHtml = marker.avatarUrl
-    ? `<img src="${escapeHtml(marker.avatarUrl)}" alt="${escapeHtml(
-        marker.name,
-      )} avatar" class="h-full w-full object-cover" />`
-    : escapeHtml(marker.initials);
 
   return `
     <div class="p-4">
@@ -917,16 +1063,19 @@ export default function MapContent({
       const highlighted = marker.id === highlightedMarkerId;
       const latLng: [number, number] = [marker.latitude, marker.longitude];
       const hasPhoto = Boolean(marker.avatarUrl);
-      const opensSoon = !marker.canBook;
+      const isEvent = marker.kind === "event";
+      const opensSoon = !isEvent && !marker.canBook;
 
-      L.circle(latLng, {
-        radius: marker.serviceRadiusMiles * METERS_PER_MILE,
-        color: opensSoon ? "#d97706" : "#059669",
-        fillColor: opensSoon ? "#f59e0b" : "#10b981",
-        fillOpacity: highlighted ? 0.18 : 0.08,
-        opacity: highlighted ? 0.58 : 0.25,
-        weight: highlighted ? 3 : 1,
-      }).addTo(layerGroup);
+      if (!isEvent) {
+        L.circle(latLng, {
+          radius: marker.serviceRadiusMiles * METERS_PER_MILE,
+          color: opensSoon ? "#d97706" : "#059669",
+          fillColor: opensSoon ? "#f59e0b" : "#10b981",
+          fillOpacity: highlighted ? 0.18 : 0.08,
+          opacity: highlighted ? 0.58 : 0.25,
+          weight: highlighted ? 3 : 1,
+        }).addTo(layerGroup);
+      }
 
       L.marker(latLng, {
         icon: createAvatarIcon(marker, highlighted),
@@ -934,9 +1083,12 @@ export default function MapContent({
         zIndexOffset: highlighted ? 1200 : hasPhoto ? 750 : 400,
       })
         .bindTooltip(
-          opensSoon
-            ? `${marker.serviceRadiusMiles}-mile radius · Booking opens soon`
-            : `${marker.serviceRadiusMiles}-mile radius`,
+          isEvent
+            ? [marker.whenLabel, marker.name].filter(Boolean).join(" · ") ||
+                marker.name
+            : opensSoon
+              ? `${marker.serviceRadiusMiles}-mile radius · Booking opens soon`
+              : `${marker.serviceRadiusMiles}-mile radius`,
           {
             direction: "top",
             offset: [0, -24],
