@@ -94,11 +94,12 @@ export default function EventAttendingButtons({
     void load();
   }, [eventId]);
 
-  function rememberPending() {
+  function rememberPending(status: AttendanceStatus) {
     savePendingEventRsvp({
       eventId,
       slug: eventSlug,
       savedAt: Date.now(),
+      status,
     });
   }
 
@@ -115,7 +116,7 @@ export default function EventAttendingButtons({
 
       if (response.status === 401) {
         setAuthed(false);
-        rememberPending();
+        rememberPending(status);
         setMessage("Join free to save your RSVP.");
         return;
       }
@@ -164,7 +165,7 @@ export default function EventAttendingButtons({
           eventId={eventId}
           source="community_event_im_going"
           variant="event"
-          onBeforeNavigate={rememberPending}
+          onBeforeNavigate={() => rememberPending(mine || "going")}
         />
       ) : (
         <div className="flex flex-wrap items-center gap-1.5">

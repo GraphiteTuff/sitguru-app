@@ -32,6 +32,7 @@ import {
 import EventShareDrawer, {
   type EventShareDrawerEvent,
 } from "@/components/community/EventShareDrawer";
+import EventAttendingButtons from "@/components/community/EventAttendingButtons";
 import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
 
 function BannerCardImage({
@@ -92,6 +93,7 @@ function EventBannerCard({
   const external = isExternalEventLink(event);
   const googleDiscovery = isGoogleDiscoveryEvent(event);
   const canShareSitGuru = !isHomepageDemoEvent(event.id);
+  const canAttend = !isHomepageDemoEvent(event.id);
 
   const mediaAndDetails = (
     <>
@@ -157,23 +159,30 @@ function EventBannerCard({
     </>
   );
 
-  const shareFooter = canShareSitGuru ? (
-    <div className="px-5 pb-5 pt-3">
-      <button
-        type="button"
-        onClick={() => onShare(event)}
-        className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
-      >
-        <Share2 className="h-3.5 w-3.5" />
-        Share from SitGuru
-      </button>
+  const cardFooter = (
+    <div className="mt-auto space-y-3 border-t border-slate-100 px-5 py-4">
+      {canAttend ? (
+        <EventAttendingButtons
+          eventId={event.id}
+          eventSlug={event.slug}
+          compact
+        />
+      ) : null}
+      {canShareSitGuru ? (
+        <button
+          type="button"
+          onClick={() => onShare(event)}
+          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+        >
+          <Share2 className="h-3.5 w-3.5" />
+          Share from SitGuru
+        </button>
+      ) : null}
     </div>
-  ) : (
-    <div className="pb-5" />
   );
 
   const className =
-    "group flex h-[520px] w-[280px] shrink-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:w-[300px]";
+    "group flex h-auto min-h-[560px] w-[280px] shrink-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:w-[300px]";
 
   if (googleDiscovery && external) {
     return (
@@ -185,7 +194,7 @@ function EventBannerCard({
         >
           {mediaAndDetails}
         </button>
-        {shareFooter}
+        {cardFooter}
       </div>
     );
   }
@@ -201,7 +210,7 @@ function EventBannerCard({
         >
           {mediaAndDetails}
         </a>
-        {shareFooter}
+        {cardFooter}
       </div>
     );
   }
@@ -211,7 +220,7 @@ function EventBannerCard({
       <Link href={href} className="flex min-h-0 flex-1 flex-col">
         {mediaAndDetails}
       </Link>
-      {shareFooter}
+      {cardFooter}
     </div>
   );
 }

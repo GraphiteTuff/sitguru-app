@@ -36,26 +36,35 @@ export default function EventRsvpReturnHandler({
 
       if (!wantsRsvp && !matchesPending) return;
 
+      const status =
+        matchesPending && pending?.status ? pending.status : "going";
+
       const response = await fetch(`/api/community/events/${eventId}/attendance`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "going" }),
+        body: JSON.stringify({ status }),
       });
 
       if (cancelled) return;
 
       if (response.status === 401) {
-        setNote("Sign up free as a Pet Parent to finish saying you're going.");
+        setNote("Sign up free as a Pet Parent to finish your RSVP.");
         return;
       }
 
       if (!response.ok) {
-        setNote("Welcome back — tap I'm Going to confirm your RSVP.");
+        setNote("Welcome back — tap Attending? to confirm your RSVP.");
         return;
       }
 
       clearPendingEventRsvp();
-      setNote("You're going! Welcome to the SitGuru community.");
+      setNote(
+        status === "going"
+          ? "You're going! Welcome to SitGuru Pet Events."
+          : status === "interested"
+            ? "Marked as maybe — thanks for letting us know."
+            : "Marked as not attending — thanks for the update.",
+      );
 
       if (wantsRsvp) {
         const params = new URLSearchParams(searchParams.toString());
