@@ -33,6 +33,7 @@ export async function saveCommunityMarketAction(
     revalidatePath("/admin/community/markets");
     revalidatePath("/admin/community/events/featured");
     revalidatePath("/");
+    revalidatePath("/community");
     revalidatePath("/community/events");
   }
   return result;
@@ -67,6 +68,7 @@ export async function syncCommunityMarketNowAction(marketId?: string) {
   revalidatePath("/admin/community/markets");
   revalidatePath("/admin/community/events/featured");
   revalidatePath("/");
+  revalidatePath("/community");
   revalidatePath("/community/events");
 
   return result;
