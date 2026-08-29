@@ -27,7 +27,7 @@ import {
   readCommunityLocationPreference,
   saveCommunityLocationPreference,
 } from "@/lib/community/location-preference";
-import { COMMUNITY_COUNTY_OPTIONS } from "@/lib/community/market-seed";
+import { COMMUNITY_COUNTY_OPTIONS, COMMUNITY_MAJOR_COUNTIES } from "@/lib/community/market-seed";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 import { COMMUNITY_EVENT_CATEGORIES } from "@/lib/community/types";
 
@@ -460,7 +460,7 @@ export default function CommunityEventsMapSearch({
                     county: e.target.value,
                   }))
                 }
-                placeholder="Bucks County"
+                placeholder="Montgomery County"
                 className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
               />
               <datalist id="community-county-options">
@@ -540,6 +540,39 @@ export default function CommunityEventsMapSearch({
               </button>
             </div>
           </form>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+              Major counties
+            </span>
+            {COMMUNITY_MAJOR_COUNTIES.map((option) => {
+              const active = draft.county
+                .toLowerCase()
+                .includes(option.county.replace(/ County$/i, "").toLowerCase());
+              return (
+                <button
+                  key={`${option.county}-${option.state}`}
+                  type="button"
+                  onClick={() => {
+                    const next = {
+                      ...draft,
+                      county: option.county,
+                      state: option.state,
+                    };
+                    setDraft(next);
+                    applySearch(next);
+                  }}
+                  className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
+                    active
+                      ? "bg-emerald-700 text-white"
+                      : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+                  }`}
+                >
+                  {option.county.replace(/ County$/i, "")}, {option.state}
+                </button>
+              );
+            })}
+          </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
