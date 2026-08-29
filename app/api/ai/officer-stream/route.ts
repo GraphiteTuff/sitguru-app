@@ -28,8 +28,10 @@ import {
 } from "@/lib/ai/officer-marketing-faqs";
 import {
   buildCommunityEventsFaqSnapshot,
-  matchCommunityEventsFaq,
+  parseCommunityEventSlugFromPath,
+  resolveDelilahInstantFaqAnswer,
 } from "@/lib/ai/community-events-faqs";
+import { compileDelilahEventsSnapshot } from "@/lib/ai/delilah-events-snapshot";
 import {
   getSitGuruAiModel,
   isSitGuruAiConfigured,
@@ -245,12 +247,12 @@ function fallbackReport(
 ) {
   const profile = getOfficerPrompt(officer);
   if (officer === "delilah") {
-    const communityHit = matchCommunityEventsFaq(question);
-    if (communityHit?.answer) return communityHit.answer;
+    const soft = resolveDelilahInstantFaqAnswer(question);
+    if (soft) return soft;
     return [
-      `**${profile.displayName} here.**`,
+      `**${profile.displayName} here — so happy to help!**`,
       ``,
-      `I couldn't reach the live model kennel just now — tap a FAQ chip or ask about pet events, RSVPs, or hosting, and I'll answer from SitGuru's Pet Events copy.`,
+      `I couldn't reach the live model kennel just now — tap a FAQ chip or ask about upcoming events, hosting, or RSVPs, and I'll answer from SitGuru's Pet Events copy.`,
     ].join("\n");
   }
 
@@ -324,6 +326,11 @@ export async function POST(req: Request) {
       companion?: string;
       pagePath?: string;
       page_path?: string;
+      community_event_slug?: string;
+      community_event_id?: string;
+      community_event_title?: string;
+      community_event_city?: string;
+      community_event_state?: string;
     };
 
     const officerRaw = asString(body?.officer || body?.officerId).toLowerCase();
@@ -450,9 +457,9 @@ export async function POST(req: Request) {
 
     // Instant FAQ layer (public + dashboard) — same responsiveness pattern as Rogue.
     if (officer === "delilah" && lastUserText) {
-      const communityHit = matchCommunityEventsFaq(lastUserText);
-      if (communityHit?.answer) {
-        return simulationDataStreamResponse(communityHit.answer);
+      const delilahHit = resolveDelilahInstantFaqAnswer(lastUserText);
+      if (delilahHit) {
+        return simulationDataStreamResponse(delilahHit);
       }
     }
 
@@ -473,7 +480,26 @@ export async function POST(req: Request) {
     // Public surface: FAQ database for the model. Dashboard: live snapshot + FAQ layer.
     let snapshotMarkdown: string;
     if (officer === "delilah") {
-      snapshotMarkdown = buildCommunityEventsFaqSnapshot({});
+      const focus = {
+        slug:
+          asString(body?.community_event_slug) ||
+          parseCommunityEventSlugFromPath(pagePath) ||
+          undefined,
+        eventId: asString(body?.community_event_id) || undefined,
+        title: asString(body?.community_event_title) || undefined,
+        city: asString(body?.community_event_city) || undefined,
+        state: asString(body?.community_event_state) || undefined,
+      };
+      const faqLayer = buildCommunityEventsFaqSnapshot(focus);
+      const live = await compileDelilahEventsSnapshot({
+        city: focus.city,
+        state: focus.state,
+        focus,
+        limit: 24,
+      }).catch(() => null);
+      snapshotMarkdown = live?.markdownContext
+        ? `${faqLayer}\n\n${live.markdownContext}`
+        : faqLayer;
     } else {
       const faqLayer = officerFaqSnapshot(officer, surface);
       if (surface === "public") {

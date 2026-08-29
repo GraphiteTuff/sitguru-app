@@ -28,6 +28,7 @@ import {
   type OpenCompanionChatDetail,
 } from "@/lib/companions/open-companion-chat";
 import { COMMUNITY_EVENT_FAQ_CHIPS } from "@/lib/ai/community-events-faqs";
+import { readStoredCommunityEventCompanion } from "@/components/community/CommunityEventCompanionSeed";
 import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
 
 const DELILAH_BRAND = "#0D5C3A";
@@ -36,15 +37,9 @@ const ACTIVE_COMPANION = "delilah" as const;
 const DELILAH_BENEFITS_CHIP = getCompanionBenefitsChip(ACTIVE_COMPANION);
 
 const GREETING =
-  "Hey there! I'm Delilah, your Pet Event Coordinator. I help planners, hosts, and pet parents with SitGuru listings — publishing Partner Events, RSVPs, sharing, and what's happening near you. Tap a chip or ask me anything!";
+  "Hi! I'm Delilah — your cheerful Pet Event Coordinator! I can share live upcoming event details around Bucks & Montgomery Counties and walk Planners & Managers through setup, management, and RSVP tracking. Tap a chip or ask me anything!";
 
 const CHIPS = [
-  {
-    id: "host_events",
-    label: "Host events",
-    prompt:
-      "How do Pet Event Planners and Managers publish Partner Events on SitGuru?",
-  },
   {
     id: DELILAH_BENEFITS_CHIP.id,
     label: DELILAH_BENEFITS_CHIP.label,
@@ -116,11 +111,21 @@ export default function AIDelilahCompanion() {
     };
   }, []);
 
+  const storedEvent = readStoredCommunityEventCompanion();
   const requestBody = {
     officer: "delilah" as const,
     companion: "delilah" as const,
     pagePath: pathname || "/events",
     surface: "public" as const,
+    ...(storedEvent?.slug
+      ? {
+          community_event_slug: storedEvent.slug,
+          community_event_id: storedEvent.id,
+          community_event_title: storedEvent.title,
+          community_event_city: storedEvent.city || undefined,
+          community_event_state: storedEvent.state || undefined,
+        }
+      : {}),
   };
 
   const {
@@ -389,7 +394,7 @@ export default function AIDelilahCompanion() {
         >
           <span className="homepage-chat-tip__pulse" aria-hidden />
           <span className="homepage-chat-tip__text">
-            Hey! I&apos;m Delilah — tap to chat about pet events & hosting!
+            Hi! I&apos;m Delilah — tap for upcoming pet events & hosting help!
           </span>
         </button>
       ) : null}

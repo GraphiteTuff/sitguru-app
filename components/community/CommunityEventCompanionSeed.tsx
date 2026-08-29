@@ -35,7 +35,7 @@ type CommunityEventCompanionSeedProps = {
   state?: string | null;
 };
 
-/** Seeds Rogue with the active event context on detail pages. */
+/** Seeds Delilah (Pet Event Coordinator) with the active event context on detail pages. */
 export default function CommunityEventCompanionSeed({
   id,
   slug,
