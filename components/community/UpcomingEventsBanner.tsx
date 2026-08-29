@@ -7,9 +7,11 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   Clock3,
   ExternalLink,
   PawPrint,
+  Sparkles,
   X,
 } from "lucide-react";
 import {
