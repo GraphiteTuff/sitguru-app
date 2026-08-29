@@ -10,6 +10,7 @@ import {
   Clock3,
   ExternalLink,
   PawPrint,
+  Share2,
   X,
 } from "lucide-react";
 import {
@@ -28,6 +29,10 @@ import {
   buildDiscoveryPetParentSignupHref,
   savePendingDiscoveryOpen,
 } from "@/lib/community/pet-parent-signup";
+import EventShareDrawer, {
+  type EventShareDrawerEvent,
+} from "@/components/community/EventShareDrawer";
+import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
 
 function BannerCardImage({
   src,
@@ -65,9 +70,11 @@ function BannerCardImage({
 function EventBannerCard({
   event,
   onGoogleCapture,
+  onShare,
 }: {
   event: CommunityEventWithPartner;
   onGoogleCapture: (event: CommunityEventWithPartner) => void;
+  onShare: (event: CommunityEventWithPartner) => void;
 }) {
   const imageUrl = getEventCardImage(event);
   const { bannerDate, timeLabel, badgeMonth, badgeDay } = formatEventDateRange(
@@ -84,8 +91,9 @@ function EventBannerCard({
   const href = getEventBannerHref(event);
   const external = isExternalEventLink(event);
   const googleDiscovery = isGoogleDiscoveryEvent(event);
+  const canShareSitGuru = !isHomepageDemoEvent(event.id);
 
-  const cardBody = (
+  const mediaAndDetails = (
     <>
       <div className="relative aspect-[4/3] shrink-0 overflow-hidden bg-slate-100">
         <BannerCardImage src={imageUrl} alt={event.title} />
@@ -106,7 +114,7 @@ function EventBannerCard({
         )}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-5 pt-5">
         <div>
           <h3 className="line-clamp-2 text-xl font-black leading-snug tracking-tight text-slate-950">
             {event.title}
@@ -149,38 +157,62 @@ function EventBannerCard({
     </>
   );
 
+  const shareFooter = canShareSitGuru ? (
+    <div className="px-5 pb-5 pt-3">
+      <button
+        type="button"
+        onClick={() => onShare(event)}
+        className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+      >
+        <Share2 className="h-3.5 w-3.5" />
+        Share from SitGuru
+      </button>
+    </div>
+  ) : (
+    <div className="pb-5" />
+  );
+
   const className =
-    "group flex h-[460px] w-[280px] shrink-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:w-[300px]";
+    "group flex h-[520px] w-[280px] shrink-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:w-[300px]";
 
   if (googleDiscovery && external) {
     return (
-      <button
-        type="button"
-        onClick={() => onGoogleCapture(event)}
-        className={`${className} cursor-pointer text-left`}
-      >
-        {cardBody}
-      </button>
+      <div className={className}>
+        <button
+          type="button"
+          onClick={() => onGoogleCapture(event)}
+          className="flex min-h-0 flex-1 cursor-pointer flex-col text-left"
+        >
+          {mediaAndDetails}
+        </button>
+        {shareFooter}
+      </div>
     );
   }
 
   if (external) {
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={className}
-      >
-        {cardBody}
-      </a>
+      <div className={className}>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          {mediaAndDetails}
+        </a>
+        {shareFooter}
+      </div>
     );
   }
 
   return (
-    <Link href={href} className={className}>
-      {cardBody}
-    </Link>
+    <div className={className}>
+      <Link href={href} className="flex min-h-0 flex-1 flex-col">
+        {mediaAndDetails}
+      </Link>
+      {shareFooter}
+    </div>
   );
 }
 
@@ -303,8 +335,35 @@ export default function UpcomingEventsBanner({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [captureEvent, setCaptureEvent] =
     useState<CommunityEventWithPartner | null>(null);
+  const [shareEvent, setShareEvent] =
+    useState<EventShareDrawerEvent | null>(null);
 
   if (!events.length) return null;
+
+  function openSitGuruShare(event: CommunityEventWithPartner) {
+    const discovery = isGoogleDiscoveryEvent(event);
+    setShareEvent({
+      id: event.id,
+      title: event.title,
+      slug: event.slug,
+      sharePath: discovery ? "/community" : undefined,
+      startAt: event.start_at,
+      endAt: event.end_at,
+      timezone: event.timezone,
+      city: event.city,
+      state: event.state,
+      shortDescription: event.short_description,
+      partnerName: event.partners?.business_name || event.venue_name,
+      imageUrl: getEventCardImage(event),
+      social_square_url: event.social_square_url,
+      social_story_url: event.social_story_url,
+      social_landscape_url: event.social_landscape_url,
+      image_hero_url: event.image_hero_url,
+      image_card_url: event.image_card_url,
+      image_original_url: event.image_original_url,
+      preferBrandedGraphics: !discovery,
+    });
+  }
 
   const resolvedSubtitle =
     subtitle ||
@@ -397,6 +456,7 @@ export default function UpcomingEventsBanner({
                 key={event.id}
                 event={event}
                 onGoogleCapture={setCaptureEvent}
+                onShare={openSitGuruShare}
               />
             ))}
           </div>
@@ -465,6 +525,13 @@ export default function UpcomingEventsBanner({
           onClose={() => setCaptureEvent(null)}
         />
       ) : null}
+
+      <EventShareDrawer
+        open={Boolean(shareEvent)}
+        onClose={() => setShareEvent(null)}
+        event={shareEvent}
+        source="homepage_events_banner_share"
+      />
     </section>
   );
 }

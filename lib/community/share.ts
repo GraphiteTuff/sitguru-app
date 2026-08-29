@@ -32,10 +32,10 @@ export function buildEventShareCaptionSocial(
   const teaser = event.short_description?.trim();
 
   if (teaser) {
-    return `Join us for ${event.title} on ${compactDate}${cityState ? ` in ${cityState}` : ""}! ${teaser}`;
+    return `Join us for ${event.title} on ${compactDate}${cityState ? ` in ${cityState}` : ""}! ${teaser} Find it on SitGuru — @SitGuruOfficial`;
   }
 
-  return `Join us for ${event.title} on ${compactDate}${cityState ? ` in ${cityState}` : ""}! Bring your pup and meet local pet lovers on SitGuru.`;
+  return `Join us for ${event.title} on ${compactDate}${cityState ? ` in ${cityState}` : ""}! Bring your pup and meet local pet lovers on SitGuru. @SitGuruOfficial`;
 }
 
 export function buildEventShareMeta(

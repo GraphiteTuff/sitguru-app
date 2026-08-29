@@ -25,11 +25,16 @@ import {
   downloadEventGraphic,
   getEventSocialAssets,
 } from "@/lib/community/social-assets";
+import {
+  SITGURU_OFFICIAL_SOCIAL_LINKS,
+} from "@/lib/chat/sitguru-social";
 
 export type EventShareDrawerEvent = {
   id?: string;
   title: string;
   slug: string;
+  /** Optional SitGuru path override (e.g. /community for discoveries). */
+  sharePath?: string;
   startAt: string;
   endAt?: string | null;
   timezone?: string | null;
@@ -44,6 +49,7 @@ export type EventShareDrawerEvent = {
   image_hero_url?: string | null;
   image_card_url?: string | null;
   image_original_url?: string | null;
+  preferBrandedGraphics?: boolean;
 };
 
 type EventShareDrawerProps = {
@@ -76,8 +82,12 @@ export default function EventShareDrawer({
 
   const url = useMemo(() => {
     if (!event) return "";
+    const path = event.sharePath || getPublicEventPath(event.slug);
     if (typeof window !== "undefined") {
-      return `${window.location.origin}${getPublicEventPath(event.slug)}`;
+      return `${window.location.origin}${path.startsWith("/") ? path : `/${path}`}`;
+    }
+    if (event.sharePath) {
+      return `https://www.sitguru.com${event.sharePath.startsWith("/") ? event.sharePath : `/${event.sharePath}`}`;
     }
     return getPublicEventUrl(event.slug);
   }, [event]);
@@ -99,7 +109,7 @@ export default function EventShareDrawer({
         image_card_url: event.image_card_url,
         image_original_url: event.image_original_url,
       },
-      { preferBranded: true },
+      { preferBranded: event.preferBrandedGraphics !== false },
     );
   }, [event]);
 
@@ -355,6 +365,40 @@ export default function EventShareDrawer({
           <Heart className="mb-1 inline h-4 w-4 text-emerald-700" /> Thanks for helping spread the
           word. Sharing events helps build a stronger pet-loving community.
         </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <p className="text-sm font-black text-slate-900">Share SitGuru too</p>
+          <p className="mt-1 text-xs font-semibold text-slate-600">
+            Tag <span className="font-black text-emerald-800">@SitGuruOfficial</span> so the pack
+            can amplify your post.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {SITGURU_OFFICIAL_SOCIAL_LINKS.map((platform) => (
+              <a
+                key={platform.id}
+                href={platform.href}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() =>
+                  void trackEvent({
+                    eventName: "event_share",
+                    eventType: "community",
+                    source,
+                    metadata: {
+                      slug: event.slug,
+                      channel: `sitguru_${platform.id}`,
+                      eventId: event.id,
+                    },
+                  })
+                }
+                className="inline-flex min-h-9 items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+              >
+                {platform.label}
+              </a>
+            ))}
+          </div>
+        </div>
+
         <p className="text-xs font-semibold text-slate-500">
           Instagram does not allow direct browser posting — use Save Graphic + Copy Caption, then
           open Instagram.
