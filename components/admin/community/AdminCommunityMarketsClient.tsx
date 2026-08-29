@@ -244,7 +244,7 @@ export default function AdminCommunityMarketsClient({
           },
           { label: "Remaining Searches", value: remainingSearches },
           {
-            label: "Community Events Found Today",
+            label: "Pet Events Found Today",
             value: summary.communityEventsToday,
           },
           {

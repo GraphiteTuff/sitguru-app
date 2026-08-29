@@ -40,7 +40,7 @@ export default async function PartnerCommunityEventsPage({
 
   if (params?.create === "1") {
     const result = await createPartnerEventDraft({
-      title: "New Community Event",
+      title: "New Pet Event",
     });
     if (result.ok && result.event) {
       redirect(`/partners/dashboard/community/events/${result.event.id}/edit`);

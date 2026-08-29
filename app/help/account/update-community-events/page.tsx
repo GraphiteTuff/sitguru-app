@@ -7,7 +7,7 @@ import {
 } from "@/lib/help/content";
 
 export const metadata: Metadata = {
-  title: "Update Community Events as a Pet Event Planner",
+  title: "Update Pet Events as a Pet Event Planner",
   description:
     "Step-by-step guide for Pet Event Planners and Managers to create and update SitGuru Partner Events.",
 };

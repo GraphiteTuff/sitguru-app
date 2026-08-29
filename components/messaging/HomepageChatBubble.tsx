@@ -866,7 +866,7 @@ export default function HomepageChatBubble() {
                 </p>
                 <p className="homepage-chat-panel__sub">
                   {isCommunityPage
-                    ? "Community Events expert — RSVP help & free signup paths 🐾"
+                    ? "Pet Events expert — RSVP help & free signup paths 🐾"
                     : "I'm your adorable assistant here during your SitGuru journey 🐾"}
                 </p>
               </div>

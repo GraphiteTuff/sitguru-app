@@ -1445,7 +1445,7 @@ export default async function AdminMessageThreadPage({
     if (linkedEvent?.id) {
       linkedCommunityEvent = {
         id: String(linkedEvent.id),
-        title: safeString(linkedEvent.title) || "Community Event",
+        title: safeString(linkedEvent.title) || "Pet Event",
         slug: safeString(linkedEvent.slug),
       };
     }
@@ -1568,7 +1568,7 @@ export default async function AdminMessageThreadPage({
   const unreadCount = messageRows.filter(isUnreadMessage).length;
   const threadType =
     linkedCommunityEvent
-      ? "Community Event"
+      ? "Pet Event"
       : participantCards.some((participant) => participant.role === "ambassador") &&
     participantCards.some((participant) => participant.role === "admin")
       ? "Ambassador → Admin"
@@ -1631,7 +1631,7 @@ export default async function AdminMessageThreadPage({
         {linkedCommunityEvent ? (
           <section className="rounded-[24px] border border-teal-200 bg-teal-50 px-5 py-4">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-teal-800">
-              Linked Community Event
+              Linked Pet Event
             </p>
             <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>

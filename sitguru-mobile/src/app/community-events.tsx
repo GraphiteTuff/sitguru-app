@@ -80,7 +80,7 @@ export default function CommunityEventsScreen() {
         <Text style={styles.backText}>Back</Text>
       </Pressable>
 
-      <Text style={styles.eyebrow}>SitGuru Community</Text>
+      <Text style={styles.eyebrow}>SitGuru Pet Events</Text>
       <Text style={styles.title}>Pet friendly events near you</Text>
       <Text style={styles.subtitle}>
         Partner Events lead the list. Browse nearby pet gatherings, or host your
@@ -126,9 +126,10 @@ export default function CommunityEventsScreen() {
           const parts = formatParts(event);
           const blurb = getBlurb(event);
           const sourceLabel =
+            event.partners?.business_name === "Pet Event" ||
             event.partners?.business_name === "Community Event" ||
             (event.partners?.business_name || "").startsWith("Google")
-              ? "Community Event"
+              ? "Pet Event"
               : "SitGuru Partner Event";
 
           return (

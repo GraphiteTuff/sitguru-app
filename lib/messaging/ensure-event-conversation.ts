@@ -113,7 +113,7 @@ export async function ensureCommunityEventConversation(
 
   const now = new Date().toISOString();
   const partnerName = partner?.business_name || null;
-  const subject = `${event.title} · Community Event`;
+  const subject = `${event.title} · Pet Event`;
   const preview =
     safeString(input.opener) ||
     `Event coordination thread for ${event.title}${partnerName ? ` (${partnerName})` : ""}.`;

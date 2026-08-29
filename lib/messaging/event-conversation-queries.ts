@@ -132,7 +132,7 @@ export async function fetchEventConversationPreview(
 
   return {
     conversationId,
-    subject: safeString(conversation.subject) || "Community Event",
+    subject: safeString(conversation.subject) || "Pet Event",
     lastMessagePreview: safeString(conversation.last_message_preview) || null,
     lastMessageAt: safeString(conversation.last_message_at) || null,
     unreadCount,

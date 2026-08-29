@@ -36,10 +36,10 @@ export default function EventCard({
   );
   const googleDiscovery = isGoogleDiscoveryEvent(event);
   const sourceLabel = googleDiscovery
-    ? "Community Event"
+    ? "Pet Event"
     : "SitGuru Partner Event";
   const partnerName = googleDiscovery
-    ? "Community Event"
+    ? "Pet Event"
     : event.partners?.business_name || "SitGuru Partner";
   const isPreview = previewMode || isHomepageDemoEvent(event.id);
   const href = isPreview ? "/community" : getPublicEventPath(event.slug);

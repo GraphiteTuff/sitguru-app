@@ -52,7 +52,7 @@ export default function CommunityHostSurfaceCtas({
       ? "Manage events"
       : "Open Event Manager";
   const map =
-    surface === "phone" || surface === "app" ? "Community map" : "View Community map";
+    surface === "phone" || surface === "app" ? "Pet Events map" : "View Pet Events map";
 
   const stackClass =
     surface === "phone" || surface === "app"

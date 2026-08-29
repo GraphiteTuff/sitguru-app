@@ -69,7 +69,7 @@ export function buildEventShareHref(
 ) {
   const encodedUrl = encodeURIComponent(url);
   const encodedText = encodeURIComponent(message);
-  const subject = encodeURIComponent("SitGuru Community Event");
+  const subject = encodeURIComponent("SitGuru Pet Event");
 
   switch (platform) {
     case "whatsapp":

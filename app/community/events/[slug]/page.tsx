@@ -86,7 +86,7 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
   const locationBlock = formatEventLocation(event);
   const googleDiscovery = isGoogleDiscoveryEvent(event);
   const sourceLabel = googleDiscovery
-    ? "Community Event"
+    ? "Pet Event"
     : "SitGuru Partner Event";
 
   return (

@@ -218,7 +218,7 @@ export default function AdminEventEditor({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Link href="/admin/community/events" className="text-sm font-black text-emerald-800">
-            ← Community Events
+            ← Pet Events
           </Link>
           <p className="mt-2 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
             {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : "Admin Editor"}

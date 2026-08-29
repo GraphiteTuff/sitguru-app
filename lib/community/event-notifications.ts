@@ -18,7 +18,7 @@ export async function notifyPartnerEventPublished(event: EventNotifyInput) {
   await dispatchNotification({
     userId: partner.owner_user_id,
     title: "Your event is live",
-    body: `${event.title} is now published on SitGuru Community.`,
+    body: `${event.title} is now published on SitGuru Pet Events.`,
     type: "community_event_published",
     href: getPublicEventPath(event.slug),
     metadata: { eventId: event.id, slug: event.slug },

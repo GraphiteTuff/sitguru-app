@@ -33,7 +33,7 @@ export default function FeaturedEventActions({
           href={href}
           className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800"
         >
-          {isPreview ? "Explore Community Events" : "View Event Details"}
+          {isPreview ? "Explore Pet Events" : "View Event Details"}
         </Link>
 
         {!isPreview && event.id ? (
