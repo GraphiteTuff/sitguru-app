@@ -1,0 +1,46 @@
+-- Allow Attending? on any listed event (partner or discovery), not only published.
+-- Discovery cards use community_event_discoveries ids, so drop the community_events FK.
+
+ALTER TABLE public.community_event_attendance
+  DROP CONSTRAINT IF EXISTS community_event_attendance_event_id_fkey;
+
+-- Counts by event_id only (works for partner + discovery UUIDs)
+DROP FUNCTION IF EXISTS public.get_community_event_attendance_counts(uuid);
+
+CREATE FUNCTION public.get_community_event_attendance_counts(p_event_id uuid)
+RETURNS TABLE (
+  pet_parents bigint,
+  gurus bigint,
+  ambassadors bigint,
+  total_going bigint,
+  total_maybe bigint,
+  total_no bigint
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    COUNT(*) FILTER (
+      WHERE a.attendance_role = 'pet_parent' AND a.status = 'going'
+    ) AS pet_parents,
+    COUNT(*) FILTER (
+      WHERE a.attendance_role = 'guru' AND a.status = 'going'
+    ) AS gurus,
+    COUNT(*) FILTER (
+      WHERE a.attendance_role = 'ambassador' AND a.status = 'going'
+    ) AS ambassadors,
+    COUNT(*) FILTER (WHERE a.status = 'going') AS total_going,
+    COUNT(*) FILTER (WHERE a.status = 'interested') AS total_maybe,
+    COUNT(*) FILTER (WHERE a.status = 'cancelled') AS total_no
+  FROM public.community_event_attendance a
+  WHERE a.event_id = p_event_id;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_community_event_attendance_counts(uuid) TO anon, authenticated;
+
+COMMENT ON FUNCTION public.get_community_event_attendance_counts(uuid) IS
+  'Yes/Maybe/No RSVP aggregates for any listed event id (partner or discovery).';
+
+NOTIFY pgrst, 'reload schema';
