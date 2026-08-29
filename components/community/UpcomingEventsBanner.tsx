@@ -105,7 +105,7 @@ function EventBannerCard({
         </div>
         {googleDiscovery ? (
           <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-slate-900/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm">
-            Community Event
+            Pet Event
           </div>
         ) : (
           <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#0D5C3A] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-white shadow-sm">
@@ -501,7 +501,7 @@ export default function UpcomingEventsBanner({
                 href={viewAllHref}
                 className="inline-flex min-h-11 items-center rounded-full border border-transparent px-4 text-sm font-black text-emerald-800 underline-offset-2 transition hover:underline"
               >
-                Browse Community map
+                Browse Pet Events map
               </Link>
             </div>
           </div>

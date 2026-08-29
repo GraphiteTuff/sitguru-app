@@ -638,7 +638,7 @@ function createPopupHtml(marker: NormalizedMarker) {
           </div>
           <div class="min-w-0">
             <p class="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
-              Community Event
+              Pet Event
             </p>
             <p class="mt-0.5 line-clamp-2 text-base font-black tracking-tight text-slate-950">
               ${escapeHtml(marker.name)}

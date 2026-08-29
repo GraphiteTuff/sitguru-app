@@ -491,7 +491,7 @@ export const eventPlannerUpdateGuides: HelpStepBlock[] = [
     tips: [
       "Partner Events always keep top visual priority on Community, the homepage banner, and the event list.",
       "Published edits update Pet Parents quickly — double-check county/city so map search stays correct.",
-      "Need a new listing? Create a draft from Community Events, complete every required field, then Submit for review.",
+      "Need a new listing? Create a draft from Pet Events, complete every required field, then Submit for review.",
       "Host hub: `/community/host` · Apply: `/partners/apply?intent=community_events`.",
     ],
   },
@@ -516,12 +516,12 @@ export const eventPlannerFaqs: HelpFaqItem[] = [
   {
     question: "Where do I edit an event after it is published?",
     answer:
-      "Partner Dashboard → Community Events → Edit on that event. Published Partner Events keep SitGuru Partner Event priority on the Community map and lists.",
+      "Partner Dashboard → Pet Events → Edit on that event. Published Partner Events keep SitGuru Partner Event priority on the Pet Events map and lists.",
   },
   {
-    question: "What is the difference between a Partner Event and a Community Event?",
+    question: "What is the difference between a Partner Event and a Pet Event?",
     answer:
-      "SitGuru Partner Events are created and updated by Pet Event Planners/Managers in the Partner Dashboard. Community Events are discoveries that fill the broader map — Partner listings always lead visually.",
+      "SitGuru Partner Events are created and updated by Pet Event Planners/Managers in the Partner Dashboard. Pet Events (discoveries) fill the broader map — Partner listings always lead visually.",
   },
   {
     question: "Can Pet Parents RSVP on event cards?",

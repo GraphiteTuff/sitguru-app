@@ -193,7 +193,7 @@ export default function EventManagerDashboardClient({
   function createEvent() {
     startCreate(async () => {
       const result = await createPartnerEventDraft({
-        title: "New Community Event",
+        title: "New Pet Event",
       });
       if (result.ok && result.event) {
         router.push(
@@ -643,7 +643,7 @@ export default function EventManagerDashboardClient({
 
           <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <h2 className="text-xl font-black text-slate-950">
-              SitGuru Community Reach
+              SitGuru Pet Events Reach
             </h2>
             <p className="mt-1 text-sm font-semibold text-slate-600">
               Your Partner Events are currently visible in:
@@ -700,7 +700,7 @@ export default function EventManagerDashboardClient({
               href="/community"
               className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-800"
             >
-              Preview Community map
+              Preview Pet Events map
             </Link>
           </div>
         </section>

@@ -89,7 +89,7 @@ export default function PartnerEventsListClient({
           disabled={creating}
           onClick={() =>
             startCreate(async () => {
-              const result = await createPartnerEventDraft({ title: "New Community Event" });
+              const result = await createPartnerEventDraft({ title: "New Pet Event" });
               if (result.ok && result.event) {
                 router.push(`/partners/dashboard/community/events/${result.event.id}/edit`);
               }

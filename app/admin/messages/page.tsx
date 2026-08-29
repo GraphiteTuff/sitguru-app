@@ -281,7 +281,7 @@ const filterLinks = [
   },
   {
     key: "event-admin",
-    label: "Community Events",
+    label: "Pet Events",
     href: "/admin/messages?filter=event-admin",
   },
   {
@@ -1048,7 +1048,7 @@ function getThreadTypeLabel(type: AdminThreadCard["type"]) {
   if (type === "guru-customer") return "Guru ↔ Pet Parent";
   if (type === "customer-admin") return "Pet Parent ↔ Admin";
   if (type === "ambassador-admin") return "Ambassador ↔ Admin";
-  if (type === "event-admin") return "Community Event";
+  if (type === "event-admin") return "Pet Event";
   if (type === "homepage-visitor") return "Homepage Visitor";
   return "General";
 }
@@ -3489,7 +3489,7 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
         const id = asString(event.id);
         if (!id) return;
         communityEventMap.set(id, {
-          title: asString(event.title) || "Community Event",
+          title: asString(event.title) || "Pet Event",
           slug: asString(event.slug),
         });
       },

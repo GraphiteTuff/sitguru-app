@@ -82,10 +82,10 @@ export default async function CommunityPage() {
       <section className="public-dark-section border-b border-emerald-900/20 bg-[#0D5C3A] py-10 text-white sm:py-12">
         <div className="mx-auto max-w-[1500px] px-5 sm:px-6 lg:px-8">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100">
-            SitGuru Community
+            SitGuru Pet Events
           </p>
           <h1 className="mt-3 text-3xl font-black tracking-tight !text-white sm:text-4xl lg:text-5xl">
-            Pet friendly community events near you
+            Pet friendly events near you
           </h1>
           <p className="mt-3 max-w-2xl text-base font-semibold text-emerald-50">
             Search like Find Care — events on the left, map on the right. Partner

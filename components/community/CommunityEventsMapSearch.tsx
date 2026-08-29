@@ -61,7 +61,7 @@ function eventToMapMarker(event: CommunityEventWithPartner) {
   const badges = [
     event.is_free ? "Free" : null,
     event.pet_friendly ? "Pet Friendly" : null,
-    googleDiscovery ? "Community Event" : "SitGuru Partner Event",
+    googleDiscovery ? "Pet Event" : "SitGuru Partner Event",
   ].filter(Boolean) as string[];
 
   return {
@@ -109,7 +109,7 @@ function EventListCard({
   const external = isExternalEventLink(event);
   const googleDiscovery = isGoogleDiscoveryEvent(event);
   const sourceLabel = googleDiscovery
-    ? "Community Event"
+    ? "Pet Event"
     : "SitGuru Partner Event";
   const description = (
     event.short_description ||

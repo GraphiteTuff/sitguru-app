@@ -60,7 +60,7 @@ export default function CommunityHostScreen() {
           style={[styles.ctaSecondary, isWide && styles.ctaHalf]}
           onPress={() => router.push("/community-events")}
         >
-          <Text style={styles.ctaSecondaryText}>Browse Community</Text>
+          <Text style={styles.ctaSecondaryText}>Browse Pet Events</Text>
         </Pressable>
       </View>
 
@@ -92,7 +92,7 @@ export default function CommunityHostScreen() {
       <View style={[styles.compareCard, styles.compareCardMuted]}>
         <View style={styles.compareHeader}>
           <Sparkles color="#0D5C3A" size={18} />
-          <Text style={styles.compareEyebrow}>Community Event</Text>
+          <Text style={styles.compareEyebrow}>Pet Event</Text>
         </View>
         <Text style={styles.compareBodyMuted}>
           Extra local pet gatherings SitGuru surfaces so the map stays full. Claim

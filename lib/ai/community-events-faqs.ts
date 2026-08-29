@@ -1,5 +1,5 @@
 /**
- * Community Events marketing FAQs for Rogue (exact-match pattern like Scout/Taco).
+ * Pet Events marketing FAQs for Rogue (exact-match pattern like Scout/Taco).
  */
 
 import {
@@ -24,8 +24,8 @@ export type CommunityEventCompanionContext = {
 export const COMMUNITY_EVENT_FAQ_CHIPS = [
   { label: "I'm Going?", question: "How does I'm Going work?" },
   { label: "Need account?", question: "Do I need a SitGuru account to RSVP?" },
-  { label: "Pet friendly?", question: "Are community events pet friendly?" },
-  { label: "Free events?", question: "Are SitGuru community events free?" },
+  { label: "Pet friendly?", question: "Are pet events pet friendly?" },
+  { label: "Free events?", question: "Are SitGuru pet events free?" },
   { label: "Meet Gurus", question: "Can I meet local Gurus at events?" },
   { label: "Pet Parent", question: "How do I join as a Pet Parent?" },
   { label: "Pet Guru", question: "How do I join as a Pet Guru?" },
@@ -38,12 +38,17 @@ function cta(role: CommunitySignupRole) {
   return "[[cta:community_parent]]";
 }
 
-/** Canonical Community Events FAQ copy — keep answers concise for Rogue voice. */
+/** Canonical Pet Events FAQ copy — keep answers concise for Rogue voice. */
 export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
+  {
+    question: "What are SitGuru pet events?",
+    answer:
+      "SitGuru Pet Events are local pet-friendly gatherings — adoption days, meetups, fundraisers, partner activations, and pack socials listed in one place on SitGuru. Browse what's near you, say **I'm Going**, and meet Gurus, partners, and pet parents in your area. [[cta:community_parent]]",
+  },
   {
     question: "What are SitGuru community events?",
     answer:
-      "SitGuru Community Events are local pet-friendly gatherings — adoption days, meetups, fundraisers, partner activations, and pack socials listed in one place on SitGuru. Browse what's near you, say **I'm Going**, and meet Gurus, partners, and pet parents in your area. [[cta:community_parent]]",
+      "SitGuru Pet Events are local pet-friendly gatherings — adoption days, meetups, fundraisers, partner activations, and pack socials listed in one place on SitGuru. Browse what's near you, say **I'm Going**, and meet Gurus, partners, and pet parents in your area. [[cta:community_parent]]",
   },
   {
     question: "How does I'm Going work?",
@@ -63,12 +68,17 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "How do I join as a Pet Guru?",
     answer:
-      "Future Gurus can join SitGuru for free, build a profile, and show up at community events where pet parents are already gathering. Great way to meet local clients! [[cta:community_guru]]",
+      "Future Gurus can join SitGuru for free, build a profile, and show up at pet events where pet parents are already gathering. Great way to meet local clients! [[cta:community_guru]]",
   },
   {
     question: "How do I join as an Ambassador?",
     answer:
-      "Ambassadors grow the SitGuru pack — share events, invite pet parents and Gurus, and represent SitGuru locally. Community events are perfect meetup spots. [[cta:community_ambassador]]",
+      "Ambassadors grow the SitGuru pack — share events, invite pet parents and Gurus, and represent SitGuru locally. Pet events are perfect meetup spots. [[cta:community_ambassador]]",
+  },
+  {
+    question: "Are pet events pet friendly?",
+    answer:
+      "Many are! Look for the **Pet Friendly** badge on event cards. Always check the event description for leash, vaccine, or breed notes from the host. [[cta:community_parent]]",
   },
   {
     question: "Are community events pet friendly?",
@@ -76,29 +86,34 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "Many are! Look for the **Pet Friendly** badge on event cards. Always check the event description for leash, vaccine, or breed notes from the host. [[cta:community_parent]]",
   },
   {
+    question: "Are SitGuru pet events free?",
+    answer:
+      "Many listings are **free** gatherings — others link to tickets or registration on the partner's site. The event page shows **Free** or **Tickets** so you know before you go. [[cta:community_parent]]",
+  },
+  {
     question: "Are SitGuru community events free?",
     answer:
-      "Many listings are **free** community gatherings — others link to tickets or registration on the partner's site. The event page shows **Free** or **Tickets** so you know before you go. [[cta:community_parent]]",
+      "Many listings are **free** gatherings — others link to tickets or registration on the partner's site. The event page shows **Free** or **Tickets** so you know before you go. [[cta:community_parent]]",
   },
   {
     question: "Can I meet local Gurus at events?",
     answer:
-      "Absolutely! Community events are one of the best ways to meet **local SitGuru Gurus** and pet parents near you — then book care on SitGuru when you're ready. [[cta:community_parent]]",
+      "Absolutely! Pet events are one of the best ways to meet **local SitGuru Gurus** and pet parents near you — then book care on SitGuru when you're ready. [[cta:community_parent]]",
   },
   {
     question: "Who hosts these events?",
     answer:
-      "Events are hosted by **SitGuru Partners** and community organizations — pet businesses, rescues, trainers, and local pet-friendly venues. SitGuru reviews listings before they're published. [[cta:community_parent]]",
+      "Events are hosted by **SitGuru Partners** and local organizations — pet businesses, rescues, trainers, and pet-friendly venues. SitGuru reviews listings before they're published. [[cta:community_parent]]",
   },
   {
     question: "How do I find events near me?",
     answer:
-      "Open **Community → Events**, search by city or keyword, or use **Happening Near You** on the homepage. Save your area and we'll surface local happenings. [[cta:community_parent]]",
+      "Open **Pet Events**, search by city or keyword, or use **Happening Near You** on the homepage. Save your area and we'll surface local happenings. [[cta:community_parent]]",
   },
   {
     question: "What's the difference between RSVP and tickets?",
     answer:
-      "**I'm Going** on SitGuru is your community RSVP so hosts know you're coming. If an event needs paid tickets or external registration, the event page links out — do both when required. [[cta:community_parent]]",
+      "**I'm Going** on SitGuru is your RSVP so hosts know you're coming. If an event needs paid tickets or external registration, the event page links out — do both when required. [[cta:community_parent]]",
   },
   {
     question: "Can Gurus RSVP to events?",
@@ -113,12 +128,12 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "What happens after I sign up?",
     answer:
-      "After your free signup, you'll land back on the event to finish **I'm Going**, explore more community listings, and optionally find Gurus near you on SitGuru. [[cta:community_parent]]",
+      "After your free signup, you'll land back on the event to finish **I'm Going**, explore more Pet Events listings, and optionally find Gurus near you on SitGuru. [[cta:community_parent]]",
   },
   {
     question: "Are events on the SitGuru mobile app?",
     answer:
-      "Yes — browse community events in the **SitGuru mobile app**, RSVP when signed in, and share events with friends. Same pack, pocket-sized. [[cta:community_parent]]",
+      "Yes — browse Pet Events in the **SitGuru mobile app**, RSVP when signed in, and share events with friends. Same pack, pocket-sized. [[cta:community_parent]]",
   },
   {
     question: "How do I share an event?",
@@ -193,7 +208,7 @@ export function buildCommunityEventsFaqSnapshot(
       : "";
 
   const base = buildMarketingFaqSnapshot({
-    officerLabel: "Rogue — Community Events",
+    officerLabel: "Rogue — Pet Events",
     faqs: COMMUNITY_EVENTS_MARKETING_FAQS,
     signupPath: signupParent,
   });
@@ -224,5 +239,5 @@ export function buildCommunityRogueOpeningHint(ctx: CommunityEventCompanionConte
   if (ctx.title) {
     return `Ask me anything about **${ctx.title}** — RSVP, pet-friendly details, or how to join SitGuru as a Pet Parent, Guru, or Ambassador!`;
   }
-  return "Ask me about SitGuru community events — RSVP, pet-friendly tips, or joining as a Pet Parent, Guru, or Ambassador!";
+  return "Ask me about SitGuru Pet Events — RSVP, pet-friendly tips, or joining as a Pet Parent, Guru, or Ambassador!";
 }

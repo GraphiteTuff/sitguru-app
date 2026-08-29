@@ -139,7 +139,7 @@ export function mapDiscoveryToCommunityEvent(
     updated_at: row.updated_at || row.synced_at,
     partners: {
       id: "00000000-0000-0000-0000-000000000001",
-      business_name: "Community Event",
+      business_name: "Pet Event",
       slug: null,
       city: discoveryCountyLabel(row) || row.city,
       state: row.state || "PA",

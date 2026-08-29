@@ -62,7 +62,7 @@ export default async function AdminCommunityMarketsPage() {
             href="/admin/community/events"
             className="text-sm font-black text-emerald-800"
           >
-            ← Community Events
+            ← Pet Events
           </Link>
           <p className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">
             Admin • Discovery Markets

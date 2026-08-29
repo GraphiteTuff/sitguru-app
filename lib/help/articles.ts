@@ -265,9 +265,9 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     slug: "update-community-events",
     href: "/help/account/update-community-events",
-    title: "Update Community Events as a Pet Event Planner",
+    title: "Update Pet Events as a Pet Event Planner",
     summary:
-      "Step-by-step: open Partner Community Events, edit Basics / Date / Details, preview, submit for review, promote, or cancel.",
+      "Step-by-step: open Partner Pet Events, edit Basics / Date / Details, preview, submit for review, promote, or cancel.",
     audience: "all",
     category: "Account & Profiles",
     tags: [

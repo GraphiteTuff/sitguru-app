@@ -153,12 +153,12 @@ const navSections = [
       { label: "Programs", href: adminRoutes.programs, icon: ShieldCheck },
       { label: "Partners", href: adminRoutes.partners, icon: HandCoins },
       {
-        label: "Community Events",
+        label: "Pet Events",
         href: adminRoutes.communityEvents,
         icon: CalendarDays,
       },
       {
-        label: "Community Markets",
+        label: "Pet Event Markets",
         href: adminRoutes.communityMarkets,
         icon: MapPin,
       },
