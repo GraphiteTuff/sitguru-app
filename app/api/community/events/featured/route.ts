@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchDiscoveredHomepageEvents } from "@/lib/community/discovered-events";
 import { isGoogleDiscoveryEvent } from "@/lib/community/event-preview";
-import { getHomepageDemoEvents } from "@/lib/community/homepage-demo-events";
+import { getHomepageDemoEvents, getUpcomingCuratedBucksMontgomeryPetEvents } from "@/lib/community/homepage-demo-events";
 import { fetchFeaturedHomepageEvents, fetchPublicEvents } from "@/lib/community/queries";
 import { lookupZipLocation, cleanZipCode } from "@/lib/location/zip-lookup";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
@@ -107,27 +107,38 @@ export async function GET(req: NextRequest) {
     12,
   );
 
-  // Fill with partners first, then discoveries; display soonest → later.
+  // Fill with partners first, then curated Bucks/Montgomery cards, then discoveries.
+  const curatedUpcoming = getUpcomingCuratedBucksMontgomeryPetEvents();
   let bannerEvents = sortEventsChronologically(
-    mergeUniqueEvents(partnerEvents, discovered.events, 16),
+    mergeUniqueEvents(
+      mergeUniqueEvents(partnerEvents, curatedUpcoming, 24),
+      discovered.events,
+      24,
+    ),
   );
   let source: "live" | "google" | "demo" = partnerEvents.length
     ? "live"
-    : discovered.events.length
-      ? "google"
-      : "demo";
-  let previewMode = !partnerEvents.length && discovered.events.length > 0;
+    : curatedUpcoming.length
+      ? "demo"
+      : discovered.events.length
+        ? "google"
+        : "demo";
+  let previewMode =
+    !partnerEvents.length &&
+    (curatedUpcoming.length > 0 || discovered.events.length > 0);
   let lastSyncedAt = discovered.lastSyncedAt;
 
   if (bannerEvents.length === 0) {
     const demo = getHomepageDemoEvents(
-      city && state ? `${city}, ${state}` : "Bucks, Montgomery, Lehigh & Northampton County, PA",
+      city && state
+        ? `${city}, ${state}`
+        : "Bucks & Montgomery Counties, PA",
     );
     bannerEvents = sortEventsChronologically(
       mergeUniqueEvents(
         demo.featured ? [demo.featured, ...demo.upcoming] : demo.upcoming,
         [],
-        16,
+        24,
       ),
     );
     source = "demo";
