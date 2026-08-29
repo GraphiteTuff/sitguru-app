@@ -45,12 +45,12 @@ const partnerStats = [
 
 const actionCards = [
   {
-    title: "Community Events",
+    title: "Pet Event Manager",
     description:
-      "Create and manage pet-friendly community events — SitGuru handles the polished presentation everywhere.",
+      "Command center for Pet Event Planners & Managers — create, update, promote, and measure SitGuru Partner Events.",
     href: "/partners/dashboard/community/events",
     icon: Megaphone,
-    cta: "Manage events",
+    cta: "Open Event Manager",
   },
   {
     title: "Share your partner link",
@@ -124,18 +124,18 @@ export default function PartnerDashboardPage() {
 
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
-                  href="/partners/dashboard/referrals"
+                  href="/partners/dashboard/community/events"
                   className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-emerald-50"
                 >
-                  Share referral link
+                  Open Event Manager
                   <ArrowRight className="h-4 w-4" />
                 </Link>
 
                 <Link
-                  href="/"
+                  href="/partners/dashboard/referrals"
                   className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-black text-white shadow-sm backdrop-blur transition hover:bg-white/15"
                 >
-                  Back to homepage
+                  Share referral link
                 </Link>
               </div>
             </div>

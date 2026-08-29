@@ -8,6 +8,10 @@ export type EventAttendanceCounts = {
   gurus: number;
   ambassadors: number;
   totalGoing: number;
+  /** Maybe = status `interested` */
+  totalMaybe: number;
+  /** No = status `cancelled` */
+  totalNo: number;
 };
 
 export type EventAttendanceRow = {
@@ -17,6 +21,15 @@ export type EventAttendanceRow = {
   attendance_role: AttendanceRole;
   status: AttendanceStatus;
 };
+
+const emptyCounts = (): EventAttendanceCounts => ({
+  petParents: 0,
+  gurus: 0,
+  ambassadors: 0,
+  totalGoing: 0,
+  totalMaybe: 0,
+  totalNo: 0,
+});
 
 export async function resolveAttendanceRole(userId: string): Promise<AttendanceRole> {
   const [{ data: roles }, { data: guru }, { data: ambassador }] = await Promise.all([
@@ -58,22 +71,28 @@ export async function getEventAttendanceCounts(
       gurus: Number(row.gurus || 0),
       ambassadors: Number(row.ambassadors || 0),
       totalGoing: Number(row.total_going || 0),
+      totalMaybe: Number(row.total_maybe ?? row.total_interested ?? 0),
+      totalNo: Number(row.total_no ?? row.total_cancelled ?? 0),
     };
   }
 
-  // Fallback if RPC not applied yet
+  // Fallback if RPC not applied / older signature
   const { data: rows } = await supabaseAdmin
     .from("community_event_attendance")
     .select("attendance_role, status")
-    .eq("event_id", eventId)
-    .eq("status", "going");
+    .eq("event_id", eventId);
 
   const list = rows || [];
+  const going = list.filter((row) => row.status === "going");
   return {
-    petParents: list.filter((row) => row.attendance_role === "pet_parent").length,
-    gurus: list.filter((row) => row.attendance_role === "guru").length,
-    ambassadors: list.filter((row) => row.attendance_role === "ambassador").length,
-    totalGoing: list.length,
+    ...emptyCounts(),
+    petParents: going.filter((row) => row.attendance_role === "pet_parent").length,
+    gurus: going.filter((row) => row.attendance_role === "guru").length,
+    ambassadors: going.filter((row) => row.attendance_role === "ambassador")
+      .length,
+    totalGoing: going.length,
+    totalMaybe: list.filter((row) => row.status === "interested").length,
+    totalNo: list.filter((row) => row.status === "cancelled").length,
   };
 }
 

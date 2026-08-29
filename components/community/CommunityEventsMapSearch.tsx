@@ -10,10 +10,13 @@ import {
   Search,
 } from "lucide-react";
 import ProviderMap from "@/components/ProviderMap";
+import EventAttendingButtons from "@/components/community/EventAttendingButtons";
 import {
+  eventMatchesCounty,
   formatEventCountyState,
   formatEventDateRange,
   getEventCardImage,
+  getEventCountyLabel,
 } from "@/lib/community/format";
 import {
   getEventBannerHref,
@@ -24,11 +27,13 @@ import {
   readCommunityLocationPreference,
   saveCommunityLocationPreference,
 } from "@/lib/community/location-preference";
+import { COMMUNITY_COUNTY_OPTIONS } from "@/lib/community/market-seed";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 import { COMMUNITY_EVENT_CATEGORIES } from "@/lib/community/types";
 
 type Filters = {
   q: string;
+  county: string;
   city: string;
   state: string;
   category: string;
@@ -209,44 +214,54 @@ function EventListCard({
           <span className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 sm:w-auto">
             View details
           </span>
-          <span className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white sm:w-auto">
-            {googleDiscovery ? "Open event" : "I'm Going"}
-          </span>
+          {googleDiscovery ? (
+            <span className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white sm:w-auto">
+              Open event
+            </span>
+          ) : null}
         </div>
       </div>
     </>
   );
 
-  const className = `flex flex-col gap-4 rounded-[24px] border bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:flex-row sm:rounded-[28px] sm:p-5 ${
+  const shellClass = `rounded-[24px] border bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:rounded-[28px] sm:p-5 ${
     highlighted
       ? "border-emerald-400 ring-4 ring-emerald-100"
       : "border-slate-200"
   }`;
-
-  if (external) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={className}
-        onMouseEnter={onHighlight}
-        onFocus={onHighlight}
-      >
-        {body}
-      </a>
-    );
-  }
+  const linkClass =
+    "flex flex-col gap-4 sm:flex-row focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 rounded-[20px]";
 
   return (
-    <Link
-      href={href}
-      className={className}
+    <article
+      className={shellClass}
       onMouseEnter={onHighlight}
       onFocus={onHighlight}
     >
-      {body}
-    </Link>
+      {external ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClass}
+        >
+          {body}
+        </a>
+      ) : (
+        <Link href={href} className={linkClass}>
+          {body}
+        </Link>
+      )}
+      {!googleDiscovery ? (
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <EventAttendingButtons
+            eventId={event.id}
+            eventSlug={event.slug}
+            compact
+          />
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -257,6 +272,7 @@ export default function CommunityEventsMapSearch({
 }) {
   const [filters, setFilters] = useState<Filters>({
     q: "",
+    county: "",
     city: "",
     state: "",
     category: "",
@@ -266,9 +282,10 @@ export default function CommunityEventsMapSearch({
 
   useEffect(() => {
     const preference = readCommunityLocationPreference();
-    if (!preference.city && !preference.state) return;
+    if (!preference.county && !preference.city && !preference.state) return;
     const next = {
       q: "",
+      county: preference.county || "",
       city: preference.city || "",
       state: preference.state || "",
       category: "",
@@ -278,21 +295,19 @@ export default function CommunityEventsMapSearch({
   }, []);
 
   const filtered = useMemo(() => {
-    return events.filter((event) => {
+    const matched = events.filter((event) => {
       if (
         filters.category &&
         !(event.categories || []).includes(filters.category)
       ) {
         return false;
       }
+      if (filters.county && !eventMatchesCounty(event, filters.county)) {
+        return false;
+      }
       if (
         filters.city &&
-        !(
-          event.city?.toLowerCase().includes(filters.city.toLowerCase()) ||
-          event.featured_market_city
-            ?.toLowerCase()
-            .includes(filters.city.toLowerCase())
-        )
+        !event.city?.toLowerCase().includes(filters.city.toLowerCase())
       ) {
         return false;
       }
@@ -314,7 +329,32 @@ export default function CommunityEventsMapSearch({
       }
       return true;
     });
+
+    // All events show by county (then date).
+    return [...matched].sort((a, b) => {
+      const countyA = getEventCountyLabel(a) || "Other";
+      const countyB = getEventCountyLabel(b) || "Other";
+      const byCounty = countyA.localeCompare(countyB);
+      if (byCounty !== 0) return byCounty;
+      return new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
+    });
   }, [events, filters]);
+
+  const groupedByCounty = useMemo(() => {
+    const groups: { county: string; events: CommunityEventWithPartner[] }[] =
+      [];
+    for (const event of filtered) {
+      const county =
+        formatEventCountyState(event) || getEventCountyLabel(event) || "Other";
+      const last = groups[groups.length - 1];
+      if (last && last.county === county) {
+        last.events.push(event);
+      } else {
+        groups.push({ county, events: [event] });
+      }
+    }
+    return groups;
+  }, [filtered]);
 
   const markers = useMemo(
     () => filtered.map(eventToMapMarker),
@@ -337,6 +377,7 @@ export default function CommunityEventsMapSearch({
 
   const activeFilterCount = [
     filters.q,
+    filters.county,
     filters.city,
     filters.state,
     filters.category,
@@ -344,8 +385,9 @@ export default function CommunityEventsMapSearch({
 
   function applySearch(next: Filters = draft) {
     setFilters(next);
-    if (next.city || next.state) {
+    if (next.county || next.city || next.state) {
       saveCommunityLocationPreference({
+        county: next.county || undefined,
         city: next.city || undefined,
         state: next.state || undefined,
         source: "manual",
@@ -354,7 +396,7 @@ export default function CommunityEventsMapSearch({
   }
 
   function clearFilters() {
-    const cleared = { q: "", city: "", state: "", category: "" };
+    const cleared = { q: "", county: "", city: "", state: "", category: "" };
     setDraft(cleared);
     applySearch(cleared);
   }
@@ -376,7 +418,7 @@ export default function CommunityEventsMapSearch({
 
         <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:rounded-[28px] sm:p-6">
           <form
-            className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-[1.1fr_0.9fr_0.7fr_1.2fr_auto]"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-[1fr_1.05fr_0.9fr_0.55fr_1.15fr_auto]"
             onSubmit={(e) => {
               e.preventDefault();
               applySearch(draft);
@@ -403,6 +445,34 @@ export default function CommunityEventsMapSearch({
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label className="block min-w-0">
+              <span className="mb-2 block text-sm font-semibold text-slate-800">
+                County
+              </span>
+              <input
+                list="community-county-options"
+                value={draft.county}
+                onChange={(e) =>
+                  setDraft((current) => ({
+                    ...current,
+                    county: e.target.value,
+                  }))
+                }
+                placeholder="Bucks County"
+                className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+              />
+              <datalist id="community-county-options">
+                {COMMUNITY_COUNTY_OPTIONS.map((option) => (
+                  <option
+                    key={`${option.county}-${option.state}`}
+                    value={option.county}
+                  >
+                    {option.county}, {option.state}
+                  </option>
+                ))}
+              </datalist>
             </label>
 
             <label className="block min-w-0">
@@ -499,11 +569,13 @@ export default function CommunityEventsMapSearch({
               <p className="mt-1 text-sm text-slate-600">
                 Pet friendly gatherings near you — partners first, community next.
               </p>
-              {(filters.city || filters.state) && (
+              {(filters.county || filters.city || filters.state) && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
                     Centered on{" "}
-                    {[filters.city, filters.state].filter(Boolean).join(", ")}
+                    {[filters.county, filters.city, filters.state]
+                      .filter(Boolean)
+                      .join(", ")}
                   </span>
                 </div>
               )}
@@ -515,6 +587,8 @@ export default function CommunityEventsMapSearch({
                 highlightedMarkerId={
                   highlightedId ? `event:${highlightedId}` : undefined
                 }
+                footerTitle="Your next pet hang is already on the map."
+                footerBadge="Pull up — paws welcome"
               />
             </div>
           </div>
@@ -536,7 +610,7 @@ export default function CommunityEventsMapSearch({
                   No events match just yet
                 </h3>
                 <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
-                  Try another city or category. Partner events and SerpApi
+                  Try another county, city, or category. Partner events and SerpApi
                   community discoveries show here once markets are syncing.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -556,13 +630,26 @@ export default function CommunityEventsMapSearch({
                 </div>
               </div>
             ) : (
-              filtered.map((event) => (
-                <EventListCard
-                  key={event.id}
-                  event={event}
-                  highlighted={highlightedId === event.id}
-                  onHighlight={() => setHighlightedId(event.id)}
-                />
+              groupedByCounty.map((group) => (
+                <div key={group.county} className="space-y-4 sm:space-y-5">
+                  <div className="sticky top-20 z-[1] -mx-1 rounded-2xl border border-emerald-100 bg-emerald-50/95 px-4 py-2.5 backdrop-blur xl:static xl:mx-0">
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
+                      {group.county}
+                    </p>
+                    <p className="text-sm font-semibold text-emerald-900/80">
+                      {group.events.length} event
+                      {group.events.length === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  {group.events.map((event) => (
+                    <EventListCard
+                      key={event.id}
+                      event={event}
+                      highlighted={highlightedId === event.id}
+                      onHighlight={() => setHighlightedId(event.id)}
+                    />
+                  ))}
+                </div>
               ))
             )}
           </div>

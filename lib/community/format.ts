@@ -1,3 +1,4 @@
+import { COMMUNITY_MARKET_SEEDS } from "@/lib/community/market-seed";
 import type { CommunityEventRow } from "@/lib/community/types";
 
 export function formatEventDateRange(
@@ -75,6 +76,79 @@ export function formatEventLocationInline(event: Pick<
   return venue || cityState || "Location TBA";
 }
 
+/** Normalize "Bucks County" / "bucks" for matching. */
+export function normalizeCountyQuery(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\bcounty\b/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function resolveCountyFromCity(city: string | null | undefined) {
+  const needle = city?.trim().toLowerCase();
+  if (!needle) return null;
+  const seed = COMMUNITY_MARKET_SEEDS.find(
+    (market) =>
+      market.city.toLowerCase() === needle ||
+      market.city_anchors.some((anchor) => anchor.toLowerCase() === needle),
+  );
+  return seed?.county_name || null;
+}
+
+/** County label stamped on discoveries (`featured_market_city`) or city→county map. */
+export function getEventCountyLabel(
+  event: Pick<
+    CommunityEventRow,
+    "city" | "featured_market_city"
+  > & {
+    partners?: { city?: string | null } | null;
+  },
+) {
+  const stamped = event.featured_market_city?.trim();
+  if (stamped && /county/i.test(stamped)) return stamped;
+  if (stamped) {
+    return resolveCountyFromCity(stamped) || stamped;
+  }
+  return (
+    resolveCountyFromCity(event.city) ||
+    resolveCountyFromCity(event.partners?.city) ||
+    event.city?.trim() ||
+    event.partners?.city?.trim() ||
+    null
+  );
+}
+
+export function eventMatchesCounty(
+  event: Pick<
+    CommunityEventRow,
+    "city" | "featured_market_city"
+  > & {
+    partners?: { city?: string | null } | null;
+  },
+  countyQuery: string,
+) {
+  const needle = normalizeCountyQuery(countyQuery);
+  if (!needle) return true;
+
+  const haystacks = [
+    getEventCountyLabel(event),
+    event.featured_market_city,
+    event.partners?.city,
+    event.city,
+  ]
+    .filter(Boolean)
+    .map((value) => normalizeCountyQuery(String(value)));
+
+  return haystacks.some(
+    (haystack) =>
+      haystack.includes(needle) ||
+      needle.includes(haystack) ||
+      haystack.startsWith(needle),
+  );
+}
+
 /** County (or city fallback), State — shown under event titles on cards. */
 export function formatEventCountyState(
   event: Pick<
@@ -84,11 +158,7 @@ export function formatEventCountyState(
     partners?: { city?: string | null; state?: string | null } | null;
   },
 ) {
-  const countyOrCity =
-    event.featured_market_city?.trim() ||
-    event.partners?.city?.trim() ||
-    event.city?.trim() ||
-    null;
+  const countyOrCity = getEventCountyLabel(event);
   const state =
     event.featured_market_state?.trim() ||
     event.partners?.state?.trim() ||

@@ -1,14 +1,17 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import PartnerEventsListClient from "@/components/partners/events/PartnerEventsListClient";
-import { fetchPartnerEvents } from "@/lib/community/queries";
+import EventManagerDashboardClient from "@/components/partners/events/EventManagerDashboardClient";
+import { createPartnerEventDraft } from "@/app/partners/dashboard/community/events/actions";
+import {
+  fetchAllPartnerEvents,
+  getPartnerCommandCenterStats,
+} from "@/lib/community/event-command-center";
 import { requirePartnerAccount } from "@/lib/community/partner-access";
 import type { PartnerEventTab } from "@/lib/community/types";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  searchParams?: Promise<{ tab?: string }>;
+  searchParams?: Promise<{ tab?: string; range?: string; create?: string }>;
 };
 
 function parseTab(value?: string): PartnerEventTab {
@@ -20,38 +23,44 @@ function parseTab(value?: string): PartnerEventTab {
     "past",
     "cancelled",
   ]);
-
-  if (value && tabs.has(value)) {
-    return value as PartnerEventTab;
-  }
-
+  if (value && tabs.has(value)) return value as PartnerEventTab;
   return "upcoming";
 }
 
-export default async function PartnerCommunityEventsPage({ searchParams }: PageProps) {
+export default async function PartnerCommunityEventsPage({
+  searchParams,
+}: PageProps) {
   const access = await requirePartnerAccount();
 
   if (!access.ok || !access.partner) {
-    redirect("/partners/apply");
+    redirect("/partners/apply?intent=community_events");
   }
 
   const params = await searchParams;
+
+  if (params?.create === "1") {
+    const result = await createPartnerEventDraft({
+      title: "New Community Event",
+    });
+    if (result.ok && result.event) {
+      redirect(`/partners/dashboard/community/events/${result.event.id}/edit`);
+    }
+  }
+
   const tab = parseTab(params?.tab);
-  const events = await fetchPartnerEvents(access.partner.id, tab);
+  const events = await fetchAllPartnerEvents(access.partner.id);
+  const stats = await getPartnerCommandCenterStats(
+    events,
+    "month",
+    access.partner,
+  );
 
   return (
-    <main className="min-h-screen bg-[#f7f8f4]">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <Link
-            href="/partners/dashboard"
-            className="text-sm font-black text-emerald-800 hover:underline"
-          >
-            ← Partner Dashboard
-          </Link>
-        </div>
-        <PartnerEventsListClient events={events} initialTab={tab} />
-      </div>
-    </main>
+    <EventManagerDashboardClient
+      partner={access.partner}
+      events={events}
+      initialStats={stats}
+      initialTab={tab}
+    />
   );
 }

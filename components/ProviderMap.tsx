@@ -11,6 +11,9 @@ type ProviderMapProps = {
   center?: [number, number];
   highlightedMarkerId?: string;
   highlightedMarkerPosition?: [number, number];
+  /** Under-map CTA headline (Find Care keeps Guru copy; Community passes Events copy). */
+  footerTitle?: string;
+  footerBadge?: string;
 };
 
 type NormalizedMapMarker = MapMarker & {
@@ -359,6 +362,8 @@ export default function ProviderMap({
   center,
   highlightedMarkerId,
   highlightedMarkerPosition,
+  footerTitle = "Your next Guru is closer than you think.",
+  footerBadge = "Ready when you are",
 }: ProviderMapProps) {
   const searchParams = useSearchParams();
 
@@ -383,12 +388,10 @@ export default function ProviderMap({
 
       <div className="border-t border-slate-100 bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <p className="text-sm font-black text-slate-950">
-            Your next Guru is closer than you think.
-          </p>
+          <p className="text-sm font-black text-slate-950">{footerTitle}</p>
 
           <div className="shrink-0 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-black text-emerald-800">
-            Ready when you are
+            {footerBadge}
           </div>
         </div>
       </div>

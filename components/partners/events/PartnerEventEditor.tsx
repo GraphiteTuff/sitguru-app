@@ -586,15 +586,25 @@ export default function PartnerEventEditor({ event, partner }: PartnerEventEdito
   );
 
   const mobileSteps: EditorStep[] = ["basics", "datetime", "details", "preview", "publish"];
+  const stepLabels: Record<EditorStep, string> = {
+    basics: "1 · Basics",
+    datetime: "2 · Date & Location",
+    details: "3 · Details",
+    preview: "4 · Preview",
+    publish: "5 · Publish",
+  };
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
-            {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Draft saved" : "Community Event"}
+            {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Draft saved" : "SitGuru Partner Event"}
           </p>
           <h1 className="text-2xl font-black text-slate-950 sm:text-3xl">{draft.title}</h1>
+          <p className="mt-1 text-sm font-semibold text-slate-600">
+            Facebook-simple flow — about 2–3 minutes when your details are ready.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {draft.status === "published" ? (
@@ -622,7 +632,7 @@ export default function PartnerEventEditor({ event, partner }: PartnerEventEdito
             }
             className="inline-flex min-h-11 items-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white disabled:opacity-60"
           >
-            {submitting ? "Submitting…" : "Submit for review"}
+            {submitting ? "Submitting…" : draft.status === "published" ? "Save updates" : "Publish Event"}
           </button>
         </div>
       </div>
@@ -635,17 +645,17 @@ export default function PartnerEventEditor({ event, partner }: PartnerEventEdito
         </p>
       ) : null}
 
-      <div className="flex gap-2 overflow-x-auto lg:hidden">
+      <div className="flex gap-2 overflow-x-auto">
         {mobileSteps.map((item) => (
           <button
             key={item}
             type="button"
             onClick={() => setStep(item)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-black capitalize ${
-              step === item ? "bg-emerald-700 text-white" : "bg-white text-slate-700"
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-black ${
+              step === item ? "bg-emerald-700 text-white" : "bg-white text-slate-700 ring-1 ring-slate-200"
             }`}
           >
-            {item}
+            {stepLabels[item]}
           </button>
         ))}
       </div>

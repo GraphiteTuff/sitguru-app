@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 type PageProps = {
   searchParams?: Promise<{
     q?: string;
+    county?: string;
     city?: string;
     state?: string;
     category?: string;
@@ -49,7 +50,7 @@ export default async function CommunityEventsPage({ searchParams }: PageProps) {
           </h1>
           <p className="mt-3 max-w-2xl text-sm font-semibold text-slate-600 sm:text-base">
             This page is the full text list with filters — not the map. Use it when
-            you want to scan many events by category, city, free, or pet friendly.
+            you want to scan many events by county, category, city, free, or pet friendly.
           </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -116,6 +117,7 @@ export default async function CommunityEventsPage({ searchParams }: PageProps) {
           events={events}
           initialFilters={{
             q: filters?.q || "",
+            county: filters?.county || "",
             city: filters?.city || "",
             state: filters?.state || "",
             category: filters?.category || "",

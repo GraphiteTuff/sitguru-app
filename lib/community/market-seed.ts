@@ -483,3 +483,17 @@ export const COMMUNITY_MARKET_SEEDS: CommunityMarketSeed[] = [
     search_terms: PET_TERMS,
   },
 ];
+
+/** Unique county options for Community search (Category → County → City → State). */
+export const COMMUNITY_COUNTY_OPTIONS = Array.from(
+  new Map(
+    COMMUNITY_MARKET_SEEDS.map((seed) => [
+      `${seed.county_name}|${seed.state}`,
+      { county: seed.county_name, state: seed.state as string },
+    ]),
+  ).values(),
+).sort((a, b) =>
+  a.state === b.state
+    ? a.county.localeCompare(b.county)
+    : a.state.localeCompare(b.state),
+);

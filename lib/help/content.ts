@@ -473,3 +473,59 @@ export const guruOpsFaqs: HelpFaqItem[] = [
       "Pet Gurus provide services as independent local providers through the SitGuru marketplace. More detailed onboarding, tax, and provider information is shared during approval and setup.",
   },
 ];
+
+/** Pet Event Planners / Partner Managers — create & update SitGuru Partner Events. */
+export const eventPlannerUpdateGuides: HelpStepBlock[] = [
+  {
+    title: "Update a SitGuru Partner Event",
+    audience: "For Pet Event Planners & Managers",
+    steps: [
+      "Step 1: Sign in and open the Pet Event Manager (`/partners/dashboard/community/events`).",
+      "Step 2: Find your event under Your Events — then tap Manage Event (or Edit in the ⋮ menu).",
+      "Step 3: Update Basics — event name, short description, and hero image (autosaves as you type).",
+      "Step 4: Update Date & Location — start date, start/end time, venue, and address.",
+      "Step 5: Update Details — categories, free vs ticketed, pet-friendly flags, and full description.",
+      "Step 6: Preview the SitGuru card, then Publish Event / submit for review if still a draft.",
+      "Step 7: Use Share / Promotion Center for social posts, QR, and flyers — Cancel from the ⋮ menu if needed.",
+    ],
+    tips: [
+      "Partner Events always keep top visual priority on Community, the homepage banner, and the event list.",
+      "Published edits update Pet Parents quickly — double-check county/city so map search stays correct.",
+      "Need a new listing? Create a draft from Community Events, complete every required field, then Submit for review.",
+      "Host hub: `/community/host` · Apply: `/partners/apply?intent=community_events`.",
+    ],
+  },
+  {
+    title: "Create a new Partner Event (first time)",
+    audience: "For Pet Event Planners & Managers",
+    steps: [
+      "Step 1: Apply or sign in as a Partner if you do not have Partner access yet.",
+      "Step 2: Go to `/partners/dashboard/community/events` and choose Create / New draft.",
+      "Step 3: Fill Basics → Date & Time → Details in the editor (fields autosave).",
+      "Step 4: Preview, then Submit for review.",
+      "Step 5: SitGuru reviews the listing — once published it appears as a SitGuru Partner Event on `/community` and `/community/events`.",
+    ],
+    tips: [
+      "Use clear titles Pet Parents can scan on mobile (adoption day, meetup, festival, fundraiser).",
+      "Upload a bright event photo — cards and shares look better with a strong image.",
+    ],
+  },
+];
+
+export const eventPlannerFaqs: HelpFaqItem[] = [
+  {
+    question: "Where do I edit an event after it is published?",
+    answer:
+      "Partner Dashboard → Community Events → Edit on that event. Published Partner Events keep SitGuru Partner Event priority on the Community map and lists.",
+  },
+  {
+    question: "What is the difference between a Partner Event and a Community Event?",
+    answer:
+      "SitGuru Partner Events are created and updated by Pet Event Planners/Managers in the Partner Dashboard. Community Events are discoveries that fill the broader map — Partner listings always lead visually.",
+  },
+  {
+    question: "Can Pet Parents RSVP on event cards?",
+    answer:
+      "Yes. On Partner Event cards, Attending? offers Yes, Maybe, and No with live counters so planners can gauge interest.",
+  },
+];

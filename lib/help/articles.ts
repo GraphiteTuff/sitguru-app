@@ -262,6 +262,32 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "marketplace",
     ],
   },
+  {
+    slug: "update-community-events",
+    href: "/help/account/update-community-events",
+    title: "Update Community Events as a Pet Event Planner",
+    summary:
+      "Step-by-step: open Partner Community Events, edit Basics / Date / Details, preview, submit for review, promote, or cancel.",
+    audience: "all",
+    category: "Account & Profiles",
+    tags: [
+      "partner",
+      "community events",
+      "event planner",
+      "host",
+      "publish",
+    ],
+    keywords: [
+      "pet event planner",
+      "update event",
+      "partner dashboard",
+      "submit for review",
+      "sitguru partner event",
+      "host an event",
+      "edit published event",
+      "rsvp attending",
+    ],
+  },
 
   /* —— Booking & Cancellations —— */
   {

@@ -4,14 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import EventCard from "@/components/community/EventCard";
 import {
+  eventMatchesCounty,
+  formatEventCountyState,
+  getEventCountyLabel,
+} from "@/lib/community/format";
+import {
   readCommunityLocationPreference,
   saveCommunityLocationPreference,
 } from "@/lib/community/location-preference";
+import { COMMUNITY_COUNTY_OPTIONS } from "@/lib/community/market-seed";
 import { COMMUNITY_EVENT_CATEGORIES } from "@/lib/community/types";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 
 type Filters = {
   q: string;
+  county: string;
   city: string;
   state: string;
   category: string;
@@ -32,20 +39,22 @@ export default function CommunityEventsExplorer({
 
   useEffect(() => {
     if (hydratedLocation) return;
-    if (initialFilters.city || initialFilters.state) {
+    if (initialFilters.county || initialFilters.city || initialFilters.state) {
       setHydratedLocation(true);
       return;
     }
 
     const preference = readCommunityLocationPreference();
-    if (preference.city || preference.state) {
+    if (preference.county || preference.city || preference.state) {
       const next = {
         ...initialFilters,
+        county: preference.county || "",
         city: preference.city || "",
         state: preference.state || "",
       };
       setFilters(next);
       const params = new URLSearchParams();
+      if (next.county) params.set("county", next.county);
       if (next.city) params.set("city", next.city);
       if (next.state) params.set("state", next.state);
       router.replace(`/community/events?${params.toString()}`);
@@ -54,7 +63,7 @@ export default function CommunityEventsExplorer({
   }, [hydratedLocation, initialFilters, router]);
 
   const filtered = useMemo(() => {
-    return events.filter((event) => {
+    const matched = events.filter((event) => {
       if (filters.category && !(event.categories || []).includes(filters.category)) {
         return false;
       }
@@ -62,24 +71,60 @@ export default function CommunityEventsExplorer({
       if (typeof filters.isFree === "boolean" && event.is_free !== filters.isFree) {
         return false;
       }
+      if (filters.county && !eventMatchesCounty(event, filters.county)) {
+        return false;
+      }
       if (filters.city && !event.city?.toLowerCase().includes(filters.city.toLowerCase())) {
         return false;
       }
-      if (filters.state && !event.state?.toLowerCase().includes(filters.state.toLowerCase())) {
+      if (
+        filters.state &&
+        !(
+          event.state?.toLowerCase().includes(filters.state.toLowerCase()) ||
+          event.featured_market_state
+            ?.toLowerCase()
+            .includes(filters.state.toLowerCase())
+        )
+      ) {
         return false;
       }
       if (filters.q) {
-        const haystack = `${event.title} ${event.short_description || ""} ${event.venue_name || ""}`.toLowerCase();
+        const haystack =
+          `${event.title} ${event.short_description || ""} ${event.venue_name || ""} ${formatEventCountyState(event)}`.toLowerCase();
         if (!haystack.includes(filters.q.toLowerCase())) return false;
       }
       return true;
     });
+
+    return [...matched].sort((a, b) => {
+      const countyA = getEventCountyLabel(a) || "Other";
+      const countyB = getEventCountyLabel(b) || "Other";
+      const byCounty = countyA.localeCompare(countyB);
+      if (byCounty !== 0) return byCounty;
+      return new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
+    });
   }, [events, filters]);
+
+  const groupedByCounty = useMemo(() => {
+    const groups: { county: string; events: CommunityEventWithPartner[] }[] = [];
+    for (const event of filtered) {
+      const county =
+        formatEventCountyState(event) || getEventCountyLabel(event) || "Other";
+      const last = groups[groups.length - 1];
+      if (last && last.county === county) {
+        last.events.push(event);
+      } else {
+        groups.push({ county, events: [event] });
+      }
+    }
+    return groups;
+  }, [filtered]);
 
   function apply(next: Filters) {
     setFilters(next);
-    if (next.city || next.state) {
+    if (next.county || next.city || next.state) {
       saveCommunityLocationPreference({
+        county: next.county || undefined,
         city: next.city || undefined,
         state: next.state || undefined,
         source: "manual",
@@ -87,6 +132,7 @@ export default function CommunityEventsExplorer({
     }
     const params = new URLSearchParams();
     if (next.q) params.set("q", next.q);
+    if (next.county) params.set("county", next.county);
     if (next.city) params.set("city", next.city);
     if (next.state) params.set("state", next.state);
     if (next.category) params.set("category", next.category);
@@ -97,23 +143,43 @@ export default function CommunityEventsExplorer({
 
   return (
     <div className="space-y-6">
-      {(filters.city || filters.state) && (
+      {(filters.county || filters.city || filters.state) && (
         <p className="text-sm font-semibold text-slate-600">
           Showing events near{" "}
           <span className="font-black text-slate-900">
-            {[filters.city, filters.state].filter(Boolean).join(", ")}
+            {[filters.county, filters.city, filters.state]
+              .filter(Boolean)
+              .join(", ")}
           </span>
         </p>
       )}
 
       <div className="sticky top-0 z-10 -mx-4 border-b border-slate-100 bg-[#f8fcfd]/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
-        <div className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-6">
+        <div className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-7">
         <input
           defaultValue={filters.q}
           onBlur={(event) => apply({ ...filters, q: event.target.value })}
           placeholder="Search events"
           className="min-h-11 rounded-2xl border border-slate-200 px-4 text-sm font-semibold xl:col-span-2"
         />
+        <input
+          key={`county-${filters.county}`}
+          list="explorer-county-options"
+          defaultValue={filters.county}
+          onBlur={(event) => apply({ ...filters, county: event.target.value })}
+          placeholder="County"
+          className="min-h-11 rounded-2xl border border-slate-200 px-4 text-sm font-semibold"
+        />
+        <datalist id="explorer-county-options">
+          {COMMUNITY_COUNTY_OPTIONS.map((option) => (
+            <option
+              key={`${option.county}-${option.state}`}
+              value={option.county}
+            >
+              {option.county}, {option.state}
+            </option>
+          ))}
+        </datalist>
         <input
           key={`city-${filters.city}`}
           defaultValue={filters.city}
@@ -173,13 +239,28 @@ export default function CommunityEventsExplorer({
         <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-10 text-center">
           <p className="text-lg font-black text-slate-900">No upcoming events match your filters</p>
           <p className="mt-2 text-sm font-semibold text-slate-600">
-            Try another city or check back soon — partners add new events regularly.
+            Try another county or city — partners add new events regularly.
           </p>
         </div>
       ) : (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((event) => (
-            <EventCard key={event.id} event={event} />
+        <div className="space-y-8">
+          {groupedByCounty.map((group) => (
+            <section key={group.county} className="space-y-4">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/90 px-4 py-2.5">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
+                  {group.county}
+                </p>
+                <p className="text-sm font-semibold text-emerald-900/80">
+                  {group.events.length} event
+                  {group.events.length === 1 ? "" : "s"}
+                </p>
+              </div>
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {group.events.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
