@@ -6,13 +6,13 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
-  Share,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 
 import SitGuruScreen from "@/components/SitGuruScreen";
+import CommunityEventShareSheet from "@/components/community/CommunityEventShareSheet";
 import CommunityRoguePanel from "@/components/community/CommunityRoguePanel";
 import { AppFonts } from "@/constants/fonts";
 import {
@@ -21,7 +21,6 @@ import {
   type MobileCommunityEvent,
 } from "@/hooks/data/useCommunityEvents";
 import { trackMobileEvent } from "@/lib/analytics/track";
-import { getSitGuruApiBaseUrl } from "@/lib/data/api";
 
 const PENDING_RSVP_KEY = "sitguru_pending_event_rsvp";
 
@@ -34,6 +33,7 @@ export default function CommunityEventDetailScreen() {
   const [rsvpMessage, setRsvpMessage] = useState("");
   const [rsvpPending, setRsvpPending] = useState(false);
   const [needsSignup, setNeedsSignup] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const { counts, going, setAttendance, reload } = useEventAttendance(event?.id);
 
@@ -100,22 +100,7 @@ export default function CommunityEventDetailScreen() {
 
   async function shareEvent() {
     if (!event) return;
-
-    const base = getSitGuruApiBaseUrl() || "https://www.sitguru.com";
-    const url = `${base}/community/events/${event.slug}`;
-    const message = `Join us for ${event.title} on SitGuru: ${url}`;
-
-    await Share.share({
-      title: event.title,
-      message,
-      url,
-    });
-
-    void trackMobileEvent({
-      eventName: "event_share",
-      source: "mobile_community_event_detail",
-      metadata: { eventId: event.id, slug: event.slug },
-    });
+    setShareOpen(true);
   }
 
   async function goToCommunitySignup(
@@ -293,7 +278,7 @@ export default function CommunityEventDetailScreen() {
 
       <Pressable style={styles.shareButton} onPress={() => void shareEvent()}>
         <Share2 color="#0D5C3A" size={18} />
-        <Text style={styles.shareButtonText}>Share Event</Text>
+        <Text style={styles.shareButtonText}>Share from SitGuru</Text>
       </Pressable>
 
       <Pressable
@@ -302,6 +287,12 @@ export default function CommunityEventDetailScreen() {
       >
         <Text style={styles.secondaryButtonText}>Browse more events</Text>
       </Pressable>
+
+      <CommunityEventShareSheet
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        event={event}
+      />
     </SitGuruScreen>
   );
 }

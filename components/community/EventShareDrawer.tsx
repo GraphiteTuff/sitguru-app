@@ -6,7 +6,6 @@ import {
   Check,
   Copy,
   Download,
-  Heart,
   Link2,
   Mail,
   MessageCircle,
@@ -25,9 +24,7 @@ import {
   downloadEventGraphic,
   getEventSocialAssets,
 } from "@/lib/community/social-assets";
-import {
-  SITGURU_OFFICIAL_SOCIAL_LINKS,
-} from "@/lib/chat/sitguru-social";
+import { SITGURU_OFFICIAL_SOCIAL_LINKS } from "@/lib/chat/sitguru-social";
 
 export type EventShareDrawerEvent = {
   id?: string;
@@ -60,15 +57,24 @@ type EventShareDrawerProps = {
 };
 
 const socialPlatforms: Array<{
-  id: SharePlatform | "native";
+  id: SharePlatform;
   label: string;
   tone: string;
 }> = [
   { id: "sms", label: "Messages", tone: "bg-emerald-600 text-white" },
   { id: "facebook", label: "Facebook", tone: "bg-[#1877F2] text-white" },
-  { id: "email", label: "Email", tone: "bg-sky-600 text-white" },
   { id: "x", label: "X", tone: "bg-slate-900 text-white" },
+  { id: "email", label: "Email", tone: "bg-sky-600 text-white" },
 ];
+
+function displayShareHost(url: string) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.host}${parsed.pathname}`.replace(/\/$/, "");
+  } catch {
+    return url.replace(/^https?:\/\//, "");
+  }
+}
 
 export default function EventShareDrawer({
   event,
@@ -87,14 +93,31 @@ export default function EventShareDrawer({
       return `${window.location.origin}${path.startsWith("/") ? path : `/${path}`}`;
     }
     if (event.sharePath) {
-      return `https://www.sitguru.com${event.sharePath.startsWith("/") ? event.sharePath : `/${event.sharePath}`}`;
+      return `https://www.sitguru.com${
+        event.sharePath.startsWith("/") ? event.sharePath : `/${event.sharePath}`
+      }`;
     }
     return getPublicEventUrl(event.slug);
   }, [event]);
 
   const timing = useMemo(() => {
     if (!event) return null;
-    return formatEventDateRange(event.startAt, event.endAt || null, event.timezone || null);
+    return formatEventDateRange(
+      event.startAt,
+      event.endAt || null,
+      event.timezone || null,
+    );
+  }, [event]);
+
+  const previewImage = useMemo(() => {
+    if (!event) return null;
+    return (
+      event.imageUrl ||
+      event.image_card_url ||
+      event.image_hero_url ||
+      event.image_original_url ||
+      null
+    );
   }, [event]);
 
   const assets = useMemo(() => {
@@ -130,15 +153,17 @@ export default function EventShareDrawer({
 
   useEffect(() => {
     if (!open) return;
+    const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = previous;
     };
   }, [open]);
 
   if (!open || !event) return null;
 
   const current = event;
+  const square = assets.find((asset) => asset.id === "square") || assets[0];
 
   async function copyValue(value: string, kind: "link" | "caption") {
     try {
@@ -166,7 +191,7 @@ export default function EventShareDrawer({
       }
     }
     await copyValue(caption, "caption");
-    setHint("Instagram: graphic saved + caption copied — open Instagram to post");
+    setHint("Graphic saved + caption copied — open Instagram to post");
     window.setTimeout(() => setHint(""), 2800);
     void trackEvent({
       eventName: "event_share",
@@ -194,237 +219,248 @@ export default function EventShareDrawer({
     await copyValue(url, "link");
   }
 
-  const drawer = (
-    <div className="flex h-full flex-col bg-white">
-      <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
-        <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
-            Share Event
-          </p>
-          <h2 className="mt-1 text-xl font-black text-slate-950 sm:text-2xl">
-            {event.title}
-          </h2>
-          {timing ? (
-            <p className="mt-1 text-sm font-semibold text-slate-600">
-              {timing.dateLabel} • {timing.timeLabel}
-            </p>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close share panel"
-          className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600"
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-
-      <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-6">
-        <div>
-          <p className="text-sm font-semibold text-slate-600">
-            Anyone with this link can view the event details.
-          </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <div className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-xs font-bold text-slate-800">
-              {url}
-            </div>
-            <button
-              type="button"
-              onClick={() => void copyValue(url, "link")}
-              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white"
-            >
-              {copied === "link" ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-              {copied === "link" ? "Copied" : "Copy Link"}
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-black text-slate-900">Share to</p>
-          <div className="mt-3 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => void nativeShare()}
-              className="flex w-[72px] flex-col items-center gap-2"
-            >
-              <span className="grid h-14 w-14 place-items-center rounded-full bg-emerald-700 text-white">
-                <Share2 className="h-5 w-5" />
-              </span>
-              <span className="text-xs font-bold text-slate-700">Share</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => void prepareInstagramShare()}
-              className="flex w-[72px] flex-col items-center gap-2"
-            >
-              <span className="grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-amber-400 via-pink-500 to-violet-600 text-white">
-                <Download className="h-5 w-5" />
-              </span>
-              <span className="text-xs font-bold text-slate-700">Instagram</span>
-            </button>
-            {socialPlatforms.map((platform) => (
-              <a
-                key={platform.id}
-                href={buildEventShareHref(platform.id as SharePlatform, url, caption)}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() =>
-                  void trackEvent({
-                    eventName: "event_share",
-                    eventType: "community",
-                    source,
-                    metadata: { slug: event.slug, channel: platform.id, eventId: event.id },
-                  })
-                }
-                className="flex w-[72px] flex-col items-center gap-2"
-              >
-                <span
-                  className={`grid h-14 w-14 place-items-center rounded-full ${platform.tone}`}
-                >
-                  {platform.id === "email" ? (
-                    <Mail className="h-5 w-5" />
-                  ) : (
-                    <MessageCircle className="h-5 w-5" />
-                  )}
-                </span>
-                <span className="text-xs font-bold text-slate-700">{platform.label}</span>
-              </a>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-black text-slate-900">Social graphics</p>
-          <p className="mt-1 text-sm font-semibold text-slate-600">
-            Download and post on social media.
-          </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            {assets.map((asset) => (
-              <div key={asset.id} className="overflow-hidden rounded-2xl border border-slate-200">
-                <div className={`relative ${asset.aspectClass} bg-emerald-50`}>
-                  {asset.url ? (
-                    <Image
-                      src={asset.url}
-                      alt={asset.label}
-                      fill
-                      unoptimized
-                      className="object-cover"
-                    />
-                  ) : null}
-                </div>
-                <div className="space-y-2 p-3">
-                  <p className="text-sm font-black text-slate-900">{asset.label}</p>
-                  <p className="text-xs font-semibold text-slate-500">{asset.dimensions}</p>
-                  {asset.url ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void downloadEventGraphic(
-                          asset.url!,
-                          `${event.slug}-${asset.id}.jpg`,
-                        )
-                      }
-                      className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-black text-slate-800"
-                    >
-                      <Download className="h-4 w-4" />
-                      Save
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-black text-slate-900">Suggested caption</p>
-            <button
-              type="button"
-              onClick={() => void copyValue(caption, "caption")}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-black text-white"
-            >
-              {copied === "caption" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copied === "caption" ? "Copied" : "Copy Caption"}
-            </button>
-          </div>
-          <textarea
-            value={caption}
-            onChange={(event) => setCaption(event.target.value)}
-            rows={4}
-            className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium leading-relaxed text-slate-700"
-          />
-          <p className="mt-2 text-right text-xs font-semibold text-slate-500">
-            {caption.length} characters
-          </p>
-          {hint ? <p className="mt-2 text-xs font-black text-emerald-800">{hint}</p> : null}
-        </div>
-
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
-          <Heart className="mb-1 inline h-4 w-4 text-emerald-700" /> Thanks for helping spread the
-          word. Sharing events helps build a stronger pet-loving community.
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <p className="text-sm font-black text-slate-900">Share SitGuru too</p>
-          <p className="mt-1 text-xs font-semibold text-slate-600">
-            Tag <span className="font-black text-emerald-800">@SitGuruOfficial</span> so the pack
-            can amplify your post.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {SITGURU_OFFICIAL_SOCIAL_LINKS.map((platform) => (
-              <a
-                key={platform.id}
-                href={platform.href}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() =>
-                  void trackEvent({
-                    eventName: "event_share",
-                    eventType: "community",
-                    source,
-                    metadata: {
-                      slug: event.slug,
-                      channel: `sitguru_${platform.id}`,
-                      eventId: event.id,
-                    },
-                  })
-                }
-                className="inline-flex min-h-9 items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
-              >
-                {platform.label}
-              </a>
-            ))}
-          </div>
-        </div>
-
-        <p className="text-xs font-semibold text-slate-500">
-          Instagram does not allow direct browser posting — use Save Graphic + Copy Caption, then
-          open Instagram.
-        </p>
-      </div>
-    </div>
-  );
+  async function savePrimaryGraphic() {
+    if (!square?.url) return;
+    try {
+      await downloadEventGraphic(square.url, `${current.slug}-share.png`);
+      setHint("Graphic saved — ready to post");
+      window.setTimeout(() => setHint(""), 2200);
+      void trackEvent({
+        eventName: "event_share",
+        eventType: "community",
+        source,
+        metadata: {
+          slug: current.slug,
+          channel: "save_graphic",
+          eventId: current.id,
+        },
+      });
+    } catch {
+      setHint("Could not download graphic — try Copy Link instead");
+      window.setTimeout(() => setHint(""), 2200);
+    }
+  }
 
   return (
-    <>
+    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-6">
       <button
         type="button"
         aria-label="Close share overlay"
         onClick={onClose}
-        className="fixed inset-0 z-[70] bg-slate-950/45 backdrop-blur-[1px]"
+        className="absolute inset-0 bg-slate-950/50 backdrop-blur-[1px]"
       />
 
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 right-0 z-[80] hidden w-full max-w-md border-l border-slate-200 shadow-2xl lg:block">
-        {drawer}
-      </aside>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sitguru-share-title"
+        className="relative z-[81] flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.75rem] border border-slate-200 bg-white shadow-2xl sm:rounded-[1.75rem]"
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
+              SitGuru Community
+            </p>
+            <h2
+              id="sitguru-share-title"
+              className="mt-1 truncate text-xl font-black text-slate-950"
+            >
+              Share &ldquo;{event.title}&rdquo;
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-600">
+              Help pet parents discover this event!
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close share panel"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-      {/* Mobile bottom sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-[80] max-h-[92vh] overflow-hidden rounded-t-[2rem] border border-slate-200 shadow-2xl lg:hidden">
-        {drawer}
+        <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-5">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+            <div className="flex gap-3 p-3">
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-emerald-50">
+                {previewImage ? (
+                  <Image
+                    src={previewImage}
+                    alt=""
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                ) : null}
+                {timing ? (
+                  <div className="absolute inset-x-0 bottom-0 bg-slate-950/70 px-1.5 py-1 text-center text-[9px] font-black uppercase tracking-wide text-white">
+                    {timing.compactDate}
+                  </div>
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="line-clamp-3 text-sm font-semibold leading-snug text-slate-800">
+                  {caption}
+                </p>
+                <p className="mt-2 truncate text-xs font-black text-emerald-700">
+                  {displayShareHost(url)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-black text-slate-900">Share to</p>
+            <div className="mt-3 flex flex-wrap justify-between gap-2 sm:justify-start sm:gap-3">
+              <button
+                type="button"
+                onClick={() => void nativeShare()}
+                className="flex w-[64px] flex-col items-center gap-1.5 sm:w-[72px]"
+              >
+                <span className="grid h-12 w-12 place-items-center rounded-full bg-[#0D5C3A] text-white sm:h-14 sm:w-14">
+                  <Share2 className="h-5 w-5" />
+                </span>
+                <span className="text-[11px] font-bold text-slate-700">Share</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void prepareInstagramShare()}
+                className="flex w-[64px] flex-col items-center gap-1.5 sm:w-[72px]"
+              >
+                <span className="grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-amber-400 via-pink-500 to-violet-600 text-white sm:h-14 sm:w-14">
+                  <Download className="h-5 w-5" />
+                </span>
+                <span className="text-[11px] font-bold text-slate-700">
+                  Instagram
+                </span>
+              </button>
+              {socialPlatforms.map((platform) => (
+                <a
+                  key={platform.id}
+                  href={buildEventShareHref(platform.id, url, caption)}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() =>
+                    void trackEvent({
+                      eventName: "event_share",
+                      eventType: "community",
+                      source,
+                      metadata: {
+                        slug: event.slug,
+                        channel: platform.id,
+                        eventId: event.id,
+                      },
+                    })
+                  }
+                  className="flex w-[64px] flex-col items-center gap-1.5 sm:w-[72px]"
+                >
+                  <span
+                    className={`grid h-12 w-12 place-items-center rounded-full sm:h-14 sm:w-14 ${platform.tone}`}
+                  >
+                    {platform.id === "email" ? (
+                      <Mail className="h-5 w-5" />
+                    ) : (
+                      <MessageCircle className="h-5 w-5" />
+                    )}
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-700">
+                    {platform.label}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => void copyValue(url, "link")}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-900"
+            >
+              {copied === "link" ? (
+                <Check className="h-4 w-4 text-emerald-700" />
+              ) : (
+                <Link2 className="h-4 w-4 text-emerald-700" />
+              )}
+              {copied === "link" ? "Copied" : "Copy Link"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void savePrimaryGraphic()}
+              disabled={!square?.url}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-900 disabled:opacity-50"
+            >
+              <Download className="h-4 w-4 text-emerald-700" />
+              Save Graphic
+            </button>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-black text-slate-900">Suggested caption</p>
+              <button
+                type="button"
+                onClick={() => void copyValue(caption, "caption")}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[#0D5C3A] px-3 text-xs font-black text-white"
+              >
+                {copied === "caption" ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+                {copied === "caption" ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <textarea
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              rows={3}
+              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium leading-relaxed text-slate-700"
+            />
+            {hint ? (
+              <p className="mt-2 text-xs font-black text-emerald-800">{hint}</p>
+            ) : null}
+          </div>
+
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-800">
+              SitGuru Community
+            </p>
+            <p className="mt-1 text-sm font-semibold text-emerald-950/90">
+              Tag{" "}
+              <span className="font-black text-emerald-900">@SitGuruOfficial</span>{" "}
+              so the pack can amplify your post.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {SITGURU_OFFICIAL_SOCIAL_LINKS.map((platform) => (
+                <a
+                  key={platform.id}
+                  href={platform.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() =>
+                    void trackEvent({
+                      eventName: "event_share",
+                      eventType: "community",
+                      source,
+                      metadata: {
+                        slug: event.slug,
+                        channel: `sitguru_${platform.id}`,
+                        eventId: event.id,
+                      },
+                    })
+                  }
+                  className="inline-flex min-h-8 items-center rounded-full border border-emerald-200 bg-white px-3 text-[11px] font-black text-emerald-900"
+                >
+                  {platform.label}
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
