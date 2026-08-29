@@ -33,6 +33,55 @@ function readGuestKey(req: NextRequest, body?: Record<string, unknown>) {
   return null;
 }
 
+type ListedEvent = {
+  id: string;
+  title: string;
+  slug: string;
+  partner_id: string | null;
+  kind: "partner" | "discovery";
+};
+
+/** Accept partner community_events OR discovery listings shown on cards. */
+async function resolveListedEvent(id: string): Promise<ListedEvent | null> {
+  const { data: event } = await supabaseAdmin
+    .from("community_events")
+    .select("id, title, slug, partner_id, status, cancelled_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (event?.id) {
+    if (event.cancelled_at || event.status === "cancelled") {
+      return null;
+    }
+    return {
+      id: String(event.id),
+      title: String(event.title || "Event"),
+      slug: String(event.slug || ""),
+      partner_id: event.partner_id ? String(event.partner_id) : null,
+      kind: "partner",
+    };
+  }
+
+  const { data: discovery } = await supabaseAdmin
+    .from("community_event_discoveries")
+    .select("id, title, external_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (discovery?.id) {
+    const external = String(discovery.external_id || discovery.id);
+    return {
+      id: String(discovery.id),
+      title: String(discovery.title || "Pet Event"),
+      slug: `google-${external.slice(0, 48)}`,
+      partner_id: null,
+      kind: "discovery",
+    };
+  }
+
+  return null;
+}
+
 export async function GET(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const counts = await getEventAttendanceCounts(id);
@@ -78,21 +127,16 @@ export async function POST(req: NextRequest, context: RouteContext) {
     );
   }
 
-  const { data: event } = await supabaseAdmin
-    .from("community_events")
-    .select("id, title, slug, partner_id, status, cancelled_at")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (!event || event.status !== "published" || event.cancelled_at) {
+  const event = await resolveListedEvent(id);
+  if (!event) {
     return NextResponse.json(
-      { error: "Published event required." },
-      { status: 400, headers: mobileCorsHeaders(req) },
+      { error: "Event not found." },
+      { status: 404, headers: mobileCorsHeaders(req) },
     );
   }
 
   const result = await setEventAttendance({
-    eventId: id,
+    eventId: event.id,
     userId: resolved?.user.id || null,
     guestKey: resolved?.user.id ? null : guestKey,
     status,
@@ -105,8 +149,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     );
   }
 
-  // Only notify partners for signed-in "going" (avoid guest spam)
-  if (status === "going" && resolved?.user.id) {
+  if (status === "going" && resolved?.user.id && event.partner_id) {
     void notifyPartnerSomeoneIsGoing({
       event: {
         id: event.id,
@@ -118,7 +161,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     });
   }
 
-  const counts = await getEventAttendanceCounts(id);
+  const counts = await getEventAttendanceCounts(event.id);
 
   return NextResponse.json(
     {

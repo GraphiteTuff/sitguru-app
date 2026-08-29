@@ -83,7 +83,7 @@ export async function getEventAttendanceCounts(
     };
   }
 
-  // Fallback if RPC not applied / older signature
+  // Fallback: count rows directly (no published-status gate)
   const { data: rows } = await supabaseAdmin
     .from("community_event_attendance")
     .select("attendance_role, status")
