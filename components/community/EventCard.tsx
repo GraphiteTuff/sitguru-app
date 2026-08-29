@@ -43,7 +43,6 @@ export default function EventCard({
     : event.partners?.business_name || "SitGuru Partner";
   const isPreview = previewMode || isHomepageDemoEvent(event.id);
   const href = isPreview ? "/events" : getPublicEventPath(event.slug);
-  const showAttending = !isPreview;
 
   return (
     <article
@@ -131,13 +130,11 @@ export default function EventCard({
       </Link>
 
       <div className="space-y-3 border-t border-slate-100 px-5 py-4">
-        {showAttending ? (
-          <EventAttendingButtons
-            eventId={event.id}
-            eventSlug={event.slug}
-            compact
-          />
-        ) : null}
+        <EventAttendingButtons
+          eventId={event.id}
+          eventSlug={event.slug}
+          compact
+        />
         <Link
           href={href}
           className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-emerald-700 px-4 text-sm font-black text-white transition hover:bg-emerald-800"

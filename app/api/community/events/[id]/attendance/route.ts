@@ -7,6 +7,10 @@ import {
   setEventAttendance,
   type AttendanceStatus,
 } from "@/lib/community/attendance";
+import {
+  getCuratedBucksMontgomeryPetEvents,
+  isHomepageDemoEvent,
+} from "@/lib/community/homepage-demo-events";
 import { notifyPartnerSomeoneIsGoing } from "@/lib/community/event-notifications";
 import {
   mobileCorsHeaders,
@@ -74,6 +78,20 @@ async function resolveListedEvent(id: string): Promise<ListedEvent | null> {
       id: String(discovery.id),
       title: String(discovery.title || "Pet Event"),
       slug: `google-${external.slice(0, 48)}`,
+      partner_id: null,
+      kind: "discovery",
+    };
+  }
+
+  // Curated homepage / carousel cards (demo-homepage-*) — allow Attending + Share.
+  if (isHomepageDemoEvent(id)) {
+    const curated = getCuratedBucksMontgomeryPetEvents().find(
+      (row) => row.id === id,
+    );
+    return {
+      id,
+      title: curated?.title || "Pet Event",
+      slug: curated?.slug || id.replace(/^demo-homepage-/, ""),
       partner_id: null,
       kind: "discovery",
     };

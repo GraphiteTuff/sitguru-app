@@ -193,6 +193,13 @@ export function getCuratedBucksMontgomeryPetEvents(): CommunityEventWithPartner[
   const fmcaDec = rangeEastern(2026, 12, 12, 12, 0, 15, 0);
   const adoptAndShop = rangeEastern(2026, 10, 18, 10, 0, 16, 0);
   const montcoHours = rangeEastern(2026, 8, 30, 11, 0, 17, 0);
+  const pawPalooza = rangeEastern(2026, 9, 5, 10, 0, 16, 0);
+  const newHopeDogFest = rangeEastern(2026, 6, 6, 10, 0, 16, 0);
+  const doggieDiveKnoebels = rangeEastern(2026, 9, 13, 11, 0, 15, 0);
+  const houndHike = rangeEastern(2026, 9, 13, 10, 0, 15, 0);
+  const fidoFloat = rangeEastern(2026, 9, 12, 11, 0, 15, 0);
+  const howlOWheelin = rangeEastern(2026, 10, 24, 12, 0, 16, 0);
+  const wienerDogParade = rangeEastern(2026, 10, 3, 12, 0, 14, 0);
 
   return [
     demoEvent("clear-the-shelters-wac-2026-08-29", {
@@ -598,6 +605,145 @@ export function getCuratedBucksMontgomeryPetEvents(): CommunityEventWithPartner[
       outdoor: false,
       eventUrl: "https://www.montgomerycountyspca.org",
       featuredStatus: "community",
+    }),
+    demoEvent("paw-palooza-hunlock-creek-2026-09-05", {
+      title: "Paw-Palooza",
+      slug: "paw-palooza-garden-drive-in-sep-5-2026",
+      partnerName: "Garden Drive-In Theater",
+      shortDescription:
+        "First annual pet festival with vendors for dogs, cats, birds, reptiles & more — free admission & parking. Tip: bring the whole family for a full day of pet-themed fun.",
+      venueName: "Garden Drive-In Theater",
+      addressLine1: "20 State Route 11",
+      city: "Hunlock Creek",
+      state: "PA",
+      postalCode: "18621",
+      countyLabel: "Luzerne County (NEPA)",
+      startAt: pawPalooza.startAt,
+      endAt: pawPalooza.endAt,
+      imageUrl: IMG.fair,
+      categories: ["Festival", "Community"],
+      isFree: true,
+      eventUrl: "https://discovernepa.com/event/paw-palooza/",
+      featuredStatus: "homepage",
+    }),
+    demoEvent("new-hope-dog-festival-2026-06-06", {
+      title: "New Hope Dog Festival (DogDaddy)",
+      slug: "new-hope-dog-festival-jun-6-2026",
+      partnerName: "New Hope Dog Festival / DogDaddy.org",
+      shortDescription:
+        "Summer celebration for dogs & families at Rice's Market — adoption fair, agility, grooming, costume contest, live music. Tip: $10 admission · $1 parking · buy tickets at dogdaddyfest.org.",
+      venueName: "Rice's Market",
+      city: "New Hope",
+      state: "PA",
+      countyLabel: "Bucks County",
+      startAt: newHopeDogFest.startAt,
+      endAt: newHopeDogFest.endAt,
+      imageUrl: IMG.dogs,
+      categories: ["Festival", "Adoption"],
+      isFree: false,
+      eventUrl: "https://dogdaddyfest.org/",
+      featuredStatus: "homepage",
+    }),
+    demoEvent("doggie-dive-knoebels-2026-09-13", {
+      title: "Doggie Dive at Knoebels Amusement Resort",
+      slug: "doggie-dive-knoebels-sep-13-2026",
+      partnerName: "Knoebels Amusement Resort",
+      shortDescription:
+        "Dog-friendly swim fundraiser for local rescues — swimming, raffles, vendors & rescue visits. Tip: rabies tag/license required · 1 dog per handler · listed on BringFido PA.",
+      venueName: "Knoebels Crystal Pool",
+      addressLine1: "391 Knoebels Blvd",
+      city: "Elysburg",
+      state: "PA",
+      postalCode: "17824",
+      countyLabel: "Northumberland County",
+      startAt: doggieDiveKnoebels.startAt,
+      endAt: doggieDiveKnoebels.endAt,
+      imageUrl: IMG.outdoor,
+      categories: ["Festival", "Community"],
+      isFree: false,
+      eventUrl: "https://www.bringfido.com/event/16770",
+      featuredStatus: "homepage",
+    }),
+    demoEvent("oktoberfest-wiener-dog-parade-2026-10-03", {
+      title: "Oktoberfest Wiener Dog Parade (SteelStacks)",
+      slug: "oktoberfest-wiener-dog-parade-bethlehem-oct-3-2026",
+      partnerName: "ArtsQuest / SteelStacks",
+      shortDescription:
+        "Costume-friendly Wiener Dog Parade at Oktoberfest — then stick around for races. Tip: sign up before 12:00 PM at Oktoberfest Arena · BringFido PA favorite.",
+      venueName: "Oktoberfest Arena at SteelStacks",
+      addressLine1: "711 E 1st St",
+      city: "Bethlehem",
+      state: "PA",
+      postalCode: "18015",
+      countyLabel: "Lehigh / Northampton",
+      startAt: wienerDogParade.startAt,
+      endAt: wienerDogParade.endAt,
+      imageUrl: IMG.fair,
+      categories: ["Festival", "Social"],
+      isFree: true,
+      eventUrl: "https://www.bringfido.com/event/55396",
+      featuredStatus: "homepage",
+    }),
+    demoEvent("hound-hike-guyasuta-2026-09-13", {
+      title: "Hound Hike 2026",
+      slug: "hound-hike-camp-guyasuta-sep-13-2026",
+      partnerName: "Laurel Highlands Council · BSA",
+      shortDescription:
+        "Dog-gone fun at Camp Guyasuta — dog-friendly vendors, live demos, hiking & more. Tip: rain or shine · minutes from downtown Pittsburgh.",
+      venueName: "Camp Guyasuta",
+      addressLine1: "300 23rd Street",
+      city: "Sharpsburg",
+      state: "PA",
+      postalCode: "15215",
+      countyLabel: "Allegheny County",
+      startAt: houndHike.startAt,
+      endAt: houndHike.endAt,
+      imageUrl: IMG.outdoor,
+      categories: ["Festival", "Community"],
+      isFree: true,
+      eventUrl: "https://scoutingevent.com/527-105614",
+      featuredStatus: "homepage",
+    }),
+    demoEvent("fido-float-fanny-chapman-2026-09-12", {
+      title: "Fido Float at Fanny Chapman Pool",
+      slug: "fido-float-fanny-chapman-sep-12-2026",
+      partnerName: "Doylestown Township Parks & Recreation",
+      shortDescription:
+        "Dogs-only end-of-season swim — large-dog sessions 11–12 & 12:30–1:30; small dogs 2–3 PM. Tip: pre-register required · vaccinations · $15/dog ($10 dog-park members).",
+      venueName: "Fanny Chapman Memorial Pool",
+      addressLine1: "10 McKinstry Drive",
+      city: "Doylestown",
+      state: "PA",
+      postalCode: "18901",
+      countyLabel: "Bucks County",
+      startAt: fidoFloat.startAt,
+      endAt: fidoFloat.endAt,
+      imageUrl: IMG.outdoor,
+      categories: ["Community", "Social"],
+      isFree: false,
+      eventUrl:
+        "https://doylestownpa.myrec.com/info/activities/program_details.aspx?ProgramID=28962",
+      featuredStatus: "homepage",
+    }),
+    demoEvent("howl-o-wheelin-2026-10-24", {
+      title: "Howl-O-Wheelin Car Show & Fall Fest",
+      slug: "howl-o-wheelin-east-greenville-oct-24-2026",
+      partnerName: "Logan's Heroes Animal Rescue",
+      shortDescription:
+        "Car show + fall fest raising funds for Logan's Heroes Animal Rescue — vendors, raffles, music & food. Tip: free to attend · rain date Oct 25 · $15 to register a vehicle.",
+      venueName: "Logan's Heroes Animal Rescue",
+      addressLine1: "9411 Kings Hwy",
+      city: "East Greenville",
+      state: "PA",
+      postalCode: "18041",
+      countyLabel: "Montgomery County",
+      startAt: howlOWheelin.startAt,
+      endAt: howlOWheelin.endAt,
+      imageUrl: IMG.shop,
+      categories: ["Festival", "Adoption"],
+      isFree: true,
+      eventUrl: "https://www.lharinc.org/howl-o-wheelin",
+      featuredStatus: "homepage",
     }),
   ];
 }

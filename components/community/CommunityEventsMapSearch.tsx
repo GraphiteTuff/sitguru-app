@@ -254,15 +254,13 @@ function EventListCard({
           {body}
         </Link>
       )}
-      {!isHomepageDemoEvent(event.id) ? (
-        <div className="mt-4 border-t border-slate-100 pt-3">
-          <EventAttendingButtons
-            eventId={event.id}
-            eventSlug={event.slug}
-            compact
-          />
-        </div>
-      ) : null}
+      <div className="mt-4 border-t border-slate-100 pt-3">
+        <EventAttendingButtons
+          eventId={event.id}
+          eventSlug={event.slug}
+          compact
+        />
+      </div>
     </article>
   );
 }
