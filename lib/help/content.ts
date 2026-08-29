@@ -492,7 +492,7 @@ export const eventPlannerUpdateGuides: HelpStepBlock[] = [
       "Partner Events always keep top visual priority on Community, the homepage banner, and the event list.",
       "Published edits update Pet Parents quickly — double-check county/city so map search stays correct.",
       "Need a new listing? Create a draft from Pet Events, complete every required field, then Submit for review.",
-      "Host hub: `/community/host` · Apply: `/partners/apply?intent=community_events`.",
+      "Host hub: `/events/host` · Apply: `/partners/apply?intent=community_events`.",
     ],
   },
   {

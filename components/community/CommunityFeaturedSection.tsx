@@ -24,7 +24,7 @@ export default function CommunityFeaturedSection({
           </p>
         </div>
         <Link
-          href="/community"
+          href="/events"
           className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-white px-5 text-sm font-black text-emerald-800"
         >
           See all events

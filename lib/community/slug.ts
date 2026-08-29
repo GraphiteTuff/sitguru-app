@@ -16,7 +16,7 @@ export function buildEventSlug(title: string, suffix?: string) {
 }
 
 export function getPublicEventPath(slug: string) {
-  return `/community/events/${slug}`;
+  return `/events/${slug}`;
 }
 
 export function getPublicEventUrl(slug: string, origin?: string) {

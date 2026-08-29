@@ -123,6 +123,8 @@ function isAudienceCompatiblePath(
     return (
       path.startsWith("/ambassador/") ||
       path.startsWith("/api/stripe/return") ||
+      path.startsWith("/events/") ||
+      path === "/events" ||
       path.startsWith("/community/") ||
       path === "/community" ||
       path === "/login/route?preferred=ambassador"
@@ -133,6 +135,8 @@ function isAudienceCompatiblePath(
     return (
       path.startsWith("/guru/") ||
       path.startsWith("/api/stripe/return") ||
+      path.startsWith("/events/") ||
+      path === "/events" ||
       path.startsWith("/community/") ||
       path === "/community" ||
       path === "/login/route?preferred=guru"
@@ -142,6 +146,8 @@ function isAudienceCompatiblePath(
   if (audience === "pet_parent") {
     return (
       path.startsWith("/customer/") ||
+      path.startsWith("/events/") ||
+      path === "/events" ||
       path.startsWith("/community/") ||
       path === "/community" ||
       path.startsWith("/search") ||

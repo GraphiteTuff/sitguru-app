@@ -96,6 +96,7 @@ export default function EventSharePanel({
   async function nativeShare() {
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
+        // Pass text + url separately so SMS/socials don't duplicate the link
         await navigator.share({ title, text: caption, url });
         void trackEvent({
           eventName: "event_share",

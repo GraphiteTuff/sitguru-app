@@ -13,6 +13,7 @@ import {
 import { trackEvent } from "@/lib/analytics/track";
 import { formatEventDateRange } from "@/lib/community/format";
 import {
+  buildEventShareBody,
   buildEventShareCaptionSocial,
   buildEventShareHref,
   type SharePlatform,
@@ -27,7 +28,7 @@ export type EventShareDrawerEvent = {
   id?: string;
   title: string;
   slug: string;
-  /** Optional SitGuru path override (e.g. /community for discoveries). */
+  /** Optional SitGuru path override (e.g. /events for discoveries). */
   sharePath?: string;
   startAt: string;
   endAt?: string | null;
@@ -36,6 +37,7 @@ export type EventShareDrawerEvent = {
   state?: string | null;
   shortDescription?: string | null;
   partnerName?: string | null;
+  venueName?: string | null;
   imageUrl?: string | null;
   social_square_url?: string | null;
   social_story_url?: string | null;
@@ -172,15 +174,19 @@ export default function EventShareDrawer({
   useEffect(() => {
     if (!event) return;
     setCaption(
-      buildEventShareCaptionSocial({
-        title: event.title,
-        start_at: event.startAt,
-        end_at: event.endAt || null,
-        timezone: event.timezone || null,
-        city: event.city || null,
-        state: event.state || null,
-        short_description: event.shortDescription || null,
-      }),
+      buildEventShareCaptionSocial(
+        {
+          title: event.title,
+          start_at: event.startAt,
+          end_at: event.endAt || null,
+          timezone: event.timezone || null,
+          city: event.city || null,
+          state: event.state || null,
+          short_description: event.shortDescription || null,
+          venue_name: event.venueName || null,
+        },
+        event.partnerName,
+      ),
     );
   }, [event]);
 
@@ -202,6 +208,16 @@ export default function EventShareDrawer({
 
   const current = event;
   const square = assets.find((asset) => asset.id === "square") || assets[0];
+  const shareBody = buildEventShareBody(caption, url);
+
+  function trackShare(channel: string) {
+    void trackEvent({
+      eventName: "event_share",
+      eventType: "community",
+      source,
+      metadata: { slug: current.slug, channel, eventId: current.id },
+    });
+  }
 
   async function copyLink() {
     try {
@@ -219,7 +235,52 @@ export default function EventShareDrawer({
     }
   }
 
+  /**
+   * Messages: prefer OS share (one payload: text + url).
+   * Fallback sms: body is caption+url once — never append url twice.
+   */
+  async function shareViaMessages() {
+    trackShare("sms");
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: `${current.title} | SitGuru Pet Events`,
+          text: caption,
+          url,
+        });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        // fall through to sms:
+      }
+    }
+    window.location.assign(buildEventShareHref("sms", url, caption));
+  }
+
+  async function shareViaPlatform(platform: SharePlatform) {
+    trackShare(platform);
+    const href = buildEventShareHref(platform, url, caption);
+
+    // Facebook often ignores quote — copy SitGuru caption so it can paste into the post
+    if (platform === "facebook") {
+      try {
+        await navigator.clipboard.writeText(shareBody);
+        setHint("Caption copied — paste into your Facebook post");
+        window.setTimeout(() => setHint(""), 3200);
+      } catch {
+        // continue to open sharer
+      }
+    }
+
+    if (platform === "email" || platform === "sms") {
+      window.location.assign(href);
+      return;
+    }
+    window.open(href, "_blank", "noopener,noreferrer");
+  }
+
   async function prepareInstagramShare() {
+    trackShare("instagram");
     const story = assets.find((asset) => asset.id === "story") || assets[0];
     if (story?.url) {
       try {
@@ -228,19 +289,29 @@ export default function EventShareDrawer({
         // continue with caption copy
       }
     }
+
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: `${current.title} | SitGuru Pet Events`,
+          text: caption,
+          url,
+        });
+        setHint("Shared — paste into Instagram if needed");
+        window.setTimeout(() => setHint(""), 2800);
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+
     try {
-      await navigator.clipboard.writeText(`${caption}\n\n${url}`);
+      await navigator.clipboard.writeText(shareBody);
     } catch {
       // ignore
     }
-    setHint("Graphic saved + caption copied — open Instagram to post");
+    setHint("Caption + SitGuru link copied — open Instagram to paste");
     window.setTimeout(() => setHint(""), 2800);
-    void trackEvent({
-      eventName: "event_share",
-      eventType: "community",
-      source,
-      metadata: { slug: current.slug, channel: "instagram", eventId: current.id },
-    });
   }
 
   async function savePrimaryGraphic() {
@@ -249,16 +320,7 @@ export default function EventShareDrawer({
       await downloadEventGraphic(square.url, `${current.slug}-share.png`);
       setHint("Graphic saved — ready to post");
       window.setTimeout(() => setHint(""), 2200);
-      void trackEvent({
-        eventName: "event_share",
-        eventType: "community",
-        source,
-        metadata: {
-          slug: current.slug,
-          channel: "save_graphic",
-          eventId: current.id,
-        },
-      });
+      trackShare("save_graphic");
     } catch {
       setHint("Could not download graphic — try Copy Link instead");
       window.setTimeout(() => setHint(""), 2200);
@@ -274,10 +336,6 @@ export default function EventShareDrawer({
         className="absolute inset-0 bg-slate-950/45"
       />
 
-      {/*
-        Mobile web: bottom sheet (mockup).
-        Desktop web: compact centered modal — not a full-height drawer.
-      */}
       <div
         role="dialog"
         aria-modal="true"
@@ -326,7 +384,7 @@ export default function EventShareDrawer({
                 ) : null}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="line-clamp-3 text-[13px] font-semibold leading-snug text-slate-800">
+                <p className="line-clamp-4 whitespace-pre-line text-[13px] font-semibold leading-snug text-slate-800">
                   {caption}
                 </p>
                 <p
@@ -363,24 +421,29 @@ export default function EventShareDrawer({
                 );
               }
 
+              if (action.id === "sms") {
+                return (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => void shareViaMessages()}
+                    className={commonClass}
+                  >
+                    <span className={iconClass}>
+                      <PlatformGlyph id={action.id} />
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-700">
+                      {action.label}
+                    </span>
+                  </button>
+                );
+              }
+
               return (
-                <a
+                <button
                   key={action.id}
-                  href={buildEventShareHref(action.id, url, caption)}
-                  target={action.id === "sms" || action.id === "email" ? undefined : "_blank"}
-                  rel="noreferrer"
-                  onClick={() =>
-                    void trackEvent({
-                      eventName: "event_share",
-                      eventType: "community",
-                      source,
-                      metadata: {
-                        slug: event.slug,
-                        channel: action.id,
-                        eventId: event.id,
-                      },
-                    })
-                  }
+                  type="button"
+                  onClick={() => void shareViaPlatform(action.id as SharePlatform)}
                   className={commonClass}
                 >
                   <span className={iconClass}>
@@ -389,7 +452,7 @@ export default function EventShareDrawer({
                   <span className="text-[11px] font-semibold text-slate-700">
                     {action.label}
                   </span>
-                </a>
+                </button>
               );
             })}
           </div>

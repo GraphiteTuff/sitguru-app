@@ -110,17 +110,21 @@ export default function PartnerEventPromoteWorkspace({
 
   useEffect(() => {
     setCaption(
-      buildEventShareCaptionSocial({
-        title: selectedEvent.title,
-        start_at: selectedEvent.start_at,
-        end_at: selectedEvent.end_at,
-        timezone: selectedEvent.timezone,
-        city: selectedEvent.city,
-        state: selectedEvent.state,
-        short_description: selectedEvent.short_description,
-      }),
+      buildEventShareCaptionSocial(
+        {
+          title: selectedEvent.title,
+          start_at: selectedEvent.start_at,
+          end_at: selectedEvent.end_at,
+          timezone: selectedEvent.timezone,
+          city: selectedEvent.city,
+          state: selectedEvent.state,
+          short_description: selectedEvent.short_description,
+          venue_name: selectedEvent.venue_name,
+        },
+        partner.business_name,
+      ),
     );
-  }, [selectedEvent]);
+  }, [selectedEvent, partner.business_name]);
 
   useEffect(() => {
     async function loadStats() {

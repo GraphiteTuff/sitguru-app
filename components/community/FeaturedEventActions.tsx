@@ -24,7 +24,7 @@ export default function FeaturedEventActions({
 }: FeaturedEventActionsProps) {
   const [shareOpen, setShareOpen] = useState(false);
   const isPreview = previewMode || isHomepageDemoEvent(event.id);
-  const href = isPreview ? "/community" : getPublicEventPath(event.slug);
+  const href = isPreview ? "/events" : getPublicEventPath(event.slug);
 
   return (
     <>

@@ -116,7 +116,7 @@ const PUBLIC_GURU_SEARCH_HREF = "/search";
 const publicNavLinks: NavLink[] = [
   { label: "Home", href: "/" },
   { label: "Find Care", href: PUBLIC_GURU_SEARCH_HREF },
-  { label: "Pet Events", href: "/community" },
+  { label: "Pet Events", href: "/events" },
   { label: "Become a Guru", href: "/become-a-guru" },
   { label: "Programs", href: "/programs" },
   { label: "Ambassadors", href: "/ambassadors" },

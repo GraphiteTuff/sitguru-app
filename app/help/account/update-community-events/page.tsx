@@ -23,7 +23,7 @@ export default function EventPlannerUpdateEventsPage() {
       jumps={[
         { href: "#update-steps", label: "Update steps" },
         { href: "#faqs", label: "FAQs" },
-        { href: "/community/host", label: "Host hub" },
+        { href: "/events/host", label: "Host hub" },
         {
           href: "/partners/dashboard/community/events",
           label: "Partner Events",

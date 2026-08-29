@@ -49,12 +49,14 @@ export function isSafeCommunityNextPath(path: string) {
   if (decoded.startsWith("/signup")) return false;
 
   return (
+    decoded.startsWith("/events/") ||
     decoded.startsWith("/community/") ||
     decoded.startsWith("/customer/") ||
     decoded.startsWith("/guru/") ||
     decoded.startsWith("/ambassador/") ||
     decoded.startsWith("/search") ||
     decoded.startsWith("/find-care") ||
+    decoded === "/events" ||
     decoded === "/community"
   );
 }
@@ -63,7 +65,7 @@ export function buildEventReturnPath(slug: string, opts?: { rsvp?: boolean }) {
   const params = new URLSearchParams();
   if (opts?.rsvp !== false) params.set("rsvp", "1");
   const query = params.toString();
-  return `/community/events/${encodeURIComponent(slug)}${query ? `?${query}` : ""}`;
+  return `/events/${encodeURIComponent(slug)}${query ? `?${query}` : ""}`;
 }
 
 function roleToSignupParams(role: CommunitySignupRole) {
@@ -154,7 +156,7 @@ export function buildCommunityJoinHref(input?: {
 }) {
   const role = input?.role || "pet_parent";
   const roleParams = roleToSignupParams(role);
-  const next = input?.next || "/community";
+  const next = input?.next || "/events";
   const campaign =
     input?.campaign ||
     (role === "guru"
@@ -165,7 +167,7 @@ export function buildCommunityJoinHref(input?: {
 
   const params = new URLSearchParams({
     ...roleParams,
-    next: isSafeCommunityNextPath(next) ? next : "/community",
+    next: isSafeCommunityNextPath(next) ? next : "/events",
     source: input?.source || "community_events",
     platform: "web",
     campaign,

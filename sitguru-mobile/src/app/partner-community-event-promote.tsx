@@ -67,7 +67,7 @@ export default function PartnerCommunityEventPromoteScreen() {
 
   async function shareEvent() {
     const base = getSitGuruApiBaseUrl() || "https://www.sitguru.com";
-    const url = `${base}/community/events/${slug}`;
+    const url = `${base}/events/${slug}`;
     const shareMessage = `Join us for ${title} on SitGuru: ${url}`;
 
     await Share.share({ title, message: shareMessage, url });

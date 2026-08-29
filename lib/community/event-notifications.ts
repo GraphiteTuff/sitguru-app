@@ -82,7 +82,7 @@ export async function notifyAttendeesEventCancelled(event: EventNotifyInput) {
         title: "Event cancelled",
         body: `${event.title} has been cancelled.`,
         type: "community_event_cancelled",
-        href: "/community",
+        href: "/events",
         metadata: { eventId: event.id, slug: event.slug },
         channels: ["in_app"],
       }),

@@ -63,7 +63,7 @@ export default function CommunityEventsExplorer({
       if (next.county) params.set("county", next.county);
       if (next.city) params.set("city", next.city);
       if (next.state) params.set("state", next.state);
-      router.replace(`/community/events?${params.toString()}`);
+      router.replace(`/events?${params.toString()}`);
     }
     setHydratedLocation(true);
   }, [hydratedLocation, initialFilters, router]);
@@ -144,7 +144,7 @@ export default function CommunityEventsExplorer({
     if (next.category) params.set("category", next.category);
     if (next.petFriendly) params.set("petFriendly", "true");
     if (typeof next.isFree === "boolean") params.set("isFree", String(next.isFree));
-    router.push(`/community/events?${params.toString()}`);
+    router.push(`/events?${params.toString()}`);
   }
 
   return (

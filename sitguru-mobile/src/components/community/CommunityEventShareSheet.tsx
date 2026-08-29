@@ -70,7 +70,7 @@ export default function CommunityEventShareSheet({
   const url = useMemo(() => {
     if (!event) return "";
     const base = (getSitGuruApiBaseUrl() || "https://www.sitguru.com").replace(/\/$/, "");
-    return `${base}/community/events/${event.slug}`;
+    return `${base}/events/${event.slug}`;
   }, [event]);
 
   const previewImage = event?.image_card_url || event?.image_hero_url || null;
