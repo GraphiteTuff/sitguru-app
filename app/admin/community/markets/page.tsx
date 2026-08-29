@@ -38,6 +38,14 @@ export default async function AdminCommunityMarketsPage() {
     markets = await listCommunityMarkets();
   }
 
+  const { ensureCommunityGeographiesSeeded } = await import(
+    "@/lib/community/geography-queries"
+  );
+  await ensureCommunityGeographiesSeeded({
+    forceCatalogSync: needsCatalogFix,
+    seedIfEmpty: true,
+  });
+
   const [usage, partnerEvents, communityEventsToday, petRelevantToday] =
     await Promise.all([
       getSerpUsageToday(),

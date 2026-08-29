@@ -12,7 +12,7 @@ import {
   readCommunityLocationPreference,
   saveCommunityLocationPreference,
 } from "@/lib/community/location-preference";
-import { COMMUNITY_COUNTY_OPTIONS } from "@/lib/community/market-seed";
+import CommunityCountySuggestInput from "@/components/community/CommunityCountySuggestInput";
 import { COMMUNITY_EVENT_CATEGORIES } from "@/lib/community/types";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 
@@ -35,7 +35,12 @@ export default function CommunityEventsExplorer({
 }) {
   const router = useRouter();
   const [filters, setFilters] = useState(initialFilters);
+  const [countyDraft, setCountyDraft] = useState(initialFilters.county);
   const [hydratedLocation, setHydratedLocation] = useState(false);
+
+  useEffect(() => {
+    setCountyDraft(filters.county);
+  }, [filters.county]);
 
   useEffect(() => {
     if (hydratedLocation) return;
@@ -53,6 +58,7 @@ export default function CommunityEventsExplorer({
         state: preference.state || "",
       };
       setFilters(next);
+      setCountyDraft(next.county);
       const params = new URLSearchParams();
       if (next.county) params.set("county", next.county);
       if (next.city) params.set("city", next.city);
@@ -162,24 +168,26 @@ export default function CommunityEventsExplorer({
           placeholder="Search events"
           className="min-h-11 rounded-2xl border border-slate-200 px-4 text-sm font-semibold xl:col-span-2"
         />
-        <input
-          key={`county-${filters.county}`}
-          list="explorer-county-options"
-          defaultValue={filters.county}
-          onBlur={(event) => apply({ ...filters, county: event.target.value })}
+        <CommunityCountySuggestInput
+          value={countyDraft}
+          stateValue={filters.state}
           placeholder="County"
-          className="min-h-11 rounded-2xl border border-slate-200 px-4 text-sm font-semibold"
+          className="min-h-11 w-full rounded-2xl border border-slate-200 px-4 text-sm font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+          onChange={setCountyDraft}
+          onCommit={(county) => {
+            if (county !== filters.county) {
+              apply({ ...filters, county });
+            }
+          }}
+          onSelect={(hit) =>
+            apply({
+              ...filters,
+              county: hit.county_name,
+              state: hit.state,
+              city: hit.city || filters.city,
+            })
+          }
         />
-        <datalist id="explorer-county-options">
-          {COMMUNITY_COUNTY_OPTIONS.map((option) => (
-            <option
-              key={`${option.county}-${option.state}`}
-              value={option.county}
-            >
-              {option.county}, {option.state}
-            </option>
-          ))}
-        </datalist>
         <input
           key={`city-${filters.city}`}
           defaultValue={filters.city}

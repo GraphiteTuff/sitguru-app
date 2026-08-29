@@ -162,14 +162,40 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
   limit?: number;
   marketId?: string;
   marketSlug?: string;
+  city?: string;
+  state?: string;
+  county?: string;
+  /** When true (default), only markets marked homepage_eligible on community_geographies. */
+  homepageEligibleOnly?: boolean;
   /** Minimum effective pet relevance (default 40 for public surfaces). */
   minPetScore?: number;
 }) {
   const limit = opts?.limit ?? 12;
   const minPetScore = opts?.minPetScore ?? 40;
+  const homepageEligibleOnly = opts?.homepageEligibleOnly !== false;
 
   try {
     const now = new Date().toISOString();
+
+    let eligibleMarketIds: string[] | null = null;
+    if (homepageEligibleOnly && !opts?.marketId && !opts?.marketSlug) {
+      try {
+        const { listHomepageEligibleMarketIds } = await import(
+          "@/lib/community/geography-queries"
+        );
+        const eligible = await listHomepageEligibleMarketIds();
+        if (eligible.ready) {
+          eligibleMarketIds = eligible.marketIds;
+        }
+      } catch (error) {
+        console.warn(
+          "fetchDiscoveredHomepageEvents geography lookup:",
+          error,
+        );
+        eligibleMarketIds = null;
+      }
+    }
+
     // Fetch extra then sort by pet relevance (PostgREST can't easily express override).
     let query = supabaseAdmin
       .from("community_event_discoveries")
@@ -189,10 +215,19 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
       .eq("status", "active")
       .gte("start_at", now)
       .order("start_at", { ascending: true })
-      .limit(Math.max(limit * 3, 36));
+      .limit(Math.max(limit * 4, 48));
 
     if (opts?.marketId) {
       query = query.eq("market_id", opts.marketId);
+    } else if (eligibleMarketIds && eligibleMarketIds.length > 0) {
+      query = query.in("market_id", eligibleMarketIds);
+    } else if (eligibleMarketIds && eligibleMarketIds.length === 0) {
+      // Geography catalog is ready but nothing is homepage-eligible.
+      return { events: [] as CommunityEventWithPartner[], lastSyncedAt: null };
+    }
+
+    if (opts?.state) {
+      query = query.ilike("state", opts.state.trim().slice(0, 2));
     }
 
     const { data, error } = await query;
@@ -221,6 +256,26 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
         (row) =>
           row.community_markets?.slug === opts.marketSlug ||
           row.county === opts.marketSlug,
+      );
+    }
+
+    const countyNeedle = opts?.county?.trim().toLowerCase();
+    const cityNeedle = opts?.city?.trim().toLowerCase();
+    if (countyNeedle) {
+      const needle = countyNeedle.replace(/\s+county$/i, "");
+      rows = rows.filter((row) => {
+        const label = discoveryCountyLabel(row)?.toLowerCase() || "";
+        const marketCounty =
+          row.community_markets?.county_name?.toLowerCase() || "";
+        return (
+          label.includes(needle) ||
+          marketCounty.includes(needle) ||
+          (row.county || "").toLowerCase().includes(countyNeedle)
+        );
+      });
+    } else if (cityNeedle) {
+      rows = rows.filter((row) =>
+        (row.city || "").toLowerCase().includes(cityNeedle),
       );
     }
 

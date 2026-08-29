@@ -77,6 +77,12 @@ export async function restoreCommunityMarketsAction() {
   if (!gate.ok) return gate;
 
   const result = await ensureCommunityMarketsSeeded({ forceCatalogSync: true });
+  const { ensureCommunityGeographiesSeeded } = await import(
+    "@/lib/community/geography-queries"
+  );
+  const geography = await ensureCommunityGeographiesSeeded({
+    forceCatalogSync: true,
+  });
   const { backfillDiscoveryPetRelevance, listCommunityMarkets, refreshMarketDiscoveryCount } =
     await import("@/lib/community/market-queries");
   const scored = await backfillDiscoveryPetRelevance(500);
@@ -86,6 +92,8 @@ export async function restoreCommunityMarketsAction() {
   revalidatePath("/admin/community/markets");
   return {
     ...result,
+    geographySeeded: geography.seeded,
+    geographyLinked: geography.linked,
     petScoresUpdated: scored.updated,
   };
 }

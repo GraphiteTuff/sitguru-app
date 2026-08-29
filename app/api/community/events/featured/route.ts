@@ -30,24 +30,49 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   let city = searchParams.get("city") || undefined;
   let state = searchParams.get("state") || undefined;
+  let county = searchParams.get("county") || undefined;
   const zip = cleanZipCode(searchParams.get("zip"));
 
-  if ((!city || !state) && zip.length === 5) {
+  if ((!city || !state || !county) && zip.length === 5) {
     try {
-      const location = await lookupZipLocation(zip);
-      if (location?.city && location?.state) {
-        city = city || location.city;
-        state = state || location.state;
+      const { resolveCommunityGeography } = await import(
+        "@/lib/community/geography-queries"
+      );
+      const resolved = await resolveCommunityGeography({ zip });
+      if (resolved?.ok) {
+        city = city || resolved.city || undefined;
+        state = state || resolved.state || undefined;
+        county = county || resolved.county || undefined;
+      } else {
+        const location = await lookupZipLocation(zip);
+        if (location?.city && location?.state) {
+          city = city || location.city;
+          state = state || location.state;
+        }
       }
     } catch {
-      // fall through
+      try {
+        const location = await lookupZipLocation(zip);
+        if (location?.city && location?.state) {
+          city = city || location.city;
+          state = state || location.state;
+        }
+      } catch {
+        // fall through
+      }
     }
   }
 
   const [featuredEvents, partnerUpcoming, discovered] = await Promise.all([
     fetchFeaturedHomepageEvents({ city, state, limit: 1 }),
     fetchPublicEvents({ city, state, limit: 8 }),
-    fetchDiscoveredHomepageEvents({ limit: 16 }),
+    fetchDiscoveredHomepageEvents({
+      city,
+      state,
+      county,
+      limit: 16,
+      homepageEligibleOnly: true,
+    }),
   ]);
 
   let featured = featuredEvents[0] || null;
@@ -92,13 +117,14 @@ export async function GET(req: NextRequest) {
   }
 
   const locationLabel =
-    city && state ? `${city}, ${state}` : city || state || undefined;
+    [county, city, state].filter(Boolean).join(", ") || undefined;
 
   return NextResponse.json({
     featured,
     upcoming: bannerEvents.slice(featured ? 1 : 0),
     bannerEvents,
     locationLabel,
+    county: county || null,
     source,
     previewMode,
     lastSyncedAt,

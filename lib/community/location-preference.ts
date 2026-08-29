@@ -77,6 +77,25 @@ export function formatCommunityLocationLabel(
 }
 
 export async function resolveCommunityLocationFromZip(zip: string) {
+  try {
+    const response = await fetch(
+      `/api/search/resolve?zip=${encodeURIComponent(zip)}`,
+    );
+    const payload = await response.json();
+
+    if (response.ok && payload.ok) {
+      return {
+        zip: String(payload.zip || zip),
+        county: payload.county ? String(payload.county) : undefined,
+        city: String(payload.city || ""),
+        state: String(payload.state || ""),
+        source: "search" as const,
+      };
+    }
+  } catch {
+    // fall through to ZIP-only lookup
+  }
+
   const response = await fetch(`/api/location/zip?zip=${encodeURIComponent(zip)}`);
   const payload = await response.json();
 

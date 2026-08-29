@@ -27,7 +27,8 @@ import {
   readCommunityLocationPreference,
   saveCommunityLocationPreference,
 } from "@/lib/community/location-preference";
-import { COMMUNITY_COUNTY_OPTIONS, COMMUNITY_MAJOR_COUNTIES } from "@/lib/community/market-seed";
+import { COMMUNITY_MAJOR_COUNTIES } from "@/lib/community/market-seed";
+import CommunityCountySuggestInput from "@/components/community/CommunityCountySuggestInput";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 import { COMMUNITY_EVENT_CATEGORIES } from "@/lib/community/types";
 
@@ -451,28 +452,26 @@ export default function CommunityEventsMapSearch({
               <span className="mb-2 block text-sm font-semibold text-slate-800">
                 County
               </span>
-              <input
-                list="community-county-options"
+              <CommunityCountySuggestInput
                 value={draft.county}
-                onChange={(e) =>
+                stateValue={draft.state}
+                placeholder="Search any U.S. county"
+                onChange={(county) =>
                   setDraft((current) => ({
                     ...current,
-                    county: e.target.value,
+                    county,
                   }))
                 }
-                placeholder="Montgomery County"
-                className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+                onSelect={(hit) => {
+                  const next = {
+                    ...draft,
+                    county: hit.county_name,
+                    state: hit.state,
+                    city: hit.city || draft.city,
+                  };
+                  setDraft(next);
+                }}
               />
-              <datalist id="community-county-options">
-                {COMMUNITY_COUNTY_OPTIONS.map((option) => (
-                  <option
-                    key={`${option.county}-${option.state}`}
-                    value={option.county}
-                  >
-                    {option.county}, {option.state}
-                  </option>
-                ))}
-              </datalist>
             </label>
 
             <label className="block min-w-0">
