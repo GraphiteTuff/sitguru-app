@@ -292,7 +292,7 @@ export default function UpcomingEventsBanner({
   previewMode = false,
   source = "demo",
   lastSyncedAt: _lastSyncedAt = null,
-  viewAllHref = "/community/events",
+  viewAllHref = "/community",
   eyebrow = "Local pet life",
   title = "Where good pets gather.",
   subtitle,

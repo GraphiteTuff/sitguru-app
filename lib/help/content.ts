@@ -503,7 +503,7 @@ export const eventPlannerUpdateGuides: HelpStepBlock[] = [
       "Step 2: Go to `/partners/dashboard/community/events` and choose Create / New draft.",
       "Step 3: Fill Basics → Date & Time → Details in the editor (fields autosave).",
       "Step 4: Preview, then Submit for review.",
-      "Step 5: SitGuru reviews the listing — once published it appears as a SitGuru Partner Event on `/community` and `/community/events`.",
+      "Step 5: SitGuru reviews the listing — once published it appears as a SitGuru Partner Event on `/community`.",
     ],
     tips: [
       "Use clear titles Pet Parents can scan on mobile (adoption day, meetup, festival, fundraiser).",

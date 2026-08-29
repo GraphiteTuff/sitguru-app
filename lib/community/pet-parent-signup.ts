@@ -154,7 +154,7 @@ export function buildCommunityJoinHref(input?: {
 }) {
   const role = input?.role || "pet_parent";
   const roleParams = roleToSignupParams(role);
-  const next = input?.next || "/community/events";
+  const next = input?.next || "/community";
   const campaign =
     input?.campaign ||
     (role === "guru"
@@ -165,7 +165,7 @@ export function buildCommunityJoinHref(input?: {
 
   const params = new URLSearchParams({
     ...roleParams,
-    next: isSafeCommunityNextPath(next) ? next : "/community/events",
+    next: isSafeCommunityNextPath(next) ? next : "/community",
     source: input?.source || "community_events",
     platform: "web",
     campaign,
@@ -235,7 +235,7 @@ export function buildDiscoveryPetParentSignupHref(input: {
   const params = new URLSearchParams({
     role: "pet_parent",
     intent: "pet_parent",
-    next: "/community/events?welcome=1",
+    next: "/community?welcome=1",
     source: input.source || "homepage_events_banner",
     platform: "web",
     campaign,

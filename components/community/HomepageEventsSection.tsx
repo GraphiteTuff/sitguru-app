@@ -50,7 +50,7 @@ export default function HomepageEventsSection({
       previewMode={previewMode}
       source={source}
       lastSyncedAt={lastSyncedAt}
-      viewAllHref="/community/events"
+      viewAllHref="/community"
       adminHref={adminHref}
       eyebrow="Local pet life"
       title="Where good pets gather."

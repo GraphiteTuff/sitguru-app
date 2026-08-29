@@ -55,7 +55,7 @@ export default async function CommunityEventsBannerSection() {
       previewMode={previewMode}
       source={source}
       lastSyncedAt={discovered.lastSyncedAt}
-      viewAllHref="/community/events"
+      viewAllHref="/community"
       eyebrow="Local pet life"
       title="Where good pets gather."
     />

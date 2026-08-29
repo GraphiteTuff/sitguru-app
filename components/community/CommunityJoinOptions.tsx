@@ -109,7 +109,7 @@ export default function CommunityJoinOptions({
                       ? "community_event_ambassador"
                       : "community_event_im_going"),
               })
-            : `/signup?role=${role.id}&intent=${role.signupIntent}&next=${encodeURIComponent("/community/events")}&source=${source}`;
+            : `/signup?role=${role.id}&intent=${role.signupIntent}&next=${encodeURIComponent("/community")}&source=${source}`;
 
           return (
             <Link

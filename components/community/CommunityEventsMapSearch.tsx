@@ -581,12 +581,6 @@ export default function CommunityEventsMapSearch({
               {activeFilterCount} active filter
               {activeFilterCount === 1 ? "" : "s"}
             </span>
-            <Link
-              href="/community/events"
-              className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-800 hover:underline"
-            >
-              Open full event list →
-            </Link>
           </div>
         </div>
       </div>
@@ -654,10 +648,10 @@ export default function CommunityEventsMapSearch({
                     Show all events
                   </button>
                   <Link
-                    href="/community/events"
+                    href="/community/host"
                     className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800"
                   >
-                    Browse calendar
+                    Host a pet event
                   </Link>
                 </div>
               </div>
