@@ -31,7 +31,6 @@ import { COMMUNITY_MAJOR_COUNTIES } from "@/lib/community/market-seed";
 import CommunityCountySuggestInput from "@/components/community/CommunityCountySuggestInput";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 import { COMMUNITY_EVENT_CATEGORIES } from "@/lib/community/types";
-import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
 
 type Filters = {
   q: string;
