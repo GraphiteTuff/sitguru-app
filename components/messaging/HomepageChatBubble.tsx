@@ -128,7 +128,7 @@ const ALL_INTENT_CHIPS: ReadonlyArray<{
 ];
 
 const INTENT_CHIP_CLASS =
-  "px-4 py-1.5 bg-[#0D5C3A] text-white text-xs font-medium rounded-full shadow-sm hover:bg-opacity-95 active:scale-95 transition-all whitespace-nowrap flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
+  "min-h-[44px] px-4 py-2.5 bg-[#0D5C3A] text-white text-sm font-medium rounded-full shadow-sm hover:bg-opacity-95 active:scale-95 transition-all whitespace-nowrap flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
 
 function sanitizeFirstName(raw: string): string {
   const extracted = extractVisitorPreferredName(raw);
@@ -231,7 +231,7 @@ function CtaActionButton({ cta }: { cta: HomepageCtaDef }) {
         href={cta.href}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-2 inline-flex w-full items-center justify-center rounded-full bg-[#0D5C3A] px-4 py-2 text-center text-sm font-medium text-white transition-all hover:bg-opacity-90"
+        className="mt-2 inline-flex min-h-[48px] w-full items-center justify-center rounded-full bg-[#0D5C3A] px-4 py-3 text-center text-base font-medium text-white transition-all hover:bg-opacity-90"
       >
         {cta.label}
       </a>
@@ -240,7 +240,7 @@ function CtaActionButton({ cta }: { cta: HomepageCtaDef }) {
   return (
     <Link
       href={cta.href}
-      className="mt-2 inline-flex w-full items-center justify-center rounded-full bg-[#0D5C3A] px-4 py-2 text-center text-sm font-medium text-white transition-all hover:bg-opacity-90"
+      className="mt-2 inline-flex min-h-[48px] w-full items-center justify-center rounded-full bg-[#0D5C3A] px-4 py-3 text-center text-base font-medium text-white transition-all hover:bg-opacity-90"
     >
       {cta.label}
     </Link>
@@ -578,11 +578,15 @@ export default function HomepageChatBubble() {
     }
   }
 
-  function handleCloseChat() {
-    const confirmClose = window.confirm(
-      "Are you sure you want to close this conversation? Your chat history will be cleared.",
-    );
+  /** Minimize only — never clear history or block with confirm (X must always work). */
+  function handleMinimizeChat() {
+    setOpen(false);
+  }
 
+  function handleEndAndClearChat() {
+    const confirmClose = window.confirm(
+      "End this chat and clear the conversation history?",
+    );
     if (!confirmClose) return;
 
     void auditTranscriptToBackend({
@@ -744,7 +748,7 @@ export default function HomepageChatBubble() {
 
       {open ? (
         <div
-          className="homepage-chat-panel fixed inset-0 z-50 flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[600px] sm:w-[400px] sm:rounded-2xl sm:shadow-2xl"
+          className="homepage-chat-panel fixed inset-0 z-[10000] flex h-full w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(680px,calc(100vh-3rem))] sm:w-[min(440px,calc(100vw-2rem))] sm:rounded-2xl sm:shadow-2xl"
           role="dialog"
           aria-label="Rogue, Your Chief Treat Officer chat"
         >
@@ -766,15 +770,26 @@ export default function HomepageChatBubble() {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleCloseChat}
-              className="homepage-chat-panel__close absolute top-2 right-2 z-10"
-              aria-label="Close chat and clear history"
-              title="Close conversation"
-            >
-              <X className="h-5 w-5 text-white" aria-hidden="true" />
-            </button>
+            <div className="homepage-chat-panel__header-actions absolute top-2 right-2 z-20 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleEndAndClearChat}
+                className="homepage-chat-panel__clear hidden min-h-[44px] rounded-full px-3 text-xs font-bold text-white/90 underline-offset-2 hover:underline sm:inline-flex sm:items-center"
+                aria-label="End chat and clear history"
+                title="End & clear"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={handleMinimizeChat}
+                className="homepage-chat-panel__close"
+                aria-label="Close chat"
+                title="Close chat"
+              >
+                <X className="h-6 w-6 text-white" aria-hidden="true" />
+              </button>
+            </div>
           </header>
 
           <div
@@ -823,7 +838,7 @@ export default function HomepageChatBubble() {
 
           {showIntentChips ? (
             <div
-              className="flex shrink-0 flex-row items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-gray-50 p-2 scrollbar-none"
+              className="flex shrink-0 flex-row items-center gap-2.5 overflow-x-auto whitespace-nowrap border-b border-gray-100 bg-gray-50 p-3 scrollbar-none"
               role="toolbar"
               aria-label="Quick intents"
             >
@@ -875,26 +890,22 @@ export default function HomepageChatBubble() {
         </div>
       ) : null}
 
-      <button
-        type="button"
-        className="homepage-chat-launcher"
-        onClick={() => (open ? handleCloseChat() : openPanel())}
-        aria-label={
-          open ? "Close SitGuru AI Concierge" : "Open SitGuru AI Pack Leader"
-        }
-        aria-expanded={open}
-      >
-        {hasUnread && !open ? (
-          <span className="homepage-chat-launcher__badge" aria-hidden />
-        ) : null}
-        {open ? (
-          <span className="homepage-chat-launcher__icon">×</span>
-        ) : (
+      {!open ? (
+        <button
+          type="button"
+          className="homepage-chat-launcher"
+          onClick={openPanel}
+          aria-label="Open SitGuru AI Pack Leader"
+          aria-expanded={false}
+        >
+          {hasUnread ? (
+            <span className="homepage-chat-launcher__badge" aria-hidden />
+          ) : null}
           <span className="homepage-chat-launcher__icon" aria-hidden>
             <SitGuruAvatar className="h-full w-full rounded-full overflow-hidden flex-shrink-0" />
           </span>
-        )}
-      </button>
+        </button>
+      ) : null}
     </div>
   );
 }

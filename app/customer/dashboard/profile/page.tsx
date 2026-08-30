@@ -394,17 +394,17 @@ function SetupCard({ step }: { step: PetParentSetupStep }) {
   return (
     <Link
       href={step.actionHref}
-      className={`group flex min-h-[315px] flex-col rounded-[1.75rem] border p-5 transition hover:-translate-y-1 hover:shadow-xl ${getStatusClassName(
+      className={`group flex min-h-[280px] flex-col rounded-[1.75rem] border p-5 transition hover:-translate-y-1 hover:shadow-xl sm:min-h-[315px] ${getStatusClassName(
         step.status,
       )}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-xl shadow-sm ring-1 ring-white/80">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-xl shadow-sm ring-1 ring-white/80">
           {isComplete ? "✓" : step.number}
         </div>
 
         <span
-          className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${
+          className={`rounded-full border px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] ${
             isComplete
               ? "border-emerald-200 bg-emerald-100 text-emerald-800"
               : step.status === "required"
@@ -442,11 +442,11 @@ function SetupCard({ step }: { step: PetParentSetupStep }) {
         </p>
       </div>
 
-      <div className="mt-auto flex items-center justify-between border-t border-white/80 pt-5">
-        <span className="text-sm font-black text-emerald-700">
+      <div className="mt-auto flex min-h-[52px] items-center justify-between border-t border-white/80 pt-5">
+        <span className="text-base font-black text-emerald-700">
           {step.actionLabel}
         </span>
-        <ArrowRight className="h-4 w-4 text-emerald-700 transition group-hover:translate-x-1" />
+        <ArrowRight className="h-5 w-5 text-emerald-700 transition group-hover:translate-x-1" />
       </div>
     </Link>
   );
@@ -600,12 +600,14 @@ export default function CustomerProfileSetupPage() {
     const basic = getCompletionStatus(setupBooleans.basicInfoComplete);
     const location = getCompletionStatus(setupBooleans.serviceLocationComplete);
     const pets = getCompletionStatus(setupBooleans.petPassportsComplete);
-    const careNotes = getCompletionStatus(setupBooleans.careNotesComplete);
+    const careNotes = getCompletionStatus(setupBooleans.careNotesComplete, false);
     const emergency = getCompletionStatus(
       setupBooleans.emergencyContactComplete,
+      false,
     );
     const notifications = getCompletionStatus(
       setupBooleans.notificationsComplete,
+      false,
     );
 
     return [
@@ -696,18 +698,35 @@ export default function CustomerProfileSetupPage() {
     ];
   }, [setupBooleans]);
 
-  const completedSteps = setupSteps.filter(
+  const requiredSteps = setupSteps.filter((step) => step.number <= 3);
+  const recommendedSteps = setupSteps.filter((step) => step.number > 3);
+  const completedRequired = requiredSteps.filter(
     (step) => step.status === "complete",
   ).length;
-
-  const completionPercent = Math.round(
-    (completedSteps / setupSteps.length) * 100,
-  );
+  const completedRecommended = recommendedSteps.filter(
+    (step) => step.status === "complete",
+  ).length;
+  const completedSteps = completedRequired + completedRecommended;
 
   const isBookingReady =
     setupBooleans.basicInfoComplete &&
     setupBooleans.serviceLocationComplete &&
     setupBooleans.petPassportsComplete;
+
+  /** Booking-ready progress drives the hero % so parents are not stuck at 67% on extras. */
+  const bookingReadyPercent = Math.round(
+    (completedRequired / requiredSteps.length) * 100,
+  );
+  const completionPercent = isBookingReady
+    ? Math.round(
+        80 +
+          (completedRecommended / Math.max(recommendedSteps.length, 1)) * 20,
+      )
+    : bookingReadyPercent;
+
+  const nextIncompleteStep = setupSteps.find(
+    (step) => step.status !== "complete",
+  );
 
   const avatarSrc = profile?.avatar_url || "";
   const displayName = getCustomerDisplayName(profile);
@@ -835,29 +854,44 @@ export default function CustomerProfileSetupPage() {
               </div>
             </div>
 
-            <section className="mt-6 overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#047857_0%,#059669_42%,#10b981_100%)] text-white shadow-[0_22px_60px_rgba(5,150,105,0.24)]">
+            <section className="mt-6 overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#047857_0%,#059669_42%,#10b981_100%)] text-white shadow-[0_22px_60px_rgba(5,150,105,0.24)] public-dark-section" data-brand-green>
               <div className="grid gap-6 p-6 md:p-8 lg:grid-cols-[1fr_190px] lg:items-center">
                 <div>
                   <p className="text-sm font-black uppercase tracking-[0.26em] text-emerald-100">
                     Pet Parent Setup Hub
                   </p>
 
-                  <h2 className="mt-3 text-4xl font-black tracking-[-0.055em] md:text-5xl">
-                    Complete your 6-step care profile
+                  <h2 className="mt-3 !text-white text-4xl font-black tracking-[-0.055em] md:text-5xl">
+                    {isBookingReady
+                      ? "You are booking ready"
+                      : "Get booking ready in 3 steps"}
                   </h2>
 
                   <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-emerald-50">
-                    Each step captures information SitGuru uses throughout the
-                    platform: matching, bookings, maps, Guru preparation,
-                    safety, messaging, reminders, and rebooking.
+                    {isBookingReady
+                      ? "Required basics are done. Care notes, emergency contact, and notifications are optional extras that help Gurus care with confidence."
+                      : "Add basic info, your care location, and at least one Pet Passport. Everything else can wait."}
                   </p>
+
+                  {nextIncompleteStep && !isBookingReady ? (
+                    <Link
+                      href={nextIncompleteStep.actionHref}
+                      className="mt-5 inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-white px-5 text-base font-black text-emerald-800 transition hover:bg-emerald-50"
+                    >
+                      Next: {nextIncompleteStep.title}
+                    </Link>
+                  ) : null}
                 </div>
 
                 <div className="rounded-[1.75rem] border border-white/20 bg-white/15 p-5 text-center shadow-sm backdrop-blur">
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-50">
-                    Setup Progress
+                    {isBookingReady ? "Profile polish" : "Booking ready"}
                   </p>
-                  <p className="mt-2 text-5xl font-black">{completedSteps}/6</p>
+                  <p className="mt-2 text-5xl font-black !text-white">
+                    {isBookingReady
+                      ? `${completedSteps}/6`
+                      : `${completedRequired}/3`}
+                  </p>
                   <p className="mt-1 text-sm font-black text-emerald-50">
                     {completionPercent}% complete
                   </p>
@@ -871,6 +905,12 @@ export default function CustomerProfileSetupPage() {
                     style={{ width: `${completionPercent}%` }}
                   />
                 </div>
+                {!isBookingReady ? (
+                  <p className="mt-3 text-sm font-semibold text-emerald-50">
+                    Recommended extras unlock after you are booking ready — they
+                    do not block care requests.
+                  </p>
+                ) : null}
               </div>
             </section>
 
@@ -1022,9 +1062,11 @@ export default function CustomerProfileSetupPage() {
                     Setup Summary
                   </p>
                   <h3 className="mt-2 text-2xl font-black text-slate-950">
-                    {completionPercent === 100
-                      ? "Your 6-step Pet Parent profile is complete."
-                      : "Keep going to complete your 6-step profile."}
+                    {isBookingReady
+                      ? "Your booking-ready profile is set. Optional polish is available below."
+                      : nextIncompleteStep
+                        ? `Next up: ${nextIncompleteStep.title}`
+                        : "Finish the required setup steps"}
                   </h3>
                   <p className="mt-2 max-w-4xl text-sm font-semibold leading-7 text-slate-600">
                     Saved Gurus, PawPerks, invites, and becoming a Guru are

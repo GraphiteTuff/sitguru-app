@@ -32,6 +32,9 @@ type MobileWizardProps = {
   nextLabel?: string;
   backLabel?: string;
   nextDisabled?: boolean;
+  /** Optional skip for non-blocking steps (vaccines, care notes, etc.). */
+  skipLabel?: string;
+  onSkip?: () => void;
   /** Hide chrome when embedding a single step inside a larger screen. */
   compact?: boolean;
 };
@@ -48,6 +51,8 @@ export default function MobileWizard({
   nextLabel = 'Continue',
   backLabel = 'Back',
   nextDisabled = false,
+  skipLabel,
+  onSkip,
   compact = false,
 }: MobileWizardProps) {
   const step = steps[stepIndex];
@@ -119,7 +124,7 @@ export default function MobileWizard({
 
       <Animated.View style={[styles.body, bodyStyle]}>{children}</Animated.View>
 
-      {(onBack || onNext) && !compact ? (
+      {(onBack || onNext || onSkip) && !compact ? (
         <View style={styles.actions}>
           {!isFirst && onBack ? (
             <TouchTarget
@@ -132,11 +137,22 @@ export default function MobileWizard({
             </TouchTarget>
           ) : null}
 
+          {onSkip && skipLabel ? (
+            <TouchTarget
+              accessibilityRole="button"
+              accessibilityLabel={skipLabel}
+              onPress={onSkip}
+              style={styles.skip}
+            >
+              <Text style={styles.skipText}>{skipLabel}</Text>
+            </TouchTarget>
+          ) : null}
+
           {onNext ? (
             <Animated.View
               style={[
                 styles.primaryShell,
-                isFirst ? styles.primaryAlone : null,
+                isFirst && !onSkip ? styles.primaryAlone : null,
                 nextStyle,
               ]}
             >
@@ -232,6 +248,21 @@ const styles = StyleSheet.create({
   secondaryText: {
     color: SitGuruColors.primary,
     fontFamily: AppFonts.extraBold,
+    fontSize: MobileType.label,
+  },
+  skip: {
+    backgroundColor: SitGuruColors.surface,
+    borderColor: SitGuruColors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexGrow: 1,
+    minHeight: TOUCH_MIN,
+    minWidth: '40%',
+    paddingHorizontal: MobileSpace.lg,
+  },
+  skipText: {
+    color: SitGuruColors.textMuted,
+    fontFamily: AppFonts.bold,
     fontSize: MobileType.label,
   },
   primaryShell: {
