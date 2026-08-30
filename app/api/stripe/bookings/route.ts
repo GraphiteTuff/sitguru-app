@@ -267,10 +267,9 @@ function resolveCheckoutPaymentSelection(
       uiOption,
       uiLabel,
       provider: "stripe",
-      paymentMethod: "bank_account",
-      checkoutEnabled: false,
-      disabledMessage:
-        "ACH and bank-account checkout are not enabled yet. Please select card or an available digital wallet.",
+      paymentMethod: "automatic",
+      checkoutEnabled: true,
+      disabledMessage: "",
     };
   }
 
@@ -288,6 +287,9 @@ function resolveCheckoutPaymentSelection(
     saved_method: "automatic",
     automatic: "automatic",
     stripe: "automatic",
+    bank_account: "automatic",
+    ach: "automatic",
+    us_bank_account: "automatic",
     pawperks_credit: "automatic",
     promo_code: "automatic",
     gift_card: "automatic",

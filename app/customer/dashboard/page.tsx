@@ -4,6 +4,7 @@
 import {
   ChangeEvent,
   FormEvent,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -33,6 +34,11 @@ import { supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
 import { PawIcon } from "@/components/ui/PawIcon";
 import MultiPetProfileCenter from "@/components/customer/MultiPetProfileCenter";
+import FinishPaymentButton, {
+  isUnpaidBookingPayment,
+} from "@/components/customer/FinishPaymentButton";
+import CustomerStickyCta from "@/components/customer/CustomerStickyCta";
+import FirstVisitCoach from "@/components/customer/FirstVisitCoach";
 import UniversityExpress from "@/components/dashboard/UniversityExpress";
 import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
 import { normalizeCanonicalPet } from "@/lib/pets/canonical";
@@ -407,8 +413,9 @@ const routes = {
   allBookings: "/customer/dashboard/bookings",
   messages: "/customer/dashboard/messages",
   adminMessages: "/customer/dashboard/messages?support=admin",
-  pets: "/customer/dashboard#multi-pet-center",
+  pets: "/customer/pets",
   profile: "/customer/dashboard/profile",
+  serviceLocation: "/customer/dashboard/profile/service-location",
   accountSecurity: "/customer/dashboard/account-security",
   pawPerks: "/customer/dashboard/pawperks",
   search: "/search",
@@ -1224,12 +1231,17 @@ function getBookingNextStep(booking: Booking) {
   const status = booking.status.toLowerCase();
   const payment = booking.payment_status.toLowerCase();
 
-  if (["pending", "requested"].includes(status)) {
-    return "Request sent. Watch here for updates.";
+  if (
+    ["checkout_started", "unpaid", "pending", "pending_payment"].includes(
+      payment,
+    ) &&
+    !["confirmed", "completed", "cancelled", "canceled"].includes(status)
+  ) {
+    return "Finish payment to confirm care.";
   }
 
-  if (["checkout_started", "unpaid"].includes(payment)) {
-    return "Finish payment to confirm care.";
+  if (["pending", "requested"].includes(status)) {
+    return "Request sent. Watch here for updates.";
   }
 
   if (
@@ -2548,37 +2560,45 @@ function BookingCard({
       </div>
 
       <div className="grid gap-3 border-t border-slate-100 p-5 sm:grid-cols-2 xl:grid-cols-5">
+        {isUnpaidBookingPayment(booking.payment_status) ? (
+          <FinishPaymentButton
+            bookingId={booking.id}
+            label="Finish payment"
+            className="inline-flex min-h-[52px] w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 py-3 text-base font-black text-white transition hover:bg-[#09462c] disabled:opacity-60 sm:col-span-2 xl:col-span-5"
+          />
+        ) : null}
+
         <Link
           href={getBookingDetailHref(booking.id)}
-          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+          className="inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-base font-black text-white transition hover:bg-emerald-700"
         >
           View Details
         </Link>
 
         <Link
           href={getBookingPawReportHref(booking.id)}
-          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-black text-sky-900 transition hover:bg-sky-100"
+          className="inline-flex min-h-[52px] items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-base font-black text-sky-900 transition hover:bg-sky-100"
         >
           View Live PawReport
         </Link>
 
         <Link
           href={routes.messages}
-          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 transition hover:bg-slate-50"
+          className="inline-flex min-h-[52px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base font-bold text-slate-900 transition hover:bg-slate-50"
         >
           Message Guru
         </Link>
 
         <Link
           href={routes.findGuru}
-          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
+          className="inline-flex min-h-[52px] items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-base font-bold text-emerald-800 transition hover:bg-emerald-100"
         >
           Rebook
         </Link>
 
         <Link
           href={routes.adminMessages}
-          className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 transition hover:bg-slate-100"
+          className="inline-flex min-h-[52px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-bold text-slate-900 transition hover:bg-slate-100"
         >
           Get Help
         </Link>
@@ -2684,6 +2704,28 @@ export default function CustomerDashboardPage() {
     return Math.round(80 + (recommendedDone / recommendedFields.length) * 20);
   }, [customerProfile, pets.length]);
 
+  const isZeroBookingHome = bookings.length === 0;
+  const unpaidBooking = useMemo(
+    () =>
+      bookings.find((booking) =>
+        isUnpaidBookingPayment(booking.payment_status),
+      ) || null,
+    [bookings],
+  );
+  const stickySetup =
+    !unpaidBooking && isZeroBookingHome
+      ? !careZip
+        ? {
+            href: routes.serviceLocation,
+            label: "Add your care ZIP",
+          }
+        : pets.length === 0
+          ? {
+              href: routes.pets,
+              label: "Add your first pet",
+            }
+          : null
+      : null;
   const loadDashboard = useCallback(async () => {
     setFormError("");
 
@@ -3371,29 +3413,75 @@ export default function CustomerDashboardPage() {
       ) : null}
 
       <main
-        className="min-h-screen bg-[linear-gradient(180deg,#fffdf8_0%,#ffffff_34%,#f2fff8_100%)] pb-24 text-slate-950 md:pb-10"
+        className="min-h-screen bg-[linear-gradient(180deg,#fffdf8_0%,#ffffff_34%,#f2fff8_100%)] pb-36 text-slate-950 md:pb-10"
       >
         <Header />
 
-        <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 md:py-6 lg:px-8">
-          <UniversityExpress
-            variant="banner"
-            progressPercent={universityProgress.progressPercent}
-            petProfileDone={pets.length > 0 && profileCompletion >= 60}
-            guruVibeDone={Boolean(stats.nextBooking) || bookings.length > 0}
-            safeBookingDone={
-              universityProgress.isComplete ||
-              bookings.some((booking) =>
-                ["confirmed", "completed", "paid", "succeeded"].includes(
-                  String(booking.status || booking.payment_status || "").toLowerCase(),
-                ),
-              )
-            }
-            petProfileHref={routes.pets}
-            guruVibeHref={routes.findGuru}
-            safeBookingHref={routes.findGuru}
-            academyHref={routes.university}
+        <Suspense fallback={null}>
+          <FirstVisitCoach
+            hasPet={pets.length > 0}
+            hasZip={Boolean(careZip)}
+            profileHref={routes.serviceLocation}
+            petsHref={routes.pets}
+            findCareHref={routes.findGuru}
           />
+        </Suspense>
+
+        <CustomerStickyCta
+          unpaidBookingId={unpaidBooking?.id || null}
+          setupHref={stickySetup?.href}
+          setupLabel={stickySetup?.label}
+          findCareHref={routes.findGuru}
+        />
+
+        <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 md:py-6 lg:px-8">
+          {isZeroBookingHome ? (
+            <section className="mb-4 overflow-hidden rounded-[2rem] border border-emerald-100 bg-[linear-gradient(135deg,#047857_0%,#059669_45%,#10b981_100%)] p-5 text-white shadow-sm public-dark-section sm:p-7" data-brand-green>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
+                Pet Parent Portal
+              </p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight !text-white sm:text-4xl">
+                Ready to book trusted care?
+              </h2>
+              <p className="mt-2 max-w-2xl text-base font-semibold text-emerald-50">
+                Find a Guru near you, add a pet passport anytime, and finish
+                checkout with debit, credit, or digital wallets.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  href={routes.findGuru}
+                  className="inline-flex min-h-[56px] items-center justify-center rounded-2xl bg-white px-6 text-base font-black text-emerald-800 transition hover:bg-emerald-50"
+                >
+                  Find Care near you
+                </Link>
+                <Link
+                  href={pets.length ? routes.pets : routes.pets}
+                  className="inline-flex min-h-[56px] items-center justify-center rounded-2xl border border-white/30 bg-white/10 px-6 text-base font-black text-white transition hover:bg-white/20"
+                >
+                  {pets.length ? "Manage pets" : "Add a pet"}
+                </Link>
+              </div>
+            </section>
+          ) : (
+            <UniversityExpress
+              variant="banner"
+              progressPercent={universityProgress.progressPercent}
+              petProfileDone={pets.length > 0 && profileCompletion >= 60}
+              guruVibeDone={Boolean(stats.nextBooking) || bookings.length > 0}
+              safeBookingDone={
+                universityProgress.isComplete ||
+                bookings.some((booking) =>
+                  ["confirmed", "completed", "paid", "succeeded"].includes(
+                    String(booking.status || booking.payment_status || "").toLowerCase(),
+                  ),
+                )
+              }
+              petProfileHref={routes.pets}
+              guruVibeHref={routes.findGuru}
+              safeBookingHref={routes.findGuru}
+              academyHref={routes.university}
+            />
+          )}
 
           <UniversalRoleDashboard
             role="parent"
@@ -3791,35 +3879,62 @@ export default function CustomerDashboardPage() {
 
           {authUserId ? (
             <section className="mt-4">
-              <MultiPetProfileCenter
-                parent={{
-                  userId: authUserId,
-                  displayName: customerDisplayName,
-                  email: customerProfile?.email ?? null,
-                  phone: customerProfile?.phone ?? null,
-                  zip: careZip || null,
-                  profileCompletion,
-                }}
-                onPetsChange={(rows) => {
-                  setPets(
-                    rows.map((pet) => ({
-                      id: pet.id,
-                      name: pet.name,
-                      species: pet.species,
-                      breed: pet.breed,
-                      age: pet.age,
-                      size: pet.size,
-                      weight: pet.weight,
-                      temperament: pet.temperament,
-                      medical_notes: pet.medical_notes,
-                      medications: pet.medical_notes,
-                      notes: pet.notes,
-                      photo_url: pet.photo_url,
-                      video_url: pet.video_url,
-                    })),
-                  );
-                }}
-              />
+              {isZeroBookingHome ? (
+                <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">
+                        Pet Passports
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black text-slate-950">
+                        {pets.length
+                          ? `${pets.length} pet${pets.length === 1 ? "" : "s"} ready`
+                          : "Add your pet to book faster"}
+                      </h2>
+                      <p className="mt-1 text-sm font-semibold text-slate-600">
+                        Name is enough to save — full details live on the pets
+                        page.
+                      </p>
+                    </div>
+                    <Link
+                      href={routes.pets}
+                      className="inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 text-base font-black text-white hover:bg-[#09462c]"
+                    >
+                      {pets.length ? "Manage pets" : "Add pet"}
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <MultiPetProfileCenter
+                  parent={{
+                    userId: authUserId,
+                    displayName: customerDisplayName,
+                    email: customerProfile?.email ?? null,
+                    phone: customerProfile?.phone ?? null,
+                    zip: careZip || null,
+                    profileCompletion,
+                  }}
+                  onPetsChange={(rows) => {
+                    setPets(
+                      rows.map((pet) => ({
+                        id: pet.id,
+                        name: pet.name,
+                        species: pet.species,
+                        breed: pet.breed,
+                        age: pet.age,
+                        size: pet.size,
+                        weight: pet.weight,
+                        temperament: pet.temperament,
+                        medical_notes: pet.medical_notes,
+                        medications: pet.medical_notes,
+                        notes: pet.notes,
+                        photo_url: pet.photo_url,
+                        video_url: pet.video_url,
+                      })),
+                    );
+                  }}
+                />
+              )}
             </section>
           ) : null}
 
@@ -4248,29 +4363,6 @@ export default function CustomerDashboardPage() {
             )}
           </section>
         </div>
-
-        <nav className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-5 rounded-[1.5rem] border border-slate-200 bg-white/95 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.2)] backdrop-blur md:hidden">
-          {[
-            { label: "Home", href: routes.dashboard, icon: <PawIcon className="h-5 w-5" /> },
-            { label: "Find", href: routes.findGuru, icon: <Sparkles className="h-5 w-5" /> },
-            { label: "Care", href: routes.bookings, icon: <CalendarDays className="h-5 w-5" /> },
-            { label: "Messages", href: routes.messages, icon: <MessageCircle className="h-5 w-5" /> },
-            { label: "Profile", href: routes.profile, icon: <ShieldCheck className="h-5 w-5" /> },
-          ].map((item, index) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl text-[10px] font-black ${
-                index === 0
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "text-slate-500"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          ))}
-        </nav>
       </main>
     </>
   );
