@@ -22,6 +22,7 @@ import {
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { getPetParentReadiness } from "@/lib/pet-parent-readiness";
+import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 
 type CustomerProfile = {
   id: string;
@@ -89,42 +90,6 @@ function readBoolean(value: unknown) {
   return typeof value === "boolean" ? value : false;
 }
 
-function isOAuthProviderAvatarUrl(value: string) {
-  try {
-    const url = new URL(value);
-    const hostname = url.hostname.toLowerCase();
-
-    return (
-      hostname.includes("googleusercontent.com") ||
-      hostname.includes("ggpht.com") ||
-      hostname.includes("google.com") ||
-      hostname.includes("googleapis.com") ||
-      hostname.includes("facebook.com") ||
-      hostname.includes("fbcdn.net") ||
-      hostname.includes("apple.com")
-    );
-  } catch {
-    return false;
-  }
-}
-
-function normalizePhotoUrl(value: string | null) {
-  if (!value) return null;
-
-  const cleanValue = value.trim();
-
-  if (!cleanValue) return null;
-
-  if (isOAuthProviderAvatarUrl(cleanValue)) return null;
-
-  if (cleanValue.startsWith("http://")) return cleanValue;
-  if (cleanValue.startsWith("https://")) return cleanValue;
-  if (cleanValue.startsWith("/")) return cleanValue;
-  if (cleanValue.startsWith("data:image")) return cleanValue;
-
-  return `/${cleanValue}`;
-}
-
 function readFirstString(row: RawProfileRow | null, keys: string[]) {
   for (const key of keys) {
     const value = readString(row?.[key]);
@@ -179,15 +144,8 @@ function buildCustomerProfile(
     fullName?.split(" ")[0] ||
     null;
 
-  const avatarUrl = normalizePhotoUrl(
-    readFirstString(row, [
-      "profile_photo_url",
-      "photo_url",
-      "image_url",
-      "avatar_url",
-      "picture",
-    ]),
-  );
+  const avatarUrl =
+    resolvePetParentAvatarUrl(row, metadata) || null;
 
   return {
     id: user.id,
@@ -747,13 +705,13 @@ export default function CustomerProfileSetupPage() {
             <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm">
               <div className="grid gap-6 lg:grid-cols-[1.05fr_1.35fr] lg:items-center">
                 <div className="flex items-center gap-5">
-                  <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-emerald-100 bg-emerald-50 text-3xl font-black text-emerald-700">
+                  <div className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-emerald-100 bg-white text-3xl font-black text-emerald-700">
                     {showAvatarImage ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={avatarSrc}
                         alt={`${displayName} profile`}
-                        className="h-full w-full object-cover"
+                        className="absolute inset-0 h-full w-full object-cover object-center"
                         onError={() => setAvatarImageFailed(true)}
                       />
                     ) : (

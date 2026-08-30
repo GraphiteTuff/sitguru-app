@@ -35,6 +35,11 @@ import {
 } from "@/lib/programs/veterans-military-families";
 import { supabase } from "@/lib/supabase";
 import { getPetParentSetupStatus } from "@/lib/pet-parent-readiness";
+import {
+  normalizePetParentAvatarUrl,
+  petParentAvatarWritePayload,
+  resolvePetParentAvatarUrl,
+} from "@/lib/pet-parent-avatar";
 
 type PhotoColumn = "avatar_url" | "profile_photo_url" | "photo_url" | "image_url";
 
@@ -117,8 +122,6 @@ const initialForm: BasicInfoForm = {
   avatar_url: "",
 };
 
-const fallbackAvatar = "/images/customer-profile-photo.jpg";
-
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -137,17 +140,7 @@ function readMetadataString(
 }
 
 function normalizePhotoUrl(value: string | null) {
-  if (!value) return null;
-
-  const cleanValue = value.trim();
-
-  if (!cleanValue) return null;
-  if (cleanValue.startsWith("http://")) return cleanValue;
-  if (cleanValue.startsWith("https://")) return cleanValue;
-  if (cleanValue.startsWith("/")) return cleanValue;
-  if (cleanValue.startsWith("data:image")) return cleanValue;
-
-  return `/${cleanValue}`;
+  return normalizePetParentAvatarUrl(value) || null;
 }
 
 function formatPhoneWithDashes(value: string) {
@@ -172,43 +165,29 @@ function isValidPhoto(file: File) {
 }
 
 function getExistingPhoto(row: RawProfileRow | null) {
-  const avatarUrl = normalizePhotoUrl(readString(row?.avatar_url));
-  const profilePhotoUrl = normalizePhotoUrl(readString(row?.profile_photo_url));
-  const photoUrl = normalizePhotoUrl(readString(row?.photo_url));
-  const imageUrl = normalizePhotoUrl(readString(row?.image_url));
-
-  if (avatarUrl) {
+  const url = resolvePetParentAvatarUrl(row) || null;
+  if (!url) {
     return {
-      url: avatarUrl,
-      column: "avatar_url" as const,
+      url: null,
+      column: null as PhotoColumn | null,
     };
   }
 
-  if (profilePhotoUrl) {
-    return {
-      url: profilePhotoUrl,
-      column: "profile_photo_url" as const,
-    };
+  // Prefer writing back to profile_photo_url so Header + portal stay aligned.
+  if (normalizePhotoUrl(readString(row?.profile_photo_url)) === url) {
+    return { url, column: "profile_photo_url" as const };
+  }
+  if (normalizePhotoUrl(readString(row?.photo_url)) === url) {
+    return { url, column: "photo_url" as const };
+  }
+  if (normalizePhotoUrl(readString(row?.image_url)) === url) {
+    return { url, column: "image_url" as const };
+  }
+  if (normalizePhotoUrl(readString(row?.avatar_url)) === url) {
+    return { url, column: "avatar_url" as const };
   }
 
-  if (photoUrl) {
-    return {
-      url: photoUrl,
-      column: "photo_url" as const,
-    };
-  }
-
-  if (imageUrl) {
-    return {
-      url: imageUrl,
-      column: "image_url" as const,
-    };
-  }
-
-  return {
-    url: null,
-    column: null,
-  };
+  return { url, column: "profile_photo_url" as const };
 }
 
 function getCustomerInitials(profile: BasicInfoProfile | null) {
@@ -237,16 +216,8 @@ function buildBasicInfoProfile(
   const metadata = user.user_metadata ?? null;
   const existingPhoto = getExistingPhoto(row);
 
-  const metadataPhoto = normalizePhotoUrl(
-    readMetadataString(metadata, [
-      "avatar_url",
-      "profile_photo_url",
-      "photo_url",
-      "image_url",
-      "picture",
-      "avatar",
-    ]),
-  );
+  const metadataPhoto =
+    resolvePetParentAvatarUrl(null, metadata) || null;
 
   const fullName =
     readString(row?.full_name) ||
@@ -435,11 +406,11 @@ async function saveBasicInfo(
   ];
 
   const photoColumnOrder = [
-    profile.photo_column,
-    "avatar_url",
     "profile_photo_url",
     "photo_url",
+    "avatar_url",
     "image_url",
+    profile.photo_column,
   ].filter((column, index, columns): column is PhotoColumn => {
     return Boolean(column) && columns.indexOf(column) === index;
   });
@@ -448,6 +419,17 @@ async function saveBasicInfo(
 
   for (const basePayload of basePayloadAttempts) {
     if (photoUrl) {
+      const syncedPhotoPayload = {
+        ...basePayload,
+        ...petParentAvatarWritePayload(photoUrl),
+      };
+      const syncedError = await updateProfileWithPayload(
+        profile.source,
+        syncedPhotoPayload,
+      );
+      if (!syncedError) return;
+      lastErrorMessage = syncedError.message;
+
       for (const photoColumn of photoColumnOrder) {
         const payload = {
           ...basePayload,
@@ -610,7 +592,7 @@ export default function CustomerBasicInfoPage() {
     ? "border-emerald-200 bg-emerald-50 text-emerald-800"
     : "border-red-200 bg-red-50 text-red-700";
 
-  const avatarSrc = normalizePhotoUrl(form.avatar_url) || fallbackAvatar;
+  const avatarSrc = normalizePhotoUrl(form.avatar_url);
   const showImage = Boolean(avatarSrc && !photoFailed);
 
   const loadPage = useCallback(async () => {
@@ -875,13 +857,13 @@ export default function CustomerBasicInfoPage() {
             <div className="mt-6 grid gap-6 lg:grid-cols-[0.78fr_1.22fr]">
               <div className="rounded-[2rem] border border-emerald-100 bg-emerald-50 p-6">
                 <div className="rounded-[1.7rem] border border-emerald-100 bg-white p-5 text-center shadow-sm">
-                  <div className="mx-auto flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border-4 border-emerald-100 bg-emerald-50 text-4xl font-black text-emerald-700">
-                    {showImage ? (
+                  <div className="relative mx-auto flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border-4 border-emerald-100 bg-white text-4xl font-black text-emerald-700">
+                    {showImage && avatarSrc ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={avatarSrc}
                         alt="Pet Parent profile"
-                        className="h-full w-full object-cover"
+                        className="absolute inset-0 h-full w-full object-cover object-center"
                         onError={() => setPhotoFailed(true)}
                       />
                     ) : (

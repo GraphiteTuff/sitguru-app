@@ -179,14 +179,13 @@ export default function UniversalRoleDashboard({
         {/* LEFT — profile meta */}
         <div className="bg-[radial-gradient(circle_at_95%_10%,rgba(16,185,129,0.18),transparent_28%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_100%)] p-5 sm:p-6">
           <div className="flex min-w-0 flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left">
-            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-white bg-emerald-100 text-xl font-black text-emerald-900 shadow-sm ring-1 ring-emerald-200">
+            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-white bg-white text-xl font-black text-emerald-900 shadow-sm ring-1 ring-emerald-200">
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={avatarUrl}
                   alt=""
-                  className="sg-face-photo h-full w-full"
-                  style={{ backgroundColor: "#fff" }}
+                  className="sg-face-photo absolute inset-0 h-full w-full object-cover object-center"
                 />
               ) : (
                 avatarFallback || initialsFromName(userName)

@@ -56,6 +56,10 @@ import {
 } from "@/lib/rewards/perks-broker";
 import { buildPetParentBookUrl } from "@/lib/booking/pet-parent-booking";
 import { getPetParentReadiness } from "@/lib/pet-parent-readiness";
+import {
+  petParentAvatarWritePayload,
+  resolvePetParentAvatarUrl,
+} from "@/lib/pet-parent-avatar";
 
 type CustomerProfile = {
   first_name: string | null;
@@ -427,7 +431,6 @@ const routes = {
   login: "/login",
 };
 
-const CUSTOMER_PROFILE_PHOTO_SRC = "/images/customer-profile-photo.jpg";
 const PAWPERKS_PREVIEW_DOG_SRC =
   "https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=900&q=80";
 const PAWPERKS_PREVIEW_CAT_SRC =
@@ -1399,19 +1402,7 @@ function buildCustomerProfile(
         "notes",
       ]) ||
       null,
-    avatar_url:
-      readString(row?.avatar_url) ||
-      readString(row?.profile_photo_url) ||
-      readString(row?.photo_url) ||
-      readString(row?.image_url) ||
-      readMetadataString(metadata, [
-        "avatar_url",
-        "profile_photo_url",
-        "photo_url",
-        "picture",
-        "avatar",
-      ]) ||
-      null,
+    avatar_url: resolvePetParentAvatarUrl(row, metadata) || null,
   };
 }
 
@@ -1780,10 +1771,13 @@ async function uploadCustomerProfilePhoto(userId: string, file: File) {
 }
 
 async function saveCustomerProfilePhotoUrl(userId: string, avatarUrl: string) {
+  const photoFields = petParentAvatarWritePayload(avatarUrl);
   const saveAttempts = [
-    { id: userId, role: "customer", avatar_url: avatarUrl },
+    { id: userId, role: "customer", ...photoFields },
+    { id: userId, role: "customer", avatar_url: avatarUrl, profile_photo_url: avatarUrl, photo_url: avatarUrl },
+    { id: userId, role: "customer", avatar_url: avatarUrl, profile_photo_url: avatarUrl },
     { id: userId, role: "customer", profile_photo_url: avatarUrl },
-    { id: userId, role: "customer", photo_url: avatarUrl },
+    { id: userId, role: "customer", avatar_url: avatarUrl },
   ];
 
   let lastError =
@@ -2786,8 +2780,7 @@ export default function CustomerDashboardPage() {
   const [universityProgress, setUniversityProgress] =
     useState<UniversityProgress>(defaultUniversityProgress);
 
-  const customerAvatarSrc =
-    customerProfile?.avatar_url?.trim() || CUSTOMER_PROFILE_PHOTO_SRC;
+  const customerAvatarSrc = customerProfile?.avatar_url?.trim() || "";
 
   const showCustomerProfilePhoto =
     Boolean(customerAvatarSrc) && !customerPhotoFailed;
@@ -4218,14 +4211,14 @@ export default function CustomerDashboardPage() {
                       : "Name, care ZIP, and one pet are enough to book. Extra details help your Guru."}
                   </p>
                 </div>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.3rem] bg-emerald-50 text-lg font-black text-emerald-700 ring-1 ring-emerald-100">
+                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.3rem] bg-white text-lg font-black text-emerald-700 ring-1 ring-emerald-100">
                   {showCustomerProfilePhoto ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={customerAvatarSrc}
                       alt={`${customerDisplayName} profile photo`}
                       onError={() => setCustomerPhotoFailed(true)}
-                      className="h-full w-full object-cover"
+                      className="absolute inset-0 h-full w-full object-cover object-center"
                     />
                   ) : (
                     customerInitials

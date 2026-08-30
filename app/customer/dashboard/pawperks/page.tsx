@@ -22,6 +22,7 @@ import {
   bumpSharedLinkCounter,
   readStoredPetPerksRef,
 } from "@/lib/rewards/perks-broker";
+import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 
 type CustomerProfile = {
   full_name: string | null;
@@ -130,11 +131,7 @@ async function fetchCustomerProfile(userId: string, email: string | null) {
     full_name: readString(row?.full_name),
     first_name: readString(row?.first_name),
     email,
-    avatar_url:
-      readString(row?.avatar_url) ||
-      readString(row?.profile_photo_url) ||
-      readString(row?.photo_url) ||
-      null,
+    avatar_url: resolvePetParentAvatarUrl(row) || null,
   };
 }
 

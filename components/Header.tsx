@@ -28,6 +28,10 @@ import {
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
+import {
+  normalizePetParentAvatarUrl,
+  resolvePetParentAvatarUrl,
+} from "@/lib/pet-parent-avatar";
 
 type HeaderMode = "public" | "customer" | "guru" | "ambassador" | "admin";
 
@@ -290,40 +294,12 @@ function getProfileName(profile: ProfileRow | null, email?: string | null) {
   );
 }
 
-function isOAuthProviderAvatarUrl(value: string) {
-  try {
-    const url = new URL(value);
-    const hostname = url.hostname.toLowerCase();
-    return (
-      hostname.includes("googleusercontent.com") ||
-      hostname.includes("ggpht.com") ||
-      hostname.includes("google.com") ||
-      hostname.includes("googleapis.com") ||
-      hostname.includes("facebook.com") ||
-      hostname.includes("fbcdn.net") ||
-      hostname.includes("apple.com")
-    );
-  } catch {
-    return false;
-  }
-}
-
 function normalizeAvatarUrl(value?: string | null) {
-  if (!value) return "";
-  const cleanValue = value.trim();
-  if (!cleanValue) return "";
-  if (isOAuthProviderAvatarUrl(cleanValue)) return "";
-  return cleanValue;
+  return normalizePetParentAvatarUrl(value);
 }
 
 function getProfileAvatar(profile: ProfileRow | null) {
-  return (
-    normalizeAvatarUrl(profile?.profile_photo_url) ||
-    normalizeAvatarUrl(profile?.photo_url) ||
-    normalizeAvatarUrl(profile?.image_url) ||
-    normalizeAvatarUrl(profile?.avatar_url) ||
-    ""
-  );
+  return resolvePetParentAvatarUrl(profile);
 }
 
 function getInitials(name?: string | null, email?: string | null) {

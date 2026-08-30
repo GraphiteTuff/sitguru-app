@@ -20,6 +20,7 @@ import {
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -189,19 +190,8 @@ function getInitials(displayName: string) {
 }
 
 function getAvatarUrl(profile: AnyRow | null, authUser: AnyRow | null) {
-  const metadata = getAuthMetadata(authUser);
-
   return (
-    asString(profile?.avatar_url) ||
-    asString(profile?.profile_photo_url) ||
-    asString(profile?.photo_url) ||
-    asString(profile?.image_url) ||
-    asString(profile?.profile_image_url) ||
-    asString(metadata?.avatar_url) ||
-    asString(metadata?.profile_photo_url) ||
-    asString(metadata?.photo_url) ||
-    asString(metadata?.picture) ||
-    asString(metadata?.image_url)
+    resolvePetParentAvatarUrl(profile, getAuthMetadata(authUser)) || null
   );
 }
 
