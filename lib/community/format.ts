@@ -54,6 +54,37 @@ export function formatEventDateRange(
   };
 }
 
+/** Local calendar YYYY-MM-DD for date inputs / day comparisons. */
+export function toLocalDateInputValue(value: string | Date | null | undefined) {
+  const date = value instanceof Date ? value : value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Match an event when its start day falls within optional From/To (inclusive).
+ * Empty bounds are ignored.
+ */
+export function eventMatchesDateRange(
+  event: Pick<CommunityEventRow, "start_at" | "end_at">,
+  dateFrom?: string | null,
+  dateTo?: string | null,
+) {
+  const from = String(dateFrom || "").trim();
+  const to = String(dateTo || "").trim();
+  if (!from && !to) return true;
+
+  const startDay = toLocalDateInputValue(event.start_at);
+  if (!startDay) return false;
+
+  if (from && startDay < from) return false;
+  if (to && startDay > to) return false;
+  return true;
+}
+
 export function formatEventLocation(event: Pick<
   CommunityEventRow,
   "venue_name" | "city" | "state" | "address_line_1"

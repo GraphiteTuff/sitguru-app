@@ -13,6 +13,7 @@ import ProviderMap from "@/components/ProviderMap";
 import EventAttendingButtons from "@/components/community/EventAttendingButtons";
 import {
   eventMatchesCounty,
+  eventMatchesDateRange,
   formatEventCountyState,
   formatEventDateRange,
   getEventCardImage,
@@ -39,6 +40,18 @@ type Filters = {
   city: string;
   state: string;
   category: string;
+  dateFrom: string;
+  dateTo: string;
+};
+
+const EMPTY_FILTERS: Filters = {
+  q: "",
+  county: "",
+  city: "",
+  state: "",
+  category: "",
+  dateFrom: "",
+  dateTo: "",
 };
 
 const DEFAULT_CENTER: [number, number] = [40.3368, -75.1113];
@@ -271,25 +284,18 @@ export default function CommunityEventsMapSearch({
 }: {
   events: CommunityEventWithPartner[];
 }) {
-  const [filters, setFilters] = useState<Filters>({
-    q: "",
-    county: "",
-    city: "",
-    state: "",
-    category: "",
-  });
-  const [draft, setDraft] = useState<Filters>(filters);
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   useEffect(() => {
     const preference = readCommunityLocationPreference();
     if (!preference.county && !preference.city && !preference.state) return;
     const next = {
-      q: "",
+      ...EMPTY_FILTERS,
       county: preference.county || "",
       city: preference.city || "",
       state: preference.state || "",
-      category: "",
     };
     setDraft(next);
     setFilters(next);
@@ -321,6 +327,9 @@ export default function CommunityEventsMapSearch({
             .includes(filters.state.toLowerCase())
         )
       ) {
+        return false;
+      }
+      if (!eventMatchesDateRange(event, filters.dateFrom, filters.dateTo)) {
         return false;
       }
       if (filters.q) {
@@ -382,24 +391,72 @@ export default function CommunityEventsMapSearch({
     filters.city,
     filters.state,
     filters.category,
+    filters.dateFrom,
+    filters.dateTo,
   ].filter(Boolean).length;
 
   function applySearch(next: Filters = draft) {
-    setFilters(next);
-    if (next.county || next.city || next.state) {
+    const normalized = { ...next };
+    if (
+      normalized.dateFrom &&
+      normalized.dateTo &&
+      normalized.dateFrom > normalized.dateTo
+    ) {
+      // Swap if user picked an inverted range.
+      const swap = normalized.dateFrom;
+      normalized.dateFrom = normalized.dateTo;
+      normalized.dateTo = swap;
+      setDraft(normalized);
+    }
+    setFilters(normalized);
+    if (normalized.county || normalized.city || normalized.state) {
       saveCommunityLocationPreference({
-        county: next.county,
-        city: next.city,
-        state: next.state,
+        county: normalized.county,
+        city: normalized.city,
+        state: normalized.state,
         source: "manual",
       });
     }
   }
 
   function clearFilters() {
-    const cleared = { q: "", county: "", city: "", state: "", category: "" };
-    setDraft(cleared);
-    applySearch(cleared);
+    setDraft(EMPTY_FILTERS);
+    applySearch(EMPTY_FILTERS);
+  }
+
+  function applyDatePreset(preset: "today" | "weekend" | "week") {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    let from = today;
+    let to = today;
+
+    if (preset === "weekend") {
+      const day = today.getDay(); // 0 Sun … 6 Sat
+      const daysUntilSaturday = (6 - day + 7) % 7;
+      from = new Date(today);
+      from.setDate(today.getDate() + daysUntilSaturday);
+      to = new Date(from);
+      to.setDate(from.getDate() + 1);
+    } else if (preset === "week") {
+      to = new Date(today);
+      to.setDate(today.getDate() + 6);
+    }
+
+    const ymd = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+
+    const next = {
+      ...draft,
+      dateFrom: ymd(from),
+      dateTo: ymd(to),
+    };
+    setDraft(next);
+    applySearch(next);
   }
 
   return (
@@ -419,126 +476,187 @@ export default function CommunityEventsMapSearch({
 
         <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:rounded-[28px] sm:p-6">
           <form
-            className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-[1fr_1.05fr_0.9fr_0.55fr_1.15fr_auto]"
+            className="space-y-3"
             onSubmit={(e) => {
               e.preventDefault();
               applySearch(draft);
             }}
           >
-            <label className="block min-w-0">
-              <span className="mb-2 block text-sm font-semibold text-slate-800">
-                Category
-              </span>
-              <select
-                value={draft.category}
-                onChange={(e) =>
-                  setDraft((current) => ({
-                    ...current,
-                    category: e.target.value,
-                  }))
-                }
-                className="min-h-12 w-full appearance-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
-              >
-                <option value="">All categories</option>
-                {COMMUNITY_EVENT_CATEGORIES.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block min-w-0">
-              <span className="mb-2 block text-sm font-semibold text-slate-800">
-                County
-              </span>
-              <CommunityCountySuggestInput
-                value={draft.county}
-                stateValue={draft.state}
-                placeholder="Search any U.S. county"
-                onChange={(county) =>
-                  setDraft((current) => ({
-                    ...current,
-                    county,
-                  }))
-                }
-                onSelect={(hit) => {
-                  const next = {
-                    ...draft,
-                    county: hit.county_name,
-                    state: hit.state,
-                    city: hit.city || draft.city,
-                  };
-                  setDraft(next);
-                }}
-              />
-            </label>
-
-            <label className="block min-w-0">
-              <span className="mb-2 block text-sm font-semibold text-slate-800">
-                City
-              </span>
-              <input
-                value={draft.city}
-                onChange={(e) =>
-                  setDraft((current) => ({ ...current, city: e.target.value }))
-                }
-                placeholder="Quakertown"
-                className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
-              />
-            </label>
-
-            <label className="block min-w-0">
-              <span className="mb-2 block text-sm font-semibold text-slate-800">
-                State
-              </span>
-              <input
-                value={draft.state}
-                onChange={(e) =>
-                  setDraft((current) => ({
-                    ...current,
-                    state: e.target.value.toUpperCase().slice(0, 2),
-                  }))
-                }
-                placeholder="PA"
-                maxLength={2}
-                className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base uppercase text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
-              />
-            </label>
-
-            <label className="block min-w-0">
-              <span className="mb-2 block text-sm font-semibold text-slate-800">
-                Search events
-              </span>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={draft.q}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
+              <label className="block min-w-0">
+                <span className="mb-2 block text-sm font-semibold text-slate-800">
+                  Category
+                </span>
+                <select
+                  value={draft.category}
                   onChange={(e) =>
-                    setDraft((current) => ({ ...current, q: e.target.value }))
+                    setDraft((current) => ({
+                      ...current,
+                      category: e.target.value,
+                    }))
                   }
-                  placeholder="Adoption, meetup, festival…"
-                  className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
-                />
-              </div>
-            </label>
+                  className="min-h-12 w-full appearance-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+                >
+                  <option value="">All categories</option>
+                  {COMMUNITY_EVENT_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <div className="flex items-end gap-2 sm:col-span-2 xl:col-span-1">
-              <button
-                type="submit"
-                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white transition hover:bg-emerald-800"
-              >
-                Search
-              </button>
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
-              >
-                Clear
-              </button>
+              <label className="block min-w-0">
+                <span className="mb-2 block text-sm font-semibold text-slate-800">
+                  County
+                </span>
+                <CommunityCountySuggestInput
+                  value={draft.county}
+                  stateValue={draft.state}
+                  placeholder="Search any U.S. county"
+                  onChange={(county) =>
+                    setDraft((current) => ({
+                      ...current,
+                      county,
+                    }))
+                  }
+                  onSelect={(hit) => {
+                    const next = {
+                      ...draft,
+                      county: hit.county_name,
+                      state: hit.state,
+                      city: hit.city || draft.city,
+                    };
+                    setDraft(next);
+                  }}
+                />
+              </label>
+
+              <label className="block min-w-0">
+                <span className="mb-2 block text-sm font-semibold text-slate-800">
+                  City
+                </span>
+                <input
+                  value={draft.city}
+                  onChange={(e) =>
+                    setDraft((current) => ({ ...current, city: e.target.value }))
+                  }
+                  placeholder="Quakertown"
+                  className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+                />
+              </label>
+
+              <label className="block min-w-0">
+                <span className="mb-2 block text-sm font-semibold text-slate-800">
+                  State
+                </span>
+                <input
+                  value={draft.state}
+                  onChange={(e) =>
+                    setDraft((current) => ({
+                      ...current,
+                      state: e.target.value.toUpperCase().slice(0, 2),
+                    }))
+                  }
+                  placeholder="PA"
+                  maxLength={2}
+                  className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base uppercase text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+                />
+              </label>
+
+              <label className="block min-w-0">
+                <span className="mb-2 block text-sm font-semibold text-slate-800">
+                  From date
+                </span>
+                <input
+                  type="date"
+                  value={draft.dateFrom}
+                  onChange={(e) =>
+                    setDraft((current) => ({
+                      ...current,
+                      dateFrom: e.target.value,
+                    }))
+                  }
+                  className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+                />
+              </label>
+
+              <label className="block min-w-0">
+                <span className="mb-2 block text-sm font-semibold text-slate-800">
+                  To date
+                </span>
+                <input
+                  type="date"
+                  value={draft.dateTo}
+                  min={draft.dateFrom || undefined}
+                  onChange={(e) =>
+                    setDraft((current) => ({
+                      ...current,
+                      dateTo: e.target.value,
+                    }))
+                  }
+                  className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+                />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+              <label className="block min-w-0">
+                <span className="mb-2 block text-sm font-semibold text-slate-800">
+                  Search events
+                </span>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={draft.q}
+                    onChange={(e) =>
+                      setDraft((current) => ({ ...current, q: e.target.value }))
+                    }
+                    placeholder="Adoption, meetup, festival…"
+                    className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
+                  />
+                </div>
+              </label>
+
+              <div className="flex items-end gap-2">
+                <button
+                  type="submit"
+                  className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white transition hover:bg-emerald-800 sm:flex-none sm:px-6"
+                >
+                  Search
+                </button>
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
           </form>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+              Dates
+            </span>
+            {(
+              [
+                ["today", "Today"],
+                ["weekend", "This weekend"],
+                ["week", "Next 7 days"],
+              ] as const
+            ).map(([preset, label]) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => applyDatePreset(preset)}
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
@@ -584,6 +702,24 @@ export default function CommunityEventsMapSearch({
               {activeFilterCount} active filter
               {activeFilterCount === 1 ? "" : "s"}
             </span>
+            {(filters.dateFrom || filters.dateTo) && (
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-800">
+                {[
+                  filters.dateFrom
+                    ? new Date(`${filters.dateFrom}T12:00:00`).toLocaleDateString(
+                        "en-US",
+                        { month: "short", day: "numeric" },
+                      )
+                    : "Any",
+                  filters.dateTo
+                    ? new Date(`${filters.dateTo}T12:00:00`).toLocaleDateString(
+                        "en-US",
+                        { month: "short", day: "numeric" },
+                      )
+                    : "Any",
+                ].join(" – ")}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -639,7 +775,7 @@ export default function CommunityEventsMapSearch({
                   No events match just yet
                 </h3>
                 <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
-                  Try another county, city, or category. Partner Events and local
+                  Try another county, city, category, or date range. Partner Events and local
                   community listings show here when markets are syncing.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
