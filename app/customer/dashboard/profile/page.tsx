@@ -920,10 +920,41 @@ export default function CustomerProfileSetupPage() {
             </section>
 
             <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {setupSteps.map((step) => (
+              {(isBookingReady ? requiredSteps : setupSteps).map((step) => (
                 <SetupCard key={step.number} step={step} />
               ))}
             </section>
+
+            {isBookingReady ? (
+              <section className="mt-6">
+                <details className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm open:pb-6">
+                  <summary className="cursor-pointer list-none text-left [&::-webkit-details-marker]:hidden">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+                          Optional polish
+                        </p>
+                        <h3 className="mt-1 text-2xl font-black text-slate-950">
+                          Care notes, emergency contact & notifications
+                        </h3>
+                        <p className="mt-1 text-sm font-semibold text-slate-600">
+                          Recommended — not required to book.{" "}
+                          {completedRecommended}/3 complete.
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-800">
+                        Show extras
+                      </span>
+                    </div>
+                  </summary>
+                  <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {recommendedSteps.map((step) => (
+                      <SetupCard key={step.number} step={step} />
+                    ))}
+                  </div>
+                </details>
+              </section>
+            ) : null}
 
             <section className="mt-8 rounded-[2rem] border border-emerald-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_52%,#f0fdf4_100%)] p-5 shadow-sm md:p-6">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

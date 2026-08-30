@@ -249,7 +249,7 @@ export default function GlobalMessageNotifier() {
   if (!visibleAlert) return null;
 
   return (
-    <div className="fixed bottom-4 left-3 right-3 z-[9999] mx-auto max-w-md sm:bottom-5 sm:left-auto sm:right-5">
+    <div className="fixed bottom-[5.75rem] left-3 right-3 z-[9999] mx-auto max-w-md sm:bottom-5 sm:left-auto sm:right-5 md:bottom-5">
       <div className="overflow-hidden rounded-[26px] border border-emerald-200 bg-white shadow-2xl shadow-emerald-950/20">
         <div className="flex items-start gap-3 bg-emerald-50 px-4 py-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-white shadow-sm">

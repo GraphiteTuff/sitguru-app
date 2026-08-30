@@ -319,7 +319,7 @@ function buildAuthCallbackUrl({
 function getRedirectPath(intent: AccountIntent) {
   if (intent === "guru" || intent === "both") return "/guru/dashboard/profile";
   if (intent === "ambassador") return "/ambassador/dashboard";
-  return "/customer/dashboard";
+  return "/customer/dashboard?coach=1";
 }
 
 function getSafeSignupNextPath(nextValue: string | null, intent: AccountIntent) {

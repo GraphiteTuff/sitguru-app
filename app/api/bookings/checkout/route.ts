@@ -161,7 +161,11 @@ function resolveCheckoutRail(body: RequestBody): CheckoutRail | null {
     requestedMethod === "googlepay" ||
     requestedMethod === "link" ||
     requestedMethod === "cash_app" ||
-    requestedMethod === "cash_app_pay"
+    requestedMethod === "cash_app_pay" ||
+    requestedMethod === "bank_account" ||
+    requestedMethod === "us_bank_account" ||
+    requestedMethod === "ach" ||
+    requestedMethod === "saved_method"
   ) {
     return {
       processor: "stripe",
@@ -279,17 +283,23 @@ export async function POST(req: NextRequest) {
               processor: "stripe",
               methods: [
                 "card",
+                "debit_card",
+                "credit_card",
                 "apple_pay",
                 "google_pay",
                 "link",
                 "cash_app",
+                "us_bank_account",
               ],
               enabled: true,
             },
             {
               processor: "paypal",
               methods: ["paypal", "venmo"],
-              enabled: false,
+              enabled: Boolean(
+                process.env.PAYPAL_MARKETPLACE_ENABLED?.trim().toLowerCase() ===
+                  "true",
+              ),
             },
           ],
         },

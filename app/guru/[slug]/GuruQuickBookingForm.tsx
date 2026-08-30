@@ -241,22 +241,51 @@ export default function GuruQuickBookingForm({
 
       setIsLoggedIn(true);
 
-      /*
-        Keep this query aligned with the current pets table.
-        The Pet Passport page currently saves:
-        id, owner_id, name, breed, age, photo_url, notes.
-      */
-      const { data, error } = await supabase
-        .from("pets")
-        .select("id,name,breed,age,photo_url,notes")
-        .eq("owner_id", user.id)
-        .order("created_at", { ascending: false });
+      const [{ data, error }, { data: profileData }] = await Promise.all([
+        supabase
+          .from("pets")
+          .select("id,name,breed,age,photo_url,notes")
+          .eq("owner_id", user.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("profiles")
+          .select("service_zip,zip_code,service_city,service_state,city,state")
+          .eq("id", user.id)
+          .maybeSingle(),
+      ]);
 
       if (!mounted) return;
 
       if (!error) {
         setPets((data || []) as PetProfile[]);
       }
+
+      const zip = String(
+        (profileData as { service_zip?: string; zip_code?: string } | null)
+          ?.service_zip ||
+          (profileData as { service_zip?: string; zip_code?: string } | null)
+            ?.zip_code ||
+          "",
+      ).replace(/\D/g, "");
+      if (zip.length >= 5) {
+        setCareZipCode((current) => current || zip.slice(0, 5));
+      }
+      const city = String(
+        (profileData as { service_city?: string; city?: string } | null)
+          ?.service_city ||
+          (profileData as { service_city?: string; city?: string } | null)
+            ?.city ||
+          "",
+      );
+      const state = String(
+        (profileData as { service_state?: string; state?: string } | null)
+          ?.service_state ||
+          (profileData as { service_state?: string; state?: string } | null)
+            ?.state ||
+          "",
+      );
+      if (city) setCareCity((current) => current || city);
+      if (state) setCareState((current) => current || state);
 
       setLoadingPets(false);
     }
@@ -283,10 +312,22 @@ export default function GuruQuickBookingForm({
   }, [selectedPet]);
 
   function toggleCompliance(key: ComplianceKey) {
-    setCompliance((current) => ({
-      ...current,
-      [key]: !current[key],
-    }));
+    setCompliance((current) => {
+      const nextValue = !current[key];
+      // One agreement checkbox can satisfy the full compliance set.
+      if (key === "terms") {
+        return {
+          details: nextValue,
+          payments: nextValue,
+          payouts: nextValue,
+          terms: nextValue,
+        };
+      }
+      return {
+        ...current,
+        [key]: nextValue,
+      };
+    });
   }
 
   function clearSavedPetSelection() {
@@ -858,61 +899,17 @@ export default function GuruQuickBookingForm({
         </div>
 
         <div className="space-y-3">
-          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 !bg-white p-4">
+          <label className="flex min-h-[72px] items-start gap-3 rounded-2xl border border-slate-200 !bg-white p-4">
             <input
               type="checkbox"
-              checked={compliance.details}
-              onChange={() => toggleCompliance("details")}
-              className="mt-1 h-4 w-4 accent-emerald-600"
-            />
-
-            <span className="!text-slate-700 text-sm font-semibold leading-6">
-              I confirm the booking details, booking type, care date, service
-              type, pet information, ZIP code, city/state, and care notes are
-              accurate to the best of my knowledge.
-            </span>
-          </label>
-
-          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 !bg-white p-4">
-            <input
-              type="checkbox"
-              checked={compliance.payments}
-              onChange={() => toggleCompliance("payments")}
-              className="mt-1 h-4 w-4 accent-emerald-600"
-            />
-
-            <span className="!text-slate-700 text-sm font-semibold leading-6">
-              I understand SitGuru securely processes payment at checkout and
-              that payment handling, refunds, disputes, and chargebacks are
-              managed through SitGuru’s platform policies.
-            </span>
-          </label>
-
-          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 !bg-white p-4">
-            <input
-              type="checkbox"
-              checked={compliance.payouts}
-              onChange={() => toggleCompliance("payouts")}
-              className="mt-1 h-4 w-4 accent-emerald-600"
-            />
-
-            <span className="!text-slate-700 text-sm font-semibold leading-6">
-              I understand Guru payouts are released 48 hours after completed
-              care unless a support case, refund request, chargeback, or safety
-              review is open.
-            </span>
-          </label>
-
-          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 !bg-white p-4">
-            <input
-              type="checkbox"
-              checked={compliance.terms}
+              checked={allComplianceChecked}
               onChange={() => toggleCompliance("terms")}
-              className="mt-1 h-4 w-4 accent-emerald-600"
+              className="mt-1 h-6 w-6 accent-emerald-600"
             />
 
-            <span className="!text-slate-700 text-sm font-semibold leading-6">
-              I agree to SitGuru’s{" "}
+            <span className="!text-slate-700 text-base font-semibold leading-6">
+              I confirm these booking details are accurate and agree to
+              SitGuru’s{" "}
               <a
                 href="/terms"
                 className="font-black !text-emerald-700 underline-offset-4 hover:underline"
@@ -926,8 +923,8 @@ export default function GuruQuickBookingForm({
               >
                 Privacy Policy
               </a>
-              , cancellation/refund policies, and booking agreement
-              acknowledgments.
+              , and cancellation/refund policies. Debit, credit, and digital
+              wallets are completed in secure checkout.
             </span>
           </label>
         </div>
@@ -942,11 +939,11 @@ export default function GuruQuickBookingForm({
           type="button"
           onClick={handleCheckout}
           disabled={!canCheckout}
-          className="inline-flex min-h-[64px] w-full items-center justify-center rounded-2xl !bg-emerald-500 px-6 py-4 text-center text-lg font-black tracking-tight !text-slate-950 shadow-[0_18px_40px_rgba(16,185,129,0.20)] transition hover:!bg-emerald-400 disabled:cursor-not-allowed disabled:!bg-slate-200 disabled:!text-slate-500"
+          className="inline-flex min-h-[64px] w-full items-center justify-center rounded-2xl !bg-[#0D5C3A] px-6 py-4 text-center text-lg font-black tracking-tight !text-white shadow-[0_18px_40px_rgba(13,92,58,0.28)] transition hover:!bg-[#09462c] disabled:cursor-not-allowed disabled:!bg-slate-200 disabled:!text-slate-500"
         >
           {submitting
             ? "Preparing Secure Checkout..."
-            : "I Agree — Continue to Secure Checkout"}
+            : "Continue to Secure Checkout"}
         </button>
 
         <p className="!text-slate-500 text-xs font-medium leading-6">

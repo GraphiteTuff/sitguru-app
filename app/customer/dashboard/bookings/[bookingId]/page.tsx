@@ -16,6 +16,9 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import Header from "@/components/Header";
 import { buildPetParentBookUrl } from "@/lib/booking/pet-parent-booking";
+import FinishPaymentButton, {
+  isUnpaidBookingPayment,
+} from "@/components/customer/FinishPaymentButton";
 
 type PageProps = {
   params: Promise<{
@@ -1138,6 +1141,20 @@ export default async function CustomerBookingDetailsPage({ params }: PageProps) 
                   <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Payment status</p>
                   <p className="mt-2 text-lg font-black text-slate-950">{formatStatus(paymentStatus)}</p>
                 </div>
+
+                {isUnpaidBookingPayment(paymentStatus) ? (
+                  <div className="mt-4">
+                    <FinishPaymentButton
+                      bookingId={bookingId}
+                      label="Finish payment with card or wallet"
+                    />
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                      Debit, credit, Apple Pay, Google Pay, Link, Cash App, and
+                      bank payout options appear in secure Stripe checkout when
+                      available.
+                    </p>
+                  </div>
+                ) : null}
 
                 {!hasUsableAmount(total) ? (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">

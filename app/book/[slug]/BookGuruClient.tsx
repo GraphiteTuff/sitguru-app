@@ -47,6 +47,7 @@ type PaymentOption =
   | "apple_pay"
   | "google_pay"
   | "link"
+  | "cash_app"
   | "paypal"
   | "venmo"
   | "saved_method"
@@ -105,6 +106,12 @@ type CustomerProfile = {
   avatar_url?: string | null;
   profile_photo_url?: string | null;
   photo_url?: string | null;
+  service_zip?: string | null;
+  zip_code?: string | null;
+  service_city?: string | null;
+  service_state?: string | null;
+  city?: string | null;
+  state?: string | null;
 };
 
 type GuruProfileRow = {
@@ -316,83 +323,90 @@ const paymentOptions: {
   status: string;
   enabled?: boolean;
   disabledMessage?: string;
+  featured?: boolean;
 }[] = [
   {
     key: "card",
-    label: "Credit / debit card",
-    helper: "Use a card through SitGuru secure checkout.",
+    label: "Credit or debit card",
+    helper:
+      "Pay securely with Visa, Mastercard, Amex, Discover, and debit cards.",
     icon: "💳",
-    status: "Ready at checkout",
+    status: "Most popular",
+    featured: true,
   },
   {
     key: "apple_pay",
     label: "Apple Pay",
-    helper: "Available when your device and Stripe checkout support it.",
+    helper: "One-tap checkout on iPhone, iPad, and Safari when available.",
     icon: "",
-    status: "Wallet option",
+    status: "Wallet",
   },
   {
     key: "google_pay",
     label: "Google Pay",
-    helper: "Available when your browser and Stripe checkout support it.",
+    helper: "Fast checkout in Chrome and Android wallets when available.",
     icon: "G",
-    status: "Wallet option",
+    status: "Wallet",
   },
   {
     key: "link",
     label: "Link by Stripe",
-    helper: "Use a saved Link account for faster checkout when available.",
+    helper: "Use a saved Link email for faster card checkout.",
     icon: "🔗",
     status: "Fast checkout",
+  },
+  {
+    key: "cash_app",
+    label: "Cash App Pay",
+    helper: "Pay with Cash App through SitGuru secure Stripe checkout.",
+    icon: "$",
+    status: "Available",
+  },
+  {
+    key: "bank_account",
+    label: "Bank account (ACH)",
+    helper:
+      "Pay directly from your bank when Stripe offers ACH on checkout.",
+    icon: "🏦",
+    status: "Available",
+  },
+  {
+    key: "saved_method",
+    label: "Saved payment method",
+    helper: "Returning Pet Parents can reuse saved Stripe payment details.",
+    icon: "✅",
+    status: "Account",
   },
   {
     key: "paypal",
     label: "PayPal",
     helper: paypalMarketplaceEnabled
       ? "Continue through SitGuru secure PayPal marketplace checkout."
-      : "PayPal will be available after SitGuru marketplace approval is activated.",
+      : "PayPal will unlock after SitGuru marketplace approval is activated.",
     icon: "P",
     status: paypalMarketplaceEnabled ? "Available" : "Coming soon",
     enabled: paypalMarketplaceEnabled,
     disabledMessage:
-      "PayPal checkout is not enabled yet. Please choose card or an available digital wallet.",
+      "PayPal checkout is not enabled yet. Please choose card or another available option.",
   },
   {
     key: "venmo",
     label: "Venmo",
     helper: paypalMarketplaceEnabled
       ? "Continue through SitGuru secure Venmo marketplace checkout."
-      : "Venmo will be available after SitGuru marketplace approval is activated.",
+      : "Venmo will unlock after SitGuru marketplace approval is activated.",
     icon: "V",
     status: paypalMarketplaceEnabled ? "Available" : "Coming soon",
     enabled: paypalMarketplaceEnabled,
     disabledMessage:
-      "Venmo checkout is not enabled yet. Please choose card or an available digital wallet.",
-  },
-  {
-    key: "saved_method",
-    label: "Saved payment method",
-    helper: "Returning Pet Parents can use saved payment details when available.",
-    icon: "✅",
-    status: "Account option",
-  },
-  {
-    key: "bank_account",
-    label: "ACH / bank account",
-    helper:
-      "Bank account payments are planned for larger bookings and future support.",
-    icon: "🏦",
-    status: "Coming soon",
-    enabled: false,
-    disabledMessage:
-      "ACH and bank-account checkout are not enabled yet. Please choose card or an available digital wallet.",
+      "Venmo checkout is not enabled yet. Please choose card or another available option.",
   },
   {
     key: "pawperks_credit",
     label: "PawPerks / referral credit",
-    helper: "Credits can be applied before final payment when available on your account.",
+    helper: "Apply account credits before final payment when available.",
     icon: "🐾",
-    status: "Account credit",
+    status: "Credits",
   },
   {
     key: "promo_code",
@@ -1394,10 +1408,8 @@ export default function BookGuruClient({
     "idle" | "loading" | "found" | "not_found"
   >("idle");
 
-  const [detailsAccepted, setDetailsAccepted] = useState(false);
-  const [paymentAccepted, setPaymentAccepted] = useState(false);
-  const [payoutAccepted, setPayoutAccepted] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [bookingAgreementAccepted, setBookingAgreementAccepted] =
+    useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -1801,8 +1813,7 @@ export default function BookGuruClient({
     !isRangeSelectionIncomplete &&
     !isSelectedDateUnavailable;
 
-  const allAcknowledgementsAccepted =
-    detailsAccepted && paymentAccepted && payoutAccepted && termsAccepted;
+  const allAcknowledgementsAccepted = bookingAgreementAccepted;
 
   useEffect(() => {
     if (
@@ -2560,7 +2571,7 @@ export default function BookGuruClient({
 
       if (!allAcknowledgementsAccepted) {
         setSubmitError(
-          "Please check all acknowledgements before continuing to secure checkout.",
+          "Please accept the booking agreement before continuing to secure checkout.",
         );
         return;
       }
@@ -3766,9 +3777,10 @@ export default function BookGuruClient({
                         Payment options
                       </p>
                       <p className="mt-2 max-w-2xl text-sm font-semibold leading-7 text-slate-700">
-                        Pick how you want to pay or apply credits. Final card,
-                        wallet, Link, and saved payment options are completed
-                        inside SitGuru secure checkout.
+                        Debit and credit cards are ready first. Apple Pay,
+                        Google Pay, Link, Cash App, bank account, and credits
+                        are also available — final wallets appear inside
+                        SitGuru secure Stripe checkout.
                       </p>
                     </div>
 
@@ -3787,6 +3799,7 @@ export default function BookGuruClient({
                       const selected = selectedPaymentOption === option.key;
                       const optionEnabled = option.enabled !== false;
                       const comingSoon = !optionEnabled;
+                      const featured = Boolean(option.featured);
 
                       return (
                         <button
@@ -3799,9 +3812,10 @@ export default function BookGuruClient({
                             setSubmitError("");
                           }}
                           className={[
-                            "rounded-2xl border p-4 text-left transition",
+                            "rounded-2xl border p-4 text-left transition md:min-h-[140px]",
+                            featured ? "md:col-span-2 xl:col-span-3" : "",
                             selected
-                              ? "border-emerald-500 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.16)]"
+                              ? "border-emerald-500 bg-emerald-50 shadow-[0_14px_35px_rgba(16,185,129,0.16)] ring-2 ring-emerald-200"
                               : "border-slate-200 bg-slate-50 hover:border-emerald-200 hover:bg-emerald-50/70",
                             !optionEnabled
                               ? "cursor-not-allowed opacity-65 hover:border-slate-200 hover:bg-slate-50"
@@ -3809,12 +3823,19 @@ export default function BookGuruClient({
                           ].join(" ")}
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-xl font-black text-slate-950 shadow-sm">
+                            <span
+                              className={[
+                                "flex shrink-0 items-center justify-center rounded-2xl bg-white font-black text-slate-950 shadow-sm",
+                                featured
+                                  ? "h-14 w-14 text-2xl"
+                                  : "h-12 w-12 text-xl",
+                              ].join(" ")}
+                            >
                               {option.icon}
                             </span>
                             <span
                               className={[
-                                "rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em]",
+                                "rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-[0.1em]",
                                 comingSoon
                                   ? "bg-amber-100 text-amber-800"
                                   : "bg-emerald-100 text-emerald-800",
@@ -3825,13 +3846,19 @@ export default function BookGuruClient({
                           </div>
                           <p
                             className={[
-                              "mt-3 text-base font-black",
+                              "mt-3 font-black",
+                              featured ? "text-xl" : "text-base",
                               selected ? "text-emerald-800" : "text-slate-950",
                             ].join(" ")}
                           >
                             {option.label}
                           </p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                          <p
+                            className={[
+                              "mt-1 font-semibold leading-5 text-slate-600",
+                              featured ? "text-sm" : "text-xs",
+                            ].join(" ")}
+                          >
                             {option.helper}
                           </p>
                         </button>
@@ -3972,46 +3999,37 @@ export default function BookGuruClient({
                   </div>
                 </div>
 
-                <div className="mt-6 space-y-4">
-                  {[
-                    {
-                      checked: detailsAccepted,
-                      setChecked: setDetailsAccepted,
-                      text: "I confirm the pet care details, requested date(s), duration, notes, and pricing are accurate.",
-                    },
-                    {
-                      checked: paymentAccepted,
-                      setChecked: setPaymentAccepted,
-                      text: "I understand SitGuru securely processes payment at checkout. Any PawPerks credit, referral credit, promo code, gift card, or SitGuru credit must stay on-platform and is subject to SitGuru policies.",
-                    },
-                    {
-                      checked: payoutAccepted,
-                      setChecked: setPayoutAccepted,
-                      text: "I understand Guru payouts are released after completed care unless a support case, refund request, chargeback, or safety review is open.",
-                    },
-                    {
-                      checked: termsAccepted,
-                      setChecked: setTermsAccepted,
-                      text: "I agree to SitGuru's Terms, Privacy Policy, cancellation/refund policies, and booking agreement acknowledgements.",
-                    },
-                  ].map((item) => (
-                    <label
-                      key={item.text}
-                      className="flex cursor-pointer gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:bg-emerald-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={item.checked}
-                        onChange={(event) =>
-                          item.setChecked(event.target.checked)
-                        }
-                        className="mt-1 h-5 w-5 rounded border-slate-300 accent-emerald-600"
-                      />
-                      <span className="text-sm font-semibold leading-7 text-slate-800">
-                        {item.text}
-                      </span>
-                    </label>
-                  ))}
+                <div className="mt-6">
+                  <label className="flex min-h-[72px] cursor-pointer gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:bg-emerald-50">
+                    <input
+                      type="checkbox"
+                      checked={bookingAgreementAccepted}
+                      onChange={(event) =>
+                        setBookingAgreementAccepted(event.target.checked)
+                      }
+                      className="mt-1 h-6 w-6 shrink-0 rounded border-slate-300 accent-emerald-600"
+                    />
+                    <span className="text-base font-semibold leading-7 text-slate-800">
+                      I confirm these booking details are accurate and agree to
+                      SitGuru&apos;s{" "}
+                      <Link
+                        href="/terms"
+                        className="font-black text-emerald-700 underline"
+                      >
+                        Terms
+                      </Link>
+                      ,{" "}
+                      <Link
+                        href="/privacy"
+                        className="font-black text-emerald-700 underline"
+                      >
+                        Privacy Policy
+                      </Link>
+                      , and cancellation/refund policies. Payment is processed
+                      securely at checkout; Guru payouts release after completed
+                      care unless a support case is open.
+                    </span>
+                  </label>
                 </div>
 
                 {submitError ? (
@@ -4023,12 +4041,12 @@ export default function BookGuruClient({
                   </div>
                 ) : null}
 
-                <div className="mt-7 flex flex-wrap gap-3">
+                <div className="mt-7 flex flex-wrap gap-3 pb-28 md:pb-0">
                   <button
                     type="button"
                     onClick={handleBack}
                     disabled={submitting}
-                    className="inline-flex min-h-[54px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-4 text-base font-black text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex min-h-[56px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-4 text-base font-black text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Back
                   </button>
@@ -4038,10 +4056,10 @@ export default function BookGuruClient({
                     onClick={handleConfirm}
                     disabled={submitting || !allAcknowledgementsAccepted}
                     className={[
-                      "inline-flex min-h-[54px] items-center justify-center rounded-2xl px-6 py-4 text-base font-black transition disabled:cursor-not-allowed",
+                      "inline-flex min-h-[56px] flex-1 items-center justify-center rounded-2xl px-6 py-4 text-base font-black transition disabled:cursor-not-allowed sm:flex-none sm:min-w-[240px]",
                       submitting || !allAcknowledgementsAccepted
                         ? "bg-slate-200 text-slate-500"
-                        : "bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700",
+                        : "bg-[#0D5C3A] text-white shadow-lg shadow-emerald-600/20 hover:bg-[#09462c]",
                     ].join(" ")}
                   >
                     {submitting ? (
@@ -4454,7 +4472,7 @@ export default function BookGuruClient({
                 (step === 1 && !canContinueStep1) ||
                 (step === 3 && !allAcknowledgementsAccepted)
                   ? "bg-slate-200 text-slate-500"
-                  : "bg-emerald-600 text-white shadow-lg shadow-emerald-600/25 hover:bg-emerald-700",
+                  : "bg-[#0D5C3A] text-white shadow-lg shadow-emerald-600/25 hover:bg-[#09462c]",
               ].join(" ")}
             >
               {submitting ? (
@@ -4495,6 +4513,36 @@ export default function BookGuruClient({
           </aside>
         </div>
       </div>
+
+      {step === 3 ? (
+        <div className="fixed inset-x-0 bottom-0 z-[70] border-t border-emerald-100 bg-white/95 p-3 shadow-[0_-12px_40px_rgba(15,23,42,0.12)] backdrop-blur md:hidden">
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={submitting || !allAcknowledgementsAccepted}
+            className={[
+              "inline-flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl px-5 text-base font-black transition disabled:cursor-not-allowed",
+              submitting || !allAcknowledgementsAccepted
+                ? "bg-slate-200 text-slate-500"
+                : "bg-[#0D5C3A] text-white",
+            ].join(" ")}
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Opening checkout…
+              </>
+            ) : selectedGuruServiceIsCustomQuote ? (
+              "Submit Quote Request"
+            ) : (
+              <>
+                <LockKeyhole className="h-5 w-5" />
+                Secure Checkout
+              </>
+            )}
+          </button>
+        </div>
+      ) : null}
     </main>
   );
 }
