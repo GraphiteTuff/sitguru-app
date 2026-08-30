@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { emailFallback, fallbackInitials } from "@/lib/sitguru/display";
+import MergeDuplicateGuruButton from "@/components/admin/MergeDuplicateGuruButton";
 
 type ApplicationStatus =
   | "new"
@@ -108,6 +109,48 @@ function getCompletion(guru: GuruDisplayRow) {
   if (Number.isFinite(direct)) return Math.max(0, Math.min(100, direct));
   if (guru.bookable) return 100;
   return 10;
+}
+
+function normalizePhoneKey(value: string | undefined) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) return digits.slice(1);
+  return digits;
+}
+
+function toProperPersonName(value: string) {
+  const cleaned = value.trim().replace(/\s+/g, " ");
+  if (!cleaned) return "Angel Costner";
+  return cleaned
+    .split(" ")
+    .map((part) => {
+      if (!part) return part;
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
+function getMergePartner(
+  guru: GuruDisplayRow,
+  all: GuruDisplayRow[],
+): GuruDisplayRow | null {
+  if (!guru.possibleDuplicate) return null;
+  const phoneKey = normalizePhoneKey(guru.phone);
+  if (phoneKey.length < 10) return null;
+
+  const siblings = all.filter((row) => {
+    if (row.id === guru.id) return false;
+    if ((row.userId || row.guruUserId) === (guru.userId || guru.guruUserId)) {
+      return false;
+    }
+    return normalizePhoneKey(row.phone) === phoneKey;
+  });
+
+  if (!siblings.length) return null;
+
+  // Prefer the stronger profile as canonical partner.
+  return [...siblings].sort(
+    (a, b) => getCompletion(b) - getCompletion(a),
+  )[0];
 }
 
 function getCompletionStyles(value: number) {
@@ -405,6 +448,39 @@ export default function GuruRecordsTable({
                         ? "Repair Account"
                         : "Review Guru"}
                     </Link>
+
+                    {(() => {
+                      const partner = getMergePartner(guru, gurus);
+                      if (!partner) return null;
+                      const selfCompletion = getCompletion(guru);
+                      const partnerCompletion = getCompletion(partner);
+                      const keepSelf = selfCompletion >= partnerCompletion;
+                      const canonicalUserId = String(
+                        (keepSelf
+                          ? guru.userId || guru.guruUserId || guru.id
+                          : partner.userId || partner.guruUserId || partner.id) ||
+                          "",
+                      );
+                      const duplicateUserId = String(
+                        (keepSelf
+                          ? partner.userId || partner.guruUserId || partner.id
+                          : guru.userId || guru.guruUserId || guru.id) || "",
+                      );
+                      const displayName = toProperPersonName(
+                        keepSelf ? guru.name : partner.name || guru.name,
+                      );
+                      // Only render the merge CTA on the duplicate (weaker) card
+                      // to avoid two identical merge buttons.
+                      if (keepSelf) return null;
+                      return (
+                        <MergeDuplicateGuruButton
+                          canonicalUserId={canonicalUserId}
+                          duplicateUserId={duplicateUserId}
+                          displayName={displayName}
+                          label={`Merge into ${displayName}`}
+                        />
+                      );
+                    })()}
 
                     {canMessage ? (
                       <Link
