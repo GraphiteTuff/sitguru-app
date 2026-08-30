@@ -103,10 +103,10 @@ export default function CommunityHostPage() {
               interest buttons. Partner Events always show first on Pet Events.
             </p>
             <Link
-              href="/partners/dashboard/community/events"
+              href="/partners/dashboard/community/events?create=1"
               className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black text-white sm:w-auto"
             >
-              Open Event Manager
+              Create Event
             </Link>
           </article>
 
