@@ -548,8 +548,8 @@ export default function HomepageChatBubble() {
   }, [isLoading, open]);
 
   const showIntentChips = useMemo(
-    () => Boolean(clientFirstName) && !awaitingName && !isLoading,
-    [clientFirstName, awaitingName, isLoading],
+    () => !isLoading,
+    [isLoading],
   );
 
   const showMatchingChips = useMemo(() => {
@@ -673,7 +673,7 @@ export default function HomepageChatBubble() {
   }
 
   async function sendChip(content: string) {
-    if (!content.trim() || isLoading || awaitingName) return;
+    if (!content.trim() || isLoading) return;
 
     if (
       content === benefitsChip.prompt ||
@@ -720,6 +720,9 @@ export default function HomepageChatBubble() {
       return;
     }
 
+    // Role / care chips wait until we have a preferred name.
+    if (awaitingName) return;
+
     const inferred = inferRogueUserTypeFromIntent(content);
     if (inferred) setRogueUserType(inferred);
     await append({ role: "user", content }, chatRequestOptions());
@@ -730,6 +733,53 @@ export default function HomepageChatBubble() {
     e.preventDefault();
     const text = input.trim();
     if (!text || isLoading) return;
+
+    if (
+      text === benefitsChip.prompt ||
+      text === COMPANION_BENEFITS_USER_PROMPT.rogue
+    ) {
+      const stamp = Date.now();
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: `rogue-benefits-user-${stamp}`,
+          role: "user",
+          content: benefitsChip.prompt,
+        },
+        {
+          id: `rogue-benefits-assistant-${stamp}`,
+          role: "assistant",
+          content: benefitsChip.response,
+        },
+      ]);
+      setInput("");
+      focusComposer(40);
+      return;
+    }
+
+    const growthAnswer = resolveCompanionGrowthFaqAnswer(
+      ACTIVE_COMPANION,
+      text,
+    );
+    if (growthAnswer) {
+      const stamp = Date.now();
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: `rogue-growth-user-${stamp}`,
+          role: "user",
+          content: text,
+        },
+        {
+          id: `rogue-growth-assistant-${stamp}`,
+          role: "assistant",
+          content: growthAnswer,
+        },
+      ]);
+      setInput("");
+      focusComposer(40);
+      return;
+    }
 
     if (awaitingName || !clientFirstName) {
       // Never treat "Hi Rogue" / greetings / reserved names as their name.
