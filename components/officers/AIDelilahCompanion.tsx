@@ -56,7 +56,7 @@ const HOST_CALLOUTS = [
   "Publish Partner Events that stay first in the feed",
   "Track Yes / Maybe / No attendance on each listing",
   "Share branded SitGuru graphics from every card",
-  "Help pet parents find local pack gathers near them",
+  "Help Pet Parents find local pack gathers near them",
 ] as const;
 
 function isEventsPath(pathname: string | null) {

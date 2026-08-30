@@ -58,7 +58,7 @@ export default function DelilahEventCompanionIntro({
           </h2>
           <p className="mt-4 max-w-3xl text-base font-semibold leading-7 text-slate-600 sm:text-lg sm:leading-8">
             Meet Delilah — SitGuru&apos;s Pet Event Coordinator. She helps Pet
-            Event Planners &amp; Managers, hosts, and pet parents with every
+            Event Planners &amp; Managers, hosts, and Pet Parents with every
             listing on SitGuru: publishing Partner Events, RSVPs, sharing, and
             answering questions about what&apos;s happening near you.
           </p>

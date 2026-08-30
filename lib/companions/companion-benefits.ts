@@ -62,7 +62,7 @@ Here’s what hosts and Pet Event Planners & Managers unlock:
 * 📌 **Partner Event priority** – Your manually published events lead the feed; social discovery listings fill the gaps behind you.
 * 🙋 **Live attendance** – Yes / Maybe / No counts so you know who’s coming before the day of.
 * 📣 **SitGuru share tools** – Branded graphics and share links ready for Instagram, Facebook, TikTok, X, and more.
-* 🗺️ **Local discovery** – Pet parents, Gurus, and Ambassadors find you on the Pet Events map and homepage.
+* 🗺️ **Local discovery** – Pet Parents, Gurus, and Ambassadors find you on the Pet Events map and homepage.
 * 🤝 **Pack conversion** – Guests can join as Pet Parents, Gurus, or Ambassadors right from your listing energy.
 
 Ready to publish? Head to **/events/host** — or tap **Host / manage events** — and let’s fill the yard!`;
