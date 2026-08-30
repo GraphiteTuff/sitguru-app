@@ -65,12 +65,12 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "What are SitGuru pet events?",
     answer:
-      "Yay — SitGuru Pet Events are local pet-friendly gathers: adoption days, meetups, fundraisers, partner activations, and pack socials, all in one happy place! Browse what's near you, tap **Attending?** (Yes / Maybe / No), and meet Gurus, partners, and Pet Parents. [[cta:community_parent]]",
+      "SitGuru Pet Events are local pet-friendly gathers — browse nearby, tap **Attending?** Yes / Maybe / No, and meet the pack. [[cta:community_parent]]",
   },
   {
     question: "What are SitGuru community events?",
     answer:
-      "Yay — SitGuru Pet Events are local pet-friendly gathers: adoption days, meetups, fundraisers, partner activations, and pack socials, all in one happy place! Browse what's near you, tap **Attending?** (Yes / Maybe / No), and meet Gurus, partners, and Pet Parents. [[cta:community_parent]]",
+      "SitGuru Pet Events are local pet-friendly gathers — browse nearby, tap **Attending?** Yes / Maybe / No, and meet the pack. [[cta:community_parent]]",
   },
   {
     question: "What pet events are coming up?",
@@ -410,7 +410,7 @@ export function buildCommunityEventsFaqSnapshot(
     "- Social / follow pack → append [[cta:social]]",
     "- Email / newsletter / subscribe → append [[cta:email]]",
     "",
-    "VOICE: Very happy, outgoing, and cheerful golden Cocker Spaniel energy — punchy, encouraging, never invent listing details outside the LIVE EVENTS digest + FAQ.",
+    "VOICE: Very happy, outgoing, and cheerful golden Cocker Spaniel energy — punchy (1–2 sentences), encouraging, never invent listing details outside the LIVE EVENTS digest + FAQ.",
   ]
     .filter(Boolean)
     .join("\n")

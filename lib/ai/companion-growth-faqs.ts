@@ -1,7 +1,6 @@
 /**
  * Shared growth / conversion FAQs for all Pet AIs (Rogue, Scout, Taco, Delilah).
- * Encourage signup, SitGuru feature awareness, @SitGuruOfficial social follow,
- * and email subscribe — with persona-flavored answers + CTA markers.
+ * Punchy answers only — under ~2 short sentences + CTA markers.
  */
 
 import type { CompanionId } from "@/lib/companions/companion-benefits";
@@ -60,90 +59,57 @@ const WHY_JOIN_ALIASES = [
 
 const SOCIAL_ANSWERS: Record<CompanionId, string> = {
   rogue:
-    "Follow **@SitGuruOfficial** on Facebook, Instagram, TikTok, X, and YouTube for events, pics, pack updates, and community highlights — same handle everywhere. Tap below to follow the pack! [[cta:social]]",
+    "Follow **@SitGuruOfficial** on Facebook, Instagram, TikTok, X, and YouTube — same handle for events, pics, and pack updates. [[cta:social]]",
   scout:
-    "Stay trail-ready: follow **@SitGuruOfficial** on Facebook, Instagram, TikTok, X, and YouTube for Guru tips, events, pics, and pack updates. Same handle on every platform. [[cta:social]]",
+    "Follow **@SitGuruOfficial** on Facebook, Instagram, TikTok, X, and YouTube for Guru tips and pack updates. [[cta:social]]",
   taco:
-    "Main-character energy lives on **@SitGuruOfficial** — Facebook, Instagram, TikTok, X, and YouTube. Same handle for events, pics, drops, and pack hype. Follow the squad! [[cta:social]]",
+    "Follow **@SitGuruOfficial** on Facebook, Instagram, TikTok, X, and YouTube — same handle for drops and pack hype. [[cta:social]]",
   delilah:
-    "Yay — follow **@SitGuruOfficial** on Facebook, Instagram, TikTok, X, and YouTube for event pics, pack gathers, and community highlights! Same handle everywhere. [[cta:social]]",
+    "Follow **@SitGuruOfficial** on Facebook, Instagram, TikTok, X, and YouTube for event pics and pack highlights! [[cta:social]]",
 };
 
 const EMAIL_ANSWERS: Record<CompanionId, string> = {
   rogue:
-    "Don’t miss out — subscribe with your email for SitGuru news, exclusive offers, event announcements, and pack updates. You can unsubscribe anytime. [[cta:email]]",
+    "Subscribe for SitGuru news, offers, and event updates — unsubscribe anytime. [[cta:email]]",
   scout:
-    "Get upcoming Guru tips, product updates, and pack announcements by email. Subscribe below — manage preferences or unsubscribe anytime. [[cta:email]]",
+    "Subscribe for Guru tips and pack announcements — unsubscribe anytime. [[cta:email]]",
   taco:
-    "Don’t sleep on drops — subscribe with your email for SitGuru news, offers, Ambassador highlights, and upcoming pack announcements. Unsubscribe anytime. [[cta:email]]",
+    "Subscribe for SitGuru drops and Ambassador news — unsubscribe anytime. [[cta:email]]",
   delilah:
-    "Don’t miss a pack gather — subscribe with your email for event news, offers, and SitGuru announcements. Unsubscribe anytime! [[cta:email]]",
+    "Subscribe for event news and SitGuru announcements — unsubscribe anytime! [[cta:email]]",
 };
 
 const FEATURES_ANSWERS: Record<CompanionId, string> = {
-  rogue: [
-    "SitGuru keeps pet care **personal, local, and trackable**:",
-    "- **Find verified Gurus** near you for walks, drop-ins, sitting, overnight, boarding, day care, and training support",
-    "- **Book in-app** with messaging, care notes, and secure checkout",
-    "- **PawReport Live** — GPS, photos, potty/food/med updates during care",
-    "- **PawPerks** — earn on walks and redeem at checkout",
-    "- **Pet Events** — local gathers with Attending? Yes / Maybe / No",
-    "",
-    "Create a free Pet Parent account to unlock the full pack — then follow **@SitGuruOfficial** and subscribe for updates! [[cta:parent]] [[cta:social]] [[cta:email]]",
-  ].join("\n"),
-  scout: [
-    "SitGuru is built for Gurus who want **trusted bookings + clear logistics**:",
-    "- **Free Guru profile** — services, rates, availability, and service area you control",
-    "- **Bookings workspace** — pet notes, messaging, and day-of tools",
-    "- **PawReport Live** — automated care updates parents love",
-    "- **Secure payouts** via Stripe or PayPal after setup",
-    "- **Guru Academy** (optional) for a Certified Guru badge",
-    "- **Pet Events** to meet local Pet Parents in person",
-    "",
-    "Start free, then follow **@SitGuruOfficial** and subscribe for Guru tips! [[cta:guru]] [[cta:social]] [[cta:email]]",
-  ].join("\n"),
-  taco: [
-    "SitGuru gives Ambassadors real growth tools:",
-    "- **Referral link + QR** to introduce Pet Parents and future Gurus",
-    "- **PetPerks** share-and-earn path under current program terms",
-    "- **Dashboard metrics** — referrals, activity, and recognition opportunities",
-    "- **Campus & community outreach** plus Pet Events for local pack energy",
-    "- **Creator / social reach** amplified with **@SitGuruOfficial**",
-    "",
-    "Claim your Ambassador path, follow the pack on social, and subscribe for drops! [[cta:ambassador]] [[cta:social]] [[cta:email]]",
-  ].join("\n"),
-  delilah: [
-    "SitGuru Pet Events + platform features, all in one happy place:",
-    "- **Browse & RSVP** with Attending? Yes / Maybe / No",
-    "- **Partner Events** that lead the feed for hosts and planners",
-    "- **Share tools** — branded graphics, links, and QR",
-    "- **Guru matching** — book trusted local care after you meet the pack",
-    "- **Free accounts** for Pet Parents, Gurus, and Ambassadors",
-    "",
-    "Join free, follow **@SitGuruOfficial**, and subscribe so you never miss a gather! [[cta:community_parent]] [[cta:social]] [[cta:email]]",
-  ].join("\n"),
+  rogue:
+    "SitGuru is **local Guru matching**, in-app booking, **PawReport Live**, **PawPerks**, and **Pet Events** — personal care you can track. Join free to unlock it. [[cta:parent]] [[cta:social]] [[cta:email]]",
+  scout:
+    "Gurus get a **free profile**, bookings tools, **PawReport Live**, secure payouts, and optional **Guru Academy** — plus Pet Events to meet Pet Parents. [[cta:guru]] [[cta:social]] [[cta:email]]",
+  taco:
+    "Ambassadors get **referral link + QR**, PetPerks under current terms, dashboard metrics, and local pack reach — grow SitGuru with style. [[cta:ambassador]] [[cta:social]] [[cta:email]]",
+  delilah:
+    "Pet Events with **Yes / Maybe / No**, Partner Event priority, share tools, and free signup paths for Parents, Gurus, and Ambassadors. [[cta:community_parent]] [[cta:social]] [[cta:email]]",
 };
 
 const WHY_JOIN_ANSWERS: Record<CompanionId, string> = {
   rogue:
-    "Join free to match with vetted local Gurus, book care on SitGuru, get PawReport Live updates, earn PawPerks, and tap into Pet Events. Follow **@SitGuruOfficial** and subscribe for pics and announcements! [[cta:parent]] [[cta:social]] [[cta:email]]",
+    "Join free to match vetted Gurus, book on SitGuru, and get live care updates — then follow and subscribe for more. [[cta:parent]] [[cta:social]] [[cta:email]]",
   scout:
-    "Join free as a Guru to set your services, rates, and schedule, get matched with Pet Parents, run PawReport Live, and get paid through SitGuru. Follow **@SitGuruOfficial** and subscribe for trail tips! [[cta:guru]] [[cta:social]] [[cta:email]]",
+    "Join free to set services, rates, and schedule, get matched, and get paid through SitGuru. [[cta:guru]] [[cta:social]] [[cta:email]]",
   taco:
-    "Join as an Ambassador to grow the pack with referral tools, PetPerks opportunities, campus/community reach, and dashboard tracking. Follow **@SitGuruOfficial** and subscribe for hype drops! [[cta:ambassador]] [[cta:social]] [[cta:email]]",
+    "Join to grow the pack with referral tools, PetPerks opportunities, and dashboard tracking. [[cta:ambassador]] [[cta:social]] [[cta:email]]",
   delilah:
-    "Sign up free to RSVP with extras, host Partner Events, meet Gurus, and stay in the pack. Follow **@SitGuruOfficial** and subscribe so you never miss a gather! [[cta:community_parent]] [[cta:social]] [[cta:email]]",
+    "Sign up free to RSVP, host, meet Gurus, and stay in the pack. [[cta:community_parent]] [[cta:social]] [[cta:email]]",
 };
 
 const HOW_SIGNUP_ANSWERS: Record<CompanionId, string> = {
   rogue:
-    "Tap **Create Pet Parent Account**, add your details, then search Gurus by ZIP and service. Booking stays on SitGuru — follow **@SitGuruOfficial** and subscribe for updates after you join! [[cta:parent]] [[cta:social]] [[cta:email]]",
+    "Tap **Create Pet Parent Account**, then search Gurus by ZIP and service — booking stays on SitGuru. [[cta:parent]] [[cta:social]] [[cta:email]]",
   scout:
-    "Tap **Start Free Guru Profile**, complete services/rates/availability, finish trust + payout setup, then go bookable. Follow **@SitGuruOfficial** and subscribe for onboarding tips! [[cta:guru]] [[cta:social]] [[cta:email]]",
+    "Tap **Start Free Guru Profile**, add services and rates, finish trust + payout setup, then go bookable. [[cta:guru]] [[cta:social]] [[cta:email]]",
   taco:
-    "Apply as an Ambassador, get your referral link + QR, share SitGuru, and track impact in your dashboard. Watch the role video, follow **@SitGuruOfficial**, and subscribe for pack drops! [[cta:ambassador_video]] [[cta:ambassador]] [[cta:social]] [[cta:email]]",
+    "Apply, grab your referral link + QR, share SitGuru, and track impact — watch the role video if you want the vibe. [[cta:ambassador_video]] [[cta:ambassador]] [[cta:social]] [[cta:email]]",
   delilah:
-    "Join free as a **Pet Parent** (RSVP + care), **Pet Guru** (local presence), or **Ambassador** (grow the pack) — I’ll cheer you on! Follow **@SitGuruOfficial** and subscribe for event news. [[cta:community_parent]] [[cta:community_guru]] [[cta:community_ambassador]] [[cta:social]] [[cta:email]]",
+    "Join free as Pet Parent, Pet Guru, or Ambassador — I’ll cheer you on! [[cta:community_parent]] [[cta:community_guru]] [[cta:community_ambassador]] [[cta:social]] [[cta:email]]",
 };
 
 /**

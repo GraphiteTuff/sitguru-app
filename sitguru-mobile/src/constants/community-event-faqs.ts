@@ -22,11 +22,11 @@ export const COMMUNITY_EVENT_FAQ_ANSWERS: Record<string, string> = {
   "Can I meet local Gurus at events?":
     "Absolutely! Community events are one of the best ways to meet local SitGuru Gurus and pet parents near you.",
   "What features does SitGuru offer?":
-    "SitGuru brings Guru matching, in-app booking, PawReport Live care updates, PawPerks, and Pet Events together. Create a free account, follow @SitGuruOfficial, and subscribe for email updates.",
+    "SitGuru brings Guru matching, in-app booking, PawReport Live, PawPerks, and Pet Events together. Join free, follow @SitGuruOfficial, and subscribe for updates.",
   "Where can I follow SitGuru on social media?":
-    "Follow @SitGuruOfficial on Facebook, Instagram, TikTok, X, and YouTube for events, pics, and pack updates — same handle everywhere.",
+    "Follow @SitGuruOfficial on Facebook, Instagram, TikTok, X, and YouTube — same handle everywhere.",
   "How do I subscribe for email updates?":
-    "Subscribe with your email for SitGuru news, offers, event announcements, and pack updates. You can unsubscribe anytime.",
+    "Subscribe with your email for SitGuru news, offers, and event updates — unsubscribe anytime.",
   "How do I join as a Pet Parent?":
     "Create a free Pet Parent account in minutes — then RSVP, find trusted local Gurus, and keep pet care in one place.",
 };

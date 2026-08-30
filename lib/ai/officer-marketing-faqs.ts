@@ -33,17 +33,11 @@ export const AMBASSADOR_VIDEO_CARD_MARKER = "[[ambassador_video_card]]";
  * Always appends the video card marker so Taco embeds the promo in-chat.
  */
 export const TACO_WHAT_AMBASSADORS_DO_ANSWER = [
-  "Ambassadors help people discover SitGuru — they share SitGuru on campus, online, at events, or with people they already know.",
+  "Ambassadors help people discover SitGuru — share on campus, online, at events, or with people you already know.",
   "",
-  "That means helping Pet Parents find care, helping great people become Gurus, and building real community experience along the way.",
+  "**What you do:** share the vibe, refer Pet Parents & future Gurus, show up locally, and grow real community experience.",
   "",
-  "**What you actually do:**",
-  "- **Share the vibe** — Post, text, talk, or use your QR code to introduce people to SitGuru.",
-  "- **Refer great people** — Connect Pet Parents, future Gurus, and local partners with the right SitGuru path.",
-  "- **Show up locally** — Represent SitGuru at campus activities, community events, pet spaces, and local meetups.",
-  "- **Grow your lane** — Build real outreach, leadership, referral, and community experience as SitGuru grows.",
-  "",
-  "Hit play below to see what Ambassadors actually do.",
+  "Hit play below for the quick tour.",
   "",
   AMBASSADOR_VIDEO_CARD_MARKER,
 ].join("\n");
@@ -136,17 +130,11 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "start free guru profile",
     ],
     answer: [
-      "Start free — creating your Guru account and submitting your profile costs nothing.",
+      "Start free — Guru signup costs nothing.",
       "",
-      "**First setup trail:**",
-      "1. Create your Guru account and open your profile workspace.",
-      "2. Add services, rates, availability, experience, photos, and your local area.",
-      "3. Finish required identity, safety, account, and payout setup (Stripe or PayPal).",
-      "4. Stay approved and active so Pet Parents can fully book you.",
+      "**First trail:** create your account → add services, rates, availability, photos → finish trust + payout setup → stay approved and bookable.",
       "",
-      "Guru Academy is optional. Take it anytime for your Certified Guru badge — it is not required to go bookable.",
-      "",
-      "You choose services, rates, availability, service area, and which booking requests to accept. Tap **Start Free Guru Profile** on /become-a-guru when you’re ready. [[cta:guru]]",
+      "Guru Academy is optional for a Certified Guru badge. Tap **Start Free Guru Profile** when ready. [[cta:guru]]",
     ].join("\n"),
   },
   {
@@ -252,32 +240,32 @@ export const ROGUE_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "How do I find a Guru?",
     answer:
-      "Search by service and location, review Guru profiles, services, service area, pricing, photos, care style, and any available reviews. Choose the Guru who feels like the best match for your pet’s routine, personality, and care needs. [[cta:parent]]",
+      "Search by service and location, review profiles and reviews, then pick the Guru who fits your pet’s routine. [[cta:parent]]",
   },
   {
     question: "How do bookings work on SitGuru?",
     answer:
-      "Bookings organize the service, date, time, location, pet, Guru, payment status, messages, PawReport activity, and support context. Pet Parents use bookings to follow care, and Gurus use bookings as their work queue. All care is booked through SitGuru. [[cta:parent]]",
+      "Book through SitGuru — service, timing, pet, Guru, payment, messages, and PawReport stay in one place. [[cta:parent]]",
   },
   {
     question: "What is PawReport Live?",
     answer:
-      "PawReport Live is the automated care update system connected to a booking. It shows when care starts, live walk activity, distance and duration, photos, potty updates, food and water confirmations, medication, play, mood, notes, and a final summary — so you are not waiting on a manual “I’ll text you later.”",
+      "PawReport Live sends automated care updates on a booking — start/finish, walk activity, photos, potty/food/med notes, and a final summary.",
   },
   {
     question: "How does SitGuru support trust and safety?",
     answer:
-      "SitGuru may use profile reviews, trust and safety / compliance steps, communication tools, support records, user reports, PawReport history (including GPS and automated visit timelines), and platform rules to help protect pets, Pet Parents, Gurus, Ambassadors, and the community.",
+      "SitGuru uses profile reviews, trust steps, in-app messaging, PawReport history, and community reporting to help protect the pack.",
   },
   {
     question: "Is SitGuru free to join as a Pet Parent?",
     answer:
-      "Creating a Pet Parent account is free. You only pay when you book care through SitGuru checkout — review the price before you confirm. [[cta:parent]]",
+      "Pet Parent signup is free — you only pay when you book care. [[cta:parent]]",
   },
   {
     question: "Can I message my Guru?",
     answer:
-      "Use SitGuru messaging when available so booking questions, care details, timing, access notes, and support context stay organized in one place.",
+      "Yes — use SitGuru messaging so care details stay organized with the booking.",
   },
   {
     question: "What services can I book on SitGuru?",
@@ -288,7 +276,7 @@ export const ROGUE_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "pet sitting boarding day care",
     ],
     answer:
-      "Book **Drop-in Visits**, **Dog Walks**, **Overnight / house sitting**, **Boarding**, **Doggy Day Care**, and **Training Support** with local verified Gurus — all through SitGuru. [[cta:parent]]",
+      "Book drop-ins, dog walks, overnight / house sitting, boarding, day care, and training support with local Gurus. [[cta:parent]]",
   },
   {
     question: "How do PawPerks work?",
@@ -299,7 +287,7 @@ export const ROGUE_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "redeem pawperks",
     ],
     answer:
-      "PawPerks lets Pet Parents earn points on eligible walks and redeem them at checkout (about **100 pts ≈ $1**). Never invent a live balance — check your account after signup. [[cta:parent]]",
+      "Earn PawPerks on eligible walks and redeem at checkout (~**100 pts ≈ $1**). Check your balance in-account after signup. [[cta:parent]]",
   },
   {
     question: "Is booking on SitGuru safe?",
@@ -310,7 +298,7 @@ export const ROGUE_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "vetted sitters",
     ],
     answer:
-      "SitGuru supports trust with profile reviews, compliance steps, in-app messaging, PawReport history, and community reporting — booking stays on the platform so care details stay organized. [[cta:parent]]",
+      "Yes — booking stays on SitGuru with vetted Gurus, messaging, and PawReport history so care details stay organized. [[cta:parent]]",
   },
   {
     question: "How do I rebook my favorite Guru?",
@@ -320,7 +308,7 @@ export const ROGUE_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "favorite guru",
     ],
     answer:
-      "Open your past booking or Guru profile on SitGuru and book again — favorites stay easier when you use an account. I’ll help you find them by name or ZIP anytime. [[cta:parent]]",
+      "Open their profile or a past booking on SitGuru and book again — an account makes favorites easier. [[cta:parent]]",
   },
   {
     question: COMPANION_BENEFITS_USER_PROMPT.rogue,
@@ -393,13 +381,9 @@ export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "join the pack",
     ],
     answer: [
-      "Apply in four clear steps:",
-      "1. **Apply** — Choose your Ambassador type and tell us where you have reach.",
-      "2. **Get your tools** — Use your referral link, QR code, and simple sharing materials.",
-      "3. **Share SitGuru** — Connect with your campus, community, pet network, or social circle.",
-      "4. **Track your impact** — Follow eligible referrals, activity, rewards, and recognition opportunities.",
+      "Apply in four steps: **Apply** → get referral link/QR → **Share SitGuru** → track impact.",
       "",
-      "Ready? Head to `/programs/ambassadors/apply` and I’ll cheer you on. [[cta:ambassador]]",
+      "Ready? Head to apply and I’ll cheer you on. [[cta:ambassador]]",
     ].join("\n"),
   },
   {

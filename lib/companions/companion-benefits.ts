@@ -1,5 +1,6 @@
 /**
  * Companion benefits pill labels + exact markdown replies for Scout / Taco / Rogue / Delilah.
+ * Keep punchy — short opener, tight bullets, one CTA line.
  */
 
 export type CompanionId = "scout" | "taco" | "rogue" | "delilah";
@@ -21,51 +22,44 @@ export const COMPANION_BENEFITS_USER_PROMPT: Record<CompanionId, string> = {
   delilah: "Tell me about Event Host Benefits",
 };
 
-export const SCOUT_GURU_BENEFITS_RESPONSE = `You tapped it, now let's unlock it! 🚀 Choosing **Guru Benefits** is your ticket to scaling up your brand and stacking your revenue. Here is exactly what you get when you finish your quick verification profile:
+export const SCOUT_GURU_BENEFITS_RESPONSE = `**Guru Benefits** after you finish verification:
 
-* 💸 **Keep 100% of Your Hustle** – Say goodbye to ridiculous platform fees. What you earn stays in your pocket!
-* 👑 **Instant Credibility Badge** – Unlock a verified profile status that shows clients you are a top-tier professional.
-* 🚀 **Algorithmic Boost** – We push completed and verified profiles straight to the absolute top of client search feeds.
-* 🛡️ **Bulletproof Protection** – Enjoy secure, automated milestone payments so you never have to guess when you're getting paid.
-* 🎒 **Exclusive Squad Perks** – Access premium digital tools, advanced masterclasses, and networking events for free.
+* 💸 Keep more of what you earn
+* 👑 Verified profile credibility
+* 🚀 Stronger search visibility
+* 🛡️ Secure payouts after setup
+* 🎒 Tools, Academy, and pack perks
 
-Ready to turn on these power-ups? Tap that green **Start Free Guru Profile** button below, follow **@SitGuruOfficial**, and subscribe for trail tips! [[cta:guru]] [[cta:social]] [[cta:email]]`;
+Start free, follow **@SitGuruOfficial**, and subscribe for tips. [[cta:guru]] [[cta:social]] [[cta:email]]`;
 
-export const TACO_AMBASSADOR_BENEFITS_RESPONSE = `Let’s GOOOO! You clicked the golden ticket! 🎟️✨ Choosing **Ambassador Benefits** means you are moving straight past 'casual user' and stepping into elite Main Character status. 
+export const TACO_AMBASSADOR_BENEFITS_RESPONSE = `**Ambassador Benefits** — grow the pack with style:
 
-As your official AI Companion and hype-pet, I am legally required to tell you that this profile verification unlocks absolute cheat codes for your brand. Check the perks:
+* 💰 Eligible rewards under current terms
+* 💎 Verified Ambassador badge
+* 📈 Referral tools + dashboard metrics
+* 🚀 Creator / campus / community reach
+* 🎟️ PetPerks share path + pack drops
 
-* 💰 **The 100% Bag Guarantee** – Zero predatory platform fees. You put in the work, you stack 100% of the coin. Period.
-* 💎 **The Verified Glow-Up** – Get a shiny, premium Ambassador badge that instantly tells clients you are the rarest tier in the game.
-* 📈 **VIP Feed Priority** – We tweak the algorithm just for you, launching your profile straight to the front row of client searches. 
-* 🔒 **The Vault Security** – Bulletproof, automated milestones. The money is locked in safe and secure before you even lift a finger.
-* 🚀 **The Creator Lab Access** – Free entry into elite masterclasses, advanced digital toolkits, and private community networking drops.
+Claim your code, follow **@SitGuruOfficial**, and subscribe. [[cta:ambassador]] [[cta:social]] [[cta:email]]`;
 
-You're already built for this. Smash **Claim My Referral Code**, follow **@SitGuruOfficial**, and subscribe for pack drops! [[cta:ambassador]] [[cta:social]] [[cta:email]] 🐺💼`;
+export const ROGUE_PET_PARENT_BENEFITS_RESPONSE = `**Pet Parent Benefits** — peace of mind for your pack:
 
-export const ROGUE_PET_PARENT_BENEFITS_RESPONSE = `Alright, let’s talk real benefits. 🐾 Security and top-tier care aren't optional for your pack—they’re mandatory. Tapping **Pet Parent Benefits** means you are unlocking a fortress of perks designed to give your pet a luxury lifestyle and give you absolute peace of mind. 
+* 🛡️ Vetted, community-trusted Gurus
+* 📸 PawReport Live updates during care
+* 💳 Secure in-app booking + payments
+* 🎁 PawPerks + local Pet Events
 
-I don't do fluff, so let me give you the straight facts on what this profile setup unlocks for you right now:
+Create a free account, follow **@SitGuruOfficial**, and subscribe. [[cta:parent]] [[cta:social]] [[cta:email]]`;
 
-* 🛡️ **The Elite Vetting Shield** – Every single Guru on this platform is thoroughly vetted, verified, and community-trusted. No randoms, ever.
-* 🏥 **Premium Care Guarantee** – Access to 24/7 premium support and built-in care protections so your pet is always covered.
-* 📸 **Live Pack Updates** – Real-time photo check-ins and GPS tracking during services. You’ll never have to wonder how your pup is doing.
-* 💳 **Zero-Hassle Vault Payments** – Safe, encrypted payments. The price you see is the price you pay—no hidden platform fees or surprise surcharges.
-* 🎁 **The VIP Treat Box** – Exclusive discounts on premium pet food, trendy accessories, and local pet events dropped straight to your inbox.
+export const DELILAH_EVENT_HOST_BENEFITS_RESPONSE = `**Event Host Benefits** for Partner Events:
 
-Your pet deserves the best crew in town. Let's make it official—tap **Create Pet Parent Account**, follow **@SitGuruOfficial** for pics and updates, and subscribe so you never miss a drop! [[cta:parent]] [[cta:social]] [[cta:email]] 🐕💼`;
+* 📌 Partner Events stay first in the feed
+* 🙋 Live Yes / Maybe / No attendance
+* 📣 Branded share tools
+* 🗺️ Local discovery on Pet Events
+* 🤝 Easy guest signup paths
 
-export const DELILAH_EVENT_HOST_BENEFITS_RESPONSE = `Let’s get your pack gather on the calendar! 🐾📅 Choosing **Event Host Benefits** means you’re stepping into SitGuru Partner Events — the listings that always stay first.
-
-Here’s what hosts and Pet Event Planners & Managers unlock:
-
-* 📌 **Partner Event priority** – Your manually published events lead the feed; social discovery listings fill the gaps behind you.
-* 🙋 **Live attendance** – Yes / Maybe / No counts so you know who’s coming before the day of.
-* 📣 **SitGuru share tools** – Branded graphics and share links ready for Instagram, Facebook, TikTok, X, and more.
-* 🗺️ **Local discovery** – Pet Parents, Gurus, and Ambassadors find you on the Pet Events map and homepage.
-* 🤝 **Pack conversion** – Guests can join as Pet Parents, Gurus, or Ambassadors right from your listing energy.
-
-Ready to publish? Tap **Create Event** on the homepage — quick Pet Parent signup is enough to open a draft. Businesses can still **Apply to host** for a full Partner profile. Follow **@SitGuruOfficial** and subscribe so guests never miss your gathers! [[cta:community_parent]] [[cta:social]] [[cta:email]]`;
+Publish a draft, follow **@SitGuruOfficial**, and subscribe. [[cta:community_parent]] [[cta:social]] [[cta:email]]`;
 
 export const COMPANION_BENEFITS_RESPONSE: Record<CompanionId, string> = {
   scout: SCOUT_GURU_BENEFITS_RESPONSE,
