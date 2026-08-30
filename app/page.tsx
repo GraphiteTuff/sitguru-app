@@ -97,7 +97,7 @@ const aiPetCompanions = [
     avatarSrc: "/images/delilah-avatar.png",
     objectPosition: "50% 28%",
     statement:
-      "I'm your Pet Event Coordinator — helping planners, hosts, and pet parents with listings, RSVPs, and pack gathers near you!",
+      "I'm your Pet Event Coordinator — helping planners, hosts, and Pet Parents with listings, RSVPs, and pack gathers near you!",
     ctaLabel: "Chat with Delilah",
   },
 ] as const;

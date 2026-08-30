@@ -53,12 +53,12 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "What are SitGuru pet events?",
     answer:
-      "Yay — SitGuru Pet Events are local pet-friendly gathers: adoption days, meetups, fundraisers, partner activations, and pack socials, all in one happy place! Browse what's near you, tap **Attending?** (Yes / Maybe / No), and meet Gurus, partners, and pet parents. [[cta:community_parent]]",
+      "Yay — SitGuru Pet Events are local pet-friendly gathers: adoption days, meetups, fundraisers, partner activations, and pack socials, all in one happy place! Browse what's near you, tap **Attending?** (Yes / Maybe / No), and meet Gurus, partners, and Pet Parents. [[cta:community_parent]]",
   },
   {
     question: "What are SitGuru community events?",
     answer:
-      "Yay — SitGuru Pet Events are local pet-friendly gathers: adoption days, meetups, fundraisers, partner activations, and pack socials, all in one happy place! Browse what's near you, tap **Attending?** (Yes / Maybe / No), and meet Gurus, partners, and pet parents. [[cta:community_parent]]",
+      "Yay — SitGuru Pet Events are local pet-friendly gathers: adoption days, meetups, fundraisers, partner activations, and pack socials, all in one happy place! Browse what's near you, tap **Attending?** (Yes / Maybe / No), and meet Gurus, partners, and Pet Parents. [[cta:community_parent]]",
   },
   {
     question: "What pet events are coming up?",
@@ -93,12 +93,12 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "How do I join as a Pet Guru?",
     answer:
-      "Future Gurus can join SitGuru for free, build a profile, and show up at pet events where pet parents are already gathering — such a fun way to meet local clients! [[cta:community_guru]]",
+      "Future Gurus can join SitGuru for free, build a profile, and show up at pet events where Pet Parents are already gathering — such a fun way to meet local clients! [[cta:community_guru]]",
   },
   {
     question: "How do I join as an Ambassador?",
     answer:
-      "Ambassadors grow the SitGuru pack — share events, invite pet parents and Gurus, and represent SitGuru locally. Pet events are perfect meetup spots — let's gooo! [[cta:community_ambassador]]",
+      "Ambassadors grow the SitGuru pack — share events, invite Pet Parents and Gurus, and represent SitGuru locally. Pet events are perfect meetup spots — let's gooo! [[cta:community_ambassador]]",
   },
   {
     question: "Are pet events pet friendly?",
@@ -123,7 +123,7 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "Can I meet local Gurus at events?",
     answer:
-      "Absolutely — Pet Events are one of the happiest ways to meet **local SitGuru Gurus** and pet parents near you, then book care on SitGuru when you're ready! [[cta:community_parent]]",
+      "Absolutely — Pet Events are one of the happiest ways to meet **local SitGuru Gurus** and Pet Parents near you, then book care on SitGuru when you're ready! [[cta:community_parent]]",
   },
   {
     question: "Who hosts these events?",
@@ -143,7 +143,7 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
   {
     question: "Can Gurus RSVP to events?",
     answer:
-      "Yes! Gurus tap **Yes / Maybe / No** too — your RSVP shows in the Guru count so pet parents know trusted sitters will be there. [[cta:community_guru]]",
+      "Yes! Gurus tap **Yes / Maybe / No** too — your RSVP shows in the Guru count so Pet Parents know trusted sitters will be there. [[cta:community_guru]]",
   },
   {
     question: "Can Ambassadors RSVP to events?",
