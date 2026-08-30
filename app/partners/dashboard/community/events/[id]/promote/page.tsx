@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import PartnerEventPromoteWorkspace from "@/components/partners/events/PartnerEventPromoteWorkspace";
-import { requirePartnerAccount } from "@/lib/community/partner-access";
+import { requireEventHostPartnerAccount } from "@/lib/community/partner-access";
 import { createClient } from "@/lib/supabase/server";
 import type { CommunityEventRow } from "@/lib/community/types";
+import { buildEventHostCreateSignupHref } from "@/lib/community/pet-parent-signup";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +13,10 @@ type PageProps = {
 };
 
 export default async function PartnerEventPromotePage({ params }: PageProps) {
-  const access = await requirePartnerAccount();
+  const access = await requireEventHostPartnerAccount();
 
   if (!access.ok || !access.partner) {
-    redirect("/partners/apply");
+    redirect(buildEventHostCreateSignupHref({ source: "event_promote" }));
   }
 
   const { id } = await params;

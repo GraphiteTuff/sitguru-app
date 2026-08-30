@@ -338,10 +338,10 @@ export default function AIDelilahCompanion() {
 
           <div className="shrink-0 border-t border-emerald-50 bg-white px-3 py-2">
             <Link
-              href="/events/host"
+              href="/partners/dashboard/community/events?create=1"
               className="mb-2 flex min-h-10 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white transition hover:bg-[#09462C]"
             >
-              Host / manage events
+              Create Event
             </Link>
             <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
               {CHIPS.map((chip) => (

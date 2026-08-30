@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEventPromotionStats } from "@/lib/community/event-analytics";
-import { requirePartnerAccountFromRequest } from "@/lib/community/partner-access";
+import { requireEventHostPartnerAccountFromRequest } from "@/lib/community/partner-access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   mobileCorsHeaders,
@@ -18,7 +18,7 @@ export function OPTIONS(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest, context: RouteContext) {
-  const access = await requirePartnerAccountFromRequest(req);
+  const access = await requireEventHostPartnerAccountFromRequest(req);
 
   if (!access.ok || !access.partner) {
     return NextResponse.json(

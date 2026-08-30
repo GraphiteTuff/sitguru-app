@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { requirePartnerAccount } from "@/lib/community/partner-access";
+import { requireEventHostPartnerAccount } from "@/lib/community/partner-access";
 import { uploadEventImageWithClient } from "@/lib/community/event-images-server";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const access = await requirePartnerAccount();
+  const access = await requireEventHostPartnerAccount();
 
   if (!access.ok || !access.userId) {
     return NextResponse.json({ error: access.error }, { status: 401 });

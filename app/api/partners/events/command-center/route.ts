@@ -4,7 +4,7 @@ import {
   getPartnerCommandCenterStats,
   type CommandCenterRange,
 } from "@/lib/community/event-command-center";
-import { requirePartnerAccountFromRequest } from "@/lib/community/partner-access";
+import { requireEventHostPartnerAccountFromRequest } from "@/lib/community/partner-access";
 import {
   mobileCorsHeaders,
   optionsWithMobileCors,
@@ -24,7 +24,7 @@ function parseRange(value: string | null): CommandCenterRange {
 }
 
 export async function GET(req: NextRequest) {
-  const access = await requirePartnerAccountFromRequest(req);
+  const access = await requireEventHostPartnerAccountFromRequest(req);
   if (!access.ok || !access.partner) {
     return NextResponse.json(
       { error: access.error || "Partner required." },

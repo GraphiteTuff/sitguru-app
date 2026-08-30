@@ -56,11 +56,29 @@ export function isSafeCommunityNextPath(path: string) {
     decoded.startsWith("/customer/") ||
     decoded.startsWith("/guru/") ||
     decoded.startsWith("/ambassador/") ||
+    decoded.startsWith("/partners/dashboard/community/events") ||
     decoded.startsWith("/search") ||
     decoded.startsWith("/find-care") ||
     decoded === "/events" ||
     decoded === "/community"
   );
+}
+
+/** One-click Partner Event draft create path (Pet Event Manager). */
+export const EVENT_HOST_ONE_CLICK_CREATE_PATH =
+  "/partners/dashboard/community/events?create=1";
+
+/** Quick Pet Parent signup → return to one-click create. */
+export function buildEventHostCreateSignupHref(input?: {
+  source?: string;
+  campaign?: string;
+}) {
+  return buildCommunityJoinHref({
+    next: EVENT_HOST_ONE_CLICK_CREATE_PATH,
+    source: input?.source || "homepage_create_event",
+    campaign: input?.campaign || "one_click_create_event",
+    role: "pet_parent",
+  });
 }
 
 export function buildEventReturnPath(slug: string, opts?: { rsvp?: boolean }) {

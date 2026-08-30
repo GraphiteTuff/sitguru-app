@@ -100,10 +100,10 @@ export default async function CommunityPage() {
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
-              href="/events/host"
+              href="/partners/dashboard/community/events?create=1"
               className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-emerald-900"
             >
-              Pet Event Planners & Managers
+              Create Event
             </Link>
             <Link
               href="/partners/dashboard/community/events"
@@ -191,16 +191,16 @@ export default async function CommunityPage() {
                 Pet Event Planners & Managers
               </p>
               <p className="mt-1 text-sm font-semibold text-emerald-950/80">
-                Publish and update events manually as SitGuru Partner Events.
-                Social listings fill gaps — Partner Events always stay first.
+                One-click create after a quick Pet Parent signup. Publish as
+                SitGuru Partner Events — they always stay first on the map.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
-                href="/events/host"
+                href="/partners/dashboard/community/events?create=1"
                 className="inline-flex min-h-11 items-center rounded-2xl bg-emerald-700 px-5 text-sm font-black text-white"
               >
-                Host / manage events
+                Create Event
               </Link>
               <Link
                 href="/partners/apply?intent=community_events&source=community_hub"

@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import PartnerEventEditor from "@/components/partners/events/PartnerEventEditor";
 import PartnerEventMessagePanel from "@/components/partners/events/PartnerEventMessagePanel";
 import { createClient } from "@/lib/supabase/server";
-import { requirePartnerAccount } from "@/lib/community/partner-access";
+import { requireEventHostPartnerAccount } from "@/lib/community/partner-access";
 import type { CommunityEventRow } from "@/lib/community/types";
+import { buildEventHostCreateSignupHref } from "@/lib/community/pet-parent-signup";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +13,10 @@ type PageProps = {
 };
 
 export default async function PartnerEventEditPage({ params }: PageProps) {
-  const access = await requirePartnerAccount();
+  const access = await requireEventHostPartnerAccount();
 
   if (!access.ok || !access.partner) {
-    redirect("/partners/apply");
+    redirect(buildEventHostCreateSignupHref({ source: "event_editor" }));
   }
 
   const { id } = await params;
