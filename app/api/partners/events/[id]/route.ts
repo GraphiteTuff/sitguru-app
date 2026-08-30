@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePartnerAccountFromRequest } from "@/lib/community/partner-access";
+import { requireEventHostPartnerAccountFromRequest } from "@/lib/community/partner-access";
 import {
   autosavePartnerEventWithAccess,
   cancelPartnerEventWithAccess,
@@ -26,7 +26,7 @@ export function OPTIONS(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest, context: RouteContext) {
-  const access = await requirePartnerAccountFromRequest(req);
+  const access = await requireEventHostPartnerAccountFromRequest(req);
 
   if (!access.ok || !access.partner || !access.userId) {
     return NextResponse.json(
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
-  const access = await requirePartnerAccountFromRequest(req);
+  const access = await requireEventHostPartnerAccountFromRequest(req);
 
   if (!access.ok || !access.partner || !access.userId) {
     return NextResponse.json(
@@ -80,7 +80,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {
-  const access = await requirePartnerAccountFromRequest(req);
+  const access = await requireEventHostPartnerAccountFromRequest(req);
 
   if (!access.ok || !access.partner || !access.userId) {
     return NextResponse.json(
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 }
 
 export async function DELETE(req: NextRequest, context: RouteContext) {
-  const access = await requirePartnerAccountFromRequest(req);
+  const access = await requireEventHostPartnerAccountFromRequest(req);
 
   if (!access.ok || !access.partner || !access.userId) {
     return NextResponse.json(

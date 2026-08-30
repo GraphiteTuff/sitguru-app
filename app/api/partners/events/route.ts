@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePartnerAccountFromRequest } from "@/lib/community/partner-access";
+import { requireEventHostPartnerAccountFromRequest } from "@/lib/community/partner-access";
 import { createPartnerEventDraftWithAccess } from "@/lib/community/partner-event-mutations";
 import { fetchPartnerEvents } from "@/lib/community/queries";
 import type { PartnerEventTab } from "@/lib/community/types";
@@ -15,7 +15,7 @@ export function OPTIONS(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const access = await requirePartnerAccountFromRequest(req);
+  const access = await requireEventHostPartnerAccountFromRequest(req);
 
   if (!access.ok || !access.partner) {
     return NextResponse.json(
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const access = await requirePartnerAccountFromRequest(req);
+  const access = await requireEventHostPartnerAccountFromRequest(req);
 
   if (!access.ok || !access.partner || !access.userId) {
     return NextResponse.json(

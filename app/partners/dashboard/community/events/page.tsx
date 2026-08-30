@@ -5,7 +5,11 @@ import {
   fetchAllPartnerEvents,
   getPartnerCommandCenterStats,
 } from "@/lib/community/event-command-center";
-import { requirePartnerAccount } from "@/lib/community/partner-access";
+import {
+  getAuthenticatedUserId,
+  requireEventHostPartnerAccount,
+} from "@/lib/community/partner-access";
+import { buildEventHostCreateSignupHref } from "@/lib/community/pet-parent-signup";
 import type { PartnerEventTab } from "@/lib/community/types";
 
 export const dynamic = "force-dynamic";
@@ -30,15 +34,31 @@ function parseTab(value?: string): PartnerEventTab {
 export default async function PartnerCommunityEventsPage({
   searchParams,
 }: PageProps) {
-  const access = await requirePartnerAccount();
+  const params = await searchParams;
+  const wantsCreate = params?.create === "1";
 
-  if (!access.ok || !access.partner) {
-    redirect("/partners/apply?intent=community_events");
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    redirect(
+      buildEventHostCreateSignupHref({
+        source: wantsCreate ? "one_click_create_event" : "event_manager",
+        campaign: wantsCreate ? "one_click_create_event" : "event_manager_gate",
+      }),
+    );
   }
 
-  const params = await searchParams;
+  const access = await requireEventHostPartnerAccount();
 
-  if (params?.create === "1") {
+  if (!access.ok || !access.partner) {
+    redirect(
+      buildEventHostCreateSignupHref({
+        source: "event_manager",
+        campaign: "event_host_setup_failed",
+      }),
+    );
+  }
+
+  if (wantsCreate) {
     const result = await createPartnerEventDraft({
       title: "New Pet Event",
     });

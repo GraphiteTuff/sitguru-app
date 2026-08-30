@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePartnerAccount } from "@/lib/community/partner-access";
+import { requireEventHostPartnerAccount } from "@/lib/community/partner-access";
 import {
   autosavePartnerEventWithAccess,
   cancelPartnerEventWithAccess,
@@ -26,7 +26,7 @@ function revalidatePartnerEventPaths(eventId?: string, slug?: string) {
 }
 
 export async function createPartnerEventDraft(input: CommunityEventDraftInput = {}) {
-  const access = await requirePartnerAccount();
+  const access = await requireEventHostPartnerAccount();
 
   if (!access.ok || !access.partner || !access.userId) {
     return { ok: false as const, error: access.error || "Partner access required." };
@@ -45,7 +45,7 @@ export async function createPartnerEventDraft(input: CommunityEventDraftInput = 
 }
 
 export async function autosavePartnerEvent(eventId: string, input: CommunityEventDraftInput) {
-  const access = await requirePartnerAccount();
+  const access = await requireEventHostPartnerAccount();
 
   if (!access.ok || !access.partner || !access.userId) {
     return { ok: false as const, error: access.error || "Partner access required." };
@@ -65,7 +65,7 @@ export async function autosavePartnerEvent(eventId: string, input: CommunityEven
 }
 
 export async function submitPartnerEventForReview(eventId: string) {
-  const access = await requirePartnerAccount();
+  const access = await requireEventHostPartnerAccount();
 
   if (!access.ok || !access.partner || !access.userId) {
     return { ok: false as const, error: access.error || "Partner access required." };
@@ -84,7 +84,7 @@ export async function submitPartnerEventForReview(eventId: string) {
 }
 
 export async function cancelPartnerEvent(eventId: string) {
-  const access = await requirePartnerAccount();
+  const access = await requireEventHostPartnerAccount();
 
   if (!access.ok || !access.partner || !access.userId) {
     return { ok: false as const, error: access.error || "Partner access required." };
@@ -103,7 +103,7 @@ export async function cancelPartnerEvent(eventId: string) {
 }
 
 export async function duplicatePartnerEvent(eventId: string) {
-  const access = await requirePartnerAccount();
+  const access = await requireEventHostPartnerAccount();
 
   if (!access.ok || !access.partner || !access.userId) {
     return { ok: false as const, error: access.error || "Partner access required." };
@@ -122,7 +122,7 @@ export async function duplicatePartnerEvent(eventId: string) {
 }
 
 export async function deletePartnerEventDraft(eventId: string) {
-  const access = await requirePartnerAccount();
+  const access = await requireEventHostPartnerAccount();
 
   if (!access.ok || !access.partner || !access.userId) {
     return { ok: false as const, error: access.error || "Partner access required." };
@@ -145,7 +145,7 @@ export async function createPartnerEventSeries(
   rule: RecurrenceRule,
   count: number,
 ) {
-  const access = await requirePartnerAccount();
+  const access = await requireEventHostPartnerAccount();
 
   if (!access.ok || !access.partner || !access.userId) {
     return { ok: false as const, error: access.error || "Partner access required." };

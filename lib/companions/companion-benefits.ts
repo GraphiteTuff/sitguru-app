@@ -65,7 +65,7 @@ Here’s what hosts and Pet Event Planners & Managers unlock:
 * 🗺️ **Local discovery** – Pet Parents, Gurus, and Ambassadors find you on the Pet Events map and homepage.
 * 🤝 **Pack conversion** – Guests can join as Pet Parents, Gurus, or Ambassadors right from your listing energy.
 
-Ready to publish? Head to **/events/host** — or tap **Host / manage events** — and let’s fill the yard!`;
+Ready to publish? Tap **Create Event** on the homepage — quick Pet Parent signup is enough to open a draft. Businesses can still **Apply to host** for a full Partner profile. Let's fill the yard!`;
 
 export const COMPANION_BENEFITS_RESPONSE: Record<CompanionId, string> = {
   scout: SCOUT_GURU_BENEFITS_RESPONSE,

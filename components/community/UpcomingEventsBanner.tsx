@@ -489,16 +489,16 @@ export default function UpcomingEventsBanner({
                 Pet Event Planners & Managers
               </p>
               <p className="mt-1 text-sm font-semibold text-emerald-950/80">
-                Publish and update events manually as SitGuru Partner Events.
-                Social listings fill gaps — Partner Events always stay first.
+                One-click create after a quick Pet Parent signup. Publish as
+                SitGuru Partner Events — they always stay first on the map.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
-                href="/events/host"
+                href="/partners/dashboard/community/events?create=1"
                 className="inline-flex min-h-11 items-center rounded-full bg-[#0D5C3A] px-5 text-sm font-black text-white transition hover:bg-emerald-900"
               >
-                Host / manage events
+                Create Event
               </Link>
               <Link
                 href="/partners/apply?intent=community_events&source=homepage_events_banner"

@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requirePartnerAccount } from "@/lib/community/partner-access";
+import { requireEventHostPartnerAccount } from "@/lib/community/partner-access";
+import { buildEventHostCreateSignupHref } from "@/lib/community/pet-parent-signup";
 
 export const dynamic = "force-dynamic";
 
 export default async function PartnerOrganizationProfilePage() {
-  const access = await requirePartnerAccount();
+  const access = await requireEventHostPartnerAccount();
   if (!access.ok || !access.partner) {
-    redirect("/partners/apply?intent=community_events");
+    redirect(buildEventHostCreateSignupHref({ source: "org_profile" }));
   }
 
   const partner = access.partner;

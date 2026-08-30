@@ -348,7 +348,8 @@ function getSafeSignupNextPath(nextValue: string | null, intent: AccountIntent) 
       if (
         decoded.startsWith("/customer/") ||
         decoded.startsWith("/search") ||
-        decoded.startsWith("/find-care")
+        decoded.startsWith("/find-care") ||
+        decoded.startsWith("/partners/dashboard/community/events")
       ) {
         return decoded;
       }
