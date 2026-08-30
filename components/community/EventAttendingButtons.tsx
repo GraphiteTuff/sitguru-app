@@ -206,7 +206,17 @@ export default function EventAttendingButtons({
       </div>
 
       {message ? (
-        <p className="text-[11px] font-bold text-emerald-800">{message}</p>
+        <p
+          className={`text-[11px] font-bold ${
+            message.startsWith("Unable") ||
+            message.toLowerCase().includes("invalid") ||
+            message.toLowerCase().includes("error")
+              ? "text-red-700"
+              : "text-emerald-800"
+          }`}
+        >
+          {message}
+        </p>
       ) : null}
     </div>
   );

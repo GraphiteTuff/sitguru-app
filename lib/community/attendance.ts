@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { toAttendanceEventId } from "@/lib/community/homepage-demo-events";
 
 export type AttendanceRole = "pet_parent" | "guru" | "ambassador";
 export type AttendanceStatus = "going" | "interested" | "cancelled";
@@ -66,9 +67,10 @@ export async function resolveAttendanceRole(userId: string): Promise<AttendanceR
 export async function getEventAttendanceCounts(
   eventId: string,
 ): Promise<EventAttendanceCounts> {
+  const normalizedEventId = toAttendanceEventId(eventId);
   const { data, error } = await supabaseAdmin.rpc(
     "get_community_event_attendance_counts",
-    { p_event_id: eventId },
+    { p_event_id: normalizedEventId },
   );
 
   if (!error && Array.isArray(data) && data[0]) {
@@ -87,7 +89,7 @@ export async function getEventAttendanceCounts(
   const { data: rows } = await supabaseAdmin
     .from("community_event_attendance")
     .select("attendance_role, status")
-    .eq("event_id", eventId);
+    .eq("event_id", normalizedEventId);
 
   const list = rows || [];
   const going = list.filter((row) => row.status === "going");
@@ -107,7 +109,7 @@ export async function getUserEventAttendance(eventId: string, userId: string) {
   const { data } = await supabaseAdmin
     .from("community_event_attendance")
     .select("*")
-    .eq("event_id", eventId)
+    .eq("event_id", toAttendanceEventId(eventId))
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -118,7 +120,7 @@ export async function getGuestEventAttendance(eventId: string, guestKey: string)
   const { data } = await supabaseAdmin
     .from("community_event_attendance")
     .select("*")
-    .eq("event_id", eventId)
+    .eq("event_id", toAttendanceEventId(eventId))
     .eq("guest_key", guestKey.trim())
     .maybeSingle();
 
@@ -132,6 +134,7 @@ export async function setEventAttendance(input: {
   status: AttendanceStatus;
   role?: AttendanceRole;
 }) {
+  const eventId = toAttendanceEventId(input.eventId);
   const userId = input.userId?.trim() || null;
   const guestKey = input.guestKey?.trim() || null;
 
@@ -152,8 +155,8 @@ export async function setEventAttendance(input: {
 
   // Upsert by unique partial indexes — look up existing row first for guests/users
   const existing = userId
-    ? await getUserEventAttendance(input.eventId, userId)
-    : await getGuestEventAttendance(input.eventId, guestKey!);
+    ? await getUserEventAttendance(eventId, userId)
+    : await getGuestEventAttendance(eventId, guestKey!);
 
   if (existing?.id) {
     const { data, error } = await supabaseAdmin
@@ -179,7 +182,7 @@ export async function setEventAttendance(input: {
   const { data, error } = await supabaseAdmin
     .from("community_event_attendance")
     .insert({
-      event_id: input.eventId,
+      event_id: eventId,
       user_id: userId,
       guest_key: guestKey,
       attendance_role: role,
@@ -200,7 +203,7 @@ export async function getEventAttendeeUserIds(eventId: string) {
   const { data } = await supabaseAdmin
     .from("community_event_attendance")
     .select("user_id")
-    .eq("event_id", eventId)
+    .eq("event_id", toAttendanceEventId(eventId))
     .eq("status", "going")
     .not("user_id", "is", null);
 
@@ -231,12 +234,13 @@ export async function listEventAttendanceForAdmin(eventId: string): Promise<{
   counts: EventAttendanceCounts;
   rows: EventAttendanceAdminRow[];
 }> {
-  const counts = await getEventAttendanceCounts(eventId);
+  const normalizedEventId = toAttendanceEventId(eventId);
+  const counts = await getEventAttendanceCounts(normalizedEventId);
 
   const { data: attendanceRows } = await supabaseAdmin
     .from("community_event_attendance")
     .select("id, user_id, guest_key, attendance_role, status, updated_at, created_at")
-    .eq("event_id", eventId)
+    .eq("event_id", normalizedEventId)
     .order("updated_at", { ascending: false });
 
   const list = attendanceRows || [];

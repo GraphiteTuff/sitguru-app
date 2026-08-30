@@ -10,6 +10,7 @@ import {
 import {
   getCuratedBucksMontgomeryPetEvents,
   isHomepageDemoEvent,
+  toAttendanceEventId,
 } from "@/lib/community/homepage-demo-events";
 import { notifyPartnerSomeoneIsGoing } from "@/lib/community/event-notifications";
 import {
@@ -84,12 +85,13 @@ async function resolveListedEvent(id: string): Promise<ListedEvent | null> {
   }
 
   // Curated homepage / carousel cards (demo-homepage-*) — allow Attending + Share.
+  // Map string demo ids → stable UUIDs because community_event_attendance.event_id is uuid.
   if (isHomepageDemoEvent(id)) {
     const curated = getCuratedBucksMontgomeryPetEvents().find(
       (row) => row.id === id,
     );
     return {
-      id,
+      id: toAttendanceEventId(id),
       title: curated?.title || "Pet Event",
       slug: curated?.slug || id.replace(/^demo-homepage-/, ""),
       partner_id: null,
@@ -101,7 +103,9 @@ async function resolveListedEvent(id: string): Promise<ListedEvent | null> {
 }
 
 export async function GET(req: NextRequest, context: RouteContext) {
-  const { id } = await context.params;
+  const { id: rawId } = await context.params;
+  const listed = await resolveListedEvent(rawId);
+  const id = listed?.id || toAttendanceEventId(rawId);
   const counts = await getEventAttendanceCounts(id);
   const resolved = await resolveRequestUser(req);
   const guestKey = readGuestKey(req);
@@ -126,7 +130,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
 export async function POST(req: NextRequest, context: RouteContext) {
   const resolved = await resolveRequestUser(req);
-  const { id } = await context.params;
+  const { id: rawId } = await context.params;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const status = String(body.status || "going") as AttendanceStatus;
   const guestKey = readGuestKey(req, body);
@@ -145,7 +149,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     );
   }
 
-  const event = await resolveListedEvent(id);
+  const event = await resolveListedEvent(rawId);
   if (!event) {
     return NextResponse.json(
       { error: "Event not found." },

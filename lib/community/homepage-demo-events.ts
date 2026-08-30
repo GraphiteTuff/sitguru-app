@@ -1,9 +1,49 @@
+import { createHash } from "node:crypto";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 
 export const HOMEPAGE_DEMO_EVENT_ID_PREFIX = "demo-homepage-";
 
+/** Stable namespace for mapping curated demo-* string ids → UUID attendance keys. */
+const DEMO_ATTENDANCE_NAMESPACE = "7c3e9a12-4b8f-4d61-9e2a-1f0c5d8b6a34";
+
 export function isHomepageDemoEvent(eventId: string | null | undefined) {
   return String(eventId || "").startsWith(HOMEPAGE_DEMO_EVENT_ID_PREFIX);
+}
+
+export function isAttendanceEventUuid(value: string | null | undefined) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || "").trim(),
+  );
+}
+
+function uuidV5FromName(name: string, namespaceUuid: string) {
+  const namespaceBytes = Buffer.from(namespaceUuid.replace(/-/g, ""), "hex");
+  const hash = createHash("sha1")
+    .update(namespaceBytes)
+    .update(name, "utf8")
+    .digest();
+
+  hash[6] = (hash[6] & 0x0f) | 0x50;
+  hash[8] = (hash[8] & 0x3f) | 0x80;
+
+  const hex = hash.subarray(0, 16).toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+/**
+ * Attendance rows require a UUID `event_id`. Curated homepage cards use
+ * `demo-homepage-*` string ids — map those to a deterministic UUID so RSVP works
+ * without inserting fake community_events rows (FK was dropped for discovery).
+ */
+export function toAttendanceEventId(eventId: string) {
+  const clean = String(eventId || "").trim();
+  if (!clean) return clean;
+  if (isAttendanceEventUuid(clean)) return clean.toLowerCase();
+  if (isHomepageDemoEvent(clean)) {
+    return uuidV5FromName(clean, DEMO_ATTENDANCE_NAMESPACE);
+  }
+  // Non-UUID discovery/external keys — still hash so Postgres accepts the column.
+  return uuidV5FromName(`listed:${clean}`, DEMO_ATTENDANCE_NAMESPACE);
 }
 
 /** America/New_York wall time → ISO (EDT -04 through Oct; EST -05 from Nov). */
