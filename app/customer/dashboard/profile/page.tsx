@@ -395,17 +395,17 @@ function SetupCard({ step }: { step: PetParentSetupStep }) {
   return (
     <Link
       href={step.actionHref}
-      className={`group flex min-h-[315px] flex-col rounded-[1.75rem] border p-5 transition hover:-translate-y-1 hover:shadow-xl ${getStatusClassName(
+      className={`group flex min-h-[280px] flex-col rounded-[1.75rem] border p-5 transition hover:-translate-y-1 hover:shadow-xl sm:min-h-[315px] ${getStatusClassName(
         step.status,
       )}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-xl shadow-sm ring-1 ring-white/80">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-xl shadow-sm ring-1 ring-white/80">
           {isComplete ? "✓" : step.number}
         </div>
 
         <span
-          className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${
+          className={`rounded-full border px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] ${
             isComplete
               ? "border-emerald-200 bg-emerald-100 text-emerald-800"
               : step.status === "required"
@@ -443,11 +443,11 @@ function SetupCard({ step }: { step: PetParentSetupStep }) {
         </p>
       </div>
 
-      <div className="mt-auto flex items-center justify-between border-t border-white/80 pt-5">
-        <span className="text-sm font-black text-emerald-700">
+      <div className="mt-auto flex min-h-[52px] items-center justify-between border-t border-white/80 pt-5">
+        <span className="text-base font-black text-emerald-700">
           {step.actionLabel}
         </span>
-        <ArrowRight className="h-4 w-4 text-emerald-700 transition group-hover:translate-x-1" />
+        <ArrowRight className="h-5 w-5 text-emerald-700 transition group-hover:translate-x-1" />
       </div>
     </Link>
   );
@@ -692,6 +692,10 @@ export default function CustomerProfileSetupPage() {
 
   const isBookingReady = readiness.readyToBook;
 
+  const nextIncompleteStep = setupSteps.find(
+    (step) => step.status !== "complete",
+  );
+
   const avatarSrc = profile?.avatar_url || "";
   const displayName = getCustomerDisplayName(profile);
   const avatarInitials = getCustomerInitials(profile);
@@ -837,6 +841,15 @@ export default function CustomerProfileSetupPage() {
                     send a booking. Extra steps are recommended so your Guru
                     knows routines, safety contacts, and how to reach you.
                   </p>
+
+                  {nextIncompleteStep && !isBookingReady ? (
+                    <Link
+                      href={nextIncompleteStep.actionHref}
+                      className="mt-5 inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-white px-5 text-base font-black text-emerald-800 transition hover:bg-emerald-50"
+                    >
+                      Next: {nextIncompleteStep.title}
+                    </Link>
+                  ) : null}
                 </div>
 
                 <div className="rounded-[1.75rem] border border-white/20 bg-white/15 p-5 text-center shadow-sm backdrop-blur">
@@ -859,6 +872,12 @@ export default function CustomerProfileSetupPage() {
                     style={{ width: `${readiness.bookingReadyPercent}%` }}
                   />
                 </div>
+                {!isBookingReady ? (
+                  <p className="mt-3 text-sm font-semibold text-emerald-50">
+                    Recommended extras unlock after you are booking ready — they
+                    do not block care requests.
+                  </p>
+                ) : null}
               </div>
             </section>
 

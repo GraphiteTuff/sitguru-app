@@ -3908,15 +3908,15 @@ export default function CustomerDashboardPage() {
               <Link
                 key={action.label}
                 href={action.href}
-                className="group rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg"
+                className="group flex min-h-[108px] flex-col rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg sm:min-h-[120px]"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 transition group-hover:bg-emerald-100">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 transition group-hover:bg-emerald-100">
                   {action.icon}
                 </div>
-                <p className="mt-3 text-sm font-black text-slate-950">
+                <p className="mt-3 text-base font-black text-slate-950">
                   {action.label}
                 </p>
-                <p className="mt-1 text-[11px] font-bold text-slate-500">
+                <p className="mt-1 text-xs font-bold text-slate-500">
                   {action.helper}
                 </p>
               </Link>

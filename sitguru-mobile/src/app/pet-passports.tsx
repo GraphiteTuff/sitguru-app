@@ -49,22 +49,22 @@ const WIZARD_STEPS: WizardStep[] = [
   {
     id: 'basics',
     title: 'Who is this pet?',
-    helper: 'Name and type first — we keep each step short.',
+    helper: 'Name and type are enough to save — extras are optional.',
   },
   {
     id: 'profile',
     title: 'Breed, weight & age',
-    helper: 'Thumb-friendly fields Gurus use to prepare gear.',
+    helper: 'Skip anytime — Gurus can still care with name and type.',
   },
   {
     id: 'vaccines',
     title: 'Vaccines & scan',
-    helper: 'Toggle Rabies, DHPP, and Bordetella — add dates when you have them.',
+    helper: 'Optional — toggle vaccines or skip and add papers later.',
   },
   {
     id: 'care',
     title: 'Diet & care notes',
-    helper: 'Dietary notes plus one comfort tip for handoff.',
+    helper: 'Optional comfort tips — save whenever you are ready.',
   },
 ];
 
@@ -180,24 +180,12 @@ export default function PetPassportsScreen() {
   const editing = Boolean(draft.petId);
 
   const canContinue = useMemo(() => {
+    // Only name + type are required to progress or save.
     if (stepIndex === 0) return draft.name.trim().length > 1 && !!draft.type;
-    if (stepIndex === 1) return !!draft.size;
-    if (stepIndex === 2) {
-      return (
-        hasAnyVaccine(draft.vaccines) ||
-        !!draft.vaccineUri ||
-        !!draft.existingPhotoUrl
-      );
-    }
-    if (stepIndex === 3) {
-      return (
-        draft.dietaryNotes.trim().length > 2 ||
-        draft.careNote.trim().length > 3
-      );
-    }
-    return false;
-  }, [draft, stepIndex]);
+    return draft.name.trim().length > 1 && !!draft.type;
+  }, [draft.name, draft.type, stepIndex]);
 
+  const canSaveBasics = draft.name.trim().length > 1 && !!draft.type;
   function startWizard(pet?: CanonicalPet | null) {
     setDraft(pet ? draftFromPet(pet) : EMPTY);
     setStepIndex(0);
@@ -238,7 +226,7 @@ export default function PetPassportsScreen() {
   }
 
   async function finishWizard() {
-    if (!user?.id || !draft.type || !draft.size) return;
+    if (!user?.id || !draft.type || !canSaveBasics) return;
 
     let photoUrl = draft.existingPhotoUrl;
 
@@ -275,7 +263,7 @@ export default function PetPassportsScreen() {
       ...EMPTY_CANONICAL_PET_FORM,
       name: draft.name.trim(),
       species: draft.type,
-      size: draft.size,
+      size: draft.size || '',
       breed: draft.breed.trim(),
       weight: draft.weight.trim(),
       age: draft.age.trim(),
@@ -382,6 +370,24 @@ export default function PetPassportsScreen() {
                   : 'Save passport'
               : 'Continue'
           }
+          skipLabel={
+            stepIndex === 0 && canSaveBasics
+              ? saving
+                ? 'Saving…'
+                : 'Save & finish later'
+              : stepIndex > 0 && stepIndex < WIZARD_STEPS.length - 1
+                ? 'Skip for now'
+                : undefined
+          }
+          onSkip={
+            stepIndex === 0 && canSaveBasics
+              ? () => {
+                  void finishWizard();
+                }
+              : stepIndex > 0 && stepIndex < WIZARD_STEPS.length - 1
+                ? () => setStepIndex((i) => i + 1)
+                : undefined
+          }
           onBack={() => {
             if (stepIndex === 0) setMode('hub');
             else setStepIndex((i) => i - 1);
@@ -433,7 +439,7 @@ export default function PetPassportsScreen() {
 
           {stepIndex === 1 ? (
             <View style={styles.stepBody}>
-              <Text style={styles.fieldLabel}>Size</Text>
+              <Text style={styles.fieldLabel}>Size (optional)</Text>
               <View style={styles.pillRow}>
                 {SIZE_OPTIONS.map((option) => {
                   const active = draft.size === option;
