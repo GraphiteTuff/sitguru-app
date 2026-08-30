@@ -327,3 +327,131 @@ export async function createAdminGuruAction(formData: FormData) {
     );
   }
 }
+
+/**
+ * Merge a duplicate Guru into a canonical Guru account.
+ * - Updates canonical display name (proper casing)
+ * - Hides duplicate from public + admin queues via account_merge_aliases
+ * - Does not delete auth users or booking history
+ */
+export async function mergeDuplicateGuruAction(formData: FormData) {
+  await requireAdminSession();
+
+  const canonicalUserId = asTrimmedString(formData.get("canonicalUserId"));
+  const duplicateUserId = asTrimmedString(formData.get("duplicateUserId"));
+  const displayNameRaw = asTrimmedString(formData.get("displayName"));
+  const displayName = displayNameRaw || "Angel Costner";
+
+  if (!canonicalUserId || !duplicateUserId) {
+    redirect("/admin/gurus?queue=duplicates&error=missing_merge_ids");
+  }
+
+  if (canonicalUserId === duplicateUserId) {
+    redirect("/admin/gurus?queue=duplicates&error=same_merge_ids");
+  }
+
+  const now = new Date().toISOString();
+  const parts = displayName.split(/\s+/).filter(Boolean);
+  const firstName = parts[0] || displayName;
+  const lastName = parts.slice(1).join(" ") || "";
+
+  try {
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        full_name: displayName,
+        display_name: displayName,
+        first_name: firstName,
+        last_name: lastName || null,
+        updated_at: now,
+      })
+      .eq("id", canonicalUserId);
+
+    if (profileError) {
+      throw new Error(profileError.message);
+    }
+
+    await supabaseAdmin
+      .from("gurus")
+      .update({
+        full_name: displayName,
+        display_name: displayName,
+        first_name: firstName,
+        last_name: lastName || null,
+        updated_at: now,
+      })
+      .or(
+        `id.eq.${canonicalUserId},user_id.eq.${canonicalUserId},profile_id.eq.${canonicalUserId}`,
+      );
+
+    await supabaseAdmin
+      .from("gurus")
+      .update({
+        is_public: false,
+        is_public_visible: false,
+        is_accepting_bookings: false,
+        accepting_bookings: false,
+        public_status: "hidden",
+        status: "merged_duplicate",
+        application_status: "merged_duplicate",
+        updated_at: now,
+      })
+      .or(
+        `id.eq.${duplicateUserId},user_id.eq.${duplicateUserId},profile_id.eq.${duplicateUserId}`,
+      );
+
+    await supabaseAdmin
+      .from("profiles")
+      .update({
+        account_status: "merged_duplicate",
+        display_name: `${displayName} (merged)`,
+        updated_at: now,
+      })
+      .eq("id", duplicateUserId);
+
+    const { error: aliasError } = await supabaseAdmin
+      .from("account_merge_aliases")
+      .insert({
+        duplicate_user_id: duplicateUserId,
+        canonical_user_id: canonicalUserId,
+        status: "active",
+      });
+
+    if (aliasError) {
+      // Upsert-style retry if row exists
+      const { error: updateAliasError } = await supabaseAdmin
+        .from("account_merge_aliases")
+        .update({
+          canonical_user_id: canonicalUserId,
+          status: "active",
+        })
+        .eq("duplicate_user_id", duplicateUserId);
+
+      if (updateAliasError) {
+        throw new Error(aliasError.message || updateAliasError.message);
+      }
+    }
+
+    revalidatePath("/admin/gurus");
+    revalidatePath(`/admin/gurus/${canonicalUserId}`);
+    redirect(
+      `/admin/gurus/${encodeURIComponent(canonicalUserId)}?notice=merged_duplicate`,
+    );
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "digest" in error &&
+      String((error as { digest?: string }).digest || "").startsWith("NEXT_REDIRECT")
+    ) {
+      throw error;
+    }
+
+    console.error("mergeDuplicateGuruAction failed:", error);
+    const message =
+      error instanceof Error ? error.message : "Unable to merge Guru accounts.";
+    redirect(
+      `/admin/gurus?queue=duplicates&error=${encodeURIComponent(message.slice(0, 160))}`,
+    );
+  }
+}
