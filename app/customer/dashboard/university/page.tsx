@@ -190,9 +190,7 @@ function getInitials(displayName: string) {
 }
 
 function getAvatarUrl(profile: AnyRow | null, authUser: AnyRow | null) {
-  return (
-    resolvePetParentAvatarUrl(profile, getAuthMetadata(authUser)) || null
-  );
+  return resolvePetParentAvatarUrl(profile, getAuthMetadata(authUser));
 }
 
 function getContentTypeLabel(value?: string | null) {
