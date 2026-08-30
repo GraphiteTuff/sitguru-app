@@ -690,6 +690,12 @@ export default function CustomerProfileSetupPage() {
     ];
   }, [setupBooleans]);
 
+  const requiredSteps = setupSteps.filter((step) => step.number <= 3);
+  const recommendedSteps = setupSteps.filter((step) => step.number > 3);
+  const completedRecommended = recommendedSteps.filter(
+    (step) => step.status === "complete",
+  ).length;
+
   const isBookingReady = readiness.readyToBook;
 
   const nextIncompleteStep = setupSteps.find(
