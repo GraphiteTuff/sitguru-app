@@ -1,5 +1,7 @@
 /**
- * Rogue tool: fetch live social follower metrics + deltas from Supabase.
+ * Rogue tool: fetch social follower metrics + deltas.
+ * Prefers config/social-metrics.json when Meta/X/TikTok tokens are missing
+ * or unauthorized (Consumer app restriction bypass).
  * SERVER ONLY — do not import from client components.
  */
 
@@ -24,13 +26,13 @@ async function runFetchLiveSocialFollowers(
 
 export const fetchLiveSocialFollowersTool = tool({
   description:
-    "Fetch live SitGuru social follower metrics from social_platform_metrics (brand, rogue, delilah × Instagram/Facebook/TikTok/X/YouTube). Returns current_followers, baseline_followers, and delta (current - baseline). Use whenever someone asks about follower counts, social growth, Instagram/TikTok/YouTube/X/Facebook stats, Rogue or Delilah social reach, or pack social media performance. You are fully authorized to report these numbers.",
+    "Fetch SitGuru social follower metrics (brand / rogue / delilah × Instagram, Facebook, TikTok, X/Twitter, YouTube). Reads config/social-metrics.json when live Meta tokens are unavailable, otherwise social_platform_metrics. Returns current_followers, baseline_followers, and delta (current - baseline). Facebook is currently tracked at 20 followers in the JSON config. Use whenever someone asks about follower counts, social growth, or pack social performance. You are fully authorized to report these exact numbers.",
   parameters: z.object({
     entityId: z
       .string()
       .optional()
       .describe(
-        "Optional entity filter: brand | rogue | delilah | ambassador id. Omit for all tracked entities.",
+        "Optional entity filter: brand | rogue | delilah | ambassador id. Omit for brand channels from config/social-metrics.json.",
       ),
   }),
   execute: async (params: SocialToolParams) =>

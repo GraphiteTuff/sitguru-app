@@ -1,9 +1,16 @@
 /**
  * Social media follower sync for SitGuru brand + AI personas (Rogue / Delilah).
  *
- * Server-only. Tokens live in env; missing/placeholder values use safe fallbacks
- * so cron and seed scripts never crash local/dev environments.
+ * Priority when live Meta/X/TikTok tokens are missing or unauthorized:
+ *   1) config/social-metrics.json (manual tracking)
+ *   2) social_platform_metrics database rows
+ *   3) hard-coded offline fallbacks
+ *
+ * Server-only — do not import from client components.
  */
+
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 export type SocialPlatform = "instagram" | "facebook" | "tiktok" | "x" | "youtube";
 
@@ -13,7 +20,8 @@ export type SocialFollowerSnapshot = {
   entityId: SocialEntityId;
   platform: SocialPlatform;
   currentFollowers: number;
-  source: "live" | "fallback";
+  baselineFollowers?: number;
+  source: "live" | "config" | "fallback";
 };
 
 /** Default tracked handles / entities for baseline seeding and cron sync. */
@@ -31,31 +39,51 @@ export const SOCIAL_TRACKED_PLATFORMS: readonly SocialPlatform[] = [
   "youtube",
 ] as const;
 
-/** Safe offline baselines when API tokens are absent or still placeholders. */
+export const SOCIAL_METRICS_CONFIG_PATH = join(
+  process.cwd(),
+  "config",
+  "social-metrics.json",
+);
+
+type JsonChannelMetrics = {
+  baseline?: number;
+  current?: number;
+};
+
+type SocialMetricsJsonFile = {
+  updatedAt?: string;
+  handle?: string;
+  notes?: string;
+  channels?: Record<string, JsonChannelMetrics>;
+  /** Optional per-entity override map */
+  entities?: Record<string, Record<string, JsonChannelMetrics>>;
+};
+
+/** Safe offline baselines when config + API tokens are absent. */
 const FALLBACK_FOLLOWERS: Record<
   SocialEntityId,
   Partial<Record<SocialPlatform, number>>
 > = {
   brand: {
-    instagram: 1250,
-    facebook: 980,
-    tiktok: 2100,
-    x: 640,
-    youtube: 420,
+    instagram: 0,
+    facebook: 20,
+    tiktok: 0,
+    x: 0,
+    youtube: 0,
   },
   rogue: {
-    instagram: 860,
-    facebook: 510,
-    tiktok: 1440,
-    x: 390,
-    youtube: 275,
+    instagram: 0,
+    facebook: 20,
+    tiktok: 0,
+    x: 0,
+    youtube: 0,
   },
   delilah: {
-    instagram: 720,
-    facebook: 430,
-    tiktok: 990,
-    x: 280,
-    youtube: 190,
+    instagram: 0,
+    facebook: 20,
+    tiktok: 0,
+    x: 0,
+    youtube: 0,
   },
 };
 
@@ -95,6 +123,11 @@ export function hasTikTokClientKey(): boolean {
   return isUsableToken(readEnv("TIKTOK_CLIENT_KEY"));
 }
 
+/** True when at least one live social API credential looks usable. */
+export function hasUsableLiveSocialTokens(): boolean {
+  return hasMetaAccessToken() || hasXBearerToken() || hasTikTokClientKey();
+}
+
 export function computeFollowerDelta(
   currentFollowers: number,
   baselineFollowers: number,
@@ -102,6 +135,26 @@ export function computeFollowerDelta(
   const current = Number.isFinite(currentFollowers) ? currentFollowers : 0;
   const baseline = Number.isFinite(baselineFollowers) ? baselineFollowers : 0;
   return Math.trunc(current) - Math.trunc(baseline);
+}
+
+function asInt(value: unknown) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.trunc(n) : 0;
+}
+
+/** Map config keys like `twitter` onto our canonical platform ids. */
+export function normalizeSocialPlatformKey(
+  raw: string,
+): SocialPlatform | null {
+  const key = String(raw || "")
+    .trim()
+    .toLowerCase();
+  if (key === "facebook" || key === "fb") return "facebook";
+  if (key === "instagram" || key === "ig") return "instagram";
+  if (key === "tiktok" || key === "tt") return "tiktok";
+  if (key === "twitter" || key === "x" || key === "tweet") return "x";
+  if (key === "youtube" || key === "yt") return "youtube";
+  return null;
 }
 
 function fallbackFollowers(
@@ -115,9 +168,141 @@ function fallbackFollowers(
 }
 
 /**
- * Mock-ready live fetch. When tokens are configured this is the extension
- * point for Meta / X / TikTok / YouTube Graph calls. Until then, returns
- * deterministic fallbacks so cron + local seed stay green.
+ * Load manual tracking from config/social-metrics.json.
+ * Returns null when the file is missing or unreadable.
+ */
+export function loadSocialMetricsConfig(
+  configPath: string = SOCIAL_METRICS_CONFIG_PATH,
+): SocialMetricsJsonFile | null {
+  try {
+    if (!existsSync(configPath)) return null;
+    const raw = readFileSync(configPath, "utf8");
+    const parsed = JSON.parse(raw) as SocialMetricsJsonFile;
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch (error) {
+    console.warn(
+      "[socialMediaClient] failed to read config/social-metrics.json:",
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
+}
+
+function channelMetricsFromConfig(
+  config: SocialMetricsJsonFile,
+  entityId: SocialEntityId,
+  platform: SocialPlatform,
+): { baseline: number; current: number } | null {
+  const entityMap = config.entities?.[String(entityId)];
+  if (entityMap && typeof entityMap === "object") {
+    for (const [rawKey, metrics] of Object.entries(entityMap)) {
+      if (normalizeSocialPlatformKey(rawKey) !== platform) continue;
+      return {
+        baseline: asInt(metrics?.baseline),
+        current: asInt(metrics?.current),
+      };
+    }
+  }
+
+  // Brand (and default) channels live at the top-level `channels` map.
+  if (entityId === "brand" || entityId === "rogue" || entityId === "delilah") {
+    const channels = config.channels || {};
+    for (const [rawKey, metrics] of Object.entries(channels)) {
+      if (normalizeSocialPlatformKey(rawKey) !== platform) continue;
+      return {
+        baseline: asInt(metrics?.baseline),
+        current: asInt(metrics?.current),
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Build Rogue-ready rows directly from the JSON tracking file.
+ */
+export function rowsFromSocialMetricsConfig(
+  opts?: { entityId?: string; configPath?: string },
+): LiveSocialFollowerRow[] {
+  const config = loadSocialMetricsConfig(opts?.configPath);
+  if (!config) return [];
+
+  const updatedAt = config.updatedAt ? String(config.updatedAt) : null;
+  const filterEntity = String(opts?.entityId || "").trim();
+  const entityIds: SocialEntityId[] = filterEntity
+    ? [filterEntity]
+    : ["brand"];
+
+  const rows: LiveSocialFollowerRow[] = [];
+
+  for (const entityId of entityIds) {
+    const channels = config.channels || {};
+    const seen = new Set<SocialPlatform>();
+
+    for (const rawKey of Object.keys(channels)) {
+      const platform = normalizeSocialPlatformKey(rawKey);
+      if (!platform || seen.has(platform)) continue;
+      seen.add(platform);
+
+      const metrics = channelMetricsFromConfig(config, entityId, platform);
+      if (!metrics) continue;
+
+      rows.push({
+        entityId,
+        platform,
+        currentFollowers: metrics.current,
+        baselineFollowers: metrics.baseline,
+        delta: computeFollowerDelta(metrics.current, metrics.baseline),
+        updatedAt,
+      });
+    }
+
+    // Also surface entity-specific platforms not listed in top-level channels.
+    const entityMap = config.entities?.[String(entityId)] || {};
+    for (const rawKey of Object.keys(entityMap)) {
+      const platform = normalizeSocialPlatformKey(rawKey);
+      if (!platform || seen.has(platform)) continue;
+      seen.add(platform);
+      const metrics = channelMetricsFromConfig(config, entityId, platform);
+      if (!metrics) continue;
+      rows.push({
+        entityId,
+        platform,
+        currentFollowers: metrics.current,
+        baselineFollowers: metrics.baseline,
+        delta: computeFollowerDelta(metrics.current, metrics.baseline),
+        updatedAt,
+      });
+    }
+  }
+
+  return rows.sort((a, b) =>
+    `${a.entityId}:${a.platform}`.localeCompare(`${b.entityId}:${b.platform}`),
+  );
+}
+
+function formatSocialDigest(
+  rows: LiveSocialFollowerRow[],
+  sourceLabel: string,
+): string {
+  if (!rows.length) {
+    return "No social metrics rows available yet.";
+  }
+  return [
+    `LIVE SOCIAL FOLLOWERS (from ${sourceLabel}):`,
+    ...rows.map((row) => {
+      const sign = row.delta > 0 ? "+" : "";
+      return `- ${row.entityId} / ${row.platform}: current ${row.currentFollowers.toLocaleString()} · baseline ${row.baselineFollowers.toLocaleString()} · delta ${sign}${row.delta.toLocaleString()}`;
+    }),
+    "Authorized: report these exact numbers. Do not invent counts outside this digest.",
+  ].join("\n");
+}
+
+/**
+ * Mock-ready live fetch. When tokens are missing/unauthorized, prefer
+ * config/social-metrics.json so Rogue can report manual counts (e.g. FB 20).
  */
 export async function fetchLiveFollowerCount(params: {
   entityId: SocialEntityId;
@@ -137,11 +322,26 @@ export async function fetchLiveFollowerCount(params: {
   } else if (platform === "tiktok") {
     canAttemptLive = tiktokReady;
   } else if (platform === "youtube") {
-    // YouTube often rides Meta/Google stacks; treat Meta token as optional gate.
     canAttemptLive = metaReady;
   }
 
+  // Live Graph calls are not available on Consumer apps / missing tokens.
+  // Prefer the checked-in JSON tracker before hard-coded fallbacks.
   if (!canAttemptLive) {
+    const config = loadSocialMetricsConfig();
+    if (config) {
+      const metrics = channelMetricsFromConfig(config, entityId, platform);
+      if (metrics) {
+        return {
+          entityId,
+          platform,
+          currentFollowers: metrics.current,
+          baselineFollowers: metrics.baseline,
+          source: "config",
+        };
+      }
+    }
+
     return {
       entityId,
       platform,
@@ -150,8 +350,22 @@ export async function fetchLiveFollowerCount(params: {
     };
   }
 
-  // Live API wiring is intentionally stubbed until credentials are production-ready.
-  // Returning fallback keeps jobs idempotent and crash-free.
+  // Token present but live Graph wiring still stubbed / unauthorized for
+  // Consumer app types — fall through to JSON so numbers stay accurate.
+  const config = loadSocialMetricsConfig();
+  if (config) {
+    const metrics = channelMetricsFromConfig(config, entityId, platform);
+    if (metrics) {
+      return {
+        entityId,
+        platform,
+        currentFollowers: metrics.current,
+        baselineFollowers: metrics.baseline,
+        source: "config",
+      };
+    }
+  }
+
   return {
     entityId,
     platform,
@@ -183,7 +397,7 @@ export type LiveSocialFollowerRow = {
 
 export type LiveSocialFollowersResult = {
   ok: boolean;
-  source: "database" | "empty" | "error";
+  source: "database" | "config" | "empty" | "error";
   rows: LiveSocialFollowerRow[];
   digest: string;
   error?: string;
@@ -212,19 +426,29 @@ type SocialMetricsReader = {
   };
 };
 
-function asInt(value: unknown) {
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.trunc(n) : 0;
-}
-
 /**
- * Read live follower rows from `social_platform_metrics` and compute
- * `current_followers - baseline_followers` deltas for Rogue / Delilah tools.
+ * Read follower metrics for Rogue / Delilah.
+ * When live API tokens are missing/unauthorized (typical for Meta Consumer apps),
+ * prioritize config/social-metrics.json so Facebook current=20 is reported exactly.
  */
 export async function fetchLiveSocialFollowers(
   admin: SocialMetricsReader,
   opts?: { entityId?: string },
 ): Promise<LiveSocialFollowersResult> {
+  const preferConfig = !hasUsableLiveSocialTokens();
+  const configRows = rowsFromSocialMetricsConfig({
+    entityId: opts?.entityId || (preferConfig ? "brand" : undefined),
+  });
+
+  if (preferConfig && configRows.length) {
+    return {
+      ok: true,
+      source: "config",
+      rows: configRows,
+      digest: formatSocialDigest(configRows, "config/social-metrics.json"),
+    };
+  }
+
   try {
     const entityId = String(opts?.entityId || "").trim();
     const columns =
@@ -235,6 +459,14 @@ export async function fetchLiveSocialFollowers(
       : await selected.order("entity_id", { ascending: true });
 
     if (error) {
+      if (configRows.length) {
+        return {
+          ok: true,
+          source: "config",
+          rows: configRows,
+          digest: formatSocialDigest(configRows, "config/social-metrics.json"),
+        };
+      }
       return {
         ok: false,
         source: "error",
@@ -265,31 +497,38 @@ export async function fetchLiveSocialFollowers(
       );
 
     if (!rows.length) {
+      if (configRows.length) {
+        return {
+          ok: true,
+          source: "config",
+          rows: configRows,
+          digest: formatSocialDigest(configRows, "config/social-metrics.json"),
+        };
+      }
       return {
         ok: true,
         source: "empty",
         rows: [],
         digest:
-          "No social_platform_metrics rows yet. Seed baselines with `npm run seed-social-baseline` or run the social-metrics-baseline cron.",
+          "No social_platform_metrics rows yet. Update config/social-metrics.json or run npm run seed-social-baseline.",
       };
     }
-
-    const digestLines = [
-      "LIVE SOCIAL FOLLOWERS (from social_platform_metrics):",
-      ...rows.map((row) => {
-        const sign = row.delta > 0 ? "+" : "";
-        return `- ${row.entityId} / ${row.platform}: current ${row.currentFollowers.toLocaleString()} · baseline ${row.baselineFollowers.toLocaleString()} · delta ${sign}${row.delta.toLocaleString()}`;
-      }),
-      "Authorized: report these exact numbers. Do not invent counts outside this digest.",
-    ];
 
     return {
       ok: true,
       source: "database",
       rows,
-      digest: digestLines.join("\n"),
+      digest: formatSocialDigest(rows, "social_platform_metrics"),
     };
   } catch (error) {
+    if (configRows.length) {
+      return {
+        ok: true,
+        source: "config",
+        rows: configRows,
+        digest: formatSocialDigest(configRows, "config/social-metrics.json"),
+      };
+    }
     return {
       ok: false,
       source: "error",
@@ -306,7 +545,7 @@ export type BaselineSyncRowResult = {
   currentFollowers: number;
   baselineFollowers: number;
   delta: number;
-  source: "live" | "fallback";
+  source: "live" | "config" | "fallback";
   action: "upserted" | "skipped" | "error";
   error?: string;
 };
@@ -339,11 +578,15 @@ export async function syncSocialMetricsBaseline(
   let updated = 0;
 
   for (const snapshot of snapshots) {
+    const baseline =
+      typeof snapshot.baselineFollowers === "number"
+        ? snapshot.baselineFollowers
+        : snapshot.currentFollowers;
     const payload = {
       entity_id: snapshot.entityId,
       platform: snapshot.platform,
       current_followers: snapshot.currentFollowers,
-      baseline_followers: snapshot.currentFollowers,
+      baseline_followers: baseline,
       updated_at: new Date().toISOString(),
     };
 
@@ -356,8 +599,8 @@ export async function syncSocialMetricsBaseline(
         entityId: snapshot.entityId,
         platform: snapshot.platform,
         currentFollowers: snapshot.currentFollowers,
-        baselineFollowers: snapshot.currentFollowers,
-        delta: 0,
+        baselineFollowers: baseline,
+        delta: computeFollowerDelta(snapshot.currentFollowers, baseline),
         source: snapshot.source,
         action: "error",
         error: error.message || "upsert failed",
@@ -370,11 +613,8 @@ export async function syncSocialMetricsBaseline(
       entityId: snapshot.entityId,
       platform: snapshot.platform,
       currentFollowers: snapshot.currentFollowers,
-      baselineFollowers: snapshot.currentFollowers,
-      delta: computeFollowerDelta(
-        snapshot.currentFollowers,
-        snapshot.currentFollowers,
-      ),
+      baselineFollowers: baseline,
+      delta: computeFollowerDelta(snapshot.currentFollowers, baseline),
       source: snapshot.source,
       action: "upserted",
     });
