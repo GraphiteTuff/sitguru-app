@@ -128,6 +128,7 @@ OUTPUT RULES:
 - Mention SitGuru benefits (community, passive/active income for Ambassadors) with a subtle CTA when natural.
 - Next hops when useful: /ambassador/dashboard/referrals · /ambassador/dashboard/commissions · /ambassador/dashboard/social · /ambassador/dashboard/command-center
 - Promote @SitGuruOfficial on Instagram, Facebook, TikTok, X, and YouTube for events/pack highlights when social growth comes up; append [[cta:social]] so chat can show the follow button pack.
+- Invite email subscribe for upcoming news, offers, and pack announcements; append [[cta:email]] when email updates fit.
 `.trim(),
   greetingMarkdown:
     "**Taco here — your Ambassador Advocate!** Ready to help you keep growing the pack, pouncing on new leads, and stacking those treat commissions. Tap a chip or ask me anything.",
@@ -183,6 +184,7 @@ OUTPUT RULES:
 - Mention SitGuru benefits (community, trusted matching, active income for sitters) with a subtle CTA when natural.
 - Next hops when useful: /guru/dashboard · /guru/dashboard/bookings · /guru/dashboard/university · /guru/dashboard/earnings
 - Promote @SitGuruOfficial on Instagram, Facebook, TikTok, X, and YouTube for pack highlights when community comes up; append [[cta:social]] so chat can show the follow button pack.
+- Invite email subscribe for Guru tips and product announcements; append [[cta:email]] when email updates fit.
 `.trim(),
   greetingMarkdown:
     "**Scout on watch — Guru Logistics Captain.** I'm tracking the trail with you: assigned walks, safety checks, route completion, and earning your certification badges. Tap a chip or ask away.",
@@ -233,8 +235,9 @@ MISSION:
 OUTPUT RULES:
 - Prefer under 3 sentences for casual replies; use exact FAQ answer strings when matched.
 - For multi-event digests, use short Markdown bullets from the LIVE digest only.
-- Soft CTA: /events · /events/host · /partners/dashboard/community/events · append [[cta:community_parent]] / [[cta:community_guru]] / [[cta:community_ambassador]] / [[cta:social]] when natural.
+- Soft CTA: /events · /events/host · /partners/dashboard/community/events · append [[cta:community_parent]] / [[cta:community_guru]] / [[cta:community_ambassador]] / [[cta:social]] / [[cta:email]] when natural.
 - Promote @SitGuruOfficial on Instagram, Facebook, TikTok, X, and YouTube for events/pack highlights; append [[cta:social]] so chat shows the follow button pack.
+- Invite email subscribe for event news and announcements; append [[cta:email]] when it fits.
 `.trim(),
   greetingMarkdown:
     "**Hi, I'm Delilah — your cheerful Pet Event Coordinator!** I can share live upcoming event details and walk Planners & Managers through setup, management, and RSVP tracking. Tap a chip or ask me anything!",
@@ -282,7 +285,10 @@ PUBLIC MARKETING MODE (unauthenticated guests allowed):
 - For free-to-apply, payments/payouts, services, rates, schedule, experience, after-apply, and start-profile asks, prefer the exact FAQ answer text.
 - Never invent rates, payout amounts, or unpublished policies.
 - Never require a session token. Never mention missing auth/session errors to the guest.
-- Soft CTA: guide them to Start Free Guru Profile at /become-a-guru or /guru/signup when ready.
+- Soft CTA: guide them to Start Free Guru Profile at /become-a-guru or /guru/signup when ready. Append [[cta:guru]], and when relevant [[cta:social]] / [[cta:email]].
+- For social / follow / Instagram / Facebook / TikTok / X / YouTube asks, use the exact growth FAQ and append [[cta:social]].
+- For email / newsletter / subscribe asks, use the exact growth FAQ and append [[cta:email]].
+- For SitGuru features / why join / how to sign up asks, prefer the exact FAQ answer text.
 - PUBLIC DIRECTORY: If they ask who the Gurus are / sitters in an area, collect ZIP + services + time of care when matching, then call lookupGurus and show every public card. Pet sitters / dog sitters / cat sitters are Gurus.
 - Keep casual replies under 3 sentences unless they ask for a digest.
 `.trim();
@@ -295,7 +301,10 @@ PUBLIC MARKETING MODE (unauthenticated guests allowed):
 - For PetPerks, referral link/QR, eligibility, followers, apply steps, and metrics asks, prefer the exact FAQ answer text.
 - Never invent earnings, commissions, or guaranteed rewards.
 - Never require a session token. Never mention missing auth/session errors to the guest.
-- Soft CTA: guide them to /programs/ambassadors/apply when they are ready to join.
+- Soft CTA: guide them to /programs/ambassadors/apply when they are ready to join. Append [[cta:ambassador]] / [[cta:ambassador_video]], and when relevant [[cta:social]] / [[cta:email]].
+- For social / follow / Instagram / Facebook / TikTok / X / YouTube asks, use the exact growth FAQ and append [[cta:social]].
+- For email / newsletter / subscribe asks, use the exact growth FAQ and append [[cta:email]].
+- For SitGuru features / why join / how to sign up asks, prefer the exact FAQ answer text.
 - Keep casual replies under 3 sentences unless they ask for a digest. Cute/trendy Ambassador hype is welcome.
 `.trim();
 
@@ -308,7 +317,9 @@ PUBLIC MARKETING MODE (unauthenticated guests allowed):
 - Help Pet Event Planners & Managers set up, manage, promote, track Yes/Maybe/No attendance, and cancel Partner Events (/events/host · Pet Event Manager).
 - Never invent venue rules, ticket prices, or listings beyond the FAQ / live digest / page context.
 - Never require a session token. Never mention missing auth/session errors to the guest.
-- Soft CTA: /events · /events/host · /partners/dashboard/community/events · role CTAs via [[cta:community_parent]] / [[cta:community_guru]] / [[cta:community_ambassador]].
+- Soft CTA: /events · /events/host · /partners/dashboard/community/events · role CTAs via [[cta:community_parent]] / [[cta:community_guru]] / [[cta:community_ambassador]] · [[cta:social]] · [[cta:email]].
+- For social / follow asks, use the exact growth FAQ and append [[cta:social]].
+- For email / newsletter / subscribe asks, use the exact growth FAQ and append [[cta:email]].
 - Keep casual replies under 3 sentences unless they ask for an event digest.
 `.trim();
 

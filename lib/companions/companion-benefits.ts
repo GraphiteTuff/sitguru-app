@@ -29,7 +29,7 @@ export const SCOUT_GURU_BENEFITS_RESPONSE = `You tapped it, now let's unlock it!
 * 🛡️ **Bulletproof Protection** – Enjoy secure, automated milestone payments so you never have to guess when you're getting paid.
 * 🎒 **Exclusive Squad Perks** – Access premium digital tools, advanced masterclasses, and networking events for free.
 
-Ready to turn on these power-ups? Tap that green **'Start Free Guru Profile'** button below and let's get it!`;
+Ready to turn on these power-ups? Tap that green **Start Free Guru Profile** button below, follow **@SitGuruOfficial**, and subscribe for trail tips! [[cta:guru]] [[cta:social]] [[cta:email]]`;
 
 export const TACO_AMBASSADOR_BENEFITS_RESPONSE = `Let’s GOOOO! You clicked the golden ticket! 🎟️✨ Choosing **Ambassador Benefits** means you are moving straight past 'casual user' and stepping into elite Main Character status. 
 
@@ -41,7 +41,7 @@ As your official AI Companion and hype-pet, I am legally required to tell you th
 * 🔒 **The Vault Security** – Bulletproof, automated milestones. The money is locked in safe and secure before you even lift a finger.
 * 🚀 **The Creator Lab Access** – Free entry into elite masterclasses, advanced digital toolkits, and private community networking drops.
 
-You're already built for this. Smash that **'Sign Up & Claim Your Tools'** button below — or head to Ambassador apply — and let's go build an empire together! 🐺💼`;
+You're already built for this. Smash **Claim My Referral Code**, follow **@SitGuruOfficial**, and subscribe for pack drops! [[cta:ambassador]] [[cta:social]] [[cta:email]] 🐺💼`;
 
 export const ROGUE_PET_PARENT_BENEFITS_RESPONSE = `Alright, let’s talk real benefits. 🐾 Security and top-tier care aren't optional for your pack—they’re mandatory. Tapping **Pet Parent Benefits** means you are unlocking a fortress of perks designed to give your pet a luxury lifestyle and give you absolute peace of mind. 
 
@@ -53,7 +53,7 @@ I don't do fluff, so let me give you the straight facts on what this profile set
 * 💳 **Zero-Hassle Vault Payments** – Safe, encrypted payments. The price you see is the price you pay—no hidden platform fees or surprise surcharges.
 * 🎁 **The VIP Treat Box** – Exclusive discounts on premium pet food, trendy accessories, and local pet events dropped straight to your inbox.
 
-Your pet deserves the best crew in town. Let's make it official—tap that **'Start Free Profile'** button below and welcome to the pack! 🐕💼`;
+Your pet deserves the best crew in town. Let's make it official—tap **Create Pet Parent Account**, follow **@SitGuruOfficial** for pics and updates, and subscribe so you never miss a drop! [[cta:parent]] [[cta:social]] [[cta:email]] 🐕💼`;
 
 export const DELILAH_EVENT_HOST_BENEFITS_RESPONSE = `Let’s get your pack gather on the calendar! 🐾📅 Choosing **Event Host Benefits** means you’re stepping into SitGuru Partner Events — the listings that always stay first.
 
@@ -65,7 +65,7 @@ Here’s what hosts and Pet Event Planners & Managers unlock:
 * 🗺️ **Local discovery** – Pet Parents, Gurus, and Ambassadors find you on the Pet Events map and homepage.
 * 🤝 **Pack conversion** – Guests can join as Pet Parents, Gurus, or Ambassadors right from your listing energy.
 
-Ready to publish? Tap **Create Event** on the homepage — quick Pet Parent signup is enough to open a draft. Businesses can still **Apply to host** for a full Partner profile. Let's fill the yard!`;
+Ready to publish? Tap **Create Event** on the homepage — quick Pet Parent signup is enough to open a draft. Businesses can still **Apply to host** for a full Partner profile. Follow **@SitGuruOfficial** and subscribe so guests never miss your gathers! [[cta:community_parent]] [[cta:social]] [[cta:email]]`;
 
 export const COMPANION_BENEFITS_RESPONSE: Record<CompanionId, string> = {
   scout: SCOUT_GURU_BENEFITS_RESPONSE,

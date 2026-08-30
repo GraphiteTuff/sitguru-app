@@ -13,6 +13,14 @@ import {
   matchMarketingFaq,
   type MarketingFaqEntry,
 } from "@/lib/ai/officer-marketing-faqs";
+import {
+  buildCompanionGrowthFaqs,
+  matchCompanionGrowthSoftIntent,
+} from "@/lib/ai/companion-growth-faqs";
+import {
+  COMPANION_BENEFITS_RESPONSE,
+  COMPANION_BENEFITS_USER_PROMPT,
+} from "@/lib/companions/companion-benefits";
 
 export type CommunityEventCompanionContext = {
   slug?: string;
@@ -34,6 +42,10 @@ export const COMMUNITY_EVENT_FAQ_CHIPS = [
   { label: "Free events?", question: "Are SitGuru pet events free?" },
   { label: "Partner vs Pet", question: "What is the difference between a Partner Event and a Pet Event?" },
   { label: "Share event", question: "How do I share an event?" },
+  { label: "Features", question: "What features does SitGuru offer?" },
+  { label: "Follow us", question: "Where can I follow SitGuru on social media?" },
+  { label: "Email updates", question: "How do I subscribe for email updates?" },
+  { label: "Why join?", question: "Why should I join SitGuru?" },
   { label: "Pet Parent", question: "How do I join as a Pet Parent?" },
   { label: "Pet Guru", question: "How do I join as a Pet Guru?" },
   { label: "Ambassador", question: "How do I join as an Ambassador?" },
@@ -238,6 +250,16 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
     answer:
       "Yes — Pet Event Planners & Managers host through a SitGuru Partner account. Apply via `/partners/apply?intent=community_events` (also linked from **/events/host**), then you'll get the Pet Event Manager!",
   },
+  {
+    question: COMPANION_BENEFITS_USER_PROMPT.delilah,
+    aliases: [
+      "event host benefits",
+      "tell me about event host benefits",
+      "what are the event host benefits",
+    ],
+    answer: COMPANION_BENEFITS_RESPONSE.delilah,
+  },
+  ...buildCompanionGrowthFaqs("delilah"),
 ] as const;
 
 export function isCommunityCompanionPath(pagePath?: string | null) {
@@ -307,7 +329,7 @@ export function matchDelilahSoftIntent(question: string): MarketingFaqEntry | nu
     return find("where is the pet event manager");
   }
 
-  return null;
+  return matchCompanionGrowthSoftIntent("delilah", question);
 }
 
 export function resolveDelilahInstantFaqAnswer(question: string): string | null {
@@ -386,6 +408,7 @@ export function buildCommunityEventsFaqSnapshot(
     `- Guru / sitter / walker interest → append ${cta("guru")}`,
     `- Ambassador / community growth interest → append ${cta("ambassador")}`,
     "- Social / follow pack → append [[cta:social]]",
+    "- Email / newsletter / subscribe → append [[cta:email]]",
     "",
     "VOICE: Very happy, outgoing, and cheerful golden Cocker Spaniel energy — punchy, encouraging, never invent listing details outside the LIVE EVENTS digest + FAQ.",
   ]

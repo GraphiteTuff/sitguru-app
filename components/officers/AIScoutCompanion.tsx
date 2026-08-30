@@ -99,6 +99,11 @@ const PUBLIC_CHIPS = [
     prompt: SCOUT_BENEFITS_CHIP.prompt,
   },
   {
+    id: "features",
+    label: "SitGuru features",
+    prompt: "What features does SitGuru offer?",
+  },
+  {
     id: "payments_work",
     label: "Payments",
     prompt: "How do payments work?",
@@ -117,6 +122,16 @@ const PUBLIC_CHIPS = [
     id: "after_apply",
     label: "After I apply",
     prompt: "What happens after I apply?",
+  },
+  {
+    id: "follow_social",
+    label: "Follow us",
+    prompt: "Where can I follow SitGuru on social media?",
+  },
+  {
+    id: "email_updates",
+    label: "Email updates",
+    prompt: "How do I subscribe for email updates?",
   },
 ] as const;
 

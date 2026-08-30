@@ -17,7 +17,8 @@ export type CompanionCtaId =
   | 'guru'
   | 'ambassador'
   | 'ambassador_video'
-  | 'social';
+  | 'social'
+  | 'email';
 
 export type CompanionCtaAction =
   /** Navigate inside the mobile app. */
@@ -130,6 +131,18 @@ export const COMPANION_CTA_DEFS: readonly CompanionCtaDef[] = [
       '\\[\\[cta:social\\]\\]',
       '\\[Follow @?SitGuruOfficial[^\\]]*\\](?:\\([^)]*\\))?',
       '\\[Follow us on social[^\\]]*\\](?:\\([^)]*\\))?',
+    ],
+  },
+  {
+    id: 'email',
+    label: 'Subscribe with email',
+    action: { kind: 'web', path: '/?email_updates=1' },
+    patterns: [
+      '\\[\\[cta:email\\]\\]',
+      '\\[\\[cta:subscribe\\]\\]',
+      '\\[Subscribe with email[^\\]]*\\](?:\\([^)]*\\))?',
+      '\\[Sign up for email updates[^\\]]*\\](?:\\([^)]*\\))?',
+      '\\[Email updates[^\\]]*\\](?:\\([^)]*\\))?',
     ],
   },
 ];

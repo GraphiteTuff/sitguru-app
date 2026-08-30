@@ -20,10 +20,12 @@ import { normalizeRogueUserType } from "@/lib/chat/rogue-user-type";
 import {
   isCommunityCompanionPath,
   matchCommunityEventsFaq,
+  matchDelilahSoftIntent,
   parseCommunityEventSlugFromPath,
 } from "@/lib/ai/community-events-faqs";
 import {
   matchMarketingFaq,
+  matchRoguePublicSoftIntent,
   ROGUE_PUBLIC_MARKETING_FAQS,
 } from "@/lib/ai/officer-marketing-faqs";
 import { inferLookupParamsFromChat } from "@/lib/gurus/guru-chat-snapshot";
@@ -371,7 +373,9 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
     }
 
     if (isCommunityCompanionPath(pagePath) && lastUserText) {
-      const faqHit = matchCommunityEventsFaq(lastUserText);
+      const faqHit =
+        matchCommunityEventsFaq(lastUserText) ||
+        matchDelilahSoftIntent(lastUserText);
       if (faqHit?.answer) {
         void supabaseAdmin.from("analytics_events").insert({
           event_name: "community_rogue_faq",
@@ -388,10 +392,9 @@ export async function handleAuthenticatedAiSend(req: Request): Promise<Response>
       }
     }
 
-    const exactParentFaq = matchMarketingFaq(
-      ROGUE_PUBLIC_MARKETING_FAQS,
-      lastUserText,
-    );
+    const exactParentFaq =
+      matchMarketingFaq(ROGUE_PUBLIC_MARKETING_FAQS, lastUserText) ||
+      matchRoguePublicSoftIntent(lastUserText);
     if (exactParentFaq?.answer) {
       return simulationDataStreamResponse(exactParentFaq.answer);
     }

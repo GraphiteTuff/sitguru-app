@@ -13,6 +13,10 @@ import {
   COMPANION_BENEFITS_USER_PROMPT,
   type CompanionId,
 } from "@/lib/companions/companion-benefits";
+import {
+  buildCompanionGrowthFaqs,
+  matchCompanionGrowthSoftIntent,
+} from "@/lib/ai/companion-growth-faqs";
 
 export type MarketingFaqEntry = {
   question: string;
@@ -146,6 +150,27 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
     ].join("\n"),
   },
   {
+    question: "What is Guru Academy?",
+    aliases: [
+      "certified guru badge",
+      "do i need guru academy",
+      "guru university",
+      "guru certification",
+    ],
+    answer:
+      "Guru Academy is **optional**. Complete it anytime for a **Certified Guru** badge — it is not required to become bookable. Finish profile, trust, and payout setup first. [[cta:guru]]",
+  },
+  {
+    question: "How do Pet Parents find me?",
+    aliases: [
+      "how do i get bookings",
+      "how do clients find me",
+      "will i show up in search",
+    ],
+    answer:
+      "Complete and activate your Guru profile with clear services, photos, rates, availability, and service area. Verified, bookable profiles are easier for Pet Parents to discover and request. [[cta:guru]]",
+  },
+  {
     question: COMPANION_BENEFITS_USER_PROMPT.scout,
     aliases: [
       "guru benefits",
@@ -154,6 +179,7 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
     ],
     answer: COMPANION_BENEFITS_RESPONSE.scout,
   },
+  ...buildCompanionGrowthFaqs("scout"),
 ] as const;
 
 /**
@@ -253,6 +279,59 @@ export const ROGUE_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
     answer:
       "Use SitGuru messaging when available so booking questions, care details, timing, access notes, and support context stay organized in one place.",
   },
+  {
+    question: "What services can I book on SitGuru?",
+    aliases: [
+      "what services does sitguru offer",
+      "dog walking drop-ins overnight",
+      "what care can i book",
+      "pet sitting boarding day care",
+    ],
+    answer:
+      "Book **Drop-in Visits**, **Dog Walks**, **Overnight / house sitting**, **Boarding**, **Doggy Day Care**, and **Training Support** with local verified Gurus — all through SitGuru. [[cta:parent]]",
+  },
+  {
+    question: "How do PawPerks work?",
+    aliases: [
+      "what are pawperks",
+      "pawperks points",
+      "earn pawperks",
+      "redeem pawperks",
+    ],
+    answer:
+      "PawPerks lets Pet Parents earn points on eligible walks and redeem them at checkout (about **100 pts ≈ $1**). Never invent a live balance — check your account after signup. [[cta:parent]]",
+  },
+  {
+    question: "Is booking on SitGuru safe?",
+    aliases: [
+      "is sitguru safe",
+      "trust and safety",
+      "are gurus vetted",
+      "vetted sitters",
+    ],
+    answer:
+      "SitGuru supports trust with profile reviews, compliance steps, in-app messaging, PawReport history, and community reporting — booking stays on the platform so care details stay organized. [[cta:parent]]",
+  },
+  {
+    question: "How do I rebook my favorite Guru?",
+    aliases: [
+      "rebook a guru",
+      "book the same sitter again",
+      "favorite guru",
+    ],
+    answer:
+      "Open your past booking or Guru profile on SitGuru and book again — favorites stay easier when you use an account. I’ll help you find them by name or ZIP anytime. [[cta:parent]]",
+  },
+  {
+    question: COMPANION_BENEFITS_USER_PROMPT.rogue,
+    aliases: [
+      "pet parent benefits",
+      "tell me about pet parent benefits",
+      "what are the pet parent benefits",
+    ],
+    answer: COMPANION_BENEFITS_RESPONSE.rogue,
+  },
+  ...buildCompanionGrowthFaqs("rogue"),
 ] as const;
 
 /** Ambassador growth FAQs — exact copy from ambassadors marketing page + aliases. */
@@ -365,6 +444,7 @@ export const TACO_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
     ],
     answer: COMPANION_BENEFITS_RESPONSE.taco,
   },
+  ...buildCompanionGrowthFaqs("taco"),
 ] as const;
 
 /** Signed-in Ambassador workspace FAQs. */
@@ -504,8 +584,22 @@ export function matchScoutPublicSoftIntent(
       ) || null
     );
   }
+  if (/guru academy|certified guru|certification badge/.test(needle)) {
+    return (
+      SCOUT_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "What is Guru Academy?",
+      ) || null
+    );
+  }
+  if (/how (do|will) (pet )?parents find|get bookings|show up in search/.test(needle)) {
+    return (
+      SCOUT_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "How do Pet Parents find me?",
+      ) || null
+    );
+  }
 
-  return null;
+  return matchCompanionGrowthSoftIntent("scout", question);
 }
 
 /** Soft intents for common Taco public asks. */
@@ -586,7 +680,7 @@ export function matchTacoPublicSoftIntent(
     );
   }
 
-  return null;
+  return matchCompanionGrowthSoftIntent("taco", question);
 }
 
 function entryMatchesNeedle(faq: MarketingFaqEntry, needle: string) {
@@ -609,6 +703,91 @@ export function matchMarketingFaq(
 
   const exact = faqs.find((faq) => entryMatchesNeedle(faq, needle));
   return exact ?? null;
+}
+
+/** Soft intents for common Rogue / Pet Parent asks. */
+export function matchRoguePublicSoftIntent(
+  question: string,
+): MarketingFaqEntry | null {
+  const needle = normalizeFaqQuery(question);
+  if (!needle) return null;
+
+  if (/find (a )?guru|search (for )?(a )?guru|how do i find/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "How do I find a Guru?",
+      ) || null
+    );
+  }
+  if (/how (do )?bookings? work|book care|how (do i|to) book/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "How do bookings work on SitGuru?",
+      ) || null
+    );
+  }
+  if (/pawreport|live (care|walk) update|gps (walk|track)/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "What is PawReport Live?",
+      ) || null
+    );
+  }
+  if (/trust|safety|vetted|safe to (use|book)/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "Is booking on SitGuru safe?",
+      ) ||
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "How does SitGuru support trust and safety?",
+      ) ||
+      null
+    );
+  }
+  if (/free to join|free (pet )?parent|cost to (sign ?up|join)/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "Is SitGuru free to join as a Pet Parent?",
+      ) || null
+    );
+  }
+  if (/message (my )?guru|chat with (my )?guru/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "Can I message my Guru?",
+      ) || null
+    );
+  }
+  if (/pawperk|points|redeem/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "How do PawPerks work?",
+      ) || null
+    );
+  }
+  if (/what services|dog walk|drop-?in|boarding|day care|overnight/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "What services can I book on SitGuru?",
+      ) || null
+    );
+  }
+  if (/rebook|favorite guru|same (sitter|guru)/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === "How do I rebook my favorite Guru?",
+      ) || null
+    );
+  }
+  if (/pet parent benefits|benefits of (being|becoming) a pet parent/.test(needle)) {
+    return (
+      ROGUE_PUBLIC_MARKETING_FAQS.find(
+        (f) => f.question === COMPANION_BENEFITS_USER_PROMPT.rogue,
+      ) || null
+    );
+  }
+
+  return matchCompanionGrowthSoftIntent("rogue", question);
 }
 
 /**
@@ -640,9 +819,12 @@ export function resolveOfficerInstantFaqAnswer(opts: {
   }
 
   // Dashboard: exact/alias FAQ only — leave Trail Check / live digests to the model + snapshot.
+  // Still allow growth soft intents (social / email) so companions can convert.
   const dashboardFaqs =
     officer === "scout" ? SCOUT_DASHBOARD_FAQS : TACO_DASHBOARD_FAQS;
-  const hit = matchMarketingFaq(dashboardFaqs, question);
+  const hit =
+    matchMarketingFaq(dashboardFaqs, question) ||
+    matchCompanionGrowthSoftIntent(officer, question);
   return hit?.answer || null;
 }
 

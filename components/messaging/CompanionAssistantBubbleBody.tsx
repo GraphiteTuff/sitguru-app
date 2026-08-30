@@ -7,6 +7,7 @@
 
 import Link from "next/link";
 import { SocialFollowPack } from "@/components/messaging/SocialFollowPack";
+import { EmailSubscribePack } from "@/components/messaging/EmailSubscribePack";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
 import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
@@ -25,6 +26,9 @@ function CtaActionButton({
 }) {
   if (cta.socialPack) {
     return <SocialFollowPack source={socialSource} />;
+  }
+  if (cta.emailPack) {
+    return <EmailSubscribePack source={socialSource} />;
   }
   const external = /^https?:\/\//i.test(cta.href);
   if (external) {

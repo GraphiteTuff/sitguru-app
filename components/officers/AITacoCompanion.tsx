@@ -76,6 +76,11 @@ const ONBOARDING_CHIPS = [
     prompt: "What do Ambassadors do?",
   },
   {
+    id: "features",
+    label: "SitGuru features",
+    prompt: "What features does SitGuru offer?",
+  },
+  {
     id: "petperks_rewards",
     label: "PetPerks",
     prompt: "What is PetPerks for Ambassadors?",
@@ -99,6 +104,16 @@ const ONBOARDING_CHIPS = [
     id: "track_metrics",
     label: "Track Metrics",
     prompt: "What metrics can I track as an Ambassador?",
+  },
+  {
+    id: "follow_social",
+    label: "Follow us",
+    prompt: "Where can I follow SitGuru on social media?",
+  },
+  {
+    id: "email_updates",
+    label: "Email updates",
+    prompt: "How do I subscribe for email updates?",
   },
 ] as const;
 

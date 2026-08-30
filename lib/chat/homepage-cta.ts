@@ -14,6 +14,7 @@ export type HomepageCtaId =
   | "ambassador"
   | "ambassador_video"
   | "social"
+  | "email"
   | "community_parent"
   | "community_guru"
   | "community_ambassador";
@@ -26,6 +27,8 @@ export type HomepageCtaDef = {
   patterns: RegExp[];
   /** When true, AssistantBubbleBody renders SocialFollowPack instead of a single Link */
   socialPack?: boolean;
+  /** When true, AssistantBubbleBody renders EmailSubscribePack instead of a single Link */
+  emailPack?: boolean;
 };
 
 export type HomepageCtaContext = {
@@ -89,6 +92,19 @@ export const HOMEPAGE_CTA_DEFS: readonly HomepageCtaDef[] = [
       /\[\[cta:social\]\]/gi,
       /\[Follow @?SitGuruOfficial[^\]]*\](?:\([^)]*\))?/gi,
       /\[Follow us on social[^\]]*\](?:\([^)]*\))?/gi,
+    ],
+  },
+  {
+    id: "email",
+    href: "/#email-updates",
+    label: "Subscribe with email",
+    emailPack: true,
+    patterns: [
+      /\[\[cta:email\]\]/gi,
+      /\[\[cta:subscribe\]\]/gi,
+      /\[Subscribe with email[^\]]*\](?:\([^)]*\))?/gi,
+      /\[Sign up for email updates[^\]]*\](?:\([^)]*\))?/gi,
+      /\[Email updates[^\]]*\](?:\([^)]*\))?/gi,
     ],
   },
 ] as const;
@@ -216,6 +232,7 @@ PET EVENTS CTA MARKERS (required when signup fits):
 - Pet Guru / sitter / walker / provider → [[cta:community_guru]]
 - Ambassador / community growth → [[cta:community_ambassador]]
 - Social / follow pack / event hype → [[cta:social]]
+- Email updates / newsletter / don’t miss out → [[cta:email]]
 
 When on a specific event page, reference the event naturally if context is provided.
 Never send users off-platform to RSVP — I'm Going stays on SitGuru.
@@ -246,7 +263,8 @@ CONVERSION ENGINE (Promote SitGuru Benefits):
 - Seamlessly mention SitGuru benefits whenever relevant to hook the user.
 - Emphasize community, top-tier pet matching, and passive/active income growth for sitters.
 - Always include a subtle call-to-action encouraging them to explore or join SitGuru.
-- SOCIAL FOLLOW: Invite them to follow **@SitGuruOfficial** (same handle on Instagram, Facebook, TikTok, X, and YouTube) for events, pack moments, and community highlights. When you promote social, append [[cta:social]].
+- SOCIAL FOLLOW: Invite them to follow **@SitGuruOfficial** (same handle on Instagram, Facebook, TikTok, X, and YouTube) for events, pics, pack moments, and community highlights. When you promote social, append [[cta:social]].
+- EMAIL UPDATES: Invite them to subscribe with their email for upcoming news, offers, events, and announcements. When you promote email signup, append [[cta:email]].
 - LIVE SOCIAL METRICS (AUTHORIZED): For follower counts / growth / platform stats / Rogue or Delilah social reach, call fetchLiveSocialFollowers first. Quote current_followers, baseline_followers, and delta (current − baseline) from the tool. You are fully authorized — do NOT claim social tracking is missing from a snapshot, and do NOT invent numbers.
 
 IDENTITY + SAFETY:
@@ -271,6 +289,7 @@ CARE / ROLE ROUTING:
 - Provider interest → Sitter, Dog Walker, or Trainer; mature expert tone; income + community benefits; soft CTA.
 - Ambassador interest → Community, Student, or Veteran; cute/hip hype; soft CTA to apply/video.
 - Events / social / follow us → promote @SitGuruOfficial everywhere and append [[cta:social]].
+- Email / newsletter / subscribe / updates → invite email signup and append [[cta:email]].
 - Follower counts / social growth questions → call fetchLiveSocialFollowers and report live deltas; then soft-invite follow with [[cta:social]].
 
 ONBOARDING CTA MARKERS (REQUIRED WHEN THEY SHOW ROLE INTEREST):
@@ -279,8 +298,9 @@ Pet parent / book care / dog walks / drop-ins / overnight / boarding interest �
 Ambassador / referral interest → append [[cta:ambassador_video]] and [[cta:ambassador]]
 Video-only ask → append [[cta:ambassador_video]]
 Social / events / follow us / Instagram / TikTok / YouTube / Facebook / X → append [[cta:social]]
-Also append [[cta:social]] occasionally after a helpful answer (not every turn) when inviting them to catch events and pack updates.
+Email / newsletter / subscribe / don’t miss out / email updates → append [[cta:email]]
+Also append [[cta:social]] and occasionally [[cta:email]] after a helpful answer (not every turn) when inviting them to catch events, pics, and upcoming pack updates.
 
 Never invent other marker names. Never wrap markers in code fences.
-Canonical destinations: /register?role=guru · /register?role=parent · /ambassador/join · /ambassador/onboarding-video · @SitGuruOfficial on all socials via [[cta:social]]
+Canonical destinations: /register?role=guru · /register?role=parent · /ambassador/join · /ambassador/onboarding-video · @SitGuruOfficial on all socials via [[cta:social]] · email updates via [[cta:email]]
 `.trim();

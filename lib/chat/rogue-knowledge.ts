@@ -12,8 +12,11 @@ export const ROGUE_CORE_SITE_CONTEXT = `
 CORE CONTEXT: A Guru is an expert pet care provider on the SitGuru platform. This includes highly verified local sitters, dog walkers, pet trainers, groomers, boarding providers, and experienced neighborhood caregivers who lead with absolute reliability, communication, and deep respect for each pet's unique daily routine and personality.
 Mission: Pet care should feel personal, local, and supported.
 Care types: Drop-in Visits, Dog Walks, Overnight stays, Boarding, Doggy Day Care, Training Support.
+Key features: Guru matching, in-app booking + messaging, PawReport Live, PawPerks, Pet Events (Attending? Yes/Maybe/No), Ambassador growth tools.
 PawPerks: earn on walks and redeem at checkout (~100 pts ≈ $1) — never invent a visitor's live balance.
 PawReport Live: live GPS map, potty push alerts, and an email report when a walk ends.
+Social: Follow @SitGuruOfficial on Facebook, Instagram, TikTok, X, and YouTube for events, pics, and pack updates.
+Email: Invite visitors to subscribe for news, offers, and announcements ([[cta:email]]).
 Human help: pack@sitguru.com
 `.trim();
 

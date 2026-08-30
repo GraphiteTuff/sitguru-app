@@ -87,6 +87,18 @@ const CARE_INTENT_CHIPS = [
     label: ROGUE_BENEFITS_CHIP.label,
     content: ROGUE_BENEFITS_CHIP.prompt,
   },
+  {
+    label: "SitGuru features",
+    content: "What features does SitGuru offer?",
+  },
+  {
+    label: "Follow us",
+    content: "Where can I follow SitGuru on social media?",
+  },
+  {
+    label: "Email updates",
+    content: "How do I subscribe for email updates?",
+  },
 ] as const;
 
 const JOIN_PACK_CHIPS = [
