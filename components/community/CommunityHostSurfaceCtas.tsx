@@ -49,8 +49,8 @@ export default function CommunityHostSurfaceCtas({
       : "Become a Partner Host";
   const manage =
     surface === "phone" || surface === "app"
-      ? "Manage events"
-      : "Open Event Manager";
+      ? "Create event"
+      : "Create Event";
   const map =
     surface === "phone" || surface === "app" ? "Pet Events map" : "View Pet Events map";
 
@@ -68,7 +68,7 @@ export default function CommunityHostSurfaceCtas({
         {primary}
       </Link>
       <Link
-        href="/partners/dashboard/community/events"
+        href="/partners/dashboard/community/events?create=1"
         className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-white/40 bg-white/10 px-6 text-sm font-black !text-white sm:w-auto"
       >
         {manage}
