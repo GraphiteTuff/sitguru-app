@@ -27,7 +27,15 @@ import {
   COMPANION_BENEFITS_CHIP_ID,
   getCompanionBenefitsChip,
 } from "@/lib/companions/companion-benefits";
-import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
+import {
+  CompanionAssistantBubbleBody,
+  COMPANION_ROGUE_PANEL_CLASS,
+} from "@/components/messaging/CompanionAssistantBubbleBody";
+import {
+  OPEN_COMPANION_CHAT_EVENT,
+  type OpenCompanionChatDetail,
+} from "@/lib/companions/open-companion-chat";
+import { X } from "lucide-react";
 
 const TACO_BRAND = "#0D5C3A";
 const TACO_BRAND_DEEP = "#09462C";
@@ -197,6 +205,18 @@ export default function AITacoCompanion({
   }, []);
 
   useEffect(() => {
+    function onOpenCompanionChat(event: Event) {
+      const detail = (event as CustomEvent<OpenCompanionChatDetail>).detail;
+      if (detail?.companion && detail.companion !== "taco") return;
+      setIsOpen(true);
+    }
+    window.addEventListener(OPEN_COMPANION_CHAT_EVENT, onOpenCompanionChat);
+    return () => {
+      window.removeEventListener(OPEN_COMPANION_CHAT_EVENT, onOpenCompanionChat);
+    };
+  }, []);
+
+  useEffect(() => {
     if (isOnboarding) return;
     let cancelled = false;
 
@@ -363,7 +383,7 @@ export default function AITacoCompanion({
     >
       {isOpen ? (
         <div
-          className="absolute bottom-[4.75rem] right-0 flex h-[min(30rem,72dvh)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white text-slate-900 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200"
+          className={COMPANION_ROGUE_PANEL_CLASS}
           role="dialog"
           aria-label="Taco AI Companion"
         >
@@ -410,14 +430,42 @@ export default function AITacoCompanion({
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-lg leading-none text-white transition hover:bg-white/25"
-              aria-label="Close Taco AI Companion"
-            >
-              ×
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "End this chat and clear the conversation history?",
+                    )
+                  ) {
+                    return;
+                  }
+                  setMessages([
+                    {
+                      id: `taco-hello-reset-${Date.now()}`,
+                      role: "assistant",
+                      content: greeting,
+                    },
+                  ]);
+                  setIsOpen(false);
+                }}
+                className="hidden min-h-[44px] rounded-full px-3 text-xs font-bold text-white/90 underline-offset-2 hover:underline sm:inline-flex sm:items-center"
+                aria-label="End chat and clear history"
+                title="End & clear"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
+                aria-label="Minimize Taco chat"
+                title="Minimize"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
           </div>
 
           <div
@@ -439,7 +487,11 @@ export default function AITacoCompanion({
                     }`}
                   >
                     {isAssistant ? (
-                      <RogueMarkdownText text={message.content} />
+                      <CompanionAssistantBubbleBody
+                        content={message.content}
+                        ctaContext={{ pagePath: requestBody.pagePath }}
+                        socialSource="taco_companion_chat"
+                      />
                     ) : (
                       message.content
                     )}
@@ -553,18 +605,14 @@ export default function AITacoCompanion({
         </button>
       ) : null}
 
-      <button
-        type="button"
-        onClick={() => setIsOpen((open) => !open)}
-        aria-label={
-          isOpen ? "Close Taco AI Companion" : "Open Taco AI Companion"
-        }
-        aria-expanded={isOpen}
-        className="homepage-chat-launcher"
-      >
-        {isOpen ? (
-          <span className="homepage-chat-launcher__icon">×</span>
-        ) : (
+      {!isOpen ? (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          aria-label="Open Taco AI Companion"
+          aria-expanded={false}
+          className="homepage-chat-launcher"
+        >
           <span className="homepage-chat-launcher__icon" aria-hidden>
             {/* Match Rogue SitGuruAvatar: plain img + object-cover fill. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -580,8 +628,8 @@ export default function AITacoCompanion({
               }}
             />
           </span>
-        )}
-      </button>
+        </button>
+      ) : null}
     </div>,
     document.body,
   );

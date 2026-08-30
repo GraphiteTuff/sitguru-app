@@ -6,19 +6,12 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import Link from "next/link";
 import { X } from "lucide-react";
 import { useChat, type Message } from "ai/react";
 import { usePathname } from "next/navigation";
-import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
-import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
-import { SocialFollowPack } from "@/components/messaging/SocialFollowPack";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
-import {
-  parseHomepageChatContent,
-  type HomepageCtaContext,
-  type HomepageCtaDef,
-} from "@/lib/chat/homepage-cta";
+import { CompanionAssistantBubbleBody } from "@/components/messaging/CompanionAssistantBubbleBody";
+import { type HomepageCtaContext } from "@/lib/chat/homepage-cta";
 import {
   COMMUNITY_EVENT_FAQ_CHIPS,
   isCommunityCompanionPath,
@@ -244,87 +237,6 @@ function SitGuruAvatar({
       style={{ objectPosition: "50% 28%" }}
       aria-hidden="true"
     />
-  );
-}
-
-function CtaActionButton({ cta }: { cta: HomepageCtaDef }) {
-  if (cta.socialPack) {
-    return <SocialFollowPack source="rogue_homepage_chat" />;
-  }
-  const external = /^https?:\/\//i.test(cta.href);
-  if (external) {
-    return (
-      <a
-        href={cta.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-2 inline-flex min-h-[48px] w-full items-center justify-center rounded-full bg-[#0D5C3A] px-4 py-3 text-center text-base font-medium text-white transition-all hover:bg-opacity-90"
-      >
-        {cta.label}
-      </a>
-    );
-  }
-  return (
-    <Link
-      href={cta.href}
-      className="mt-2 inline-flex min-h-[48px] w-full items-center justify-center rounded-full bg-[#0D5C3A] px-4 py-3 text-center text-base font-medium text-white transition-all hover:bg-opacity-90"
-    >
-      {cta.label}
-    </Link>
-  );
-}
-
-function AssistantBubbleBody({
-  content,
-  ctaContext,
-}: {
-  content: string;
-  ctaContext?: HomepageCtaContext;
-}) {
-  let text = "";
-  let ctas: HomepageCtaDef[] = [];
-  let guruCards: ReturnType<typeof parseHomepageChatContent>["guruCards"] = [];
-
-  try {
-    const parsed = parseHomepageChatContent(content, ctaContext);
-    text = parsed.text;
-    ctas = parsed.ctas;
-    guruCards = parsed.guruCards;
-  } catch {
-    // Last-resort strip so a parser failure never paints raw tokens.
-    text = String(content || "")
-      .replace(/\[\[\s*guru_card\s*:[\s\S]*?\]\]/gi, " ")
-      .replace(/\[\[\s*guru_card\s*:[^\[]*/gi, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  return (
-    <div className="space-y-1">
-      {text ? (
-        <SafeAssistantBubble contentHint={content}>
-          <RogueMarkdownText text={text} />
-        </SafeAssistantBubble>
-      ) : null}
-      {guruCards.length > 0 ? (
-        <div className="grid grid-cols-1 gap-2 pt-1.5">
-          {guruCards.map((guru) => (
-            <SafeAssistantBubble key={guru.slug} contentHint={guru.slug}>
-              <GuruProfileSnapshotCard guru={guru} />
-            </SafeAssistantBubble>
-          ))}
-        </div>
-      ) : null}
-      {ctas.length > 0 ? (
-        <div className="flex flex-col gap-1.5 pt-1">
-          {ctas.map((cta) => (
-            <SafeAssistantBubble key={cta.id} contentHint={cta.id}>
-              <CtaActionButton cta={cta} />
-            </SafeAssistantBubble>
-          ))}
-        </div>
-      ) : null}
-    </div>
   );
 }
 
@@ -920,9 +832,10 @@ export default function HomepageChatBubble() {
                 <AssistantRow key={m.id}>
                   <div className="homepage-chat-bubble homepage-chat-bubble--ai">
                     <SafeAssistantBubble contentHint={m.content}>
-                      <AssistantBubbleBody
+                      <CompanionAssistantBubbleBody
                         content={m.content}
                         ctaContext={ctaContext}
+                        socialSource="rogue_homepage_chat"
                       />
                     </SafeAssistantBubble>
                   </div>

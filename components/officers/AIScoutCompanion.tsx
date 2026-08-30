@@ -22,13 +22,19 @@ import { useGuruAuth, type GuruAuthUser } from "@/hooks/useGuruAuth";
 import AITacoCompanion from "@/components/officers/AITacoCompanion";
 import AIDelilahCompanion from "@/components/officers/AIDelilahCompanion";
 import HomepageChatBubble from "@/components/messaging/HomepageChatBubble";
-import { RogueMarkdownText } from "@/components/messaging/RogueMarkdownText";
-import { GuruProfileSnapshotCard } from "@/components/messaging/GuruProfileSnapshotCard";
-import { extractGuruCardsFromText } from "@/lib/gurus/guru-chat-snapshot";
+import {
+  CompanionAssistantBubbleBody,
+  COMPANION_ROGUE_PANEL_CLASS,
+} from "@/components/messaging/CompanionAssistantBubbleBody";
 import {
   COMPANION_DOCK_CLASS,
   SCOUT_AVATAR,
 } from "@/lib/companions/avatar-assets";
+import {
+  OPEN_COMPANION_CHAT_EVENT,
+  type OpenCompanionChatDetail,
+} from "@/lib/companions/open-companion-chat";
+import { X } from "lucide-react";
 import {
   getBotConfig,
   resolvePublicFormVariant,
@@ -129,24 +135,13 @@ function buildWorkspaceGreeting(firstName: string) {
   return `Hi ${firstName}! I'm your Scout AI Companion. How can I assist you with your dashboard schedule today?`;
 }
 
-function ScoutAssistantBody({ text }: { text: string }) {
-  const extracted = extractGuruCardsFromText(text);
-  const cleaned = extracted.text
-    .replace(/\[\[\s*cta:[^\]]+\]\]/gi, " ")
-    .replace(/\[\[\s*matching_intake\s*\]\]/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+function ScoutAssistantBody({ text, pagePath }: { text: string; pagePath?: string }) {
   return (
-    <div className="space-y-1">
-      {cleaned ? <RogueMarkdownText text={cleaned} /> : null}
-      {extracted.cards.length > 0 ? (
-        <div className="grid grid-cols-1 gap-2 pt-1.5">
-          {extracted.cards.map((guru) => (
-            <GuruProfileSnapshotCard key={guru.slug} guru={guru} />
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <CompanionAssistantBubbleBody
+      content={text}
+      ctaContext={{ pagePath: pagePath || "/" }}
+      socialSource="scout_companion_chat"
+    />
   );
 }
 
@@ -187,6 +182,18 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
     } catch {
       // ignore
     }
+  }, []);
+
+  useEffect(() => {
+    function onOpenCompanionChat(event: Event) {
+      const detail = (event as CustomEvent<OpenCompanionChatDetail>).detail;
+      if (detail?.companion && detail.companion !== "scout") return;
+      setIsOpen(true);
+    }
+    window.addEventListener(OPEN_COMPANION_CHAT_EVENT, onOpenCompanionChat);
+    return () => {
+      window.removeEventListener(OPEN_COMPANION_CHAT_EVENT, onOpenCompanionChat);
+    };
   }, []);
 
   const requestBody = {
@@ -308,7 +315,7 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
     <>
       {isOpen ? (
         <div
-          className="absolute bottom-[4.75rem] right-0 flex h-[min(28rem,70dvh)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white text-slate-900 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200"
+          className={COMPANION_ROGUE_PANEL_CLASS}
           role="dialog"
           aria-label="Scout AI Companion"
           data-scout-public={isPublic ? "true" : "false"}
@@ -358,14 +365,36 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-lg leading-none text-white transition hover:bg-white/25"
-              aria-label="Close Scout AI Companion"
-            >
-              ×
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!window.confirm("End this chat and clear the conversation history?")) return;
+                  setMessages([
+                    {
+                      id: `scout-hello-reset-${Date.now()}`,
+                      role: "assistant",
+                      content: greeting,
+                    },
+                  ]);
+                  setIsOpen(false);
+                }}
+                className="hidden min-h-[44px] rounded-full px-3 text-xs font-bold text-white/90 underline-offset-2 hover:underline sm:inline-flex sm:items-center"
+                aria-label="End chat and clear history"
+                title="End & clear"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
+                aria-label="Minimize Scout chat"
+                title="Minimize"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
           </div>
 
           <div
@@ -387,7 +416,10 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
                     }`}
                   >
                     {isAssistant ? (
-                      <ScoutAssistantBody text={message.content} />
+                      <ScoutAssistantBody
+                        text={message.content}
+                        pagePath={requestBody.pagePath}
+                      />
                     ) : (
                       message.content
                     )}
@@ -476,18 +508,14 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
         </button>
       ) : null}
 
-      <button
-        type="button"
-        onClick={() => setIsOpen((open) => !open)}
-        aria-label={
-          isOpen ? "Close Scout AI Companion" : "Open Scout AI Companion"
-        }
-        aria-expanded={isOpen}
-        className="homepage-chat-launcher"
-      >
-        {isOpen ? (
-          <span className="homepage-chat-launcher__icon">×</span>
-        ) : (
+      {!isOpen ? (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          aria-label="Open Scout AI Companion"
+          aria-expanded={false}
+          className="homepage-chat-launcher"
+        >
           <span className="homepage-chat-launcher__icon" aria-hidden>
             {/* Match Rogue SitGuruAvatar: plain img + object-cover fill. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -503,8 +531,8 @@ function ScoutCompanionShell({ isPublic, user, loading }: ScoutShellProps) {
               }}
             />
           </span>
-        )}
-      </button>
+        </button>
+      ) : null}
     </>
   );
 }
