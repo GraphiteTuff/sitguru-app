@@ -23,6 +23,7 @@ import {
   COMPANION_BENEFITS_CHIP_ID,
   getCompanionBenefitsChip,
 } from "@/lib/companions/companion-benefits";
+import { resolveCompanionGrowthFaqAnswer } from "@/lib/ai/companion-growth-faqs";
 import {
   OPEN_COMPANION_CHAT_EVENT,
   type OpenCompanionChatDetail,
@@ -186,6 +187,32 @@ export default function AIDelilahCompanion() {
           id: `delilah-benefits-assistant-${stamp}`,
           role: "assistant",
           content: benefitsChip.response,
+        },
+      ]);
+      window.setTimeout(
+        () => inputRef.current?.focus({ preventScroll: true }),
+        40,
+      );
+      return;
+    }
+
+    const growthAnswer = resolveCompanionGrowthFaqAnswer(
+      ACTIVE_COMPANION,
+      chip.prompt,
+    );
+    if (growthAnswer) {
+      const stamp = Date.now();
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: `delilah-growth-user-${stamp}`,
+          role: "user",
+          content: chip.prompt,
+        },
+        {
+          id: `delilah-growth-assistant-${stamp}`,
+          role: "assistant",
+          content: growthAnswer,
         },
       ]);
       window.setTimeout(

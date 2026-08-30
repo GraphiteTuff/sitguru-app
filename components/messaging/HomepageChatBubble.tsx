@@ -48,6 +48,7 @@ import {
   COMPANION_BENEFITS_USER_PROMPT,
   getCompanionBenefitsChip,
 } from "@/lib/companions/companion-benefits";
+import { resolveCompanionGrowthFaqAnswer } from "@/lib/ai/companion-growth-faqs";
 import {
   OPEN_COMPANION_CHAT_EVENT,
   type OpenCompanionChatDetail,
@@ -690,6 +691,29 @@ export default function HomepageChatBubble() {
           id: `rogue-benefits-assistant-${stamp}`,
           role: "assistant",
           content: benefitsChip.response,
+        },
+      ]);
+      focusComposer(40);
+      return;
+    }
+
+    const growthAnswer = resolveCompanionGrowthFaqAnswer(
+      ACTIVE_COMPANION,
+      content,
+    );
+    if (growthAnswer) {
+      const stamp = Date.now();
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: `rogue-growth-user-${stamp}`,
+          role: "user",
+          content,
+        },
+        {
+          id: `rogue-growth-assistant-${stamp}`,
+          role: "assistant",
+          content: growthAnswer,
         },
       ]);
       focusComposer(40);

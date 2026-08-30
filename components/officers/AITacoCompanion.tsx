@@ -27,6 +27,7 @@ import {
   COMPANION_BENEFITS_CHIP_ID,
   getCompanionBenefitsChip,
 } from "@/lib/companions/companion-benefits";
+import { resolveCompanionGrowthFaqAnswer } from "@/lib/ai/companion-growth-faqs";
 import {
   CompanionAssistantBubbleBody,
   COMPANION_ROGUE_PANEL_CLASS,
@@ -361,6 +362,32 @@ export default function AITacoCompanion({
           id: `taco-benefits-assistant-${stamp}`,
           role: "assistant",
           content: benefitsChip.response,
+        },
+      ]);
+      window.setTimeout(
+        () => inputRef.current?.focus({ preventScroll: true }),
+        40,
+      );
+      return;
+    }
+
+    const growthAnswer = resolveCompanionGrowthFaqAnswer(
+      ACTIVE_COMPANION,
+      chip.prompt,
+    );
+    if (growthAnswer) {
+      const stamp = Date.now();
+      setMessages((previous) => [
+        ...previous,
+        {
+          id: `taco-growth-user-${stamp}`,
+          role: "user",
+          content: chip.prompt,
+        },
+        {
+          id: `taco-growth-assistant-${stamp}`,
+          role: "assistant",
+          content: growthAnswer,
         },
       ]);
       window.setTimeout(

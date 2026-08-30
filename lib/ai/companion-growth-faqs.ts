@@ -201,6 +201,18 @@ export function matchCompanionGrowthSoftIntent(
 
   const faqs = buildCompanionGrowthFaqs(companion);
 
+  const exact = faqs.find((faq) => {
+    const candidates = [faq.question, ...(faq.aliases || [])].map((value) =>
+      String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[?!.,'"]+/g, "")
+        .replace(/\s+/g, " "),
+    );
+    return candidates.some((q) => q === needle);
+  });
+  if (exact) return exact;
+
   if (
     /follow|instagram|facebook|tiktok|youtube|\bx\b|twitter|social media|@sitguruofficial/.test(
       needle,
@@ -233,4 +245,12 @@ export function matchCompanionGrowthSoftIntent(
   }
 
   return null;
+}
+
+/** Instant answer for growth FAQ chips / typed asks (client or server). */
+export function resolveCompanionGrowthFaqAnswer(
+  companion: CompanionId,
+  question: string,
+): string | null {
+  return matchCompanionGrowthSoftIntent(companion, question)?.answer || null;
 }
