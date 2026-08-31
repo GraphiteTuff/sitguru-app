@@ -105,6 +105,28 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Hardening headers for scanners / ISP reputation filters.
+        // Keep COOP/COEP off so Stripe / PayPal / Plaid popups keep working.
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value:
+              "camera=(), microphone=(), geolocation=(self), payment=(self)",
+          },
+          {
+            key: "X-DNS-Prefetch-Control",
+            value: "on",
+          },
+        ],
+      },
+      {
         source: "/help/:path*",
         headers: [
           {
