@@ -1010,7 +1010,7 @@ async function getGuruOnboardingPacketDisplay(
         submittedAt: null,
         reviewedAt: null,
         helper:
-          "Complete your onboarding packet so SitGuru can review your Guru setup.",
+          "Open the quick agreement packet, check the boxes, and type your name.",
       };
     }
 
@@ -1025,33 +1025,32 @@ async function getGuruOnboardingPacketDisplay(
         href,
         submittedAt: data?.submitted_at || null,
         reviewedAt: data?.reviewed_at || null,
-        helper:
-          "Your Guru onboarding packet has been reviewed and marked complete.",
+        helper: "You’re all set — SitGuru reviewed and approved your packet.",
       };
     }
 
     if (["submitted", "pending_review", "in_review"].includes(rawStatus)) {
       return {
-        label: "Submitted",
+        label: "Under Review",
         status: "pending",
         href,
         submittedAt: data?.submitted_at || null,
         reviewedAt: data?.reviewed_at || null,
         helper:
-          "Your packet has been submitted. SitGuru will review it and update your onboarding status.",
+          "You sent your packet. SitGuru is reviewing it — no extra action needed right now.",
       };
     }
 
     if (["needs_fix", "needs_action"].includes(rawStatus)) {
       return {
-        label: "Needs Fix",
+        label: "Needs a Fix",
         status: "needs_action",
         href,
         submittedAt: data?.submitted_at || null,
         reviewedAt: data?.reviewed_at || null,
         helper:
           data?.admin_notes ||
-          "SitGuru needs one or more updates before this packet can be completed.",
+          "SitGuru needs a small update before this step can be marked done.",
       };
     }
 
@@ -1062,7 +1061,7 @@ async function getGuruOnboardingPacketDisplay(
       submittedAt: data?.submitted_at || null,
       reviewedAt: data?.reviewed_at || null,
       helper:
-        "Review and submit your Guru onboarding packet so SitGuru can document Step 5.",
+        "Step 5 is a short yes-check: agree to the basics, sign your name, and submit.",
     };
   } catch (error) {
     console.warn("Unable to load Guru onboarding packet status:", error);
@@ -1074,7 +1073,7 @@ async function getGuruOnboardingPacketDisplay(
       submittedAt: null,
       reviewedAt: null,
       helper:
-        "Complete your onboarding packet so SitGuru can review your Guru setup.",
+        "Open the quick agreement packet, check the boxes, and type your name.",
     };
   }
 }
