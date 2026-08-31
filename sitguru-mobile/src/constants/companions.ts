@@ -1,4 +1,4 @@
-export type CompanionId = 'rogue' | 'taco' | 'scout';
+export type CompanionId = 'rogue' | 'taco' | 'scout' | 'delilah';
 
 /** Role that unlocks the officer `dashboard` surface for Scout / Taco. */
 export type CompanionDashboardRole = 'guru' | 'ambassador' | null;
@@ -18,7 +18,11 @@ export type AiCompanionProfile = {
   benefitsLabel: string;
   deepDiveRoute: '/ai-companion';
   ctaLabel: string;
-  setupRoute: '/pet-parent-setup' | '/guru-setup' | '/ambassador-setup';
+  setupRoute:
+    | '/pet-parent-setup'
+    | '/guru-setup'
+    | '/ambassador-setup'
+    | '/community-host';
   /** Streaming endpoint on the SitGuru web app. */
   streamPath: '/api/chat/send' | '/api/ai/officer-stream';
   /** `pagePath` reported to the server for chat insight attribution. */
@@ -34,13 +38,32 @@ export type AiCompanionProfile = {
   suggestions: CompanionSuggestion[];
 };
 
+/** Shared growth chips — same intents as web companion-growth-faqs. */
+const GROWTH_SUGGESTIONS: CompanionSuggestion[] = [
+  {
+    id: 'features',
+    label: 'Features',
+    prompt: 'What features does SitGuru offer?',
+  },
+  {
+    id: 'follow_us',
+    label: 'Follow us',
+    prompt: 'Where can I follow SitGuru on social media?',
+  },
+  {
+    id: 'email_updates',
+    label: 'Email updates',
+    prompt: 'How do I subscribe for email updates?',
+  },
+];
+
 /**
- * Mobile mirror of sitguru.com AI Pet Companions (Rogue / Taco / Scout).
+ * Mobile mirror of sitguru.com AI Pet Companions
+ * (Rogue / Taco / Scout / Delilah).
  *
  * Chip copy is ported from the web surfaces so both platforms offer the same
- * entry points: `components/messaging/HomepageChatBubble.tsx` (Rogue),
- * `components/officers/AIScoutCompanion.tsx`, and
- * `components/officers/AITacoCompanion.tsx`.
+ * entry points: HomepageChatBubble (Rogue), AIScoutCompanion, AITacoCompanion,
+ * and AIDelilahCompanion.
  */
 export const AI_COMPANIONS: AiCompanionProfile[] = [
   {
@@ -94,6 +117,7 @@ export const AI_COMPANIONS: AiCompanionProfile[] = [
         label: 'Trainer',
         prompt: 'Want to register as a Trainer',
       },
+      ...GROWTH_SUGGESTIONS,
     ],
   },
   {
@@ -156,6 +180,7 @@ export const AI_COMPANIONS: AiCompanionProfile[] = [
         label: 'Track Metrics',
         prompt: 'What metrics can I track as an Ambassador?',
       },
+      ...GROWTH_SUGGESTIONS,
     ],
   },
   {
@@ -214,6 +239,81 @@ export const AI_COMPANIONS: AiCompanionProfile[] = [
         label: 'PawReport',
         prompt: 'What is PawReport Live?',
       },
+      ...GROWTH_SUGGESTIONS,
+    ],
+  },
+  {
+    id: 'delilah',
+    name: 'Delilah',
+    title: 'Pet Event Coordinator',
+    audience: 'Pet Events',
+    helper:
+      'Upcoming gathers, RSVPs, and Partner Event hosting for Pet Event Planners & Managers.',
+    benefitsLabel: 'Event Host Benefits',
+    deepDiveRoute: '/ai-companion',
+    ctaLabel: 'Chat with Delilah',
+    setupRoute: '/community-host',
+    streamPath: '/api/ai/officer-stream',
+    pagePath: '/events',
+    avatarPath: '/images/delilah-avatar.png',
+    greeting:
+      "Hi! I'm Delilah — your cheerful Pet Event Coordinator! I can share live upcoming event details and walk Planners & Managers through setup, management, and RSVP tracking. Tap a chip or ask me anything!",
+    composerPlaceholder: 'Ask Delilah about Pet Events…',
+    dashboardRole: null,
+    suggestions: [
+      {
+        id: 'companion_benefits',
+        label: 'Event Host Benefits',
+        prompt: 'Tell me about Event Host Benefits',
+      },
+      {
+        id: 'whats_on',
+        label: "What's on?",
+        prompt: 'What pet events are coming up?',
+      },
+      {
+        id: 'host_event',
+        label: 'Host an event',
+        prompt:
+          'How do Pet Event Planners and Managers publish Partner Events on SitGuru?',
+      },
+      {
+        id: 'manage_event',
+        label: 'Manage event',
+        prompt:
+          'How do I edit and manage a Partner Event after it is published?',
+      },
+      {
+        id: 'track_rsvps',
+        label: 'Track RSVPs',
+        prompt: 'How do I track Yes Maybe No attendance on my event?',
+      },
+      {
+        id: 'attending',
+        label: 'Attending?',
+        prompt: 'How does Attending Yes Maybe No work?',
+      },
+      {
+        id: 'need_account',
+        label: 'Need account?',
+        prompt: 'Do I need a SitGuru account to RSVP?',
+      },
+      {
+        id: 'pet_friendly',
+        label: 'Pet friendly?',
+        prompt: 'Are pet events pet friendly?',
+      },
+      {
+        id: 'free_events',
+        label: 'Free events?',
+        prompt: 'Are SitGuru pet events free?',
+      },
+      {
+        id: 'why_join',
+        label: 'Why join?',
+        prompt: 'Why should I join SitGuru?',
+      },
+      ...GROWTH_SUGGESTIONS,
     ],
   },
 ];
@@ -221,6 +321,7 @@ export const AI_COMPANIONS: AiCompanionProfile[] = [
 export function getCompanionWebChatUrl(id: CompanionId) {
   if (id === 'scout') return 'https://www.sitguru.com/become-a-guru?chat=scout';
   if (id === 'taco') return 'https://www.sitguru.com/ambassadors?chat=taco';
+  if (id === 'delilah') return 'https://www.sitguru.com/events?chat=delilah';
   return 'https://www.sitguru.com/?chat=rogue#ai-companions';
 }
 

@@ -57,7 +57,7 @@ export type CompanionRequest = {
 
 /**
  * Scout requires the guru role and Taco the ambassador role for the
- * `dashboard` surface; everyone else gets the public marketing surface.
+ * `dashboard` surface; Rogue and Delilah stay on the public surface.
  */
 export function resolveOfficerSurface(
   companion: AiCompanionProfile,
@@ -102,6 +102,7 @@ export function buildCompanionRequest({
     body: {
       messages: turns,
       officer: companion.id,
+      companion: companion.id,
       surface: resolveOfficerSurface(companion, roles, accessToken),
       pagePath: companion.pagePath,
       ...(accessToken ? { accessToken } : {}),

@@ -1,5 +1,6 @@
 /**
- * Native streaming chat for the SitGuru AI companions (Rogue / Scout / Taco).
+ * Native streaming chat for the SitGuru AI companions
+ * (Rogue / Scout / Taco / Delilah).
  *
  * Personas, tools, and marker generation all stay server-side. This hook only
  * owns transcript state, the streaming request, and per-companion persistence.

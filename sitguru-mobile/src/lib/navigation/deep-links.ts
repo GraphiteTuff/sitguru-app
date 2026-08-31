@@ -45,6 +45,18 @@ export function routeFromSitGuruUrl(rawUrl: string): RouteTarget | null {
   const slug = firstQuery(url, ['slug', 'guruSlug']);
 
   if (!path || path === 'search' || path === 'find-care' || path === 'explore') {
+    const chat = firstQuery(url, ['chat', 'companion', 'id']).toLowerCase();
+    if (
+      chat === 'delilah' ||
+      chat === 'rogue' ||
+      chat === 'scout' ||
+      chat === 'taco'
+    ) {
+      return {
+        pathname: '/ai-companion',
+        params: { id: chat },
+      };
+    }
     return {
       pathname: '/find-care',
       params: {
@@ -94,10 +106,47 @@ export function routeFromSitGuruUrl(rawUrl: string): RouteTarget | null {
   }
 
   if (path === 'rogue' || path === 'ai-companion' || path.startsWith('ai/')) {
+    const companion =
+      firstQuery(url, ['id', 'companion', 'chat']) ||
+      (path.startsWith('ai/') ? path.split('/')[1] : '') ||
+      'rogue';
     return {
       pathname: '/ai-companion',
-      params: { id: firstQuery(url, ['id', 'companion']) || 'rogue' },
+      params: { id: companion },
     };
+  }
+
+  if (
+    path === 'events' ||
+    path === 'community' ||
+    path.startsWith('events/') ||
+    path.startsWith('community/')
+  ) {
+    const chat = firstQuery(url, ['chat', 'companion', 'id']).toLowerCase();
+    if (
+      chat === 'delilah' ||
+      chat === 'rogue' ||
+      chat === 'scout' ||
+      chat === 'taco'
+    ) {
+      return {
+        pathname: '/ai-companion',
+        params: { id: chat },
+      };
+    }
+
+    const segments = path.split('/');
+    const leaf = segments[1] || '';
+    if (leaf === 'host') {
+      return { pathname: '/community-host' };
+    }
+    if (leaf && leaf !== 'host') {
+      return {
+        pathname: '/community-event-detail',
+        params: { slug: leaf },
+      };
+    }
+    return { pathname: '/community-events' };
   }
 
   if (path === 'account' || path === 'settings') {

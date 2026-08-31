@@ -111,6 +111,18 @@ export default function CommunityEventsScreen() {
         </Pressable>
       </View>
 
+      <Pressable
+        style={styles.delilahChat}
+        onPress={() =>
+          router.push({
+            pathname: "/ai-companion",
+            params: { id: "delilah" },
+          })
+        }
+      >
+        <Text style={styles.delilahChatText}>Chat with Delilah · Pet Event Coordinator</Text>
+      </Pressable>
+
       {loading ? (
         <ActivityIndicator color="#0D5C3A" style={{ marginTop: 24 }} />
       ) : null}
@@ -274,6 +286,22 @@ const styles = StyleSheet.create({
   ctaSecondaryText: {
     fontFamily: AppFonts.bold,
     color: "#0f172a",
+    fontSize: 14,
+  },
+  delilahChat: {
+    minHeight: 48,
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    backgroundColor: "#f0fdf4",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  delilahChatText: {
+    fontFamily: AppFonts.bold,
+    color: "#0D5C3A",
     fontSize: 14,
   },
   error: {

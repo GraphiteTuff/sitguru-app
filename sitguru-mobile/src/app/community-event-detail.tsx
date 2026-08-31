@@ -13,7 +13,7 @@ import {
 
 import SitGuruScreen from "@/components/SitGuruScreen";
 import CommunityEventShareSheet from "@/components/community/CommunityEventShareSheet";
-import CommunityRoguePanel from "@/components/community/CommunityRoguePanel";
+import CommunityDelilahPanel from "@/components/community/CommunityDelilahPanel";
 import { AppFonts } from "@/constants/fonts";
 import {
   fetchCommunityEventBySlug,
@@ -260,7 +260,7 @@ export default function CommunityEventDetailScreen() {
 
       {rsvpMessage ? <Text style={styles.rsvpMessage}>{rsvpMessage}</Text> : null}
 
-      <CommunityRoguePanel eventSlug={event.slug} eventTitle={event.title} />
+      <CommunityDelilahPanel eventSlug={event.slug} eventTitle={event.title} />
 
       <View style={styles.joinHintRow}>
         <Pressable onPress={() => void goToCommunitySignup("pet-parent")}>

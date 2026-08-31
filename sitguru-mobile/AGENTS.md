@@ -30,7 +30,7 @@ NativeWind/Tailwind is **not** installed. Use StyleSheet + shared primitives:
 
 1. **One-handed thumb zone** — Keep bottom tab nav locked. Primary actions (`Request Booking`, `Start Walk`, Accept/Decline) are large full-width sticky buttons in the footer (lower ~30%), never desktop-style top/left chrome.
 2. **Gestures over tiny taps** — List approve/decline uses swipe: **right = accept**, **left = decline** (`guru-requests`). Hint text must remain: `Swipe right to accept · Swipe left to decline`.
-3. **Card progressive disclosure** — Dashboards show a `PriorityCarousel` of highest-priority cards only; tap opens deep-dive routes instead of dumping analytics/history on one screen. AI Companions (Rogue / Taco / Scout) use the same carousel pattern.
+3. **Card progressive disclosure** — Dashboards show a `PriorityCarousel` of highest-priority cards only; tap opens deep-dive routes instead of dumping analytics/history on one screen. AI Companions (Rogue / Taco / Scout / Delilah) use the same carousel pattern.
 4. No core-flow horizontal scroll except the intentional priority carousel. All interactive targets ≥ **48dp**.
 5. **High-fidelity native surfaces** (desktop → mobile):
    - **Service core** — Thumb grid for Dog Walking / Pet Sitting / Boarding / Drop-In / Day Care / Training Support + sticky footer CTA.

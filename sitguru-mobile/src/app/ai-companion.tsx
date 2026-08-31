@@ -75,7 +75,7 @@ type ScreenStyles = ReturnType<typeof createStyles>;
 type ScreenPalette = ReturnType<typeof getPalette>;
 
 /**
- * Native in-app chat for one AI companion (Rogue / Taco / Scout).
+ * Native in-app chat for one AI companion (Rogue / Taco / Scout / Delilah).
  *
  * Personas, tools, and marker generation all live on the SitGuru web API.
  * This screen streams the reply token by token, renders the CTA / guru-card /
@@ -741,7 +741,13 @@ function CompanionAvatar({
   // Rogue is a German Shorthaired Pointer, Taco a tuxedo cat, Scout the
   // Guru matching officer — each falls back to its own mark.
   const FallbackIcon =
-    companion.id === 'taco' ? Cat : companion.id === 'scout' ? Compass : Dog;
+    companion.id === 'taco'
+      ? Cat
+      : companion.id === 'scout'
+        ? Compass
+        : companion.id === 'delilah'
+          ? MapPin
+          : Dog;
 
   return (
     <View style={[styles.avatarBase, wrapperStyle]}>
