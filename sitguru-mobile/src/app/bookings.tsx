@@ -21,6 +21,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
+import { getMobileChromePalette } from '@/constants/mobile-palette';
 import {
   setThemePreference,
   type SitGuruThemePreference,
@@ -436,19 +437,20 @@ function BookingRow({
 }
 
 function getPalette(isDark: boolean) {
+  const chrome = getMobileChromePalette(isDark);
   return {
-    background: isDark ? '#06140F' : '#FFF9F1',
-    surface: isDark ? '#0B2118' : '#FFFEFA',
-    surfaceSoft: isDark ? '#102D21' : '#FFF6E9',
-    border: isDark ? '#234B38' : '#EADDCB',
-    title: isDark ? '#FFF5E8' : '#123F31',
-    text: isDark ? '#E8EEE9' : '#27483E',
-    muted: isDark ? '#9DB0A5' : '#738078',
-    primary: isDark ? '#39D982' : '#087449',
-    primarySoft: isDark ? '#123E2A' : '#E4F5E9',
-    onPrimary: isDark ? '#06140F' : '#FFFFFF',
-    orange: '#F15A3A',
-    orangeSoft: isDark ? '#3A1A12' : '#FDEBE6',
+    background: chrome.background,
+    surface: chrome.surface,
+    surfaceSoft: chrome.surfaceSoft,
+    border: chrome.border,
+    title: chrome.title,
+    text: chrome.text,
+    muted: chrome.muted,
+    primary: chrome.primary,
+    primarySoft: chrome.primarySoft,
+    onPrimary: chrome.onPrimary,
+    orange: chrome.orange,
+    orangeSoft: chrome.orangeSoft,
   };
 }
 

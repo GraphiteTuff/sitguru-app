@@ -194,7 +194,7 @@ function createStyles(isDark: boolean, avatarSize: number) {
       width: '100%',
     },
     avatarFallback: {
-      color: isDark ? '#39D982' : '#087449',
+      color: isDark ? '#5CE09A' : '#2A9D6A',
       fontFamily: AppFonts.extraBold,
       fontSize: Math.max(11, avatarSize * 0.28),
     },

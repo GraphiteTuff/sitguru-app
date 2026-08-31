@@ -26,6 +26,7 @@ import {
   isSupabaseConfigured,
   supabase,
 } from '@/lib/supabase';
+import { trackMobileEvent } from '@/lib/analytics/track';
 import {
   normalizeRole,
   roleDashboardPath,
@@ -1175,6 +1176,17 @@ export function AuthProvider({
               error.message,
             );
 
+            void trackMobileEvent({
+              eventName: 'auth_apple_error',
+              eventType: 'auth',
+              source: 'sitguru_mobile',
+              pagePath: '/login',
+              metadata: {
+                method: 'native_id_token',
+                message,
+              },
+            });
+
             setAuthError(message);
 
             return {
@@ -1225,6 +1237,16 @@ export function AuthProvider({
 
           setAuthError(null);
 
+          void trackMobileEvent({
+            eventName: 'auth_apple_success',
+            eventType: 'auth',
+            source: 'sitguru_mobile',
+            pagePath: '/login',
+            metadata: {
+              method: 'native_id_token',
+            },
+          });
+
           await loadProfileAndRoles(
             data.session.user,
           );
@@ -1252,6 +1274,13 @@ export function AuthProvider({
             errorCode ===
             'ERR_REQUEST_CANCELED'
           ) {
+            void trackMobileEvent({
+              eventName: 'auth_apple_cancelled',
+              eventType: 'auth',
+              source: 'sitguru_mobile',
+              pagePath: '/login',
+            });
+
             return {
               error: null,
               cancelled: true,
@@ -1263,6 +1292,17 @@ export function AuthProvider({
               ? error.message
               : undefined,
           );
+
+          void trackMobileEvent({
+            eventName: 'auth_apple_error',
+            eventType: 'auth',
+            source: 'sitguru_mobile',
+            pagePath: '/login',
+            metadata: {
+              code: errorCode || undefined,
+              message,
+            },
+          });
 
           setAuthError(message);
 
