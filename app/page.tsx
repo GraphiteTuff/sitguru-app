@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
 import HomepageEventsSectionClient from "@/components/community/HomepageEventsSectionClient";
+import HomepageAppsComingSoon from "@/components/marketing/HomepageAppsComingSoon";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { PawIcon } from "@/components/ui/PawIcon";
 import { trackEvent } from "@/lib/analytics/track";
@@ -2026,6 +2027,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <HomepageAppsComingSoon onTrack={trackHomepageClick} />
 
       <section className="bg-white py-12 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
