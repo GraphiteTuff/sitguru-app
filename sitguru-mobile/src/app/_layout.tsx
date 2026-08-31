@@ -135,7 +135,7 @@ export default function RootLayout() {
                 screenOptions={{
                   headerShown: false,
                   contentStyle: {
-                    backgroundColor: '#0D5C3A',
+                    backgroundColor: '#FFFCF7',
                   },
                 }}
               />
@@ -150,5 +150,5 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  root: { backgroundColor: '#0D5C3A', flex: 1 },
+  root: { backgroundColor: '#FFFCF7', flex: 1 },
 });
