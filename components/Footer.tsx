@@ -62,6 +62,10 @@ const companyLinks = [
   { label: "Contact", href: "/contact" },
   { label: "Careers", href: "/careers" },
   { label: "Help", href: "/help", featured: true },
+  {
+    label: "iOS & Android apps — coming soon",
+    href: "/#sitguru-apps-coming-soon",
+  },
   { label: "Privacy", href: "/privacy" },
   { label: "Terms", href: "/terms" },
   { label: "Admin", href: "/admin/login" },
@@ -308,7 +312,8 @@ export default function Footer() {
               © {new Date().getFullYear()} SitGuru™. All rights reserved.
             </p>
             <p className="mt-1 text-xs italic text-slate-400">
-              Trusted Pet Care. Simplified.
+              Trusted Pet Care. Simplified. · Free iOS &amp; Android apps coming
+              soon — use the website today.
             </p>
           </div>
 
