@@ -35,7 +35,9 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import BubblePressable from '@/components/BubblePressable';
 import ConvertActionBar from '@/components/mobile/ConvertActionBar';
+import SitGuruFeatureChips from '@/components/mobile/SitGuruFeatureChips';
 import SitGuruBootScreen from '@/components/mobile/SitGuruBootScreen';
+import SitGuruTabBar from '@/components/SitGuruTabBar';
 import {
   SitGuruIcon,
   type SitGuruIconName,
@@ -149,19 +151,6 @@ const serviceOptions = [
   'Training Support',
   'Medication Help',
   'Custom Care',
-];
-
-/* Visitors have no bookings or messages yet, so every destination here has to
- * be something a signed-out person can actually use. */
-const navItems: {
-  icon: SitGuruIconName;
-  label: string;
-  href?: string;
-}[] = [
-  { icon: 'home', label: 'Home' },
-  { icon: 'explore', label: 'Explore', href: '/find-care' },
-  { icon: 'messages', label: 'Ask Rogue', href: '/ai-companion?id=rogue' },
-  { icon: 'profile', label: 'Join free', href: '/signup?role=parent' },
 ];
 
 const services: ServiceCard[] = [
@@ -898,6 +887,11 @@ function MarketingHomeScreen() {
             />
           </View>
 
+          <SitGuruFeatureChips
+            preset="visitor"
+            title="Explore SitGuru"
+          />
+
           <View style={styles.socialSection}>
             <View style={styles.socialHeadingRow}>
               <Text style={styles.socialTitle}>Follow SitGuru</Text>
@@ -943,61 +937,7 @@ function MarketingHomeScreen() {
             onPress={() => openFindCare()}
             showTrust
           />
-          <View
-            style={[
-              styles.bottomNav,
-              {
-                height: 76 + Math.max(insets.bottom, 8),
-                paddingBottom: Math.max(insets.bottom, 8),
-              },
-            ]}
-          >
-          {navItems.map((item) => {
-            const active = item.icon === 'home';
-
-            return (
-              <BubblePressable
-                key={item.label}
-                accessibilityRole="button"
-                accessibilityLabel={item.label}
-                accessibilityState={{ selected: active }}
-                active={active}
-                bubble
-                bubbleColor={styles.navBubble.backgroundColor}
-                bubblePlacement="glyph"
-                haptic="selection"
-                onPress={() => {
-                  if (item.href) {
-                    if (item.href.startsWith('/signup')) {
-                      router.push({
-                        pathname: '/signup',
-                        params: { role: 'parent' },
-                      } as never);
-                      return;
-                    }
-                    router.push(item.href as never);
-                  }
-                }}
-                scaleTo={0.84}
-                style={styles.navItem}
-              >
-                <View style={styles.navIconWell}>
-                  <SitGuruIcon
-                    name={item.icon}
-                    size={24}
-                    color={
-                      active ? styles.navActive.color : styles.navMuted.color
-                    }
-                    strokeWidth={active ? 2.6 : 2.15}
-                  />
-                </View>
-                <Text style={active ? styles.navLabelActive : styles.navLabel}>
-                  {item.label}
-                </Text>
-              </BubblePressable>
-            );
-          })}
-            </View>
+          <SitGuruTabBar active="home" role="visitor" />
         </View>
 
             {isWebPreview ? <View style={styles.homeIndicator} /> : null}
@@ -2117,7 +2057,7 @@ function createStyles(
       transform: [{ scale: 0.985 }],
     },
     bottomSpacer: {
-      height: 148,
+      height: 168,
     },
 
     bottomNav: {

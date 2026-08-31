@@ -10,7 +10,8 @@ export const SitGuruColors = {
   surface: BrandColors.white,
   surfaceSoft: BrandColors.greenSoft,
 
-  primary: '#1A4E37',
+  primary: '#1B7A52',
+  guruPrimary: '#2A9D6A',
   primaryDark: BrandColors.ink,
   primaryLight: '#C9DDD1',
 

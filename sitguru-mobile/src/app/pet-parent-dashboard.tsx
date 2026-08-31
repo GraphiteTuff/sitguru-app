@@ -52,6 +52,7 @@ import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { isVisitReviewClosed } from '@/lib/reviews/visit-review';
 import { AI_COMPANIONS } from '@/constants/companions';
+import { getDashboardPalette } from '@/constants/role-palettes';
 import { AppFonts } from '@/constants/fonts';
 import {
   StickyFooterClearance,
@@ -636,6 +637,15 @@ export default function PetParentDashboardScreen() {
       });
     }
 
+    cards.push({
+      id: 'pet-events',
+      eyebrow: 'Pet Events',
+      title: 'Sniff out fun nearby',
+      helper: 'Walks, playdates, and partner pack hangs — RSVP in one tap.',
+      onPress: () => router.push('/community-events'),
+      icon: <MapPin color={palette.primary} size={22} strokeWidth={2.4} />,
+    });
+
     const incompletePets = dashboardData.pets.filter((pet) => !pet.complete);
     cards.push({
       id: 'pets',
@@ -929,7 +939,7 @@ export default function PetParentDashboardScreen() {
             />
 
             <PriorityCarousel
-              label="AI Companions"
+              label="SitGuru experiences"
               cards={companionCards}
             />
 
@@ -2530,28 +2540,7 @@ function formatBadge(value: number) {
 }
 
 function getPalette(isDark: boolean) {
-  return {
-    background: isDark ? '#06140F' : '#FFF9F1',
-    surface: isDark ? '#0B2118' : '#FFFEFA',
-    surfaceSoft: isDark ? '#102D21' : '#FFF6E9',
-    surfaceGreen: isDark ? '#123624' : '#EEF8E8',
-    border: isDark ? '#234B38' : '#EADDCB',
-    borderStrong: isDark ? '#2D6548' : '#D8C7B0',
-    title: isDark ? '#FFF5E8' : '#123F31',
-    text: isDark ? '#E8EEE9' : '#27483E',
-    muted: isDark ? '#9DB0A5' : '#738078',
-    primary: isDark ? '#39D982' : '#087449',
-    primaryDark: isDark ? '#1C9F5E' : '#075D3B',
-    primarySoft: isDark ? '#123E2A' : '#E4F5E9',
-    orange: '#F15A3A',
-    gold: '#F4B93E',
-    white: '#FFFFFF',
-    avatarBg: isDark ? '#173527' : '#EEF5EE',
-    avatarBorder: isDark ? '#2E6C4B' : '#FFFFFF',
-    routeBg: isDark ? '#142A22' : '#EDF3EE',
-    routeStreet: isDark ? '#284538' : '#D8E1DA',
-    shadow: '#000000',
-  };
+  return getDashboardPalette('pet_parent', isDark);
 }
 
 function createStyles(isDark: boolean) {

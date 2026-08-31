@@ -37,6 +37,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BubblePressable from "@/components/BubblePressable";
 import { useKeyboardSafe } from "@/components/mobile/KeyboardSafeHost";
+import SitGuruFeatureChips from "@/components/mobile/SitGuruFeatureChips";
 import { SitGuruIcon } from "@/components/SitGuruIcon";
 import SitGuruScreen from "@/components/SitGuruScreen";
 import SitGuruTabBar from "@/components/SitGuruTabBar";
@@ -2185,7 +2186,13 @@ export default function FindCareScreen() {
               )}
 
               {activeView === "list" ? (
-                <View style={styles.bottomSpacer} />
+                <>
+                  <SitGuruFeatureChips
+                    preset="visitor"
+                    title="While you browse"
+                  />
+                  <View style={styles.bottomSpacer} />
+                </>
               ) : null}
             </ScrollView>
             </KeyboardAvoidingView>

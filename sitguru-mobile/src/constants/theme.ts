@@ -3,8 +3,10 @@ import { Platform } from 'react-native';
 export type AppThemeMode = 'light' | 'dark';
 
 export const BrandColors = {
-  green: '#176B4C',
-  greenDark: '#0F4D38',
+  green: '#1B7A52',
+  greenDark: '#0F5C3A',
+  guruGreen: '#2A9D6A',
+  guruGreenDark: '#1F7A52',
   greenSoft: '#DCEFE6',
   greenMist: '#EEF8F2',
 

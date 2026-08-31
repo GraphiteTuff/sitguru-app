@@ -47,6 +47,7 @@ import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { SitGuruColors } from '@/constants/colors';
+import { getDashboardPalette } from '@/constants/role-palettes';
 import { AppFonts } from '@/constants/fonts';
 import {
   setThemePreference,
@@ -808,7 +809,7 @@ export default function GuruDashboardScreen() {
           pathname: '/guru-earnings',
           params: { focus: 'retention' },
         }),
-      icon: <Users color={SitGuruColors.primary} size={22} strokeWidth={2.4} />,
+      icon: <Users color={SitGuruColors.guruPrimary} size={22} strokeWidth={2.4} />,
     });
 
     cards.push({
@@ -3787,49 +3788,8 @@ function dayPart() {
   return 'evening';
 }
 
-function getPalette(
-  isDark: boolean,
-) {
-  return {
-    background: isDark
-      ? '#06140F'
-      : '#FFF9F1',
-    surface: isDark
-      ? '#0B2118'
-      : '#FFFEFA',
-    surfaceSoft: isDark
-      ? '#102D21'
-      : '#FFF6E9',
-    border: isDark
-      ? '#234B38'
-      : '#EADDCB',
-    title: isDark
-      ? '#FFF5E8'
-      : '#123F31',
-    text: isDark
-      ? '#E8EEE9'
-      : '#27483E',
-    muted: isDark
-      ? '#9DB0A5'
-      : '#738078',
-    primary: isDark
-      ? '#39D982'
-      : '#087449',
-    primarySoft: isDark
-      ? '#123E2A'
-      : '#E4F5E9',
-    orange: '#F15A3A',
-    navMuted: isDark
-      ? '#9BAAA1'
-      : '#748079',
-    avatarBg: isDark
-      ? '#173527'
-      : '#EEF5EE',
-    avatarBorder: isDark
-      ? '#2E6C4B'
-      : '#FFFFFF',
-    shadow: '#000000',
-  };
+function getPalette(isDark: boolean) {
+  return getDashboardPalette('guru', isDark);
 }
 
 function createStyles(

@@ -26,7 +26,16 @@ NativeWind/Tailwind is **not** installed. Use StyleSheet + shared primitives:
 | Service core grid (Pet Parent) | `src/components/mobile/ServiceCoreGrid.tsx` |
 | Cached live photo loader | `src/components/mobile/CachedRemoteImage.tsx` |
 
-## SitGuru Mobile UX rules
+## Conversion-first mobile UX
+
+**Primary (never bury):** Book / Find Care · Join · Pay · Accept booking — sticky `ConvertActionBar` + thumb-zone tab **Explore** / **Join**.
+
+**Secondary (no tab clutter):** Pet Events, AI companions, PawPerks, Passports — `SitGuruFeatureChips` presets in `@/constants/mobile-experiences.ts` and dashboard `PriorityCarousel` cards.
+
+**Tabs (5 max):** Visitor → Home · Explore · Join · Events · Ask Rogue. Pet parent → Home · Explore · Bookings · Messages · Profile (events via chips/carousel, not a 6th tab).
+
+Feature screens (events, companions) always stack **book CTA above tab bar** via `MobileTabFooter` + `ConvertActionBar`.
+
 
 1. **One-handed thumb zone** — Keep bottom tab nav locked. Primary actions (`Request Booking`, `Start Walk`, Accept/Decline) are large full-width sticky buttons in the footer (lower ~30%), never desktop-style top/left chrome.
 2. **Gestures over tiny taps** — List approve/decline uses swipe: **right = accept**, **left = decline** (`guru-requests`). Hint text must remain: `Swipe right to accept · Swipe left to decline`.
