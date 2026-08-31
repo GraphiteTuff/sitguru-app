@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, Loader2, Wallet } from "lucide-react";
 import AmbassadorMetricsCircuit from "@/components/ambassador/metrics/AmbassadorMetricsCircuit";
+import { AMBASSADOR_METRICS_MOCK } from "@/components/ambassador/metrics/AmbassadorMetricsCharts";
 
 type MePayload = {
   ok?: boolean;
@@ -33,7 +34,12 @@ function hasReferralCode(payload: MePayload | null) {
   return typeof code === "string" && code.trim().length > 0;
 }
 
-export default function AmbassadorSelfServicePortal() {
+export default function AmbassadorSelfServicePortal({
+  isMockActive = false,
+}: {
+  /** Dev / QA: preview active chart + summary numbers without a live code. */
+  isMockActive?: boolean;
+}) {
   const [data, setData] = useState<MePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,10 +68,27 @@ export default function AmbassadorSelfServicePortal() {
     };
   }, []);
 
-  const frozen = !hasReferralCode(data);
+  const frozen = isMockActive ? false : !hasReferralCode(data);
   const displayLink = (
-    data?.referralLink || "https://sitguru.com/r/YOUR_CODE"
+    isMockActive
+      ? `https://sitguru.com/r/${AMBASSADOR_METRICS_MOCK.referralCode}`
+      : data?.referralLink || "https://sitguru.com/r/YOUR_CODE"
   ).replace(/^https?:\/\//, "://");
+  const clicksDisplay = isMockActive
+    ? AMBASSADOR_METRICS_MOCK.clicksCount
+    : frozen
+      ? 0
+      : data?.clicksTotal || 0;
+  const signupsDisplay = isMockActive
+    ? AMBASSADOR_METRICS_MOCK.referralCount
+    : frozen
+      ? 0
+      : data?.referralsTotal || 0;
+  const pendingDisplay = isMockActive
+    ? AMBASSADOR_METRICS_MOCK.unlockedCommissions
+    : frozen
+      ? 0
+      : data?.pendingCommissions || 0;
 
   async function copyLink() {
     const full =
@@ -80,7 +103,7 @@ export default function AmbassadorSelfServicePortal() {
     }
   }
 
-  if (loading) {
+  if (loading && !isMockActive) {
     return (
       <div className="flex justify-center rounded-3xl border border-emerald-100 bg-white py-12 shadow-sm">
         <Loader2 className="h-6 w-6 animate-spin text-emerald-700" />
@@ -90,7 +113,10 @@ export default function AmbassadorSelfServicePortal() {
 
   return (
     <div className="w-full space-y-4">
-      <AmbassadorMetricsCircuit initHref="/ambassador/dashboard/referrals" />
+      <AmbassadorMetricsCircuit
+        initHref="/ambassador/dashboard/referrals"
+        isMockActive={isMockActive}
+      />
 
       <section
         data-brand-green={frozen ? undefined : true}
@@ -141,15 +167,15 @@ export default function AmbassadorSelfServicePortal() {
           <section className="grid w-full grid-cols-2 gap-3">
             <SummaryCard
               label="Clicks"
-              value={String(frozen ? 0 : data.clicksTotal || 0)}
+              value={String(clicksDisplay)}
             />
             <SummaryCard
               label="Signups"
-              value={String(frozen ? 0 : data.referralsTotal || 0)}
+              value={String(signupsDisplay)}
             />
             <SummaryCard
               label="Pending $"
-              value={money(frozen ? 0 : data.pendingCommissions || 0)}
+              value={money(pendingDisplay)}
             />
             <SummaryCard
               label="Paid lifetime"
