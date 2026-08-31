@@ -35,6 +35,7 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import BubblePressable from '@/components/BubblePressable';
 import ConvertActionBar from '@/components/mobile/ConvertActionBar';
+import SitGuruFeatureChips from '@/components/mobile/SitGuruFeatureChips';
 import SitGuruBootScreen from '@/components/mobile/SitGuruBootScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import {
@@ -885,6 +886,11 @@ function MarketingHomeScreen() {
               styles={styles}
             />
           </View>
+
+          <SitGuruFeatureChips
+            preset="visitor"
+            title="Explore SitGuru"
+          />
 
           <View style={styles.socialSection}>
             <View style={styles.socialHeadingRow}>

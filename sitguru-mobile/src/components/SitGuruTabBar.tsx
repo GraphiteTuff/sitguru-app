@@ -51,6 +51,13 @@ const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
     { key: 'home', label: 'Home', icon: Home, href: '/' },
     { key: 'explore', label: 'Explore', icon: Search, href: '/find-care' },
     {
+      key: 'profile',
+      label: 'Join',
+      icon: User,
+      href: '/signup',
+      params: { role: 'parent' },
+    },
+    {
       key: 'events',
       label: 'Events',
       icon: MapPin,
@@ -62,13 +69,6 @@ const TAB_SETS: Record<SitGuruTabRole, TabDefinition[]> = {
       icon: Sparkles,
       href: '/ai-companion',
       params: { id: 'rogue' },
-    },
-    {
-      key: 'profile',
-      label: 'Join',
-      icon: User,
-      href: '/signup',
-      params: { role: 'parent' },
     },
   ],
   petParent: [

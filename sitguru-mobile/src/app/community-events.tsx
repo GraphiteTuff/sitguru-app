@@ -18,13 +18,24 @@ import {
   View,
 } from "react-native";
 
-import SitGuruScreen from "@/components/SitGuruScreen";
+import ConvertActionBar from "@/components/mobile/ConvertActionBar";
+import MobileScreen from "@/components/mobile/MobileScreen";
+import MobileTabFooter from "@/components/mobile/MobileTabFooter";
+import SitGuruFeatureChips from "@/components/mobile/SitGuruFeatureChips";
 import { AppFonts } from "@/constants/fonts";
+import {
+  EVENT_SCREEN_EXPERIENCES,
+  MOBILE_CONVERT,
+} from "@/constants/mobile-experiences";
+import { SitGuruBrand } from "@/constants/role-palettes";
 import {
   useCommunityEvents,
   type MobileCommunityEvent,
 } from "@/hooks/data/useCommunityEvents";
+import { useMobileTabContext } from "@/hooks/useMobileTabContext";
 import { trackMobileEvent } from "@/lib/analytics/track";
+
+const BRAND = SitGuruBrand.petParent;
 
 function formatParts(event: MobileCommunityEvent) {
   const start = new Date(event.start_at);
@@ -58,6 +69,7 @@ export default function CommunityEventsScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 768;
   const { events, loading, error } = useCommunityEvents({ q: query });
+  const { tabRole } = useMobileTabContext();
 
   const sorted = useMemo(
     () => [...events].sort((a, b) => a.start_at.localeCompare(b.start_at)),
@@ -74,9 +86,26 @@ export default function CommunityEventsScreen() {
   }, [query, sorted.length]);
 
   return (
-    <SitGuruScreen scroll center={false}>
+    <MobileScreen
+      scrollBottomInset={120}
+      footer={
+        <MobileTabFooter
+          active="events"
+          role={tabRole}
+          sticky={
+            <ConvertActionBar
+              embedded
+              helper="Going to an event? Book a Guru for the outing."
+              label={MOBILE_CONVERT.bookLabel}
+              onPress={() => router.push(MOBILE_CONVERT.exploreHref)}
+              showTrust
+            />
+          }
+        />
+      }
+    >
       <Pressable style={styles.backRow} onPress={() => router.back()}>
-        <ChevronLeft color="#0D5C3A" size={22} />
+        <ChevronLeft color={BRAND} size={22} />
         <Text style={styles.backText}>Back</Text>
       </Pressable>
 
@@ -120,11 +149,18 @@ export default function CommunityEventsScreen() {
           })
         }
       >
-        <Text style={styles.delilahChatText}>Chat with Delilah · Pet Event Coordinator</Text>
+        <Text style={styles.delilahChatText}>
+          Chat with Delilah · Pet Event Coordinator
+        </Text>
       </Pressable>
 
+      <SitGuruFeatureChips
+        chips={EVENT_SCREEN_EXPERIENCES}
+        title="Plan care around your outing"
+      />
+
       {loading ? (
-        <ActivityIndicator color="#0D5C3A" style={{ marginTop: 24 }} />
+        <ActivityIndicator color={BRAND} style={{ marginTop: 24 }} />
       ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -159,7 +195,7 @@ export default function CommunityEventsScreen() {
                 <Image source={{ uri: imageUrl }} style={styles.cardImage} />
               ) : (
                 <View style={[styles.cardImage, styles.cardImageFallback]}>
-                  <PawPrint color="#0D5C3A" size={28} />
+                  <PawPrint color={BRAND} size={28} />
                 </View>
               )}
 
@@ -183,11 +219,11 @@ export default function CommunityEventsScreen() {
                 </View>
 
                 <View style={styles.metaRow}>
-                  <CalendarDays color="#0D5C3A" size={16} />
+                  <CalendarDays color={BRAND} size={16} />
                   <Text style={styles.metaText}>{parts.when}</Text>
                 </View>
                 <View style={styles.metaRow}>
-                  <MapPin color="#0D5C3A" size={16} />
+                  <MapPin color={BRAND} size={16} />
                   <Text style={styles.metaText}>
                     {[event.venue_name, event.city, event.state]
                       .filter(Boolean)
@@ -199,7 +235,7 @@ export default function CommunityEventsScreen() {
           );
         })}
       </View>
-    </SitGuruScreen>
+    </MobileScreen>
   );
 }
 
@@ -213,7 +249,7 @@ const styles = StyleSheet.create({
   },
   backText: {
     fontFamily: AppFonts.bold,
-    color: "#0D5C3A",
+    color: BRAND,
     fontSize: 16,
   },
   eyebrow: {
@@ -221,7 +257,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 1.4,
     textTransform: "uppercase",
-    color: "#0D5C3A",
+    color: BRAND,
   },
   title: {
     fontFamily: AppFonts.extraBold,
@@ -261,7 +297,7 @@ const styles = StyleSheet.create({
   ctaPrimary: {
     minHeight: 48,
     borderRadius: 16,
-    backgroundColor: "#0D5C3A",
+    backgroundColor: BRAND,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -301,7 +337,7 @@ const styles = StyleSheet.create({
   },
   delilahChatText: {
     fontFamily: AppFonts.bold,
-    color: "#0D5C3A",
+    color: BRAND,
     fontSize: 14,
   },
   error: {

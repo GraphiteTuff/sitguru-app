@@ -51,6 +51,7 @@ import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { isVisitReviewClosed } from '@/lib/reviews/visit-review';
+import { AI_COMPANIONS } from '@/constants/companions';
 import { getDashboardPalette } from '@/constants/role-palettes';
 import { AppFonts } from '@/constants/fonts';
 import {
@@ -636,6 +637,15 @@ export default function PetParentDashboardScreen() {
       });
     }
 
+    cards.push({
+      id: 'pet-events',
+      eyebrow: 'Pet Events',
+      title: 'Sniff out fun nearby',
+      helper: 'Walks, playdates, and partner pack hangs — RSVP in one tap.',
+      onPress: () => router.push('/community-events'),
+      icon: <MapPin color={palette.primary} size={22} strokeWidth={2.4} />,
+    });
+
     const incompletePets = dashboardData.pets.filter((pet) => !pet.complete);
     cards.push({
       id: 'pets',
@@ -929,7 +939,7 @@ export default function PetParentDashboardScreen() {
             />
 
             <PriorityCarousel
-              label="AI Companions"
+              label="SitGuru experiences"
               cards={companionCards}
             />
 
