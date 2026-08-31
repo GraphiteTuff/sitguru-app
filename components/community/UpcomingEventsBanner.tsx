@@ -331,7 +331,7 @@ export default function UpcomingEventsBanner({
   lastSyncedAt: _lastSyncedAt = null,
   viewAllHref = "/events",
   eyebrow = "Local pet life",
-  title = "Where good pets gather.",
+  title = "Where tails wag together.",
   subtitle,
   adminHref,
 }: UpcomingEventsBannerProps) {
@@ -375,10 +375,10 @@ export default function UpcomingEventsBanner({
   const resolvedSubtitle =
     subtitle ||
     (source === "google"
-      ? "Adoption days, meetups, and neighborhood pet energy near you — refreshed daily."
+      ? "Adoption days, park meetups, and neighborhood pet energy near you — refreshed daily."
       : source === "demo"
-        ? "A taste of the local calendar. Partner events take the lead as they go live."
-        : "Pet-friendly hangs from SitGuru partners and the local scene.");
+        ? "Sniff out fun nearby — walks, playdates, and partner pack hangs as they go live."
+        : "Pet-friendly hangs from SitGuru partners and your local pack.");
 
   const previewLabel =
     source === "google"

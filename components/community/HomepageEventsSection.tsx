@@ -57,7 +57,7 @@ export default function HomepageEventsSection({
       viewAllHref="/events"
       adminHref={adminHref}
       eyebrow="Local pet life"
-      title="Where good pets gather."
+      title="Where tails wag together."
     />
   );
 }

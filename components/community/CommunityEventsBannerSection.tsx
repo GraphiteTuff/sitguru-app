@@ -65,7 +65,7 @@ export default async function CommunityEventsBannerSection() {
       lastSyncedAt={discovered.lastSyncedAt}
       viewAllHref="/events"
       eyebrow="Local pet life"
-      title="Where good pets gather."
+      title="Where tails wag together."
     />
   );
 }
