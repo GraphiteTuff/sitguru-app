@@ -10,6 +10,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import ChatInsightsPanel, {
   type GlobalInsightRow,
 } from "@/components/admin/ChatInsightsPanel";
+import ChatInsightsHourlyRefresh from "@/components/admin/ChatInsightsHourlyRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -145,12 +146,13 @@ export default async function AdminChatInsightsPage() {
             Chat Insights
           </h1>
           <p className="text-sm leading-6 text-slate-600 sm:text-[15px] sm:leading-6">
-            See what Rogue, Scout, and Taco are asked — and which page it came
-            from — so you can fix the funnel fast.
+            See what Rogue, Scout, Taco, and Delilah are asked — and which page
+            it came from — so you can fix the funnel fast.
           </p>
           <p className="truncate text-xs text-slate-500 sm:text-sm">
             Signed in as {actor.email} · {actor.role}
           </p>
+          <ChatInsightsHourlyRefresh />
         </div>
         <div className="flex w-full gap-2 overflow-x-auto pb-1 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <Link

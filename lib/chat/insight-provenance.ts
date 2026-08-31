@@ -2,7 +2,13 @@
  * Companion + page provenance helpers for Chat Insights ledger.
  */
 
-export type InsightCompanionKey = "rogue" | "taco" | "scout" | "admin" | "unknown";
+export type InsightCompanionKey =
+  | "rogue"
+  | "taco"
+  | "scout"
+  | "delilah"
+  | "admin"
+  | "unknown";
 
 export type CompanionHitMap = Record<string, number>;
 export type PageHitMap = Record<string, number>;
@@ -34,6 +40,12 @@ export const INSIGHT_COMPANION_META: Record<
     avatarSrc: "/images/scout-avatar.png",
     objectPosition: "50% 28%",
   },
+  delilah: {
+    label: "Delilah",
+    title: "Pet Event Coordinator",
+    avatarSrc: "/images/delilah-avatar.png",
+    objectPosition: "50% 28%",
+  },
   admin: {
     label: "Admin",
     title: "Human support",
@@ -52,7 +64,13 @@ export function normalizeCompanionKey(
   const key = String(value || "")
     .trim()
     .toLowerCase();
-  if (key === "rogue" || key === "taco" || key === "scout" || key === "admin") {
+  if (
+    key === "rogue" ||
+    key === "taco" ||
+    key === "scout" ||
+    key === "delilah" ||
+    key === "admin"
+  ) {
     return key;
   }
   return "unknown";
@@ -129,6 +147,12 @@ export function pageLabel(path: string): string {
   if (clean.startsWith("/become-a-guru")) return `Become a Guru (${clean})`;
   if (clean.startsWith("/ambassadors") || clean.startsWith("/programs/ambassadors")) {
     return `Ambassadors (${clean})`;
+  }
+  if (clean === "/events" || clean.startsWith("/events/")) {
+    return `Pet Events (${clean})`;
+  }
+  if (clean === "/community" || clean.startsWith("/community/")) {
+    return `Community (${clean})`;
   }
   if (clean.startsWith("/admin/messages")) return "Admin messages";
   if (clean.startsWith("/admin/insights")) return "Admin insights";

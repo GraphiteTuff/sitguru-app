@@ -6,7 +6,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { HelpCategory } from "@/lib/help/articles";
@@ -40,7 +40,7 @@ export type GlobalInsightRow = {
 };
 
 type ChannelFilter = "ALL" | ChatChannelSource;
-type CompanionFilter = "ALL" | "rogue" | "scout" | "taco";
+type CompanionFilter = "ALL" | "rogue" | "scout" | "taco" | "delilah";
 type SortKey = "tally" | "topic" | "recent" | "question";
 
 const COMPANION_FILTERS: Array<{
@@ -51,6 +51,7 @@ const COMPANION_FILTERS: Array<{
   { key: "rogue", label: "Rogue" },
   { key: "scout", label: "Scout" },
   { key: "taco", label: "Taco" },
+  { key: "delilah", label: "Delilah" },
 ];
 
 const CATEGORIES: HelpCategory[] = [
@@ -229,6 +230,10 @@ export default function ChatInsightsPanel({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setInsights(initialInsights);
+  }, [initialInsights]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -409,7 +414,7 @@ export default function ChatInsightsPanel({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search Rogue, Scout, Taco, pages…"
+              placeholder="Search Rogue, Scout, Taco, Delilah, pages…"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#0D5C3A] focus:bg-white focus:ring-2 focus:ring-emerald-100"
             />
           </label>
