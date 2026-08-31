@@ -917,6 +917,7 @@ export default function ReviewsScreen() {
   const [reviews, setReviews] = useState<ReviewView[]>([]);
   const [reviewTable, setReviewTable] =
     useState<ReviewTableName | null>(null);
+  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
@@ -1000,7 +1001,8 @@ export default function ReviewsScreen() {
     isAuthenticated &&
     Boolean(user?.id) &&
     Boolean(booking?.id) &&
-    isBookingCompleted(booking);
+    isBookingCompleted(booking) &&
+    !alreadyReviewed;
 
   const isWide = width >= 720;
 
@@ -1037,6 +1039,16 @@ export default function ReviewsScreen() {
         requestedGuruId ||
         nextBooking?.guruUserId ||
         (effectiveRole === 'guru' ? user.id : '');
+
+      if (nextBooking?.id && user?.id && roleCanReview(effectiveRole)) {
+        const existing = await findExistingReview({
+          bookingId: nextBooking.id,
+          reviewerUserId: user.id,
+        });
+        setAlreadyReviewed(Boolean(existing));
+      } else {
+        setAlreadyReviewed(false);
+      }
 
       if (!nextGuruUserId) {
         setGuruName(nextBooking?.guruName || 'Your Guru');
@@ -1185,6 +1197,7 @@ export default function ReviewsScreen() {
       title: 'Review submitted',
       message: `Thanks — your verified visit review is live.${metricNote}`,
     });
+    setAlreadyReviewed(true);
 
     await refresh();
   }
@@ -1616,8 +1629,9 @@ export default function ReviewsScreen() {
 
             {!canSubmitReview && isAuthenticated ? (
               <Text style={styles.formFootnote}>
-                A verified review requires a completed booking connected to the
-                signed-in Pet Parent.
+                {alreadyReviewed
+                  ? 'You already submitted a verified review for this booking. Thank you!'
+                  : 'A verified review requires a completed booking connected to the signed-in Pet Parent.'}
               </Text>
             ) : (
               <Text style={styles.formFootnote}>
@@ -1987,7 +2001,12 @@ export default function ReviewsScreen() {
           />
           <Button
             label="Message through SitGuru"
-            onPress={() => router.push('/conversation')}
+            onPress={() =>
+              router.push({
+                pathname: '/conversation',
+                params: booking?.id ? { bookingId: booking.id } : undefined,
+              } as never)
+            }
             icon={
               <MessageCircle
                 color="#FFFFFF"
@@ -2000,7 +2019,12 @@ export default function ReviewsScreen() {
           />
           <Button
             label="View PawReport Live"
-            onPress={() => router.push('/pawreport-live')}
+            onPress={() =>
+              router.push({
+                pathname: '/pawreport-live',
+                params: booking?.id ? { bookingId: booking.id } : undefined,
+              } as never)
+            }
             styles={styles}
           />
         </View>

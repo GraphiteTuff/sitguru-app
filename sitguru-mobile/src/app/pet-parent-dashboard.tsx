@@ -88,6 +88,8 @@ type DashboardPet = {
 type DashboardBooking = {
   id: string;
   status: string;
+  paymentStatus: string;
+  paid: boolean;
   serviceLabel: string;
   startAt: Date | null;
   endAt: Date | null;
@@ -394,6 +396,14 @@ export default function PetParentDashboardScreen() {
     );
   }, [dashboardData.bookings]);
 
+  const paymentDueBooking = useMemo(
+    () =>
+      dashboardData.bookings
+        .filter(bookingNeedsPayment)
+        .sort(compareBookings)[0] ?? null,
+    [dashboardData.bookings],
+  );
+
   const activeCare = dashboardData.activeCare;
   const recentCompletedCare = dashboardData.recentCompletedCare;
 
@@ -417,11 +427,13 @@ export default function PetParentDashboardScreen() {
 
   const primaryAction = useMemo(() => {
     if (activeCare) {
+      const careBookingId = activeCare.bookingId || activeCare.id;
       return {
         eyebrow: activeCare.isWalk ? 'WALK IN PROGRESS' : 'CARE IN PROGRESS',
         title: activeCare.isWalk ? 'View Live Walk' : 'View Live Care',
         helper: 'Follow updates from your Guru in real time.',
         route: '/pawreport-live' as const,
+        params: { bookingId: careBookingId },
       };
     }
 
@@ -437,6 +449,16 @@ export default function PetParentDashboardScreen() {
       };
     }
 
+    if (paymentDueBooking) {
+      return {
+        eyebrow: 'PAYMENT DUE',
+        title: 'Pay now to confirm care',
+        helper: 'Your Guru accepted — finish secure checkout before care starts.',
+        route: '/payments' as const,
+        params: { bookingId: paymentDueBooking.id },
+      };
+    }
+
     if (currentBooking) {
       return {
         eyebrow: 'UPCOMING CARE',
@@ -448,21 +470,30 @@ export default function PetParentDashboardScreen() {
     }
 
     if (recentCompletedCare) {
+      const careBookingId =
+        recentCompletedCare.bookingId || recentCompletedCare.id;
       return {
         eyebrow: 'PAWREPORT COMPLETE',
         title: 'View Care Report',
         helper: 'Review the completed care summary and updates.',
         route: '/pawreport-live' as const,
+        params: { bookingId: careBookingId },
       };
     }
 
     return {
       eyebrow: 'READY WHEN YOU ARE',
-      title: 'Find a Guru',
-      helper: 'Browse trusted local pet care near you.',
+      title: 'Book care near you',
+      helper: 'Browse trusted local Gurus — nothing charged until they accept.',
       route: '/find-care' as const,
     };
-  }, [activeCare, currentBooking, needsVisitReview, recentCompletedCare]);
+  }, [
+    activeCare,
+    currentBooking,
+    needsVisitReview,
+    paymentDueBooking,
+    recentCompletedCare,
+  ]);
 
   const upcomingCount = dashboardData.bookings.filter((booking) =>
     isUpcomingStatus(booking.status),
@@ -517,6 +548,7 @@ export default function PetParentDashboardScreen() {
     }
 
     if (activeCare) {
+      const careBookingId = activeCare.bookingId || activeCare.id;
       cards.push({
         id: 'live-care',
         eyebrow: activeCare.isWalk ? 'Live walk' : 'Live care',
@@ -529,8 +561,39 @@ export default function PetParentDashboardScreen() {
             : activeCare.latestUpdate || 'Open PawReport Live for updates.',
         tone: needsVisitReview ? 'surface' : 'primary',
         ctaLabel: 'Open PawReport Live',
-        onPress: () => router.push('/pawreport-live'),
+        onPress: () =>
+          router.push({
+            pathname: '/pawreport-live',
+            params: { bookingId: careBookingId },
+          }),
         icon: <PawPrint color={needsVisitReview ? palette.primary : '#FFFFFF'} size={22} strokeWidth={2.4} />,
+      });
+    } else if (paymentDueBooking) {
+      cards.push({
+        id: 'payment-due',
+        eyebrow: 'Payment due',
+        title: paymentDueBooking.serviceLabel || 'Pay to confirm care',
+        helper: [
+          paymentDueBooking.petName,
+          paymentDueBooking.guruName,
+          'Guru accepted — pay securely to lock it in',
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        tone: needsVisitReview ? 'surface' : 'primary',
+        ctaLabel: 'Pay now',
+        onPress: () =>
+          router.push({
+            pathname: '/payments',
+            params: { bookingId: paymentDueBooking.id },
+          }),
+        icon: (
+          <CreditCard
+            color={needsVisitReview ? palette.primary : '#FFFFFF'}
+            size={22}
+            strokeWidth={2.4}
+          />
+        ),
       });
     } else if (currentBooking) {
       cards.push({
@@ -563,8 +626,9 @@ export default function PetParentDashboardScreen() {
       cards.push({
         id: 'find-care',
         eyebrow: 'Ready when you are',
-        title: 'Find a trusted Guru',
-        helper: 'Browse local sitters and request care in a few taps.',
+        title: 'Book care near you',
+        helper:
+          'Browse local Gurus — free to send a request, nothing charged until they accept.',
         tone: 'primary',
         ctaLabel: 'Find Care',
         onPress: () => router.push('/find-care'),
@@ -662,6 +726,7 @@ export default function PetParentDashboardScreen() {
     palette.orange,
     palette.primary,
     pawPoints,
+    paymentDueBooking,
     recentCompletedCare,
     welcomePetId,
     welcomePetName,
@@ -716,8 +781,8 @@ export default function PetParentDashboardScreen() {
                   onPress={() => {
                     if (selectedService) {
                       router.push({
-                        pathname: '/request-booking',
-                        params: { serviceType: selectedService.serviceType },
+                        pathname: '/find-care',
+                        params: { service: selectedService.serviceType },
                       });
                       return;
                     }
@@ -898,7 +963,7 @@ export default function PetParentDashboardScreen() {
                   />
                 }
                 label="Request"
-                onPress={() => router.push('/request-booking')}
+                onPress={() => router.push('/find-care')}
                 styles={styles}
               />
 
@@ -957,7 +1022,16 @@ export default function PetParentDashboardScreen() {
                   />
                 }
                 label="Payments & Receipts"
-                onPress={() => router.push('/payments')}
+                onPress={() => {
+                  if (paymentDueBooking) {
+                    router.push({
+                      pathname: '/payments',
+                      params: { bookingId: paymentDueBooking.id },
+                    });
+                    return;
+                  }
+                  router.push('/payments');
+                }}
                 palette={palette}
                 styles={styles}
               />
@@ -1254,7 +1328,12 @@ function UpcomingCareCard({
       <View style={styles.twoButtonRow}>
         <TouchTarget
           accessibilityRole="button"
-          onPress={() => router.push('/conversation')}
+          onPress={() =>
+            router.push({
+              pathname: '/conversation',
+              params: { bookingId: booking.id },
+            })
+          }
           style={styles.outlineButton}
         >
           <MessageCircle
@@ -1411,7 +1490,12 @@ function LiveCareCard({
       <View style={styles.twoButtonRow}>
         <BubblePressable
           accessibilityRole="button"
-          onPress={() => router.push('/pawreport-live')}
+          onPress={() =>
+            router.push({
+              pathname: '/pawreport-live',
+              params: { bookingId: care.bookingId || care.id },
+            })
+          }
           style={styles.filledButton}
         >
           <Text style={styles.filledButtonText}>
@@ -1421,7 +1505,12 @@ function LiveCareCard({
 
         <BubblePressable
           accessibilityRole="button"
-          onPress={() => router.push('/conversation')}
+          onPress={() =>
+            router.push({
+              pathname: '/conversation',
+              params: { bookingId: care.bookingId || care.id },
+            })
+          }
           style={styles.outlineButton}
         >
           <Text style={styles.outlineButtonText}>Message Guru</Text>
@@ -1846,6 +1935,11 @@ function mapBookingRow(
       getFirstString(row, ['id', 'booking_id', 'request_id']) ||
       `booking-${index}`,
     status,
+    paymentStatus: normalizeStatus(
+      getFirstString(row, ['payment_status', 'paid_status', 'paymentStatus']),
+    ),
+    paid:
+      getFirstBoolean(row, ['paid', 'is_paid', 'payment_complete']) === true,
     serviceLabel:
       getFirstString(row, [
         'service_name',
@@ -2276,7 +2370,30 @@ function isUpcomingStatus(status: string) {
     'submitted',
     'awaiting',
     'awaiting_response',
+    'awaiting_payment',
+    'payment_pending',
+    'payment_required',
+    'upcoming',
+    'paid',
   ].includes(status);
+}
+
+/** Guru accepted; parent still owes checkout. */
+function bookingNeedsPayment(booking: DashboardBooking) {
+  const accepted = [
+    'accepted',
+    'confirmed',
+    'approved',
+    'awaiting_payment',
+    'payment_pending',
+    'payment_required',
+  ].includes(booking.status);
+  const settled =
+    booking.paid ||
+    ['paid', 'succeeded', 'captured', 'complete'].includes(
+      booking.paymentStatus,
+    );
+  return accepted && !settled;
 }
 
 function isActiveCareStatus(status: string) {

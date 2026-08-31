@@ -24,7 +24,7 @@ export function isUnpaidBookingPayment(paymentStatus: string | null | undefined)
 export default function FinishPaymentButton({
   bookingId,
   className = "",
-  label = "Finish payment",
+  label = "Pay now",
 }: FinishPaymentButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

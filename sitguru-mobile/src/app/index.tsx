@@ -34,6 +34,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 
 import BubblePressable from '@/components/BubblePressable';
+import ConvertActionBar from '@/components/mobile/ConvertActionBar';
 import SitGuruBootScreen from '@/components/mobile/SitGuruBootScreen';
 import {
   SitGuruIcon,
@@ -160,7 +161,7 @@ const navItems: {
   { icon: 'home', label: 'Home' },
   { icon: 'explore', label: 'Explore', href: '/find-care' },
   { icon: 'messages', label: 'Ask Rogue', href: '/ai-companion?id=rogue' },
-  { icon: 'profile', label: 'Log in', href: '/login' },
+  { icon: 'profile', label: 'Join free', href: '/signup?role=parent' },
 ];
 
 const services: ServiceCard[] = [
@@ -588,8 +589,8 @@ function MarketingHomeScreen() {
                 </Text>
 
                 <Text style={styles.heroSubtitleOnVideo}>
-                  Book walks, drop-ins, sitting, boarding, and day care with
-                  local Pet Gurus.
+                  Book a local Guru in minutes. Free to browse — nothing charged
+                  until they accept.
                 </Text>
 
                 <View style={styles.heroButtonRow}>
@@ -599,17 +600,24 @@ function MarketingHomeScreen() {
                     style={styles.heroPrimaryButton}
                   >
                     <Text style={styles.heroPrimaryButtonText}>
-                      Find a Guru Near You
+                      Book care near you
                     </Text>
                     <ArrowRight color="#FFFFFF" size={18} strokeWidth={2.5} />
                   </BubblePressable>
 
                   <BubblePressable
                     accessibilityRole="button"
-                    onPress={() => router.push('/login')}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/signup',
+                        params: { role: 'parent' },
+                      } as never)
+                    }
                     style={styles.heroLoginButtonOnVideo}
                   >
-                    <Text style={styles.heroLoginButtonOnVideoText}>Log in</Text>
+                    <Text style={styles.heroLoginButtonOnVideoText}>
+                      Join free
+                    </Text>
                   </BubblePressable>
                 </View>
               </View>
@@ -927,15 +935,23 @@ function MarketingHomeScreen() {
               </View>
         </ScrollView>
 
-        <View
-          style={[
-            styles.bottomNav,
-            {
-              height: 76 + Math.max(insets.bottom, 8),
-              paddingBottom: Math.max(insets.bottom, 8),
-            },
-          ]}
-        >
+        <View>
+          <ConvertActionBar
+            embedded
+            helper="Free to browse · Nothing charged until a Guru accepts"
+            label="Book care near you"
+            onPress={() => openFindCare()}
+            showTrust
+          />
+          <View
+            style={[
+              styles.bottomNav,
+              {
+                height: 76 + Math.max(insets.bottom, 8),
+                paddingBottom: Math.max(insets.bottom, 8),
+              },
+            ]}
+          >
           {navItems.map((item) => {
             const active = item.icon === 'home';
 
@@ -952,6 +968,13 @@ function MarketingHomeScreen() {
                 haptic="selection"
                 onPress={() => {
                   if (item.href) {
+                    if (item.href.startsWith('/signup')) {
+                      router.push({
+                        pathname: '/signup',
+                        params: { role: 'parent' },
+                      } as never);
+                      return;
+                    }
                     router.push(item.href as never);
                   }
                 }}
@@ -975,6 +998,7 @@ function MarketingHomeScreen() {
             );
           })}
             </View>
+        </View>
 
             {isWebPreview ? <View style={styles.homeIndicator} /> : null}
           </View>

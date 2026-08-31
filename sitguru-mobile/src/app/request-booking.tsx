@@ -1807,17 +1807,10 @@ export default function RequestBookingScreen() {
             </BubblePressable>
           )}
 
-          {requestSent && submitOutcome?.checkoutUrl ? (
-            <BubblePressable
-              accessibilityRole="button"
-              disabled={openingCheckout}
-              onPress={() => void openCheckout(submitOutcome.checkoutUrl as string)}
-              style={styles.readyGhostButton}
-            >
-              <Text style={styles.readyGhostButtonText}>
-                {openingCheckout ? 'Opening checkout…' : 'Pay now (optional)'}
-              </Text>
-            </BubblePressable>
+          {requestSent ? (
+            <Text style={styles.readyGhostButtonText}>
+              Nothing charged yet — you&apos;ll pay after the Guru accepts.
+            </Text>
           ) : null}
         </View>
 
@@ -2033,12 +2026,14 @@ export default function RequestBookingScreen() {
 
                 <BubblePressable
                   accessibilityRole="button"
+                  disabled={dockPrimaryDisabled}
                   onPress={goNext}
-                  style={styles.dockPrimaryButton}
+                  style={[
+                    styles.dockPrimaryButton,
+                    dockPrimaryDisabled && styles.dockPrimaryButtonDisabled,
+                  ]}
                 >
-                  <Text style={styles.dockPrimaryText}>
-                    {currentStep === 6 ? 'Finish' : 'Continue'}
-                  </Text>
+                  <Text style={styles.dockPrimaryText}>{dockPrimaryLabel}</Text>
                   <ChevronRight color="#FFFFFF" size={18} strokeWidth={2.5} />
                 </BubblePressable>
               </View>
@@ -3352,6 +3347,9 @@ function createStyles(isDark: boolean) {
       justifyContent: 'center',
       minHeight: 44,
       paddingHorizontal: 14,
+    },
+    dockPrimaryButtonDisabled: {
+      opacity: 0.45,
     },
     dockPrimaryText: {
       color: '#FFFFFF',

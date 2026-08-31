@@ -58,6 +58,8 @@ import {
   parseMessageMediaParts,
   uploadSitGuruMedia,
 } from '@/lib/data/media-upload';
+import { sitguruApiFetch } from '@/lib/data/api';
+import { API_PATHS } from '@/lib/data/schema';
 import { normalizeRole, type AppRole } from '@/types/auth';
 
 type RecordRow = Record<string, unknown>;
@@ -1008,6 +1010,28 @@ export default function ConversationScreen() {
           .maybeSingle();
 
         if (!result.error && result.data) nextConversation = result.data as ConversationRow;
+      }
+
+      if (!nextConversation && requestedBookingId) {
+        const ensured = await sitguruApiFetch<{
+          conversationId?: string;
+          id?: string;
+          error?: string;
+        }>(API_PATHS.ensureBookingConversation, {
+          body: { bookingId: requestedBookingId },
+        });
+        const ensuredId =
+          String(ensured.data?.conversationId || ensured.data?.id || '').trim();
+        if (ensuredId) {
+          const result = await supabase
+            .from('conversations')
+            .select('*')
+            .eq('id', ensuredId)
+            .maybeSingle();
+          if (!result.error && result.data) {
+            nextConversation = result.data as ConversationRow;
+          }
+        }
       }
 
       if (!nextConversation && requestedOtherUserId) {

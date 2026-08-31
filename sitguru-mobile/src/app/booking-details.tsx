@@ -159,7 +159,6 @@ const PENDING_STATUSES = new Set([
   'awaiting_guru',
   'submitted',
   'new',
-  'unpaid',
 ]);
 const ACCEPTED_STATUSES = new Set([
   'accepted',
@@ -167,6 +166,9 @@ const ACCEPTED_STATUSES = new Set([
   'paid',
   'upcoming',
   'scheduled',
+  'awaiting_payment',
+  'payment_pending',
+  'payment_required',
 ]);
 const ACTIVE_STATUSES = new Set([
   'active',
@@ -388,11 +390,11 @@ export default function BookingDetailsScreen() {
         eyebrow: 'REQUEST ACCEPTED',
         title: bookingView?.paid
           ? 'Payment received'
-          : 'Complete payment when ready',
+          : 'Pay now to confirm care',
         text: bookingView?.paid
           ? 'Review your receipt and payment status for this booking.'
-          : 'Review the final amount and pay securely inside SitGuru before care begins.',
-        label: bookingView?.paid ? 'View Payment Status' : 'Open Payments',
+          : 'Your Guru accepted — finish secure checkout before care begins. Nothing was charged when you sent the request.',
+        label: bookingView?.paid ? 'View Payment Status' : 'Pay now',
         route: '/payments',
         icon: 'payment',
       };
@@ -854,18 +856,22 @@ export default function BookingDetailsScreen() {
                     styles={styles}
                   />
 
-                  <QuickAction
-                    icon={
-                      <WalletCards
-                        color={palette.primary}
-                        size={20}
-                        strokeWidth={2.3}
-                      />
-                    }
-                    label="Payment"
-                    onPress={() => openBookingRoute('/payments')}
-                    styles={styles}
-                  />
+                  {bookingView?.statusStep === 'Accepted' ||
+                  bookingView?.statusStep === 'Active' ||
+                  bookingView?.paid ? (
+                    <QuickAction
+                      icon={
+                        <WalletCards
+                          color={palette.primary}
+                          size={20}
+                          strokeWidth={2.3}
+                        />
+                      }
+                      label={bookingView?.paid ? 'Receipt' : 'Pay now'}
+                      onPress={() => openBookingRoute('/payments')}
+                      styles={styles}
+                    />
+                  ) : null}
 
                   <QuickAction
                     icon={

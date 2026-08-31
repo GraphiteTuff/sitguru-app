@@ -429,15 +429,19 @@ export default function GuruQuickBookingForm({
         );
       }
 
-      const checkoutUrl = created.checkoutUrl || created.checkout_url || created.url;
+      const bookingId =
+        created?.booking?.id ||
+        created?.bookingId ||
+        created?.id ||
+        "";
 
-      if (!checkoutUrl) {
-        throw new Error(
-          "Booking was created, but no secure checkout URL was returned.",
-        );
+      // Pay after Guru accepts — send parents to their booking, not checkout.
+      if (bookingId) {
+        window.location.href = `/customer/dashboard/bookings/${bookingId}?requested=1`;
+        return;
       }
 
-      window.location.href = checkoutUrl;
+      window.location.href = "/customer/dashboard?booking=requested";
     } catch (err) {
       console.error("Checkout error:", err);
 

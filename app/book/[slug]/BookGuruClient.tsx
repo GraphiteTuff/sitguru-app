@@ -2812,13 +2812,12 @@ export default function BookGuruClient({
 
       const checkoutUrl = data?.checkoutUrl || data?.url;
 
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
-        return;
-      }
+      // Pay after Guru accepts — never force checkout on send.
+      // Keep checkoutUrl out of the redirect so Pet Parents land on their dashboard.
+      void checkoutUrl;
 
       const params = new URLSearchParams({
-        booking: "confirmed",
+        booking: "requested",
         guru: guruSlug,
       });
 
