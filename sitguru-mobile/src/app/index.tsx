@@ -2117,7 +2117,7 @@ function createStyles(
       transform: [{ scale: 0.985 }],
     },
     bottomSpacer: {
-      height: 22,
+      height: 148,
     },
 
     bottomNav: {
