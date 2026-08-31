@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
       .select(
         "insight_id,text_string_hash,core_question_summary,ai_assigned_category,channel_source_enum,frequency_tally_count,is_converted_to_article,is_friction_flag,updated_at,created_at,converted_article_slug,converted_at,companion_hits,page_hits,last_companion_key,last_source_page_path",
       )
-      .order("frequency_tally_count", { ascending: false })
       .order("updated_at", { ascending: false })
+      .order("frequency_tally_count", { ascending: false })
       .limit(800);
 
     if (error) {

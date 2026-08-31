@@ -7,7 +7,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Search } from "lucide-react";
+import { Filter, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { HelpCategory } from "@/lib/help/articles";
 import type { ChatChannelSource } from "@/lib/chat/insights";
@@ -41,7 +41,15 @@ export type GlobalInsightRow = {
 
 type ChannelFilter = "ALL" | ChatChannelSource;
 type CompanionFilter = "ALL" | "rogue" | "scout" | "taco" | "delilah";
-type SortKey = "tally" | "topic" | "recent" | "question";
+type StatusFilter = "ALL" | "open" | "published" | "friction";
+type SortKey = "recent" | "tally" | "topic" | "question";
+
+const STATUS_FILTERS: Array<{ key: StatusFilter; label: string }> = [
+  { key: "ALL", label: "All status" },
+  { key: "open", label: "Needs article" },
+  { key: "published", label: "Published" },
+  { key: "friction", label: "Friction" },
+];
 
 const COMPANION_FILTERS: Array<{
   key: CompanionFilter;
@@ -84,10 +92,25 @@ function channelBadgeClass(channel: string) {
 function formatUpdated(value: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "—";
-  return parsed.toLocaleDateString("en-US", {
+  const now = new Date();
+  const sameDay =
+    parsed.getFullYear() === now.getFullYear() &&
+    parsed.getMonth() === now.getMonth() &&
+    parsed.getDate() === now.getDate();
+  if (sameDay) {
+    return parsed.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  const opts: Intl.DateTimeFormatOptions = {
     month: "short",
     day: "numeric",
-  });
+  };
+  if (parsed.getFullYear() !== now.getFullYear()) {
+    opts.year = "numeric";
+  }
+  return parsed.toLocaleDateString("en-US", opts);
 }
 
 function compactQuestion(text: string, max = 160) {
@@ -221,7 +244,9 @@ export default function ChatInsightsPanel({
   const [insights, setInsights] = useState(initialInsights);
   const [channel, setChannel] = useState<ChannelFilter>("ALL");
   const [companion, setCompanion] = useState<CompanionFilter>("ALL");
-  const [sortKey, setSortKey] = useState<SortKey>("tally");
+  const [status, setStatus] = useState<StatusFilter>("ALL");
+  const [topic, setTopic] = useState<string>("ALL");
+  const [sortKey, setSortKey] = useState<SortKey>("recent");
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<GlobalInsightRow | null>(null);
   const [title, setTitle] = useState("");
@@ -234,6 +259,18 @@ export default function ChatInsightsPanel({
   useEffect(() => {
     setInsights(initialInsights);
   }, [initialInsights]);
+
+  const topicOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of insights) {
+      const label = String(row.ai_assigned_category || "General Inquiry").trim();
+      if (!label) continue;
+      counts.set(label, (counts.get(label) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([label, count]) => ({ label, count }));
+  }, [insights]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -250,6 +287,22 @@ export default function ChatInsightsPanel({
           (hit) => normalizeCompanionKey(hit.key) === companion,
         );
       });
+    }
+
+    if (status === "open") {
+      rows = rows.filter((row) => !row.is_converted_to_article);
+    } else if (status === "published") {
+      rows = rows.filter((row) => Boolean(row.is_converted_to_article));
+    } else if (status === "friction") {
+      rows = rows.filter((row) => Boolean(row.is_friction_flag));
+    }
+
+    if (topic !== "ALL") {
+      rows = rows.filter(
+        (row) =>
+          String(row.ai_assigned_category || "General Inquiry").trim() ===
+          topic,
+      );
     }
 
     const searched = needle
@@ -274,20 +327,28 @@ export default function ChatInsightsPanel({
 
     searched.sort((a, b) => {
       if (sortKey === "tally") {
-        return b.frequency_tally_count - a.frequency_tally_count;
-      }
-      if (sortKey === "topic") {
-        return a.ai_assigned_category.localeCompare(b.ai_assigned_category);
-      }
-      if (sortKey === "recent") {
         return (
+          b.frequency_tally_count - a.frequency_tally_count ||
           new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
         );
       }
-      return a.core_question_summary.localeCompare(b.core_question_summary);
+      if (sortKey === "topic") {
+        return (
+          a.ai_assigned_category.localeCompare(b.ai_assigned_category) ||
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        );
+      }
+      if (sortKey === "question") {
+        return a.core_question_summary.localeCompare(b.core_question_summary);
+      }
+      // newest first (default)
+      return (
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() ||
+        b.frequency_tally_count - a.frequency_tally_count
+      );
     });
     return searched;
-  }, [insights, channel, companion, sortKey, query]);
+  }, [insights, channel, companion, status, topic, sortKey, query]);
 
   function openConvert(row: GlobalInsightRow) {
     setActive(row);
@@ -398,12 +459,17 @@ export default function ChatInsightsPanel({
                 {filtered.length}
               </span>{" "}
               of {insights.length} topics
+              {sortKey === "recent" ? " · newest first" : ""}
               {companion !== "ALL"
                 ? ` · ${INSIGHT_COMPANION_META[companion].label}`
                 : ""}
               {channel !== "ALL"
                 ? ` · ${CHANNEL_LABELS[channel] || channel}`
                 : ""}
+              {status !== "ALL"
+                ? ` · ${STATUS_FILTERS.find((item) => item.key === status)?.label}`
+                : ""}
+              {topic !== "ALL" ? ` · ${topic}` : ""}
               {query.trim() ? ` · matching “${query.trim()}”` : ""}
             </p>
           </div>
@@ -421,12 +487,17 @@ export default function ChatInsightsPanel({
         </div>
 
         <div className="mt-4 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <Filter className="h-4 w-4 text-[#0D5C3A]" aria-hidden />
+            Filters
+          </div>
+
           <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <span className="shrink-0 text-sm font-medium text-slate-500">
               Avatar
             </span>
             {COMPANION_FILTERS.map((item) => {
-              const active = companion === item.key;
+              const activeChip = companion === item.key;
               const meta =
                 item.key === "ALL" ? null : INSIGHT_COMPANION_META[item.key];
               return (
@@ -435,7 +506,7 @@ export default function ChatInsightsPanel({
                   type="button"
                   onClick={() => setCompanion(item.key)}
                   className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition ${
-                    active
+                    activeChip
                       ? "bg-[#0D5C3A] text-white"
                       : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
@@ -485,13 +556,53 @@ export default function ChatInsightsPanel({
 
             <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <span className="shrink-0 text-sm font-medium text-slate-500">
+                Status
+              </span>
+              {STATUS_FILTERS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setStatus(item.key)}
+                  className={`shrink-0 rounded-full px-3 py-2 text-sm font-semibold transition ${
+                    status === item.key
+                      ? "bg-[#0D5C3A] text-white"
+                      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <label className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="shrink-0 text-sm font-medium text-slate-500">
+                Topic
+              </span>
+              <select
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                className="w-full max-w-md rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-[#0D5C3A] focus:ring-2 focus:ring-emerald-100"
+              >
+                <option value="ALL">All topics</option>
+                {topicOptions.map((item) => (
+                  <option key={item.label} value={item.label}>
+                    {item.label} ({item.count})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <span className="shrink-0 text-sm font-medium text-slate-500">
                 Sort
               </span>
               {(
                 [
+                  ["recent", "Newest"],
                   ["tally", "Most asked"],
                   ["topic", "Topic"],
-                  ["recent", "Recent"],
                   ["question", "A–Z"],
                 ] as const
               ).map(([key, label]) => (
@@ -597,7 +708,23 @@ export default function ChatInsightsPanel({
                 <th className="w-[14%] px-4 py-3.5 font-semibold">Topic</th>
                 <th className="w-[10%] px-4 py-3.5 font-semibold">Channel</th>
                 <th className="w-[6%] px-4 py-3.5 font-semibold">Asked</th>
-                <th className="w-[8%] px-4 py-3.5 font-semibold">Updated</th>
+                <th className="w-[8%] px-4 py-3.5 font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setSortKey("recent")}
+                    className={`inline-flex items-center gap-1 font-semibold transition hover:text-[#0D5C3A] ${
+                      sortKey === "recent" ? "text-[#0D5C3A]" : ""
+                    }`}
+                    title="Sort by newest"
+                  >
+                    Updated
+                    {sortKey === "recent" ? (
+                      <span className="text-[10px] font-black uppercase tracking-wide">
+                        ↓
+                      </span>
+                    ) : null}
+                  </button>
+                </th>
                 <th className="w-[12%] px-5 py-3.5 font-semibold">Action</th>
               </tr>
             </thead>

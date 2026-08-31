@@ -69,8 +69,8 @@ export default async function AdminChatInsightsPage() {
     .select(
       "insight_id,core_question_summary,ai_assigned_category,channel_source_enum,frequency_tally_count,is_converted_to_article,is_friction_flag,updated_at,converted_article_slug,companion_hits,page_hits,last_companion_key,last_source_page_path",
     )
-    .order("frequency_tally_count", { ascending: false })
     .order("updated_at", { ascending: false })
+    .order("frequency_tally_count", { ascending: false })
     .limit(800);
 
   if (withProvenance.error) {
@@ -79,8 +79,8 @@ export default async function AdminChatInsightsPage() {
       .select(
         "insight_id,core_question_summary,ai_assigned_category,channel_source_enum,frequency_tally_count,is_converted_to_article,is_friction_flag,updated_at,converted_article_slug",
       )
-      .order("frequency_tally_count", { ascending: false })
       .order("updated_at", { ascending: false })
+      .order("frequency_tally_count", { ascending: false })
       .limit(800);
     insights = (legacy.error ? [] : legacy.data || []) as GlobalInsightRow[];
     error = legacy.error
