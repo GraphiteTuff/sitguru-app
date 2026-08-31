@@ -69,15 +69,16 @@ const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 56,
+    minHeight: 58,
   },
   fullWidth: {
     width: '100%',
   },
   defaultButton: {
-    paddingVertical: 17,
-    paddingHorizontal: 22,
-    borderRadius: 18,
+    minHeight: 58,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 20,
   },
   compactButton: {
     minHeight: 48,
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontFamily: AppFonts.extraBold,
-    fontSize: 16,
+    fontSize: 17,
     textAlign: 'center',
   },
   compactText: {

@@ -209,7 +209,7 @@ function friendlyAuthError(
       'audience',
     )
   ) {
-    return 'Apple sign-in is not fully enabled for this SitGuru app yet. Use email or try again.';
+    return 'Apple Sign In is not linked to the SitGuru iOS app yet. Use email or Google, or contact support if this keeps happening.';
   }
 
   if (
@@ -1171,9 +1171,16 @@ export function AuthProvider({
               });
 
           if (error) {
-            return await performBrowserOAuth(
-              'apple',
+            const message = friendlyAuthError(
+              error.message,
             );
+
+            setAuthError(message);
+
+            return {
+              error: message,
+              cancelled: false,
+            };
           }
 
           const fullName = [
@@ -1251,17 +1258,23 @@ export function AuthProvider({
             };
           }
 
-          return await performBrowserOAuth(
-            'apple',
+          const message = friendlyAuthError(
+            error instanceof Error
+              ? error.message
+              : undefined,
           );
+
+          setAuthError(message);
+
+          return {
+            error: message,
+            cancelled: false,
+          };
         } finally {
           setSocialLoading(null);
         }
       },
-      [
-        loadProfileAndRoles,
-        performBrowserOAuth,
-      ],
+      [loadProfileAndRoles, performBrowserOAuth],
     );
 
   const refreshSession =
