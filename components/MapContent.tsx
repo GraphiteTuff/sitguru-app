@@ -4,6 +4,11 @@ import "leaflet/dist/leaflet.css";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
+import {
+  placeGlyph,
+  placeGlyphSvg,
+  type PlaceGlyph,
+} from "@/lib/community/place-icons";
 
 type RawMarker = Record<string, unknown>;
 
@@ -28,6 +33,7 @@ type NormalizedMarker = {
   profileHref: string;
   avatarUrl: string;
   initials: string;
+  placeGlyph: PlaceGlyph | null;
   serviceRadiusMiles: number;
   canBook: boolean;
   source: "zip" | "city" | "service_coordinates" | "coordinates";
@@ -394,6 +400,31 @@ function getServiceRadiusMiles(marker: RawMarker) {
   return Math.min(Math.max(Math.round(radius), 1), MAX_SERVICE_RADIUS_MILES);
 }
 
+function getPlaceGlyph(marker: RawMarker): PlaceGlyph | null {
+  if (getMarkerKind(marker) !== "place") return null;
+  const explicit = asString(marker.placeGlyph) || asString(marker.place_glyph);
+  if (
+    explicit === "utensils" ||
+    explicit === "coffee" ||
+    explicit === "beer" ||
+    explicit === "wine" ||
+    explicit === "bed" ||
+    explicit === "trees" ||
+    explicit === "paw" ||
+    explicit === "waves" ||
+    explicit === "tent" ||
+    explicit === "stethoscope" ||
+    explicit === "hospital" ||
+    explicit === "store"
+  ) {
+    return explicit;
+  }
+  return placeGlyph(
+    asString(marker.placeCategory) || asString(marker.place_category),
+    asString(marker.placeLane) || asString(marker.place_lane),
+  );
+}
+
 function getInitials(name: string) {
   const initials = name
     .split(/\s+/)
@@ -564,6 +595,7 @@ function normalizeMarker(marker: RawMarker): NormalizedMarker | null {
     profileHref: getProfileHref(marker),
     avatarUrl,
     initials: getInitials(name),
+    placeGlyph: getPlaceGlyph(marker),
     serviceRadiusMiles: radius,
     canBook: getMarkerCanBook(marker),
     source,
@@ -583,14 +615,23 @@ function isValidCenter(center?: [number, number]) {
   );
 }
 
+function markerFaceMarkup(marker: NormalizedMarker) {
+  if (marker.avatarUrl) {
+    return `<img src="${escapeHtml(marker.avatarUrl)}" alt="" />`;
+  }
+  if (marker.kind === "place") {
+    return placeGlyphSvg(marker.placeGlyph || "utensils");
+  }
+  return `<span>${escapeHtml(marker.initials)}</span>`;
+}
+
 function createAvatarIcon(marker: NormalizedMarker, highlighted: boolean) {
-  const imageMarkup = marker.avatarUrl
-    ? `<img src="${escapeHtml(marker.avatarUrl)}" alt="" />`
-    : `<span>${escapeHtml(marker.initials)}</span>`;
+  const imageMarkup = markerFaceMarkup(marker);
   const shellClass = [
     "sitguru-leaflet-avatar-shell",
     highlighted ? "is-highlighted" : "",
-    marker.canBook ? "" : "is-opens-soon",
+    marker.kind === "guru" && !marker.canBook ? "is-opens-soon" : "",
+    marker.kind === "place" ? "is-place" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -611,7 +652,9 @@ function createPopupHtml(marker: NormalizedMarker) {
     ? `<img src="${escapeHtml(marker.avatarUrl)}" alt="${escapeHtml(
         marker.name,
       )} avatar" class="h-full w-full object-cover" />`
-    : escapeHtml(marker.initials);
+    : marker.kind === "place"
+      ? placeGlyphSvg(marker.placeGlyph || "utensils", 26)
+      : escapeHtml(marker.initials);
 
   if (marker.kind === "event" || marker.kind === "place") {
     const badges = [
@@ -1389,6 +1432,17 @@ export default function MapContent({
           font-size: 0.9rem;
           font-weight: 1000;
           letter-spacing: -0.04em;
+        }
+
+        .sitguru-leaflet-avatar-shell svg {
+          display: block;
+          height: 28px;
+          width: 28px;
+        }
+
+        .sitguru-leaflet-avatar-shell.is-place {
+          background: #ecfdf5;
+          border-color: rgba(13, 92, 58, 0.42);
         }
 
         .sitguru-leaflet-avatar-shell.is-opens-soon {

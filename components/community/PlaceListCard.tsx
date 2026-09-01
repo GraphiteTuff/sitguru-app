@@ -3,14 +3,22 @@
 import Link from "next/link";
 import {
   BedDouble,
+  Beer,
+  Coffee,
   Footprints,
+  Hospital,
   MapPin,
   PawPrint,
   Phone,
   Stethoscope,
+  Store,
+  Tent,
   Trees,
   UtensilsCrossed,
+  Waves,
+  Wine,
 } from "lucide-react";
+import { placeGlyph, type PlaceGlyph } from "@/lib/community/place-icons";
 import {
   amenityStatusLabel,
   claimPlaceHref,
@@ -22,12 +30,20 @@ import {
   type PlaceLane,
 } from "@/lib/community/places";
 
-const LANE_ICON = {
-  eat: UtensilsCrossed,
-  stay: BedDouble,
-  play: Trees,
-  services: Stethoscope,
-} satisfies Record<PlaceLane, typeof PawPrint>;
+const GLYPH_ICON = {
+  utensils: UtensilsCrossed,
+  coffee: Coffee,
+  beer: Beer,
+  wine: Wine,
+  bed: BedDouble,
+  trees: Trees,
+  paw: PawPrint,
+  waves: Waves,
+  tent: Tent,
+  stethoscope: Stethoscope,
+  hospital: Hospital,
+  store: Store,
+} satisfies Record<PlaceGlyph, typeof PawPrint>;
 
 function Paws({ score }: { score: number }) {
   const filled = pawCount(score);
@@ -39,7 +55,7 @@ function Paws({ score }: { score: number }) {
         return (
           <PawPrint
             key={index}
-            className={`h-3.5 w-3.5 ${
+            className={`h-5 w-5 ${
               on || half ? "text-emerald-700" : "text-slate-300"
             } ${half ? "opacity-60" : ""}`}
             fill={on ? "currentColor" : "none"}
@@ -83,14 +99,14 @@ export default function PlaceListCard({
   onHighlight: () => void;
   onSwitchLane: (lane: PlaceLane, category?: PlaceCategoryId | "") => void;
 }) {
-  const Icon = LANE_ICON[place.lane];
+  const Icon = GLYPH_ICON[placeGlyph(place.category, place.lane)];
   const claimHref = claimPlaceHref(place);
   const guruHref = nearbyGurusHref(place);
   const knownAmenities = place.amenities.filter((item) => item.status === "yes");
 
   return (
     <article
-      className={`rounded-[24px] border bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:rounded-[28px] sm:p-5 ${
+      className={`relative rounded-[24px] border bg-white p-4 pr-[5.5rem] shadow-[0_8px_26px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:rounded-[28px] sm:p-5 sm:pr-28 ${
         highlighted
           ? "border-emerald-400 ring-4 ring-emerald-100"
           : "border-slate-200"
@@ -98,38 +114,39 @@ export default function PlaceListCard({
       onMouseEnter={onHighlight}
       onFocus={onHighlight}
     >
-      <div className="flex items-start gap-4">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
-          <Icon className="h-7 w-7" />
+      <div
+        className="absolute top-4 right-4 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-[22px] bg-emerald-50 text-emerald-800 sm:top-5 sm:right-5 sm:h-24 sm:w-24"
+        aria-hidden
+      >
+        <Icon className="h-10 w-10 sm:h-12 sm:w-12" strokeWidth={2.1} />
+      </div>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-lg font-black leading-snug text-slate-950 sm:text-xl">
+            {place.name}
+          </h3>
+          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-slate-700">
+            {place.categoryLabel}
+          </span>
+          {place.isPartner ? (
+            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-800">
+              SitGuru Partner
+            </span>
+          ) : null}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-black leading-snug text-slate-950 sm:text-xl">
-              {place.name}
-            </h3>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-slate-700">
-              {place.categoryLabel}
-            </span>
-            {place.isPartner ? (
-              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-800">
-                SitGuru Partner
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-1 text-sm font-bold text-emerald-800">
-            {[place.city, place.state].filter(Boolean).join(", ") ||
-              place.county ||
-              "Nearby"}
+        <p className="mt-1 text-sm font-bold text-emerald-800">
+          {[place.city, place.state].filter(Boolean).join(", ") ||
+            place.county ||
+            "Nearby"}
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Paws score={place.petFriendlyScore} />
+          <p className="text-base font-black text-slate-950">
+            Pet Friendliness {formatPetFriendlyScore(place.petFriendlyScore)} / 5
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Paws score={place.petFriendlyScore} />
-            <p className="text-sm font-black text-slate-950">
-              Pet Friendliness {formatPetFriendlyScore(place.petFriendlyScore)} / 5
-            </p>
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-black text-emerald-800">
-              {place.petFriendlyLabel}
-            </span>
-          </div>
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
+            {place.petFriendlyLabel}
+          </span>
         </div>
       </div>
 

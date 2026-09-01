@@ -35,6 +35,7 @@ import CommunityCountySuggestInput from "@/components/community/CommunityCountyS
 import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 import { COMMUNITY_EVENT_CATEGORIES } from "@/lib/community/types";
+import { placeGlyph } from "@/lib/community/place-icons";
 import {
   LANE_SEARCH_PLACEHOLDERS,
   PLACE_LANES,
@@ -317,6 +318,9 @@ function placeToMapMarker(place: PetFriendlyPlace) {
       place.category === "vet_er" ? "ER" : null,
     ].filter(Boolean) as string[],
     avatar_url: null,
+    placeCategory: place.category,
+    placeLane: place.lane,
+    placeGlyph: placeGlyph(place.category, place.lane),
   };
 }
 
