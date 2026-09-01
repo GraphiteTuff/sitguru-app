@@ -14,6 +14,7 @@ import {
   Share2,
 } from "lucide-react";
 import EventShareDrawer from "@/components/community/EventShareDrawer";
+import { shareEventNatively } from "@/lib/community/share-client";
 import {
   formatEventDateRange,
   formatEventLocationInline,
@@ -107,6 +108,26 @@ export default function PartnerEventPromoteWorkspace({
     () => getEventSocialAssets(selectedEvent, { preferBranded: true }),
     [selectedEvent],
   );
+
+  async function openShare() {
+    const result = await shareEventNatively(
+      {
+        id: selectedEvent.id,
+        title: selectedEvent.title,
+        slug: selectedEvent.slug,
+        startAt: selectedEvent.start_at,
+        endAt: selectedEvent.end_at,
+        timezone: selectedEvent.timezone,
+        city: selectedEvent.city,
+        state: selectedEvent.state,
+        shortDescription: selectedEvent.short_description,
+        partnerName: partner.business_name,
+        venueName: selectedEvent.venue_name,
+      },
+      "partner_promote_drawer",
+    );
+    if (result === "unavailable") setShareOpen(true);
+  }
 
   useEffect(() => {
     setCaption(
@@ -301,7 +322,7 @@ export default function PartnerEventPromoteWorkspace({
             </button>
             <button
               type="button"
-              onClick={() => setShareOpen(true)}
+              onClick={() => void openShare()}
               className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-700 text-sm font-black text-white"
             >
               Open Share Panel

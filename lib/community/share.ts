@@ -26,8 +26,7 @@ export function buildEventShareCaption(
   return [
     `Join us for ${event.title} on ${dateLabel} at ${location}.`,
     host ? `Hosted by ${host}.` : null,
-    "Going? Tap Yes, Maybe, or No on SitGuru.",
-    "SitGuru Events — @SitGuruOfficial",
+    "RSVP on SitGuru.",
   ]
     .filter(Boolean)
     .join(" ");
@@ -38,7 +37,7 @@ export function buildEventShareCaptionSocial(
     CommunityEventRow,
     "title" | "start_at" | "end_at" | "timezone" | "city" | "state" | "short_description"
   > & { venue_name?: string | null },
-  partnerName?: string | null,
+  _partnerName?: string | null,
 ) {
   const { compactDate, timeLabel } = formatEventDateRange(
     event.start_at,
@@ -47,15 +46,12 @@ export function buildEventShareCaptionSocial(
   );
   const cityState = [event.city, event.state].filter(Boolean).join(", ");
   const place = [event.venue_name?.trim(), cityState].filter(Boolean).join(" · ");
-  const host = isGenericHostName(partnerName) ? null : partnerName?.trim();
   const when = [compactDate, timeLabel].filter(Boolean).join(" · ");
 
   const lines = [
     `🐾 ${event.title}`,
     when ? `${when}${place ? ` · ${place}` : ""}` : place || null,
-    host ? `Presented by ${host}` : null,
-    "Going? Tap Yes, Maybe, or No on SitGuru.",
-    "SitGuru Events — @SitGuruOfficial",
+    "RSVP on SitGuru",
   ].filter(Boolean);
 
   return lines.join("\n");
@@ -81,19 +77,18 @@ export function buildEventShareMeta(
   partnerName?: string | null,
   origin?: string,
 ) {
-  const { compactDate, timeLabel } = formatEventDateRange(event.start_at, null, null);
+  const { compactDate } = formatEventDateRange(event.start_at, null, null);
   const cityState = [event.city, event.state].filter(Boolean).join(", ");
   const place = [event.venue_name?.trim(), cityState].filter(Boolean).join(", ");
   const host = isGenericHostName(partnerName) ? null : partnerName?.trim();
-  const when = [compactDate, timeLabel].filter(Boolean).join(" · ");
   const summary =
     event.short_description?.trim() ||
-    [when, place, host].filter(Boolean).join(" • ") ||
+    [compactDate, place, host].filter(Boolean).join(" • ") ||
     "Pet friendly event";
 
   return {
     title: `${event.title} | SitGuru Events`,
-    description: `${summary.replace(/\s+/g, " ").trim()} Tap Yes, Maybe, or No to RSVP on SitGuru.`,
+    description: `${summary.replace(/\s+/g, " ").trim()} RSVP on SitGuru.`,
     url: getPublicEventUrl(event.slug, origin),
     image: getBrandedSocialGraphicUrl(event.slug, "landscape", origin),
   };

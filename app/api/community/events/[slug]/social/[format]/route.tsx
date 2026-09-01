@@ -53,47 +53,6 @@ async function remoteImageDataUri(url: string | null) {
   }
 }
 
-function RsvpPills({ size }: { size: "lg" | "sm" }) {
-  const fontSize = size === "lg" ? 26 : 22;
-  const pad = size === "lg" ? "12px 22px" : "10px 18px";
-  const pills = [
-    { label: "Yes", bg: "#0D5C3A", color: "#ffffff" },
-    { label: "Maybe", bg: "#D97706", color: "#ffffff" },
-    { label: "No", bg: "#E2E8F0", color: "#334155" },
-  ];
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div
-        style={{
-          display: "flex",
-          fontSize: size === "lg" ? 24 : 20,
-          fontWeight: 800,
-          color: "#0F172A",
-        }}
-      >
-        Attending?
-      </div>
-      {pills.map((pill) => (
-        <div
-          key={pill.label}
-          style={{
-            display: "flex",
-            backgroundColor: pill.bg,
-            color: pill.color,
-            borderRadius: 999,
-            padding: pad,
-            fontSize,
-            fontWeight: 800,
-          }}
-        >
-          {pill.label}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export async function GET(_req: NextRequest, context: RouteContext) {
   const { slug, format } = await context.params;
 
@@ -346,7 +305,20 @@ export async function GET(_req: NextRequest, context: RouteContext) {
                 Presented by {partnerName}
               </div>
             ) : null}
-            <RsvpPills size={isLandscape ? "sm" : "lg"} />
+            <div
+              style={{
+                display: "flex",
+                alignSelf: "flex-start",
+                backgroundColor: "#0D5C3A",
+                color: "#ffffff",
+                borderRadius: 999,
+                padding: isLandscape ? "10px 18px" : "12px 22px",
+                fontSize: isLandscape ? 22 : 26,
+                fontWeight: 800,
+              }}
+            >
+              RSVP on SitGuru
+            </div>
             <div
               style={{
                 display: "flex",

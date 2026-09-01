@@ -6,6 +6,7 @@ import EventShareDrawer, {
   type EventShareDrawerEvent,
 } from "@/components/community/EventShareDrawer";
 import { getPublicEventPath } from "@/lib/community/slug";
+import { shareEventNatively } from "@/lib/community/share-client";
 import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
 
 type FeaturedEventActionsProps = {
@@ -25,6 +26,11 @@ export default function FeaturedEventActions({
   const isPreview = previewMode || isHomepageDemoEvent(event.id);
   const href = isPreview ? "/events" : getPublicEventPath(event.slug);
 
+  async function onShare() {
+    const result = await shareEventNatively(event, "homepage_featured_event");
+    if (result === "unavailable") setShareOpen(true);
+  }
+
   return (
     <>
       <div className="flex flex-col justify-center gap-3 border-t border-slate-100 p-6 sm:p-8 lg:border-l lg:border-t-0">
@@ -43,10 +49,10 @@ export default function FeaturedEventActions({
         </Link>
         <button
           type="button"
-          onClick={() => setShareOpen(true)}
+          onClick={() => void onShare()}
           className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-black text-emerald-900 transition hover:bg-emerald-100"
         >
-          Share Event
+          Share
         </button>
       </div>
 

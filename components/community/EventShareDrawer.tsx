@@ -4,26 +4,25 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   Check,
-  ImageIcon,
   Link2,
   Mail,
   MessageCircle,
   PawPrint,
+  Share2,
   X,
 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
 import { formatEventDateRange } from "@/lib/community/format";
 import {
-  buildEventShareBody,
   buildEventShareCaptionSocial,
   buildEventShareHref,
   type SharePlatform,
 } from "@/lib/community/share";
-import { getPublicEventPath, getPublicEventUrl } from "@/lib/community/slug";
 import {
-  downloadEventGraphic,
-  getEventSocialAssets,
-} from "@/lib/community/social-assets";
+  canUseNativeShare,
+  shareEventNatively,
+} from "@/lib/community/share-client";
+import { getPublicEventPath, getPublicEventUrl } from "@/lib/community/slug";
 
 export type EventShareDrawerEvent = {
   id?: string;
@@ -56,21 +55,14 @@ type EventShareDrawerProps = {
   source?: string;
 };
 
-/** Mockup-aligned row: Messages · Facebook · Instagram · X · TikTok · Email */
-const SHARE_ACTIONS: Array<{
-  id: SharePlatform | "instagram" | "tiktok";
+const QUICK_ACTIONS: Array<{
+  id: SharePlatform;
   label: string;
   tone: string;
 }> = [
   { id: "sms", label: "Messages", tone: "bg-[#34C759] text-white" },
   { id: "facebook", label: "Facebook", tone: "bg-[#1877F2] text-white" },
-  {
-    id: "instagram",
-    label: "Instagram",
-    tone: "bg-gradient-to-br from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] text-white",
-  },
   { id: "x", label: "X", tone: "bg-slate-950 text-white" },
-  { id: "tiktok", label: "TikTok", tone: "bg-slate-950 text-white" },
   { id: "email", label: "Email", tone: "bg-[#0A84FF] text-white" },
 ];
 
@@ -83,37 +75,15 @@ function displayShareHost(url: string) {
   }
 }
 
-function PlatformGlyph({ id }: { id: SharePlatform | "instagram" | "tiktok" }) {
+function PlatformGlyph({ id }: { id: SharePlatform }) {
   if (id === "email") return <Mail className="h-5 w-5" strokeWidth={2.25} />;
   if (id === "x") {
     return (
       <span className="text-[15px] font-black leading-none tracking-tight">𝕏</span>
     );
   }
-  if (id === "tiktok") {
-    return (
-      <span className="text-[13px] font-black leading-none tracking-tight">TT</span>
-    );
-  }
   if (id === "facebook") {
     return <span className="text-[18px] font-black leading-none">f</span>;
-  }
-  if (id === "instagram") {
-    return (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden>
-        <rect
-          x="3.5"
-          y="3.5"
-          width="17"
-          height="17"
-          rx="5"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
-        <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
-        <circle cx="17.2" cy="6.8" r="1.2" fill="currentColor" />
-      </svg>
-    );
   }
   return <MessageCircle className="h-5 w-5" strokeWidth={2.25} />;
 }
@@ -125,8 +95,7 @@ export default function EventShareDrawer({
   source = "community_event_share_drawer",
 }: EventShareDrawerProps) {
   const [copied, setCopied] = useState(false);
-  const [caption, setCaption] = useState("");
-  const [hint, setHint] = useState("");
+  const [canNativeShare, setCanNativeShare] = useState(false);
 
   const url = useMemo(() => {
     if (!event) return "";
@@ -162,43 +131,32 @@ export default function EventShareDrawer({
     );
   }, [event]);
 
-  const assets = useMemo(() => {
-    if (!event) return [];
-    return getEventSocialAssets(
+  const caption = useMemo(() => {
+    if (!event) return "";
+    return buildEventShareCaptionSocial(
       {
-        slug: event.slug,
-        social_square_url: event.social_square_url,
-        social_story_url: event.social_story_url,
-        social_landscape_url: event.social_landscape_url,
-        image_hero_url: event.image_hero_url || event.imageUrl,
-        image_card_url: event.image_card_url,
-        image_original_url: event.image_original_url,
+        title: event.title,
+        start_at: event.startAt,
+        end_at: event.endAt || null,
+        timezone: event.timezone || null,
+        city: event.city || null,
+        state: event.state || null,
+        short_description: event.shortDescription || null,
+        venue_name: event.venueName || null,
       },
-      { preferBranded: event.preferBrandedGraphics !== false },
+      event.partnerName,
     );
   }, [event]);
 
   useEffect(() => {
-    if (!event) return;
-    setCaption(
-      buildEventShareCaptionSocial(
-        {
-          title: event.title,
-          start_at: event.startAt,
-          end_at: event.endAt || null,
-          timezone: event.timezone || null,
-          city: event.city || null,
-          state: event.state || null,
-          short_description: event.shortDescription || null,
-          venue_name: event.venueName || null,
-        },
-        event.partnerName,
-      ),
-    );
-  }, [event]);
+    setCanNativeShare(canUseNativeShare());
+  }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setCopied(false);
+      return;
+    }
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
@@ -214,8 +172,12 @@ export default function EventShareDrawer({
   if (!open || !event) return null;
 
   const current = event;
-  const square = assets.find((asset) => asset.id === "square") || assets[0];
-  const shareBody = buildEventShareBody(caption, url);
+  const placeLine = [
+    timing?.compactDate,
+    event.venueName || [event.city, event.state].filter(Boolean).join(", "),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   function trackShare(channel: string) {
     void trackEvent({
@@ -242,109 +204,29 @@ export default function EventShareDrawer({
     }
   }
 
-  /**
-   * Messages: prefer OS share (one payload: text + url).
-   * Fallback sms: body is caption+url once — never append url twice.
-   */
-  async function shareViaMessages() {
-    trackShare("sms");
-    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-      try {
-        await navigator.share({
-          title: `${current.title} | SitGuru Events`,
-          text: caption,
-          url,
-        });
-        return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        // fall through to sms:
-      }
+  async function shareNative() {
+    const result = await shareEventNatively(current, source);
+    if (result === "shared") {
+      onClose();
+      return;
     }
-    window.location.assign(buildEventShareHref("sms", url, caption));
+    if (result === "cancelled") return;
+    await copyLink();
   }
 
-  async function shareViaPlatform(platform: SharePlatform) {
+  function shareViaPlatform(platform: SharePlatform) {
     trackShare(platform);
     const href = buildEventShareHref(
       platform,
       url,
       caption,
-      `SitGuru Events: ${current.title}`,
+      current.title,
     );
-
-    // Facebook often ignores quote — copy SitGuru caption so it can paste into the post
-    if (platform === "facebook") {
-      try {
-        await navigator.clipboard.writeText(shareBody);
-        setHint("Caption copied — paste into your Facebook post");
-        window.setTimeout(() => setHint(""), 3200);
-      } catch {
-        // continue to open sharer
-      }
-    }
-
     if (platform === "email" || platform === "sms") {
       window.location.assign(href);
       return;
     }
     window.open(href, "_blank", "noopener,noreferrer");
-  }
-
-  async function prepareVisualShare(channel: "instagram" | "tiktok") {
-    trackShare(channel);
-    const story = assets.find((asset) => asset.id === "story") || assets[0];
-    if (story?.url) {
-      try {
-        await downloadEventGraphic(story.url, `${current.slug}-${channel}.png`);
-      } catch {
-        // continue with caption copy
-      }
-    }
-
-    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-      try {
-        await navigator.share({
-          title: `${current.title} | SitGuru Events`,
-          text: caption,
-          url,
-        });
-        setHint(
-          channel === "tiktok"
-            ? "Shared — paste into TikTok if needed"
-            : "Shared — paste into Instagram if needed",
-        );
-        window.setTimeout(() => setHint(""), 2800);
-        return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(shareBody);
-    } catch {
-      // ignore
-    }
-    setHint(
-      channel === "tiktok"
-        ? "Caption + SitGuru link copied — open TikTok to paste"
-        : "Caption + SitGuru link copied — open Instagram to paste",
-    );
-    window.setTimeout(() => setHint(""), 2800);
-  }
-
-  async function savePrimaryGraphic() {
-    if (!square?.url) return;
-    try {
-      await downloadEventGraphic(square.url, `${current.slug}-share.png`);
-      setHint("Graphic saved — ready to post");
-      window.setTimeout(() => setHint(""), 2200);
-      trackShare("save_graphic");
-    } catch {
-      setHint("Could not download graphic — try Copy Link instead");
-      window.setTimeout(() => setHint(""), 2200);
-    }
   }
 
   return (
@@ -360,34 +242,31 @@ export default function EventShareDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby="sitguru-share-title"
-        className="relative z-[81] w-full max-w-[420px] overflow-hidden rounded-t-[1.5rem] bg-white shadow-[0_-8px_40px_rgba(15,23,42,0.18)] sm:rounded-[1.5rem] sm:shadow-2xl"
+        className="relative z-[81] w-full max-w-[420px] overflow-hidden rounded-t-[1.75rem] bg-white shadow-[0_-8px_40px_rgba(15,23,42,0.18)] sm:rounded-[1.75rem] sm:shadow-2xl"
       >
-        <div className="flex items-start justify-between gap-3 px-5 pb-1 pt-5">
-          <div className="min-w-0 pr-2">
-            <h2
-              id="sitguru-share-title"
-              className="truncate text-[1.35rem] font-black leading-tight tracking-tight text-slate-950"
-            >
-              Share &ldquo;{event.title}&rdquo;
-            </h2>
-            <p className="mt-1 text-[15px] font-medium text-slate-500">
-              Share the event — ask friends to tap Yes, Maybe, or No.
-            </p>
-          </div>
+        <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-slate-200 sm:hidden" />
+
+        <div className="flex items-center justify-between gap-3 px-5 pb-1 pt-4">
+          <h2
+            id="sitguru-share-title"
+            className="text-xl font-black tracking-tight text-slate-950"
+          >
+            Share event
+          </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close share panel"
-            className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
           >
             <X className="h-4 w-4" strokeWidth={2.5} />
           </button>
         </div>
 
-        <div className="px-5 pb-4 pt-3">
+        <div className="px-5 pb-5 pt-2">
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <div className="flex gap-3 p-3.5">
-              <div className="relative h-[4.75rem] w-[4.75rem] shrink-0 overflow-hidden rounded-xl bg-slate-100">
+            <div className="flex gap-3 p-3">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:h-[4.5rem] sm:w-[4.5rem]">
                 {previewImage ? (
                   <Image
                     src={previewImage}
@@ -401,32 +280,18 @@ export default function EventShareDrawer({
                     <PawPrint className="h-6 w-6 text-emerald-800/40" />
                   </div>
                 )}
-                {timing ? (
-                  <div className="absolute inset-x-0 bottom-0 bg-slate-950/75 px-1 py-1 text-center text-[9px] font-black uppercase tracking-wide text-white">
-                    {timing.timeLabel || timing.compactDate}
-                  </div>
-                ) : null}
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="flex items-start gap-1.5 text-[13px] font-black leading-snug text-slate-900">
-                  <PawPrint className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500" />
-                  <span className="line-clamp-2">{event.title}</span>
+              <div className="min-w-0 flex-1 py-0.5">
+                <p className="line-clamp-2 text-[15px] font-black leading-snug text-slate-950">
+                  {event.title}
                 </p>
-                <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-snug text-slate-500">
-                  {[
-                    timing?.compactDate,
-                    timing?.timeLabel,
-                    event.venueName,
-                    [event.city, event.state].filter(Boolean).join(", "),
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-                <p className="mt-1.5 text-[11px] font-bold text-slate-700">
-                  Attending? Yes · Maybe · No
-                </p>
+                {placeLine ? (
+                  <p className="mt-0.5 line-clamp-1 text-sm font-medium text-slate-500">
+                    {placeLine}
+                  </p>
+                ) : null}
                 <p
-                  className="mt-1 truncate text-[12px] font-bold"
+                  className="mt-1 truncate text-xs font-bold"
                   style={{ color: "#E85D04" }}
                 >
                   {displayShareHost(url)}
@@ -435,96 +300,56 @@ export default function EventShareDrawer({
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap items-start justify-center gap-x-1 gap-y-3 px-0.5 sm:justify-between sm:px-1">
-            {SHARE_ACTIONS.map((action) => {
-              const commonClass =
-                "flex w-[3.9rem] flex-col items-center gap-1.5 sm:w-[4.25rem]";
-              const iconClass = `grid h-[2.95rem] w-[2.95rem] place-items-center rounded-full shadow-sm sm:h-[3.25rem] sm:w-[3.25rem] ${action.tone}`;
+          <button
+            type="button"
+            onClick={() => void shareNative()}
+            className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white transition hover:bg-[#0a4a2f]"
+          >
+            <Share2 className="h-4 w-4" strokeWidth={2.4} />
+            {canNativeShare ? "Share" : "Copy link"}
+          </button>
 
-              if (action.id === "instagram" || action.id === "tiktok") {
-                const visualChannel = action.id;
-                return (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => void prepareVisualShare(visualChannel)}
-                    className={commonClass}
-                  >
-                    <span className={iconClass}>
-                      <PlatformGlyph id={action.id} />
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-700">
-                      {action.label}
-                    </span>
-                  </button>
-                );
-              }
-
-              if (action.id === "sms") {
-                return (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => void shareViaMessages()}
-                    className={commonClass}
-                  >
-                    <span className={iconClass}>
-                      <PlatformGlyph id={action.id} />
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-700">
-                      {action.label}
-                    </span>
-                  </button>
-                );
-              }
-
-              return (
-                <button
-                  key={action.id}
-                  type="button"
-                  onClick={() => void shareViaPlatform(action.id as SharePlatform)}
-                  className={commonClass}
-                >
-                  <span className={iconClass}>
-                    <PlatformGlyph id={action.id} />
-                  </span>
-                  <span className="text-[11px] font-semibold text-slate-700">
-                    {action.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {hint ? (
-            <p className="mt-3 text-center text-xs font-semibold text-[#0D5C3A]">
-              {hint}
+          {canNativeShare ? (
+            <button
+              type="button"
+              onClick={() => void copyLink()}
+              className="mt-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 transition hover:bg-slate-50"
+            >
+              {copied ? (
+                <Check className="h-4 w-4 text-[#0D5C3A]" strokeWidth={2.5} />
+              ) : (
+                <Link2 className="h-4 w-4 text-slate-600" strokeWidth={2.25} />
+              )}
+              {copied ? "Link copied" : "Copy link"}
+            </button>
+          ) : copied ? (
+            <p className="mt-2 text-center text-sm font-semibold text-[#0D5C3A]">
+              Link copied
             </p>
           ) : null}
-        </div>
 
-        <div className="grid grid-cols-2 gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4">
-          <button
-            type="button"
-            onClick={() => void copyLink()}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-50"
-          >
-            {copied ? (
-              <Check className="h-4 w-4 text-[#0D5C3A]" strokeWidth={2.5} />
-            ) : (
-              <Link2 className="h-4 w-4 text-slate-600" strokeWidth={2.25} />
-            )}
-            {copied ? "Copied" : "Copy Link"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void savePrimaryGraphic()}
-            disabled={!square?.url}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <ImageIcon className="h-4 w-4 text-slate-600" strokeWidth={2.25} />
-            Save Graphic
-          </button>
+          <p className="mt-5 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+            Or send to
+          </p>
+          <div className="mt-3 flex items-start justify-around">
+            {QUICK_ACTIONS.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => shareViaPlatform(action.id)}
+                className="flex w-[4.5rem] flex-col items-center gap-1.5"
+              >
+                <span
+                  className={`grid h-12 w-12 place-items-center rounded-full shadow-sm ${action.tone}`}
+                >
+                  <PlatformGlyph id={action.id} />
+                </span>
+                <span className="text-[11px] font-semibold text-slate-600">
+                  {action.label}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

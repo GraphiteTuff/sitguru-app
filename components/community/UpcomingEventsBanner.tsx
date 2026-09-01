@@ -32,6 +32,7 @@ import {
 import EventShareDrawer, {
   type EventShareDrawerEvent,
 } from "@/components/community/EventShareDrawer";
+import { shareEventNatively } from "@/lib/community/share-client";
 import EventAttendingButtons from "@/components/community/EventAttendingButtons";
 import DelilahEventCompanionIntro from "@/components/community/DelilahEventCompanionIntro";
 import { isHomepageDemoEvent } from "@/lib/community/homepage-demo-events";
@@ -168,7 +169,7 @@ function EventBannerCard({
       />
       <button
         type="button"
-        onClick={() => onShare(event)}
+        onClick={() => void onShare(event)}
         className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
       >
         <Share2 className="h-3.5 w-3.5" />
@@ -345,9 +346,9 @@ export default function UpcomingEventsBanner({
 
   if (!events.length) return null;
 
-  function openSitGuruShare(event: CommunityEventWithPartner) {
+  async function openSitGuruShare(event: CommunityEventWithPartner) {
     const curatedDemo = isHomepageDemoEvent(event.id);
-    setShareEvent({
+    const payload: EventShareDrawerEvent = {
       id: event.id,
       title: event.title,
       slug: event.slug,
@@ -368,7 +369,9 @@ export default function UpcomingEventsBanner({
       image_card_url: event.image_card_url,
       image_original_url: event.image_original_url,
       preferBrandedGraphics: !curatedDemo,
-    });
+    };
+    const result = await shareEventNatively(payload, "community_event_share_drawer");
+    if (result === "unavailable") setShareEvent(payload);
   }
 
   const resolvedSubtitle =

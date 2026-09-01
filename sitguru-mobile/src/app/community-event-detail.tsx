@@ -6,13 +6,13 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 
 import SitGuruScreen from "@/components/SitGuruScreen";
-import CommunityEventShareSheet from "@/components/community/CommunityEventShareSheet";
 import CommunityDelilahPanel from "@/components/community/CommunityDelilahPanel";
 import { AppFonts } from "@/constants/fonts";
 import {
@@ -21,6 +21,7 @@ import {
   type MobileCommunityEvent,
 } from "@/hooks/data/useCommunityEvents";
 import { trackMobileEvent } from "@/lib/analytics/track";
+import { getSitGuruApiBaseUrl } from "@/lib/data/api";
 
 const PENDING_RSVP_KEY = "sitguru_pending_event_rsvp";
 
@@ -33,7 +34,6 @@ export default function CommunityEventDetailScreen() {
   const [rsvpMessage, setRsvpMessage] = useState("");
   const [rsvpPending, setRsvpPending] = useState(false);
   const [needsSignup, setNeedsSignup] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
 
   const { counts, going, setAttendance, reload } = useEventAttendance(event?.id);
 
@@ -100,7 +100,36 @@ export default function CommunityEventDetailScreen() {
 
   async function shareEvent() {
     if (!event) return;
-    setShareOpen(true);
+    const base = (getSitGuruApiBaseUrl() || "https://www.sitguru.com").replace(/\/$/, "");
+    const url = `${base}/events/${event.slug}`;
+    const when = new Date(event.start_at);
+    const dateLabel = Number.isNaN(when.getTime())
+      ? ""
+      : when.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const cityState = [event.city, event.state].filter(Boolean).join(", ");
+    const message = [
+      `🐾 ${event.title}`,
+      [dateLabel, cityState].filter(Boolean).join(" · "),
+      "RSVP on SitGuru",
+      url,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    try {
+      await Share.share({
+        title: event.title,
+        message,
+        url,
+      });
+      void trackMobileEvent({
+        eventName: "event_share",
+        source: "mobile_community_event_detail",
+        metadata: { eventId: event.id, slug: event.slug, channel: "native" },
+      });
+    } catch {
+      // cancelled
+    }
   }
 
   async function goToCommunitySignup(
@@ -278,7 +307,7 @@ export default function CommunityEventDetailScreen() {
 
       <Pressable style={styles.shareButton} onPress={() => void shareEvent()}>
         <Share2 color="#0D5C3A" size={18} />
-        <Text style={styles.shareButtonText}>Share from SitGuru</Text>
+        <Text style={styles.shareButtonText}>Share</Text>
       </Pressable>
 
       <Pressable
@@ -287,12 +316,6 @@ export default function CommunityEventDetailScreen() {
       >
         <Text style={styles.secondaryButtonText}>Browse more events</Text>
       </Pressable>
-
-      <CommunityEventShareSheet
-        open={shareOpen}
-        onClose={() => setShareOpen(false)}
-        event={event}
-      />
     </SitGuruScreen>
   );
 }
