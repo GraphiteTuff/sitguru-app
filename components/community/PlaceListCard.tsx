@@ -18,6 +18,7 @@ import {
   nearbyGurusHref,
   pawCount,
   type PetFriendlyPlace,
+  type PlaceCategoryId,
   type PlaceLane,
 } from "@/lib/community/places";
 
@@ -80,7 +81,7 @@ export default function PlaceListCard({
   place: PetFriendlyPlace;
   highlighted: boolean;
   onHighlight: () => void;
-  onSwitchLane: (lane: PlaceLane, category?: string) => void;
+  onSwitchLane: (lane: PlaceLane, category?: PlaceCategoryId | "") => void;
 }) {
   const Icon = LANE_ICON[place.lane];
   const claimHref = claimPlaceHref(place);
