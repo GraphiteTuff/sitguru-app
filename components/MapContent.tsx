@@ -34,6 +34,7 @@ type NormalizedMarker = {
   avatarUrl: string;
   initials: string;
   placeGlyph: PlaceGlyph | null;
+  photoAttribution: string;
   serviceRadiusMiles: number;
   canBook: boolean;
   source: "zip" | "city" | "service_coordinates" | "coordinates";
@@ -400,6 +401,14 @@ function getServiceRadiusMiles(marker: RawMarker) {
   return Math.min(Math.max(Math.round(radius), 1), MAX_SERVICE_RADIUS_MILES);
 }
 
+function getPhotoAttribution(marker: RawMarker) {
+  return (
+    asString(marker.photoAttribution) ||
+    asString(marker.photo_attribution) ||
+    asString(marker.photoCredit)
+  );
+}
+
 function getPlaceGlyph(marker: RawMarker): PlaceGlyph | null {
   if (getMarkerKind(marker) !== "place") return null;
   const explicit = asString(marker.placeGlyph) || asString(marker.place_glyph);
@@ -596,6 +605,7 @@ function normalizeMarker(marker: RawMarker): NormalizedMarker | null {
     avatarUrl,
     initials: getInitials(name),
     placeGlyph: getPlaceGlyph(marker),
+    photoAttribution: getPhotoAttribution(marker),
     serviceRadiusMiles: radius,
     canBook: getMarkerCanBook(marker),
     source,
@@ -699,6 +709,15 @@ function createPopupHtml(marker: NormalizedMarker) {
             }
           </div>
         </div>
+        ${
+          marker.kind === "place" &&
+          marker.avatarUrl &&
+          marker.photoAttribution
+            ? `<p class="mt-2 text-[10px] font-semibold text-slate-400">Photo: ${escapeHtml(
+                marker.photoAttribution,
+              )}</p>`
+            : ""
+        }
 
         ${
           marker.description

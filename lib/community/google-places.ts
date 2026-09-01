@@ -48,8 +48,17 @@ type GooglePlace = {
     shortText?: string;
     types?: string[];
   }>;
+  photos?: Array<{
+    name?: string;
+    authorAttributions?: Array<{
+      displayName?: string;
+      uri?: string;
+    }>;
+  }>;
   businessStatus?: string;
 };
+
+type MappedPlace = PetFriendlyPlace & { photoName: string | null };
 
 type CacheEntry = {
   expiresAt: number;
@@ -82,7 +91,11 @@ const FIELD_MASK = [
   "places.currentOpeningHours",
   "places.addressComponents",
   "places.businessStatus",
+  "places.photos",
 ].join(",");
+
+const MAX_PLACE_PHOTOS = 32;
+const PHOTO_FETCH_CONCURRENCY = 6;
 
 const CONSERVATIVE_TYPES = [
   "restaurant",
@@ -374,6 +387,62 @@ async function placesRequest(
   return payload.places || [];
 }
 
+function firstPhoto(place: GooglePlace) {
+  const photo = place.photos?.[0];
+  const name = photo?.name?.trim() || "";
+  if (!name.startsWith("places/")) {
+    return { photoName: null, photoAttribution: null };
+  }
+  return {
+    photoName: name,
+    photoAttribution: photo?.authorAttributions?.[0]?.displayName?.trim() || null,
+  };
+}
+
+async function fetchPlacePhotoUri(photoName: string) {
+  const apiKey = placesApiKey();
+  if (!apiKey) return null;
+
+  try {
+    const url = new URL(`https://places.googleapis.com/v1/${photoName}/media`);
+    url.searchParams.set("maxWidthPx", "400");
+    url.searchParams.set("maxHeightPx", "400");
+    url.searchParams.set("skipHttpRedirect", "true");
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "X-Goog-Api-Key": apiKey },
+    });
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as { photoUri?: string };
+    const photoUri = payload.photoUri?.trim() || "";
+    return photoUri.startsWith("https://") ? photoUri : null;
+  } catch {
+    return null;
+  }
+}
+
+async function attachPlacePhotos(places: MappedPlace[]): Promise<PetFriendlyPlace[]> {
+  const targets = places
+    .map((place, index) => ({ place, index }))
+    .filter((item) => item.place.photoName)
+    .slice(0, MAX_PLACE_PHOTOS);
+
+  for (let i = 0; i < targets.length; i += PHOTO_FETCH_CONCURRENCY) {
+    const batch = targets.slice(i, i + PHOTO_FETCH_CONCURRENCY);
+    await Promise.all(
+      batch.map(async ({ place }) => {
+        place.photoUrl = place.photoName
+          ? await fetchPlacePhotoUri(place.photoName)
+          : null;
+      }),
+    );
+  }
+
+  return places.map(({ photoName: _photoName, ...place }) => place);
+}
+
 async function searchNearbyPlaces(opts: {
   includedTypes: string[];
   latitude: number;
@@ -484,7 +553,7 @@ export async function discoverPlaces(input: DiscoverPlacesInput) {
 function mapGooglePlace(
   place: GooglePlace,
   input: PlacesSearchInput,
-): PetFriendlyPlace | null {
+): MappedPlace | null {
   const id = place.id;
   const name = place.displayName?.text || "";
   const latitude = place.location?.latitude;
@@ -503,6 +572,7 @@ function mapGooglePlace(
   if (input.category === "park" && dedicatedDogPark) return null;
 
   const upcomingEvent = matchLinkedEvent(name, input.linkedEvents);
+  const { photoName, photoAttribution } = firstPhoto(place);
   const hours = hoursLabel(place);
   const openNow =
     place.currentOpeningHours?.openNow ?? place.regularOpeningHours?.openNow ?? null;
@@ -549,6 +619,9 @@ function mapGooglePlace(
     websiteUrl: place.websiteUri ?? null,
     googleMapsUrl: place.googleMapsUri ?? null,
     phone: place.nationalPhoneNumber ?? null,
+    photoUrl: null,
+    photoAttribution,
+    photoName,
     editorialSummary: summary,
     hoursLabel: hours ?? null,
     allowsDogs: place.allowsDogs ?? null,
@@ -580,7 +653,7 @@ async function loadMappedPlaces(
   ) =>
     raw
       .map((place) => mapGooglePlace(place, { ...input, category }))
-      .filter((place): place is PetFriendlyPlace => Boolean(place));
+      .filter((place): place is MappedPlace => Boolean(place));
 
   if (textQuery) {
     const raw = await discoverPlaces({
@@ -649,18 +722,20 @@ export async function searchPetFriendlyPlaces(input: PlacesSearchInput) {
 
   const mapped = await loadMappedPlaces(input, center, textQuery);
 
-  const unique = new Map<string, PetFriendlyPlace>();
+  const unique = new Map<string, MappedPlace>();
   for (const place of mapped) {
     if (!unique.has(place.googlePlaceId)) unique.set(place.googlePlaceId, place);
   }
 
-  const places = [...unique.values()].sort((a, b) => {
+  const ranked = [...unique.values()].sort((a, b) => {
     if (a.category === "vet_er" && b.category !== "vet_er") return -1;
     if (b.category === "vet_er" && a.category !== "vet_er") return 1;
     if (a.category === "dog_park" && b.category !== "dog_park") return -1;
     if (b.category === "dog_park" && a.category !== "dog_park") return 1;
     return b.petFriendlyScore - a.petFriendlyScore;
   });
+
+  const places = await attachPlacePhotos(ranked);
 
   cache.set(cacheKey, { places, expiresAt: Date.now() + CACHE_TTL_MS });
 

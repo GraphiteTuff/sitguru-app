@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   BedDouble,
@@ -147,11 +148,27 @@ export default function PlaceListCard({
       onMouseEnter={onHighlight}
       onFocus={onHighlight}
     >
-      <div
-        className="absolute top-4 right-4 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-[22px] bg-emerald-50 text-emerald-800 sm:top-5 sm:right-5 sm:h-24 sm:w-24"
-        aria-hidden
-      >
-        <Icon className="h-10 w-10 sm:h-12 sm:w-12" strokeWidth={2.1} />
+      <div className="absolute top-4 right-4 sm:top-5 sm:right-5">
+        <div className="relative h-[4.5rem] w-[4.5rem] overflow-hidden rounded-[22px] bg-white sm:h-24 sm:w-24">
+        {place.photoUrl ? (
+          <>
+            <Image
+              src={place.photoUrl}
+              alt=""
+              fill
+              className="object-cover object-center"
+              sizes="96px"
+            />
+            <span className="absolute right-1 bottom-1 flex h-7 w-7 items-center justify-center rounded-xl bg-white/95 text-emerald-800 shadow-sm">
+              <Icon className="h-4 w-4" strokeWidth={2.2} />
+            </span>
+          </>
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-emerald-50 text-emerald-800">
+            <Icon className="h-10 w-10 sm:h-12 sm:w-12" strokeWidth={2.1} />
+          </div>
+        )}
+        </div>
       </div>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
@@ -181,6 +198,11 @@ export default function PlaceListCard({
             {place.petFriendlyLabel}
           </span>
         </div>
+        {place.photoUrl && place.photoAttribution ? (
+          <p className="mt-1 text-[10px] font-semibold text-slate-400">
+            Photo: {place.photoAttribution}
+          </p>
+        ) : null}
       </div>
 
       {place.editorialSummary ? (

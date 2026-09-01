@@ -195,6 +195,8 @@ export type PetFriendlyPlace = {
   websiteUrl: string | null;
   googleMapsUrl: string | null;
   phone: string | null;
+  photoUrl: string | null;
+  photoAttribution: string | null;
   editorialSummary: string | null;
   hoursLabel: string | null;
   allowsDogs: boolean | null;
