@@ -422,7 +422,8 @@ const routes = {
   allBookings: "/customer/dashboard/bookings",
   messages: "/customer/dashboard/messages",
   adminMessages: "/customer/dashboard/messages?support=admin",
-  pets: "/customer/pets",
+  pets: "#multi-pet-center",
+  addPet: "#new-pet-passport",
   profile: "/customer/dashboard/profile",
   serviceLocation: "/customer/dashboard/profile/service-location",
   accountSecurity: "/customer/dashboard/account-security",
@@ -2832,7 +2833,7 @@ export default function CustomerDashboardPage() {
           }
         : pets.length === 0
           ? {
-              href: routes.pets,
+              href: routes.addPet,
               label: "Add your first pet",
             }
           : null
@@ -3412,7 +3413,7 @@ export default function CustomerDashboardPage() {
       updates.push({
         label: pets.length === 0 ? "Add a pet to book" : "Finish booking setup",
         detail: `${profileCompletion}% ready · name, ZIP, and one pet`,
-        href: pets.length === 0 ? routes.pets : routes.profile,
+        href: pets.length === 0 ? routes.addPet : routes.profile,
         tone: "slate",
       });
     } else if (!petParentReadiness.guruReady) {
@@ -3545,7 +3546,7 @@ export default function CustomerDashboardPage() {
             hasPet={pets.length > 0}
             hasZip={Boolean(careZip)}
             profileHref={routes.serviceLocation}
-            petsHref={routes.pets}
+            petsHref={pets.length ? routes.pets : routes.addPet}
             findCareHref={routes.findGuru}
           />
         </Suspense>
@@ -3578,7 +3579,7 @@ export default function CustomerDashboardPage() {
                   Find Care near you
                 </Link>
                 <Link
-                  href={pets.length ? routes.pets : routes.pets}
+                  href={pets.length ? routes.pets : routes.addPet}
                   className="inline-flex min-h-[56px] items-center justify-center rounded-2xl border border-white/30 bg-white/10 px-6 text-base font-black text-white transition hover:bg-white/20"
                 >
                   {pets.length ? "Manage pets" : "Add a pet"}
@@ -3599,7 +3600,7 @@ export default function CustomerDashboardPage() {
                   ),
                 )
               }
-              petProfileHref={routes.pets}
+              petProfileHref={pets.length ? routes.pets : routes.addPet}
               guruVibeHref={routes.findGuru}
               safeBookingHref={routes.findGuru}
               academyHref={routes.university}
@@ -4006,62 +4007,35 @@ export default function CustomerDashboardPage() {
 
           {authUserId ? (
             <section className="mt-4">
-              {isZeroBookingHome ? (
-                <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">
-                        Pet Passports
-                      </p>
-                      <h2 className="mt-1 text-2xl font-black text-slate-950">
-                        {pets.length
-                          ? `${pets.length} pet${pets.length === 1 ? "" : "s"} ready`
-                          : "Add your pet to book faster"}
-                      </h2>
-                      <p className="mt-1 text-sm font-semibold text-slate-600">
-                        Name is enough to save — full details live on the pets
-                        page.
-                      </p>
-                    </div>
-                    <Link
-                      href={routes.pets}
-                      className="inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 text-base font-black text-white hover:bg-[#09462c]"
-                    >
-                      {pets.length ? "Manage pets" : "Add pet"}
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <MultiPetProfileCenter
-                  parent={{
-                    userId: authUserId,
-                    displayName: customerDisplayName,
-                    email: customerProfile?.email ?? null,
-                    phone: customerProfile?.phone ?? null,
-                    zip: careZip || null,
-                    profileCompletion,
-                  }}
-                  onPetsChange={(rows) => {
-                    setPets(
-                      rows.map((pet) => ({
-                        id: pet.id,
-                        name: pet.name,
-                        species: pet.species,
-                        breed: pet.breed,
-                        age: pet.age,
-                        size: pet.size,
-                        weight: pet.weight,
-                        temperament: pet.temperament,
-                        medical_notes: pet.medical_notes,
-                        medications: pet.medical_notes,
-                        notes: pet.notes,
-                        photo_url: pet.photo_url,
-                        video_url: pet.video_url,
-                      })),
-                    );
-                  }}
-                />
-              )}
+              <MultiPetProfileCenter
+                parent={{
+                  userId: authUserId,
+                  displayName: customerDisplayName,
+                  email: customerProfile?.email ?? null,
+                  phone: customerProfile?.phone ?? null,
+                  zip: careZip || null,
+                  profileCompletion,
+                }}
+                onPetsChange={(rows) => {
+                  setPets(
+                    rows.map((pet) => ({
+                      id: pet.id,
+                      name: pet.name,
+                      species: pet.species,
+                      breed: pet.breed,
+                      age: pet.age,
+                      size: pet.size,
+                      weight: pet.weight,
+                      temperament: pet.temperament,
+                      medical_notes: pet.medical_notes,
+                      medications: pet.medical_notes,
+                      notes: pet.notes,
+                      photo_url: pet.photo_url,
+                      video_url: pet.video_url,
+                    })),
+                  );
+                }}
+              />
             </section>
           ) : null}
 
@@ -4404,7 +4378,7 @@ export default function CustomerDashboardPage() {
                     ),
                   )
                 }
-                petProfileHref={routes.pets}
+                petProfileHref={pets.length ? routes.pets : routes.addPet}
                 guruVibeHref={routes.findGuru}
                 safeBookingHref={routes.findGuru}
                 academyHref={routes.university}

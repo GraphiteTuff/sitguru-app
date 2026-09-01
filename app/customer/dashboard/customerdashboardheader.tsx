@@ -62,7 +62,7 @@ const navItems: CustomerNavItem[] = [
   },
   {
     label: "My Pets",
-    href: "/customer/dashboard/pets",
+    href: "/customer/dashboard#multi-pet-center",
     activePaths: ["/customer/dashboard/pets", "/customer/pets"],
   },
   {
@@ -273,7 +273,7 @@ export default function CustomerDashboardHeader({
                 </Link>
 
                 <Link
-                  href="/customer/dashboard/pets"
+                  href="/customer/dashboard#multi-pet-center"
                   onClick={() => setProfileOpen(false)}
                   className="block rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800"
                 >

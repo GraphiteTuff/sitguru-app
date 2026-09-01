@@ -137,25 +137,52 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parent.userId]);
 
-  function scrollToPassportEditor() {
+  const scrollToPassportEditor = useCallback(() => {
     editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => nameInputRef.current?.focus(), 280);
-    if (typeof window !== "undefined") {
-      const nextHash = "#new-pet-passport";
-      if (window.location.hash !== nextHash) {
-        window.history.replaceState(null, "", nextHash);
-      }
-    }
-  }
+  }, []);
 
-  function startCreate() {
+  const startCreate = useCallback(() => {
     setEditingId(null);
     setForm(EMPTY_CANONICAL_PET_FORM);
     setTraitTab("basics");
     setMessage("");
     setError("");
     scrollToPassportEditor();
-  }
+    if (typeof window !== "undefined") {
+      const nextUrl = `${window.location.pathname}${window.location.search}#new-pet-passport`;
+      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (currentUrl !== nextUrl) {
+        window.history.replaceState(null, "", nextUrl);
+      }
+    }
+  }, [scrollToPassportEditor]);
+
+  useEffect(() => {
+    function applyPetHash() {
+      const hash = window.location.hash;
+      if (hash === "#new-pet-passport" || hash === "#add-pet") {
+        setEditingId(null);
+        setForm(EMPTY_CANONICAL_PET_FORM);
+        setTraitTab("basics");
+        window.setTimeout(() => {
+          editorRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+          nameInputRef.current?.focus();
+        }, 80);
+      } else if (hash === "#multi-pet-center") {
+        document
+          .getElementById("multi-pet-center")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
+    applyPetHash();
+    window.addEventListener("hashchange", applyPetHash);
+    return () => window.removeEventListener("hashchange", applyPetHash);
+  }, []);
 
   function startEdit(pet: CanonicalPet) {
     setEditingId(pet.id);

@@ -90,7 +90,7 @@ const DEFAULT_ACTIONS: Record<UniversalDashboardRole, UniversalQuickAction[]> = 
     { label: "Pricing", href: "/guru/dashboard/pricing", icon: Wallet },
   ],
   parent: [
-    { label: "My Pets", href: "/customer/dashboard/pets", icon: PawPrint },
+    { label: "My Pets", href: "/customer/dashboard#multi-pet-center", icon: PawPrint },
     { label: "Find a Guru", href: "/search", icon: Search },
     {
       label: "Active Care",

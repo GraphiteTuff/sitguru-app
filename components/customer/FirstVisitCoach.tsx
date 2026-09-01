@@ -19,7 +19,7 @@ export default function FirstVisitCoach({
   hasPet = false,
   hasZip = false,
   profileHref = "/customer/dashboard/profile/service-location",
-  petsHref = "/customer/pets",
+  petsHref = "#new-pet-passport",
   findCareHref = "/search",
 }: FirstVisitCoachProps) {
   const router = useRouter();
@@ -46,6 +46,10 @@ export default function FirstVisitCoach({
       // ignore
     }
     setOpen(false);
+  }
+
+  function dismissAndClearQuery() {
+    dismiss();
     if (searchParams?.get("coach") === "1") {
       router.replace("/customer/dashboard");
     }
@@ -98,7 +102,7 @@ export default function FirstVisitCoach({
           </div>
           <button
             type="button"
-            onClick={dismiss}
+            onClick={dismissAndClearQuery}
             className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-white/15 text-white"
             aria-label="Dismiss"
           >
@@ -143,7 +147,7 @@ export default function FirstVisitCoach({
 
           <button
             type="button"
-            onClick={dismiss}
+            onClick={dismissAndClearQuery}
             className="inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-700"
           >
             Skip for now

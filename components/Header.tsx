@@ -133,7 +133,7 @@ const customerNavLinks: NavLink[] = [
   { label: "Find a Guru", href: PUBLIC_GURU_SEARCH_HREF },
   { label: "Bookings", href: "/customer/dashboard/bookings" },
   { label: "Messages", href: "/messages" },
-  { label: "My Pets", href: "/customer/pets" },
+  { label: "My Pets", href: "/customer/dashboard#multi-pet-center" },
   { label: "My Profile", href: "/customer/dashboard/profile" },
   { label: "PawPerks", href: "/customer/dashboard/pawperks" },
 ];
@@ -333,7 +333,12 @@ function getActiveAliases(href: string) {
   if (href === "/messages" || href === "/customer/dashboard/messages") {
     return ["/messages", "/customer/messages", "/customer/dashboard/messages"];
   }
-  if (href === "/customer/pets" || href === "/customer/dashboard/pets") {
+  if (
+    href === "/customer/pets" ||
+    href === "/customer/dashboard/pets" ||
+    href === "/customer/dashboard#multi-pet-center" ||
+    href === "/customer/dashboard#new-pet-passport"
+  ) {
     return ["/customer/pets", "/customer/dashboard/pets", "/pets"];
   }
   if (href === "/customer/dashboard/profile") {
@@ -758,7 +763,7 @@ export default function Header({ user = null }: HeaderProps) {
               href: "/customer/dashboard/profile",
             },
             { label: "My Care", href: "/customer/dashboard/bookings" },
-            { label: "My Pets", href: "/customer/pets" },
+            { label: "My Pets", href: "/customer/dashboard#multi-pet-center" },
             { label: "Messages", href: "/messages" },
             { label: "PawPerks", href: "/customer/dashboard/pawperks" },
           ];

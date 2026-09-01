@@ -70,7 +70,7 @@ const routes = {
   dashboard: "/customer/dashboard",
   basicInfo: "/customer/dashboard/profile/basic-info",
   serviceLocation: "/customer/dashboard/profile/service-location",
-  pets: "/customer/pets",
+  pets: "/customer/dashboard#new-pet-passport",
   careNotes: "/customer/dashboard/profile/care-notes",
   emergencyContact: "/customer/dashboard/profile/emergency-contact",
   notifications: "/customer/dashboard/profile/notifications",
