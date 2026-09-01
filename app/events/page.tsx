@@ -3,34 +3,15 @@ import { CalendarDays, PawPrint, Users } from "lucide-react";
 import CommunityEventsMapSearch from "@/components/community/CommunityEventsMapSearch";
 import CommunityFeaturedSection from "@/components/community/CommunityFeaturedSection";
 import CommunityPetParentCta from "@/components/community/CommunityPetParentCta";
+import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import { fetchDiscoveredHomepageEvents } from "@/lib/community/discovered-events";
 import { getUpcomingCuratedBucksMontgomeryPetEvents } from "@/lib/community/homepage-demo-events";
 import {
   fetchFeaturedCommunityPageEvents,
   fetchPublicEvents,
 } from "@/lib/community/queries";
-import type { CommunityEventWithPartner } from "@/lib/community/types";
 
 export const dynamic = "force-dynamic";
-
-function mergeUniqueEvents(
-  primary: CommunityEventWithPartner[],
-  secondary: CommunityEventWithPartner[],
-  limit = 48,
-) {
-  const seen = new Set<string>();
-  const merged: CommunityEventWithPartner[] = [];
-
-  for (const event of [...primary, ...secondary]) {
-    const key = `${event.title}|${event.start_at}|${event.city || ""}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(event);
-    if (merged.length >= limit) break;
-  }
-
-  return merged;
-}
 
 const communityLinks = [
   {
@@ -78,8 +59,8 @@ export default async function CommunityPage() {
 
   // Lift curated Bucks & Montgomery listings into the map/search (same set as homepage).
   const curated = getUpcomingCuratedBucksMontgomeryPetEvents();
-  const mapEvents = mergeUniqueEvents(
-    mergeUniqueEvents(partnerEvents, curated, 80),
+  const mapEvents = mergeUniqueCommunityEvents(
+    mergeUniqueCommunityEvents(partnerEvents, curated, 80),
     discovered.events,
     80,
   );

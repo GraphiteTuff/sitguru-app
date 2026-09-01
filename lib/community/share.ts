@@ -3,6 +3,11 @@ import type { CommunityEventRow } from "@/lib/community/types";
 import { getPublicEventUrl } from "@/lib/community/slug";
 import { getBrandedSocialGraphicUrl } from "@/lib/community/social-assets";
 
+function isGenericHostName(value?: string | null) {
+  const host = value?.trim() || "";
+  return !host || /^pet event$/i.test(host);
+}
+
 export function buildEventShareCaption(
   event: Pick<
     CommunityEventRow,
@@ -16,9 +21,16 @@ export function buildEventShareCaption(
     event.timezone,
   );
   const location = formatEventLocationInline(event);
-  const host = partnerName?.trim() || "a SitGuru partner";
+  const host = isGenericHostName(partnerName) ? null : partnerName?.trim();
 
-  return `Join us for ${event.title} on ${dateLabel} at ${location}. Hosted by ${host}. Bring your pup and meet local pet lovers on SitGuru Pet Events — @SitGuruOfficial`;
+  return [
+    `Join us for ${event.title} on ${dateLabel} at ${location}.`,
+    host ? `Hosted by ${host}.` : null,
+    "Going? Tap Yes, Maybe, or No on SitGuru.",
+    "SitGuru Events — @SitGuruOfficial",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function buildEventShareCaptionSocial(
@@ -35,16 +47,15 @@ export function buildEventShareCaptionSocial(
   );
   const cityState = [event.city, event.state].filter(Boolean).join(", ");
   const place = [event.venue_name?.trim(), cityState].filter(Boolean).join(" · ");
-  const host = partnerName?.trim();
-  const teaser = event.short_description?.trim();
+  const host = isGenericHostName(partnerName) ? null : partnerName?.trim();
   const when = [compactDate, timeLabel].filter(Boolean).join(" · ");
 
   const lines = [
     `🐾 ${event.title}`,
     when ? `${when}${place ? ` · ${place}` : ""}` : place || null,
     host ? `Presented by ${host}` : null,
-    teaser || "Bring your pup and meet local pet lovers on SitGuru.",
-    "Shared via SitGuru Pet Events — @SitGuruOfficial",
+    "Going? Tap Yes, Maybe, or No on SitGuru.",
+    "SitGuru Events — @SitGuruOfficial",
   ].filter(Boolean);
 
   return lines.join("\n");
@@ -65,20 +76,24 @@ export function buildEventShareBody(message: string, url: string) {
 export function buildEventShareMeta(
   event: Pick<
     CommunityEventRow,
-    "title" | "slug" | "short_description" | "start_at" | "city" | "state" | "image_hero_url" | "image_original_url" | "image_card_url"
+    "title" | "slug" | "short_description" | "start_at" | "city" | "state" | "image_hero_url" | "image_original_url" | "image_card_url" | "venue_name"
   >,
   partnerName?: string | null,
   origin?: string,
 ) {
-  const { compactDate } = formatEventDateRange(event.start_at, null, null);
+  const { compactDate, timeLabel } = formatEventDateRange(event.start_at, null, null);
   const cityState = [event.city, event.state].filter(Boolean).join(", ");
-  const host = partnerName?.trim() || "SitGuru partner";
+  const place = [event.venue_name?.trim(), cityState].filter(Boolean).join(", ");
+  const host = isGenericHostName(partnerName) ? null : partnerName?.trim();
+  const when = [compactDate, timeLabel].filter(Boolean).join(" · ");
+  const summary =
+    event.short_description?.trim() ||
+    [when, place, host].filter(Boolean).join(" • ") ||
+    "Pet friendly event";
 
   return {
-    title: `${event.title} | SitGuru Pet Events`,
-    description:
-      event.short_description?.trim() ||
-      `${compactDate}${cityState ? ` • ${cityState}` : ""} — Hosted by ${host}. Find pet-friendly events on SitGuru.`,
+    title: `${event.title} | SitGuru Events`,
+    description: `${summary.replace(/\s+/g, " ").trim()} Tap Yes, Maybe, or No to RSVP on SitGuru.`,
     url: getPublicEventUrl(event.slug, origin),
     image: getBrandedSocialGraphicUrl(event.slug, "landscape", origin),
   };
@@ -90,27 +105,24 @@ export function buildEventShareHref(
   platform: SharePlatform,
   url: string,
   message: string,
+  subjectLine = "SitGuru Events",
 ) {
   const body = buildEventShareBody(message, url);
   const encodedBody = encodeURIComponent(body);
   const encodedUrl = encodeURIComponent(url.trim());
   const encodedQuote = encodeURIComponent(message.trim());
-  const subject = encodeURIComponent("SitGuru Pet Event");
+  const subject = encodeURIComponent(subjectLine);
 
   switch (platform) {
     case "whatsapp":
-      // Single composed body (caption + URL once)
       return `https://wa.me/?text=${encodedBody}`;
     case "facebook":
-      // u = link preview / OG; quote prefills caption when Facebook supports it
       return `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedQuote}`;
     case "x":
-      // Full caption + SitGuru + URL in one text param (no separate url= to avoid doubles)
       return `https://twitter.com/intent/tweet?text=${encodedBody}`;
     case "email":
       return `mailto:?subject=${subject}&body=${encodedBody}`;
     case "sms":
-      // One body only — do NOT append url again after encodedText (that sent the event twice)
       return `sms:?body=${encodedBody}`;
     default:
       return url;

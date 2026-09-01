@@ -1,3 +1,4 @@
+import { fetchDiscoveredEventByPublicSlug } from "@/lib/community/discovered-events";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type {
   CommunityEventRow,
@@ -104,10 +105,11 @@ export async function fetchPublicEventBySlug(slug: string) {
 
   if (error) {
     console.error("fetchPublicEventBySlug:", error);
-    return null;
   }
 
-  return (data as CommunityEventWithPartner | null) || null;
+  if (data) return data as CommunityEventWithPartner;
+
+  return fetchDiscoveredEventByPublicSlug(slug);
 }
 
 export type FeaturedEventQuery = {

@@ -31,6 +31,7 @@ import {
 } from "@/lib/community/location-preference";
 import { COMMUNITY_MAJOR_COUNTIES } from "@/lib/community/market-seed";
 import CommunityCountySuggestInput from "@/components/community/CommunityCountySuggestInput";
+import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 import { COMMUNITY_EVENT_CATEGORIES } from "@/lib/community/types";
 
@@ -99,7 +100,7 @@ function eventToMapMarker(event: CommunityEventWithPartner) {
     radius_miles: 1,
     profileHref: href,
     href,
-    ctaLabel: googleDiscovery ? "Open event" : "View event",
+    ctaLabel: "RSVP on SitGuru",
     badges,
     avatar_url: event.image_card_url || event.image_hero_url || null,
   };
@@ -232,7 +233,7 @@ function EventListCard({
           </span>
           {googleDiscovery ? (
             <span className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-emerald-700 px-4 text-sm font-semibold text-white sm:w-auto">
-              Open event
+              RSVP on SitGuru
             </span>
           ) : null}
         </div>
@@ -302,7 +303,12 @@ export default function CommunityEventsMapSearch({
   }, []);
 
   const filtered = useMemo(() => {
-    const matched = events.filter((event) => {
+    const unique = mergeUniqueCommunityEvents(
+      events,
+      [],
+      Math.max(events.length, 1),
+    );
+    const matched = unique.filter((event) => {
       if (
         filters.category &&
         !(event.categories || []).includes(filters.category)

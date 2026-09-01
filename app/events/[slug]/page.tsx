@@ -56,7 +56,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: meta.title,
       description: meta.description,
       url: meta.url,
-      siteName: "SitGuru",
+      siteName: "SitGuru Events",
       images: [{ url: meta.image, width: 1200, height: 630, alt: meta.title }],
       type: "website",
     },
@@ -86,7 +86,7 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
   const locationBlock = formatEventLocation(event);
   const googleDiscovery = isGoogleDiscoveryEvent(event);
   const sourceLabel = googleDiscovery
-    ? "Pet Event"
+    ? "SitGuru Events"
     : "SitGuru Partner Event";
 
   return (
@@ -133,19 +133,25 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
                     <p className="text-sm font-bold text-emerald-800">
                       {formatEventCountyState(event)}
                     </p>
-                    <p className="text-sm font-semibold text-slate-600">
-                      Hosted by{" "}
-                      {partnerSlug ? (
-                        <Link
-                          href={`/p/${partnerSlug}`}
-                          className="font-black text-emerald-800"
-                        >
-                          {partnerName}
-                        </Link>
-                      ) : (
-                        partnerName
-                      )}
-                    </p>
+                    {googleDiscovery ? (
+                      <p className="text-sm font-semibold text-slate-600">
+                        Highlighted by SitGuru Events — tap Yes, Maybe, or No to RSVP.
+                      </p>
+                    ) : (
+                      <p className="text-sm font-semibold text-slate-600">
+                        Hosted by{" "}
+                        {partnerSlug ? (
+                          <Link
+                            href={`/p/${partnerSlug}`}
+                            className="font-black text-emerald-800"
+                          >
+                            {partnerName}
+                          </Link>
+                        ) : (
+                          partnerName
+                        )}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-2">
@@ -228,6 +234,17 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
                       eventSlug={event.slug}
                       initialCounts={attendanceCounts}
                     />
+                    {googleDiscovery && event.event_url ? (
+                      <a
+                        href={event.event_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 text-sm font-black text-slate-900"
+                      >
+                        Event website
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    ) : null}
                     {event.ticket_url ? (
                       <a
                         href={event.ticket_url}
@@ -264,7 +281,10 @@ export default async function CommunityEventDetailPage({ params }: PageProps) {
                 source="community_event_detail"
                 campaign="event_detail_pet_parent_signup"
               />
-              <EventDetailShare event={event} partnerName={partnerName} />
+              <EventDetailShare
+                event={event}
+                partnerName={googleDiscovery ? "SitGuru Events" : partnerName}
+              />
               <Link
                 href="/events"
                 className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-800"

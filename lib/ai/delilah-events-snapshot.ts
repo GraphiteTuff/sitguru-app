@@ -5,6 +5,7 @@
 
 import type { CommunityEventCompanionContext } from "@/lib/ai/community-events-faqs";
 import { buildCuratedBucksMontgomeryEventsMarkdown } from "@/lib/community/homepage-demo-events";
+import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import { fetchDiscoveredHomepageEvents } from "@/lib/community/discovered-events";
 import { isGoogleDiscoveryEvent } from "@/lib/community/event-preview";
 import {
@@ -24,25 +25,6 @@ export type DelilahEventsSnapshotOpts = {
   /** Prefer highlighting this event (detail page / chat seed). */
   focus?: CommunityEventCompanionContext;
 };
-
-function mergeUniqueEvents(
-  primary: CommunityEventWithPartner[],
-  secondary: CommunityEventWithPartner[],
-  limit: number,
-) {
-  const seen = new Set<string>();
-  const merged: CommunityEventWithPartner[] = [];
-
-  for (const event of [...primary, ...secondary]) {
-    const key = `${event.title}|${event.start_at}|${event.city || ""}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(event);
-    if (merged.length >= limit) break;
-  }
-
-  return merged;
-}
 
 function eventKindLabel(event: CommunityEventWithPartner) {
   return isGoogleDiscoveryEvent(event)
@@ -130,7 +112,7 @@ export async function compileDelilahEventsSnapshot(
     }).catch(() => ({ events: [] as CommunityEventWithPartner[] })),
   ]);
 
-  const upcoming = mergeUniqueEvents(
+  const upcoming = mergeUniqueCommunityEvents(
     partnerEvents,
     discovered.events || [],
     limit,

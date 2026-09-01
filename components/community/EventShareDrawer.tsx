@@ -8,6 +8,7 @@ import {
   Link2,
   Mail,
   MessageCircle,
+  PawPrint,
   X,
 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
@@ -28,7 +29,7 @@ export type EventShareDrawerEvent = {
   id?: string;
   title: string;
   slug: string;
-  /** Optional SitGuru path override (e.g. /events for discoveries). */
+  /** Optional SitGuru path override (e.g. /events for demo listings). */
   sharePath?: string;
   startAt: string;
   endAt?: string | null;
@@ -55,9 +56,9 @@ type EventShareDrawerProps = {
   source?: string;
 };
 
-/** Mockup-aligned row: Messages · Facebook · Instagram · X · Email */
+/** Mockup-aligned row: Messages · Facebook · Instagram · X · TikTok · Email */
 const SHARE_ACTIONS: Array<{
-  id: SharePlatform | "instagram";
+  id: SharePlatform | "instagram" | "tiktok";
   label: string;
   tone: string;
 }> = [
@@ -69,6 +70,7 @@ const SHARE_ACTIONS: Array<{
     tone: "bg-gradient-to-br from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] text-white",
   },
   { id: "x", label: "X", tone: "bg-slate-950 text-white" },
+  { id: "tiktok", label: "TikTok", tone: "bg-slate-950 text-white" },
   { id: "email", label: "Email", tone: "bg-[#0A84FF] text-white" },
 ];
 
@@ -81,11 +83,16 @@ function displayShareHost(url: string) {
   }
 }
 
-function PlatformGlyph({ id }: { id: SharePlatform | "instagram" }) {
+function PlatformGlyph({ id }: { id: SharePlatform | "instagram" | "tiktok" }) {
   if (id === "email") return <Mail className="h-5 w-5" strokeWidth={2.25} />;
   if (id === "x") {
     return (
       <span className="text-[15px] font-black leading-none tracking-tight">𝕏</span>
+    );
+  }
+  if (id === "tiktok") {
+    return (
+      <span className="text-[13px] font-black leading-none tracking-tight">TT</span>
     );
   }
   if (id === "facebook") {
@@ -244,7 +251,7 @@ export default function EventShareDrawer({
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
         await navigator.share({
-          title: `${current.title} | SitGuru Pet Events`,
+          title: `${current.title} | SitGuru Events`,
           text: caption,
           url,
         });
@@ -259,7 +266,12 @@ export default function EventShareDrawer({
 
   async function shareViaPlatform(platform: SharePlatform) {
     trackShare(platform);
-    const href = buildEventShareHref(platform, url, caption);
+    const href = buildEventShareHref(
+      platform,
+      url,
+      caption,
+      `SitGuru Events: ${current.title}`,
+    );
 
     // Facebook often ignores quote — copy SitGuru caption so it can paste into the post
     if (platform === "facebook") {
@@ -279,12 +291,12 @@ export default function EventShareDrawer({
     window.open(href, "_blank", "noopener,noreferrer");
   }
 
-  async function prepareInstagramShare() {
-    trackShare("instagram");
+  async function prepareVisualShare(channel: "instagram" | "tiktok") {
+    trackShare(channel);
     const story = assets.find((asset) => asset.id === "story") || assets[0];
     if (story?.url) {
       try {
-        await downloadEventGraphic(story.url, `${current.slug}-instagram.png`);
+        await downloadEventGraphic(story.url, `${current.slug}-${channel}.png`);
       } catch {
         // continue with caption copy
       }
@@ -293,11 +305,15 @@ export default function EventShareDrawer({
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
         await navigator.share({
-          title: `${current.title} | SitGuru Pet Events`,
+          title: `${current.title} | SitGuru Events`,
           text: caption,
           url,
         });
-        setHint("Shared — paste into Instagram if needed");
+        setHint(
+          channel === "tiktok"
+            ? "Shared — paste into TikTok if needed"
+            : "Shared — paste into Instagram if needed",
+        );
         window.setTimeout(() => setHint(""), 2800);
         return;
       } catch (error) {
@@ -310,7 +326,11 @@ export default function EventShareDrawer({
     } catch {
       // ignore
     }
-    setHint("Caption + SitGuru link copied — open Instagram to paste");
+    setHint(
+      channel === "tiktok"
+        ? "Caption + SitGuru link copied — open TikTok to paste"
+        : "Caption + SitGuru link copied — open Instagram to paste",
+    );
     window.setTimeout(() => setHint(""), 2800);
   }
 
@@ -351,7 +371,7 @@ export default function EventShareDrawer({
               Share &ldquo;{event.title}&rdquo;
             </h2>
             <p className="mt-1 text-[15px] font-medium text-slate-500">
-              Help pet parents discover this event!
+              Share the event — ask friends to tap Yes, Maybe, or No.
             </p>
           </div>
           <button
@@ -376,7 +396,11 @@ export default function EventShareDrawer({
                     unoptimized
                     className="object-cover"
                   />
-                ) : null}
+                ) : (
+                  <div className="grid h-full place-items-center bg-emerald-50">
+                    <PawPrint className="h-6 w-6 text-emerald-800/40" />
+                  </div>
+                )}
                 {timing ? (
                   <div className="absolute inset-x-0 bottom-0 bg-slate-950/75 px-1 py-1 text-center text-[9px] font-black uppercase tracking-wide text-white">
                     {timing.timeLabel || timing.compactDate}
@@ -384,11 +408,25 @@ export default function EventShareDrawer({
                 ) : null}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="line-clamp-4 whitespace-pre-line text-[13px] font-semibold leading-snug text-slate-800">
-                  {caption}
+                <p className="flex items-start gap-1.5 text-[13px] font-black leading-snug text-slate-900">
+                  <PawPrint className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500" />
+                  <span className="line-clamp-2">{event.title}</span>
+                </p>
+                <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-snug text-slate-500">
+                  {[
+                    timing?.compactDate,
+                    timing?.timeLabel,
+                    event.venueName,
+                    [event.city, event.state].filter(Boolean).join(", "),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                <p className="mt-1.5 text-[11px] font-bold text-slate-700">
+                  Attending? Yes · Maybe · No
                 </p>
                 <p
-                  className="mt-2 truncate text-[12px] font-bold"
+                  className="mt-1 truncate text-[12px] font-bold"
                   style={{ color: "#E85D04" }}
                 >
                   {displayShareHost(url)}
@@ -397,18 +435,18 @@ export default function EventShareDrawer({
             </div>
           </div>
 
-          <div className="mt-5 flex items-start justify-between gap-1 px-0.5 sm:px-2">
+          <div className="mt-5 flex flex-wrap items-start justify-center gap-x-1 gap-y-3 px-0.5 sm:justify-between sm:px-1">
             {SHARE_ACTIONS.map((action) => {
               const commonClass =
-                "flex w-[4.25rem] flex-col items-center gap-1.5 sm:w-[4.5rem]";
-              const iconClass = `grid h-[3.25rem] w-[3.25rem] place-items-center rounded-full shadow-sm ${action.tone}`;
+                "flex w-[3.9rem] flex-col items-center gap-1.5 sm:w-[4.25rem]";
+              const iconClass = `grid h-[2.95rem] w-[2.95rem] place-items-center rounded-full shadow-sm sm:h-[3.25rem] sm:w-[3.25rem] ${action.tone}`;
 
-              if (action.id === "instagram") {
+              if (action.id === "instagram" || action.id === "tiktok") {
                 return (
                   <button
                     key={action.id}
                     type="button"
-                    onClick={() => void prepareInstagramShare()}
+                    onClick={() => void prepareVisualShare(action.id)}
                     className={commonClass}
                   >
                     <span className={iconClass}>

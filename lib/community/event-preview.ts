@@ -22,10 +22,6 @@ export function getEventBannerHref(
     "id" | "slug" | "event_type" | "event_url"
   >,
 ) {
-  if (isGoogleDiscoveryEvent(event) && event.event_url) {
-    return event.event_url;
-  }
-
   if (isHomepageDemoEvent(event.id)) {
     return "/events";
   }
@@ -34,7 +30,7 @@ export function getEventBannerHref(
 }
 
 export function isExternalEventLink(
-  event: Pick<CommunityEventRow, "event_type" | "id" | "event_url">,
+  _event: Pick<CommunityEventRow, "event_type" | "id" | "event_url">,
 ) {
-  return isGoogleDiscoveryEvent(event) && Boolean(event.event_url);
+  return false;
 }

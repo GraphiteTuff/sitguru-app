@@ -55,6 +55,7 @@ export default function EventDetailShare({ event, partnerName }: EventDetailShar
           state: event.state,
           shortDescription: event.short_description,
           partnerName,
+          venueName: event.venue_name,
           social_square_url: event.social_square_url,
           social_story_url: event.social_story_url,
           social_landscape_url: event.social_landscape_url,

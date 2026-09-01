@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import { fetchDiscoveredHomepageEvents } from "@/lib/community/discovered-events";
 import { isGoogleDiscoveryEvent } from "@/lib/community/event-preview";
 import { getHomepageDemoEvents, getUpcomingCuratedBucksMontgomeryPetEvents } from "@/lib/community/homepage-demo-events";
@@ -7,25 +8,6 @@ import { lookupZipLocation, cleanZipCode } from "@/lib/location/zip-lookup";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 
 export const dynamic = "force-dynamic";
-
-function mergeUniqueEvents(
-  primary: CommunityEventWithPartner[],
-  secondary: CommunityEventWithPartner[],
-  limit = 16,
-) {
-  const seen = new Set<string>();
-  const merged: CommunityEventWithPartner[] = [];
-
-  for (const event of [...primary, ...secondary]) {
-    const key = `${event.title}|${event.start_at}|${event.event_url || event.slug}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(event);
-    if (merged.length >= limit) break;
-  }
-
-  return merged;
-}
 
 /** Homepage carousel: soonest first (partners still preferred when filling slots). */
 function sortEventsChronologically(events: CommunityEventWithPartner[]) {
@@ -101,7 +83,7 @@ export async function GET(req: NextRequest) {
     upcoming = await fetchPublicEvents({ limit: 8 });
   }
 
-  const partnerEvents = mergeUniqueEvents(
+  const partnerEvents = mergeUniqueCommunityEvents(
     featured ? [featured, ...upcoming] : upcoming,
     [],
     12,
@@ -119,13 +101,13 @@ export async function GET(req: NextRequest) {
   }
 
   const curatedUpcoming = getUpcomingCuratedBucksMontgomeryPetEvents();
-  const liveEvents = mergeUniqueEvents(
+  const liveEvents = mergeUniqueCommunityEvents(
     partnerEvents,
     discovered.events,
     24,
   );
   let bannerEvents = sortEventsChronologically(
-    mergeUniqueEvents(liveEvents, curatedUpcoming, 24),
+    mergeUniqueCommunityEvents(liveEvents, curatedUpcoming, 24),
   );
   let source: "live" | "google" | "demo" = partnerEvents.length
     ? "live"
@@ -142,7 +124,7 @@ export async function GET(req: NextRequest) {
         : "Bucks & Montgomery Counties, PA",
     );
     bannerEvents = sortEventsChronologically(
-      mergeUniqueEvents(
+      mergeUniqueCommunityEvents(
         demo.featured ? [demo.featured, ...demo.upcoming] : demo.upcoming,
         [],
         24,

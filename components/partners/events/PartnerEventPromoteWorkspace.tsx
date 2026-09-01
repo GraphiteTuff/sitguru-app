@@ -451,6 +451,7 @@ export default function PartnerEventPromoteWorkspace({
           state: selectedEvent.state,
           shortDescription: selectedEvent.short_description,
           partnerName: partner.business_name,
+          venueName: selectedEvent.venue_name,
           imageUrl: imageUrl || undefined,
           social_square_url: selectedEvent.social_square_url,
           social_story_url: selectedEvent.social_story_url,

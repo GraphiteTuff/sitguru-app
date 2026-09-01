@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import { GOOGLE_DISCOVERY_EVENT_TYPE } from "@/lib/community/event-preview";
 import {
   effectivePetRelevanceScore,
@@ -241,13 +242,17 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
         .select("*")
         .gte("start_at", now)
         .order("start_at", { ascending: true })
-        .limit(limit);
+        .limit(Math.max(limit * 4, 48));
 
       const rows = sortDiscoveriesForDisplay(
         (fallback.data || []) as CommunityEventDiscoveryRow[],
       ).filter((row) => effectivePetRelevanceScore(row) >= minPetScore);
       return {
-        events: rows.slice(0, limit).map(mapDiscoveryToCommunityEvent),
+        events: mergeUniqueCommunityEvents(
+          rows.map(mapDiscoveryToCommunityEvent),
+          [],
+          limit,
+        ),
         lastSyncedAt: rows[0]?.synced_at || null,
       };
     }
@@ -294,11 +299,81 @@ export async function fetchDiscoveredHomepageEvents(opts?: {
       null;
 
     return {
-      events: rows.slice(0, limit).map(mapDiscoveryToCommunityEvent),
+      events: mergeUniqueCommunityEvents(
+        rows.map(mapDiscoveryToCommunityEvent),
+        [],
+        limit,
+      ),
       lastSyncedAt,
     };
   } catch (error) {
     console.warn("fetchDiscoveredHomepageEvents crashed:", error);
     return { events: [] as CommunityEventWithPartner[], lastSyncedAt: null };
   }
+}
+
+const DISCOVERY_DETAIL_SELECT = `
+  *,
+  community_markets:market_id (
+    id,
+    name,
+    slug,
+    county_name,
+    latitude,
+    longitude
+  )
+`;
+
+/** Resolve a public `/events/google-…` slug to a discovery listing. */
+export async function fetchDiscoveredEventByPublicSlug(slug: string) {
+  const raw = String(slug || "").trim();
+  if (!raw.startsWith("google-")) return null;
+
+  const token = raw.slice("google-".length).trim();
+  if (!token) return null;
+
+  try {
+    const byExternal = await supabaseAdmin
+      .from("community_event_discoveries")
+      .select(DISCOVERY_DETAIL_SELECT)
+      .eq("status", "active")
+      .eq("external_id", token)
+      .maybeSingle();
+
+    if (byExternal.data) {
+      return mapDiscoveryToCommunityEvent(
+        byExternal.data as CommunityEventDiscoveryRow,
+      );
+    }
+
+    const { data: prefixRows } = await supabaseAdmin
+      .from("community_event_discoveries")
+      .select(DISCOVERY_DETAIL_SELECT)
+      .eq("status", "active")
+      .like("external_id", `${token}%`)
+      .limit(1);
+
+    if (prefixRows?.[0]) {
+      return mapDiscoveryToCommunityEvent(
+        prefixRows[0] as CommunityEventDiscoveryRow,
+      );
+    }
+
+    const byId = await supabaseAdmin
+      .from("community_event_discoveries")
+      .select(DISCOVERY_DETAIL_SELECT)
+      .eq("status", "active")
+      .eq("id", token)
+      .maybeSingle();
+
+    if (byId.data) {
+      return mapDiscoveryToCommunityEvent(
+        byId.data as CommunityEventDiscoveryRow,
+      );
+    }
+  } catch (error) {
+    console.warn("fetchDiscoveredEventByPublicSlug:", error);
+  }
+
+  return null;
 }

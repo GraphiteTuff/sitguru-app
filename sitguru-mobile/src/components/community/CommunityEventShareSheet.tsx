@@ -53,9 +53,9 @@ function buildCaption(event: NonNullable<CommunityEventShareSheetProps["event"]>
   const cityState = [event.city, event.state].filter(Boolean).join(", ");
   const teaser = event.short_description?.trim();
   if (teaser) {
-    return `Join us for ${event.title} on ${dateLabel}${cityState ? ` in ${cityState}` : ""}! ${teaser} Find it on SitGuru — @SitGuruOfficial`;
+    return `🐾 ${event.title} on ${dateLabel}${cityState ? ` in ${cityState}` : ""}. ${teaser}\nGoing? Tap Yes, Maybe, or No on SitGuru.\nSitGuru Events — @SitGuruOfficial`;
   }
-  return `Join us for ${event.title} on ${dateLabel}${cityState ? ` in ${cityState}` : ""}! Bring your pup and meet local pet lovers on SitGuru. @SitGuruOfficial`;
+  return `🐾 ${event.title} on ${dateLabel}${cityState ? ` in ${cityState}` : ""}!\nGoing? Tap Yes, Maybe, or No on SitGuru.\nSitGuru Events — @SitGuruOfficial`;
 }
 
 export default function CommunityEventShareSheet({

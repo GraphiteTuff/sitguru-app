@@ -1,4 +1,5 @@
 import UpcomingEventsBanner from "@/components/community/UpcomingEventsBanner";
+import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 import type { EventsBannerSource } from "@/components/community/UpcomingEventsBanner";
 
@@ -30,8 +31,12 @@ function mergeBannerEvents(
         return merged;
       })();
 
-  return base.sort(
-    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
+  return mergeUniqueCommunityEvents(
+    base.sort(
+      (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
+    ),
+    [],
+    24,
   );
 }
 

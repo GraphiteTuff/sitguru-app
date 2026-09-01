@@ -346,13 +346,12 @@ export default function UpcomingEventsBanner({
   if (!events.length) return null;
 
   function openSitGuruShare(event: CommunityEventWithPartner) {
-    const discovery = isGoogleDiscoveryEvent(event);
     const curatedDemo = isHomepageDemoEvent(event.id);
     setShareEvent({
       id: event.id,
       title: event.title,
       slug: event.slug,
-      sharePath: discovery || curatedDemo ? "/events" : undefined,
+      sharePath: curatedDemo ? "/events" : undefined,
       startAt: event.start_at,
       endAt: event.end_at,
       timezone: event.timezone,
@@ -368,7 +367,7 @@ export default function UpcomingEventsBanner({
       image_hero_url: event.image_hero_url,
       image_card_url: event.image_card_url,
       image_original_url: event.image_original_url,
-      preferBrandedGraphics: !discovery && !curatedDemo,
+      preferBrandedGraphics: !curatedDemo,
     });
   }
 
