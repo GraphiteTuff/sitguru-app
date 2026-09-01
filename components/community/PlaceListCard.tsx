@@ -66,24 +66,57 @@ function Paws({ score }: { score: number }) {
   );
 }
 
+function knownStatus(value?: string | null) {
+  if (!value || value === "Not listed yet") return null;
+  return value;
+}
+
 function StatusRow({
   label,
   value,
 }: {
   label: string;
-  value: string;
+  value?: string | null;
 }) {
-  const unknown = value === "Not listed yet";
+  const shown = knownStatus(value);
+  if (!shown) return null;
   return (
     <div className="flex items-baseline justify-between gap-3 text-sm">
       <span className="font-semibold text-slate-600">{label}</span>
-      <span
-        className={`text-right font-black ${
-          unknown ? "text-slate-400" : "text-slate-900"
+      <span className="text-right font-black text-slate-900">{shown}</span>
+    </div>
+  );
+}
+
+function SnapshotBlock({
+  title,
+  tone = "slate",
+  rows,
+}: {
+  title: string;
+  tone?: "slate" | "rose";
+  rows: Array<{ label: string; value?: string | null }>;
+}) {
+  const known = rows.filter((row) => knownStatus(row.value));
+  if (!known.length) return null;
+  return (
+    <div
+      className={`mt-4 space-y-1.5 rounded-2xl border px-4 py-3 ${
+        tone === "rose"
+          ? "border-rose-100 bg-rose-50/70"
+          : "border-slate-100 bg-slate-50"
+      }`}
+    >
+      <p
+        className={`text-[11px] font-black uppercase tracking-[0.14em] ${
+          tone === "rose" ? "text-rose-800" : "text-emerald-800"
         }`}
       >
-        {value}
-      </span>
+        {title}
+      </p>
+      {known.map((row) => (
+        <StatusRow key={row.label} label={row.label} value={row.value} />
+      ))}
     </div>
   );
 }
@@ -184,84 +217,61 @@ export default function PlaceListCard({
       ) : null}
 
       {place.stay ? (
-        <div className="mt-4 space-y-1.5 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-800">
-            Stay details pet parents actually need
-          </p>
-          <StatusRow label="Pet fee" value={place.stay.petFee || "Not listed yet"} />
-          <StatusRow
-            label="Pets allowed"
-            value={place.stay.petsAllowed || "Not listed yet"}
-          />
-          <StatusRow
-            label="Weight limit"
-            value={place.stay.weightLimit || "Not listed yet"}
-          />
-          <StatusRow
-            label="Breed restrictions"
-            value={place.stay.breedRestrictions || "Not listed yet"}
-          />
-          <StatusRow
-            label="Unattended pets"
-            value={place.stay.unattendedPets || "Not listed yet"}
-          />
-          <StatusRow
-            label="Grass / walking area"
-            value={amenityStatusLabel(place.stay.grassWalkingArea)}
-          />
-          <StatusRow
-            label="Dog relief station"
-            value={amenityStatusLabel(place.stay.dogReliefStation)}
-          />
-        </div>
+        <SnapshotBlock
+          title="Stay details pet parents actually need"
+          rows={[
+            { label: "Pet fee", value: place.stay.petFee },
+            { label: "Pets allowed", value: place.stay.petsAllowed },
+            { label: "Weight limit", value: place.stay.weightLimit },
+            { label: "Breed restrictions", value: place.stay.breedRestrictions },
+            { label: "Unattended pets", value: place.stay.unattendedPets },
+            {
+              label: "Grass / walking area",
+              value: amenityStatusLabel(place.stay.grassWalkingArea),
+            },
+            {
+              label: "Dog relief station",
+              value: amenityStatusLabel(place.stay.dogReliefStation),
+            },
+          ]}
+        />
       ) : null}
 
       {place.play ? (
-        <div className="mt-4 space-y-1.5 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-800">
-            {place.category === "dog_park" ? "Dog park snapshot" : "Play snapshot"}
-          </p>
-          <StatusRow label="Fenced" value={amenityStatusLabel(place.play.fenced)} />
-          <StatusRow
-            label="Small-dog area"
-            value={amenityStatusLabel(place.play.separateSmallDogArea)}
-          />
-          <StatusRow label="Water" value={amenityStatusLabel(place.play.water)} />
-          <StatusRow
-            label="Waste stations"
-            value={amenityStatusLabel(place.play.wasteStations)}
-          />
-          <StatusRow label="Shade" value={amenityStatusLabel(place.play.shade)} />
-          <StatusRow
-            label="Hours"
-            value={place.play.hours || "Not listed yet"}
-          />
-        </div>
+        <SnapshotBlock
+          title={place.category === "dog_park" ? "Dog park snapshot" : "Play snapshot"}
+          rows={[
+            { label: "Fenced", value: amenityStatusLabel(place.play.fenced) },
+            {
+              label: "Small-dog area",
+              value: amenityStatusLabel(place.play.separateSmallDogArea),
+            },
+            { label: "Water", value: amenityStatusLabel(place.play.water) },
+            {
+              label: "Waste stations",
+              value: amenityStatusLabel(place.play.wasteStations),
+            },
+            { label: "Shade", value: amenityStatusLabel(place.play.shade) },
+            { label: "Hours", value: place.play.hours },
+          ]}
+        />
       ) : null}
 
       {place.care ? (
-        <div className="mt-4 space-y-1.5 rounded-2xl border border-rose-100 bg-rose-50/70 px-4 py-3">
-          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-rose-800">
-            {place.category === "vet_er" ? "Emergency / ER" : "Veterinary care"}
-          </p>
-          <StatusRow
-            label="Emergency"
-            value={amenityStatusLabel(place.care.emergency)}
-          />
-          <StatusRow
-            label="Open 24 hours"
-            value={amenityStatusLabel(place.care.open24Hours)}
-          />
-          <StatusRow
-            label="Open now"
-            value={amenityStatusLabel(place.care.openNow)}
-          />
-          <StatusRow label="Hours" value={place.care.hours || "Not listed yet"} />
-          <StatusRow
-            label="Walk-ins"
-            value={amenityStatusLabel(place.care.walkIns)}
-          />
-        </div>
+        <SnapshotBlock
+          title={place.category === "vet_er" ? "Emergency / ER" : "Veterinary care"}
+          tone="rose"
+          rows={[
+            { label: "Emergency", value: amenityStatusLabel(place.care.emergency) },
+            {
+              label: "Open 24 hours",
+              value: amenityStatusLabel(place.care.open24Hours),
+            },
+            { label: "Open now", value: amenityStatusLabel(place.care.openNow) },
+            { label: "Hours", value: place.care.hours },
+            { label: "Walk-ins", value: amenityStatusLabel(place.care.walkIns) },
+          ]}
+        />
       ) : null}
 
       {place.upcomingEvent ? (
