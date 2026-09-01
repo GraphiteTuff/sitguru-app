@@ -51,8 +51,79 @@ type Props = {
   onPetsChange?: (pets: CanonicalPet[]) => void;
 };
 
+function supabaseErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (error && typeof error === "object") {
+    const record = error as { message?: unknown; details?: unknown; hint?: unknown };
+    const message = [record.message, record.details, record.hint]
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .filter(Boolean)
+      .join(" — ");
+    if (message) return message;
+  }
+  return fallback;
+}
+
+function getMissingColumnFromError(message?: string) {
+  const match = String(message || "").match(/Could not find the '([^']+)' column/i);
+  return match?.[1] || "";
+}
+
+async function writePetWithColumnFallback(params: {
+  mode: "insert" | "update";
+  payload: Record<string, unknown>;
+  petId?: string | null;
+}) {
+  const workingPayload = { ...params.payload };
+  const removedColumns: string[] = [];
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const query =
+      params.mode === "update" && params.petId
+        ? supabase
+            .from("pets")
+            .update(workingPayload)
+            .eq("id", params.petId)
+            .select(CANONICAL_PET_SELECT)
+            .maybeSingle()
+        : supabase
+            .from("pets")
+            .insert(workingPayload)
+            .select(CANONICAL_PET_SELECT)
+            .maybeSingle();
+
+    const { data, error } = await query;
+    if (!error) {
+      if (removedColumns.length) {
+        console.warn(
+          "Pet save succeeded after removing missing optional columns:",
+          removedColumns,
+        );
+      }
+      return { data, error: null };
+    }
+
+    const missingColumn = getMissingColumnFromError(error.message);
+    if (
+      missingColumn &&
+      Object.prototype.hasOwnProperty.call(workingPayload, missingColumn)
+    ) {
+      delete workingPayload[missingColumn];
+      removedColumns.push(missingColumn);
+      continue;
+    }
+
+    return { data: null, error };
+  }
+
+  return {
+    data: null,
+    error: { message: "Unable to save pet after removing optional missing columns." },
+  };
+}
+
 async function loadPetsForUser(userId: string): Promise<CanonicalPet[]> {
-  const attempts = ["user_id", "owner_id"] as const;
+  const attempts = ["owner_id", "owner_profile_id"] as const;
   for (const column of attempts) {
     const { data, error } = await supabase
       .from("pets")
@@ -206,52 +277,38 @@ export default function MultiPetProfileCenter({ parent, onPetsChange }: Props) {
     const payload = buildCanonicalPetWritePayload(form, parent.userId);
 
     try {
-      if (editingId) {
-        const { data, error: updateError } = await supabase
-          .from("pets")
-          .update(payload)
-          .eq("id", editingId)
-          .select(CANONICAL_PET_SELECT)
-          .maybeSingle();
+      const { data, error: writeError } = await writePetWithColumnFallback({
+        mode: editingId ? "update" : "insert",
+        payload,
+        petId: editingId,
+      });
 
-        if (updateError) throw updateError;
-        const normalized = normalizeCanonicalPet(
-          (data || { ...payload, id: editingId }) as unknown as Record<
-            string,
-            unknown
-          >,
-        );
-        if (normalized) {
-          setPets((prev) => {
-            const next = prev.map((p) => (p.id === editingId ? normalized : p));
-            onPetsChange?.(next);
-            return next;
-          });
-        }
-        setMessage("Pet passport updated.");
-      } else {
-        const { data, error: insertError } = await supabase
-          .from("pets")
-          .insert(payload)
-          .select(CANONICAL_PET_SELECT)
-          .maybeSingle();
-
-        if (insertError) throw insertError;
-        const normalized = normalizeCanonicalPet(
-          data as unknown as Record<string, unknown>,
-        );
-        if (normalized) {
-          const next = [normalized, ...pets];
-          setPets(next);
-          onPetsChange?.(next);
-          setSelectedId(normalized.id);
-          setEditingId(normalized.id);
-        }
-        setMessage("Pet passport created.");
+      if (writeError) {
+        throw writeError;
       }
+
+      const normalized = normalizeCanonicalPet(
+        (data || { ...payload, id: editingId }) as unknown as Record<
+          string,
+          unknown
+        >,
+      );
+
+      if (normalized) {
+        setPets((prev) => {
+          const next = editingId
+            ? prev.map((p) => (p.id === editingId ? normalized : p))
+            : [normalized, ...prev];
+          onPetsChange?.(next);
+          return next;
+        });
+        setSelectedId(normalized.id);
+        setEditingId(normalized.id);
+      }
+      setMessage(editingId ? "Pet passport updated." : "Pet passport created.");
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save pet.");
+      setError(supabaseErrorMessage(err, "Unable to save pet."));
     } finally {
       setSaving(false);
     }

@@ -10,7 +10,6 @@
 
 export const CANONICAL_PET_SELECT = [
   "id",
-  "user_id",
   "owner_id",
   "owner_profile_id",
   "name",
@@ -360,8 +359,9 @@ function clean(value: string) {
 }
 
 /**
- * Build a write payload with canonical columns + user_id binding.
- * Also mirrors deprecated columns for backward-compatible readers.
+ * Build a write payload bound to the logged-in Pet Parent.
+ * Production `pets` uses owner_id / owner_profile_id — there is no user_id column.
+ * Deprecated aliases stay mirrored for older readers.
  */
 export function buildCanonicalPetWritePayload(
   form: CanonicalPetForm,
@@ -372,8 +372,8 @@ export function buildCanonicalPetWritePayload(
   const medicalNotes = clean(form.medical_notes);
 
   return {
-    user_id: userId,
     owner_id: userId,
+    owner_profile_id: userId,
     name: form.name.trim(),
     species,
     pet_type: species, // deprecated mirror

@@ -2046,7 +2046,7 @@ async function fetchPetsForUser(userId: string) {
     let query = supabase
       .from("pets")
       .select(
-        "id, name, species, pet_type, breed, age, size, size_category, weight, temperament, medical_notes, medications, notes, photo_url, video_url, user_id, owner_id, feeding_routine, potty_routine",
+        "id, name, species, pet_type, breed, age, size, size_category, weight, temperament, medical_notes, medications, notes, photo_url, video_url, owner_id, owner_profile_id, feeding_routine, potty_routine",
       )
       .eq(attempt.matchColumn, userId);
 
