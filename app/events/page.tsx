@@ -10,6 +10,11 @@ import {
   fetchFeaturedCommunityPageEvents,
   fetchPublicEvents,
 } from "@/lib/community/queries";
+import {
+  getPlaceCategory,
+  parsePlaceLane,
+  type PlaceCategoryId,
+} from "@/lib/community/places";
 
 export const dynamic = "force-dynamic";
 
@@ -36,11 +41,11 @@ const communityLinks = [
       "Find trusted pet Gurus near you for walks, sitting, training, and more.",
   },
   {
-    href: "/find-care",
+    href: "/events?view=places",
     label: "Pet Friendly Places",
     ready: true,
     description:
-      "Explore pet friendly destinations and care options in your area.",
+      "Restaurants, hotels, dog parks, and pet services — scored for how welcome pets really are.",
   },
   {
     href: "/ambassadors",
@@ -50,7 +55,22 @@ const communityLinks = [
   },
 ];
 
-export default async function CommunityPage() {
+type PageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function first(value?: string | string[]) {
+  return typeof value === "string" ? value : value?.[0] || "";
+}
+
+export default async function CommunityPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const view = first(params?.view) === "places" ? "places" : "events";
+  const initialLane = parsePlaceLane(first(params?.lane));
+  const categoryParam = first(params?.category);
+  const initialCategory = (
+    getPlaceCategory(categoryParam) ? categoryParam : ""
+  ) as PlaceCategoryId | "";
   const [featuredEvents, partnerEvents, discovered] = await Promise.all([
     fetchFeaturedCommunityPageEvents({ limit: 3 }),
     fetchPublicEvents({ limit: 40 }),
@@ -96,7 +116,12 @@ export default async function CommunityPage() {
         </div>
       </section>
 
-      <CommunityEventsMapSearch events={mapEvents} />
+      <CommunityEventsMapSearch
+        events={mapEvents}
+        initialView={view}
+        initialLane={initialLane}
+        initialCategory={initialCategory}
+      />
 
       <CommunityFeaturedSection events={featuredEvents} />
 

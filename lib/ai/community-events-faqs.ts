@@ -38,7 +38,8 @@ export const COMMUNITY_EVENT_FAQ_CHIPS = [
   { label: "Track RSVPs", question: "How do I track Yes Maybe No attendance on my event?" },
   { label: "Attending?", question: "How does Attending Yes Maybe No work?" },
   { label: "Need account?", question: "Do I need a SitGuru account to RSVP?" },
-  { label: "Pet friendly?", question: "Are pet events pet friendly?" },
+  { label: "Places", question: "How do I find pet-friendly places near me?" },
+  { label: "Vet ER", question: "Where is the nearest emergency vet?" },
   { label: "Free events?", question: "Are SitGuru pet events free?" },
   { label: "Partner vs Pet", question: "What is the difference between a Partner Event and a Pet Event?" },
   { label: "Share event", question: "How do I share an event?" },
@@ -146,6 +147,41 @@ export const COMMUNITY_EVENTS_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
     question: "How do I find events near me?",
     answer:
       "Open **/events**, search by city or keyword, or ask me what's coming up — I'll pull from the live upcoming list! Homepage **Happening Near You** also surfaces local energy. [[cta:community_parent]]",
+  },
+  {
+    question: "How do I find pet-friendly places near me?",
+    answer:
+      "Stay on **/events** and switch **Events | Pet-Friendly Places** — same map! Then pick Eat & Drink, Stay, Play, or Pet Services. We only keep listings Google marks **allowsDogs**, except dedicated dog parks and pet services. [[cta:community_parent]]",
+  },
+  {
+    question: "Where can I take my dog to eat?",
+    answer:
+      "Open **/events?view=places&lane=eat** for restaurants, breweries, bars, and cafés where Google says **dogs are allowed**. SitGuru then scores the visit — indoor welcome, patio, water — not generic restaurant stars. [[cta:community_parent]]",
+  },
+  {
+    question: "Where are pet friendly hotels?",
+    answer:
+      "Switch Community search to **Stay** at **/events?view=places&lane=stay**. We look for hotels and motels that actually accept pets, then surface the details parents struggle to find — fees, limits, and whether it's truly welcoming. [[cta:community_parent]]",
+  },
+  {
+    question: "Where are dog parks near me?",
+    answer:
+      "Tap **Play** then **Dog Parks** on the Community map: **/events?view=places&lane=play&category=dog_park**. A regular park that allows dogs is not the same as a dog park — we look for name signals like dog park, off-leash, or bark park. [[cta:community_parent]]",
+  },
+  {
+    question: "Where is the nearest emergency vet?",
+    answer:
+      "Open **/events?view=places&lane=services&category=vet_er** — Pet Services includes veterinarians, pet hospitals, **Emergency / ER**, stores, and boarding. Call and Open now sit on the card. If it's an emergency, call the clinic and go. [[cta:community_parent]]",
+  },
+  {
+    question: "How do I find a veterinarian near me?",
+    answer:
+      "Community → Pet-Friendly Places → **Pet Services**: veterinarians, hospitals, ER, pet stores, and boarding on the same map. Start at **/events?view=places&lane=services**. [[cta:community_parent]]",
+  },
+  {
+    question: "What is the SitGuru pet friendliness rating?",
+    answer:
+      "It's **how good the visit is for someone bringing a pet**, not Google's food stars. Under the paws we show why — dogs indoors, no pet fee, water bowls, fenced park, emergency hours. [[cta:community_parent]]",
   },
   {
     question: "What's the difference between RSVP and tickets?",

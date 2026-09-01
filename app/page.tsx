@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import PaymentIntegrationsGrid from "@/components/payments/PaymentIntegrationsGrid";
 import HomepageEventsSectionClient from "@/components/community/HomepageEventsSectionClient";
+import HomepagePlacesTeaser from "@/components/community/HomepagePlacesTeaser";
 import HomepageAppsComingSoon from "@/components/marketing/HomepageAppsComingSoon";
 import AcademyGraduateBadge from "@/components/university/AcademyGraduateBadge";
 import { PawIcon } from "@/components/ui/PawIcon";
@@ -2459,6 +2460,7 @@ export default function HomePage() {
 
       <CompactPartnerSection onTrack={trackHomepageClick} />
       <HomepageEventsSectionClient />
+      <HomepagePlacesTeaser />
     </main>
   );
 }

@@ -16,7 +16,7 @@ type MapContentProps = {
 
 type NormalizedMarker = {
   id: string;
-  kind: "guru" | "event";
+  kind: "guru" | "event" | "place";
   name: string;
   title: string;
   city: string;
@@ -272,14 +272,16 @@ function getAvatarUrl(marker: RawMarker) {
   );
 }
 
-function getMarkerKind(marker: RawMarker): "guru" | "event" {
+function getMarkerKind(marker: RawMarker): "guru" | "event" | "place" {
   const explicit =
     asString(marker.__sitguruMapKind) ||
     asString(marker.mapKind) ||
     asString(marker.kind);
   if (explicit === "event") return "event";
+  if (explicit === "place") return "place";
   const id = getId(marker);
   if (id.startsWith("event:")) return "event";
+  if (id.startsWith("place:")) return "place";
   return "guru";
 }
 
@@ -311,13 +313,15 @@ function getMarkerVenueName(marker: RawMarker) {
   );
 }
 
-function getMarkerCtaLabel(marker: RawMarker, kind: "guru" | "event") {
+function getMarkerCtaLabel(marker: RawMarker, kind: "guru" | "event" | "place") {
   const explicit =
     asString(marker.ctaLabel) ||
     asString(marker.cta_label) ||
     asString(marker.buttonLabel);
   if (explicit) return explicit;
-  return kind === "event" ? "View event" : "View Guru Profile";
+  if (kind === "event") return "View event";
+  if (kind === "place") return "Directions";
+  return "View Guru Profile";
 }
 
 function getMarkerBadges(marker: RawMarker) {
@@ -609,7 +613,7 @@ function createPopupHtml(marker: NormalizedMarker) {
       )} avatar" class="h-full w-full object-cover" />`
     : escapeHtml(marker.initials);
 
-  if (marker.kind === "event") {
+  if (marker.kind === "event" || marker.kind === "place") {
     const badges = [
       ...marker.badges,
       ...marker.services,
@@ -638,7 +642,7 @@ function createPopupHtml(marker: NormalizedMarker) {
           </div>
           <div class="min-w-0">
             <p class="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
-              Pet Event
+              ${marker.kind === "place" ? "Pet-Friendly Place" : "Pet Event"}
             </p>
             <p class="mt-0.5 line-clamp-2 text-base font-black tracking-tight text-slate-950">
               ${escapeHtml(marker.name)}
@@ -1064,9 +1068,10 @@ export default function MapContent({
       const latLng: [number, number] = [marker.latitude, marker.longitude];
       const hasPhoto = Boolean(marker.avatarUrl);
       const isEvent = marker.kind === "event";
-      const opensSoon = !isEvent && !marker.canBook;
+      const isPlace = marker.kind === "place";
+      const opensSoon = !isEvent && !isPlace && !marker.canBook;
 
-      if (!isEvent) {
+      if (!isEvent && !isPlace) {
         L.circle(latLng, {
           radius: marker.serviceRadiusMiles * METERS_PER_MILE,
           color: opensSoon ? "#d97706" : "#059669",
@@ -1085,6 +1090,9 @@ export default function MapContent({
         .bindTooltip(
           isEvent
             ? [marker.whenLabel, marker.name].filter(Boolean).join(" · ") ||
+                marker.name
+            : isPlace
+              ? [marker.title, marker.name].filter(Boolean).join(" · ") ||
                 marker.name
             : opensSoon
               ? `${marker.serviceRadiusMiles}-mile radius · Booking opens soon`

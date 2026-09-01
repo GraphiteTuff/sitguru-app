@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import ProviderMap from "@/components/ProviderMap";
 import EventAttendingButtons from "@/components/community/EventAttendingButtons";
+import PlaceListCard from "@/components/community/PlaceListCard";
 import {
   eventMatchesCounty,
   eventMatchesDateRange,
@@ -34,6 +35,14 @@ import CommunityCountySuggestInput from "@/components/community/CommunityCountyS
 import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
 import { COMMUNITY_EVENT_CATEGORIES } from "@/lib/community/types";
+import {
+  LANE_SEARCH_PLACEHOLDERS,
+  PLACE_LANES,
+  categoriesForLane,
+  type PetFriendlyPlace,
+  type PlaceCategoryId,
+  type PlaceLane,
+} from "@/lib/community/places";
 
 type Filters = {
   q: string;
@@ -280,11 +289,77 @@ function EventListCard({
   );
 }
 
+function placeToMapMarker(place: PetFriendlyPlace) {
+  return {
+    id: place.id,
+    __sitguruMapMarkerId: place.id,
+    __sitguruMapKind: "place",
+    __sitguruCanBook: false,
+    kind: "place",
+    title: place.petFriendlyLabel,
+    name: place.name,
+    headline: place.reasons[0] || place.categoryLabel,
+    short_description: place.reasons.slice(0, 3).join(" · "),
+    description: place.editorialSummary || place.reasons.join(" · "),
+    whenLabel: place.hoursLabel || "",
+    venue_name: place.address,
+    city: place.city,
+    state: place.state,
+    latitude: place.latitude,
+    longitude: place.longitude,
+    radius_miles: 0.4,
+    profileHref: place.googleMapsUrl || place.websiteUrl || "/events?view=places",
+    href: place.googleMapsUrl || place.websiteUrl || "/events?view=places",
+    ctaLabel: place.category === "vet_er" ? "Call / Directions" : "Directions",
+    badges: [
+      place.categoryLabel,
+      `Pet Friendliness ${place.petFriendlyScore.toFixed(1)}`,
+      place.category === "vet_er" ? "ER" : null,
+    ].filter(Boolean) as string[],
+    avatar_url: null,
+  };
+}
+
+function syncCommunityView(view: "events" | "places", lane: PlaceLane, category: string) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (view === "places") {
+    url.searchParams.set("view", "places");
+    url.searchParams.set("lane", lane);
+    if (category) url.searchParams.set("category", category);
+    else url.searchParams.delete("category");
+  } else {
+    url.searchParams.delete("view");
+    url.searchParams.delete("lane");
+    url.searchParams.delete("category");
+  }
+  window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+}
+
 export default function CommunityEventsMapSearch({
   events,
+  initialView = "events",
+  initialLane = "eat",
+  initialCategory = "",
 }: {
   events: CommunityEventWithPartner[];
+  initialView?: "events" | "places";
+  initialLane?: PlaceLane;
+  initialCategory?: PlaceCategoryId | "";
 }) {
+  const [view, setView] = useState<"events" | "places">(initialView);
+  const [lane, setLane] = useState<PlaceLane>(initialLane);
+  const [placeCategory, setPlaceCategory] = useState<PlaceCategoryId | "">(
+    initialCategory,
+  );
+  const [highlyFriendly, setHighlyFriendly] = useState(false);
+  const [dogsIndoors, setDogsIndoors] = useState(false);
+  const [outdoorPatio, setOutdoorPatio] = useState(false);
+  const [openNow, setOpenNow] = useState(false);
+  const [places, setPlaces] = useState<PetFriendlyPlace[]>([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const [placesError, setPlacesError] = useState<string | null>(null);
+  const [placesErrorCode, setPlacesErrorCode] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -301,6 +376,69 @@ export default function CommunityEventsMapSearch({
     setDraft(next);
     setFilters(next);
   }, []);
+
+  useEffect(() => {
+    if (view !== "places") return;
+    const controller = new AbortController();
+    const params = new URLSearchParams();
+    if (filters.q) params.set("q", filters.q);
+    if (filters.county) params.set("county", filters.county);
+    if (filters.city) params.set("city", filters.city);
+    if (filters.state) params.set("state", filters.state);
+    params.set("lane", lane);
+    if (placeCategory) params.set("category", placeCategory);
+    if (highlyFriendly) params.set("highlyFriendly", "true");
+    if (dogsIndoors) params.set("dogsIndoors", "true");
+    if (outdoorPatio) params.set("outdoor", "true");
+    if (openNow) params.set("openNow", "true");
+
+    setPlacesLoading(true);
+    setPlacesError(null);
+    setPlacesErrorCode(null);
+
+    fetch(`/api/community/places?${params.toString()}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          places?: PetFriendlyPlace[];
+          error?: string;
+          code?: string;
+        };
+        if (!response.ok) {
+          const err = new Error(
+            payload.error || "Place search failed.",
+          ) as Error & { code?: string };
+          err.code = payload.code;
+          throw err;
+        }
+        setPlaces(payload.places || []);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setPlaces([]);
+        const err = error as Error & { code?: string };
+        setPlacesError(err?.message || "Place search failed.");
+        setPlacesErrorCode(err?.code || "google_unavailable");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPlacesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [
+    view,
+    lane,
+    placeCategory,
+    highlyFriendly,
+    dogsIndoors,
+    outdoorPatio,
+    openNow,
+    filters.q,
+    filters.county,
+    filters.city,
+    filters.state,
+  ]);
 
   const filtered = useMemo(() => {
     const unique = mergeUniqueCommunityEvents(
@@ -373,32 +511,46 @@ export default function CommunityEventsMapSearch({
   }, [filtered]);
 
   const markers = useMemo(
-    () => filtered.map(eventToMapMarker),
-    [filtered],
+    () =>
+      view === "places"
+        ? places.map(placeToMapMarker)
+        : filtered.map(eventToMapMarker),
+    [view, places, filtered],
   );
 
   const mapCenter = useMemo<[number, number] | undefined>(() => {
-    const withCoords = filtered.find(
-      (event) =>
-        Number.isFinite(Number(event.latitude)) &&
-        Number.isFinite(Number(event.longitude)) &&
-        Number(event.latitude) !== 0 &&
-        Number(event.longitude) !== 0,
+    const source =
+      view === "places"
+        ? places.map((place) => ({
+            latitude: place.latitude,
+            longitude: place.longitude,
+          }))
+        : filtered;
+    const withCoords = source.find(
+      (item) =>
+        Number.isFinite(Number(item.latitude)) &&
+        Number.isFinite(Number(item.longitude)) &&
+        Number(item.latitude) !== 0 &&
+        Number(item.longitude) !== 0,
     );
     if (withCoords?.latitude != null && withCoords?.longitude != null) {
       return [Number(withCoords.latitude), Number(withCoords.longitude)];
     }
     return DEFAULT_CENTER;
-  }, [filtered]);
+  }, [view, places, filtered]);
 
   const activeFilterCount = [
     filters.q,
     filters.county,
     filters.city,
     filters.state,
-    filters.category,
-    filters.dateFrom,
-    filters.dateTo,
+    view === "events" ? filters.category : placeCategory,
+    view === "events" ? filters.dateFrom : "",
+    view === "events" ? filters.dateTo : "",
+    view === "places" && highlyFriendly ? "1" : "",
+    view === "places" && dogsIndoors ? "1" : "",
+    view === "places" && outdoorPatio ? "1" : "",
+    view === "places" && openNow ? "1" : "",
   ].filter(Boolean).length;
 
   function applySearch(next: Filters = draft) {
@@ -427,7 +579,26 @@ export default function CommunityEventsMapSearch({
 
   function clearFilters() {
     setDraft(EMPTY_FILTERS);
+    setPlaceCategory("");
+    setHighlyFriendly(false);
+    setDogsIndoors(false);
+    setOutdoorPatio(false);
+    setOpenNow(false);
     applySearch(EMPTY_FILTERS);
+  }
+
+  function changeView(next: "events" | "places") {
+    setView(next);
+    setHighlightedId(null);
+    syncCommunityView(next, lane, placeCategory);
+  }
+
+  function changeLane(next: PlaceLane, category: PlaceCategoryId | "" = "") {
+    setView("places");
+    setLane(next);
+    setPlaceCategory(category);
+    setHighlightedId(null);
+    syncCommunityView("places", next, category);
   }
 
   function applyDatePreset(preset: "today" | "weekend" | "week") {
@@ -473,11 +644,36 @@ export default function CommunityEventsMapSearch({
             Local pet life
           </p>
           <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-            Find events near you
+            {view === "places"
+              ? "Find places where pets are truly welcome"
+              : "Find events near you"}
           </h2>
           <p className="mt-2 text-sm font-semibold text-slate-600 sm:text-base">
-            Search nearby pet friendly events — map on top on phones, side-by-side on desktop.
+            {view === "places"
+              ? "Same map as events — restaurants, stays, dog parks, and pet services, scored for how pet-friendly it really is."
+              : "Search nearby pet friendly events — map on top on phones, side-by-side on desktop."}
           </p>
+          <div className="mt-5 inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
+            {(
+              [
+                ["events", "Events"],
+                ["places", "Pet-Friendly Places"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => changeView(id)}
+                className={`rounded-full px-4 py-2 text-sm font-black transition ${
+                  view === id
+                    ? "bg-emerald-700 text-white"
+                    : "text-slate-700 hover:bg-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:rounded-[28px] sm:p-6">
@@ -489,6 +685,7 @@ export default function CommunityEventsMapSearch({
             }}
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
+              {view === "events" ? (
               <label className="block min-w-0">
                 <span className="mb-2 block text-sm font-semibold text-slate-800">
                   Category
@@ -511,6 +708,7 @@ export default function CommunityEventsMapSearch({
                   ))}
                 </select>
               </label>
+              ) : null}
 
               <label className="block min-w-0">
                 <span className="mb-2 block text-sm font-semibold text-slate-800">
@@ -570,6 +768,8 @@ export default function CommunityEventsMapSearch({
                 />
               </label>
 
+              {view === "events" ? (
+              <>
               <label className="block min-w-0">
                 <span className="mb-2 block text-sm font-semibold text-slate-800">
                   From date
@@ -604,12 +804,14 @@ export default function CommunityEventsMapSearch({
                   className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
                 />
               </label>
+              </>
+              ) : null}
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
               <label className="block min-w-0">
                 <span className="mb-2 block text-sm font-semibold text-slate-800">
-                  Search events
+                  {view === "places" ? "Search places" : "Search events"}
                 </span>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -618,7 +820,11 @@ export default function CommunityEventsMapSearch({
                     onChange={(e) =>
                       setDraft((current) => ({ ...current, q: e.target.value }))
                     }
-                    placeholder="Adoption, meetup, festival…"
+                    placeholder={
+                      view === "places"
+                        ? LANE_SEARCH_PLACEHOLDERS[lane]
+                        : "Adoption, meetup, festival…"
+                    }
                     className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
                   />
                 </div>
@@ -642,6 +848,85 @@ export default function CommunityEventsMapSearch({
             </div>
           </form>
 
+          {view === "places" ? (
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {PLACE_LANES.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => changeLane(item.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
+                      lane === item.id
+                        ? "bg-emerald-700 text-white"
+                        : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs font-semibold text-slate-500">
+                {PLACE_LANES.find((item) => item.id === lane)?.hint}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => changeLane(lane, "")}
+                  className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
+                    !placeCategory
+                      ? "bg-slate-900 text-white"
+                      : "border border-slate-200 bg-white text-slate-700"
+                  }`}
+                >
+                  All
+                </button>
+                {categoriesForLane(lane).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => changeLane(lane, item.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
+                      placeCategory === item.id
+                        ? "bg-slate-900 text-white"
+                        : "border border-slate-200 bg-white text-slate-700 hover:border-emerald-300"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {(
+                  [
+                    ["highly", "Highly pet friendly", highlyFriendly, () => setHighlyFriendly((v) => !v)],
+                    ["indoors", "Dogs indoors", dogsIndoors, () => setDogsIndoors((v) => !v)],
+                    ["outdoor", "Outdoor patio", outdoorPatio, () => setOutdoorPatio((v) => !v)],
+                    ["open", "Open now", openNow, () => setOpenNow((v) => !v)],
+                  ] as const
+                )
+                  .filter(([id]) => {
+                    if (lane === "services") return id === "open";
+                    if (lane === "play") return id !== "indoors";
+                    return true;
+                  })
+                  .map(([id, label, active, toggle]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={toggle}
+                      className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
+                        active
+                          ? "bg-emerald-700 text-white"
+                          : "border border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          ) : (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
               Dates
@@ -663,6 +948,7 @@ export default function CommunityEventsMapSearch({
               </button>
             ))}
           </div>
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
@@ -702,13 +988,15 @@ export default function CommunityEventsMapSearch({
 
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
-              {filtered.length} event{filtered.length === 1 ? "" : "s"} nearby
+              {view === "places"
+                ? `${placesLoading ? "Searching" : places.length} place${places.length === 1 ? "" : "s"} nearby`
+                : `${filtered.length} event${filtered.length === 1 ? "" : "s"} nearby`}
             </span>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
               {activeFilterCount} active filter
               {activeFilterCount === 1 ? "" : "s"}
             </span>
-            {(filters.dateFrom || filters.dateTo) && (
+            {(view === "events" && (filters.dateFrom || filters.dateTo)) && (
               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-800">
                 {[
                   filters.dateFrom
@@ -735,10 +1023,14 @@ export default function CommunityEventsMapSearch({
           <div className="order-1 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.05)] xl:order-2 xl:sticky xl:top-28 xl:self-start">
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 className="text-lg font-bold text-slate-900">
-                Events are closer with SitGuru
+                {view === "places"
+                  ? "Places are closer with SitGuru"
+                  : "Events are closer with SitGuru"}
               </h3>
               <p className="mt-1 text-sm text-slate-600">
-                Pet friendly gatherings near you — partners first, community next.
+                {view === "places"
+                  ? "Pet-friendly restaurants, stays, parks, and pet services — scored for the pet experience."
+                  : "Pet friendly gatherings near you — partners first, community next."}
               </p>
               {(filters.county || filters.city || filters.state) && (
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -756,10 +1048,20 @@ export default function CommunityEventsMapSearch({
                 markers={markers as unknown as Record<string, unknown>[]}
                 center={mapCenter}
                 highlightedMarkerId={
-                  highlightedId ? `event:${highlightedId}` : undefined
+                  highlightedId
+                    ? view === "places"
+                      ? highlightedId
+                      : `event:${highlightedId}`
+                    : undefined
                 }
-                footerTitle="Your next pet hang is already on the map."
-                footerBadge="Pull up — paws welcome"
+                footerTitle={
+                  view === "places"
+                    ? "Take your best friend with you."
+                    : "Your next pet hang is already on the map."
+                }
+                footerBadge={
+                  view === "places" ? "Truly pet welcome" : "Pull up — paws welcome"
+                }
               />
             </div>
           </div>
@@ -767,15 +1069,59 @@ export default function CommunityEventsMapSearch({
           <div className="order-2 space-y-4 sm:space-y-5 xl:order-1">
             <div className="flex items-center justify-between gap-2 xl:hidden">
               <p className="text-sm font-black text-slate-800">
-                {filtered.length} event{filtered.length === 1 ? "" : "s"}
+                {view === "places"
+                  ? `${places.length} place${places.length === 1 ? "" : "s"}`
+                  : `${filtered.length} event${filtered.length === 1 ? "" : "s"}`}
               </p>
               <Link
-                href="/events/host"
+                href={view === "places" ? "/partners/apply?intent=pet_friendly_place&source=community_places" : "/events/host"}
                 className="text-sm font-black text-emerald-800"
               >
-                Host an event
+                {view === "places" ? "Claim a place" : "Host an event"}
               </Link>
-            </div>            {filtered.length === 0 ? (
+            </div>
+            {view === "places" ? (
+              placesLoading ? (
+                <div className="rounded-[28px] border border-slate-200 bg-white p-7">
+                  <h3 className="text-xl font-bold text-slate-900">
+                    Finding pet-friendly places…
+                  </h3>
+                  <p className="mt-3 text-sm font-semibold text-slate-600">
+                    Checking Google listings, then scoring how welcome pets really are.
+                  </p>
+                </div>
+              ) : placesError ? (
+                <div className="rounded-[28px] border border-slate-200 bg-white p-7">
+                  <h3 className="text-xl font-bold text-slate-900">
+                    {placesErrorCode === "missing_key"
+                      ? "Places search is not configured"
+                      : "Could not load pet-friendly places"}
+                  </h3>
+                  <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
+                    {placesError}
+                  </p>
+                </div>
+              ) : places.length === 0 ? (
+                <div className="rounded-[28px] border border-slate-200 bg-white p-7">
+                  <h3 className="text-xl font-bold text-slate-900">
+                    No places match just yet
+                  </h3>
+                  <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
+                    Try another county, city, or lane — Eat & Drink, Stay, Play, or Pet Services.
+                  </p>
+                </div>
+              ) : (
+                places.map((place) => (
+                  <PlaceListCard
+                    key={place.id}
+                    place={place}
+                    highlighted={highlightedId === place.id}
+                    onHighlight={() => setHighlightedId(place.id)}
+                    onSwitchLane={changeLane}
+                  />
+                ))
+              )
+            ) : filtered.length === 0 ? (
               <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-[0_8px_26px_rgba(15,23,42,0.05)]">
                 <h3 className="text-xl font-bold text-slate-900">
                   No events match just yet
