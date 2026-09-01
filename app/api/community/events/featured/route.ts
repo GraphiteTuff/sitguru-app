@@ -78,14 +78,14 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const [featuredEvents, partnerUpcoming, discovered] = await Promise.all([
+  const [featuredEvents, partnerUpcoming, discoveredLocal] = await Promise.all([
     fetchFeaturedHomepageEvents({ city, state, limit: 1 }),
     fetchPublicEvents({ city, state, limit: 8 }),
     fetchDiscoveredHomepageEvents({
       city,
       state,
       county,
-      limit: 16,
+      limit: 24,
       homepageEligibleOnly: true,
     }),
   ]);
@@ -107,25 +107,32 @@ export async function GET(req: NextRequest) {
     12,
   );
 
-  // Fill with partners first, then curated Bucks/Montgomery cards, then discoveries.
+  let discovered = discoveredLocal;
+  if (
+    discovered.events.length === 0 &&
+    (city || state || county)
+  ) {
+    discovered = await fetchDiscoveredHomepageEvents({
+      limit: 24,
+      homepageEligibleOnly: true,
+    });
+  }
+
   const curatedUpcoming = getUpcomingCuratedBucksMontgomeryPetEvents();
+  const liveEvents = mergeUniqueEvents(
+    partnerEvents,
+    discovered.events,
+    24,
+  );
   let bannerEvents = sortEventsChronologically(
-    mergeUniqueEvents(
-      mergeUniqueEvents(partnerEvents, curatedUpcoming, 24),
-      discovered.events,
-      24,
-    ),
+    mergeUniqueEvents(liveEvents, curatedUpcoming, 24),
   );
   let source: "live" | "google" | "demo" = partnerEvents.length
     ? "live"
-    : curatedUpcoming.length
-      ? "demo"
-      : discovered.events.length
-        ? "google"
-        : "demo";
-  let previewMode =
-    !partnerEvents.length &&
-    (curatedUpcoming.length > 0 || discovered.events.length > 0);
+    : discovered.events.length
+      ? "google"
+      : "demo";
+  let previewMode = source === "demo";
   let lastSyncedAt = discovered.lastSyncedAt;
 
   if (bannerEvents.length === 0) {

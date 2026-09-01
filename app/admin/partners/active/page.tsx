@@ -30,6 +30,7 @@ import {
 } from "@/lib/email/partner-approval-welcome";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import BackToPartnersButton from "../_components/back-to-partners-button";
+import DeletePartnerButton from "../_components/delete-partner-button";
 import SupabaseCoordinationBanner from "../_components/supabase-coordination-banner";
 
 export const dynamic = "force-dynamic";
@@ -389,6 +390,56 @@ async function regenerateReferralCodeAction(formData: FormData) {
 
   revalidatePath("/admin/partners/active");
   revalidatePath("/admin/partners");
+}
+
+async function deletePartnerAction(formData: FormData) {
+  "use server";
+
+  const partnerId = String(formData.get("partnerId") || "").trim();
+  if (!partnerId) return;
+
+  const admin = await getAdminIdentity();
+  if (!admin?.canAccessAdmin) return;
+
+  const childTables = [
+    "partner_tracking_events",
+    "partner_campaigns",
+    "partner_rewards",
+    "partner_payouts",
+    "admin_referral_tracking",
+    "admin_referral_reward_liability",
+    "pawperks_account_referral_codes",
+  ] as const;
+
+  for (const table of childTables) {
+    const { error } = await supabaseAdmin
+      .from(table)
+      .delete()
+      .eq("partner_id", partnerId);
+
+    if (
+      error &&
+      !/relation .* does not exist|could not find the table|column .* does not exist/i.test(
+        error.message,
+      )
+    ) {
+      console.error(`Partner delete cleanup failed on ${table}:`, error);
+    }
+  }
+
+  const { error } = await supabaseAdmin
+    .from("partners")
+    .delete()
+    .eq("id", partnerId);
+
+  if (error) {
+    console.error("Partner delete failed:", error);
+    throw new Error(error.message || "Could not delete this partner.");
+  }
+
+  revalidatePath("/admin/partners/active");
+  revalidatePath("/admin/partners");
+  revalidatePath("/admin/partners/applications");
 }
 
 function welcomeProgramFromPartnerType(partnerType: string): PartnerWelcomeProgram {
@@ -1385,6 +1436,14 @@ export default async function AdminActivePartnersPage({
                                   </button>
                                 </form>
                               ) : null}
+
+                              <DeletePartnerButton
+                                partnerId={partner.id}
+                                businessName={
+                                  partner.business_name || "this partner"
+                                }
+                                deleteAction={deletePartnerAction}
+                              />
                             </div>
                           </div>
 

@@ -151,10 +151,12 @@ export function mapDiscoveryToCommunityEvent(
 
 function sortDiscoveriesForDisplay(rows: CommunityEventDiscoveryRow[]) {
   return [...rows].sort((a, b) => {
+    const byStart = String(a.start_at).localeCompare(String(b.start_at));
+    if (byStart !== 0) return byStart;
     const scoreDiff =
       effectivePetRelevanceScore(b) - effectivePetRelevanceScore(a);
     if (scoreDiff !== 0) return scoreDiff;
-    return String(a.start_at).localeCompare(String(b.start_at));
+    return a.title.localeCompare(b.title);
   });
 }
 
