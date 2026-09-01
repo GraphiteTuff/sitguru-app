@@ -18,6 +18,7 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const preferredRegion = "iad1";
 
 export function OPTIONS(req: NextRequest) {
   return optionsWithMobileCors(req);
