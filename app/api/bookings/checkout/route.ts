@@ -120,6 +120,114 @@ function roundMoney(amount: number) {
   return Number(amount.toFixed(2));
 }
 
+function getMissingColumnName(errorMessage: string) {
+  const quotedColumnMatch = errorMessage.match(/'([^']+)' column/i);
+  if (quotedColumnMatch?.[1]) return quotedColumnMatch[1];
+
+  const columnDoesNotExistMatch = errorMessage.match(
+    /column "([^"]+)" does not exist/i,
+  );
+  if (columnDoesNotExistMatch?.[1]) return columnDoesNotExistMatch[1];
+
+  const schemaCacheMatch = errorMessage.match(
+    /Could not find the '([^']+)' column/i,
+  );
+  if (schemaCacheMatch?.[1]) return schemaCacheMatch[1];
+
+  return "";
+}
+
+async function loadOwnedBooking(bookingId: string, userId: string) {
+  const { data: byCustomer, error: customerError } = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .eq("customer_id", userId)
+    .maybeSingle();
+
+  if (!customerError && byCustomer) return byCustomer;
+
+  const { data: byUser, error: userError } = await supabaseAdmin
+    .from("bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!userError && byUser) return byUser;
+
+  if (customerError) {
+    console.error("Checkout booking lookup error:", {
+      bookingId,
+      userId,
+      bookingError: customerError,
+    });
+  } else if (userError) {
+    console.error("Checkout booking lookup error:", {
+      bookingId,
+      userId,
+      bookingError: userError,
+    });
+  }
+
+  return null;
+}
+
+async function attachCheckoutSessionToBooking(params: {
+  bookingId: string;
+  sessionId: string;
+  checkoutUrl: string;
+  marketplaceFeeAmount: number;
+  trustAndSafetyFeeAmount: number;
+  tipAmount: number;
+  checkoutAmount: number;
+}) {
+  const workingPayload: Record<string, unknown> = {
+    stripe_checkout_session_id: params.sessionId,
+    stripe_session_id: params.sessionId,
+    checkout_session_id: params.sessionId,
+    checkout_url: params.checkoutUrl,
+    payment_provider: "stripe",
+    payment_status: "pending",
+    marketplace_fee_amount: params.marketplaceFeeAmount,
+    trust_and_safety_fee_amount: params.trustAndSafetyFeeAmount,
+    tip_amount: params.tipAmount,
+    checkout_amount: params.checkoutAmount,
+    fee_status: "free",
+  };
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const { error } = await supabaseAdmin
+      .from("bookings")
+      .update(workingPayload)
+      .eq("id", params.bookingId);
+
+    if (!error) return { ok: true as const };
+
+    const missingColumn = getMissingColumnName(error.message || "");
+    if (
+      missingColumn &&
+      Object.prototype.hasOwnProperty.call(workingPayload, missingColumn)
+    ) {
+      console.warn(
+        "Removing missing checkout attach column and retrying:",
+        missingColumn,
+      );
+      delete workingPayload[missingColumn];
+      continue;
+    }
+
+    return { ok: false as const, error };
+  }
+
+  return {
+    ok: false as const,
+    error: {
+      message: "Unable to attach checkout session after removing optional columns.",
+    },
+  };
+}
+
 function normalizeMoneyValue(value: unknown, fallback = 0) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -363,21 +471,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: booking, error: bookingError } =
-      await supabaseAdmin
-        .from("bookings")
-        .select("*")
-        .eq("id", bookingId)
-        .eq("customer_id", user.id)
-        .single();
+    const booking = await loadOwnedBooking(bookingId, user.id);
 
-    if (bookingError || !booking) {
-      console.error("Checkout booking lookup error:", {
-        bookingId,
-        userId: user.id,
-        bookingError,
-      });
-
+    if (!booking) {
       return json(
         req,
         {
@@ -543,28 +639,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { error: updateError } =
-      await supabaseAdmin
-        .from("bookings")
-        .update({
-          stripe_checkout_session_id: session.id,
-          payment_provider: "stripe",
-          payment_status: "pending",
-          marketplace_fee_amount:
-            marketplaceFeeAmount,
-          trust_and_safety_fee_amount:
-            trustAndSafetyFeeAmount,
-          tip_amount: tipAmount,
-          checkout_amount: checkoutAmount,
-          fee_status: "free",
-        })
-        .eq("id", booking.id)
-        .eq("customer_id", user.id);
+    const attachResult = await attachCheckoutSessionToBooking({
+      bookingId: String(booking.id),
+      sessionId: session.id,
+      checkoutUrl: session.url,
+      marketplaceFeeAmount,
+      trustAndSafetyFeeAmount,
+      tipAmount,
+      checkoutAmount,
+    });
 
-    if (updateError) {
+    if (!attachResult.ok) {
       console.error(
         "Booking update after checkout error:",
-        updateError,
+        attachResult.error,
       );
 
       try {
