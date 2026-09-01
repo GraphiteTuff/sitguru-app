@@ -4,6 +4,7 @@ import { geocodeAddress } from "@/lib/geocoding/geocodeAddress";
 import {
   LANE_SEARCH_QUERIES,
   buildPetFriendlyProfile,
+  categoriesForLane,
   getPlaceCategory,
   googleTypesForDiscovery,
   isDedicatedDogPark,
@@ -568,6 +569,56 @@ function mapGooglePlace(
   };
 }
 
+async function loadMappedPlaces(
+  input: PlacesSearchInput,
+  center: { latitude: number; longitude: number; radiusMeters: number },
+  textQuery?: string,
+) {
+  const mapRaw = (
+    raw: GooglePlace[],
+    category: PlaceCategoryId | "" | undefined,
+  ) =>
+    raw
+      .map((place) => mapGooglePlace(place, { ...input, category }))
+      .filter((place): place is PetFriendlyPlace => Boolean(place));
+
+  if (textQuery) {
+    const raw = await discoverPlaces({
+      category: input.category,
+      lane: input.lane,
+      latitude: center.latitude,
+      longitude: center.longitude,
+      radiusMeters: center.radiusMeters,
+      textQuery,
+      openNow: input.openNow,
+    });
+    return mapRaw(raw, input.category);
+  }
+
+  // Nearby Search returns at most 20 mixed results. Searching the whole Eat
+  // lane at once lets restaurants crowd out cafés and breweries. All fans
+  // out per category, then we merge.
+  const categoryIds: Array<PlaceCategoryId | ""> = input.category
+    ? [input.category]
+    : categoriesForLane(input.lane || "eat").map((item) => item.id);
+
+  const batches = await Promise.all(
+    categoryIds.map(async (category) => {
+      const raw = await discoverPlaces({
+        category,
+        lane: input.lane,
+        latitude: center.latitude,
+        longitude: center.longitude,
+        radiusMeters: center.radiusMeters,
+        openNow: input.openNow,
+      });
+      return mapRaw(raw, category);
+    }),
+  );
+
+  return batches.flat();
+}
+
 export async function searchPetFriendlyPlaces(input: PlacesSearchInput) {
   const center = await resolvePlacesCenter(input);
   const freeText = input.q?.trim();
@@ -596,19 +647,7 @@ export async function searchPetFriendlyPlaces(input: PlacesSearchInput) {
     };
   }
 
-  const raw = await discoverPlaces({
-    category: input.category,
-    lane: input.lane,
-    latitude: center.latitude,
-    longitude: center.longitude,
-    radiusMeters: center.radiusMeters,
-    textQuery,
-    openNow: input.openNow,
-  });
-
-  const mapped = raw
-    .map((place) => mapGooglePlace(place, input))
-    .filter((place): place is PetFriendlyPlace => Boolean(place));
+  const mapped = await loadMappedPlaces(input, center, textQuery);
 
   const unique = new Map<string, PetFriendlyPlace>();
   for (const place of mapped) {
