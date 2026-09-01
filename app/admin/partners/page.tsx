@@ -18,8 +18,10 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import SupabaseCoordinationBanner from "./_components/supabase-coordination-banner";
+
+export const dynamic = "force-dynamic";
 
 type PartnerApplication = {
   id: string;
@@ -177,9 +179,7 @@ const quickLinks = [
 ];
 
 export default async function AdminPartnersOverviewPage() {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("partner_applications")
     .select(
       "id, applicant_type, business_name, contact_name, email, business_type, city, state, status, created_at"
@@ -867,7 +867,7 @@ export default async function AdminPartnersOverviewPage() {
           </aside>
         </section>
 
-        <SupabaseCoordinationBanner>
+        <SupabaseCoordinationBanner dataSource="Supabase admin client using supabaseAdmin after HQ admin auth">
           this page reads partner_applications directly from Supabase. Partner
           type, application status, review queue, approval rate, recent
           applications, program counts, KPI cards, drill links, and export links

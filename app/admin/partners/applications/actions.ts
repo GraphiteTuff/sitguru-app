@@ -1,10 +1,11 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { getAdminIdentity } from "@/lib/admin/access";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+type AdminDb = typeof supabaseAdmin;
 
 type ApplicationStatus = "approved" | "rejected" | "needs_review";
 
@@ -124,7 +125,7 @@ function buildBaseName(application: PartnerApplication) {
 }
 
 async function makeUniqueSlug(
-  supabase: SupabaseServerClient,
+  supabase: AdminDb,
   baseName: string
 ) {
   const baseSlug = slugify(baseName) || "sitguru-partner";
@@ -156,7 +157,7 @@ async function makeUniqueSlug(
 }
 
 async function makeUniqueReferralCode(
-  supabase: SupabaseServerClient,
+  supabase: AdminDb,
   baseName: string
 ) {
   const base = slugify(baseName)
@@ -186,7 +187,7 @@ async function createApprovedPartnerRecord({
   application,
   adminUserId,
 }: {
-  supabase: SupabaseServerClient;
+  supabase: AdminDb;
   application: PartnerApplication;
   adminUserId: string;
 }) {
@@ -265,7 +266,7 @@ async function createApprovedAmbassadorRecord({
   application,
   adminUserId,
 }: {
-  supabase: SupabaseServerClient;
+  supabase: AdminDb;
   application: PartnerApplication;
   adminUserId: string;
 }) {
@@ -355,18 +356,13 @@ export async function updatePartnerApplicationStatus(formData: FormData) {
     throw new Error("Invalid application status.");
   }
 
-  const supabase = await createClient();
+  const admin = await getAdminIdentity();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  if (!admin?.canAccessAdmin) {
     throw new Error("You must be signed in as Admin to update applications.");
   }
 
-  const { data: applicationData, error: applicationError } = await supabase
+  const { data: applicationData, error: applicationError } = await supabaseAdmin
     .from("partner_applications")
     .select("*")
     .eq("id", applicationId)
@@ -385,9 +381,9 @@ export async function updatePartnerApplicationStatus(formData: FormData) {
   if (status === "approved") {
     if (application.applicant_type === "ambassador") {
       const created = await createApprovedAmbassadorRecord({
-        supabase,
+        supabase: supabaseAdmin,
         application,
-        adminUserId: user.id,
+        adminUserId: admin.id,
       });
 
       updatedNotes = [
@@ -398,9 +394,9 @@ export async function updatePartnerApplicationStatus(formData: FormData) {
         .join("\n\n");
     } else {
       const created = await createApprovedPartnerRecord({
-        supabase,
+        supabase: supabaseAdmin,
         application,
-        adminUserId: user.id,
+        adminUserId: admin.id,
       });
 
       updatedNotes = [
@@ -412,11 +408,11 @@ export async function updatePartnerApplicationStatus(formData: FormData) {
     }
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from("partner_applications")
     .update({
       status,
-      reviewed_by: user.id,
+      reviewed_by: admin.id,
       reviewed_at: new Date().toISOString(),
       admin_notes: updatedNotes,
     })

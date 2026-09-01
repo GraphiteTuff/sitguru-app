@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdminApi } from "@/lib/admin/access";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type PartnerExportRow = {
   id: string;
@@ -91,9 +92,10 @@ function getTimestampForFilename() {
 }
 
 export async function GET() {
-  const supabase = await createClient();
+  const auth = await requireAdminApi();
+  if (auth.response) return auth.response;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("partners")
     .select(
       `

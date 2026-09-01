@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { updatePartnerApplicationStatus } from "../actions";
+
+export const dynamic = "force-dynamic";
 
 type PartnerApplication = {
   id: string;
@@ -27,9 +29,9 @@ type PartnerApplication = {
 };
 
 type PageProps = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 function formatApplicantType(type: PartnerApplication["applicant_type"]) {
@@ -135,12 +137,12 @@ function StatusActionButton({
 export default async function AdminPartnerApplicationReviewPage({
   params,
 }: PageProps) {
-  const supabase = await createClient();
+  const { id } = await params;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from("partner_applications")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error || !data) {

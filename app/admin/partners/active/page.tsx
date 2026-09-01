@@ -21,9 +21,12 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { getAdminIdentity } from "@/lib/admin/access";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import BackToPartnersButton from "../_components/back-to-partners-button";
 import SupabaseCoordinationBanner from "../_components/supabase-coordination-banner";
+
+export const dynamic = "force-dynamic";
 
 type Partner = {
   id: string;
@@ -340,9 +343,10 @@ async function updatePartnerStatusAction(formData: FormData) {
 
   if (!partnerId || !status) return;
 
-  const supabase = await createClient();
+  const admin = await getAdminIdentity();
+  if (!admin?.canAccessAdmin) return;
 
-  await supabase
+  await supabaseAdmin
     .from("partners")
     .update({
       status,
@@ -365,9 +369,10 @@ async function regenerateReferralCodeAction(formData: FormData) {
   const referralCode = createReferralCode(businessName);
   const slug = createSlug(referralCode);
 
-  const supabase = await createClient();
+  const admin = await getAdminIdentity();
+  if (!admin?.canAccessAdmin) return;
 
-  await supabase
+  await supabaseAdmin
     .from("partners")
     .update({
       referral_code: referralCode,
@@ -381,11 +386,9 @@ async function regenerateReferralCodeAction(formData: FormData) {
 }
 
 export default async function AdminActivePartnersPage() {
-  const supabase = await createClient();
-
   const [{ data, error }, trackingResponse] = await Promise.all([
-    supabase.from("partners").select("*").order("created_at", { ascending: false }),
-    supabase
+    supabaseAdmin.from("partners").select("*").order("created_at", { ascending: false }),
+    supabaseAdmin
       .from("partner_tracking_events")
       .select(
         "id, partner_id, ambassador_id, affiliate_id, campaign_id, referral_code, event_type, event_source, event_medium, event_campaign, landing_page, current_url, referrer_url, user_id, customer_id, guru_id, booking_id, revenue_amount, reward_amount, currency, created_at"

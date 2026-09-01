@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdminApi } from "@/lib/admin/access";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type PartnerApplicationExport = {
   id: string;
@@ -41,13 +42,15 @@ function formatStatus(value: string | null) {
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
+  const auth = await requireAdminApi();
+  if (auth.response) return auth.response;
+
   const searchParams = request.nextUrl.searchParams;
 
   const status = searchParams.get("status");
   const type = searchParams.get("type");
 
-  let query = supabase
+  let query = supabaseAdmin
     .from("partner_applications")
     .select(
       "id, applicant_type, business_name, contact_name, email, business_type, city, state, status, created_at"

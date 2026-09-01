@@ -18,9 +18,11 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import BackToPartnersButton from "../_components/back-to-partners-button";
 import SupabaseCoordinationBanner from "../_components/supabase-coordination-banner";
+
+export const dynamic = "force-dynamic";
 
 type PartnerApplication = {
   id: string;
@@ -220,9 +222,7 @@ export default async function AdminPartnerApplicationsPage({
   const selectedType = params?.type || "";
   const searchQuery = params?.q?.trim() || "";
 
-  const supabase = await createClient();
-
-  let query = supabase
+  let query = supabaseAdmin
     .from("partner_applications")
     .select(
       "id, applicant_type, business_name, contact_name, email, business_type, city, state, status, created_at"
@@ -1131,8 +1131,9 @@ export default async function AdminPartnerApplicationsPage({
           pagePath="app/admin/partners/applications/page.tsx"
           folderPath="app/admin/partners/applications"
           primaryTable="partner_applications"
+          dataSource="Supabase admin client using supabaseAdmin after HQ admin auth"
           operation="Read, filter, search, drill, export, and visualize Partner Network application rows"
-          selectQuery='supabase.from("partner_applications").select("id, applicant_type, business_name, contact_name, email, business_type, city, state, status, created_at").order("created_at", { ascending: false }).limit(500)'
+          selectQuery='supabaseAdmin.from("partner_applications").select("id, applicant_type, business_name, contact_name, email, business_type, city, state, status, created_at").order("created_at", { ascending: false }).limit(500)'
           readFields={[
             "id",
             "applicant_type",
