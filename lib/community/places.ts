@@ -496,7 +496,7 @@ export function buildPetFriendlyProfile(input: {
   const playDetails: PlayDetails | null =
     lane === "play"
       ? {
-          fenced: dogPark ? "unknown" : "unknown",
+          fenced: "unknown",
           separateSmallDogArea: "unknown",
           water: mentionsWater ? "yes" : "unknown",
           benches: "unknown",
@@ -506,7 +506,7 @@ export function buildPetFriendlyProfile(input: {
           wasteStations: "unknown",
           agility: "unknown",
           surfaceType: null,
-          hours: input.hoursLabel,
+          hours: input.hoursLabel ?? null,
         }
       : null;
 
@@ -515,7 +515,7 @@ export function buildPetFriendlyProfile(input: {
         emergency: emergency ? "yes" : "unknown",
         open24Hours: input.open24Hours === true ? "yes" : "unknown",
         openNow: input.openNow === true ? "yes" : input.openNow === false ? "no" : "unknown",
-        hours: input.hoursLabel,
+        hours: input.hoursLabel ?? null,
         walkIns: "unknown",
       }
     : null;

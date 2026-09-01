@@ -228,15 +228,16 @@ function componentText(
   return (short ? hit.shortText : hit.longText) || hit.longText || hit.shortText || "";
 }
 
-function hoursLabel(place: GooglePlace) {
+function hoursLabel(place: GooglePlace): string | null {
   const openNow =
     place.currentOpeningHours?.openNow ?? place.regularOpeningHours?.openNow;
   const today =
-    place.currentOpeningHours?.weekdayDescriptions?.[0] ||
-    place.regularOpeningHours?.weekdayDescriptions?.[0];
+    place.currentOpeningHours?.weekdayDescriptions?.[0] ??
+    place.regularOpeningHours?.weekdayDescriptions?.[0] ??
+    null;
   if (openNow === true) return today ? `Open now · ${today}` : "Open now";
   if (openNow === false) return today ? `Closed · ${today}` : "Closed now";
-  return today || null;
+  return today;
 }
 
 function isOpen24Hours(place: GooglePlace) {
@@ -514,7 +515,7 @@ function mapGooglePlace(
     servesBeer: place.servesBeer ?? null,
     servesWine: place.servesWine ?? null,
     servesCoffee: place.servesCoffee ?? null,
-    hoursLabel: hours,
+    hoursLabel: hours ?? null,
     openNow,
     open24Hours: isOpen24Hours(place),
     preferredCategory: input.category || null,
@@ -544,11 +545,11 @@ function mapGooglePlace(
     address: place.formattedAddress || "",
     latitude: latitude as number,
     longitude: longitude as number,
-    websiteUrl: place.websiteUri || null,
-    googleMapsUrl: place.googleMapsUri || null,
-    phone: place.nationalPhoneNumber || null,
+    websiteUrl: place.websiteUri ?? null,
+    googleMapsUrl: place.googleMapsUri ?? null,
+    phone: place.nationalPhoneNumber ?? null,
     editorialSummary: summary,
-    hoursLabel: hours,
+    hoursLabel: hours ?? null,
     allowsDogs: place.allowsDogs ?? null,
     outdoorSeating: place.outdoorSeating ?? null,
     access: profile.access,
