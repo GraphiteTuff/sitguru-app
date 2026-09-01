@@ -4,6 +4,7 @@ type SendEmailParams = {
   html: string;
   text?: string;
   replyTo?: string;
+  bcc?: string | string[];
 };
 
 type ResendSendResponse = {
@@ -30,10 +31,16 @@ export async function sendSitGuruEmail({
   html,
   text,
   replyTo,
+  bcc,
 }: SendEmailParams) {
   const apiKey = getRequiredEnv("RESEND_API_KEY");
   const from = getRequiredEnv("RESEND_FROM_EMAIL");
   const resolvedReplyTo = replyTo || process.env.RESEND_REPLY_TO_EMAIL;
+  const resolvedBcc = Array.isArray(bcc)
+    ? bcc.filter(Boolean)
+    : bcc
+      ? [bcc]
+      : [];
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -48,6 +55,7 @@ export async function sendSitGuruEmail({
       html,
       text,
       reply_to: resolvedReplyTo,
+      ...(resolvedBcc.length > 0 ? { bcc: resolvedBcc } : {}),
     }),
   });
 

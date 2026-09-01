@@ -339,8 +339,9 @@ export default async function AdminPartnerApplicationReviewPage({
             </h2>
 
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Add optional notes, then choose an application status. This updates
-              the application in Supabase.
+              Add optional notes, then choose an application status. Approving
+              sends a branded welcome email to the applicant and BCCs
+              jason@sitguru.com.
             </p>
 
             <label className="mt-5 block">

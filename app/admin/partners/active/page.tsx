@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -22,6 +23,11 @@ import {
   Users,
 } from "lucide-react";
 import { getAdminIdentity } from "@/lib/admin/access";
+import {
+  buildPartnerPageUrl,
+  sendPartnerApprovalWelcome,
+  type PartnerWelcomeProgram,
+} from "@/lib/email/partner-approval-welcome";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import BackToPartnersButton from "../_components/back-to-partners-button";
 import SupabaseCoordinationBanner from "../_components/supabase-coordination-banner";
@@ -385,7 +391,62 @@ async function regenerateReferralCodeAction(formData: FormData) {
   revalidatePath("/admin/partners");
 }
 
-export default async function AdminActivePartnersPage() {
+function welcomeProgramFromPartnerType(partnerType: string): PartnerWelcomeProgram {
+  const type = partnerType.toLowerCase();
+  if (type.includes("affiliate")) return "affiliate";
+  if (type.includes("national")) return "national_partner";
+  if (type.includes("ambassador")) return "ambassador";
+  return "local_partner";
+}
+
+async function sendPartnerWelcomeEmailAction(formData: FormData) {
+  "use server";
+
+  const partnerId = String(formData.get("partnerId") || "");
+  if (!partnerId) return;
+
+  const admin = await getAdminIdentity();
+  if (!admin?.canAccessAdmin) return;
+
+  const { data: partner, error } = await supabaseAdmin
+    .from("partners")
+    .select(
+      "email, contact_name, business_name, partner_type, city, state, referral_code, slug",
+    )
+    .eq("id", partnerId)
+    .maybeSingle();
+
+  if (error || !partner?.email || !partner.referral_code) {
+    redirect("/admin/partners/active?welcome=failed");
+  }
+
+  try {
+    await sendPartnerApprovalWelcome({
+      to: String(partner.email),
+      contactName: String(partner.contact_name || partner.business_name || ""),
+      businessName: String(partner.business_name || partner.contact_name || ""),
+      program: welcomeProgramFromPartnerType(String(partner.partner_type || "")),
+      locationLabel: [partner.city, partner.state].filter(Boolean).join(", "),
+      referralCode: String(partner.referral_code),
+      partnerPageUrl: buildPartnerPageUrl(
+        partner.slug ? String(partner.slug) : null,
+        String(partner.referral_code),
+      ),
+    });
+  } catch (sendError) {
+    console.error("Partner welcome email failed:", sendError);
+    redirect("/admin/partners/active?welcome=failed");
+  }
+
+  redirect("/admin/partners/active?welcome=sent");
+}
+
+export default async function AdminActivePartnersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ welcome?: string }>;
+}) {
+  const welcomeStatus = (await searchParams)?.welcome;
   const [{ data, error }, trackingResponse] = await Promise.all([
     supabaseAdmin.from("partners").select("*").order("created_at", { ascending: false }),
     supabaseAdmin
@@ -572,6 +633,16 @@ export default async function AdminActivePartnersPage() {
   return (
     <main className="min-h-screen bg-[#F7FAF3] text-[#17382B]">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        {welcomeStatus === "sent" ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-950">
+            Welcome email sent. A BCC copy went to jason@sitguru.com.
+          </div>
+        ) : null}
+        {welcomeStatus === "failed" ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-900">
+            SitGuru could not send the partner welcome email. Check Resend settings and try again.
+          </div>
+        ) : null}
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1153,6 +1224,17 @@ export default async function AdminActivePartnersPage() {
                               <QrCode className="mr-2 h-3.5 w-3.5 !text-white" />
                               Open QR Code
                             </a>
+
+                            <form action={sendPartnerWelcomeEmailAction} className="mt-3">
+                              <input type="hidden" name="partnerId" value={partner.id} />
+                              <button
+                                type="submit"
+                                className="inline-flex rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+                              >
+                                <Mail className="mr-2 h-3.5 w-3.5" />
+                                Send welcome email
+                              </button>
+                            </form>
                           </div>
 
                           <div className="rounded-2xl border border-emerald-100 bg-white p-4">

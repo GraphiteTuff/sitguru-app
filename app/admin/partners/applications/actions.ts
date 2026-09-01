@@ -1,6 +1,11 @@
 "use server";
 
 import { getAdminIdentity } from "@/lib/admin/access";
+import {
+  buildPartnerPageUrl,
+  sendPartnerApprovalWelcome,
+  type PartnerWelcomeProgram,
+} from "@/lib/email/partner-approval-welcome";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -280,6 +285,7 @@ async function createApprovedAmbassadorRecord({
     return {
       ambassadorId: existingAmbassador.id as string,
       referralCode: existingAmbassador.referral_code as string,
+      slug: null as string | null,
     };
   }
 
@@ -340,7 +346,52 @@ async function createApprovedAmbassadorRecord({
   return {
     ambassadorId: ambassador.id as string,
     referralCode,
+    slug,
   };
+}
+
+function ambassadorSignupUrl(referralCode: string) {
+  return `https://www.sitguru.com/signup?ref=${encodeURIComponent(referralCode)}`;
+}
+
+async function sendApprovedWelcomeEmail({
+  application,
+  referralCode,
+  slug,
+}: {
+  application: PartnerApplication;
+  referralCode: string;
+  slug?: string | null;
+}) {
+  const email = application.email.trim();
+  if (!email) {
+    return "Welcome email skipped: no email on file.";
+  }
+
+  const partnerPageUrl =
+    application.applicant_type === "ambassador"
+      ? ambassadorSignupUrl(referralCode)
+      : buildPartnerPageUrl(slug || null, referralCode);
+
+  try {
+    await sendPartnerApprovalWelcome({
+      to: email,
+      contactName: application.contact_name,
+      businessName: application.business_name || application.contact_name,
+      program: application.applicant_type as PartnerWelcomeProgram,
+      locationLabel: [application.city, application.state]
+        .filter(Boolean)
+        .join(", "),
+      referralCode,
+      partnerPageUrl,
+    });
+    return `Welcome email sent to ${email}.`;
+  } catch (error) {
+    console.error("Partner welcome email failed:", error);
+    return `Welcome email failed: ${
+      error instanceof Error ? error.message : "unknown error"
+    }`;
+  }
 }
 
 export async function updatePartnerApplicationStatus(formData: FormData) {
@@ -377,6 +428,7 @@ export async function updatePartnerApplicationStatus(formData: FormData) {
   const application = applicationData as PartnerApplication;
 
   let updatedNotes = adminNotes || null;
+  let welcomeQuery = "";
 
   if (status === "approved") {
     if (application.applicant_type === "ambassador") {
@@ -386,12 +438,25 @@ export async function updatePartnerApplicationStatus(formData: FormData) {
         adminUserId: admin.id,
       });
 
+      const welcomeResult = await sendApprovedWelcomeEmail({
+        application,
+        referralCode: created.referralCode,
+        slug: created.slug,
+      });
+
       updatedNotes = [
         adminNotes,
         `Approved as Ambassador. Referral code: ${created.referralCode}.`,
+        welcomeResult,
       ]
         .filter(Boolean)
         .join("\n\n");
+
+      welcomeQuery = welcomeResult.startsWith("Welcome email sent")
+        ? "sent"
+        : welcomeResult.startsWith("Welcome email failed")
+          ? "failed"
+          : "skipped";
     } else {
       const created = await createApprovedPartnerRecord({
         supabase: supabaseAdmin,
@@ -399,12 +464,25 @@ export async function updatePartnerApplicationStatus(formData: FormData) {
         adminUserId: admin.id,
       });
 
+      const welcomeResult = await sendApprovedWelcomeEmail({
+        application,
+        referralCode: created.referralCode,
+        slug: created.slug,
+      });
+
       updatedNotes = [
         adminNotes,
         `Approved as Partner/Affiliate. Referral code: ${created.referralCode}. Partner slug: ${created.slug}.`,
+        welcomeResult,
       ]
         .filter(Boolean)
         .join("\n\n");
+
+      welcomeQuery = welcomeResult.startsWith("Welcome email sent")
+        ? "sent"
+        : welcomeResult.startsWith("Welcome email failed")
+          ? "failed"
+          : "skipped";
     }
   }
 
@@ -430,5 +508,9 @@ export async function updatePartnerApplicationStatus(formData: FormData) {
   revalidatePath("/admin/partners/ambassadors");
   revalidatePath("/admin/partners/affiliates");
 
-  redirect(`/admin/partners/applications/${applicationId}`);
+  redirect(
+    welcomeQuery
+      ? `/admin/partners/applications/${applicationId}?welcome=${welcomeQuery}`
+      : `/admin/partners/applications/${applicationId}`,
+  );
 }

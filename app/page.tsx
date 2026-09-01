@@ -981,6 +981,13 @@ function CompactPartnerSection({
 }) {
   const partners = [
     {
+      name: "Annabel's Touch Chiropractic",
+      href: "https://annabelstouchchiropracticandrehab.janeapp.com/",
+      image: "/images/partners/annabels-touch-chiropractic.png",
+      imageClassName: "h-auto max-h-24 w-full object-contain",
+      imageWrapperClassName: "bg-white",
+    },
+    {
       name: "Doylestown Animal Medical Clinic",
       href: "https://doylestownanimalmedicalclinic.com/",
       image: "/images/partners/doylestown-animal-medical-clinic.png",
