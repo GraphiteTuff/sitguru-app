@@ -442,11 +442,12 @@ export default function EventShareDrawer({
               const iconClass = `grid h-[2.95rem] w-[2.95rem] place-items-center rounded-full shadow-sm sm:h-[3.25rem] sm:w-[3.25rem] ${action.tone}`;
 
               if (action.id === "instagram" || action.id === "tiktok") {
+                const visualChannel = action.id;
                 return (
                   <button
                     key={action.id}
                     type="button"
-                    onClick={() => void prepareVisualShare(action.id)}
+                    onClick={() => void prepareVisualShare(visualChannel)}
                     className={commonClass}
                   >
                     <span className={iconClass}>
