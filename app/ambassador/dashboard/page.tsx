@@ -38,8 +38,8 @@ import {
   canUseAllRoleWorkspaces,
   getFounderAmbassadorPreview,
 } from "@/lib/dashboard/founder-workspaces";
+import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
 import {
-  getAvailableDashboardSwitches,
   resolveAuthorizedRolesFromProfile,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
@@ -1189,9 +1189,9 @@ export default async function AmbassadorDashboardPage() {
           }
           actionsFooter={
             <div className="space-y-3">
-              <DashboardSwitcherPanel
+              <AccountRoleSwitcher
+                currentRole="ambassador"
                 authorizedRoles={dashboardAccess.authorizedRoles}
-                current="ambassador"
               />
               <form action={signOutAction}>
                 <button
@@ -2073,51 +2073,6 @@ function AmbassadorProgressPanel({
   );
 }
 
-function DashboardSwitcherPanel({
-  authorizedRoles,
-  current,
-}: {
-  authorizedRoles: readonly DashboardSwitchRole[];
-  current: DashboardSwitchRole;
-}) {
-  const switchTargets = getAvailableDashboardSwitches({
-    currentRole: current,
-    authorizedRoles,
-    includeAdmin: false,
-  });
-
-  if (!switchTargets.length) return null;
-
-  return (
-    <div className="rounded-2xl border border-green-100 bg-green-50 p-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-green-800">
-        Switch Portal
-      </p>
-      <div className="mt-3 grid gap-2">
-        {switchTargets.map((dashboard) => (
-          <Link
-            key={dashboard.id}
-            href={dashboard.path}
-            className="group rounded-2xl border border-green-100 bg-white px-4 py-3 transition hover:border-green-200 hover:bg-green-100/50"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-black text-green-950">
-                {dashboard.label}
-              </p>
-              <ArrowRight
-                size={15}
-                className="text-green-800 transition group-hover:translate-x-0.5"
-              />
-            </div>
-            <p className="mt-1 text-xs font-bold leading-5 text-slate-600">
-              {dashboard.helper}
-            </p>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function DashboardCard({ children }: { children: ReactNode }) {
   return (

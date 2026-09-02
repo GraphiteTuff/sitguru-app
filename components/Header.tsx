@@ -882,16 +882,17 @@ export default function Header({ user = null }: HeaderProps) {
                           <p className="mt-1 text-sm font-semibold tracking-[-0.01em] text-emerald-700">
                             {displayRole}
                           </p>
-                          <AccountRoleSwitcher
-                            currentRole={currentSwitchRole}
-                            authorizedRoles={authorizedRoles}
-                            onNavigate={() => setAvatarOpen(false)}
-                          />
                         </div>
                       </div>
                     </div>
 
                     <div className="grid gap-1 p-3">
+                      <AccountRoleSwitcher
+                        currentRole={currentSwitchRole}
+                        authorizedRoles={authorizedRoles}
+                        onNavigate={() => setAvatarOpen(false)}
+                        className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
+                      />
                       {accountMenuLinks.map((item) => (
                         <Link
                           key={item.href}
@@ -984,15 +985,16 @@ export default function Header({ user = null }: HeaderProps) {
                       <p className="text-sm font-semibold tracking-[-0.01em] text-emerald-700">
                         {displayRole}
                       </p>
-                      <AccountRoleSwitcher
-                        currentRole={currentSwitchRole}
-                        authorizedRoles={authorizedRoles}
-                        onNavigate={() => setMobileOpen(false)}
-                      />
                     </div>
                   </div>
                   <NotificationBell />
                 </div>
+                <AccountRoleSwitcher
+                  currentRole={currentSwitchRole}
+                  authorizedRoles={authorizedRoles}
+                  onNavigate={() => setMobileOpen(false)}
+                  className="mt-3 rounded-2xl border border-emerald-100 bg-white/80 p-2"
+                />
               </div>
             ) : null}
 

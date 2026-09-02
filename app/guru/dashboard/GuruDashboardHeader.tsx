@@ -6,10 +6,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
 import {
-  getAvailableDashboardSwitches,
   resolveAuthorizedRolesFromProfile,
-  toRoleSwitchOptions,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
 import {
@@ -21,7 +20,6 @@ import {
   LayoutDashboard,
   LogOut,
   MessageCircle,
-  Repeat2,
   UserCircle,
   UserPlus,
   Wallet,
@@ -262,18 +260,6 @@ export default function GuruDashboardHeader({
   });
 
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
-
-  const guruSwitchOptions = useMemo(
-    () =>
-      toRoleSwitchOptions(
-        getAvailableDashboardSwitches({
-          currentRole: "guru",
-          authorizedRoles: loadedProfile.authorizedRoles,
-          includeAdmin: true,
-        }),
-      ),
-    [loadedProfile.authorizedRoles],
-  );
 
   useEffect(() => {
     setLoadedProfile((current) => ({
@@ -634,25 +620,12 @@ export default function GuruDashboardHeader({
                 </div>
 
                 <div className="grid gap-1 bg-white p-3">
-                  {guruSwitchOptions.length ? (
-                    <div className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2">
-                      <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                        Switch Portal
-                      </p>
-                      {guruSwitchOptions.map((option) => (
-                        <Link
-                          key={option.href}
-                          href={option.href}
-                          role="menuitem"
-                          onClick={() => setAccountMenuOpen(false)}
-                          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-semibold tracking-[-0.01em] text-emerald-900 transition hover:bg-white"
-                        >
-                          <Repeat2 className="h-4 w-4" />
-                          {option.label}
-                        </Link>
-                      ))}
-                    </div>
-                  ) : null}
+                  <AccountRoleSwitcher
+                    currentRole="guru"
+                    authorizedRoles={loadedProfile.authorizedRoles}
+                    onNavigate={() => setAccountMenuOpen(false)}
+                    className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
+                  />
 
                   {guruAccountMenuLinks.map((item) => (
                     <Link
@@ -786,24 +759,12 @@ export default function GuruDashboardHeader({
                 </div>
               </div>
 
-              {guruSwitchOptions.length ? (
-                <div className="mt-3 rounded-2xl border border-emerald-100 bg-white/80 p-2">
-                  <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                    Switch Portal
-                  </p>
-                  {guruSwitchOptions.map((option) => (
-                    <Link
-                      key={`mobile-switch-${option.href}`}
-                      href={option.href}
-                      onClick={() => setAccountMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold tracking-[-0.01em] text-emerald-800 transition hover:bg-emerald-50"
-                    >
-                      <Repeat2 className="h-4 w-4" />
-                      {option.label}
-                    </Link>
-                  ))}
-                </div>
-              ) : null}
+              <AccountRoleSwitcher
+                currentRole="guru"
+                authorizedRoles={loadedProfile.authorizedRoles}
+                onNavigate={() => setAccountMenuOpen(false)}
+                className="mt-3 rounded-2xl border border-emerald-100 bg-white/80 p-2"
+              />
             </div>
 
             {guruAccountMenuLinks.map((item) => (

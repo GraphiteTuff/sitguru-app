@@ -28,6 +28,7 @@ import {
   type HrLeadRecord,
 } from "@/lib/admin/hr/dashboard";
 import { getGrowthHirePipelineSummary } from "@/lib/admin/growth/pipeline";
+import { countCareerJobs } from "@/lib/careers/jobs";
 import {
   VETERANS_MILITARY_FAMILIES_PROGRAM,
 } from "@/lib/programs/veterans-military-families";
@@ -51,6 +52,7 @@ const routes = {
   backgroundChecks: "/admin/background-checks",
   settings: "/admin/settings",
   growthHire: "/admin/hr/growth-hire",
+  careers: "/admin/hr/careers",
   growthPortal: "/admin/growth",
   users: "/admin/users",
   messages: "/admin/messages",
@@ -349,9 +351,10 @@ export default async function AdminHrPage() {
     );
   }
 
-  const [data, growthHire] = await Promise.all([
+  const [data, growthHire, careerCounts] = await Promise.all([
     getHrDashboardData(),
     getGrowthHirePipelineSummary(),
+    countCareerJobs(),
   ]);
 
   const liveModules: ModuleCard[] = [
@@ -438,6 +441,15 @@ export default async function AdminHrPage() {
       wiring: "live",
       value: `${growthHire.approvedSchools} / ${growthHire.schools}`,
       icon: <Sparkles size={20} />,
+    },
+    {
+      eyebrow: "Careers",
+      title: "Job & Internship Board",
+      description: `${careerCounts.published} published on sitguru.com/careers — ${careerCounts.careers} careers, ${careerCounts.internships} internships. Add roles by track.`,
+      href: routes.careers,
+      wiring: "live",
+      value: String(careerCounts.published),
+      icon: <BriefcaseBusiness size={20} />,
     },
     {
       eyebrow: "HQ People",
@@ -559,6 +571,13 @@ export default async function AdminHrPage() {
               >
                 <Sparkles size={17} />
                 Hire Social
+              </Link>
+              <Link
+                href={routes.careers}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+              >
+                <BriefcaseBusiness size={17} />
+                Post a Job
               </Link>
             </div>
           </div>
@@ -866,6 +885,11 @@ export default async function AdminHrPage() {
                 contractor starts the 30-day trial.
               </li>
               <li>
+                Publish company careers and SitGuru Internship Program roles on
+                the Job &amp; Internship Board. Those listings feed
+                sitguru.com/careers. Prefer paid internships plus college credit.
+              </li>
+              <li>
                 Other HQ people access (roles, passwords, MFA) still lives in
                 Admin Settings.
               </li>
@@ -884,6 +908,12 @@ export default async function AdminHrPage() {
                 className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
               >
                 Hire Social & Community
+              </Link>
+              <Link
+                href={routes.careers}
+                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+              >
+                Careers board
               </Link>
               <Link
                 href={routes.growthPortal}

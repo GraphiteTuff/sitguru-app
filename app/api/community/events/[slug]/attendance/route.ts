@@ -23,7 +23,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 type RouteContext = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
 };
 
 export function OPTIONS(req: NextRequest) {
@@ -84,8 +84,6 @@ async function resolveListedEvent(id: string): Promise<ListedEvent | null> {
     };
   }
 
-  // Curated homepage / carousel cards (demo-homepage-*) — allow Attending + Share.
-  // Map string demo ids → stable UUIDs because community_event_attendance.event_id is uuid.
   if (isHomepageDemoEvent(id)) {
     const curated = getCuratedBucksMontgomeryPetEvents().find(
       (row) => row.id === id,
@@ -103,7 +101,7 @@ async function resolveListedEvent(id: string): Promise<ListedEvent | null> {
 }
 
 export async function GET(req: NextRequest, context: RouteContext) {
-  const { id: rawId } = await context.params;
+  const { slug: rawId } = await context.params;
   const listed = await resolveListedEvent(rawId);
   const id = listed?.id || toAttendanceEventId(rawId);
   const counts = await getEventAttendanceCounts(id);
@@ -130,7 +128,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
 export async function POST(req: NextRequest, context: RouteContext) {
   const resolved = await resolveRequestUser(req);
-  const { id: rawId } = await context.params;
+  const { slug: rawId } = await context.params;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const status = String(body.status || "going") as AttendanceStatus;
   const guestKey = readGuestKey(req, body);

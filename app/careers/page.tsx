@@ -16,16 +16,20 @@ import {
   Trophy,
   UsersRound,
 } from "lucide-react";
+import { CareersJobBoard } from "@/components/careers/CareersJobBoard";
+import { listPublishedCareerJobs } from "@/lib/careers/jobs";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
-  title: "Careers & Opportunities | SitGuru",
+  title: "Careers, Internships & Opportunities | SitGuru",
   description:
-    "Grow with SitGuru as a Guru, through Student Hire, Community Hire, or Veterans & Military Families pathways — or explore future company roles as we scale.",
+    "Search SitGuru careers and paid internships, or grow as a Guru through Student Hire, Community Hire, and Veterans & Military Families pathways.",
   openGraph: {
-    title: "Careers & Opportunities | SitGuru",
+    title: "Careers, Internships & Opportunities | SitGuru",
     description:
-      "Most SitGuru opportunities today start with becoming a Guru. Explore marketplace paths, guided programs, and future team roles.",
+      "Open company roles, SitGuru Internship Program postings, marketplace Guru paths, and guided hire programs.",
   },
 };
 
@@ -116,14 +120,15 @@ const opportunityTypes = [
       "Student Hire, Community Hire, and Veterans & Military Families — structured on-ramps toward Guru status.",
   },
   {
-    title: "Future company roles",
+    title: "Company careers & internships",
     description:
-      "As SitGuru scales, we may open operations, support, partnerships, marketing, and technology roles. Those are separate from Guru work.",
+      "Paid SitGuru roles and the SitGuru Internship Program — searchable below. Interns support a paid manager and can earn college credit.",
   },
 ];
 
 const quickStats = [
-  "Pet Parent marketplace",
+  "Open careers",
+  "Paid internships",
   "Guru opportunities",
   "Student Hire",
   "Community Hire",
@@ -168,23 +173,23 @@ const applicationSupport = [
 const faqs = [
   {
     q: "Is this a traditional job board?",
-    a: "Not primarily. Most opportunities today are marketplace Guru paths and guided programs that lead toward becoming a Guru. Future SitGuru company roles may open as we grow — those are separate from Guru work.",
+    a: "It is both. Search open SitGuru careers and internships below. Most marketplace opportunities are still Guru paths and guided programs. Company roles are posted separately when they are live.",
   },
   {
     q: "What’s the difference between Careers and Programs?",
-    a: "Careers is the overview of how people grow with SitGuru. Programs are the specific guided pathways (Student Hire, Community Hire, Veterans & Military Families) with their own applications and partner on-ramps.",
+    a: "Careers includes paid company jobs, the SitGuru Internship Program, and Guru growth. Programs are guided pathways (Student Hire, Community Hire, Veterans & Military Families) toward becoming a Guru.",
+  },
+  {
+    q: "Are SitGuru internships unpaid?",
+    a: "Our preferred model is a paid hourly internship that is also eligible for academic credit through the student’s college. Unpaid placements are only considered through a college-approved educational program — SitGuru does not advertise unpaid work in exchange for credit on its own.",
   },
   {
     q: "Does “Hire” mean SitGuru employs me?",
-    a: "Program names like Student Hire and Community Hire describe pathways into SitGuru — typically toward independent Guru marketplace work, not a guarantee of W-2 employment. Review each program page for details.",
+    a: "Company career postings are SitGuru roles. Program names like Student Hire and Community Hire describe pathways into Guru marketplace work, not a guarantee of W-2 employment. Review each listing or program page.",
   },
   {
-    q: "How do I apply for a future company role?",
-    a: "We are not listing open corporate positions on this page yet. The fastest way to grow with us today is Become a Guru or Apply to a Program. Partners and applicants can also reach us through Partners or Support.",
-  },
-  {
-    q: "I’m a career center or workforce partner. Where do I go?",
-    a: "Visit Partners to explore referral and collaboration options, or Programs to see how Student Hire, Community Hire, and Veterans & Military Families fit your community.",
+    q: "I’m a career center or college coordinator. Where do I go?",
+    a: "Email jason@sitguru.com about becoming an internship site, or visit Partners for Student Hire, Community Hire, and Veterans & Military Families referral options.",
   },
 ];
 
@@ -290,20 +295,33 @@ function InfoList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-export default function CareersPage() {
+export default async function CareersPage() {
+  const openJobs = await listPublishedCareerJobs();
+
   return (
-    <main className="min-h-screen bg-[#f9faf5] pb-[calc(6rem+env(safe-area-inset-bottom))] text-slate-950 sm:pb-0">
+    <main className="min-h-screen bg-[#f9faf5] pb-[calc(8.5rem+env(safe-area-inset-bottom))] text-slate-950 sm:pb-0">
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <Link
-          href="/become-a-guru"
-          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-green-800 px-6 py-4 text-base font-black text-white shadow-lg shadow-emerald-900/20 transition hover:bg-green-900"
-        >
-          Become a Guru
-          <ArrowRight size={18} />
-        </Link>
+        <div className="grid grid-cols-2 gap-2">
+          <Link
+            href="#open-roles"
+            className="flex min-h-12 items-center justify-center rounded-full border border-emerald-200 bg-white px-3 text-sm font-black text-green-900"
+          >
+            Search jobs
+          </Link>
+          <Link
+            href="/become-a-guru"
+            className="flex min-h-12 items-center justify-center gap-1 rounded-full bg-green-800 px-3 text-sm font-black text-white"
+          >
+            Become a Guru
+            <ArrowRight size={16} />
+          </Link>
+        </div>
       </div>
 
-      <section className="relative overflow-hidden bg-gradient-to-br from-green-950 via-green-900 to-emerald-800 px-4 py-12 text-white sm:px-6 sm:py-16 lg:px-8 lg:py-20">
+      <section
+        className="public-dark-section relative overflow-hidden bg-gradient-to-br from-green-950 via-green-900 to-emerald-800 px-4 py-12 text-white sm:px-6 sm:py-16 lg:px-8 lg:py-20"
+        data-brand-green
+      >
         <div className="absolute inset-0 opacity-20">
           <div className="absolute left-[-80px] top-[-80px] h-72 w-72 rounded-full bg-white blur-3xl" />
           <div className="absolute bottom-[-120px] right-[-120px] h-96 w-96 rounded-full bg-emerald-300 blur-3xl" />
@@ -317,30 +335,37 @@ export default function CareersPage() {
             </div>
 
             <h1 className="max-w-5xl text-4xl font-black leading-[1.05] tracking-tight !text-white drop-shadow-sm sm:text-5xl lg:text-6xl">
-              Grow with SitGuru as a Guru, program participant, or future team
-              member.
+              Search SitGuru careers, internships, and Guru pathways.
             </h1>
 
             <p className="mt-5 max-w-3xl text-base font-semibold leading-8 !text-white/90 sm:text-lg">
-              SitGuru is a trusted pet care marketplace where Pet Parents
-              connect with local Gurus. Most opportunities today start with
-              becoming a Guru — not a traditional corporate job listing.
+              Open company roles and the SitGuru Internship Program are posted
+              here. Most marketplace opportunities still start with becoming a
+              Guru — plus Student Hire, Community Hire, and{" "}
+              {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}.
             </p>
 
             <p className="mt-4 max-w-3xl text-base font-semibold leading-8 !text-white/80">
-              You can also apply through Student Hire, Community Hire, or{" "}
-              {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName} pathways. As we
-              grow, future company roles may open in operations, support, and
-              more.
+              Internships are paid hourly and academic-credit eligible. They
+              support a paid Social Media &amp; Community Growth Manager — they
+              do not replace that hire.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Link
-                href="/become-a-guru"
+                href="#open-roles"
                 className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-7 py-4 text-base font-black text-green-950 shadow-xl shadow-black/20 transition hover:bg-green-50 sm:w-auto"
               >
-                Become a Guru
+                Search open roles
                 <ArrowRight size={18} />
+              </Link>
+
+              <Link
+                href="/become-a-guru"
+                className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-7 py-4 text-base font-black !text-white transition hover:bg-white/15 sm:w-auto"
+              >
+                Become a Guru
+                <PawPrint size={18} />
               </Link>
 
               <Link
@@ -391,10 +416,10 @@ export default function CareersPage() {
 
               <div className="space-y-3">
                 {[
-                  "Start by becoming a Guru or applying to a program",
-                  "Build a profile Pet Parents can find and trust",
-                  "Complete onboarding, trust, and safety steps",
-                  "Grow with SitGuru through reliable care and strong communication",
+                  "Search paid careers and internships below",
+                  "Or start as a Guru / apply to a hire program",
+                  "Interns get mentoring, portfolio work, and college credit options",
+                  "The best interns can grow into paid SitGuru roles",
                 ].map((item) => (
                   <div
                     key={item}
@@ -428,12 +453,12 @@ export default function CareersPage() {
               Three ways to grow
             </p>
             <h2 className="mt-2 text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-              Careers here means marketplace paths, programs, and future roles.
+              Careers here means open jobs, internships, Guru paths, and programs.
             </h2>
             <p className="mt-3 text-base font-semibold leading-7 text-slate-600">
-              We keep naming clear so visitors and partners know what they are
-              applying for — Guru work today, guided pathways when you need
-              support, and company roles when those listings open.
+              Search live SitGuru postings first. Guru work and guided hire
+              programs remain the main marketplace paths. Company roles and
+              internships are listed when HR publishes them.
             </p>
           </div>
 
@@ -449,6 +474,58 @@ export default function CareersPage() {
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                   {item.description}
                 </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section
+          id="open-roles"
+          className="rounded-[32px] border border-green-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8"
+        >
+          <div className="mb-5 max-w-3xl">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
+              Career search
+            </p>
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
+              Open SitGuru careers and internships
+            </h2>
+            <p className="mt-3 text-base font-semibold leading-7 text-slate-600">
+              Filter by careers or internships. These listings are managed by
+              SitGuru HR and go live as soon as they are published.
+            </p>
+          </div>
+          <CareersJobBoard jobs={openJobs} />
+        </section>
+
+        <section className="rounded-[32px] border border-green-100 bg-emerald-50 p-5 shadow-sm sm:p-6 lg:p-8">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
+            SitGuru Internship Program
+          </p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
+            Paid, remote, academic-credit eligible — not free labor.
+          </h2>
+          <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-slate-600">
+            Interns work 8–12 hours a week with SitGuru leadership and support
+            the Social Media &amp; Community Growth Manager. Preferred model:
+            paid hourly plus college credit through the student&apos;s school
+            (for example Bucks County Community College MKTG-280). Semester
+            rotations keep the program educational and recurring.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[
+              "Social Media & Digital Marketing",
+              "Community Partnerships",
+              "Pet Event Marketing",
+              "Graphic Design / Content",
+              "Software Development",
+              "Data / Analytics",
+            ].map((track) => (
+              <div
+                key={track}
+                className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm font-black text-green-950"
+              >
+                {track}
               </div>
             ))}
           </div>
@@ -639,7 +716,7 @@ export default function CareersPage() {
               </p>
 
               <h2 className="mt-2 text-3xl font-black tracking-tight !text-white sm:text-4xl">
-                Apply today and take the first step with SitGuru.
+                Search a role, apply as a Guru, or start an internship.
               </h2>
 
               <p className="mt-3 max-w-4xl text-sm font-semibold leading-6 !text-white/85 sm:text-base sm:leading-7">

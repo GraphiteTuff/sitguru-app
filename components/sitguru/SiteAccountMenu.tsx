@@ -128,6 +128,24 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
   const loadedAccount = account;
   const initials = getInitials(loadedAccount.name, loadedAccount.email);
   const currentRole = resolveDashboardRoleFromPath(pathname);
+  const roleLabel =
+    currentRole === "guru"
+      ? "SitGuru Guru"
+      : currentRole === "ambassador"
+        ? "SitGuru Ambassador"
+        : currentRole === "parent"
+          ? "SitGuru Pet Parent"
+          : currentRole === "admin"
+            ? "SitGuru Admin"
+            : "SitGuru";
+  const dashboardHref =
+    currentRole === "guru"
+      ? "/guru/dashboard"
+      : currentRole === "ambassador"
+        ? "/ambassador/dashboard"
+        : currentRole === "admin"
+          ? "/admin"
+          : "/customer/dashboard";
 
   async function handleLogout() {
     setOpen(false);
@@ -199,47 +217,27 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
                     {loadedAccount.email}
                   </p>
                 ) : null}
-                <AccountRoleSwitcher
-                  currentRole={currentRole}
-                  authorizedRoles={loadedAccount.authorizedRoles}
-                  onNavigate={() => setOpen(false)}
-                />
+                <p className="mt-1 text-base font-semibold tracking-[-0.01em] text-emerald-700">
+                  {roleLabel}
+                </p>
               </div>
             </div>
           </div>
 
           <div className="grid gap-1 p-3">
+            <AccountRoleSwitcher
+              currentRole={currentRole}
+              authorizedRoles={loadedAccount.authorizedRoles}
+              onNavigate={() => setOpen(false)}
+              className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
+            />
             <Link
-              href="/customer/dashboard"
+              href={dashboardHref}
               role="menuitem"
               onClick={() => setOpen(false)}
               className="rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
             >
-              Pet Parent
-            </Link>
-            <Link
-              href="/guru/dashboard"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
-            >
-              Guru
-            </Link>
-            <Link
-              href="/ambassador/dashboard"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
-            >
-              Ambassador
-            </Link>
-            <Link
-              href="/admin"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
-            >
-              Admin
+              Dashboard
             </Link>
             <button
               type="button"

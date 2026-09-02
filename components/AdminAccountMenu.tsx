@@ -304,8 +304,14 @@ export default function AdminAccountMenu() {
     router.refresh();
   }
 
+  const adminSwitchRoles = isSitGuruSuperUser(account.email)
+    ? FOUNDER_ROLES
+    : growthOnly
+      ? ([] as const)
+      : (["parent", "admin"] as const);
+
   return (
-    <div ref={menuRef} className="relative hidden sm:block">
+    <div ref={menuRef} className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -370,21 +376,17 @@ export default function AdminAccountMenu() {
                 <p className="mt-1 text-base font-black text-green-800">
                   {account.roleLabel}
                 </p>
-
-                {isSitGuruSuperUser(account.email) ? (
-                  <AccountRoleSwitcher
-                    currentRole={
-                      resolveDashboardRoleFromPath(pathname) || "admin"
-                    }
-                    authorizedRoles={FOUNDER_ROLES}
-                    onNavigate={() => setOpen(false)}
-                  />
-                ) : null}
               </div>
             </div>
           </div>
 
           <div className="grid gap-1 p-3">
+            <AccountRoleSwitcher
+              currentRole={resolveDashboardRoleFromPath(pathname) || "admin"}
+              authorizedRoles={adminSwitchRoles}
+              onNavigate={() => setOpen(false)}
+              className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
+            />
             <Link
               href="/admin/growth"
               role="menuitem"
