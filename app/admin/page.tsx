@@ -361,6 +361,12 @@ export default async function AdminOperationsDashboard() {
 
   const actions: ActionCard[] = [
     {
+      title: "Open Growth Portal",
+      description: "Same Social & Community workspace the hire uses — campaigns, tracking links, and signups.",
+      href: "/admin/growth",
+      priority: "High",
+    },
+    {
       title: "Review Guru Approvals",
       description: "Approve, request fixes, or send Checkr invites.",
       href: "/admin/guru-approvals",
@@ -452,6 +458,7 @@ export default async function AdminOperationsDashboard() {
     {
       title: "Growth",
       links: [
+        ["Growth Portal", "/admin/growth"],
         ["Programs", "/admin/programs"],
         ["Referrals", "/admin/referrals"],
         ["Sales & Marketing", "/admin/sales-marketing"],

@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Settings,
   ShieldCheck,
+  Megaphone,
   Users,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -181,6 +182,7 @@ export default function AdminAccountMenu() {
   const [account, setAccount] = useState<AdminAccount>(() =>
     getAdminAccountFromEmail(null),
   );
+  const [growthOnly, setGrowthOnly] = useState(false);
 
   const topButtonRoleLabel = useMemo(() => {
     return account.roleLabel.replace("SitGuru ", "");
@@ -228,6 +230,20 @@ export default function AdminAccountMenu() {
     }
 
     loadCurrentAdmin();
+
+    fetch("/api/admin/session")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!mounted || !data) return;
+        setGrowthOnly(data.workspace === "growth");
+        if (data.workspace === "growth") {
+          setAccount((current) => ({
+            ...current,
+            roleLabel: "Social & Community",
+          }));
+        }
+      })
+      .catch(() => {});
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       const sessionEmail = session?.user?.email || getStoredSessionEmail();
@@ -354,6 +370,18 @@ export default function AdminAccountMenu() {
 
           <div className="grid gap-1 p-3">
             <Link
+              href="/admin/growth"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
+            >
+              <Megaphone size={19} className="text-green-800" />
+              Growth Portal
+            </Link>
+
+            {growthOnly ? null : (
+              <>
+            <Link
               href="/admin"
               role="menuitem"
               onClick={() => setOpen(false)}
@@ -361,6 +389,16 @@ export default function AdminAccountMenu() {
             >
               <LayoutDashboard size={19} className="text-green-800" />
               Dashboard
+            </Link>
+
+            <Link
+              href="/admin/hr/growth-hire"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
+            >
+              <Users size={19} className="text-green-800" />
+              Hire Social
             </Link>
 
             <Link
@@ -402,6 +440,8 @@ export default function AdminAccountMenu() {
               <Settings size={19} className="text-green-800" />
               Settings
             </Link>
+              </>
+            )}
 
             <Link
               href="/"

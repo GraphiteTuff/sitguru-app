@@ -1871,10 +1871,18 @@ export default async function AdminSettingsPage({
               </h1>
 
               <p className="mt-4 max-w-4xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-                Assign HQ roles from this page — including Social & Community
-                Manager for the growth hire. Find the person in User Directory,
-                then grant access here. They get marketing tools only: no
-                Stripe, payouts, IDs, or private messages.
+                Assign HQ roles from this page. To hire the Social & Community
+                Manager, use{" "}
+                <Link href="/admin/hr/growth-hire" className="font-black text-emerald-800">
+                  HR → Hire Social
+                </Link>
+                . That opens the{" "}
+                <Link href="/admin/growth" className="font-black text-emerald-800">
+                  Growth Portal
+                </Link>{" "}
+                for them. Super Admins can use the same portal. They get
+                marketing tools only: no Stripe, payouts, IDs, or private
+                messages.
               </p>
             </div>
 

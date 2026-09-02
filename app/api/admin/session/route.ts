@@ -14,5 +14,7 @@ export async function GET() {
     workspace: isGrowthOnlyRole(identity.role) ? "growth" : "full",
     isSuperUser: identity.isSuperUser,
     canManageUsers: identity.canManageUsers,
+    canUseGrowthPortal:
+      identity.isSuperUser || isGrowthOnlyRole(identity.role),
   });
 }

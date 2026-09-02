@@ -49,6 +49,8 @@ const routes = {
   guruApprovals: "/admin/guru-approvals",
   backgroundChecks: "/admin/background-checks",
   settings: "/admin/settings",
+  growthHire: "/admin/hr/growth-hire",
+  growthPortal: "/admin/growth",
   users: "/admin/users",
   messages: "/admin/messages",
   exports: "/admin/exports",
@@ -425,6 +427,15 @@ export default async function AdminHrPage() {
       icon: <BriefcaseBusiness size={20} />,
     },
     {
+      eyebrow: "Growth Hire",
+      title: "Social & Community Manager",
+      description:
+        "Hire the contractor, grant Growth Portal access, and keep them off Financials and private messages.",
+      href: routes.growthHire,
+      wiring: "live",
+      icon: <Sparkles size={20} />,
+    },
+    {
       eyebrow: "HQ People",
       title: "Admin Access Control",
       description:
@@ -539,11 +550,11 @@ export default async function AdminHrPage() {
                 University
               </Link>
               <Link
-                href={routes.newGuru}
+                href={routes.growthHire}
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-900"
               >
-                <PawPrint size={17} />
-                Add Guru
+                <Sparkles size={17} />
+                Hire Social
               </Link>
             </div>
           </div>
@@ -846,8 +857,13 @@ export default async function AdminHrPage() {
                 Approvals, Trust &amp; Safety, University, Programs, and Settings.
               </li>
               <li>
-                HQ people access (roles, passwords, MFA) lives in Admin Settings —
-                not a second HR access UI.
+                Hire the Social & Community Manager here. That grant opens the
+                Growth Portal and keeps them off Financials, Users, and private
+                messages. Super Admins can open the same portal anytime.
+              </li>
+              <li>
+                Other HQ people access (roles, passwords, MFA) still lives in
+                Admin Settings.
               </li>
               <li>
                 Contractor payouts stay in Payouts / Financials. Employee payroll
@@ -860,8 +876,20 @@ export default async function AdminHrPage() {
             </ul>
             <div className="mt-5 flex flex-wrap gap-2">
               <Link
-                href={routes.settings}
+                href={routes.growthHire}
                 className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+              >
+                Hire Social & Community
+              </Link>
+              <Link
+                href={routes.growthPortal}
+                className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-50"
+              >
+                Growth Portal
+              </Link>
+              <Link
+                href={routes.settings}
+                className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-50"
               >
                 HQ People Access
               </Link>

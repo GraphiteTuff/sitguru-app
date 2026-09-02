@@ -29,7 +29,6 @@ export function isGrowthAllowedAdminPath(pathname: string) {
   const path = pathname || "/";
 
   if (path === "/admin/login") return true;
-  if (path === "/admin" || path === "/admin/") return true;
 
   return GROWTH_ALLOWED_ADMIN_PREFIXES.some(
     (prefix) => path === prefix || path.startsWith(`${prefix}/`),

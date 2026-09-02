@@ -28,6 +28,7 @@ import {
   MessageCircle,
   PawPrint,
   PieChart,
+  Plus,
   Radio,
   Search,
   Settings,
@@ -35,10 +36,13 @@ import {
   UserPlus,
   Users,
   WalletCards,
+  Images,
+  FolderOpen,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import AdminAccountMenu from "@/components/AdminAccountMenu";
 import RogueFloatingAssistant from "@/components/admin/RogueFloatingAssistant";
+import GrowthPhoneBar from "@/components/admin/growth/GrowthPhoneBar";
 import { SafeAssistantBubble } from "@/components/messaging/ChatBubbleErrorBoundary";
 
 const adminRoutes = {
@@ -53,6 +57,14 @@ const adminRoutes = {
   support: "/admin/support",
   settings: "/admin/settings",
   growth: "/admin/growth",
+  growthCreate: "/admin/growth/create",
+  growthCampaigns: "/admin/growth/campaigns",
+  growthContent: "/admin/growth/content",
+  growthGurus: "/admin/growth/gurus",
+  growthEvents: "/admin/growth/events",
+  growthPartners: "/admin/growth/partners",
+  growthMedia: "/admin/growth/media",
+  growthAnalytics: "/admin/growth/analytics",
   trustSafety: "/admin/background-checks",
   hr: "/admin/hr",
   universityTraining: "/admin/ambassador-training",
@@ -95,42 +107,27 @@ const adminRoutes = {
 
 const growthNavSections = [
   {
-    title: "Growth & Community",
+    title: "Growth Portal",
     items: [
-      { label: "Growth Home", href: adminRoutes.growth, icon: Megaphone },
-      {
-        label: "Sales & Marketing",
-        href: adminRoutes.salesMarketing,
-        icon: Megaphone,
-      },
-      {
-        label: "Market Growth Map",
-        href: adminRoutes.marketGrowth,
-        icon: MapPin,
-      },
-      { label: "Growth & Referrals", href: adminRoutes.referrals, icon: Link2 },
-      { label: "Partners", href: adminRoutes.partners, icon: HandCoins },
-      {
-        label: "Pet Events",
-        href: adminRoutes.communityEvents,
-        icon: CalendarDays,
-      },
-      {
-        label: "Pet Event Markets",
-        href: adminRoutes.communityMarkets,
-        icon: MapPin,
-      },
+      { label: "Home", href: adminRoutes.growth, icon: Home },
+      { label: "Create", href: adminRoutes.growthCreate, icon: Plus },
+      { label: "Campaigns", href: adminRoutes.growthCampaigns, icon: Megaphone },
+      { label: "Content", href: adminRoutes.growthContent, icon: FolderOpen },
+      { label: "Gurus", href: adminRoutes.growthGurus, icon: PawPrint },
+      { label: "Events", href: adminRoutes.growthEvents, icon: CalendarDays },
+      { label: "Partners", href: adminRoutes.growthPartners, icon: HandCoins },
+      { label: "Media", href: adminRoutes.growthMedia, icon: Images },
+      { label: "Analytics", href: adminRoutes.growthAnalytics, icon: BarChart3 },
     ],
   },
 ];
 
 const growthHeaderLinks = [
-  { label: "Homepage", href: "/" },
-  { label: "Growth Home", href: adminRoutes.growth },
-  { label: "Sales & Marketing", href: adminRoutes.salesMarketing },
-  { label: "Pet Events", href: adminRoutes.communityEvents },
-  { label: "Partners", href: adminRoutes.partners },
-  { label: "Referrals", href: adminRoutes.referrals },
+  { label: "Home", href: adminRoutes.growth },
+  { label: "Create", href: adminRoutes.growthCreate },
+  { label: "Campaigns", href: adminRoutes.growthCampaigns },
+  { label: "Content", href: adminRoutes.growthContent },
+  { label: "Analytics", href: adminRoutes.growthAnalytics },
 ];
 
 const navSections = [
@@ -171,6 +168,11 @@ const navSections = [
   {
     title: "Growth & Marketing",
     items: [
+      {
+        label: "Growth Portal",
+        href: adminRoutes.growth,
+        icon: Megaphone,
+      },
       {
         label: "Sales & Marketing",
         href: adminRoutes.salesMarketing,
@@ -844,9 +846,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "";
   const isAdminLoginPage = pathname === "/admin/login";
   const [workspace, setWorkspace] = useState<"full" | "growth">("full");
-  const isGrowthWorkspace = workspace === "growth";
-  const visibleNavSections = isGrowthWorkspace ? growthNavSections : navSections;
-  const visibleHeaderLinks = isGrowthWorkspace
+  const [isSuperUser, setIsSuperUser] = useState(false);
+  const onGrowthPortal = pathname.startsWith("/admin/growth");
+  const isGrowthChrome = workspace === "growth" || onGrowthPortal;
+  const visibleNavSections = isGrowthChrome ? growthNavSections : navSections;
+  const visibleHeaderLinks = isGrowthChrome
     ? growthHeaderLinks
     : topHeaderLinks;
 
@@ -856,9 +860,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     fetch("/api/admin/session")
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
-        if (!cancelled && data?.workspace === "growth") {
-          setWorkspace("growth");
-        }
+        if (cancelled || !data) return;
+        if (data.workspace === "growth") setWorkspace("growth");
+        setIsSuperUser(Boolean(data.isSuperUser));
       })
       .catch(() => {});
 
@@ -886,13 +890,25 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </p>
 
                 <h2 className="mt-1 text-[2.05rem] font-black leading-[0.92] tracking-tight text-green-950 xl:text-[2.35rem]">
-                  Admin
-                  <br />
-                  Control
+                  {isGrowthChrome ? (
+                    <>
+                      Growth
+                      <br />
+                      Portal
+                    </>
+                  ) : (
+                    <>
+                      Admin
+                      <br />
+                      Control
+                    </>
+                  )}
                 </h2>
 
                 <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-                  Trusted Pet Care. Simplified.
+                  {isGrowthChrome
+                    ? "Campaigns, stories, and signups."
+                    : "Trusted Pet Care. Simplified."}
                 </p>
               </div>
 
@@ -912,10 +928,18 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </p>
 
                 <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">
-                  {isGrowthWorkspace
+                  {isGrowthChrome
                     ? "Promote Gurus, events, and partners. Measure Pet Parent and Guru signups."
                     : "Oversee Pet Parents, Gurus, Ambassadors, approvals, bookings, payments, hiring, growth, training, academies, reporting, taxes, and messages."}
                 </p>
+                {isSuperUser && onGrowthPortal && workspace !== "growth" ? (
+                  <Link
+                    href="/admin"
+                    className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white"
+                  >
+                    Back to Full HQ
+                  </Link>
+                ) : null}
               </div>
             </div>
 
@@ -930,7 +954,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               ))}
             </nav>
 
-            {isGrowthWorkspace ? null : (
+            {isGrowthChrome ? null : (
             <div className="shrink-0 border-t border-[#e8eee5] px-4 py-3">
               <Link
                 href={adminRoutes.settings}
@@ -981,7 +1005,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   <div className="flex items-center gap-2 rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm">
                     <SearchBar />
 
-                    {isGrowthWorkspace ? null : (
+                    {isGrowthChrome ? null : (
                     <>
                     <Link
                       href="/admin/gurus/new"
@@ -1004,7 +1028,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                     )}
                   </div>
 
-                  {isGrowthWorkspace ? null : (
+                  {isGrowthChrome ? null : (
                   <Link
                     href={adminRoutes.messages}
                     className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-800 text-white shadow-sm transition hover:bg-green-900"
@@ -1023,13 +1047,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            <MobileNav pathname={pathname} growthOnly={isGrowthWorkspace} />
+            {isGrowthChrome ? null : (
+              <MobileNav pathname={pathname} growthOnly={false} />
+            )}
           </header>
 
           <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-5 lg:px-6 xl:px-6 2xl:px-7">
             <div className="w-full max-w-none">{children}</div>
 
-            {isGrowthWorkspace ? null : <AdminFooter />}
+            {isGrowthChrome ? null : <AdminFooter />}
+            {isGrowthChrome ? <GrowthPhoneBar pathname={pathname} /> : null}
           </main>
         </div>
       </div>
