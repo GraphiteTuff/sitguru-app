@@ -649,8 +649,7 @@ async function sendCertificationEmail({
       body: JSON.stringify({
         from: getEmailFromName(),
         to: [cleanTo],
-        bcc: mergeAdminBcc(cleanTo),
-        bcc: adminBcc,
+        bcc: mergeAdminBcc(cleanTo, adminBcc),
         subject,
         html: getCertificateNoticeEmailHtml({
           firstName,

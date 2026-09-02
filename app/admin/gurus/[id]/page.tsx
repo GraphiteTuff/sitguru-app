@@ -924,8 +924,11 @@ async function sendGuruStatusEmail(payload: GuruStatusEmailPayload) {
       body: JSON.stringify({
         from: fromEmail,
         to: [payload.toEmail],
-        bcc: mergeAdminBcc(payload.toEmail),
-        bcc: ["jason@sitguru.com", "nette@sitguru.com", "support@sitguru.com"],
+        bcc: mergeAdminBcc(payload.toEmail, [
+          "jason@sitguru.com",
+          "nette@sitguru.com",
+          "support@sitguru.com",
+        ]),
         subject: content.subject,
         text: content.body,
         html: toHtmlEmail({ body: content.body, preview: content.preview }),

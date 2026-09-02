@@ -469,6 +469,7 @@ async function sendDisputeEmail({
       body: JSON.stringify({
         from,
         to,
+        bcc: mergeAdminBcc(to),
         subject,
         html,
         text,
@@ -551,7 +552,6 @@ async function updateDisputeStatus(formData: FormData) {
 
     const emailResult = await sendDisputeEmail({
       to: recipientEmail,
-      bcc: mergeAdminBcc(recipientEmail),
       subject: `SitGuru dispute update: ${disputeNumber}`,
       text: buildDisputeUpdateText({
         customerName,
