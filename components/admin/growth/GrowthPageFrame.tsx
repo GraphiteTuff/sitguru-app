@@ -15,7 +15,7 @@ export function GrowthPageFrame({
   action?: ReactNode;
 }) {
   return (
-    <div className="mx-auto max-w-5xl space-y-5 pb-4">
+    <div className="mx-auto max-w-6xl space-y-5 pb-4">
       <section
         className="public-dark-section overflow-hidden rounded-[1.75rem] border border-emerald-100 p-5 shadow-sm sm:p-7"
         data-brand-green

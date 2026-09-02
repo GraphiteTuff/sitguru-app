@@ -723,9 +723,7 @@ function getRole(row: AnyRow) {
 
 function isCustomerProfile(profile: ProfileRow) {
   const role = getRole(profile as AnyRow);
-
-  if (!role) return true;
-
+  if (["guru", "admin", "ambassador"].includes(role)) return false;
   return [
     "customer",
     "pet_parent",

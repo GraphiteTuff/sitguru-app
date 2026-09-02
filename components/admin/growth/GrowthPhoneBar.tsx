@@ -39,7 +39,7 @@ export default function GrowthPhoneBar({ pathname }: { pathname: string }) {
 
   return (
     <div className="lg:hidden">
-      <div className="h-24" />
+      <div className="h-28" />
       {moreOpen ? (
         <div className="fixed inset-x-0 bottom-24 z-40 px-3">
           <div className="rounded-[1.5rem] border border-emerald-100 bg-white p-3 shadow-xl">
@@ -54,8 +54,8 @@ export default function GrowthPhoneBar({ pathname }: { pathname: string }) {
                     onClick={() => setMoreOpen(false)}
                     className={
                       active
-                        ? "flex min-h-12 items-center gap-2 rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black text-white"
-                        : "flex min-h-12 items-center gap-2 rounded-2xl bg-emerald-50 px-3 text-sm font-black text-emerald-950"
+                    ? "flex min-h-14 items-center gap-2 rounded-2xl bg-[#0D5C3A] px-3 text-sm font-black text-white"
+                    : "flex min-h-14 items-center gap-2 rounded-2xl bg-emerald-50 px-3 text-sm font-black text-emerald-950"
                     }
                   >
                     <Icon size={16} />
@@ -77,11 +77,11 @@ export default function GrowthPhoneBar({ pathname }: { pathname: string }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex min-h-12 flex-1 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
+                className={`flex min-h-14 flex-1 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
                   active ? "text-[#0D5C3A]" : "text-slate-500"
                 }`}
               >
-                <Icon size={18} />
+                <Icon size={22} />
                 {item.label}
               </Link>
             );
@@ -90,10 +90,10 @@ export default function GrowthPhoneBar({ pathname }: { pathname: string }) {
           <Link
             href="/admin/growth/create"
             aria-label="Create"
-            className="mb-1 flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-white shadow-lg"
+            className="mb-1 flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-white shadow-lg"
             style={{ background: "#0D5C3A" }}
           >
-            <Plus size={26} />
+            <Plus size={30} />
           </Link>
 
           {primary.slice(2).map((item) => {
@@ -103,11 +103,11 @@ export default function GrowthPhoneBar({ pathname }: { pathname: string }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex min-h-12 flex-1 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
+                className={`flex min-h-14 flex-1 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
                   active ? "text-[#0D5C3A]" : "text-slate-500"
                 }`}
               >
-                <Icon size={18} />
+                <Icon size={22} />
                 {item.label}
               </Link>
             );
@@ -116,11 +116,11 @@ export default function GrowthPhoneBar({ pathname }: { pathname: string }) {
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
-            className={`flex min-h-12 flex-1 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
+            className={`flex min-h-14 flex-1 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
               moreOpen ? "text-[#0D5C3A]" : "text-slate-500"
             }`}
           >
-            <FolderOpen size={18} />
+            <FolderOpen size={22} />
             More
           </button>
         </div>

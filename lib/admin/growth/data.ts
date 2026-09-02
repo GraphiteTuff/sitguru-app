@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isLivePetParentProfile } from "@/lib/admin/customers/pet-parents";
 import { isPubliclyVisibleGuruProfile } from "@/lib/gurus/public-visibility";
 import {
   campaignTrackingUrl,
@@ -297,7 +298,9 @@ export async function getGrowthHomeStats(): Promise<GrowthHomeStats> {
       safeRows<AnyRow>(
         supabaseAdmin
           .from("profiles")
-          .select("id,role,created_at")
+          .select(
+            "id,role,account_type,signup_role,admin_status,is_demo,is_test_account,is_archived,archived_at,deleted_at,created_at",
+          )
           .gte("created_at", since)
           .limit(2000),
         "growth_week_profiles",
@@ -330,10 +333,7 @@ export async function getGrowthHomeStats(): Promise<GrowthHomeStats> {
       listGrowthContent(),
     ]);
 
-  const petParents = parentRows.filter((row) => {
-    const role = text(row.role).toLowerCase();
-    return role.includes("customer") || role.includes("parent") || !role;
-  }).length;
+  const petParents = parentRows.filter(isLivePetParentProfile).length;
   const visits = events.filter((row) => {
     const type = text(row.event_type).toLowerCase();
     return type === "click" || type === "page_view";

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
+import { notifyHqNewPetParent } from "@/lib/admin/customers/signup-alerts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -519,11 +520,33 @@ function getAdminEmails() {
     .filter(Boolean);
 }
 
+const PET_PARENT_ALERT_SMS = ["+14552290920", "+12534550369"] as const;
+
+function toE164(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return value.startsWith("+") ? value : value;
+}
+
+function uniquePhones(values: string[]) {
+  return Array.from(new Set(values.map(toE164).filter(Boolean)));
+}
+
 function getAdminSmsNumbers() {
-  return (process.env.ADMIN_ALERT_SMS_TO || "+12534552377")
-    .split(",")
-    .map((phone) => phone.trim())
-    .filter(Boolean);
+  return uniquePhones(
+    (process.env.ADMIN_ALERT_SMS_TO || "+12534552377")
+      .split(",")
+      .map((phone) => phone.trim())
+      .filter(Boolean),
+  );
+}
+
+function getSignupSmsNumbers(role: string) {
+  if (role === "pet_parent" || role === "both") {
+    return uniquePhones([...getAdminSmsNumbers(), ...PET_PARENT_ALERT_SMS]);
+  }
+  return getAdminSmsNumbers();
 }
 
 async function sendEmailAlert({
@@ -566,12 +589,7 @@ async function sendEmailAlert({
   return { skipped: false };
 }
 
-async function sendSmsAlert(message: string) {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const fromNumber = process.env.TWILIO_FROM_NUMBER;
-  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-  const recipients = getAdminSmsNumbers();
+async function sendSmsAlert(message: string, recipients = getAdminSmsNumbers()) {
 
   if (
     !accountSid ||
@@ -790,9 +808,17 @@ export async function POST(request: NextRequest) {
   `;
 
   try {
-    const [emailResult, smsResult] = await Promise.all([
+    const [emailResult, smsResult, inApp] = await Promise.all([
       sendEmailAlert({ subject, html, text }),
-      sendSmsAlert(smsMessage),
+      sendSmsAlert(smsMessage, getSignupSmsNumbers(role)),
+      role === "pet_parent" || role === "both"
+        ? notifyHqNewPetParent({
+            userId: id,
+            name,
+            email,
+            phone,
+          })
+        : Promise.resolve({ notified: 0 }),
     ]);
 
     return NextResponse.json({
@@ -812,6 +838,7 @@ export async function POST(request: NextRequest) {
       },
       email: emailResult,
       sms: smsResult,
+      inApp,
     });
   } catch (error) {
     console.error("Signup alert failed:", error);

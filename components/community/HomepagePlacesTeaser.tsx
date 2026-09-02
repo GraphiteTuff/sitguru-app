@@ -16,22 +16,22 @@ export default function HomepagePlacesTeaser() {
           <div className="max-w-2xl">
             <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
               <PawPrint className="h-4 w-4" />
-              Explore with your pet
+              Bring the pack
             </p>
             <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-              Find places where pets are truly welcome.
+              Go where tails are truly welcome.
             </h2>
             <p className="mt-2 text-sm font-semibold text-slate-600 sm:text-base">
-              Restaurants, hotels, dog parks, and pet services — on the same
-              Community map as events. Google’s allowsDogs flag is the first
-              pass; SitGuru scores how welcome pets really are.
+              Patio brunches, cozy stays, sunny dog parks, and trusted pet care
+              — all on the same Community map as local events. SitGuru shows
+              the spots that love your pet back.
             </p>
           </div>
           <Link
             href="/events?view=places"
             className="inline-flex min-h-12 items-center justify-center rounded-full bg-emerald-700 px-6 text-sm font-semibold text-white"
           >
-            Open Pet-Friendly Places
+            Explore pet-friendly places
           </Link>
         </div>
         <div className="mt-6 flex flex-wrap gap-2">

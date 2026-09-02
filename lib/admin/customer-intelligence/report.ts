@@ -50,7 +50,7 @@ function normalizeSource(value: string) {
 
 function isCustomerRole(row: AnyRow) {
   const role = getText(row, ["role", "account_type", "user_role"]).toLowerCase();
-  if (!role) return true;
+  if (["guru", "admin", "ambassador"].includes(role)) return false;
   return [
     "customer",
     "pet_parent",

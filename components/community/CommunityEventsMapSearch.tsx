@@ -756,12 +756,12 @@ export default function CommunityEventsMapSearch({
           </p>
           <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
             {view === "places"
-              ? "Find places where pets are truly welcome"
+              ? "Go where tails are truly welcome"
               : "Find events near you"}
           </h2>
           <p className="mt-2 text-sm font-semibold text-slate-600 sm:text-base">
             {view === "places"
-              ? "Same map as events — restaurants, stays, dog parks, and pet services, scored for how pet-friendly it really is."
+              ? "Patio brunches, cozy stays, sunny dog parks, and trusted pet care — on the same map as local events, with spots that love your pet back."
               : "Search nearby pet friendly events — map on top on phones, side-by-side on desktop."}
           </p>
           <div className="mt-5 inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
