@@ -89,7 +89,7 @@ export function parseDirectoryFilters(
   ) as DirectoryStatusFilter;
 
   const source = (
-    ["all", "profile", "guru", "launch"].includes(sourceRaw)
+    ["all", "profile", "guru", "launch", "hq"].includes(sourceRaw)
       ? sourceRaw
       : "all"
   ) as DirectorySourceFilter;
@@ -169,7 +169,15 @@ export function getProfileRole(profile: Record<string, unknown>) {
     "customer"
   ).toLowerCase();
 
-  if (rawRole.includes("admin")) return "Admin";
+  if (
+    rawRole.includes("social_community") ||
+    rawRole.includes("social & community")
+  ) {
+    return "Social & Community";
+  }
+  if (rawRole.includes("admin") || rawRole.includes("founder") || rawRole.includes("owner")) {
+    return "Admin";
+  }
   if (rawRole.includes("guru") || rawRole.includes("sitter")) return "Guru";
   if (rawRole.includes("vendor")) return "Vendor";
   if (rawRole.includes("educator")) return "Educator";
@@ -364,6 +372,17 @@ export function getProfileHref(user: {
   return `/admin/customers/${encodeURIComponent(user.id)}`;
 }
 
+export function getSettingsHref(user: {
+  email: string;
+  id?: string;
+}) {
+  const email = user.email && user.email !== "—" ? user.email : "";
+  const params = new URLSearchParams();
+  if (email) params.set("q", email);
+  if (user.id) params.set("user", user.id);
+  return `/admin/settings?${params.toString()}`;
+}
+
 export function getScopeHref(user: {
   id: string;
   email: string;
@@ -408,6 +427,64 @@ export function toDirectoryUserFromProfile(
     messageHref: getMessageHref(base),
     profileHref: getProfileHref(base),
     scopeHref: getScopeHref(base),
+    settingsHref: getSettingsHref(base),
+  };
+}
+
+export function toDirectoryUserFromIdentity(
+  row: Record<string, unknown>,
+): DirectoryUser | null {
+  const id =
+    asTrimmedString(row.profile_id) ||
+    asTrimmedString(row.auth_user_id) ||
+    asTrimmedString(row.guru_id) ||
+    asTrimmedString(row.email).toLowerCase();
+
+  if (!id) return null;
+
+  const email = asTrimmedString(row.email) || "—";
+  const name =
+    asTrimmedString(row.display_name) ||
+    email.split("@")[0] ||
+    "SitGuru User";
+  const role = getProfileRole(row);
+  const source = asTrimmedString(row.directory_source) || "Profile";
+  const joinedAt =
+    asTrimmedString(row.profile_created_at) ||
+    asTrimmedString(row.auth_created_at) ||
+    null;
+  const isActive = String(row.is_active || "").toLowerCase();
+  const actionNeeded = asTrimmedString(row.admin_action_needed).toLowerCase();
+  const guruStatus = asTrimmedString(row.guru_status).toLowerCase();
+
+  let status = "Active";
+  if (actionNeeded.includes("suspend") || isActive === "false") status = "Suspended";
+  else if (guruStatus.includes("pending") || actionNeeded.includes("review")) {
+    status = "Pending";
+  } else if (guruStatus.includes("verified") || guruStatus.includes("approved")) {
+    status = "Verified";
+  } else if (!name || email === "—") {
+    status = "Guest";
+  }
+
+  const base = { id, email, name, role, source };
+
+  return {
+    id,
+    name,
+    email,
+    phone: asTrimmedString(row.phone),
+    avatarUrl: "",
+    role,
+    status,
+    risk: actionNeeded ? "Medium" : "Low",
+    joined: formatDateShort(joinedAt),
+    joinedAt,
+    source,
+    messageHref: getMessageHref(base),
+    profileHref: getProfileHref(base),
+    scopeHref: getScopeHref(base),
+    settingsHref: getSettingsHref(base),
   };
 }
 
@@ -445,6 +522,7 @@ export function toDirectoryUserFromLaunch(
     messageHref: getMessageHref(base),
     profileHref: getProfileHref(base),
     scopeHref: getScopeHref(base),
+    settingsHref: getSettingsHref(base),
   };
 }
 
@@ -478,7 +556,13 @@ export function matchesRoleFilter(
     return value.includes("pet parent") || value.includes("customer");
   }
   if (role === "guru") return value.includes("guru");
-  if (role === "admin") return value.includes("admin");
+  if (role === "admin") {
+    return (
+      value.includes("admin") ||
+      value.includes("social") ||
+      Boolean(user.hqRole)
+    );
+  }
   if (role === "vendor") return value.includes("vendor");
   if (role === "educator") return value.includes("educator");
   if (role === "medical") return value.includes("medical");

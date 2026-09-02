@@ -112,6 +112,7 @@ export default function UsersFilterBar({
             <option value="all">All sources</option>
             <option value="profile">Profiles</option>
             <option value="guru">Guru records</option>
+            <option value="hq">HQ / Admin access</option>
             <option value="launch">Launch leads</option>
           </select>
         </label>

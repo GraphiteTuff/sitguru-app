@@ -4,6 +4,10 @@ import {
   isHardcodedSuperUserEmail,
   normalizeAdminEmail,
 } from "@/lib/admin/super-users";
+import {
+  hasGrowthOnlyRole,
+  isGrowthAllowedAdminPath,
+} from "@/lib/admin/growth-paths";
 
 const ADMIN_PROFILE_ROLES = new Set([
   "founder",
@@ -22,6 +26,7 @@ const ADMIN_PROFILE_ROLES = new Set([
   "hr_admin",
   "sales_admin",
   "marketing_admin",
+  "social_community_manager",
   "partner_admin",
   "customer_service",
   "guru_approvals_admin",
@@ -467,6 +472,19 @@ export async function proxy(request: NextRequest) {
         roleList.some((role) => isAdminProfileRole(role)));
 
     if (hasAdminRole) {
+      const growthOnly = hasGrowthOnlyRole([profileRole, ...roleList]);
+      if (
+        growthOnly &&
+        (pathname === "/admin" ||
+          pathname === "/admin/" ||
+          !isGrowthAllowedAdminPath(pathname))
+      ) {
+        const growthUrl = request.nextUrl.clone();
+        growthUrl.pathname = "/admin/growth";
+        growthUrl.search = "";
+        return NextResponse.redirect(growthUrl);
+      }
+
       return responseRef.current;
     }
 

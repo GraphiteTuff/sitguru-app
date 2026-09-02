@@ -1,9 +1,11 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isAdminRole } from "@/lib/admin/access";
 import {
   asTrimmedString,
   isWithinLastDays,
   matchesRoleFilter,
   matchesStatusFilter,
+  toDirectoryUserFromIdentity,
   toDirectoryUserFromLaunch,
   toDirectoryUserFromProfile,
 } from "@/lib/admin/users/normalize";
@@ -23,30 +25,30 @@ type SafeQueryResponse = {
   count?: number | null;
 };
 
+/** Columns that actually exist on production `profiles`. */
 const PROFILE_COLUMNS = `
   id,
   email,
   role,
+  account_type,
   account_status,
+  admin_status,
   approval_status,
   full_name,
-  display_name,
-  name,
   first_name,
   last_name,
   phone,
-  phone_number,
   avatar_url,
   profile_photo_url,
-  is_verified,
-  verified,
   is_active,
-  active,
-  is_suspended,
-  suspended,
+  is_archived,
+  is_test_account,
   suspended_at,
   deactivated_at,
   deleted_at,
+  signup_source,
+  city,
+  state,
   created_at
 `;
 
@@ -75,116 +77,112 @@ async function safeRows<T>(
   return Array.isArray(result.data) ? (result.data as T[]) : [];
 }
 
-function roleDbValues(role: DirectoryFilters["role"]) {
-  if (role === "pet_parent") return ["customer", "pet_parent", "parent", "client"];
-  if (role === "guru") return ["guru", "sitter", "provider"];
-  if (role === "admin") return ["admin", "super_admin"];
-  if (role === "vendor") return ["vendor"];
-  if (role === "educator") return ["educator"];
-  if (role === "medical") return ["medical", "vet", "medical_pro"];
-  return null;
+function roleKey(value: string) {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
 }
 
-function statusDbValues(status: DirectoryFilters["status"]) {
-  if (status === "active") return ["active", "approved"];
-  if (status === "pending") return ["pending", "review", "under_review"];
-  if (status === "suspended") return ["suspended"];
-  if (status === "blocked") return ["deleted", "banned", "blocked"];
-  return null;
-}
-
-function wantsLaunchOnly(filters: DirectoryFilters) {
+function isHqRole(value: string) {
+  const normalized = roleKey(value);
   return (
-    filters.role === "lead" ||
-    filters.status === "lead" ||
-    filters.source === "launch"
+    isAdminRole(normalized) ||
+    normalized === "social_community_manager" ||
+    normalized.includes("social") ||
+    normalized.includes("marketing")
   );
 }
 
-function wantsProfiles(filters: DirectoryFilters) {
-  if (wantsLaunchOnly(filters)) return false;
-  if (filters.source === "launch") return false;
-  return true;
+async function loadHqAssignments() {
+  const [accessRows, roleRows] = await Promise.all([
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_user_access")
+        .select("user_id,email,role_key,is_active")
+        .eq("is_active", true)
+        .limit(4000),
+      "admin_user_access_directory",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("user_roles").select("user_id,role").limit(8000),
+      "user_roles_directory",
+    ),
+  ]);
+
+  const byId = new Map<string, string>();
+  const byEmail = new Map<string, string>();
+
+  for (const row of roleRows) {
+    const id = asTrimmedString(row.user_id).toLowerCase();
+    const role = asTrimmedString(row.role);
+    if (id && isHqRole(role)) byId.set(id, role);
+  }
+
+  for (const row of accessRows) {
+    const id = asTrimmedString(row.user_id).toLowerCase();
+    const email = asTrimmedString(row.email).toLowerCase();
+    const role = asTrimmedString(row.role_key);
+    if (id && role) byId.set(id, role);
+    if (email && role) byEmail.set(email, role);
+  }
+
+  return { byId, byEmail };
 }
 
-async function countExact(
-  table: string,
-  apply?: (query: any) => any,
-): Promise<number> {
-  let query = supabaseAdmin
-    .from(table)
-    .select("id", { count: "exact", head: true });
+function applyHqRole(
+  user: DirectoryUser,
+  hq: { byId: Map<string, string>; byEmail: Map<string, string> },
+): DirectoryUser {
+  const hqRole =
+    hq.byId.get(user.id.toLowerCase()) ||
+    (user.email !== "—" ? hq.byEmail.get(user.email.toLowerCase()) : "") ||
+    "";
 
-  if (apply) query = apply(query);
-
-  const result = await safeQuery(query, `${table}_count`);
-  return typeof result.count === "number" ? result.count : 0;
-}
-
-async function loadProfilePage(filters: DirectoryFilters): Promise<{
-  users: DirectoryUser[];
-  filteredTotal: number;
-}> {
-  const from = (filters.page - 1) * filters.pageSize;
-  const to = from + filters.pageSize - 1;
-
-  let query = supabaseAdmin
-    .from("profiles")
-    .select(PROFILE_COLUMNS, { count: "exact" })
-    .order("created_at", { ascending: false });
-
-  const roles = roleDbValues(filters.role);
-  if (roles) query = query.in("role", roles);
-
-  const statuses = statusDbValues(filters.status);
-  if (statuses) query = query.in("account_status", statuses);
-
-  if (filters.status === "verified") {
-    query = query.or("is_verified.eq.true,verified.eq.true,account_status.eq.verified");
-  }
-
-  if (filters.q) {
-    const q = filters.q.replace(/[%_,]/g, " ").trim();
-    if (q) {
-      query = query.or(
-        `full_name.ilike.%${q}%,display_name.ilike.%${q}%,name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`,
-      );
-    }
-  }
-
-  query = query.range(from, to);
-
-  const result = await safeQuery(query, "profiles_page");
-  const rows = Array.isArray(result.data) ? (result.data as AnyRow[]) : [];
-
-  let users = rows
-    .map((row) => toDirectoryUserFromProfile(row))
-    .filter(Boolean) as DirectoryUser[];
-
-  // Guest is derived client-side from incomplete profiles.
-  if (filters.status === "guest") {
-    users = users.filter((user) => user.status === "Guest");
-  } else if (filters.status !== "all" && !statuses && filters.status !== "verified") {
-    users = users.filter((user) => matchesStatusFilter(user, filters.status));
-  }
+  if (!hqRole) return user;
 
   return {
-    users,
-    filteredTotal:
-      typeof result.count === "number" ? result.count : users.length,
+    ...user,
+    hqRole,
+    role: user.role === "Pet Parent" || user.role === "Guru" ? user.role : user.role,
   };
 }
 
-async function loadLaunchPage(filters: DirectoryFilters): Promise<{
-  users: DirectoryUser[];
-  filteredTotal: number;
-}> {
+async function loadIdentityRows(): Promise<DirectoryUser[]> {
+  const identity = await safeRows<AnyRow>(
+    supabaseAdmin
+      .from("admin_identity_directory")
+      .select(
+        "directory_source,display_name,role,email,phone,auth_user_id,profile_id,guru_id,is_active,guru_status,admin_action_needed,profile_created_at,auth_created_at,auth_last_sign_in_at",
+      )
+      .limit(4000),
+    "admin_identity_directory",
+  );
+
+  if (identity.length) {
+    return identity
+      .map((row) => toDirectoryUserFromIdentity(row))
+      .filter(Boolean) as DirectoryUser[];
+  }
+
+  const profiles = await safeRows<AnyRow>(
+    supabaseAdmin
+      .from("profiles")
+      .select(PROFILE_COLUMNS)
+      .order("created_at", { ascending: false })
+      .limit(4000),
+    "profiles_directory",
+  );
+
+  return profiles
+    .map((row) => toDirectoryUserFromProfile(row))
+    .filter(Boolean) as DirectoryUser[];
+}
+
+async function loadLaunchRows(): Promise<DirectoryUser[]> {
   const [signups, waitlist] = await Promise.all([
     safeRows<AnyRow>(
       supabaseAdmin
         .from("launch_signups")
         .select(
-          "id,email,name,full_name,phone,phone_number,role,interest_type,joining_as,user_type,segment,source,utm_source,created_at",
+          "id,email,name,full_name,phone,role,interest_type,joining_as,user_type,segment,source,utm_source,created_at",
         )
         .order("created_at", { ascending: false })
         .limit(500),
@@ -194,7 +192,7 @@ async function loadLaunchPage(filters: DirectoryFilters): Promise<{
       supabaseAdmin
         .from("launch_waitlist")
         .select(
-          "id,email,name,full_name,phone,phone_number,role,interest_type,joining_as,user_type,segment,source,utm_source,created_at",
+          "id,email,name,full_name,phone,role,interest_type,joining_as,user_type,segment,source,utm_source,created_at",
         )
         .order("created_at", { ascending: false })
         .limit(500),
@@ -214,198 +212,93 @@ async function loadLaunchPage(filters: DirectoryFilters): Promise<{
     merged.push(user);
   }
 
+  return merged;
+}
+
+function filterDirectoryUsers(
+  users: DirectoryUser[],
+  filters: DirectoryFilters,
+) {
   const q = filters.q.toLowerCase();
-  let filtered = merged;
 
-  if (filters.role !== "all") {
-    filtered = filtered.filter((user) => matchesRoleFilter(user, filters.role));
-  }
+  return users.filter((user) => {
+    if (filters.role !== "all" && !matchesRoleFilter(user, filters.role)) {
+      return false;
+    }
+    if (filters.status !== "all" && !matchesStatusFilter(user, filters.status)) {
+      return false;
+    }
+    if (filters.source === "profile" && user.source === "Launch") return false;
+    if (filters.source === "guru" && user.role !== "Guru") return false;
+    if (filters.source === "launch" && user.source !== "Launch") return false;
+    if (filters.source === "hq" && !user.hqRole && !isHqRole(user.role)) {
+      return false;
+    }
+    if (!q) return true;
 
-  if (filters.status !== "all") {
-    filtered = filtered.filter((user) => matchesStatusFilter(user, filters.status));
-  }
+    const haystack =
+      `${user.name} ${user.email} ${user.phone} ${user.role} ${user.hqRole || ""} ${user.id}`.toLowerCase();
+    return haystack.includes(q);
+  });
+}
 
-  if (q) {
-    filtered = filtered.filter((user) => {
-      const haystack = `${user.name} ${user.email} ${user.phone} ${user.role}`.toLowerCase();
-      return haystack.includes(q);
-    });
-  }
-
-  filtered.sort((a, b) => {
+function sortNewest(users: DirectoryUser[]) {
+  return [...users].sort((a, b) => {
     const aTime = Date.parse(a.joinedAt || "");
     const bTime = Date.parse(b.joinedAt || "");
     return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
   });
-
-  const from = (filters.page - 1) * filters.pageSize;
-  const pageRows = filtered.slice(from, from + filters.pageSize);
-
-  return {
-    users: pageRows,
-    filteredTotal: filtered.length,
-  };
 }
 
-async function loadGuruOrphans(
-  filters: DirectoryFilters,
-  knownIds: Set<string>,
-): Promise<DirectoryUser[]> {
-  if (filters.role !== "all" && filters.role !== "guru") return [];
-  if (filters.source === "profile" || filters.source === "launch") return [];
-  if (wantsLaunchOnly(filters)) return [];
-
-  const gurus = await safeRows<AnyRow>(
-    supabaseAdmin
-      .from("gurus")
-      .select(
-        "id,user_id,profile_id,email,display_name,full_name,name,slug,status,approval_status,is_verified,verified,is_active,active,phone,phone_number,avatar_url,created_at",
-      )
-      .order("created_at", { ascending: false })
-      .limit(250),
-    "gurus_orphans",
-  );
-
-  const orphans: DirectoryUser[] = [];
-
-  for (const guru of gurus) {
-    const id =
-      asTrimmedString(guru.user_id) ||
-      asTrimmedString(guru.profile_id) ||
-      asTrimmedString(guru.id) ||
-      asTrimmedString(guru.email).toLowerCase();
-
-    const email = asTrimmedString(guru.email).toLowerCase();
-    if (!id) continue;
-    if (knownIds.has(id.toLowerCase()) || (email && knownIds.has(email))) {
-      continue;
-    }
-
-    const mapped = toDirectoryUserFromProfile(
-      {
-        ...guru,
-        id,
-        role: "guru",
-      },
-      { forceRole: "Guru", source: "Guru" },
-    );
-
-    if (!mapped) continue;
-    if (!matchesStatusFilter(mapped, filters.status)) continue;
-    if (filters.q) {
-      const haystack =
-        `${mapped.name} ${mapped.email} ${mapped.phone}`.toLowerCase();
-      if (!haystack.includes(filters.q.toLowerCase())) continue;
-    }
-
-    orphans.push(mapped);
-  }
-
-  return orphans;
-}
-
-async function loadTotals(): Promise<{
+function buildTotals(users: DirectoryUser[]): {
   totals: DirectoryTotals;
   roleCounts: DirectoryRoleCounts;
-}> {
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const weekIso = weekAgo.toISOString();
-
-  const [
-    profileCount,
-    launchCount,
-    waitlistCount,
-    guruCount,
-    newProfiles,
-    newLaunch,
-    newWaitlist,
-    suspendedCount,
-    adminCount,
-    customerCount,
-    guruRoleCount,
-    vendorCount,
-    educatorCount,
-    medicalCount,
-    recentProfiles,
-  ] = await Promise.all([
-    countExact("profiles"),
-    countExact("launch_signups"),
-    countExact("launch_waitlist"),
-    countExact("gurus"),
-    countExact("profiles", (q) => q.gte("created_at", weekIso)),
-    countExact("launch_signups", (q) => q.gte("created_at", weekIso)),
-    countExact("launch_waitlist", (q) => q.gte("created_at", weekIso)),
-    countExact("profiles", (q) => q.eq("account_status", "suspended")),
-    countExact("profiles", (q) => q.in("role", ["admin", "super_admin"])),
-    countExact("profiles", (q) =>
-      q.in("role", ["customer", "pet_parent", "parent", "client"]),
-    ),
-    countExact("profiles", (q) => q.in("role", ["guru", "sitter", "provider"])),
-    countExact("profiles", (q) => q.eq("role", "vendor")),
-    countExact("profiles", (q) => q.eq("role", "educator")),
-    countExact("profiles", (q) => q.in("role", ["medical", "vet", "medical_pro"])),
-    safeRows<AnyRow>(
-      supabaseAdmin
-        .from("profiles")
-        .select("id,role,account_status,is_verified,verified,created_at")
-        .order("created_at", { ascending: false })
-        .limit(300),
-      "recent_profiles_for_kpi",
-    ),
-  ]);
-
-  const launchLeads = launchCount + waitlistCount;
-  const totalUsers = profileCount + launchLeads;
-  const newThisWeek = newProfiles + newLaunch + newWaitlist;
-
-  const verifiedGurus = recentProfiles.filter((row) => {
-    const role = asTrimmedString(row.role).toLowerCase();
-    const isGuru =
-      role.includes("guru") || role.includes("sitter") || role.includes("provider");
-    return (
-      isGuru &&
-      (Boolean(row.is_verified || row.verified) ||
-        asTrimmedString(row.account_status).toLowerCase() === "verified")
-    );
+} {
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const profiles = users.filter((user) => user.source !== "Launch");
+  const leads = users.filter((user) => user.source === "Launch");
+  const gurus = users.filter((user) => user.role === "Guru");
+  const flagged = users.filter(
+    (user) => user.status === "Suspended" || user.status === "Blocked",
+  );
+  const verifiedGurus = gurus.filter((user) => user.status === "Verified").length;
+  const newThisWeek = users.filter((user) => {
+    const time = Date.parse(user.joinedAt || "");
+    return Number.isFinite(time) && time >= weekAgo;
   }).length;
 
-  const flaggedAccounts = Math.max(
-    suspendedCount,
-    recentProfiles.filter((row) => {
-      const status = asTrimmedString(row.account_status).toLowerCase();
-      return status === "suspended" || status === "deleted" || status === "blocked";
-    }).length,
-  );
-
+  const totalUsers = users.length;
+  const flaggedAccounts = flagged.length;
   const healthScore =
     totalUsers === 0
       ? 0
-      : Math.max(
-          0,
-          Math.min(100, Math.round(100 - (flaggedAccounts / totalUsers) * 100)),
-        );
+      : Math.max(0, Math.min(100, Math.round(100 - (flaggedAccounts / totalUsers) * 100)));
 
   return {
     totals: {
       totalUsers,
       filteredTotal: totalUsers,
       newThisWeek,
-      verifiedGurus: Math.max(verifiedGurus, 0),
+      verifiedGurus,
       flaggedAccounts,
       healthScore,
-      launchLeads,
-      profileCount,
-      guruCount,
+      launchLeads: leads.length,
+      profileCount: profiles.length,
+      guruCount: gurus.length,
     },
     roleCounts: {
-      petParents: customerCount,
-      gurus: Math.max(guruRoleCount, guruCount),
-      vendors: vendorCount,
-      educators: educatorCount,
-      medical: medicalCount,
-      admins: adminCount,
-      leads: launchLeads,
+      petParents: users.filter((user) => user.role === "Pet Parent").length,
+      gurus: gurus.length,
+      vendors: users.filter((user) => user.role === "Vendor").length,
+      educators: users.filter((user) => user.role === "Educator").length,
+      medical: users.filter((user) => user.role === "Medical Pro").length,
+      admins: users.filter(
+        (user) =>
+          Boolean(user.hqRole) ||
+          user.role === "Admin" ||
+          user.role === "Social & Community",
+      ).length,
+      leads: leads.length,
     },
   };
 }
@@ -413,65 +306,37 @@ async function loadTotals(): Promise<{
 export async function getAdminUsersDirectory(
   filters: DirectoryFilters,
 ): Promise<DirectoryPageResult> {
-  const [{ totals, roleCounts }, pageResult] = await Promise.all([
-    loadTotals(),
-    wantsProfiles(filters) ? loadProfilePage(filters) : loadLaunchPage(filters),
+  const [identityUsers, launchUsers, hq] = await Promise.all([
+    loadIdentityRows(),
+    loadLaunchRows(),
+    loadHqAssignments(),
   ]);
 
-  let users = pageResult.users;
-  let filteredTotal = pageResult.filteredTotal;
+  const seen = new Set<string>();
+  const merged: DirectoryUser[] = [];
 
-  if (wantsProfiles(filters) && filters.page === 1 && !filters.q) {
-    const known = new Set(
-      users.flatMap((user) => [
-        user.id.toLowerCase(),
-        user.email !== "—" ? user.email.toLowerCase() : "",
-      ]).filter(Boolean),
-    );
-    const orphans = await loadGuruOrphans(filters, known);
-    if (orphans.length) {
-      // Show orphan gurus at the top of page 1 only, without breaking pagination count.
-      users = [...orphans.slice(0, 5), ...users].slice(0, filters.pageSize);
-    }
+  for (const user of [...identityUsers, ...launchUsers]) {
+    const withHq = applyHqRole(user, hq);
+    const key = `${withHq.id.toLowerCase()}|${withHq.email.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(withHq);
   }
 
-  // If user asked for launch mixed into "all", append a small lead sample on page 1.
-  if (
-    filters.source === "all" &&
-    filters.role === "all" &&
-    filters.status === "all" &&
-    filters.page === 1 &&
-    !filters.q
-  ) {
-    const leads = await loadLaunchPage({
-      ...filters,
-      role: "lead",
-      status: "lead",
-      source: "launch",
-      page: 1,
-      pageSize: 5,
-    });
-    const known = new Set(
-      users.map((user) => `${user.id}|${user.email}`.toLowerCase()),
-    );
-    const extra = leads.users.filter(
-      (user) => !known.has(`${user.id}|${user.email}`.toLowerCase()),
-    );
-    if (extra.length) {
-      users = [...users, ...extra].slice(0, filters.pageSize);
-    }
-  }
-
-  const pageCount = Math.max(1, Math.ceil(filteredTotal / filters.pageSize));
+  const { totals, roleCounts } = buildTotals(merged);
+  const filtered = sortNewest(filterDirectoryUsers(merged, filters));
+  const from = (filters.page - 1) * filters.pageSize;
+  const pageRows = filtered.slice(from, from + filters.pageSize);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / filters.pageSize));
 
   return {
-    users,
+    users: pageRows,
     totals: {
       ...totals,
-      filteredTotal,
-      // Keep new-this-week honest even when page is filtered.
-      newThisWeek: totals.newThisWeek ||
-        users.filter((user) => isWithinLastDays(user.joinedAt, 7)).length,
+      filteredTotal: filtered.length,
+      newThisWeek:
+        totals.newThisWeek ||
+        pageRows.filter((user) => isWithinLastDays(user.joinedAt, 7)).length,
     },
     roleCounts,
     filters,

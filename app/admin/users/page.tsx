@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getAdminIdentity } from "@/lib/admin/access";
 import UserDirectoryActionPanels from "@/components/admin/users/UserDirectoryActionPanels";
 import UsersDirectoryList from "@/components/admin/users/UsersDirectoryList";
 import UsersFilterBar from "@/components/admin/users/UsersFilterBar";
@@ -104,16 +104,26 @@ function statToneClasses(tone: Tone) {
 }
 
 export default async function AdminUsersPage({ searchParams }: PageProps) {
-  const supabase = await createClient();
+  const actor = await getAdminIdentity();
   const params = searchParams ? await searchParams : {};
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return null;
+  if (!actor?.canAccessAdmin || !(actor.isSuperUser || actor.canManageUsers)) {
+    return (
+      <main className="min-h-screen bg-[#f9faf5] px-4 py-6 text-slate-950 sm:px-6">
+        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-6 shadow-sm sm:p-8">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
+            Access Restricted
+          </p>
+          <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950">
+            Superadmin access required.
+          </h1>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            Sign in with a SitGuru founder, owner, or super admin account to
+            open the User Directory and assign HQ roles.
+          </p>
+        </div>
+      </main>
+    );
   }
 
   const filters = parseDirectoryFilters(params);
@@ -136,7 +146,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
     if (selectedUserId) {
       const { data: profile } = await supabaseAdmin
         .from("profiles")
-        .select("id, email, full_name, display_name, name, role")
+        .select("id, email, full_name, first_name, last_name, role")
         .eq("id", selectedUserId)
         .maybeSingle();
 
@@ -147,8 +157,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           name:
             String(
               profile.full_name ||
-                profile.display_name ||
-                profile.name ||
+                `${profile.first_name || ""} ${profile.last_name || ""}`.trim() ||
                 selectedName ||
                 "",
             ) || null,
@@ -324,24 +333,25 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">
-                User Directory / Internal Communications
+                User Directory / HQ Access
               </p>
               <h1 className="mt-3 max-w-5xl text-4xl font-black leading-[0.96] tracking-tight text-slate-950 sm:text-5xl">
-                Live SitGuru users, roles, trust signals, and messaging.
+                Live SitGuru users, HQ roles, and access assignment.
               </h1>
               <p className="mt-4 max-w-4xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-                Search, filter, and page through profiles and launch leads without
-                loading the full directory at once. Communication and moderation
-                actions stay scoped to the selected user across desktop and mobile.
+                Search the real SitGuru directory — Pet Parents, Gurus,
+                Ambassadors, and HQ staff. Superadmin can open a person and
+                assign Social & Community Manager or any other HQ role from
+                Admin Settings.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3 xl:justify-end">
-              <ActionLink href="/admin" label="Overview" />
+              <ActionLink href="/admin/settings" label="Assign HQ Access" primary />
               <ActionLink href="/admin/messages" label="Open Message Center" />
               <ActionLink href="/admin/guru-approvals" label="Review Gurus" />
               <ActionLink href="/admin/launch-signups" label="Launch Leads" />
-              <ActionLink href="/admin/exports" label="Export Users" primary />
+              <ActionLink href="/admin" label="Overview" />
             </div>
           </div>
 
@@ -384,7 +394,15 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                 & Marketing.
               </p>
             </div>
-            <ActionLink href="/admin/settings" label="Manage Admin Access" />
+              <ActionLink
+                href={
+                  selectedUser?.email
+                    ? `/admin/settings?q=${encodeURIComponent(selectedUser.email)}`
+                    : "/admin/settings"
+                }
+                label="Assign HQ Access"
+                primary
+              />
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">

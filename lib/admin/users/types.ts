@@ -18,7 +18,7 @@ export type DirectoryStatusFilter =
   | "guest"
   | "lead";
 
-export type DirectorySourceFilter = "all" | "profile" | "guru" | "launch";
+export type DirectorySourceFilter = "all" | "profile" | "guru" | "launch" | "hq";
 
 export type DirectoryFilters = {
   q: string;
@@ -36,11 +36,13 @@ export type DirectoryUser = {
   phone: string;
   avatarUrl: string;
   role: string;
+  hqRole?: string;
   status: string;
   risk: string;
   joined: string;
   joinedAt: string | null;
   source: string;
+  settingsHref?: string;
   messageHref: string;
   profileHref: string;
   scopeHref: string;
@@ -86,7 +88,7 @@ export const DIRECTORY_ROLE_OPTIONS: Array<{
   { value: "all", label: "All roles" },
   { value: "pet_parent", label: "Pet Parents" },
   { value: "guru", label: "Gurus" },
-  { value: "admin", label: "Admins" },
+  { value: "admin", label: "Admins / HQ" },
   { value: "vendor", label: "Vendors" },
   { value: "educator", label: "Educators" },
   { value: "medical", label: "Medical Pros" },

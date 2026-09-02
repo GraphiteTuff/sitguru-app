@@ -290,6 +290,17 @@ const FALLBACK_ROLES: RoleRow[] = [
     is_active: true,
   },
   {
+    role_key: "social_community_manager",
+    department_key: "sales_marketing",
+    name: "Social & Community Manager",
+    description:
+      "Remote social and community growth. Promotes Gurus, events, and partners. Measures Pet Parent and Guru registrations. No payments, IDs, or private messages.",
+    access_level: "editor",
+    can_access_admin: true,
+    display_order: 220,
+    is_active: true,
+  },
+  {
     role_key: "support_admin",
     department_key: "customer_service",
     name: "Support Admin",
@@ -408,6 +419,16 @@ const DEFAULT_PERMISSION_LABELS: Record<string, string> = {
   "programs.manage": "Programs",
   "marketing.manage": "Marketing",
   "analytics.marketing_view": "Marketing Analytics",
+  "growth.read": "Growth Home",
+  "campaign.create": "Create Campaigns",
+  "campaign.edit": "Edit Campaigns",
+  "content.create": "Create Content",
+  "content.edit": "Edit Content",
+  "guru.marketing.read": "Guru Marketing",
+  "event.marketing.read": "Event Marketing",
+  "partner.marketing.read": "Partner Marketing",
+  "media.upload": "Media Upload",
+  "analytics.growth.read": "Growth Analytics",
   "system_health.view": "System Health View",
   "system_health.manage": "System Health Manage",
   "webhooks.view": "Webhooks View",
@@ -750,6 +771,21 @@ async function assignHqAccess(formData: FormData) {
     console.warn("admin_users mirror update skipped:", error);
   }
 
+  if (userId) {
+    const { error: roleError } = await supabaseAdmin.from("user_roles").upsert(
+      {
+        user_id: userId,
+        role: role.role_key,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,role" },
+    );
+
+    if (roleError) {
+      console.warn("user_roles HQ assignment skipped:", roleError);
+    }
+  }
+
   await writeAdminSettingsAuditLog({
     actor,
     action: "hq_access_assigned",
@@ -823,6 +859,26 @@ async function deactivateHqAccess(formData: FormData) {
     console.warn("admin_users deactivate skipped:", error);
   }
 
+  if (email) {
+    const assigned = await safeRows<{ user_id?: string | null; role_key?: string }>(
+      supabaseAdmin
+        .from("admin_user_access")
+        .select("user_id,role_key")
+        .eq("email", email)
+        .limit(1),
+      "admin_user_access_deactivate_roles",
+    );
+    const assignedUserId = asTrimmedString(assigned[0]?.user_id);
+    const assignedRole = asTrimmedString(assigned[0]?.role_key);
+    if (assignedUserId && assignedRole && !isSuperUserRole(assignedRole)) {
+      await supabaseAdmin
+        .from("user_roles")
+        .delete()
+        .eq("user_id", assignedUserId)
+        .eq("role", assignedRole);
+    }
+  }
+
   await writeAdminSettingsAuditLog({
     actor,
     action: "hq_access_deactivated",
@@ -858,7 +914,11 @@ function getRoleBadgeClass(role: string) {
     return "border-sky-200 bg-sky-50 text-sky-700";
   }
 
-  if (normalized.includes("marketing") || normalized.includes("sales")) {
+  if (
+    normalized.includes("marketing") ||
+    normalized.includes("sales") ||
+    normalized.includes("social")
+  ) {
     return "border-pink-200 bg-pink-50 text-pink-700";
   }
 
@@ -1323,17 +1383,50 @@ function PermissionMatrix({
   );
 }
 
+async function listAllAuthUsers() {
+  const users: Awaited<
+    ReturnType<typeof supabaseAdmin.auth.admin.listUsers>
+  >["data"]["users"] = [];
+  let error: { message?: string } | null = null;
+
+  for (let page = 1; page <= 10; page += 1) {
+    const response = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
+
+    if (response.error) {
+      error = response.error;
+      break;
+    }
+
+    const batch = response.data.users || [];
+    users.push(...batch);
+    if (batch.length < 200) break;
+  }
+
+  return { data: { users }, error };
+}
+
+function mergeCatalog<T extends { role_key?: string; department_key?: string }>(
+  live: T[],
+  fallback: T[],
+  key: "role_key" | "department_key",
+) {
+  if (!live.length) return fallback;
+  const seen = new Set(live.map((row) => asTrimmedString(row[key])));
+  const extras = fallback.filter((row) => !seen.has(asTrimmedString(row[key])));
+  return [...live, ...extras];
+}
+
 async function getAdminSettingsData() {
   const [authUsersResponse, profiles, legacyAdminUsers, accessRows, departmentsRows, rolesRows, permissionRows] =
     await Promise.all([
-      supabaseAdmin.auth.admin.listUsers({
-        page: 1,
-        perPage: 200,
-      }),
+      listAllAuthUsers(),
       safeRows<GenericRow>(
         supabaseAdmin
           .from("profiles")
-          .select("id,email,role,full_name,display_name,name,is_active,can_access_financials")
+          .select("id,email,role,full_name,first_name,last_name,is_active")
           .limit(2000),
         "profiles_settings_access",
       ),
@@ -1381,10 +1474,12 @@ async function getAdminSettingsData() {
 
   const departmentsUsingFallback = departmentsRows.length === 0;
   const rolesUsingFallback = rolesRows.length === 0;
-  const departments = (departmentsUsingFallback ? FALLBACK_DEPARTMENTS : departmentsRows).sort(
-    (a, b) => toNumber(a.display_order) - toNumber(b.display_order),
-  );
-  const roles = (rolesUsingFallback ? FALLBACK_ROLES : rolesRows).sort(
+  const departments = mergeCatalog(
+    departmentsRows,
+    FALLBACK_DEPARTMENTS,
+    "department_key",
+  ).sort((a, b) => toNumber(a.display_order) - toNumber(b.display_order));
+  const roles = mergeCatalog(rolesRows, FALLBACK_ROLES, "role_key").sort(
     (a, b) => toNumber(a.display_order) - toNumber(b.display_order),
   );
   const permissions = permissionRows;
@@ -1589,10 +1684,10 @@ async function getAdminSettingsData() {
   const systemChecks = [
     {
       label: "Admin Access Tables",
-      status: !usingFallbacks || accessRows.length > 0,
+      status: !usingFallbacks,
       detail: usingFallbacks
-        ? "Using preview department/role catalogs. Apply 20260802_create_admin_hq_access_tables.sql to persist live HQ access."
-        : "admin_departments, admin_roles, admin_role_permissions, and admin_user_access support corporate admin access control.",
+        ? "HQ role tables are not readable yet. Social & Community Manager and other roles are showing from the in-app catalog until admin_departments / admin_roles load."
+        : "Live HQ access tables are ready. Assign Social & Community Manager and other department roles from User access management below.",
     },
     {
       label: "Auth User Directory",
@@ -1738,6 +1833,11 @@ export default async function AdminSettingsPage({
         isSuperUserRole(user.hqRoleKey || user.role)
       );
     }
+    if (accessFilter === "growth") {
+      return ["social_community_manager", "marketing_admin", "sales_admin"].includes(
+        user.hqRoleKey || user.role,
+      );
+    }
 
     return true;
   });
@@ -1760,10 +1860,10 @@ export default async function AdminSettingsPage({
               </h1>
 
               <p className="mt-4 max-w-4xl text-sm font-semibold leading-7 text-slate-700 sm:text-base">
-                Manage Founder/CEO super-user access, HR, Billing & Finance,
-                Sales & Marketing, Customer Service, Trust & Safety, Tech
-                Support, viewer-only roles, password reset support, MFA
-                visibility, and platform readiness from one secure Admin center.
+                Assign HQ roles from this page — including Social & Community
+                Manager for the growth hire. Find the person in User Directory,
+                then grant access here. They get marketing tools only: no
+                Stripe, payouts, IDs, or private messages.
               </p>
             </div>
 
@@ -1801,10 +1901,9 @@ export default async function AdminSettingsPage({
 
           {settingsData.usingFallbacks ? (
             <div className="mt-6 rounded-[1.25rem] border border-amber-100 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-900">
-              HQ department/role catalogs are in preview mode until
-              `admin_departments` / `admin_roles` exist. Apply
-              `supabase/migrations/20260802_create_admin_hq_access_tables.sql`
-              before relying on Assign Access writes.
+              HQ catalogs are still in preview on this page. Assign Access
+              needs live admin_departments / admin_roles. Those tables now
+              exist in SitGuru — refresh after deploy to see Ready.
             </div>
           ) : null}
 
@@ -1973,6 +2072,7 @@ export default async function AdminSettingsPage({
                 <option value="admin">Admin access</option>
                 <option value="finance">Finance access</option>
                 <option value="super">Super users</option>
+                <option value="growth">Social & Marketing</option>
               </select>
             </label>
 
@@ -2077,11 +2177,10 @@ export default async function AdminSettingsPage({
             Next Access Control Step
           </p>
           <p className="mt-3 text-sm font-semibold leading-7 text-slate-700">
-            HQ departments, role assignment, password reset support, and
-            permission visibility are live. Next: enforce role permissions in the
-            Admin sidebar so Financials, Trust & Safety, Customer Service, Sales
-            & Marketing, Tech Support, and viewer-only roles only see allowed
-            sections.
+            HQ role tables are live, including Social & Community Manager. Find
+            someone in User Directory, then assign their role here. Assigned
+            staff can sign into Admin. They do not get Stripe, payouts, IDs, or
+            private messages.
           </p>
         </section>
       </div>

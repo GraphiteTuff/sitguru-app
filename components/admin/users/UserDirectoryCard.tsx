@@ -53,6 +53,11 @@ export default function UserDirectoryCard({ user }: { user: DirectoryUser }) {
             <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
               {user.role}
             </span>
+            {user.hqRole ? (
+              <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800">
+                HQ {user.hqRole.replaceAll("_", " ")}
+              </span>
+            ) : null}
             <span
               className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${statusBadgeClass(
                 user.status,
@@ -95,6 +100,14 @@ export default function UserDirectoryCard({ user }: { user: DirectoryUser }) {
           >
             Review
           </Link>
+          {user.settingsHref ? (
+            <Link
+              href={user.settingsHref}
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-xs font-black text-emerald-800 transition hover:bg-emerald-50"
+            >
+              Assign HQ Access
+            </Link>
+          ) : null}
         </div>
       </div>
     </article>

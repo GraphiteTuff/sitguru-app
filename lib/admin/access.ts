@@ -21,6 +21,7 @@ export const ADMIN_ROLES = [
   "billing_admin",
   "sales_admin",
   "marketing_admin",
+  "social_community_manager",
   "partner_admin",
   "customer_service",
   "trust_safety_admin",

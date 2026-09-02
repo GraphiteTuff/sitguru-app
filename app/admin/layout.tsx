@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import {
   ClipboardCheck,
@@ -52,6 +52,7 @@ const adminRoutes = {
   messages: "/admin/messages",
   support: "/admin/support",
   settings: "/admin/settings",
+  growth: "/admin/growth",
   trustSafety: "/admin/background-checks",
   hr: "/admin/hr",
   universityTraining: "/admin/ambassador-training",
@@ -91,6 +92,46 @@ const adminRoutes = {
   analytics: "/admin/analytics",
   insights: "/admin/insights",
 };
+
+const growthNavSections = [
+  {
+    title: "Growth & Community",
+    items: [
+      { label: "Growth Home", href: adminRoutes.growth, icon: Megaphone },
+      {
+        label: "Sales & Marketing",
+        href: adminRoutes.salesMarketing,
+        icon: Megaphone,
+      },
+      {
+        label: "Market Growth Map",
+        href: adminRoutes.marketGrowth,
+        icon: MapPin,
+      },
+      { label: "Growth & Referrals", href: adminRoutes.referrals, icon: Link2 },
+      { label: "Partners", href: adminRoutes.partners, icon: HandCoins },
+      {
+        label: "Pet Events",
+        href: adminRoutes.communityEvents,
+        icon: CalendarDays,
+      },
+      {
+        label: "Pet Event Markets",
+        href: adminRoutes.communityMarkets,
+        icon: MapPin,
+      },
+    ],
+  },
+];
+
+const growthHeaderLinks = [
+  { label: "Homepage", href: "/" },
+  { label: "Growth Home", href: adminRoutes.growth },
+  { label: "Sales & Marketing", href: adminRoutes.salesMarketing },
+  { label: "Pet Events", href: adminRoutes.communityEvents },
+  { label: "Partners", href: adminRoutes.partners },
+  { label: "Referrals", href: adminRoutes.referrals },
+];
 
 const navSections = [
   {
@@ -425,7 +466,51 @@ function SidebarSection({
   );
 }
 
-function MobileNav({ pathname }: { pathname: string }) {
+function MobileNav({
+  pathname,
+  growthOnly = false,
+}: {
+  pathname: string;
+  growthOnly?: boolean;
+}) {
+  if (growthOnly) {
+    const growthLinks = growthNavSections[0]?.items || [];
+    return (
+      <div className="border-t border-[#e5ebe2] bg-[#fcfdfb] px-3 py-3 lg:hidden">
+        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {growthLinks.map((item) => {
+            const Icon = item.icon;
+            const active = isActivePath(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={
+                  active
+                    ? "min-w-[152px] rounded-2xl border border-green-800 bg-green-800 p-3 text-white shadow-sm"
+                    : "min-w-[152px] rounded-2xl border border-green-100 bg-white p-3 text-green-950 shadow-sm"
+                }
+              >
+                <span className="flex items-center gap-2 text-xs font-black">
+                  <span
+                    className={
+                      active
+                        ? "flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 text-white"
+                        : "flex h-8 w-8 items-center justify-center rounded-xl bg-green-50 text-green-800"
+                    }
+                  >
+                    <Icon size={16} />
+                  </span>
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="border-t border-[#e5ebe2] bg-[#fcfdfb] px-3 py-3 lg:hidden">
       <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -758,6 +843,29 @@ function AdminFooter() {
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "";
   const isAdminLoginPage = pathname === "/admin/login";
+  const [workspace, setWorkspace] = useState<"full" | "growth">("full");
+  const isGrowthWorkspace = workspace === "growth";
+  const visibleNavSections = isGrowthWorkspace ? growthNavSections : navSections;
+  const visibleHeaderLinks = isGrowthWorkspace
+    ? growthHeaderLinks
+    : topHeaderLinks;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/admin/session")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.workspace === "growth") {
+          setWorkspace("growth");
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (isAdminLoginPage) {
     return <>{children}</>;
@@ -804,15 +912,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </p>
 
                 <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">
-                  Oversee Pet Parents, Gurus, Ambassadors, approvals, bookings,
-                  payments, hiring, growth, training, academies, reporting,
-                  taxes, and messages.
+                  {isGrowthWorkspace
+                    ? "Promote Gurus, events, and partners. Measure Pet Parent and Guru signups."
+                    : "Oversee Pet Parents, Gurus, Ambassadors, approvals, bookings, payments, hiring, growth, training, academies, reporting, taxes, and messages."}
                 </p>
               </div>
             </div>
 
             <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-3 [scrollbar-width:thin]">
-              {navSections.map((section) => (
+              {visibleNavSections.map((section) => (
                 <SidebarSection
                   key={section.title}
                   title={section.title}
@@ -822,6 +930,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               ))}
             </nav>
 
+            {isGrowthWorkspace ? null : (
             <div className="shrink-0 border-t border-[#e8eee5] px-4 py-3">
               <Link
                 href={adminRoutes.settings}
@@ -834,6 +943,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 <span>Settings</span>
               </Link>
             </div>
+            )}
           </div>
         </aside>
 
@@ -847,7 +957,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   </div>
 
                   <nav className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm lg:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {topHeaderLinks.map((item) => {
+                    {visibleHeaderLinks.map((item) => {
                       const active = isActivePath(pathname, item.href);
 
                       return (
@@ -871,6 +981,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   <div className="flex items-center gap-2 rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm">
                     <SearchBar />
 
+                    {isGrowthWorkspace ? null : (
+                    <>
                     <Link
                       href="/admin/gurus/new"
                       title="Add Guru"
@@ -888,8 +1000,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                       <BarChart3 size={16} className="shrink-0" />
                       <span className="hidden 2xl:inline">Export</span>
                     </Link>
+                    </>
+                    )}
                   </div>
 
+                  {isGrowthWorkspace ? null : (
                   <Link
                     href={adminRoutes.messages}
                     className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-800 text-white shadow-sm transition hover:bg-green-900"
@@ -899,6 +1014,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                     <MessageCircle size={18} />
                     <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-white" />
                   </Link>
+                  )}
 
                   <NotificationBell />
 
@@ -907,13 +1023,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            <MobileNav pathname={pathname} />
+            <MobileNav pathname={pathname} growthOnly={isGrowthWorkspace} />
           </header>
 
           <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-5 lg:px-6 xl:px-6 2xl:px-7">
             <div className="w-full max-w-none">{children}</div>
 
-            <AdminFooter />
+            {isGrowthWorkspace ? null : <AdminFooter />}
           </main>
         </div>
       </div>
