@@ -1,4 +1,5 @@
 import { escapeHtml, getStatusDetailLabel } from "@/lib/admin/support/utils";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 import type { SupportNotificationPayload } from "@/lib/admin/support/types";
 
 function getSiteUrl() {
@@ -238,6 +239,7 @@ export async function sendSupportNotification(
     const { data, error } = await resend.emails.send({
       from,
       to: payload.to,
+      bcc: mergeAdminBcc(payload.to),
       subject: getEmailSubject(payload),
       html: getEmailHtml(payload),
       text: getEmailText(payload),

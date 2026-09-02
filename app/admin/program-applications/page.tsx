@@ -25,6 +25,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 
@@ -949,6 +950,7 @@ The SitGuru Team`;
         process.env.SITGURU_FROM_EMAIL ||
         "SitGuru <noreply@sitguru.com>",
       to: [application.email],
+      bcc: mergeAdminBcc(application.email),
       subject,
       html,
       text,

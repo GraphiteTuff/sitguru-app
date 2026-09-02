@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const runtime = "nodejs";
 
@@ -449,6 +450,7 @@ async function sendApplicantConfirmationEmail({
     body: JSON.stringify({
       from: fromEmail,
       to,
+      bcc: mergeAdminBcc(to),
       subject: email.subject,
       html: email.html,
       text: email.text,

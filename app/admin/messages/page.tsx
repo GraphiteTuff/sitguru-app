@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 import AdminMessageRealtimeNotifier from "@/components/admin/AdminMessageRealtimeNotifier";
 import AdminQueueCardActions from "@/components/admin/AdminQueueCardActions";
 import ClearAllMessagesForm from "@/components/admin/ClearAllMessagesForm";
@@ -1366,7 +1367,7 @@ async function sendRecipientEmail(params: {
       from: buildOutboundFromHeader(params.senderName, params.senderEmail),
       to: [toEmail],
       ...(cc.length ? { cc } : {}),
-      ...(bcc.length ? { bcc } : {}),
+      bcc: mergeAdminBcc(toEmail, bcc),
       replyTo: asString(params.senderEmail) || getSupportReplyToEmail(),
       subject: params.subject || "New SitGuru Message",
       html: `
@@ -2121,6 +2122,7 @@ async function sendConversationThread(formData: FormData) {
   const result = await resend.emails.send({
     from: getSupportFromEmail(),
     to: [recipientEmail],
+    bcc: mergeAdminBcc(recipientEmail),
     replyTo: getSupportReplyToEmail(),
     subject: `SitGuru Conversation Thread: ${transcript.subject}`,
     html: `

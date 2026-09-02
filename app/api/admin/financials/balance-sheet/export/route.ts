@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 import { getStripeServer } from "@/lib/stripe/server";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -1200,6 +1201,7 @@ async function sendWithResend({
     body: JSON.stringify({
       from,
       to: [to],
+      bcc: mergeAdminBcc(to),
       subject,
       html,
       attachments: [

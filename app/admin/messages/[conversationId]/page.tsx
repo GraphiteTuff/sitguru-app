@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 import MessageRealtimeRefresh from "@/components/MessageRealtimeRefresh";
 import DismissibleFixedChat from "@/components/messaging/DismissibleFixedChat";
 
@@ -544,6 +545,7 @@ async function sendRecipientEmail(params: {
     const result = await resend.emails.send({
       from: getSupportFromEmail(),
       to: [toEmail],
+      bcc: mergeAdminBcc(toEmail),
       replyTo: getSupportReplyToEmail(),
       subject: "New SitGuru Message",
       html: `

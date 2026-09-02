@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 
 import { requireAdminUser } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 
@@ -303,6 +304,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await resend.emails.send({
       from: getResendFromEmail(),
       to: recipients,
+      bcc: mergeAdminBcc(recipients),
       replyTo: getResendReplyToEmail(),
       subject: emailSubject,
       html,

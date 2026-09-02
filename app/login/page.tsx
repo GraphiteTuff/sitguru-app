@@ -313,19 +313,12 @@ function LoginPageContent() {
           ? window.location.origin
           : "https://www.sitguru.com";
 
-      const intent =
-        requestedAudience === "guru"
-          ? "guru"
-          : requestedAudience === "ambassador"
-            ? "ambassador"
-            : "pet_parent";
-
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${origin}/auth/callback?${new URLSearchParams({
             next: nextPath,
-            intent,
+            flow: "login",
           }).toString()}`,
           ...(provider === "google"
             ? { queryParams: { prompt: "select_account" } }

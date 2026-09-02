@@ -58,14 +58,16 @@ export default function FirstVisitCoach({
   if (!open) return null;
 
   const steps = [
-    {
-      done: hasZip,
-      title: "Add your care ZIP",
-      body: "So we can show Gurus who serve your neighborhood.",
-      href: profileHref,
-      icon: MapPin,
-      cta: hasZip ? "Review location" : "Add ZIP",
-    },
+    !hasZip
+      ? {
+          done: false,
+          title: "Add your care ZIP",
+          body: "So we can show Gurus who serve your neighborhood.",
+          href: profileHref,
+          icon: MapPin,
+          cta: "Add ZIP",
+        }
+      : null,
     {
       done: hasPet,
       title: "Create a Pet Passport",
@@ -82,7 +84,13 @@ export default function FirstVisitCoach({
       icon: Search,
       cta: "Find Care",
     },
-  ];
+  ].filter((step): step is NonNullable<typeof step> => Boolean(step));
+
+  const coachTitle = hasZip
+    ? hasPet
+      ? "Find trusted care near you"
+      : "Add a pet and find care"
+    : "Book your first visit in 3 taps";
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-3 sm:items-center">
@@ -97,7 +105,7 @@ export default function FirstVisitCoach({
               Welcome to SitGuru
             </p>
             <h2 className="mt-1 text-2xl font-black !text-white">
-              Book your first visit in 3 taps
+              {coachTitle}
             </h2>
           </div>
           <button

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -550,6 +551,7 @@ async function sendEmailAlert({
     body: JSON.stringify({
       from: process.env.ALERT_FROM_EMAIL || "SitGuru Alerts <alerts@sitguru.com>",
       to: recipients,
+      bcc: mergeAdminBcc(recipients),
       subject,
       html,
       text,

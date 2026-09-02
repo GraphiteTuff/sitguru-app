@@ -8,6 +8,7 @@
  */
 
 import { Resend } from "resend";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 import {
   SITGURU_EMAIL_FONT_FAMILY,
   SITGURU_EMAIL_FONT_HEAD,
@@ -413,6 +414,7 @@ export async function sendFinalReportEmail(
     const { data, error } = await client.emails.send({
       from: getResendFromEmail(),
       to: [recipient],
+      bcc: mergeAdminBcc(recipient),
       subject,
       html: generatePawReportEmailHtml(summaryData),
     });

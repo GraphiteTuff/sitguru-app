@@ -1,3 +1,5 @@
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
+
 type SendEmailParams = {
   to: string;
   subject: string;
@@ -36,11 +38,7 @@ export async function sendSitGuruEmail({
   const apiKey = getRequiredEnv("RESEND_API_KEY");
   const from = getRequiredEnv("RESEND_FROM_EMAIL");
   const resolvedReplyTo = replyTo || process.env.RESEND_REPLY_TO_EMAIL;
-  const resolvedBcc = Array.isArray(bcc)
-    ? bcc.filter(Boolean)
-    : bcc
-      ? [bcc]
-      : [];
+  const resolvedBcc = mergeAdminBcc(to, bcc);
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",

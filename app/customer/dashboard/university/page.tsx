@@ -20,6 +20,7 @@ import {
 
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 import { resolvePetParentAvatarUrl } from "@/lib/pet-parent-avatar";
 
 export const dynamic = "force-dynamic";
@@ -607,6 +608,7 @@ async function sendCertificationEmail({
       body: JSON.stringify({
         from: getEmailFromName(),
         to: [cleanTo],
+        bcc: mergeAdminBcc(cleanTo),
         bcc: adminBcc,
         subject,
         html: getCertificateNoticeEmailHtml({

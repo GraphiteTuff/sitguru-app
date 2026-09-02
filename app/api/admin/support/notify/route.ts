@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 
@@ -140,6 +141,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await resend.emails.send({
       from,
       to,
+      bcc: mergeAdminBcc(to),
       subject: getEmailSubject(payload),
       html: getEmailHtml(payload),
       replyTo: process.env.SITGURU_SUPPORT_EMAIL || "support@sitguru.com",

@@ -16,6 +16,7 @@ import {
   Loader2,
   Link2,
   Mail,
+  MapPin,
   Megaphone,
   PawPrint,
   Phone,
@@ -278,23 +279,36 @@ function normalizeTrackingValue(value: string | null | undefined) {
   return (value || "").trim().slice(0, 160);
 }
 
+function getRequestedSignupMode(value?: string | null): SignupMode {
+  return String(value || "").trim().toLowerCase() === "email"
+    ? "email"
+    : "phone";
+}
+
 function buildAuthCallbackUrl({
   origin,
   nextPath,
   intent,
   referralCode,
   tracking,
+  zipCode,
+  fullName,
 }: {
   origin: string;
   nextPath: string;
   intent: AccountIntent;
   referralCode: string;
   tracking: SignupTracking;
+  zipCode?: string;
+  fullName?: string;
 }) {
   const params = new URLSearchParams({
     next: nextPath,
     intent,
   });
+
+  if (zipCode) params.set("zip_code", zipCode);
+  if (fullName) params.set("full_name", fullName);
 
   if (referralCode) {
     params.set("referral_code", referralCode);
@@ -469,6 +483,7 @@ function SignupPageContent() {
     const role =
       searchParams.get("role")?.toLowerCase() ||
       searchParams.get("type")?.toLowerCase() ||
+      searchParams.get("intent")?.toLowerCase() ||
       "";
 
     if (role === "guru" || role === "future_guru") return "guru";
@@ -477,6 +492,11 @@ function SignupPageContent() {
 
     return "pet_parent";
   }, [searchParams]);
+
+  const startingMode = useMemo(
+    () => getRequestedSignupMode(searchParams.get("mode")),
+    [searchParams],
+  );
 
   const trackingFromUrl = useMemo<SignupTracking>(() => {
     const medium =
@@ -508,9 +528,12 @@ function SignupPageContent() {
     useState<SignupTracking>(trackingFromUrl);
 
   const [intent, setIntent] = useState<AccountIntent>(startingIntent);
-  const [mode, setMode] = useState<SignupMode>("email");
+  const [mode, setMode] = useState<SignupMode>(startingMode);
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(
+    () => searchParams.get("email")?.trim().toLowerCase() || "",
+  );
+  const [awaitingEmailConfirm, setAwaitingEmailConfirm] = useState(false);
   const [phone, setPhone] = useState("");
   const [zipCode, setZipCode] = useState("");
   const [serviceArea, setServiceArea] = useState("");
@@ -686,9 +709,66 @@ function SignupPageContent() {
     }
   }, [referralCode, showReferralField]);
 
+  useEffect(() => {
+    setMode(startingMode);
+  }, [startingMode]);
+
+  useEffect(() => {
+    const incoming =
+      searchParams.get("auth_error") || searchParams.get("error") || "";
+    if (incoming) setError(incoming);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!awaitingEmailConfirm) return;
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        session?.user &&
+        (event === "SIGNED_IN" ||
+          event === "TOKEN_REFRESHED" ||
+          event === "USER_UPDATED")
+      ) {
+        router.push(redirectPath);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [awaitingEmailConfirm, redirectPath, router]);
+
   function resetAlerts() {
     setError("");
     setMessage("");
+    setAwaitingEmailConfirm(false);
+  }
+
+  function getSignupBasics() {
+    const nameParts = getNameParts(fullName);
+    const cleanZipCode = zipCode.trim();
+
+    if (!isValidFullName(nameParts.cleanName)) {
+      setError("Please enter your real first and last name.");
+      return null;
+    }
+
+    if (!isValidZipCode(cleanZipCode)) {
+      setError("Please enter a valid 5-digit ZIP code.");
+      return null;
+    }
+
+    if (!acceptedTerms) {
+      setError("Please accept the SitGuru terms before creating your account.");
+      return null;
+    }
+
+    return {
+      ...nameParts,
+      cleanZipCode,
+    };
   }
 
   function handleIntentChange(nextIntent: AccountIntent) {
@@ -718,11 +798,22 @@ function SignupPageContent() {
     resetAlerts();
     setMode(nextMode);
     setPhoneCodeSent(false);
+
+    try {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("mode", nextMode);
+      router.replace(`/signup?${params.toString()}`, { scroll: false });
+    } catch {
+      // URL sync is best-effort.
+    }
   }
 
   async function handleGoogleSignup() {
     try {
       resetAlerts();
+      const basics = getSignupBasics();
+      if (!basics) return;
+
       setGoogleLoading(true);
 
       const origin =
@@ -741,6 +832,8 @@ function SignupPageContent() {
               referralCode,
             ),
             tracking: signupTracking,
+            zipCode: basics.cleanZipCode,
+            fullName: basics.cleanName,
           }),
           queryParams: {
             prompt: "select_account",
@@ -829,6 +922,8 @@ function SignupPageContent() {
             intent,
             referralCode: cleanReferralCode,
             tracking: signupTracking,
+            zipCode: cleanZipCode,
+            fullName: cleanName,
           }),
           data: {
             full_name: cleanName,
@@ -907,12 +1002,18 @@ function SignupPageContent() {
           source: emailSignupSource,
         });
       }
+      if (data.session) {
+        router.push(redirectPath);
+        return;
+      }
+
+      setAwaitingEmailConfirm(true);
       setMessage(
         intent === "ambassador"
-          ? "Your Ambassador account and workspace were created. Please check your email to confirm your SitGuru account and continue onboarding."
+          ? "Your Ambassador account and workspace were created. Confirm the email we just sent and we’ll take you to onboarding automatically."
           : shouldCreateGuruProfile(intent)
-            ? "Account created. Please check your email, then continue to your Guru profile setup."
-            : "Account created. Please check your email to confirm your SitGuru account.",
+            ? "Account created. Confirm the email we just sent and we’ll continue to your Guru profile setup."
+            : "Account created. Confirm the email we just sent and we’ll open your dashboard automatically.",
       );
     } catch (caughtError) {
       setError(
@@ -1171,6 +1272,9 @@ function SignupPageContent() {
   async function handleAppleSignup() {
     try {
       resetAlerts();
+      const basics = getSignupBasics();
+      if (!basics) return;
+
       setAppleLoading(true);
 
       const origin =
@@ -1187,6 +1291,8 @@ function SignupPageContent() {
             intent,
             referralCode: normalizeReferralCode(referralCode),
             tracking: signupTracking,
+            zipCode: basics.cleanZipCode,
+            fullName: basics.cleanName,
           }),
         },
       });
@@ -1413,6 +1519,67 @@ function SignupPageContent() {
             </div>
           ) : null}
 
+          <div className="mt-5 space-y-4">
+            <label className="block space-y-2">
+              <span className="block text-sm font-black text-slate-900">
+                Full name <span className="text-red-500">*</span>
+              </span>
+              <div className="relative">
+                <UserRound className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-700" />
+                <input
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  className={fieldWithIconClassName}
+                  placeholder="First and last name"
+                  autoComplete="name"
+                />
+              </div>
+            </label>
+
+            <label className="block space-y-2">
+              <span className="block text-sm font-black text-slate-900">
+                ZIP code <span className="text-red-500">*</span>
+              </span>
+              <div className="relative">
+                <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-700" />
+                <input
+                  value={zipCode}
+                  onChange={(event) =>
+                    setZipCode(event.target.value.replace(/\D/g, "").slice(0, 5))
+                  }
+                  className={fieldWithIconClassName}
+                  placeholder="18951"
+                  inputMode="numeric"
+                  autoComplete="postal-code"
+                />
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(event) => setAcceptedTerms(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+              />
+              <span>
+                I agree to SitGuru&apos;s{" "}
+                <Link href="/terms" className="font-black text-emerald-800 underline">
+                  Terms
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/privacy"
+                  className="font-black text-emerald-800 underline"
+                >
+                  Privacy Policy
+                </Link>
+                . Name and ZIP are required before Google, Apple, email, or
+                phone signup.
+              </span>
+            </label>
+          </div>
+
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <button
               type="button"
@@ -1452,22 +1619,6 @@ function SignupPageContent() {
             <form onSubmit={handleEmailSignup} className="space-y-4">
               <label className="block space-y-2">
                 <span className="block text-sm font-black text-slate-900">
-                  Full name <span className="text-red-500">*</span>
-                </span>
-                <div className="relative">
-                  <UserRound className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-700" />
-                  <input
-                    value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
-                    className={fieldWithIconClassName}
-                    placeholder="First and last name"
-                    autoComplete="name"
-                  />
-                </div>
-              </label>
-
-              <label className="block space-y-2">
-                <span className="block text-sm font-black text-slate-900">
                   Email <span className="text-red-500">*</span>
                 </span>
                 <div className="relative">
@@ -1482,43 +1633,25 @@ function SignupPageContent() {
                 </div>
               </label>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block space-y-2">
-                  <span className="block text-sm font-black text-slate-900">
-                    Mobile phone{" "}
-                    <span className="font-semibold text-slate-400">(optional)</span>
-                  </span>
-                  <div className="relative">
-                    <Phone className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-700" />
-                    <input
-                      value={phone}
-                      onChange={(event) =>
-                        setPhone(formatPhoneNumber(event.target.value))
-                      }
-                      className={fieldWithIconClassName}
-                      placeholder="(267) 555-1234"
-                      inputMode="tel"
-                      autoComplete="tel"
-                    />
-                  </div>
-                </label>
-
-                <label className="block space-y-2">
-                  <span className="block text-sm font-black text-slate-900">
-                    ZIP code <span className="text-red-500">*</span>
-                  </span>
+              <label className="block space-y-2">
+                <span className="block text-sm font-black text-slate-900">
+                  Mobile phone{" "}
+                  <span className="font-semibold text-slate-400">(optional)</span>
+                </span>
+                <div className="relative">
+                  <Phone className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-700" />
                   <input
-                    value={zipCode}
+                    value={phone}
                     onChange={(event) =>
-                      setZipCode(event.target.value.replace(/\D/g, "").slice(0, 5))
+                      setPhone(formatPhoneNumber(event.target.value))
                     }
-                    className={fieldClassName}
-                    placeholder="18951"
-                    inputMode="numeric"
-                    autoComplete="postal-code"
+                    className={fieldWithIconClassName}
+                    placeholder="(267) 555-1234"
+                    inputMode="tel"
+                    autoComplete="tel"
                   />
-                </label>
-              </div>
+                </div>
+              </label>
 
               {phoneDigits(phone).length > 0 ? (
                 <label className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
@@ -1626,30 +1759,6 @@ function SignupPageContent() {
                 </label>
               )}
 
-              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={acceptedTerms}
-                  onChange={(event) => setAcceptedTerms(event.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
-                />
-                <span>
-                  I agree to SitGuru&apos;s{" "}
-                  <Link href="/terms" className="font-black text-emerald-800 underline">
-                    Terms
-                  </Link>{" "}
-                  and{" "}
-                  <Link
-                    href="/privacy"
-                    className="font-black text-emerald-800 underline"
-                  >
-                    Privacy Policy
-                  </Link>
-                  . I understand my profile may need more details before it is
-                  complete.
-                </span>
-              </label>
-
               <button type="submit" disabled={loading} className={primaryButtonClassName}>
                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
                 Create account
@@ -1660,56 +1769,22 @@ function SignupPageContent() {
             <div className="space-y-4">
               <label className="block space-y-2">
                 <span className="block text-sm font-black text-slate-900">
-                  Full name <span className="text-red-500">*</span>
+                  Phone <span className="text-red-500">*</span>
                 </span>
                 <div className="relative">
-                  <UserRound className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-700" />
+                  <Phone className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-700" />
                   <input
-                    value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
+                    value={phone}
+                    onChange={(event) =>
+                      setPhone(formatPhoneNumber(event.target.value))
+                    }
                     className={fieldWithIconClassName}
-                    placeholder="First and last name"
-                    autoComplete="name"
+                    placeholder="(267) 555-1234"
+                    inputMode="tel"
+                    autoComplete="tel"
                   />
                 </div>
               </label>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block space-y-2">
-                  <span className="block text-sm font-black text-slate-900">
-                    Phone <span className="text-red-500">*</span>
-                  </span>
-                  <div className="relative">
-                    <Phone className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-700" />
-                    <input
-                      value={phone}
-                      onChange={(event) =>
-                        setPhone(formatPhoneNumber(event.target.value))
-                      }
-                      className={fieldWithIconClassName}
-                      placeholder="(267) 555-1234"
-                      inputMode="tel"
-                      autoComplete="tel"
-                    />
-                  </div>
-                </label>
-
-                <label className="block space-y-2">
-                  <span className="block text-sm font-black text-slate-900">
-                    ZIP code <span className="text-red-500">*</span>
-                  </span>
-                  <input
-                    value={zipCode}
-                    onChange={(event) =>
-                      setZipCode(event.target.value.replace(/\D/g, "").slice(0, 5))
-                    }
-                    className={fieldClassName}
-                    placeholder="18951"
-                    inputMode="numeric"
-                    autoComplete="postal-code"
-                  />
-                </label>
-              </div>
 
               <label className="block space-y-2">
                 <span className="block text-sm font-black text-slate-900">
@@ -1796,30 +1871,11 @@ function SignupPageContent() {
                 </label>
               ) : null}
 
-              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={acceptedTerms}
-                  onChange={(event) => setAcceptedTerms(event.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
-                />
-                <span>
-                  I agree to SitGuru&apos;s{" "}
-                  <Link href="/terms" className="font-black text-emerald-800 underline">
-                    Terms
-                  </Link>{" "}
-                  and{" "}
-                  <Link
-                    href="/privacy"
-                    className="font-black text-emerald-800 underline"
-                  >
-                    Privacy Policy
-                  </Link>
-                  . By requesting a phone code, I also agree to receive
-                  transactional SMS for verification, bookings, and safety.
-                  Message and data rates may apply. Reply STOP to opt out.
-                </span>
-              </label>
+              <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-700">
+                By requesting a phone code, you also agree to receive
+                transactional SMS for verification, bookings, and safety.
+                Message and data rates may apply. Reply STOP to opt out.
+              </p>
 
               {!phoneCodeSent ? (
                 <button

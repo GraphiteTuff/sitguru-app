@@ -9,6 +9,7 @@ import {
   resolveRequestUser,
 } from "@/lib/supabase/request-auth";
 import { scanMessageForOffPlatformContact } from "@/lib/messaging/contact-guard";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -886,6 +887,7 @@ async function sendRecipientEmail(params: {
     const result = await resend.emails.send({
       from: getSupportFromEmail(),
       to: [toEmail],
+      bcc: mergeAdminBcc(toEmail),
       replyTo: getSupportReplyToEmail(),
       subject: "New SitGuru Message",
       html: `

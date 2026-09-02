@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { enrichAndPersistLocationFromZip } from "@/lib/location/enrich-from-zip";
 import { formatCityState, resolveLocationParts } from "@/lib/location/zip-lookup";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 
@@ -923,6 +924,7 @@ async function sendGuruStatusEmail(payload: GuruStatusEmailPayload) {
       body: JSON.stringify({
         from: fromEmail,
         to: [payload.toEmail],
+        bcc: mergeAdminBcc(payload.toEmail),
         bcc: ["jason@sitguru.com", "nette@sitguru.com", "support@sitguru.com"],
         subject: content.subject,
         text: content.body,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +112,7 @@ async function sendConfirmationEmail(payload: {
     body: JSON.stringify({
       from: fromEmail,
       to: payload.email,
+      bcc: mergeAdminBcc(payload.email),
       subject: "We received your SitGuru Ambassador application",
       html: `
         <div style="font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; line-height: 1.6; color: #12382b;">
@@ -170,6 +172,7 @@ async function sendAdminNotificationEmail(payload: {
     body: JSON.stringify({
       from: fromEmail,
       to: adminEmail,
+      bcc: mergeAdminBcc(adminEmail),
       subject: "New SitGuru Ambassador application",
       html: `
         <div style="font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif; line-height: 1.6; color: #12382b;">

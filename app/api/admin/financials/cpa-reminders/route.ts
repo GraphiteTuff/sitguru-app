@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 
@@ -260,6 +261,7 @@ async function sendEmailReminder(
       body: JSON.stringify({
         from: fromEmail,
         to: recipients,
+        bcc: mergeAdminBcc(recipients),
         subject: `SitGuru CPA Reminder: ${body.title}`,
         text: buildReminderMessage(body),
         html: buildReminderHtml(body),

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 
@@ -1524,6 +1525,7 @@ async function sendWithResend({
     body: JSON.stringify({
       from,
       to,
+      bcc: mergeAdminBcc(to),
       subject,
       html: `<p>${htmlEscape(message).replace(/\n/g, "<br />")}</p>`,
       attachments: [

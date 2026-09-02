@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { runAiAssistIfEnabled } from "@/lib/messaging/conversation-ai";
 import { isSitGuruAiConfigured } from "@/lib/messaging/ai-engine";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -297,6 +298,7 @@ async function sendAdminEmail(params: {
       body: JSON.stringify({
         from: getFromEmail(),
         to,
+        bcc: mergeAdminBcc(to),
         reply_to: params.email || getReplyToEmail(),
         subject: `New SitGuru Homepage Messenger: ${topicLabel}`,
         html: `

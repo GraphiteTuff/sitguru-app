@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -235,6 +236,7 @@ async function sendAdminEmail(payload: NormalizedContactPayload) {
       body: JSON.stringify({
         from: getFromEmail(),
         to,
+        bcc: mergeAdminBcc(to),
         reply_to: payload.email || getReplyToEmail(),
         subject: `New SitGuru ${topicLabel} Response`,
         html: `

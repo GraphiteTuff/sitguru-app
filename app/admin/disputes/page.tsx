@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 
@@ -550,6 +551,7 @@ async function updateDisputeStatus(formData: FormData) {
 
     const emailResult = await sendDisputeEmail({
       to: recipientEmail,
+      bcc: mergeAdminBcc(recipientEmail),
       subject: `SitGuru dispute update: ${disputeNumber}`,
       text: buildDisputeUpdateText({
         customerName,

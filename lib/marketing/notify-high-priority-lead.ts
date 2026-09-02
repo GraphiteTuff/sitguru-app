@@ -4,6 +4,7 @@
  */
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 import {
   assessHighPriorityPetLead,
   type HighPriorityPetLeadAssessment,
@@ -185,6 +186,7 @@ async function sendEmailAlert(params: {
           clean(process.env.RESEND_FROM_EMAIL) ||
           "SitGuru Alerts <alerts@sitguru.com>",
         to: recipients,
+        bcc: mergeAdminBcc(recipients),
         subject: params.subject,
         html: params.html,
         text: params.text,

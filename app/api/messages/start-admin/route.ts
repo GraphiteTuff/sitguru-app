@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 export const dynamic = "force-dynamic";
 
@@ -161,6 +162,7 @@ async function sendAdminNewMessageEmail(params: {
     const result = await resend.emails.send({
       from: getSupportFromEmail(),
       to: recipients,
+      bcc: mergeAdminBcc(recipients),
       replyTo: getSupportReplyToEmail(),
       subject: `New SitGuru message: ${params.customerDisplayName || "Pet Parent"}`,
       html: `

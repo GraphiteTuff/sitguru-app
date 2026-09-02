@@ -43,6 +43,9 @@ WebBrowser.maybeCompleteAuthSession();
 
 type SignupMetadata = {
   first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  zip_code?: string;
   signup_intent?: string;
 };
 
@@ -1780,6 +1783,25 @@ export function AuthProvider({
                 ? {
                     first_name:
                       metadata.first_name.trim(),
+                  }
+                : {}),
+              ...(metadata?.last_name
+                ? {
+                    last_name:
+                      metadata.last_name.trim(),
+                  }
+                : {}),
+              ...(metadata?.full_name
+                ? {
+                    full_name:
+                      metadata.full_name.trim(),
+                  }
+                : {}),
+              ...(metadata?.zip_code
+                ? {
+                    zip_code: metadata.zip_code.trim(),
+                    postal_code: metadata.zip_code.trim(),
+                    service_zip: metadata.zip_code.trim(),
                   }
                 : {}),
               ...(metadata?.signup_intent

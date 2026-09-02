@@ -354,9 +354,6 @@ export async function sendPartnerApprovalWelcome(
 ) {
   const content = buildPartnerApprovalWelcome(params);
   const namedTo = formatNamedEmailAddress(params.contactName, params.to);
-  const recipientEmail = params.to.trim().toLowerCase();
-  const bcc =
-    recipientEmail === "jason@sitguru.com" ? undefined : ["jason@sitguru.com"];
 
   return sendSitGuruEmail({
     to: namedTo,
@@ -364,6 +361,5 @@ export async function sendPartnerApprovalWelcome(
     html: content.html,
     text: content.text,
     replyTo: process.env.RESEND_REPLY_TO_EMAIL || "jason@sitguru.com",
-    bcc,
   });
 }

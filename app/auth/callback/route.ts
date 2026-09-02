@@ -374,16 +374,21 @@ async function updateAuthMetadata({
   intent,
   tracking,
   ambassadorReferralCode,
+  fullName,
+  zipCode,
 }: {
   userId: string;
   existingMetadata: Record<string, unknown>;
   intent: AccountIntent;
   tracking: TrackingContext;
   ambassadorReferralCode: string;
+  fullName?: string;
+  zipCode?: string;
 }) {
   const supabaseAdmin = createSupabaseAdminClient();
   const profileRole = getProfileRoleFromIntent(intent);
   const authorizedRoles = authorizedRolesFromSignupIntent(intent);
+  const nameParts = cleanText(fullName).split(/\s+/).filter(Boolean);
 
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
     user_metadata: {
@@ -404,6 +409,20 @@ async function updateAuthMetadata({
       utm_source: tracking.utmSource || null,
       utm_medium: tracking.utmMedium || null,
       utm_campaign: tracking.utmCampaign || null,
+      ...(fullName
+        ? {
+            full_name: fullName,
+            first_name: nameParts[0] || existingMetadata.first_name || null,
+            last_name: nameParts.slice(1).join(" ") || existingMetadata.last_name || null,
+          }
+        : {}),
+      ...(zipCode
+        ? {
+            zip_code: zipCode,
+            postal_code: zipCode,
+            service_zip: zipCode,
+          }
+        : {}),
     },
   });
 
@@ -589,7 +608,7 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
   const type = requestUrl.searchParams.get("type");
   const nextParam = requestUrl.searchParams.get("next");
-  const explicitIntent = normalizeCallbackIntent(
+  const urlIntent = normalizeCallbackIntent(
     requestUrl.searchParams.get("intent"),
   );
 
@@ -647,24 +666,42 @@ export async function GET(request: Request) {
   const hasExistingSitGuruAccess = Boolean(
     metadataRedirect || existingDatabaseRedirect,
   );
+  const explicitIntent =
+    urlIntent ||
+    normalizeCallbackIntent(
+      getMetadataString(metadata, ["account_intent", "signup_intent"]),
+    );
 
   if (!explicitIntent && !hasExistingSitGuruAccess) {
+    const email = cleanText(user.email).toLowerCase();
     await supabase.auth.signOut();
 
-    const loginUrl = new URL(fallbackRoutes.login, requestUrl.origin);
-    loginUrl.searchParams.set(
-      "error",
-      "We couldn’t find an existing SitGuru account for that login. Choose Pet Parent, Future Guru, or Ambassador to create one.",
+    const signupUrl = new URL(fallbackRoutes.signup, requestUrl.origin);
+    signupUrl.searchParams.set("role", "pet_parent");
+    signupUrl.searchParams.set("mode", "phone");
+    signupUrl.searchParams.set(
+      "auth_error",
+      "We couldn’t find an existing SitGuru account. Create a Pet Parent account to continue — add your name and ZIP, then Google or Apple will work.",
     );
-    loginUrl.searchParams.set("mode", "phone");
-    return NextResponse.redirect(loginUrl);
+    if (email) signupUrl.searchParams.set("email", email);
+    const safeNext = getSafeNextPath(nextParam, type);
+    if (safeNext) signupUrl.searchParams.set("next", safeNext);
+    return NextResponse.redirect(signupUrl);
   }
 
   if (explicitIntent) {
     const email = cleanText(user.email).toLowerCase();
     const phone = cleanText(user.phone) || getMetadataString(metadata, ["phone"]);
-    const fullName = buildFullName(metadata, email);
-    const zipCode = getMetadataString(metadata, ["zip_code", "postal_code"]);
+    const fullName =
+      cleanText(
+        requestUrl.searchParams.get("full_name") ||
+          requestUrl.searchParams.get("name"),
+      ) || buildFullName(metadata, email);
+    const zipCode =
+      cleanText(
+        requestUrl.searchParams.get("zip_code") ||
+          requestUrl.searchParams.get("zip"),
+      ) || getMetadataString(metadata, ["zip_code", "postal_code", "service_zip"]);
     const serviceArea =
       getMetadataString(metadata, [
         "service_area",
@@ -684,6 +721,8 @@ export async function GET(request: Request) {
         intent: explicitIntent,
         tracking,
         ambassadorReferralCode,
+        fullName,
+        zipCode,
       });
 
       await callProvisioningRoute({

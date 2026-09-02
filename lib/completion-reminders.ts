@@ -1,4 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 type SupportedRole = "pet_parent" | "guru" | "ambassador";
 type ReminderStage =
@@ -1176,6 +1177,7 @@ async function sendEmail({
     body: JSON.stringify({
       from: DEFAULT_FROM_EMAIL,
       to,
+      bcc: mergeAdminBcc(to),
       reply_to: SUPPORT_EMAIL,
       subject,
       text,

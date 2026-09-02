@@ -7,6 +7,7 @@ import {
   EyeOff,
   LockKeyhole,
   Mail,
+  MapPin,
   ShieldCheck,
   UserPlus,
 } from 'lucide-react-native';
@@ -28,6 +29,7 @@ import SocialAuthButton from '@/components/SocialAuthButton';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 
 type SignupIntent =
   | 'pet-parent'
@@ -89,6 +91,30 @@ function normalizeSignupError(message: string) {
   return 'SitGuru could not create your account. Please try again.';
 }
 
+function getNameParts(value: string) {
+  const cleanName = value.replace(/\s+/g, ' ').trim();
+  const parts = cleanName.split(' ').filter(Boolean);
+
+  return {
+    cleanName,
+    firstName: parts[0] || '',
+    lastName: parts.slice(1).join(' '),
+    parts,
+  };
+}
+
+function isValidFullName(value: string) {
+  const { parts } = getNameParts(value);
+  return (
+    parts.length >= 2 &&
+    parts.every((part) => part.replace(/[^a-zA-Z]/g, '').length >= 2)
+  );
+}
+
+function isValidZipCode(value: string) {
+  return /^\d{5}$/.test(value.trim());
+}
+
 function resolveIntent(value?: string): SignupIntent {
   const normalized = String(value || '')
     .trim()
@@ -117,7 +143,8 @@ export default function SignupScreen() {
     source?: string;
   }>();
 
-  const [firstName, setFirstName] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [zipCode, setZipCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -142,12 +169,55 @@ export default function SignupScreen() {
     [cleanEmail],
   );
 
+  const nameParts = getNameParts(fullName);
+  const cleanZip = zipCode.trim();
+
   const canSubmit =
     isConfigured &&
     !loading &&
-    firstName.trim().length >= 2 &&
+    isValidFullName(fullName) &&
+    isValidZipCode(cleanZip) &&
     emailLooksValid &&
     password.length >= 8;
+
+  function getSignupBasics() {
+    if (!isValidFullName(fullName)) {
+      setMessage('Enter your first and last name.');
+      return null;
+    }
+
+    if (!isValidZipCode(cleanZip)) {
+      setMessage('Enter a valid 5-digit ZIP code.');
+      return null;
+    }
+
+    return {
+      ...nameParts,
+      zipCode: cleanZip,
+    };
+  }
+
+  async function persistSignupProfile(basics: {
+    cleanName: string;
+    firstName: string;
+    lastName: string;
+    zipCode: string;
+  }) {
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          full_name: basics.cleanName,
+          first_name: basics.firstName,
+          last_name: basics.lastName,
+          zip_code: basics.zipCode,
+          postal_code: basics.zipCode,
+          service_zip: basics.zipCode,
+        },
+      });
+    } catch {
+      // Profile write is best-effort after auth succeeds.
+    }
+  }
 
   async function handleSignup() {
     if (loading) return;
@@ -155,10 +225,8 @@ export default function SignupScreen() {
     setMessage(null);
     setSuccess(null);
 
-    if (firstName.trim().length < 2) {
-      setMessage('Enter your first name.');
-      return;
-    }
+    const basics = getSignupBasics();
+    if (!basics) return;
 
     if (!emailLooksValid) {
       setMessage('Enter a valid email address.');
@@ -171,7 +239,10 @@ export default function SignupScreen() {
     }
 
     const result = await signUp(cleanEmail, password, {
-      first_name: firstName.trim(),
+      first_name: basics.firstName,
+      last_name: basics.lastName,
+      full_name: basics.cleanName,
+      zip_code: basics.zipCode,
       signup_intent: signupIntent,
     });
 
@@ -182,10 +253,12 @@ export default function SignupScreen() {
 
     if (result.needsEmailConfirmation) {
       setSuccess(
-        'Check your email to confirm your account, then return to log in.',
+        'Check your email to confirm your account. After you confirm, we’ll take you in automatically when you return.',
       );
       return;
     }
+
+    await persistSignupProfile(basics);
 
     setSuccess(
       fromCommunity
@@ -219,6 +292,9 @@ export default function SignupScreen() {
     setMessage(null);
     setSuccess(null);
 
+    const basics = getSignupBasics();
+    if (!basics) return;
+
     const result =
       provider === 'google'
         ? await signInWithGoogle()
@@ -235,6 +311,8 @@ export default function SignupScreen() {
       setMessage(normalizeSignupError(result.error));
       return;
     }
+
+    await persistSignupProfile(basics);
 
     if (Platform.OS === 'web') {
       return;
@@ -370,6 +448,60 @@ export default function SignupScreen() {
                     </View>
                   ) : null}
 
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>Full name</Text>
+                    <View style={styles.inputShell}>
+                      <UserPlus
+                        color={SitGuruColors.textSoft}
+                        size={19}
+                        strokeWidth={2.2}
+                      />
+                      <TextInput
+                        autoCapitalize="words"
+                        autoComplete="name"
+                        onChangeText={(value) => {
+                          setFullName(value);
+                          setMessage(null);
+                          setSuccess(null);
+                        }}
+                        placeholder="First and last name"
+                        placeholderTextColor={SitGuruColors.textSoft}
+                        returnKeyType="next"
+                        style={styles.input}
+                        textContentType="name"
+                        value={fullName}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.fieldLabel}>ZIP code</Text>
+                    <View style={styles.inputShell}>
+                      <MapPin
+                        color={SitGuruColors.textSoft}
+                        size={19}
+                        strokeWidth={2.2}
+                      />
+                      <TextInput
+                        autoCapitalize="none"
+                        autoComplete="postal-code"
+                        keyboardType="number-pad"
+                        maxLength={5}
+                        onChangeText={(value) => {
+                          setZipCode(value.replace(/\D/g, '').slice(0, 5));
+                          setMessage(null);
+                          setSuccess(null);
+                        }}
+                        placeholder="18951"
+                        placeholderTextColor={SitGuruColors.textSoft}
+                        returnKeyType="next"
+                        style={styles.input}
+                        textContentType="postalCode"
+                        value={zipCode}
+                      />
+                    </View>
+                  </View>
+
                   <SocialAuthButton
                     disabled={loading || !isConfigured}
                     loading={socialLoading === 'google'}
@@ -390,32 +522,6 @@ export default function SignupScreen() {
                     <View style={styles.dividerLine} />
                     <Text style={styles.dividerText}>or use email</Text>
                     <View style={styles.dividerLine} />
-                  </View>
-
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.fieldLabel}>First name</Text>
-                    <View style={styles.inputShell}>
-                      <UserPlus
-                        color={SitGuruColors.textSoft}
-                        size={19}
-                        strokeWidth={2.2}
-                      />
-                      <TextInput
-                        autoCapitalize="words"
-                        autoComplete="name-given"
-                        onChangeText={(value) => {
-                          setFirstName(value);
-                          setMessage(null);
-                          setSuccess(null);
-                        }}
-                        placeholder="Jane"
-                        placeholderTextColor={SitGuruColors.textSoft}
-                        returnKeyType="next"
-                        style={styles.input}
-                        textContentType="givenName"
-                        value={firstName}
-                      />
-                    </View>
                   </View>
 
                   <View style={styles.fieldGroup}>
