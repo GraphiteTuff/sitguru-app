@@ -2,6 +2,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isAdminRole } from "@/lib/admin/access";
 import {
   asTrimmedString,
+  getProfilePhone,
+  getProfileRole,
+  getProfileStatus,
+  getRiskLabel,
   isWithinLastDays,
   matchesRoleFilter,
   matchesStatusFilter,
@@ -146,30 +150,59 @@ function applyHqRole(
 }
 
 async function loadIdentityRows(): Promise<DirectoryUser[]> {
-  const identity = await safeRows<AnyRow>(
-    supabaseAdmin
-      .from("admin_identity_directory")
-      .select(
-        "directory_source,display_name,role,email,phone,auth_user_id,profile_id,guru_id,is_active,guru_status,admin_action_needed,profile_created_at,auth_created_at,auth_last_sign_in_at",
-      )
-      .limit(4000),
-    "admin_identity_directory",
-  );
+  const [identity, profiles] = await Promise.all([
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("admin_identity_directory")
+        .select(
+          "directory_source,display_name,role,email,phone,auth_user_id,profile_id,guru_id,guru_status,admin_action_needed,profile_created_at,auth_created_at,auth_last_sign_in_at",
+        )
+        .limit(4000),
+      "admin_identity_directory",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("profiles")
+        .select(PROFILE_COLUMNS)
+        .order("created_at", { ascending: false })
+        .limit(4000),
+      "profiles_directory",
+    ),
+  ]);
+
+  const profileById = new Map<string, AnyRow>();
+  const profileByEmail = new Map<string, AnyRow>();
+  for (const profile of profiles) {
+    const id = asTrimmedString(profile.id).toLowerCase();
+    const email = asTrimmedString(profile.email).toLowerCase();
+    if (id) profileById.set(id, profile);
+    if (email) profileByEmail.set(email, profile);
+  }
 
   if (identity.length) {
     return identity
-      .map((row) => toDirectoryUserFromIdentity(row))
+      .map((row) => {
+        const user = toDirectoryUserFromIdentity(row);
+        if (!user) return null;
+
+        const profile =
+          profileById.get(user.id.toLowerCase()) ||
+          (user.email !== "—"
+            ? profileByEmail.get(user.email.toLowerCase())
+            : undefined);
+
+        if (!profile) return user;
+
+        return {
+          ...user,
+          role: getProfileRole(profile),
+          status: getProfileStatus(profile),
+          risk: getRiskLabel(profile),
+          phone: getProfilePhone(profile) || user.phone,
+        };
+      })
       .filter(Boolean) as DirectoryUser[];
   }
-
-  const profiles = await safeRows<AnyRow>(
-    supabaseAdmin
-      .from("profiles")
-      .select(PROFILE_COLUMNS)
-      .order("created_at", { ascending: false })
-      .limit(4000),
-    "profiles_directory",
-  );
 
   return profiles
     .map((row) => toDirectoryUserFromProfile(row))

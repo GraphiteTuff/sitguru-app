@@ -453,13 +453,18 @@ export function toDirectoryUserFromIdentity(
     asTrimmedString(row.profile_created_at) ||
     asTrimmedString(row.auth_created_at) ||
     null;
-  const isActive = String(row.is_active || "").toLowerCase();
   const actionNeeded = asTrimmedString(row.admin_action_needed).toLowerCase();
   const guruStatus = asTrimmedString(row.guru_status).toLowerCase();
+  const actionIsAlert =
+    Boolean(actionNeeded) &&
+    !["ok", "none", "n/a", "na", "good", "clear"].includes(actionNeeded);
 
+  // Do not trust admin_identity_directory.is_active — it is text and often
+  // "false" for live Pet Parents whose profiles.account_status is active.
   let status = "Active";
-  if (actionNeeded.includes("suspend") || isActive === "false") status = "Suspended";
-  else if (guruStatus.includes("pending") || actionNeeded.includes("review")) {
+  if (actionNeeded.includes("suspend") || guruStatus.includes("suspend")) {
+    status = "Suspended";
+  } else if (guruStatus.includes("pending") || actionNeeded.includes("review")) {
     status = "Pending";
   } else if (guruStatus.includes("verified") || guruStatus.includes("approved")) {
     status = "Verified";
@@ -477,7 +482,7 @@ export function toDirectoryUserFromIdentity(
     avatarUrl: "",
     role,
     status,
-    risk: actionNeeded ? "Medium" : "Low",
+    risk: actionIsAlert ? "Medium" : "Low",
     joined: formatDateShort(joinedAt),
     joinedAt,
     source,
