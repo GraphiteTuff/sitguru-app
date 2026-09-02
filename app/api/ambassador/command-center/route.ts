@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import {
+  canUseAllRoleWorkspaces,
+  getFounderAmbassadorPreview,
+} from "@/lib/dashboard/founder-workspaces";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -520,7 +524,14 @@ async function requireAmbassador(req: NextRequest) {
     };
   }
 
-  const ambassador = await getAmbassador(user);
+  const ambassador =
+    (await getAmbassador(user)) ||
+    (canUseAllRoleWorkspaces(user.email)
+      ? getFounderAmbassadorPreview({
+          userId: user.id,
+          email: user.email,
+        })
+      : null);
 
   if (!ambassador) {
     return {

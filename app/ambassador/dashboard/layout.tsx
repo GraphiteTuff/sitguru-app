@@ -16,6 +16,7 @@ import {
   Users,
   WalletCards,
 } from "lucide-react";
+import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
 
 type AmbassadorDashboardLayoutProps = {
   children: ReactNode;
@@ -137,6 +138,8 @@ export default function AmbassadorDashboardLayout({
                 })}
               </div>
             </nav>
+
+            <SiteAccountMenu compact />
           </div>
         </div>
       </header>
