@@ -9,7 +9,6 @@ import {
   GraduationCap,
   Handshake,
   HeartHandshake,
-  HelpCircle,
   Medal,
   PawPrint,
   Sparkles,
@@ -168,29 +167,6 @@ const applicationSupport = [
   "Applicant review",
   "Onboarding progress",
   "Guru pathway support",
-];
-
-const faqs = [
-  {
-    q: "Is this a traditional job board?",
-    a: "It is both. Search open SitGuru careers and internships below. Most marketplace opportunities are still Guru paths and guided programs. Company roles are posted separately when they are live.",
-  },
-  {
-    q: "What’s the difference between Careers and Programs?",
-    a: "Careers includes paid company jobs, the SitGuru Internship Program, and Guru growth. Programs are guided pathways (Student Hire, Community Hire, Veterans & Military Families) toward becoming a Guru.",
-  },
-  {
-    q: "Are SitGuru internships unpaid?",
-    a: "Our preferred model is a paid hourly internship that is also eligible for academic credit through the student’s college. Unpaid placements are only considered through a college-approved educational program — SitGuru does not advertise unpaid work in exchange for credit on its own.",
-  },
-  {
-    q: "Does “Hire” mean SitGuru employs me?",
-    a: "Company career postings are SitGuru roles. Program names like Student Hire and Community Hire describe pathways into Guru marketplace work, not a guarantee of W-2 employment. Review each listing or program page.",
-  },
-  {
-    q: "I’m a career center or college coordinator. Where do I go?",
-    a: "Email jason@sitguru.com about becoming an internship site, or visit Partners for Student Hire, Community Hire, and Veterans & Military Families referral options.",
-  },
 ];
 
 function OpportunityCard({ opportunity }: { opportunity: OpportunityCard }) {
@@ -675,36 +651,6 @@ export default async function CareersPage() {
                 items={applicationSupport}
               />
             </div>
-          </div>
-        </section>
-
-        <section className="rounded-[32px] border border-[#e3ece5] bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-          <div className="mb-5 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-              <HelpCircle size={22} />
-            </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
-                FAQ
-              </p>
-              <h2 className="text-2xl font-black tracking-tight text-green-950 sm:text-3xl">
-                Common questions about SitGuru careers
-              </h2>
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            {faqs.map((item) => (
-              <div
-                key={item.q}
-                className="rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] p-5"
-              >
-                <h3 className="text-base font-black text-green-950">{item.q}</h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  {item.a}
-                </p>
-              </div>
-            ))}
           </div>
         </section>
 
