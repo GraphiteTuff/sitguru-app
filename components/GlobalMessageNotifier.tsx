@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Volume2, X } from "lucide-react";
+import {
+  canPlayPageSound,
+  setAmbientAudioSession,
+} from "@/lib/media/ambient-audio-session";
 
 type MessageAlert = {
   id: string;
@@ -61,6 +65,10 @@ function getSafeRoleLabel(role: string) {
 
 function playSoftAlert() {
   try {
+    if (!canPlayPageSound()) return;
+
+    setAmbientAudioSession();
+
     const AudioContextClass =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext?: typeof AudioContext })

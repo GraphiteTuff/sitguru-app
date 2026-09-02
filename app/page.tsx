@@ -19,6 +19,10 @@ import {
   companionChatHref,
   openCompanionChat,
 } from "@/lib/companions/open-companion-chat";
+import {
+  prepareSilentBackgroundVideo,
+  setAmbientAudioSession,
+} from "@/lib/media/ambient-audio-session";
 
 const heroVideoPaths = [
   "/videos/sitguru-homepage-hero.mp4",
@@ -579,6 +583,8 @@ function HeroVisual({
     const video = videoRef.current;
     if (!video) return;
 
+    setAmbientAudioSession();
+    prepareSilentBackgroundVideo(video);
     video.playbackRate = activeVideoPlaybackRate;
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -603,6 +609,8 @@ function HeroVisual({
     const video = videoRef.current;
     if (!video) return;
 
+    setAmbientAudioSession();
+    prepareSilentBackgroundVideo(video);
     video.playbackRate = activeVideoPlaybackRate;
     void video
       .play()
@@ -657,9 +665,12 @@ function HeroVisual({
         autoPlay
         muted
         playsInline
+        disableRemotePlayback
+        disablePictureInPicture
         preload="metadata"
         aria-hidden="true"
         onCanPlay={(event) => {
+          prepareSilentBackgroundVideo(event.currentTarget);
           event.currentTarget.playbackRate = activeVideoPlaybackRate;
           playActiveVideo();
         }}

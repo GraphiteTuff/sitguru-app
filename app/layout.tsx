@@ -5,6 +5,7 @@ import Script from "next/script";
 import "./globals.css";
 import CrispWidget from "@/components/CrispWidget";
 import RouteShell from "@/components/RouteShell";
+import AmbientAudioSession from "@/components/AmbientAudioSession";
 import AmbassadorReferralCapture from "@/components/ambassador/AmbassadorReferralCapture";
 import GoogleOneTapHost from "@/components/auth/GoogleOneTapHost";
 
@@ -153,6 +154,7 @@ export default function RootLayout({
           }}
         />
 
+        <AmbientAudioSession />
         <RouteShell>{children}</RouteShell>
         <AmbassadorReferralCapture />
         <GoogleOneTapHost />
