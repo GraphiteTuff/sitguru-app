@@ -385,7 +385,7 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function AdminLogo() {
+function AdminLogo({ compact = false }: { compact?: boolean }) {
   return (
     <Link
       href="/"
@@ -398,7 +398,9 @@ function AdminLogo() {
         width={320}
         height={114}
         priority
-        className="h-auto w-[118px] bg-transparent object-contain"
+        className={`h-auto bg-transparent object-contain ${
+          compact ? "w-[88px]" : "w-[118px]"
+        }`}
       />
     </Link>
   );
@@ -422,51 +424,72 @@ function SidebarSection({
   title,
   items,
   pathname,
+  open,
+  onToggle,
 }: {
   title: string;
   pathname: string;
+  open: boolean;
+  onToggle: () => void;
   items: {
     label: string;
     href: string;
     icon: React.ComponentType<{ size?: number; className?: string }>;
   }[];
 }) {
+  const hasActive = items.some((item) => isActivePath(pathname, item.href));
+
   return (
-    <div className="mb-4">
-      <p className="mb-1.5 px-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-        {title}
-      </p>
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[10px] font-black uppercase tracking-[0.16em] transition ${
+          hasActive
+            ? "text-green-800"
+            : "text-slate-400 hover:bg-white hover:text-slate-600"
+        }`}
+      >
+        <span>{title}</span>
+        <ChevronDown
+          size={14}
+          className={`shrink-0 transition ${open ? "rotate-180" : ""}`}
+        />
+      </button>
 
-      <div className="space-y-1">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = isActivePath(pathname, item.href);
+      {open ? (
+        <div className="space-y-px">
+          {items.map((item) => {
+            const Icon = item.icon;
+            const active = isActivePath(pathname, item.href);
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={
-                active
-                  ? "group flex items-center gap-2.5 rounded-xl bg-green-800 px-2.5 py-2 text-sm font-black text-white shadow-sm transition hover:bg-green-900"
-                  : "group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-bold text-slate-700 transition hover:bg-white hover:text-green-950 hover:shadow-sm"
-              }
-            >
-              <span
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
                 className={
                   active
-                    ? "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15 text-white"
-                    : "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-slate-400 ring-1 ring-[#edf2ec] transition group-hover:text-green-800"
+                    ? "group flex items-center gap-2 rounded-lg bg-green-800 px-2 py-1.5 text-[13px] font-black text-white shadow-sm transition hover:bg-green-900"
+                    : "group flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] font-bold text-slate-700 transition hover:bg-white hover:text-green-950"
                 }
               >
-                <Icon size={16} />
-              </span>
+                <span
+                  className={
+                    active
+                      ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/15 text-white"
+                      : "flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white text-slate-400 ring-1 ring-[#edf2ec] transition group-hover:text-green-800"
+                  }
+                >
+                  <Icon size={14} />
+                </span>
 
-              <span className="truncate">{item.label}</span>
-            </Link>
-          );
-        })}
-      </div>
+                <span className="truncate">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -851,6 +874,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const isAdminLoginPage = pathname === "/admin/login";
   const [workspace, setWorkspace] = useState<"full" | "growth">("full");
   const [isSuperUser, setIsSuperUser] = useState(false);
+  const [openSection, setOpenSection] = useState<string>("Operations");
   const onGrowthPortal = pathname.startsWith("/admin/growth");
   const isGrowthChrome = workspace === "growth" || onGrowthPortal;
   const visibleNavSections = isGrowthChrome ? growthNavSections : navSections;
@@ -875,6 +899,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    const match = visibleNavSections.find((section) =>
+      section.items.some((item) => isActivePath(pathname, item.href)),
+    );
+    setOpenSection(match?.title ?? visibleNavSections[0]?.title ?? "Operations");
+  }, [pathname, isGrowthChrome]);
+
   if (isAdminLoginPage) {
     return <>{children}</>;
   }
@@ -885,98 +916,65 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <div className="grid min-h-dvh lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="hidden border-r border-[#e5ebe2] bg-[#fcfdfb] lg:block">
           <div className="sticky top-0 flex h-dvh min-h-0 flex-col">
-            <div className="shrink-0 border-b border-[#e8eee5] px-4 py-4">
-              <AdminLogo />
-
-              <div className="mt-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-green-700">
-                  SitGuru Admin
-                </p>
-
-                <h2 className="mt-1 text-[2.05rem] font-black leading-[0.92] tracking-tight text-green-950 xl:text-[2.35rem]">
-                  {isGrowthChrome ? (
-                    <>
-                      Growth
-                      <br />
-                      Portal
-                    </>
-                  ) : (
-                    <>
-                      Admin
-                      <br />
-                      Control
-                    </>
-                  )}
-                </h2>
-
-                <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-                  {isGrowthChrome
-                    ? "Campaigns, stories, and signups."
-                    : "Trusted Pet Care. Simplified."}
+            <div className="shrink-0 border-b border-[#e8eee5] px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <AdminLogo compact />
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-green-700">
+                  {isGrowthChrome ? "Growth" : "Admin"}
                 </p>
               </div>
-
-              <Link
-                href="/"
-                className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-green-100 bg-white px-3 py-2 text-xs font-black text-green-900 shadow-sm transition hover:border-green-300 hover:bg-green-50"
-              >
-                <Home size={15} />
-                Back to Homepage
-              </Link>
 
               {isGrowthChrome ? null : (
                 <Link
                   href={adminRoutes.growth}
-                  className="mt-2 flex min-h-14 items-center justify-center gap-2 rounded-xl px-3 text-sm font-black text-white shadow-sm"
+                  className="mt-2 flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-xs font-black text-white shadow-sm"
                   style={{ background: "#0D5C3A" }}
                 >
-                  <Sparkles size={18} />
+                  <Sparkles size={15} />
                   Social Media Manager
                 </Link>
               )}
+
+              {isSuperUser && onGrowthPortal && workspace !== "growth" ? (
+                <Link
+                  href="/admin"
+                  className="mt-2 flex min-h-9 items-center justify-center rounded-lg bg-[#0D5C3A] px-3 text-xs font-black text-white"
+                >
+                  Back to Full HQ
+                </Link>
+              ) : null}
             </div>
 
-            <div className="shrink-0 px-4 pt-3">
-              <div className="rounded-[1.15rem] border border-[#d8eadb] bg-white p-3 shadow-sm">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-green-800">
-                  Platform View
-                </p>
-
-                <p className="mt-1 text-xs font-semibold leading-5 text-slate-700">
-                  {isGrowthChrome
-                    ? "Promote Gurus, events, and partners. Measure Pet Parent and Guru signups."
-                    : "Oversee Pet Parents, Gurus, Ambassadors, approvals, bookings, payments, hiring, growth, training, academies, reporting, taxes, and messages."}
-                </p>
-                {isSuperUser && onGrowthPortal && workspace !== "growth" ? (
-                  <Link
-                    href="/admin"
-                    className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-[#0D5C3A] px-3 text-xs font-black text-white"
-                  >
-                    Back to Full HQ
-                  </Link>
-                ) : null}
-              </div>
-            </div>
-
-            <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-3 [scrollbar-width:thin]">
+            <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {visibleNavSections.map((section) => (
                 <SidebarSection
                   key={section.title}
                   title={section.title}
                   items={section.items}
                   pathname={pathname}
+                  open={
+                    visibleNavSections.length === 1 ||
+                    openSection === section.title
+                  }
+                  onToggle={() =>
+                    setOpenSection((current) =>
+                      current === section.title && visibleNavSections.length > 1
+                        ? ""
+                        : section.title,
+                    )
+                  }
                 />
               ))}
             </nav>
 
             {isGrowthChrome ? null : (
-            <div className="shrink-0 border-t border-[#e8eee5] px-4 py-3">
+            <div className="shrink-0 border-t border-[#e8eee5] px-2.5 py-2">
               <Link
                 href={adminRoutes.settings}
-                className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-bold text-slate-700 transition hover:bg-white hover:text-green-950 hover:shadow-sm"
+                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] font-bold text-slate-700 transition hover:bg-white hover:text-green-950"
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white ring-1 ring-[#edf2ec]">
-                  <Settings size={16} />
+                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white ring-1 ring-[#edf2ec]">
+                  <Settings size={14} />
                 </span>
 
                 <span>Settings</span>
