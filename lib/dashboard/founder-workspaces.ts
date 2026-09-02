@@ -30,5 +30,26 @@ export function getFounderAmbassadorPreview(input: {
     referral_status: "active",
     onboarding_status: "complete",
     training_status: "complete",
+    training_percent: 100,
+    onboarding_step: 1,
+    onboarding_percent: 100,
+  } as {
+    id: string;
+    user_id: string;
+    full_name: string;
+    email: string;
+    login_email: string;
+    contact_email: string;
+    referral_code: string;
+    dashboard_enabled: boolean;
+    login_enabled: boolean;
+    status: string;
+    referral_status: string;
+    onboarding_status: string;
+    training_status: string;
+    training_percent: number;
+    onboarding_step: number;
+    onboarding_percent: number;
+    [key: string]: unknown;
   };
 }
