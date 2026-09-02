@@ -38,6 +38,7 @@ type ConversationParticipantRow = {
   conversation_id: string;
   user_id: string;
   role?: string | null;
+  last_read_at?: string | null;
 };
 
 const SUPER_ADMIN_EMAILS = new Set(["jason@sitguru.com", "nette@sitguru.com"]);
@@ -136,7 +137,11 @@ function getPreview(message?: MessageRow | null) {
   return body.length > 160 ? `${body.slice(0, 157)}...` : body;
 }
 
-function isUnreadMessageForUser(message: MessageRow, currentUserId: string) {
+function isUnreadMessageForUser(
+  message: MessageRow,
+  currentUserId: string,
+  lastReadAt?: string | null,
+) {
   const status = asString(message.status).toLowerCase();
 
   if (!message.id) return false;
@@ -148,13 +153,23 @@ function isUnreadMessageForUser(message: MessageRow, currentUserId: string) {
     return false;
   }
 
-  if (message.is_read === false) return true;
-
-  if (!message.read_at && status !== "read" && status !== "archived") {
-    return true;
+  if (message.is_read === true || status === "read" || status === "archived") {
+    return false;
   }
 
-  return false;
+  if (message.read_at) return false;
+
+  if (lastReadAt && message.created_at) {
+    const created = new Date(message.created_at).getTime();
+    const readAt = new Date(lastReadAt).getTime();
+    if (Number.isFinite(created) && Number.isFinite(readAt) && created <= readAt) {
+      return false;
+    }
+  }
+
+  if (message.is_read === false) return true;
+
+  return !message.read_at && status !== "read" && status !== "archived";
 }
 
 function getThreadHref({
@@ -216,13 +231,21 @@ export async function GET() {
     const participantRows = await safeRows<ConversationParticipantRow>(
       supabaseAdmin
         .from("conversation_participants")
-        .select("conversation_id,user_id,role")
+        .select("conversation_id,user_id,role,last_read_at")
         .eq("user_id", user.id)
         .limit(1000),
     );
 
+    const lastReadByConversation = new Map<string, string>();
     const participantConversationIds = participantRows
-      .map((row) => asString(row.conversation_id))
+      .map((row) => {
+        const conversationId = asString(row.conversation_id);
+        const lastReadAt = asString(row.last_read_at);
+        if (conversationId && lastReadAt) {
+          lastReadByConversation.set(conversationId, lastReadAt);
+        }
+        return conversationId;
+      })
       .filter(Boolean);
 
     if (participantConversationIds.length === 0) {
@@ -242,7 +265,11 @@ export async function GET() {
     );
 
     const unreadMessages = recentMessages.filter((message) =>
-      isUnreadMessageForUser(message, user.id),
+      isUnreadMessageForUser(
+        message,
+        user.id,
+        lastReadByConversation.get(asString(message.conversation_id)) || null,
+      ),
     );
 
     const senderIds = Array.from(

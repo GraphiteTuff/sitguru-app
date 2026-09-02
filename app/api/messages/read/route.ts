@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { markConversationReadForUser } from "@/lib/messaging/mark-conversation-read";
 
 export const dynamic = "force-dynamic";
 
@@ -35,28 +35,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const now = new Date().toISOString();
-
-    const { error } = await supabaseAdmin
-      .from("conversation_participants")
-      .update({
-        last_read_at: now,
-        updated_at: now,
-      })
-      .eq("conversation_id", conversationId)
-      .eq("user_id", user.id);
-
-    if (error) {
-      return NextResponse.json(
-        { error: error.message || "Unable to mark conversation as read." },
-        { status: 500 },
-      );
-    }
+    const result = await markConversationReadForUser(conversationId, user.id);
 
     return NextResponse.json({
       ok: true,
       conversationId,
-      lastReadAt: now,
+      lastReadAt: result.lastReadAt,
     });
   } catch (error) {
     const message =

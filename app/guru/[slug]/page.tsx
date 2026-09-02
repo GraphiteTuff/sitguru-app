@@ -43,6 +43,10 @@ type GuruProfile = {
   id?: string | number | null;
   user_id?: string | null;
   email?: string | null;
+  phone?: string | null;
+  phone_number?: string | null;
+  mobile_phone?: string | null;
+  contact_phone?: string | null;
   full_name?: string | null;
   display_name?: string | null;
   name?: string | null;
@@ -647,8 +651,19 @@ function normalizeApplicationStatus(profile: GuruProfile | null) {
   return "Profile Setup";
 }
 
-function hasGuruCommunicationEmail(profile: GuruProfile | null) {
-  return Boolean(String(profile?.email || "").trim());
+function hasGuruCommunicationContact(profile: GuruProfile | null) {
+  if (String(profile?.email || "").trim()) return true;
+
+  const digits = String(
+    profile?.phone ||
+      profile?.phone_number ||
+      profile?.mobile_phone ||
+      profile?.contact_phone ||
+      "",
+  ).replace(/\D/g, "");
+
+  // Phone-signup Gurus may not have email yet; 10+ digits is a usable contact.
+  return digits.length >= 10;
 }
 
 function hasGuruServiceArea(profile: GuruProfile | null) {
@@ -695,7 +710,7 @@ function isBookable(profile: GuruProfile | null) {
       qualityStatus === "bookable" &&
       applicationStatus === "bookable" &&
       status === "active" &&
-      hasGuruCommunicationEmail(profile) &&
+      hasGuruCommunicationContact(profile) &&
       hasGuruServiceArea(profile),
   );
 }
@@ -1098,6 +1113,10 @@ function buildGuruProfileFromProfileRow(profile: Record<string, any>): GuruProfi
     id: profile.id,
     user_id: profile.user_id || profile.id,
     email: profile.email || null,
+    phone: profile.phone || profile.phone_number || profile.mobile_phone || null,
+    phone_number: profile.phone_number || profile.phone || null,
+    mobile_phone: profile.mobile_phone || profile.phone || null,
+    contact_phone: profile.contact_phone || profile.phone || null,
     full_name: fullName,
     display_name: profile.display_name || fullName,
     name: profile.name || fullName,
@@ -1724,6 +1743,10 @@ function normalizeGuruProfileFromBookingLookupRow(
     id,
     user_id: row.user_id || row.profile_id || null,
     email: row.email || null,
+    phone: row.phone || row.phone_number || row.mobile_phone || row.contact_phone || null,
+    phone_number: row.phone_number || row.phone || null,
+    mobile_phone: row.mobile_phone || row.phone || null,
+    contact_phone: row.contact_phone || row.phone || null,
     full_name: fullName || "Guru",
     display_name: row.display_name || fullName || "Guru",
     name: row.name || fullName || "Guru",
@@ -1958,6 +1981,10 @@ function buildGuruProfileFromPublicSearchRow(row: Record<string, any>): GuruProf
     id: row.id,
     user_id: row.user_id || row.guru_user_id || row.profile_id || null,
     email: row.email || null,
+    phone: row.phone || row.phone_number || row.mobile_phone || row.contact_phone || null,
+    phone_number: row.phone_number || row.phone || null,
+    mobile_phone: row.mobile_phone || row.phone || null,
+    contact_phone: row.contact_phone || row.phone || null,
     full_name: fullName || "Guru",
     display_name: row.display_name || fullName || "Guru",
     name: row.name || fullName || "Guru",
