@@ -1022,6 +1022,7 @@ export default async function AmbassadorDashboardPage() {
     profile: (profile as Record<string, unknown> | null) || null,
     roleRows: roleValues,
     metadata: metadataPayload,
+    email: user.email,
     hasGuruRecord: Boolean(guruAccessResult.data?.length),
     hasAmbassadorRecord: Boolean(ambassadorRecord.id),
   });

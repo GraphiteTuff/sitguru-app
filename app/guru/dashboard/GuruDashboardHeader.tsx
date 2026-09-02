@@ -386,6 +386,7 @@ export default function GuruDashboardHeader({
           (row: { role?: string | null }) => row.role,
         ),
         metadata: metadataPayload,
+        email: profileEmail || user.email,
         hasGuruRecord: Boolean(guruData),
         hasAmbassadorRecord: Boolean(ambassadorRow?.id),
       });

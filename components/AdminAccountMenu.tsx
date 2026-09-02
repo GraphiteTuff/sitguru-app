@@ -3,7 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
+import { resolveDashboardRoleFromPath } from "@/lib/dashboard/role-switch";
+import { isSitGuruSuperUser } from "@/lib/sitguru/display";
 import {
   ChevronDown,
   ChevronUp,
@@ -174,8 +177,11 @@ function getAdminAccountFromEmail(email?: string | null): AdminAccount {
   };
 }
 
+const FOUNDER_ROLES = ["parent", "guru", "ambassador", "admin"] as const;
+
 export default function AdminAccountMenu() {
   const router = useRouter();
+  const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -364,6 +370,16 @@ export default function AdminAccountMenu() {
                 <p className="mt-1 text-base font-black text-green-800">
                   {account.roleLabel}
                 </p>
+
+                {isSitGuruSuperUser(account.email) ? (
+                  <AccountRoleSwitcher
+                    currentRole={
+                      resolveDashboardRoleFromPath(pathname) || "admin"
+                    }
+                    authorizedRoles={FOUNDER_ROLES}
+                    onNavigate={() => setOpen(false)}
+                  />
+                ) : null}
               </div>
             </div>
           </div>

@@ -6,25 +6,21 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowRight,
   BookOpen,
   CalendarDays,
   ChevronDown,
   ChevronUp,
   LogOut,
   Menu,
-  Repeat2,
   UserRound,
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
+import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
 import {
   accessFlagsFromAuthorizedRoles,
-  getAvailableDashboardSwitches,
   resolveAuthorizedRolesFromProfile,
-  resolveDashboardRoleFromPath,
-  toRoleSwitchOptions,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
@@ -106,13 +102,6 @@ type UserRoleRow = {
 type NavLink = {
   label: string;
   href: string;
-};
-
-type RoleSwitchLink = {
-  label: string;
-  href: string;
-  mode: HeaderMode;
-  helper?: string;
 };
 
 const PUBLIC_GURU_SEARCH_HREF = "/search";
@@ -429,51 +418,6 @@ function headerModeToSwitchRole(
   return null;
 }
 
-function switchRoleToHeaderMode(role: DashboardSwitchRole): HeaderMode {
-  if (role === "parent") return "customer";
-  return role;
-}
-
-function buildRoleSwitchLinks({
-  headerMode,
-  authorizedRoles,
-  guruStatus,
-}: {
-  headerMode: HeaderMode;
-  authorizedRoles: readonly DashboardSwitchRole[];
-  guruStatus?: string | null;
-}): RoleSwitchLink[] {
-  const currentRole =
-    headerModeToSwitchRole(headerMode) ||
-    resolveDashboardRoleFromPath(null);
-
-  return toRoleSwitchOptions(
-    getAvailableDashboardSwitches({
-      currentRole,
-      authorizedRoles,
-      includeAdmin: true,
-    }),
-  ).map((option) => {
-    const mode = switchRoleToHeaderMode(option.id);
-    const status = normalizeRole(guruStatus);
-    const label =
-      option.id === "guru" &&
-      (status.includes("pending") ||
-        status.includes("review") ||
-        status.includes("started") ||
-        status.includes("setup"))
-        ? "Switch to Guru Setup"
-        : option.label;
-
-    return {
-      label,
-      href: option.href,
-      mode,
-      helper: option.helper,
-    };
-  });
-}
-
 export default function Header({ user = null }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -587,6 +531,7 @@ export default function Header({ user = null }: HeaderProps) {
           profile: (profile as Record<string, unknown> | null) || null,
           roleRows: roles,
           metadata: metadataPayload,
+          email: activeEmail,
           hasGuruRecord: Boolean(guru?.id),
           hasAmbassadorRecord: Boolean(ambassador?.id),
         });
@@ -687,12 +632,8 @@ export default function Header({ user = null }: HeaderProps) {
   const isAdmin = headerMode === "admin";
 
   const authorizedRoles = activeUser?.authorizedRoles || [];
+  const currentSwitchRole = headerModeToSwitchRole(headerMode);
 
-  const roleSwitchLinks = buildRoleSwitchLinks({
-    headerMode,
-    authorizedRoles,
-    guruStatus: activeUser?.guruStatus,
-  });
   const navLinks = useMemo(() => {
     if (isAdmin) return adminNavLinks;
     if (isAmbassador) return ambassadorNavLinks;
@@ -938,34 +879,19 @@ export default function Header({ user = null }: HeaderProps) {
                               {userEmail}
                             </p>
                           ) : null}
-                          <p className="mt-1 text-base font-semibold tracking-[-0.01em] text-emerald-700">
+                          <p className="mt-1 text-sm font-semibold tracking-[-0.01em] text-emerald-700">
                             {displayRole}
                           </p>
+                          <AccountRoleSwitcher
+                            currentRole={currentSwitchRole}
+                            authorizedRoles={authorizedRoles}
+                            onNavigate={() => setAvatarOpen(false)}
+                          />
                         </div>
                       </div>
                     </div>
 
                     <div className="grid gap-1 p-3">
-                      {roleSwitchLinks.length ? (
-                        <div className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2">
-                          <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                            Switch Portal
-                          </p>
-                          {roleSwitchLinks.map((link) => (
-                            <Link
-                              key={link.href}
-                              href={link.href}
-                              role="menuitem"
-                              onClick={() => setAvatarOpen(false)}
-                              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-semibold tracking-[-0.01em] text-emerald-900 transition hover:bg-white"
-                            >
-                              <Repeat2 className="h-4 w-4" />
-                              {link.label}
-                            </Link>
-                          ))}
-                        </div>
-                      ) : null}
-
                       {accountMenuLinks.map((item) => (
                         <Link
                           key={item.href}
@@ -1050,32 +976,23 @@ export default function Header({ user = null }: HeaderProps) {
                       <p className="truncate text-base font-semibold tracking-[-0.01em] text-slate-950">
                         {userName}
                       </p>
+                      {userEmail ? (
+                        <p className="truncate text-xs font-medium text-slate-500">
+                          {userEmail}
+                        </p>
+                      ) : null}
                       <p className="text-sm font-semibold tracking-[-0.01em] text-emerald-700">
                         {displayRole}
                       </p>
+                      <AccountRoleSwitcher
+                        currentRole={currentSwitchRole}
+                        authorizedRoles={authorizedRoles}
+                        onNavigate={() => setMobileOpen(false)}
+                      />
                     </div>
                   </div>
                   <NotificationBell />
                 </div>
-
-                {roleSwitchLinks.length ? (
-                  <div className="mt-3 rounded-2xl border border-emerald-100 bg-white/80 p-2">
-                    <p className="px-2 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                      Switch Portal
-                    </p>
-                    {roleSwitchLinks.map((link) => (
-                      <Link
-                        key={`mobile-switch-${link.href}`}
-                        href={link.href}
-                        onClick={() => setMobileOpen(false)}
-                        className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold tracking-[-0.01em] text-emerald-800 transition hover:bg-emerald-50"
-                      >
-                        <Repeat2 className="h-4 w-4" />
-                        {link.label}
-                      </Link>
-                    ))}
-                  </div>
-                ) : null}
               </div>
             ) : null}
 

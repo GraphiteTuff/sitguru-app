@@ -3,6 +3,8 @@
  * Pet Parent always maps to `/customer/dashboard`.
  */
 
+import { isSitGuruSuperUser } from "@/lib/sitguru/display";
+
 export type DashboardSwitchRole =
   | "parent"
   | "guru"
@@ -96,8 +98,18 @@ function expandRoleToken(value: unknown): DashboardSwitchRole[] {
     return uniqueOrderedRoles(roles);
   }
 
-  if (raw.includes("admin") || raw.includes("super_admin")) {
-    return ["admin"];
+  if (
+    raw.includes("founder") ||
+    raw === "owner" ||
+    raw === "ceo" ||
+    raw.includes("super_admin") ||
+    raw.includes("super_user")
+  ) {
+    return [...ROLE_ORDER];
+  }
+
+  if (raw.includes("admin")) {
+    return ["parent", "admin"];
   }
 
   if (raw.includes("ambassador")) {
@@ -193,11 +205,20 @@ export function resolveAuthorizedRolesFromProfile(input: {
   profile?: Record<string, unknown> | null;
   roleRows?: Array<string | null | undefined> | null;
   metadata?: Record<string, unknown> | null;
+  email?: string | null;
   hasGuruRecord?: boolean;
   hasAmbassadorRecord?: boolean;
 }): DashboardSwitchRole[] {
   const profile = input.profile || {};
   const metadata = input.metadata || {};
+  const email =
+    input.email ||
+    (typeof profile.email === "string" ? profile.email : null) ||
+    (typeof metadata.email === "string" ? metadata.email : null);
+
+  if (isSitGuruSuperUser(email)) {
+    return [...ROLE_ORDER];
+  }
 
   const explicit = uniqueOrderedRoles([
     ...parseAuthorizedRoles(profile.authorizedRoles),
@@ -246,7 +267,29 @@ export function resolveAuthorizedRolesFromProfile(input: {
   if (input.hasGuruRecord) derived.push("guru");
   if (input.hasAmbassadorRecord) derived.push("ambassador");
 
+  if (derived.includes("admin") && !derived.includes("parent")) {
+    derived.push("parent");
+  }
+
   return uniqueOrderedRoles(derived);
+}
+
+/** All authorized workspaces, including the one the user is already in. */
+export function getAuthorizedDashboardTargets(options: {
+  authorizedRoles?: readonly DashboardSwitchRole[] | null;
+  access?: DashboardAccessFlags | null;
+  includeAdmin?: boolean;
+}): DashboardSwitchTarget[] {
+  const includeAdmin = options.includeAdmin !== false;
+  const authorized = uniqueOrderedRoles([
+    ...(options.authorizedRoles || []),
+    ...authorizedRolesFromAccessFlags(options.access),
+  ]);
+
+  return DASHBOARD_SWITCH_TARGETS.filter((target) => {
+    if (target.id === "admin" && !includeAdmin) return false;
+    return authorized.includes(target.id);
+  });
 }
 
 /** Infer active workspace from the current pathname. */
