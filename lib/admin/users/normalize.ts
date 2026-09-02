@@ -397,6 +397,45 @@ export function getScopeHref(user: {
   return `/admin/users?${params.toString()}`;
 }
 
+const HIDDEN_DIRECTORY_EMAILS = new Set(["admin@sitguru.com"]);
+const HIDDEN_DIRECTORY_NAMES = new Set([
+  "test user",
+  "admin user",
+  "admin hq",
+]);
+
+function directoryRowName(row: Record<string, unknown>) {
+  return (
+    asTrimmedString(row.display_name) ||
+    asTrimmedString(row.full_name) ||
+    asTrimmedString(row.name) ||
+    `${asTrimmedString(row.first_name)} ${asTrimmedString(row.last_name)}`.trim()
+  ).toLowerCase();
+}
+
+/** Leftover seed profiles with no Auth login — not real people. */
+export function isHiddenDirectoryStub(row: Record<string, unknown>): boolean {
+  const source = asTrimmedString(row.directory_source || row.source).toLowerCase();
+  if (source === "launch") return false;
+
+  const hasAuth =
+    source === "auth_user" || Boolean(asTrimmedString(row.auth_user_id));
+  if (hasAuth) return false;
+
+  if (source === "profile_without_auth") return true;
+
+  const email = asTrimmedString(row.email).toLowerCase();
+  const name = directoryRowName(row);
+  const role = asTrimmedString(row.role).toLowerCase();
+
+  if (HIDDEN_DIRECTORY_EMAILS.has(email)) return true;
+  if (HIDDEN_DIRECTORY_NAMES.has(name)) return true;
+  if (!email && role.includes("admin")) return true;
+  if (row.is_archived === true || row.is_test_account === true) return true;
+
+  return false;
+}
+
 export function toDirectoryUserFromProfile(
   profile: Record<string, unknown>,
   options?: { forceRole?: string; source?: string },

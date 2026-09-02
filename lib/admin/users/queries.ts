@@ -9,6 +9,7 @@ import {
   isWithinLastDays,
   matchesRoleFilter,
   matchesStatusFilter,
+  isHiddenDirectoryStub,
   toDirectoryUserFromIdentity,
   toDirectoryUserFromLaunch,
   toDirectoryUserFromProfile,
@@ -181,6 +182,7 @@ async function loadIdentityRows(): Promise<DirectoryUser[]> {
 
   if (identity.length) {
     return identity
+      .filter((row) => !isHiddenDirectoryStub(row))
       .map((row) => {
         const user = toDirectoryUserFromIdentity(row);
         if (!user) return null;
@@ -205,6 +207,7 @@ async function loadIdentityRows(): Promise<DirectoryUser[]> {
   }
 
   return profiles
+    .filter((row) => !isHiddenDirectoryStub(row))
     .map((row) => toDirectoryUserFromProfile(row))
     .filter(Boolean) as DirectoryUser[];
 }
@@ -350,6 +353,9 @@ export async function getAdminUsersDirectory(
 
   for (const user of [...identityUsers, ...launchUsers]) {
     const withHq = applyHqRole(user, hq);
+    if (isHiddenDirectoryStub({ ...withHq, directory_source: withHq.source })) {
+      continue;
+    }
     const key = `${withHq.id.toLowerCase()}|${withHq.email.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
