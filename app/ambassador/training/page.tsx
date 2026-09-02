@@ -21,6 +21,10 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  canUseAllRoleWorkspaces,
+  getFounderAmbassadorPreview,
+} from "@/lib/dashboard/founder-workspaces";
 
 export const dynamic = "force-dynamic";
 
@@ -422,9 +426,18 @@ async function getLoggedInAmbassador() {
     status !== "inactive" &&
     status !== "not_a_fit";
 
+  if (canUseAllRoleWorkspaces(userEmail)) {
+    return (
+      ambassador ||
+      getFounderAmbassadorPreview({
+        userId: user.id,
+        email: userEmail,
+      })
+    );
+  }
+
   if (!ambassador || !workspaceAllowed) {
-    await supabase.auth.signOut();
-    redirect("/ambassador/login?error=restricted");
+    redirect("/customer/dashboard");
   }
 
   return ambassador;

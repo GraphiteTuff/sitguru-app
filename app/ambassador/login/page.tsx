@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { canUseAllRoleWorkspaces } from "@/lib/dashboard/founder-workspaces";
 
 export const dynamic = "force-dynamic";
 
@@ -197,17 +198,12 @@ export default async function AmbassadorLoginRedirectPage({
     email: userEmail,
   });
 
+  if (canUseAllRoleWorkspaces(userEmail)) {
+    redirect(nextPath);
+  }
+
   if (!ambassador) {
-    const routeParams = new URLSearchParams({
-      preferred: "ambassador",
-      next: nextPath,
-    });
-
-    if (suppliedError) {
-      routeParams.set("error", suppliedError);
-    }
-
-    redirect(`/login/route?${routeParams.toString()}`);
+    redirect("/customer/dashboard");
   }
 
   const status = normalizeValue(ambassador.status);
@@ -222,13 +218,5 @@ export default async function AmbassadorLoginRedirectPage({
     redirect(nextPath);
   }
 
-  await supabase.auth.signOut();
-
-  redirect(
-    buildCentralLoginPath({
-      mode,
-      nextPath,
-      error: suppliedError || getAmbassadorStatusMessage(ambassador),
-    }),
-  );
+  redirect("/customer/dashboard");
 }

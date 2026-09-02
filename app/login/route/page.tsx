@@ -417,9 +417,13 @@ export default async function LoginRoutePage({
   }
 
   if (preferred === "ambassador") {
-    if (hasAmbassadorWorkspace) {
+    if (hasAmbassadorWorkspace || isSuperUserEmail(userEmail)) {
       redirect(safeNextPath || "/ambassador/dashboard");
     }
+
+    if (hasAdminAccess) redirect("/admin");
+    if (hasGuruAccess) redirect("/guru/dashboard");
+    if (hasPetParentAccess) redirect("/customer/dashboard");
 
     redirect(
       `/ambassador/login?${new URLSearchParams({

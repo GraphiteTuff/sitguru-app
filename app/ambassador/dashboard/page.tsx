@@ -35,6 +35,10 @@ import {
   type ThemeTone,
 } from "@/components/sitguru/ThemeStatCard";
 import {
+  canUseAllRoleWorkspaces,
+  getFounderAmbassadorPreview,
+} from "@/lib/dashboard/founder-workspaces";
+import {
   getAvailableDashboardSwitches,
   resolveAuthorizedRolesFromProfile,
   type DashboardSwitchRole,
@@ -986,15 +990,23 @@ export default async function AmbassadorDashboardPage() {
   }
 
   const ambassadorStatus = asString(ambassador?.status).toLowerCase();
+  const founderWorkspace = canUseAllRoleWorkspaces(userEmail);
   const hasWorkspaceAccess =
-    Boolean(ambassador?.id) &&
-    ambassador?.dashboard_enabled === true &&
-    ambassador?.login_enabled === true &&
-    ambassadorStatus !== "archived";
+    founderWorkspace ||
+    (Boolean(ambassador?.id) &&
+      ambassador?.dashboard_enabled === true &&
+      ambassador?.login_enabled === true &&
+      ambassadorStatus !== "archived");
+
+  if (!ambassador && founderWorkspace) {
+    ambassador = getFounderAmbassadorPreview({
+      userId: user.id,
+      email: userEmail,
+    });
+  }
 
   if (!ambassador || !hasWorkspaceAccess) {
-    await supabase.auth.signOut();
-    redirect("/ambassador/login?error=restricted");
+    redirect("/customer/dashboard");
   }
 
   const [profileResult, roleRowsResult, guruAccessResult] = await Promise.all([
