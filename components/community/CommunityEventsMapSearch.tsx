@@ -956,9 +956,6 @@ export default function CommunityEventsMapSearch({
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-              Major counties
-            </span>
             {COMMUNITY_MAJOR_COUNTIES.map((option) => {
               const active = draft.county
                 .toLowerCase()
