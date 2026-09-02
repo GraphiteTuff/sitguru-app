@@ -23,6 +23,10 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
+import {
+  ThemeStatCard,
+  type ThemeTone,
+} from "@/components/sitguru/ThemeStatCard";
 
 export const dynamic = "force-dynamic";
 
@@ -897,29 +901,22 @@ function StatCard({
   value,
   description,
   icon,
+  tone = "emerald",
 }: {
   title: string;
   value: string;
   description: string;
   icon: ReactNode;
+  tone?: ThemeTone;
 }) {
   return (
-    <div className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.1em] text-slate-600">
-            {title}
-          </p>
-          <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
-          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-            {description}
-          </p>
-        </div>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-          {icon}
-        </div>
-      </div>
-    </div>
+    <ThemeStatCard
+      label={title}
+      value={value}
+      helper={description}
+      icon={icon}
+      tone={tone}
+    />
   );
 }
 
@@ -1272,18 +1269,21 @@ export default async function AmbassadorSocialPage() {
             value={String(totalLinkVisits)}
             description="Normal tracked social visits"
             icon={<Link2 className="h-5 w-5" />}
+            tone="sky"
           />
           <StatCard
             title="QR Scans"
             value={String(totalQrScans)}
             description="Tracked event and flyer scans"
             icon={<ScanLine className="h-5 w-5" />}
+            tone="violet"
           />
           <StatCard
             title="Verified Signups"
             value={String(socialReferrals.length)}
             description="Canonical social referrals"
             icon={<Users className="h-5 w-5" />}
+            tone="emerald"
           />
           <StatCard
             title="Top Platform"
@@ -1298,18 +1298,21 @@ export default async function AmbassadorSocialPage() {
                 : "Share a tracked channel"
             }
             icon={<Trophy className="h-5 w-5" />}
+            tone="amber"
           />
           <StatCard
             title="Approved"
             value={money(approvedSocialAmount)}
             description="Approved, not paid"
             icon={<BadgeCheck className="h-5 w-5" />}
+            tone="rose"
           />
           <StatCard
             title="Paid"
             value={money(paidSocialAmount)}
             description="Recorded as paid"
             icon={<CheckCircle2 className="h-5 w-5" />}
+            tone="slate"
           />
         </section>
 

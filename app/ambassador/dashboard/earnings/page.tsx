@@ -18,6 +18,10 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  ThemeStatCard,
+  type ThemeTone,
+} from "@/components/sitguru/ThemeStatCard";
 
 export const dynamic = "force-dynamic";
 
@@ -596,30 +600,23 @@ function StatCard({
   value,
   description,
   icon,
+  tone = "emerald",
 }: {
   title: string;
   value: string;
   description: string;
   icon: ReactNode;
+  tone?: ThemeTone;
 }) {
   return (
-    <div className="min-w-[220px] snap-start rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm sm:min-w-0">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-black !text-slate-800">{title}</p>
-          <p className="mt-3 text-2xl font-black tracking-tight !text-slate-950">
-            {value}
-          </p>
-          <p className="mt-2 text-sm font-semibold leading-6 !text-slate-700">
-            {description}
-          </p>
-        </div>
-
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 !text-emerald-700 ring-1 ring-emerald-100">
-          {icon}
-        </div>
-      </div>
-    </div>
+    <ThemeStatCard
+      className="min-w-[220px] snap-start sm:min-w-0"
+      label={title}
+      value={value}
+      helper={description}
+      icon={icon}
+      tone={tone}
+    />
   );
 }
 
@@ -1264,30 +1261,35 @@ export default async function AmbassadorDashboardEarningsPage({
             value={money(pendingAmount)}
             description="Still being checked"
             icon={<Clock3 className="h-6 w-6" />}
+            tone="amber"
           />
           <StatCard
             title="Ready to Pay"
             value={money(approvedAmount)}
             description="Approved and waiting"
             icon={<BadgeDollarSign className="h-6 w-6" />}
+            tone="sky"
           />
           <StatCard
             title="Paid Out"
             value={money(paidAmount)}
             description="Rewards already sent"
             icon={<PiggyBank className="h-6 w-6" />}
+            tone="emerald"
           />
           <StatCard
             title="Total Earned"
             value={money(confirmedAmount)}
             description="Ready plus paid rewards"
             icon={<Trophy className="h-6 w-6" />}
+            tone="violet"
           />
           <StatCard
             title="This Month"
             value={money(paidThisMonth)}
             description="Rewards paid this month"
             icon={<CalendarDays className="h-6 w-6" />}
+            tone="slate"
           />
         </section>
 

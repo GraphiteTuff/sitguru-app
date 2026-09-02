@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { isGrowthOnlyRole } from "@/lib/admin/growth-paths";
+import { getAdminNavAccess } from "@/lib/admin/nav-access";
 
 export async function GET() {
   const identity = await getAdminIdentity();
@@ -15,6 +16,9 @@ export async function GET() {
     isSuperUser: identity.isSuperUser,
     canManageUsers: identity.canManageUsers,
     canUseGrowthPortal:
-      identity.isSuperUser || isGrowthOnlyRole(identity.role),
+      identity.isSuperUser ||
+      isGrowthOnlyRole(identity.role) ||
+      getAdminNavAccess(identity.role, identity.isSuperUser).social_media,
+    modules: getAdminNavAccess(identity.role, identity.isSuperUser),
   });
 }

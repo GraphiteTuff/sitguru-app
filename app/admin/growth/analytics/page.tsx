@@ -1,3 +1,12 @@
+import {
+  BarChart3,
+  CheckCircle2,
+  Megaphone,
+  MousePointerClick,
+  PawPrint,
+  Users,
+} from "lucide-react";
+import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
 import { requireGrowthPortal } from "@/lib/admin/growth/access";
 import { submitFridayReportAction } from "@/lib/admin/growth/actions";
 import { getGrowthHomeStats, listGrowthCampaigns } from "@/lib/admin/growth/data";
@@ -19,13 +28,13 @@ export default async function GrowthAnalyticsPage() {
   ]);
 
   const kpis = [
-    ["Pet Parents +", stats.petParents],
-    ["Gurus +", stats.gurus],
-    ["Referral clicks", stats.referrals],
-    ["Social visits", stats.visits],
-    ["Social signups", stats.signups],
-    ["Conversion", stats.conversion],
-  ] as const;
+    { label: "Pet Parents +", value: String(stats.petParents), helper: "New this week", tone: "emerald" as const, icon: <PawPrint size={18} /> },
+    { label: "Gurus +", value: String(stats.gurus), helper: "New this week", tone: "sky" as const, icon: <Users size={18} /> },
+    { label: "Referral clicks", value: String(stats.referrals), helper: "Links used", tone: "violet" as const, icon: <MousePointerClick size={18} /> },
+    { label: "Social visits", value: String(stats.visits), helper: "Clicks + views", tone: "sky" as const, icon: <Megaphone size={18} /> },
+    { label: "Social signups", value: String(stats.signups), helper: "Attributed", tone: "emerald" as const, icon: <CheckCircle2 size={18} /> },
+    { label: "Conversion", value: String(stats.conversion), helper: "Signups ÷ visits", tone: "slate" as const, icon: <BarChart3 size={18} /> },
+  ];
 
   return (
     <GrowthPageFrame
@@ -33,16 +42,15 @@ export default async function GrowthAnalyticsPage() {
       detail="County density still lives on the Market Growth map. This page is the Friday scoreboard: signups, not followers."
     >
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {kpis.map(([label, value]) => (
-          <div
-            key={label}
-            className="rounded-[1.35rem] border border-emerald-100 bg-white p-4 shadow-sm"
-          >
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
-              {label}
-            </p>
-            <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
-          </div>
+        {kpis.map((tile) => (
+          <AdminThemeCard
+            key={tile.label}
+            label={tile.label}
+            value={tile.value}
+            helper={tile.helper}
+            tone={tile.tone}
+            icon={tile.icon}
+          />
         ))}
       </section>
 

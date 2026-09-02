@@ -2,12 +2,16 @@ import Link from "next/link";
 import {
   BarChart3,
   CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
   Megaphone,
+  MousePointerClick,
   PawPrint,
   Plus,
   Sparkles,
   Users,
 } from "lucide-react";
+import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
 import { requireGrowthPortal } from "@/lib/admin/growth/access";
 import { getPetParentSummary } from "@/lib/admin/customers/pet-parents";
 import {
@@ -67,14 +71,14 @@ export default async function AdminGrowthHomePage() {
     calendarItems.set(day, list);
   }
   const tiles = [
-    { label: "Pet Parents +", value: String(stats.petParents), helper: "New this week" },
-    { label: "Gurus +", value: String(stats.gurus), helper: "New this week" },
-    { label: "Referral clicks", value: String(stats.referrals), helper: "Links used" },
-    { label: "Social visits", value: String(stats.visits), helper: "Clicks + views" },
-    { label: "Social signups", value: String(stats.signups), helper: "Attributed" },
-    { label: "Conversion", value: stats.conversion, helper: "Signups ÷ visits" },
-    { label: "Live campaigns", value: String(stats.campaigns), helper: "Ready to share" },
-    { label: "Needs review", value: String(stats.pendingReview), helper: "Waiting on Jason" },
+    { label: "Pet Parents +", value: String(stats.petParents), helper: "New this week", tone: "emerald" as const, icon: <PawPrint size={18} /> },
+    { label: "Gurus +", value: String(stats.gurus), helper: "New this week", tone: "sky" as const, icon: <Users size={18} /> },
+    { label: "Referral clicks", value: String(stats.referrals), helper: "Links used", tone: "violet" as const, icon: <MousePointerClick size={18} /> },
+    { label: "Social visits", value: String(stats.visits), helper: "Clicks + views", tone: "sky" as const, icon: <Megaphone size={18} /> },
+    { label: "Social signups", value: String(stats.signups), helper: "Attributed", tone: "emerald" as const, icon: <CheckCircle2 size={18} /> },
+    { label: "Conversion", value: stats.conversion, helper: "Signups ÷ visits", tone: "slate" as const, icon: <BarChart3 size={18} /> },
+    { label: "Live campaigns", value: String(stats.campaigns), helper: "Ready to share", tone: "emerald" as const, icon: <Sparkles size={18} /> },
+    { label: "Needs review", value: String(stats.pendingReview), helper: "Waiting on Jason", tone: "rose" as const, icon: <ClipboardCheck size={18} /> },
   ];
 
   const actions = [
@@ -131,16 +135,14 @@ export default async function AdminGrowthHomePage() {
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {tiles.map((tile) => (
-          <div
+          <AdminThemeCard
             key={tile.label}
-            className="rounded-[1.4rem] border border-emerald-100 bg-white p-4 shadow-sm"
-          >
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
-              {tile.label}
-            </p>
-            <p className="mt-2 text-3xl font-black text-slate-950">{tile.value}</p>
-            <p className="mt-1 text-xs font-semibold text-slate-500">{tile.helper}</p>
-          </div>
+            label={tile.label}
+            value={tile.value}
+            helper={tile.helper}
+            tone={tile.tone}
+            icon={tile.icon}
+          />
         ))}
       </section>
 

@@ -53,6 +53,10 @@ import {
   Users,
   X,
 } from "lucide-react";
+import {
+  ThemeStatCard,
+  type ThemeTone,
+} from "@/components/sitguru/ThemeStatCard";
 
 type ViewMode =
   | "today"
@@ -731,31 +735,22 @@ function StatCard({
   value,
   detail,
   icon,
+  tone = "emerald",
 }: {
   label: string;
   value: string;
   detail: string;
   icon: ReactNode;
+  tone?: ThemeTone;
 }) {
   return (
-    <article className="rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-            {label}
-          </p>
-          <p className="mt-2 text-2xl font-black tracking-tight text-slate-950">
-            {value}
-          </p>
-          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-            {detail}
-          </p>
-        </div>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-          {icon}
-        </div>
-      </div>
-    </article>
+    <ThemeStatCard
+      label={label}
+      value={value}
+      helper={detail}
+      icon={icon}
+      tone={tone}
+    />
   );
 }
 
@@ -2022,48 +2017,56 @@ export default function AmbassadorCommandCenterPage() {
             value={String(summary.scheduledActivities)}
             detail={`${summary.completedActivities} completed`}
             icon={<CalendarDays className="h-5 w-5" />}
+            tone="emerald"
           />
           <StatCard
             label="Hours"
             value={String(summary.totalHours)}
             detail="Completed activity time"
             icon={<Timer className="h-5 w-5" />}
+            tone="sky"
           />
           <StatCard
             label="Contacts"
             value={String(summary.contacts)}
             detail={`${summary.conversations} conversations`}
             icon={<Users className="h-5 w-5" />}
+            tone="violet"
           />
           <StatCard
             label="QR Scans"
             value={String(summary.qrScans)}
             detail={`${summary.materialsDistributed} materials shared`}
             icon={<QrCode className="h-5 w-5" />}
+            tone="amber"
           />
           <StatCard
             label="Leads"
             value={String(summary.generatedLeads)}
             detail={`${summary.convertedLeads} converted`}
             icon={<UserPlus className="h-5 w-5" />}
+            tone="rose"
           />
           <StatCard
             label="Signups"
             value={String(summary.verifiedSignups)}
             detail="Verified SitGuru results"
             icon={<BadgeCheck className="h-5 w-5" />}
+            tone="slate"
           />
           <StatCard
             label="Bookings"
             value={String(summary.completedBookings)}
             detail="Completed referrals"
             icon={<PawPrint className="h-5 w-5" />}
+            tone="emerald"
           />
           <StatCard
             label="Marketing"
             value={String(summary.marketingEfforts)}
             detail="Efforts logged"
             icon={<Megaphone className="h-5 w-5" />}
+            tone="violet"
           />
         </section>
 

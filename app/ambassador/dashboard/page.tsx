@@ -31,6 +31,10 @@ import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfS
 import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
 import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
 import {
+  ThemeStatCard,
+  type ThemeTone,
+} from "@/components/sitguru/ThemeStatCard";
+import {
   getAvailableDashboardSwitches,
   resolveAuthorizedRolesFromProfile,
   type DashboardSwitchRole,
@@ -1195,36 +1199,42 @@ export default async function AmbassadorDashboardPage() {
             label="Pet Parents"
             value={String(stats.petParentSignups)}
             detail="Verified signups"
+            tone="emerald"
           />
           <StatCard
             icon={<Users size={19} />}
             label="Gurus"
             value={String(stats.guruSignups)}
             detail="Verified applicants"
+            tone="sky"
           />
           <StatCard
             icon={<Share2 size={19} />}
             label="Social"
             value={String(stats.socialSignups)}
             detail={`Next: ${nextSocialMilestone.verified}`}
+            tone="violet"
           />
           <StatCard
             icon={<ClipboardCheck size={19} />}
             label="Bookings"
             value={String(stats.completedBookings)}
             detail="Completed referrals"
+            tone="amber"
           />
           <StatCard
             icon={<BadgeCheck size={19} />}
             label="Approved"
             value={money(approvedAndReady)}
             detail="Approved / ready"
+            tone="rose"
           />
           <StatCard
             icon={<DollarSign size={19} />}
             label="Paid"
             value={money(stats.paidRewards)}
             detail="Paid to date"
+            tone="slate"
           />
         </section>
 
@@ -2150,25 +2160,22 @@ function StatCard({
   label,
   value,
   detail,
+  tone = "emerald",
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   detail: string;
+  tone?: ThemeTone;
 }) {
   return (
-    <div className="rounded-3xl border border-[#dfe9e2] bg-white p-4 shadow-sm">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-        {icon}
-      </div>
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-black text-green-950">{value}</p>
-      <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
-        {detail}
-      </p>
-    </div>
+    <ThemeStatCard
+      icon={icon}
+      label={label}
+      value={value}
+      helper={detail}
+      tone={tone}
+    />
   );
 }
 

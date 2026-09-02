@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import GuruLinkShareCard from "@/components/guru/GuruLinkShareCard";
+import { ThemeStatCard, type ThemeTone } from "@/components/sitguru/ThemeStatCard";
 import { supabase } from "@/lib/supabase";
 
 type GuruRow = {
@@ -316,25 +317,16 @@ function StatCard({
   value: string;
   helper: string;
   icon: ReactNode;
-  tone: string;
+  tone: ThemeTone;
 }) {
   return (
-    <article
-      className={`rounded-[1.75rem] border p-5 shadow-[0_14px_36px_rgba(15,23,42,0.06)] ${tone}`}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-700">
-          {label}
-        </p>
-        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/80 ring-1 ring-black/5">
-          {icon}
-        </span>
-      </div>
-      <p className="mt-4 text-4xl font-black tracking-tight tabular-nums text-slate-950">
-        {value}
-      </p>
-      <p className="mt-1.5 text-xs font-semibold text-slate-600">{helper}</p>
-    </article>
+    <ThemeStatCard
+      label={label}
+      value={value}
+      helper={helper}
+      icon={icon}
+      tone={tone}
+    />
   );
 }
 
@@ -709,22 +701,22 @@ export default function GuruDashboardReferralsPage() {
                 label="Pending approval"
                 value={String(pendingApprovalCount)}
                 helper={`${currency(pendingRewardAmount)} awaiting payout review`}
-                icon={<Clock3 className="h-4 w-4 text-amber-700" />}
-                tone="border-amber-200 bg-amber-50"
+                icon={<Clock3 className="h-4 w-4" />}
+                tone="amber"
               />
               <StatCard
                 label="Approved Gurus"
                 value={String(approvedGurusCount)}
                 helper="Qualified / reward-ready referrals"
-                icon={<CheckCircle2 className="h-4 w-4 text-emerald-700" />}
-                tone="border-emerald-200 bg-emerald-50"
+                icon={<CheckCircle2 className="h-4 w-4" />}
+                tone="emerald"
               />
               <StatCard
                 label="Total cash payouts"
                 value={currency(paidRewardAmount)}
                 helper="Stripe-linked paid rewards"
-                icon={<Wallet className="h-4 w-4 text-sky-700" />}
-                tone="border-sky-200 bg-sky-50"
+                icon={<Wallet className="h-4 w-4" />}
+                tone="sky"
               />
             </section>
 

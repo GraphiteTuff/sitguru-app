@@ -24,6 +24,10 @@ import {
   isVeteransMilitaryFamiliesProgram,
 } from "@/lib/programs/veterans-military-families";
 import BackToPartnersButton from "../_components/back-to-partners-button";
+import {
+  ThemeStatCard,
+  type ThemeTone,
+} from "@/components/sitguru/ThemeStatCard";
 
 export const dynamic = "force-dynamic";
 
@@ -1018,30 +1022,34 @@ export default async function PartnerAmbassadorsPage() {
         </div>
       </div>
 
-      <section className="grid gap-3 rounded-[28px] border border-green-100 bg-gradient-to-r from-[#f7fbf4] via-white to-[#f7fbf4] p-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricTile
           title="Active Ambassadors"
           value={number(data.metrics.activeAmbassadors)}
           detail={`${number(data.metrics.totalAmbassadors)} total approved/connected`}
           icon={<Users size={20} />}
+          tone="emerald"
         />
         <MetricTile
           title="Pending Activation"
           value={number(data.metrics.pendingActivation)}
           detail="HR leads not yet approved"
           icon={<BadgeCheck size={20} />}
+          tone="amber"
         />
         <MetricTile
           title="Payout Ready"
           value={number(data.metrics.payoutReady)}
           detail={`${number(data.metrics.pendingPayouts)} pending payout rows`}
           icon={<WalletCards size={20} />}
+          tone="sky"
         />
         <MetricTile
           title="Referral Signups"
           value={number(data.metrics.totalSignups)}
           detail={`${number(data.metrics.totalClicks)} tracked clicks`}
           icon={<MousePointerClick size={20} />}
+          tone="violet"
         />
       </section>
 
@@ -1330,23 +1338,22 @@ function MetricTile({
   value,
   detail,
   icon,
+  tone = "emerald",
 }: {
   title: string;
   value: string;
   detail: string;
   icon: ReactNode;
+  tone?: ThemeTone;
 }) {
   return (
-    <div className="rounded-2xl border border-green-100 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-green-50 text-green-800">
-        {icon}
-      </div>
-      <p className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
-        {title}
-      </p>
-      <p className="mt-1 text-3xl font-black text-green-950">{value}</p>
-      <p className="mt-1 text-sm font-bold leading-5 text-slate-500">{detail}</p>
-    </div>
+    <ThemeStatCard
+      label={title}
+      value={value}
+      helper={detail}
+      icon={icon}
+      tone={tone}
+    />
   );
 }
 

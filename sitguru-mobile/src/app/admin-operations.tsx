@@ -1,6 +1,6 @@
 import { router, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
 import RoleGate from '@/components/RoleGate';
@@ -128,6 +128,15 @@ export default function AdminOperationsScreen() {
               Live counts are not loaded. Values marked — are empty, not sample
               operations data.
             </Text>
+            <BubblePressable
+              accessibilityRole="button"
+              onPress={() =>
+                Linking.openURL('https://www.sitguru.com/admin/growth')
+              }
+              style={styles.socialButton}
+            >
+              <Text style={styles.socialButtonText}>Social Media Manager</Text>
+            </BubblePressable>
           </View>
 
           <View style={styles.summaryGrid}>
@@ -407,6 +416,20 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 19,
     padding: 12,
+  },
+  socialButton: {
+    alignItems: 'center',
+    backgroundColor: '#0D5C3A',
+    borderRadius: 18,
+    minHeight: 56,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  socialButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
   },
   emptyText: {
     color: SitGuruColors.textMuted,

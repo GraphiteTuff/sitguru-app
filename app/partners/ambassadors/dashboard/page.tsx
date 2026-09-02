@@ -24,6 +24,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
+import { ThemeStatCard, type ThemeTone } from "@/components/sitguru/ThemeStatCard";
 
 export const dynamic = "force-dynamic";
 
@@ -40,36 +41,48 @@ const ambassador = {
     "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=500&q=80",
 };
 
-const metrics = [
+const metrics: {
+  label: string;
+  value: string;
+  change: string;
+  icon: typeof MousePointerClick;
+  tone: ThemeTone;
+  isMoney?: boolean;
+}[] = [
   {
     label: "Clicks",
     value: "12,450",
-    change: "18%",
+    change: "18% vs last 30 days",
     icon: MousePointerClick,
+    tone: "sky",
   },
   {
     label: "Qualified Referrals",
     value: "2,384",
-    change: "21%",
+    change: "21% vs last 30 days",
     icon: Users,
+    tone: "emerald",
   },
   {
     label: "First Bookings",
     value: "1,106",
-    change: "16%",
+    change: "16% vs last 30 days",
     icon: CalendarDays,
+    tone: "violet",
   },
   {
     label: "Approved Partners",
     value: "128",
-    change: "11%",
+    change: "11% vs last 30 days",
     icon: ShieldCheck,
+    tone: "amber",
   },
   {
     label: "Pending Rewards",
     value: "$1,248",
     change: "3 rewards pending",
     icon: Gift,
+    tone: "rose",
     isMoney: true,
   },
 ];
@@ -290,30 +303,14 @@ export default function AmbassadorDashboardPage() {
                   const Icon = metric.icon;
 
                   return (
-                    <div
+                    <ThemeStatCard
                       key={metric.label}
-                      className="rounded-[24px] border border-green-100 bg-[#fbfcf9] p-5 text-center shadow-sm"
-                    >
-                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-800 text-white">
-                        <Icon size={24} />
-                      </div>
-
-                      <p className="mt-4 text-sm font-black text-slate-600">
-                        {metric.label}
-                      </p>
-
-                      <p className="mt-2 text-3xl font-black text-green-950">
-                        {metric.value}
-                      </p>
-
-                      <p
-                        className={`mt-2 text-xs font-black ${
-                          metric.isMoney ? "text-orange-600" : "text-green-700"
-                        }`}
-                      >
-                        {metric.isMoney ? metric.change : `↑ ${metric.change} vs last 30 days`}
-                      </p>
-                    </div>
+                      label={metric.label}
+                      value={metric.value}
+                      helper={metric.isMoney ? metric.change : `↑ ${metric.change}`}
+                      tone={metric.tone}
+                      icon={<Icon size={20} />}
+                    />
                   );
                 })}
               </div>

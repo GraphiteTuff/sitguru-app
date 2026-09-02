@@ -25,6 +25,10 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
+  ThemeStatCard,
+  type ThemeTone,
+} from "@/components/sitguru/ThemeStatCard";
+import {
   GURU_EARNINGS_METHODS,
   getCustomerPaymentMethod,
   type CustomerPaymentMethodId,
@@ -911,25 +915,22 @@ function StatCard({
   value,
   description,
   icon,
+  tone = "emerald",
 }: {
   title: string;
   value: string;
   description: string;
   icon: ReactNode;
+  tone?: ThemeTone;
 }) {
   return (
-    <div className="rounded-3xl border border-[#dfe9e2] bg-white p-4 shadow-sm">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-green-50 !text-green-800">
-        {icon}
-      </div>
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] !text-slate-500">
-        {title}
-      </p>
-      <p className="mt-1 text-2xl font-black !text-green-950">{value}</p>
-      <p className="mt-1 text-xs font-bold leading-5 !text-slate-500">
-        {description}
-      </p>
-    </div>
+    <ThemeStatCard
+      label={title}
+      value={value}
+      helper={description}
+      icon={icon}
+      tone={tone}
+    />
   );
 }
 
@@ -1664,36 +1665,42 @@ export default async function GuruDashboardEarningsPage({
             value={currency(totalEarnings)}
             description="All time"
             icon={<Wallet className="h-5 w-5" />}
+            tone="emerald"
           />
           <StatCard
             title="Pending"
             value={currency(pendingPayouts)}
             description="Still on the way"
             icon={<Clock3 className="h-5 w-5" />}
+            tone="amber"
           />
           <StatCard
             title="Paid out"
             value={currency(paidOut)}
             description="Sent to you"
             icon={<PiggyBank className="h-5 w-5" />}
+            tone="sky"
           />
           <StatCard
             title="This month"
             value={currency(thisMonth)}
             description="Current month"
             icon={<CalendarDays className="h-5 w-5" />}
+            tone="violet"
           />
           <StatCard
             title="Bookings"
             value={String(completedBookings)}
             description="Earnings activity"
             icon={<CheckCircle2 className="h-5 w-5" />}
+            tone="rose"
           />
           <StatCard
             title="Support fee"
             value={currency(marketplaceSupportTotal)}
             description="Free during launch"
             icon={<BadgeDollarSign className="h-5 w-5" />}
+            tone="slate"
           />
         </section>
 

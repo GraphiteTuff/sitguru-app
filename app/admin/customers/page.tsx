@@ -8,6 +8,7 @@ import {
   Phone,
   UserRound,
 } from "lucide-react";
+import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
 import { getAdminIdentity } from "@/lib/admin/access";
 import {
   getPetParentSummary,
@@ -50,12 +51,12 @@ export default async function AdminCustomersPage() {
   const newest = summary.newest;
 
   const kpis = [
-    { label: "Pet Parents", value: number(summary.total), helper: "Live accounts, Gurus excluded" },
-    { label: "New 24 hours", value: number(summary.new24h), helper: "Just registered" },
-    { label: "New this week", value: number(summary.new7d), helper: "Last 7 days" },
-    { label: "With pets", value: number(summary.withPets), helper: "Profiles that added a pet" },
-    { label: "With bookings", value: number(summary.withBookings), helper: "Have used SitGuru" },
-    { label: "Need follow-up", value: number(summary.incomplete), helper: "Missing pet, phone, or location" },
+    { label: "Pet Parents", value: number(summary.total), helper: "Live accounts, Gurus excluded", tone: "emerald" as const, icon: <UserRound size={18} /> },
+    { label: "New 24 hours", value: number(summary.new24h), helper: "Just registered", tone: "amber" as const, icon: <PawPrint size={18} /> },
+    { label: "New this week", value: number(summary.new7d), helper: "Last 7 days", tone: "sky" as const, icon: <CalendarDays size={18} /> },
+    { label: "With pets", value: number(summary.withPets), helper: "Profiles that added a pet", tone: "emerald" as const, icon: <PawPrint size={18} /> },
+    { label: "With bookings", value: number(summary.withBookings), helper: "Have used SitGuru", tone: "violet" as const, icon: <CalendarDays size={18} /> },
+    { label: "Need follow-up", value: number(summary.incomplete), helper: "Missing pet, phone, or location", tone: "rose" as const, icon: <Phone size={18} /> },
   ];
 
   return (
@@ -103,16 +104,14 @@ export default async function AdminCustomersPage() {
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {kpis.map((tile) => (
-          <div
+          <AdminThemeCard
             key={tile.label}
-            className="rounded-[1.4rem] border border-emerald-100 bg-white p-4 shadow-sm"
-          >
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
-              {tile.label}
-            </p>
-            <p className="mt-2 text-3xl font-black text-slate-950">{tile.value}</p>
-            <p className="mt-1 text-xs font-semibold text-slate-500">{tile.helper}</p>
-          </div>
+            label={tile.label}
+            value={tile.value}
+            helper={tile.helper}
+            tone={tile.tone}
+            icon={tile.icon}
+          />
         ))}
       </section>
 

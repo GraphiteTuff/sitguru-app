@@ -13,33 +13,44 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import { ThemeStatCard, type ThemeTone } from "@/components/sitguru/ThemeStatCard";
 
 export const dynamic = "force-dynamic";
 
-const partnerStats = [
+const partnerStats: {
+  label: string;
+  value: string;
+  helper: string;
+  icon: typeof ShieldCheck;
+  tone: ThemeTone;
+}[] = [
   {
     label: "Partner Status",
     value: "Active",
     helper: "Your SitGuru Network profile is ready",
     icon: ShieldCheck,
+    tone: "emerald",
   },
   {
     label: "Referrals",
     value: "0",
     helper: "Tracked partner referrals",
     icon: Users,
+    tone: "sky",
   },
   {
     label: "Pending Rewards",
     value: "$0",
     helper: "Rewards awaiting approval",
     icon: Gift,
+    tone: "amber",
   },
   {
     label: "Campaigns",
     value: "0",
     helper: "Active partner campaigns",
     icon: Megaphone,
+    tone: "violet",
   },
 ];
 
@@ -182,30 +193,14 @@ export default function PartnerDashboardPage() {
             const Icon = stat.icon;
 
             return (
-              <div
+              <ThemeStatCard
                 key={stat.label}
-                className="rounded-[1.5rem] border border-[#dfe7df] bg-white p-5 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-black text-slate-600">
-                      {stat.label}
-                    </p>
-
-                    <p className="mt-3 text-3xl font-black text-green-950">
-                      {stat.value}
-                    </p>
-
-                    <p className="mt-2 text-sm font-bold text-slate-500">
-                      {stat.helper}
-                    </p>
-                  </div>
-
-                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-green-800">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                </div>
-              </div>
+                label={stat.label}
+                value={stat.value}
+                helper={stat.helper}
+                tone={stat.tone}
+                icon={<Icon className="h-5 w-5" />}
+              />
             );
           })}
         </section>

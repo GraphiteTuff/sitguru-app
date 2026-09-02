@@ -33,6 +33,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   UserPlus,
   Users,
   WalletCards,
@@ -169,11 +170,6 @@ const navSections = [
     title: "Growth & Marketing",
     items: [
       {
-        label: "Growth Portal",
-        href: adminRoutes.growth,
-        icon: Megaphone,
-      },
-      {
         label: "Sales & Marketing",
         href: adminRoutes.salesMarketing,
         icon: Megaphone,
@@ -293,6 +289,13 @@ const topHeaderLinks = [
 ];
 
 const mobileQuickLinks = [
+  {
+    label: "Social Media Manager",
+    href: adminRoutes.growth,
+    icon: Sparkles,
+    description: "Campaigns, posts, and signups",
+    featured: true,
+  },
   {
     label: "Pet Parents",
     href: adminRoutes.petParents,
@@ -731,6 +734,7 @@ function AdminFooter() {
     {
       title: "Growth & Marketing",
       links: [
+        { label: "Social Media Manager", href: adminRoutes.growth },
         { label: "Growth & Referrals", href: adminRoutes.referrals },
         { label: "Sales & Marketing", href: adminRoutes.salesMarketing },
         { label: "Email Updates", href: adminRoutes.emailUpdates },
@@ -919,6 +923,17 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 <Home size={15} />
                 Back to Homepage
               </Link>
+
+              {isGrowthChrome ? null : (
+                <Link
+                  href={adminRoutes.growth}
+                  className="mt-2 flex min-h-14 items-center justify-center gap-2 rounded-xl px-3 text-sm font-black text-white shadow-sm"
+                  style={{ background: "#0D5C3A" }}
+                >
+                  <Sparkles size={18} />
+                  Social Media Manager
+                </Link>
+              )}
             </div>
 
             <div className="shrink-0 px-4 pt-3">
@@ -978,6 +993,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <div className="flex shrink-0 items-center justify-between gap-3 lg:hidden">
                     <AdminLogo />
+                    {isGrowthChrome ? null : (
+                      <Link
+                        href={adminRoutes.growth}
+                        className="inline-flex min-h-12 items-center gap-2 rounded-xl px-3 text-xs font-black text-white"
+                        style={{ background: "#0D5C3A" }}
+                      >
+                        <Sparkles size={16} />
+                        Social Media
+                      </Link>
+                    )}
                   </div>
 
                   <nav className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm lg:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1002,6 +1027,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+                  {isGrowthChrome ? null : (
+                    <Link
+                      href={adminRoutes.growth}
+                      className="hidden min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 text-sm font-black text-white shadow-sm lg:inline-flex"
+                      style={{ background: "#0D5C3A" }}
+                    >
+                      <Sparkles size={16} />
+                      Social Media Manager
+                    </Link>
+                  )}
                   <div className="flex items-center gap-2 rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm">
                     <SearchBar />
 

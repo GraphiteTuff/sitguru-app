@@ -6,6 +6,10 @@ import GuruMediaUploader from "@/components/guru/GuruMediaUploader";
 import GuruRecognitionBadge from "@/components/guru/GuruRecognitionBadge";
 import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
 import {
+  ThemeStatCard,
+  type ThemeTone,
+} from "@/components/sitguru/ThemeStatCard";
+import {
   getTrustSafetyBypassStatusPayload,
   isGuruTrustSafetyAlreadyBypassed,
   isTrustSafetyScreeningBypassed,
@@ -1445,27 +1449,23 @@ function StatCard({
   label,
   value,
   icon,
+  helper,
+  tone = "emerald",
 }: {
   label: string;
   value: string | number;
   icon?: string;
+  helper?: string;
+  tone?: ThemeTone;
 }) {
   return (
-    <div className="rounded-[1.65rem] border border-slate-200 bg-white px-6 py-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-black !text-slate-800">{label}</p>
-          <p className="mt-2 text-5xl font-black tracking-tight !text-slate-900">
-            {value}
-          </p>
-        </div>
-        {icon ? (
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-cyan-50 text-2xl ring-1 ring-cyan-100">
-            {icon}
-          </div>
-        ) : null}
-      </div>
-    </div>
+    <ThemeStatCard
+      label={label}
+      value={value}
+      helper={helper}
+      tone={tone}
+      icon={icon}
+    />
   );
 }
 
@@ -1490,17 +1490,32 @@ function DashboardSnapshotCard({
   tone?: "emerald" | "sky" | "amber" | "violet" | "slate";
 }) {
   const toneClasses = {
-    emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
-    sky: "border-sky-100 bg-sky-50 text-sky-700",
-    amber: "border-amber-100 bg-amber-50 text-amber-700",
-    violet: "border-violet-100 bg-violet-50 text-violet-700",
-    slate: "border-slate-100 bg-slate-50 text-slate-700",
+    emerald: {
+      card: "border-emerald-200 bg-emerald-50 hover:border-emerald-300",
+      icon: "border-emerald-200 bg-emerald-600 text-white",
+    },
+    sky: {
+      card: "border-sky-200 bg-sky-50 hover:border-sky-300",
+      icon: "border-sky-200 bg-sky-600 text-white",
+    },
+    amber: {
+      card: "border-amber-200 bg-amber-50 hover:border-amber-300",
+      icon: "border-amber-200 bg-amber-500 text-white",
+    },
+    violet: {
+      card: "border-violet-200 bg-violet-50 hover:border-violet-300",
+      icon: "border-violet-200 bg-violet-600 text-white",
+    },
+    slate: {
+      card: "border-slate-200 bg-slate-50 hover:border-slate-300",
+      icon: "border-slate-200 bg-slate-700 text-white",
+    },
   }[tone];
 
   return (
     <Link
       href={href}
-      className="group flex min-h-[175px] flex-col justify-between rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
+      className={`group flex min-h-[175px] flex-col justify-between rounded-[1.5rem] border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses.card}`}
     >
       <div>
         <div className="flex items-start justify-between gap-4">
@@ -1513,7 +1528,7 @@ function DashboardSnapshotCard({
             </h3>
           </div>
           <div
-            className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border text-2xl ${toneClasses}`}
+            className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border text-2xl ${toneClasses.icon}`}
           >
             {icon}
           </div>
@@ -2063,12 +2078,12 @@ export default async function GuruDashboardPage() {
         />
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          <StatCard label="Bookings" value={bookings.length} icon="🗓️" />
-          <StatCard label="Upcoming" value={upcomingBookings.length} icon="⏱️" />
-          <StatCard label="Completed" value={completedBookings.length} icon="✅" />
-          <StatCard label="PawReports" value={pawReportStats.completed} icon="🐾" />
-          <StatCard label="Messages" value={conversations.length} icon="💬" />
-          <StatCard label="Profile" value={`${profileCompletion}%`} icon="⭐" />
+          <StatCard label="Bookings" value={bookings.length} helper="All visits" icon="🗓️" tone="emerald" />
+          <StatCard label="Upcoming" value={upcomingBookings.length} helper="Next on the calendar" icon="⏱️" tone="sky" />
+          <StatCard label="Completed" value={completedBookings.length} helper="Finished care" icon="✅" tone="violet" />
+          <StatCard label="PawReports" value={pawReportStats.completed} helper="Trusted updates sent" icon="🐾" tone="amber" />
+          <StatCard label="Messages" value={conversations.length} helper="Open threads" icon="💬" tone="rose" />
+          <StatCard label="Profile" value={`${profileCompletion}%`} helper="Ready for Pet Parents" icon="⭐" tone="slate" />
         </section>
 
         <section className="rounded-[28px] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
