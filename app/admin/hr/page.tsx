@@ -27,6 +27,7 @@ import {
   getHrDashboardData,
   type HrLeadRecord,
 } from "@/lib/admin/hr/dashboard";
+import { getGrowthHirePipelineSummary } from "@/lib/admin/growth/pipeline";
 import {
   VETERANS_MILITARY_FAMILIES_PROGRAM,
 } from "@/lib/programs/veterans-military-families";
@@ -348,7 +349,10 @@ export default async function AdminHrPage() {
     );
   }
 
-  const data = await getHrDashboardData();
+  const [data, growthHire] = await Promise.all([
+    getHrDashboardData(),
+    getGrowthHirePipelineSummary(),
+  ]);
 
   const liveModules: ModuleCard[] = [
     {
@@ -429,10 +433,10 @@ export default async function AdminHrPage() {
     {
       eyebrow: "Growth Hire",
       title: "Social & Community Manager",
-      description:
-        "Hire the contractor, grant Growth Portal access, and keep them off Financials and private messages.",
-      href: routes.growthHire,
+      description: `${growthHire.approvedSchools} schools approved, ${growthHire.pendingSchools} pending on Handshake. ${growthHire.messaged} messaged, ${growthHire.notMessaged} still to contact.`,
+      href: `${routes.growthHire}#schools`,
       wiring: "live",
+      value: `${growthHire.approvedSchools} / ${growthHire.schools}`,
       icon: <Sparkles size={20} />,
     },
     {
@@ -857,9 +861,9 @@ export default async function AdminHrPage() {
                 Approvals, Trust &amp; Safety, University, Programs, and Settings.
               </li>
               <li>
-                Hire the Social & Community Manager here. That grant opens the
-                Growth Portal and keeps them off Financials, Users, and private
-                messages. Super Admins can open the same portal anytime.
+                Track Handshake requested schools and shortlisted candidates on
+                Hire Social & Community. Grant portal access only when the
+                contractor starts the 30-day trial.
               </li>
               <li>
                 Other HQ people access (roles, passwords, MFA) still lives in
