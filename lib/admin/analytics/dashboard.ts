@@ -153,12 +153,12 @@ function toEventItem(row: AnyRow): AnalyticsRecentItem {
 function toBookingItem(row: AnyRow): AnalyticsRecentItem {
   const service = getText(
     row,
-    ["service_name", "service", "service_type", "title"],
+    ["service", "service_type", "pet_name", "guru_name", "title"],
     "Booking",
   );
   const market = [
-    getText(row, ["city", "customer_city", "location_city"]),
-    getText(row, ["state", "customer_state", "location_state"]),
+    getText(row, ["care_city", "city", "care_area"]),
+    getText(row, ["care_state", "state"]),
   ]
     .filter(Boolean)
     .join(", ");
@@ -178,7 +178,7 @@ function toBookingItem(row: AnyRow): AnalyticsRecentItem {
 function toLeadItem(row: AnyRow): AnalyticsRecentItem {
   const name = getText(
     row,
-    ["full_name", "display_name", "name", "lead_name"],
+    ["full_name", "contact_name", "first_name", "business_name", "display_name"],
     "Lead",
   );
   const email = getText(row, ["email", "lead_email"], "");
@@ -218,14 +218,18 @@ export async function getAnalyticsDashboardData(): Promise<AnalyticsDashboardDat
     ),
     safeSelect(
       "bookings",
-      "id, status, service_name, service, service_type, city, state, customer_city, customer_state, created_at, booking_date, start_time",
+      "id, status, booking_status, service, service_type, pet_name, guru_name, city, state, care_city, care_state, care_area, created_at, booking_date, start_time",
       200,
     ),
     safeSelect("gurus", "id, created_at, status", 100),
-    safeSelect("launch_signups", "id, created_at, status", 100),
+    safeSelect(
+      "launch_waitlist",
+      "id, full_name, email, source, interest_type, created_at",
+      100,
+    ),
     safeSelect(
       "ambassador_leads",
-      "id, full_name, name, email, program, program_interest, source, status, created_at, updated_at",
+      "id, full_name, contact_name, first_name, last_name, business_name, email, program, source, status, created_at, updated_at",
       200,
     ),
     safeSelect("ambassadors", "id, status, created_at", 100),
@@ -322,7 +326,7 @@ export async function getAnalyticsDashboardData(): Promise<AnalyticsDashboardDat
       message: referralCodesResult.message,
     },
     {
-      id: "launch_signups",
+      id: "launch_waitlist",
       label: "Launch Signups",
       ok: launchResult.ok,
       rowCount: launchResult.count,
