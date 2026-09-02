@@ -1,5 +1,5 @@
 import { requireGrowthPortal } from "@/lib/admin/growth/access";
-import { submitFridayReport } from "@/lib/admin/growth/actions";
+import { submitFridayReportAction } from "@/lib/admin/growth/actions";
 import { getGrowthHomeStats, listGrowthCampaigns } from "@/lib/admin/growth/data";
 import {
   GrowthCard,
@@ -71,7 +71,7 @@ export default async function GrowthAnalyticsPage() {
         <p className="mt-1 text-sm font-semibold text-slate-600">
           One page. Posts, what worked, what did not, and three bullets for next week.
         </p>
-        <form action={submitFridayReport} className="mt-4 space-y-3">
+        <form action={submitFridayReportAction} className="mt-4 space-y-3">
           <input
             name="weekLabel"
             defaultValue="This week"

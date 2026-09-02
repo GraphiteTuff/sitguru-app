@@ -266,3 +266,19 @@ export async function submitFridayReport(formData: FormData) {
   refreshGrowth();
   return { ok: true };
 }
+
+export async function updateGrowthCampaignStatusAction(formData: FormData) {
+  await updateGrowthCampaignStatus(formData);
+}
+
+export async function updateGrowthContentStatusAction(formData: FormData) {
+  await updateGrowthContentStatus(formData);
+}
+
+export async function saveGrowthMediaAction(formData: FormData) {
+  await saveGrowthMedia(formData);
+}
+
+export async function submitFridayReportAction(formData: FormData) {
+  await submitFridayReport(formData);
+}

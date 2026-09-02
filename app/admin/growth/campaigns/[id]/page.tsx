@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireGrowthPortal } from "@/lib/admin/growth/access";
-import { updateGrowthCampaignStatus } from "@/lib/admin/growth/actions";
+import { updateGrowthCampaignStatusAction } from "@/lib/admin/growth/actions";
 import { GROWTH_CAMPAIGN_STATUSES } from "@/lib/admin/growth/constants";
 import { getGrowthCampaign } from "@/lib/admin/growth/data";
 import CopyLinkButton from "@/components/admin/growth/CopyLinkButton";
@@ -61,7 +61,7 @@ export default async function GrowthCampaignDetailPage({
         <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
           Status
         </p>
-        <form action={updateGrowthCampaignStatus} className="mt-3 flex flex-wrap gap-2">
+        <form action={updateGrowthCampaignStatusAction} className="mt-3 flex flex-wrap gap-2">
           <input type="hidden" name="id" value={campaign.id} />
           {GROWTH_CAMPAIGN_STATUSES.map((status) => (
             <button

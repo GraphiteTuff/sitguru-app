@@ -1,5 +1,5 @@
 import { requireGrowthPortal } from "@/lib/admin/growth/access";
-import { updateGrowthContentStatus } from "@/lib/admin/growth/actions";
+import { updateGrowthContentStatusAction } from "@/lib/admin/growth/actions";
 import { listGrowthContent } from "@/lib/admin/growth/data";
 import {
   GrowthCard,
@@ -38,7 +38,7 @@ export default async function GrowthContentPage() {
                 {item.caption}
               </p>
             ) : null}
-            <form action={updateGrowthContentStatus} className="mt-4 flex flex-wrap gap-2">
+            <form action={updateGrowthContentStatusAction} className="mt-4 flex flex-wrap gap-2">
               <input type="hidden" name="id" value={item.id} />
               {item.status === "Draft" ? (
                 <button

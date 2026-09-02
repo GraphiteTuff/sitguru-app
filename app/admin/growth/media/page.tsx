@@ -1,5 +1,5 @@
 import { requireGrowthPortal } from "@/lib/admin/growth/access";
-import { saveGrowthMedia } from "@/lib/admin/growth/actions";
+import { saveGrowthMediaAction } from "@/lib/admin/growth/actions";
 import { listGrowthMedia } from "@/lib/admin/growth/data";
 import {
   GrowthCard,
@@ -21,7 +21,7 @@ export default async function GrowthMediaPage() {
       detail="Drop Canva or CapCut links here. SitGuru does not publish to Instagram — you still post in Meta and TikTok."
     >
       <GrowthCard>
-        <form action={saveGrowthMedia} className="grid gap-3 sm:grid-cols-2">
+        <form action={saveGrowthMediaAction} className="grid gap-3 sm:grid-cols-2">
           <label className="block sm:col-span-2">
             <span className="text-xs font-black uppercase tracking-[0.16em] text-emerald-800">
               Title
