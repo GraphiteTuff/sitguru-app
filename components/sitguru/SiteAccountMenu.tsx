@@ -125,7 +125,8 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
 
   if (!account) return null;
 
-  const initials = getInitials(account.name, account.email);
+  const loadedAccount = account;
+  const initials = getInitials(loadedAccount.name, loadedAccount.email);
   const currentRole = resolveDashboardRoleFromPath(pathname);
 
   async function handleLogout() {
@@ -144,10 +145,10 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
       <span
         className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white text-sm font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-100`}
       >
-        {account.avatarUrl ? (
+        {loadedAccount.avatarUrl ? (
           <Image
-            src={account.avatarUrl}
-            alt={`${account.name} profile photo`}
+            src={loadedAccount.avatarUrl}
+            alt={`${loadedAccount.name} profile photo`}
             width={64}
             height={64}
             className="sg-face-photo h-full w-full"
@@ -173,7 +174,7 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
         <Avatar sizeClass={compact ? "h-9 w-9" : "h-11 w-11"} />
         {compact ? null : (
           <span className="hidden max-w-[100px] truncate text-sm font-semibold text-slate-950 xl:block">
-            {account.name}
+            {loadedAccount.name}
           </span>
         )}
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
@@ -191,16 +192,16 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
               <Avatar sizeClass="h-16 w-16" />
               <div className="min-w-0">
                 <p className="truncate text-xl font-semibold leading-tight text-slate-950">
-                  {account.name}
+                  {loadedAccount.name}
                 </p>
-                {account.email ? (
+                {loadedAccount.email ? (
                   <p className="mt-1 truncate text-sm font-medium text-slate-500">
-                    {account.email}
+                    {loadedAccount.email}
                   </p>
                 ) : null}
                 <AccountRoleSwitcher
                   currentRole={currentRole}
-                  authorizedRoles={account.authorizedRoles}
+                  authorizedRoles={loadedAccount.authorizedRoles}
                   onNavigate={() => setOpen(false)}
                 />
               </div>

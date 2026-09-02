@@ -8,6 +8,7 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   GraduationCap,
+  Headphones,
   LayoutDashboard,
   LineChart,
   MessageCircle,
@@ -77,6 +78,13 @@ const navItems: AmbassadorNavItem[] = [
     icon: <MessageCircle size={16} />,
     isActive: (pathname) =>
       pathname.startsWith("/ambassador/dashboard/messages"),
+  },
+  {
+    label: "Support",
+    href: "/ambassador/dashboard/support",
+    icon: <Headphones size={16} />,
+    isActive: (pathname) =>
+      pathname.startsWith("/ambassador/dashboard/support"),
   },
   {
     label: "Rewards",
