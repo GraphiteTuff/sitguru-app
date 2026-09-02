@@ -107,7 +107,7 @@ async function safeRows(table: string, columns: string, limit = 4000) {
       console.warn(`Pet Parent query skipped ${table}:`, result.error);
       return [] as AnyRow[];
     }
-    return (result.data || []) as AnyRow[];
+    return ((result.data || []) as unknown) as AnyRow[];
   } catch (error) {
     console.warn(`Pet Parent query skipped ${table}:`, error);
     return [] as AnyRow[];
