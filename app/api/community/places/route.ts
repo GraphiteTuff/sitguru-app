@@ -76,11 +76,15 @@ export async function GET(req: NextRequest) {
   const linkedEvents = await loadLinkedEvents();
 
   try {
+    const latitude = Number(searchParams.get("lat"));
+    const longitude = Number(searchParams.get("lng"));
     const result = await searchPetFriendlyPlaces({
       q: searchParams.get("q") || undefined,
       county: searchParams.get("county") || undefined,
       city: searchParams.get("city") || undefined,
       state: searchParams.get("state") || undefined,
+      latitude: Number.isFinite(latitude) ? latitude : undefined,
+      longitude: Number.isFinite(longitude) ? longitude : undefined,
       lane,
       category,
       highlyFriendly: searchParams.get("highlyFriendly") === "true",
@@ -96,6 +100,7 @@ export async function GET(req: NextRequest) {
         center: result.center,
         source: result.source,
         query: result.query,
+        needsLocation: "needsLocation" in result ? result.needsLocation : false,
       },
       { headers: cors },
     );

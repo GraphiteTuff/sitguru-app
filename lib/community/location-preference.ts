@@ -3,7 +3,9 @@ export type CommunityLocationPreference = {
   county?: string;
   city?: string;
   state?: string;
-  source?: "search" | "profile" | "manual" | "default";
+  latitude?: number;
+  longitude?: number;
+  source?: "search" | "profile" | "manual" | "default" | "device";
 };
 
 const ZIP_KEY = "sitguru_home_zip";
@@ -11,6 +13,16 @@ const COUNTY_KEY = "sitguru_home_county";
 const CITY_KEY = "sitguru_home_city";
 const STATE_KEY = "sitguru_home_state";
 const SOURCE_KEY = "sitguru_home_location_source";
+const LAT_KEY = "sitguru_home_latitude";
+const LNG_KEY = "sitguru_home_longitude";
+
+function readStoredNumber(key: string) {
+  if (typeof window === "undefined") return undefined;
+  const raw = window.localStorage.getItem(key);
+  if (!raw) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+}
 
 export function readCommunityLocationPreference(): CommunityLocationPreference {
   if (typeof window === "undefined") return {};
@@ -20,6 +32,8 @@ export function readCommunityLocationPreference(): CommunityLocationPreference {
     county: window.localStorage.getItem(COUNTY_KEY) || undefined,
     city: window.localStorage.getItem(CITY_KEY) || undefined,
     state: window.localStorage.getItem(STATE_KEY) || undefined,
+    latitude: readStoredNumber(LAT_KEY),
+    longitude: readStoredNumber(LNG_KEY),
     source:
       (window.localStorage.getItem(SOURCE_KEY) as CommunityLocationPreference["source"]) ||
       undefined,
@@ -61,6 +75,22 @@ export function saveCommunityLocationPreference(
 
   if (preference.source) {
     window.localStorage.setItem(SOURCE_KEY, preference.source);
+  }
+
+  if (preference.latitude !== undefined) {
+    if (Number.isFinite(preference.latitude)) {
+      window.localStorage.setItem(LAT_KEY, String(preference.latitude));
+    } else {
+      window.localStorage.removeItem(LAT_KEY);
+    }
+  }
+
+  if (preference.longitude !== undefined) {
+    if (Number.isFinite(preference.longitude)) {
+      window.localStorage.setItem(LNG_KEY, String(preference.longitude));
+    } else {
+      window.localStorage.removeItem(LNG_KEY);
+    }
   }
 }
 

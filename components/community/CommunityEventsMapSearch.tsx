@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   CalendarDays,
+  LocateFixed,
   MapPin,
   PawPrint,
   Search,
@@ -30,7 +31,11 @@ import {
   readCommunityLocationPreference,
   saveCommunityLocationPreference,
 } from "@/lib/community/location-preference";
-import { COMMUNITY_MAJOR_COUNTIES } from "@/lib/community/market-seed";
+import {
+  defaultMetroChips,
+  nearbyMetroChips,
+  type MetroChip,
+} from "@/lib/community/us-metros";
 import CommunityCountySuggestInput from "@/components/community/CommunityCountySuggestInput";
 import { mergeUniqueCommunityEvents } from "@/lib/community/dedupe-events";
 import type { CommunityEventWithPartner } from "@/lib/community/types";
@@ -368,28 +373,126 @@ export default function CommunityEventsMapSearch({
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [nearbyChips, setNearbyChips] = useState<MetroChip[]>(defaultMetroChips());
+  const [locationReady, setLocationReady] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [deviceCenter, setDeviceCenter] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+
+  async function locateFromDevice() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationReady(true);
+      return false;
+    }
+
+    setLocating(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 8000,
+          maximumAge: 10 * 60 * 1000,
+        });
+      });
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+      const response = await fetch(
+        `/api/community/locate?lat=${encodeURIComponent(String(latitude))}&lng=${encodeURIComponent(String(longitude))}`,
+      );
+      const payload = (await response.json()) as {
+        city?: string;
+        county?: string;
+        state?: string;
+        nearby?: MetroChip[];
+      };
+      const next = {
+        ...EMPTY_FILTERS,
+        county: payload.county || "",
+        city: payload.city || "",
+        state: payload.state || "",
+      };
+      setDraft(next);
+      setFilters(next);
+      setDeviceCenter({ latitude, longitude });
+      setNearbyChips(
+        Array.isArray(payload.nearby) && payload.nearby.length
+          ? payload.nearby
+          : nearbyMetroChips({
+              latitude,
+              longitude,
+              city: next.city,
+              county: next.county,
+              state: next.state,
+            }),
+      );
+      saveCommunityLocationPreference({
+        county: next.county,
+        city: next.city,
+        state: next.state,
+        latitude,
+        longitude,
+        source: "device",
+      });
+      return true;
+    } catch {
+      setNearbyChips(defaultMetroChips());
+      return false;
+    } finally {
+      setLocating(false);
+      setLocationReady(true);
+    }
+  }
 
   useEffect(() => {
     const preference = readCommunityLocationPreference();
-    if (!preference.county && !preference.city && !preference.state) return;
-    const next = {
-      ...EMPTY_FILTERS,
-      county: preference.county || "",
-      city: preference.city || "",
-      state: preference.state || "",
-    };
-    setDraft(next);
-    setFilters(next);
+    if (preference.county || preference.city || preference.state) {
+      const next = {
+        ...EMPTY_FILTERS,
+        county: preference.county || "",
+        city: preference.city || "",
+        state: preference.state || "",
+      };
+      setDraft(next);
+      setFilters(next);
+      if (
+        Number.isFinite(preference.latitude) &&
+        Number.isFinite(preference.longitude)
+      ) {
+        setDeviceCenter({
+          latitude: preference.latitude as number,
+          longitude: preference.longitude as number,
+        });
+      }
+      setNearbyChips(
+        nearbyMetroChips({
+          latitude: preference.latitude,
+          longitude: preference.longitude,
+          city: preference.city,
+          county: preference.county,
+          state: preference.state,
+        }),
+      );
+      setLocationReady(true);
+      return;
+    }
+
+    void locateFromDevice();
   }, []);
 
   useEffect(() => {
-    if (view !== "places") return;
+    if (view !== "places" || !locationReady) return;
     const controller = new AbortController();
     const params = new URLSearchParams();
     if (filters.q) params.set("q", filters.q);
     if (filters.county) params.set("county", filters.county);
     if (filters.city) params.set("city", filters.city);
     if (filters.state) params.set("state", filters.state);
+    if (deviceCenter) {
+      params.set("lat", String(deviceCenter.latitude));
+      params.set("lng", String(deviceCenter.longitude));
+    }
     params.set("lane", lane);
     if (placeCategory) params.set("category", placeCategory);
     if (highlyFriendly) params.set("highlyFriendly", "true");
@@ -443,6 +546,9 @@ export default function CommunityEventsMapSearch({
     filters.county,
     filters.city,
     filters.state,
+    locationReady,
+    deviceCenter?.latitude,
+    deviceCenter?.longitude,
   ]);
 
   const filtered = useMemo(() => {
@@ -750,7 +856,7 @@ export default function CommunityEventsMapSearch({
                   onChange={(e) =>
                     setDraft((current) => ({ ...current, city: e.target.value }))
                   }
-                  placeholder="Quakertown"
+                  placeholder="Any U.S. city"
                   className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 sm:text-sm"
                 />
               </label>
@@ -956,24 +1062,48 @@ export default function CommunityEventsMapSearch({
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {COMMUNITY_MAJOR_COUNTIES.map((option) => {
-              const active = draft.county
-                .toLowerCase()
-                .includes(option.county.replace(/ County$/i, "").toLowerCase());
+            <button
+              type="button"
+              onClick={() => {
+                void locateFromDevice();
+              }}
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
+            >
+              <LocateFixed className="h-3.5 w-3.5" />
+              {locating ? "Finding you…" : "Use my location"}
+            </button>
+            {nearbyChips.map((option) => {
+              const active =
+                (option.city &&
+                  draft.city.toLowerCase() === option.city.toLowerCase() &&
+                  (!option.state ||
+                    draft.state.toLowerCase() === option.state.toLowerCase())) ||
+                Boolean(
+                  option.county &&
+                    draft.county
+                      .toLowerCase()
+                      .includes(
+                        option.county.replace(/ County$/i, "").toLowerCase(),
+                      ) &&
+                    (!option.state ||
+                      draft.state.toLowerCase() === option.state.toLowerCase()),
+                );
               return (
                 <button
-                  key={`${option.county}-${option.state}`}
+                  key={option.id}
                   type="button"
                   onClick={() => {
-                    // County-wide search: clear city so a saved town (e.g. Quakertown)
-                    // does not hide the rest of Bucks / Montgomery listings.
                     const next = {
                       ...draft,
                       county: option.county,
-                      city: "",
+                      city: option.city,
                       state: option.state,
                     };
                     setDraft(next);
+                    setDeviceCenter({
+                      latitude: option.latitude,
+                      longitude: option.longitude,
+                    });
                     applySearch(next);
                   }}
                   className={`rounded-full px-3 py-1.5 text-xs font-black transition ${
@@ -982,7 +1112,7 @@ export default function CommunityEventsMapSearch({
                       : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
                   }`}
                 >
-                  {option.county.replace(/ County$/i, "")}, {option.state}
+                  {option.label}
                 </button>
               );
             })}
@@ -1083,13 +1213,17 @@ export default function CommunityEventsMapSearch({
               </Link>
             </div>
             {view === "places" ? (
-              placesLoading ? (
+              !locationReady || locating || placesLoading ? (
                 <div className="rounded-[28px] border border-slate-200 bg-white p-7">
                   <h3 className="text-xl font-bold text-slate-900">
-                    Finding pet-friendly places…
+                    {!locationReady || locating
+                      ? "Finding your city…"
+                      : "Finding pet-friendly places…"}
                   </h3>
                   <p className="mt-3 text-sm font-semibold text-slate-600">
-                    Checking Google listings, then scoring how welcome pets really are.
+                    {!locationReady || locating
+                      ? "SitGuru works nationwide — we’ll search near you, or pick any U.S. city."
+                      : "Checking Google listings, then scoring how welcome pets really are."}
                   </p>
                 </div>
               ) : placesError ? (
@@ -1106,10 +1240,14 @@ export default function CommunityEventsMapSearch({
               ) : places.length === 0 ? (
                 <div className="rounded-[28px] border border-slate-200 bg-white p-7">
                   <h3 className="text-xl font-bold text-slate-900">
-                    No places match just yet
+                    {!filters.city && !filters.county && !filters.state
+                      ? "Pick a city to see places nearby"
+                      : "No places match just yet"}
                   </h3>
                   <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
-                    Try another county, city, or lane — Eat & Drink, Stay, Play, or Pet Services.
+                    {!filters.city && !filters.county && !filters.state
+                      ? "Tap Use my location, choose a metro, or type any U.S. city and state."
+                      : "Try another county, city, or lane — Eat & Drink, Stay, Play, or Pet Services."}
                   </p>
                 </div>
               ) : (

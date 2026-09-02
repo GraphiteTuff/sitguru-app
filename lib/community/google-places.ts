@@ -67,7 +67,6 @@ type CacheEntry = {
 
 const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 15 * 60 * 1000;
-const DEFAULT_CENTER = { latitude: 40.3368, longitude: -75.1113 };
 const FIELD_MASK = [
   "places.id",
   "places.displayName",
@@ -126,6 +125,8 @@ export type PlacesSearchInput = {
   county?: string;
   city?: string;
   state?: string;
+  latitude?: number;
+  longitude?: number;
   lane?: PlaceLane;
   category?: PlaceCategoryId | "";
   highlyFriendly?: boolean;
@@ -307,10 +308,26 @@ export async function resolvePlacesCenter(input: {
   county?: string;
   city?: string;
   state?: string;
+  latitude?: number;
+  longitude?: number;
 }) {
   const county = input.county?.trim();
   const city = input.city?.trim();
   const state = input.state?.trim().toUpperCase();
+  const hasCoords =
+    Number.isFinite(input.latitude) &&
+    Number.isFinite(input.longitude) &&
+    input.latitude !== 0 &&
+    input.longitude !== 0;
+
+  if (hasCoords) {
+    return {
+      latitude: input.latitude as number,
+      longitude: input.longitude as number,
+      label: [city, county, state].filter(Boolean).join(", ") || "Near me",
+      radiusMeters: county && !city ? 35000 : 18000,
+    };
+  }
 
   const seed = COMMUNITY_MARKET_SEEDS.find((market) => {
     if (county && market.county_name.toLowerCase().includes(county.toLowerCase().replace(/ county$/i, ""))) {
@@ -348,11 +365,7 @@ export async function resolvePlacesCenter(input: {
     }
   }
 
-  return {
-    ...DEFAULT_CENTER,
-    label: "Bucks County, PA",
-    radiusMeters: 28000,
-  };
+  return null;
 }
 
 async function placesRequest(
@@ -695,6 +708,16 @@ async function loadMappedPlaces(
 export async function searchPetFriendlyPlaces(input: PlacesSearchInput) {
   const center = await resolvePlacesCenter(input);
   const freeText = input.q?.trim();
+  if (!center) {
+    return {
+      places: [],
+      center: null,
+      source: "none" as const,
+      query: freeText || LANE_SEARCH_QUERIES[input.lane || "eat"],
+      needsLocation: true,
+    };
+  }
+
   const textQuery = freeText
     ? `${freeText} in ${center.label}`
     : undefined;
@@ -704,6 +727,8 @@ export async function searchPetFriendlyPlaces(input: PlacesSearchInput) {
       county: input.county || "",
       city: input.city || "",
       state: input.state || "",
+      latitude: input.latitude || "",
+      longitude: input.longitude || "",
       lane: input.lane || "eat",
       category: input.category || "",
       openNow: Boolean(input.openNow),
