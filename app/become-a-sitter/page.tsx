@@ -352,17 +352,37 @@ export default function BecomeGuruPage() {
     setSaving(true);
 
     try {
+      const { data: existingRoleRows } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+
+      const existingRoles = (existingRoleRows || [])
+        .map((row) => String(row.role || "").trim().toLowerCase())
+        .filter(Boolean);
+      const alreadyPetParent = existingRoles.some((role) =>
+        ["customer", "pet_parent", "pet-parent", "parent", "pet_owner"].includes(
+          role,
+        ),
+      );
+
+      const profilePayload: Record<string, unknown> = {
+        id: user.id,
+        email: user.email,
+        full_name: cleanDisplayName,
+        city: cleanCity,
+        state: cleanState,
+        zip_code: cleanZipCode,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Becoming a Guru adds access. Do not replace an existing Pet Parent role.
+      if (!alreadyPetParent) {
+        profilePayload.role = "guru";
+      }
+
       const { error: profileError } = await supabase.from("profiles").upsert(
-        {
-          id: user.id,
-          email: user.email,
-          full_name: cleanDisplayName,
-          city: cleanCity,
-          state: cleanState,
-          zip_code: cleanZipCode,
-          role: "guru",
-          updated_at: new Date().toISOString(),
-        },
+        profilePayload,
         {
           onConflict: "id",
         },
@@ -370,10 +390,15 @@ export default function BecomeGuruPage() {
 
       if (profileError) throw profileError;
 
-      const { error: userRoleError } = await supabase.from("user_roles").upsert({
-        user_id: user.id,
-        role: "guru",
-      });
+      const { error: userRoleError } = await supabase.from("user_roles").upsert(
+        {
+          user_id: user.id,
+          role: "guru",
+        },
+        {
+          onConflict: "user_id,role",
+        },
+      );
 
       if (userRoleError) throw userRoleError;
 
@@ -451,14 +476,14 @@ export default function BecomeGuruPage() {
 
           <div className="mt-6 grid gap-3">
             <Link
-              href="/login?mode=email&next=/become-a-guru"
+              href="/login?mode=email&next=/become-a-sitter"
               className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white transition hover:bg-emerald-800"
             >
               Log in with email
             </Link>
 
             <Link
-              href="/signup?role=guru&next=/become-a-guru"
+              href="/signup?role=guru&next=/become-a-sitter"
               className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50"
             >
               Create Guru account

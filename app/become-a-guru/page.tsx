@@ -47,6 +47,8 @@ export const metadata: Metadata = {
 };
 
 const guruLoginLink = "/login?role=guru&next=/guru/dashboard";
+const addGuruToExistingAccountLink =
+  "/login?next=/become-a-sitter";
 
 function buildGuruApplyLink(refCode?: string | null) {
   const params = new URLSearchParams({
@@ -433,7 +435,14 @@ export function BecomeAGuruPageContent({
 
             <p className="mt-5 max-w-2xl text-xs font-semibold leading-5 !text-emerald-100/90 sm:text-sm">
               Gurus are independent providers who choose the services they offer
-              and the booking requests they accept.
+              and the booking requests they accept. Already a Pet Parent?{" "}
+              <Link
+                href={addGuruToExistingAccountLink}
+                className="underline decoration-white/50 underline-offset-2 !text-white"
+              >
+                Add Guru to your existing SitGuru login
+              </Link>{" "}
+              instead of creating a second email.
             </p>
           </div>
 

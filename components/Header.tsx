@@ -458,13 +458,23 @@ export default function Header({ user = null }: HeaderProps) {
           .select("role")
           .eq("user_id", activeUser.id);
 
-        const { data: guruData, error: guruError } = await supabase
-          .from("gurus")
-          .select(
-            "id,user_id,status,approval_status,onboarding_status,is_active,is_public",
-          )
-          .eq("user_id", activeUser.id)
-          .maybeSingle();
+        const guruQuery = cleanEmail
+          ? supabase
+              .from("gurus")
+              .select(
+                "id,user_id,status,approval_status,onboarding_status,is_active,is_public",
+              )
+              .or(`user_id.eq.${activeUser.id},email.eq.${cleanEmail}`)
+              .maybeSingle()
+          : supabase
+              .from("gurus")
+              .select(
+                "id,user_id,status,approval_status,onboarding_status,is_active,is_public",
+              )
+              .eq("user_id", activeUser.id)
+              .maybeSingle();
+
+        const { data: guruData, error: guruError } = await guruQuery;
 
         const ambassadorQuery = cleanEmail
           ? supabase

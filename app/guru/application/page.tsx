@@ -1,4 +1,11 @@
 import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import {
+  hasGuruAccessFromSignals,
+  isEligibleGuruProfile,
+  isGuruRoleValue,
+  resolveGuruApplicationPath,
+} from "@/lib/auth/guru-access";
 
 export const dynamic = "force-dynamic";
 
@@ -13,34 +20,59 @@ type PageProps = {
   }>;
 };
 
-function buildRedirectPath(params?: {
-  saved?: string;
-  submitted?: string;
-  message?: string;
-  error?: string;
-  from?: string;
-  reason?: string;
-}) {
-  const searchParams = new URLSearchParams();
-
-  if (params?.saved) searchParams.set("saved", params.saved);
-  if (params?.submitted) searchParams.set("submitted", params.submitted);
-  if (params?.message) searchParams.set("message", params.message);
-  if (params?.error) searchParams.set("error", params.error);
-  if (params?.from) searchParams.set("from", params.from);
-  if (params?.reason) searchParams.set("reason", params.reason);
-
-  const queryString = searchParams.toString();
-
-  return queryString
-    ? `/guru/dashboard/profile?${queryString}`
-    : "/guru/dashboard/profile";
-}
-
 export default async function GuruApplicationRedirectPage({
   searchParams,
 }: PageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  redirect(buildRedirectPath(resolvedSearchParams));
+  let hasGuruAccess = false;
+
+  if (user) {
+    const [{ data: roleRows }, { data: profile }, { data: guruRow }] =
+      await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", user.id),
+        supabase
+          .from("profiles")
+          .select("role, account_type")
+          .eq("id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("gurus")
+          .select("id, user_id, email, status, application_status, is_bookable, is_active")
+          .or(
+            user.email
+              ? `user_id.eq.${user.id},email.eq.${user.email}`
+              : `user_id.eq.${user.id}`,
+          )
+          .maybeSingle(),
+      ]);
+
+    const roles = [
+      ...(roleRows || []).map((row) => row.role),
+      profile?.role,
+      profile?.account_type,
+    ];
+
+    hasGuruAccess = hasGuruAccessFromSignals({
+      roles,
+      hasGuruRole: roles.some((role) => isGuruRoleValue(role)),
+      hasEligibleGuruProfile: isEligibleGuruProfile(guruRow),
+    });
+  }
+
+  redirect(
+    resolveGuruApplicationPath({
+      hasGuruAccess,
+      from: resolvedSearchParams?.from,
+      reason: resolvedSearchParams?.reason,
+      saved: resolvedSearchParams?.saved,
+      submitted: resolvedSearchParams?.submitted,
+      message: resolvedSearchParams?.message,
+      error: resolvedSearchParams?.error,
+    }),
+  );
 }

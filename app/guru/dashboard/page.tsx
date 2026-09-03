@@ -1971,7 +1971,7 @@ export default async function GuruDashboardPage() {
   const loadedGuruProfile = await getGuruProfile(user.id, user.email);
 
   if (!loadedGuruProfile) {
-    redirect("/guru/application");
+    redirect("/become-a-sitter?from=guru-dashboard&reason=missing-profile");
   }
 
   const guruProfile = await applyTrustSafetyBypassToGuruProfile(
@@ -1979,7 +1979,7 @@ export default async function GuruDashboardPage() {
   );
 
   if (!guruProfile) {
-    redirect("/guru/application");
+    redirect("/become-a-sitter?from=guru-dashboard&reason=missing-profile");
   }
 
   const [

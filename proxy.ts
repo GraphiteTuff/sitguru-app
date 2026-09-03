@@ -8,6 +8,11 @@ import {
   hasGrowthOnlyRole,
   isGrowthAllowedAdminPath,
 } from "@/lib/admin/growth-paths";
+import {
+  guruLookupOrFilter,
+  isEligibleGuruProfile,
+  shouldRepairMissingGuruRole,
+} from "@/lib/auth/guru-access";
 
 const ADMIN_PROFILE_ROLES = new Set([
   "founder",
@@ -544,11 +549,27 @@ export async function proxy(request: NextRequest) {
   if (requiresGuruAccess && !hasGuruRole) {
     const { data: guruRow } = await supabase
       .from("gurus")
-      .select("id")
-      .eq("user_id", user.id)
+      .select("id, user_id, email, status, application_status, is_bookable, is_active")
+      .or(guruLookupOrFilter(user.id, user.email))
       .maybeSingle();
 
-    hasGuruRow = Boolean(guruRow?.id);
+    hasGuruRow = isEligibleGuruProfile(guruRow);
+
+    if (
+      hasGuruRow &&
+      shouldRepairMissingGuruRole({
+        hasGuruRole,
+        hasEligibleGuruProfile: hasGuruRow,
+      })
+    ) {
+      await supabase.from("user_roles").upsert(
+        {
+          user_id: user.id,
+          role: "guru",
+        },
+        { onConflict: "user_id,role" },
+      );
+    }
   }
 
   if (requiresGuruAccess && !hasGuruRole && !hasGuruRow) {
