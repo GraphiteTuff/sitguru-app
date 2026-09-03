@@ -357,7 +357,7 @@ export default async function AdminProgramsHubPage() {
 
   return (
     <main className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1640px] space-y-6">
+      <div className="mx-auto min-w-0 max-w-[1640px] space-y-6">
         <section className="rounded-[2rem] border border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(13,92,58,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_55%,#f8fafc_100%)] p-5 shadow-sm sm:p-7">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
@@ -496,7 +496,7 @@ export default async function AdminProgramsHubPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-3">
+        <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-3">
           <RecentList
             title="Recent applications"
             subtitle="Newest pathway applicants."
@@ -523,8 +523,8 @@ export default async function AdminProgramsHubPage() {
           />
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+        <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
+          <section className="min-w-0 overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
             <h2 className="text-xl font-black text-slate-950">Source health</h2>
             <p className="mt-1 text-sm font-semibold text-slate-500">
               Hub reads live applications, ambassadors, partners, and programs
@@ -534,15 +534,15 @@ export default async function AdminProgramsHubPage() {
               {data.sourceHealth.map((source) => (
                 <div
                   key={source.id}
-                  className="flex items-start justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                  className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-black text-slate-950">{source.label}</p>
-                    <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                    <p className="mt-1 break-words text-xs font-semibold text-slate-500">
                       {source.message}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="shrink-0 text-right">
                     <span
                       className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
                         source.ok
@@ -561,32 +561,32 @@ export default async function AdminProgramsHubPage() {
             </div>
           </section>
 
-          <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-xl font-black text-slate-950">
+          <section className="min-w-0 overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="break-words text-xl font-black text-slate-950">
               Pathway operating notes
             </h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
+            <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
               Keep public program promises aligned with contractor marketplace
               reality.
             </p>
             <div className="mt-4 grid gap-3">
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <p className="font-black text-slate-950">Independent contractors</p>
-                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                <p className="mt-1 text-sm font-semibold leading-6 break-words text-slate-600">
                   Program participation does not guarantee employment, placement,
                   bookings, commissions, or full Guru status.
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <p className="font-black text-slate-950">Fair Checkr review</p>
-                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                <p className="mt-1 text-sm font-semibold leading-6 break-words text-slate-600">
                   Community Hire and related pathways use role-related background
                   review guided by EEOC principles.
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <p className="font-black text-slate-950">SkillBridge interest only</p>
-                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                <p className="mt-1 text-sm font-semibold leading-6 break-words text-slate-600">
                   SkillBridge remains an interest list unless SitGuru later
                   creates a formally approved training program.
                 </p>

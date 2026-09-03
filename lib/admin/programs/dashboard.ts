@@ -65,6 +65,24 @@ function getText(row: AnyRow, keys: string[], fallback = "") {
   return fallback;
 }
 
+function getPersonName(row: AnyRow, fallback: string) {
+  const combined = [asString(row.first_name), asString(row.last_name)]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    getText(row, [
+      "full_name",
+      "contact_name",
+      "display_name",
+      "applicant_name",
+      "lead_name",
+    ]) ||
+    combined ||
+    getText(row, ["email"], fallback)
+  );
+}
+
 function getDate(row: AnyRow) {
   return (
     asString(row.updated_at) ||
@@ -229,13 +247,15 @@ async function safeSelect(
 
 function toApplicationItem(row: AnyRow): ProgramsRecentItem {
   const programKey = normalizeProgramKey(
-    getText(row, ["program", "program_key", "program_slug", "program_type"]),
+    getText(row, [
+      "program",
+      "program_key",
+      "program_name",
+      "program_slug",
+      "program_type",
+    ]),
   );
-  const name = getText(
-    row,
-    ["full_name", "display_name", "name", "applicant_name", "lead_name"],
-    "Applicant",
-  );
+  const name = getPersonName(row, "Applicant");
   const email = getText(row, ["email", "applicant_email", "lead_email"], "");
   const status = getStatus(row);
 
@@ -250,15 +270,11 @@ function toApplicationItem(row: AnyRow): ProgramsRecentItem {
 }
 
 function toLeadItem(row: AnyRow): ProgramsRecentItem {
-  const name = getText(
-    row,
-    ["full_name", "display_name", "name", "lead_name"],
-    "Ambassador Lead",
-  );
+  const name = getPersonName(row, "Ambassador Lead");
   const email = getText(row, ["email", "lead_email", "contact_email"], "");
   const program = getText(
     row,
-    ["program", "program_interest", "pathway", "source_program"],
+    ["program", "program_interest", "pathway", "source_program", "lead_type"],
     "Ambassador",
   );
   const status = getStatus(row);
@@ -284,12 +300,12 @@ export async function getProgramsDashboardData(): Promise<ProgramsDashboardData>
   ] = await Promise.all([
     safeSelect(
       "program_applications",
-      "id, full_name, name, email, program, program_key, program_slug, program_type, status, created_at, updated_at, submitted_at",
+      "id, full_name, email, program, program_key, program_name, status, created_at, updated_at, submitted_at",
       500,
     ),
     safeSelect(
       "ambassador_leads",
-      "id, full_name, name, email, program, program_interest, status, created_at, updated_at",
+      "id, full_name, first_name, last_name, contact_name, email, program, status, created_at, updated_at",
       200,
     ),
     safeSelect("ambassadors", "id, status, created_at", 100),
@@ -309,7 +325,13 @@ export async function getProgramsDashboardData(): Promise<ProgramsDashboardData>
     applications.filter(
       (row) =>
         normalizeProgramKey(
-          getText(row, ["program", "program_key", "program_slug", "program_type"]),
+          getText(row, [
+          "program",
+          "program_key",
+          "program_name",
+          "program_slug",
+          "program_type",
+        ]),
         ) === key,
     ).length;
 
