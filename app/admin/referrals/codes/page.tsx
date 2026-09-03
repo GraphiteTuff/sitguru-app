@@ -4,33 +4,34 @@ import { revalidatePath } from "next/cache";
 import {
   Activity,
   Archive,
-  ArrowRight,
+  ArrowLeft,
   BadgeDollarSign,
-  BarChart3,
   CheckCircle2,
-  ClipboardList,
   Edit3,
   ExternalLink,
   Filter,
   Gift,
   HandCoins,
   HeartHandshake,
-  Megaphone,
   MousePointerClick,
   Plus,
   QrCode,
-  ReceiptText,
   ScanLine,
   Search,
-  ShieldCheck,
   Sparkles,
   Target,
   Trash2,
-  UserPlus,
-  Users,
   XCircle,
 } from "lucide-react";
 
+import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
+import {
+  AdminWorkplaceActions,
+  AdminWorkplaceDenied,
+  AdminWorkplaceHealth,
+  GrowthCard,
+  GrowthPageFrame,
+} from "@/components/admin/growth/GrowthPageFrame";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getAdminIdentity } from "@/lib/admin/access";
 
@@ -193,14 +194,13 @@ type ReferralAuditRow = {
   created_at?: string | null;
 };
 
-type ProgramCard = {
-  title: string;
-  description: string;
-  href: string;
-  icon: typeof Users;
-  count: number;
-  detail: string;
-  tone: "green" | "emerald" | "blue" | "purple" | "amber" | "rose";
+type LiveAmbassadorCode = {
+  id: string;
+  name: string;
+  email: string;
+  code: string;
+  status: string;
+  inRegistry: boolean;
 };
 
 const adminRoutes = {
@@ -550,6 +550,14 @@ function isPayoutOpen(code: ReferralCode) {
   );
 }
 
+function reviewReason(code: ReferralCode) {
+  if (code.status === "needs_review") return "Marked needs review";
+  if (!code.owner_name || !code.owner_email) return "Missing owner";
+  if (code.owner_type === "unknown") return "Unknown owner type";
+  if (code.program_type === "general") return "General program";
+  return "Needs review";
+}
+
 async function getReferralData(
   params: Record<string, string | string[] | undefined>,
 ) {
@@ -565,6 +573,7 @@ async function getReferralData(
     relationshipsResult,
     eventsResult,
     auditResult,
+    ambassadorsResult,
   ] = await Promise.all([
     supabaseAdmin
       .from("referral_codes")
@@ -596,6 +605,7 @@ async function getReferralData(
       .select("*")
       .order("created_at", { ascending: false })
       .limit(500),
+    supabaseAdmin.from("ambassadors").select("*").limit(500),
   ]);
 
   const codes = ((codesResult.data || []) as ReferralCode[]).filter((code) => {
@@ -625,6 +635,33 @@ async function getReferralData(
     ((relationshipsResult.data || []) as CanonicalRelationship[]) || [];
   const events = ((eventsResult.data || []) as CanonicalEvent[]) || [];
   const audits = ((auditResult.data || []) as ReferralAuditRow[]) || [];
+  const knownCodes = new Set(
+    [
+      ...allCodes.map((code) => normalizeCode(code.normalized_code || code.code)),
+      ...allCanonicalCodes.map((code) =>
+        normalizeCode(code.normalized_code || code.code),
+      ),
+    ].filter(Boolean),
+  );
+  const ambassadorCodes: LiveAmbassadorCode[] = (
+    (ambassadorsResult.data || []) as DbRow[]
+  )
+    .map((row) => {
+      const code = normalizeCode(row.referral_code);
+      return {
+        id: asString(row.id),
+        name:
+          asString(row.full_name) ||
+          asString(row.display_name) ||
+          asString(row.email) ||
+          "Ambassador",
+        email: asString(row.email) || asString(row.login_email),
+        code,
+        status: asString(row.status) || "active",
+        inRegistry: knownCodes.has(code),
+      };
+    })
+    .filter((row) => row.id && row.code);
 
   const metrics = {
     totalCodes: allCodes.length,
@@ -638,9 +675,17 @@ async function getReferralData(
         code.program_type || "",
       ),
     ).length,
-    ambassadorCodes: allCodes.filter(
-      (code) => code.program_type === "ambassador_referral",
-    ).length,
+    ambassadorCodes: Math.max(
+      allCodes.filter(
+        (code) =>
+          code.program_type === "ambassador_referral" ||
+          code.owner_type === "ambassador",
+      ).length,
+      ambassadorCodes.length,
+    ),
+    liveAmbassadorCodes: ambassadorCodes.length,
+    missingAmbassadorCodes: ambassadorCodes.filter((row) => !row.inRegistry)
+      .length,
     partnerCodes: allCodes.filter((code) =>
       ["partner", "petperks"].includes(code.program_type || ""),
     ).length,
@@ -705,69 +750,6 @@ async function getReferralData(
     ).length,
   };
 
-  const programCards: ProgramCard[] = [
-    {
-      title: "Guru Referral Program",
-      description:
-        "Track Guru leads, new Guru signup codes, approvals, and bookable activation.",
-      href: adminRoutes.gurus,
-      icon: UserPlus,
-      count: metrics.guruCodes,
-      detail: "Guru codes",
-      tone: "green",
-    },
-    {
-      title: "Pet Parent / PetPerks",
-      description:
-        "Track Pet Parent signup codes, PetPerks, and customer referral activity.",
-      href: adminRoutes.petParents,
-      icon: Gift,
-      count: metrics.petParentCodes,
-      detail: "Pet Parent codes",
-      tone: "purple",
-    },
-    {
-      title: "Ambassador Referrals",
-      description:
-        "Track Ambassador codes, outreach links, signups, and future commission review.",
-      href: adminRoutes.ambassadors,
-      icon: HeartHandshake,
-      count: metrics.ambassadorCodes,
-      detail: "Ambassador codes",
-      tone: "blue",
-    },
-    {
-      title: "Partners / Clinics",
-      description:
-        "Track partner, clinic, PetPerks, and local business referral codes.",
-      href: adminRoutes.partners,
-      icon: ShieldCheck,
-      count: metrics.partnerCodes,
-      detail: "Partner codes",
-      tone: "emerald",
-    },
-    {
-      title: "Applications / Signups",
-      description:
-        "Review who used a code and where they are in the conversion stage.",
-      href: adminRoutes.applications,
-      icon: ClipboardList,
-      count: canonicalMetrics.relationships,
-      detail: "Canonical relationships",
-      tone: "amber",
-    },
-    {
-      title: "Payout Accountability",
-      description:
-        "Review eligible, approved, paid, declined, and manual payout records.",
-      href: adminRoutes.payouts,
-      icon: HandCoins,
-      count: canonicalMetrics.rewardReview,
-      detail: "Rewards needing review",
-      tone: "rose",
-    },
-  ];
-
   return {
     codes,
     allCodes,
@@ -778,9 +760,47 @@ async function getReferralData(
     relationships,
     events,
     audits,
+    ambassadorCodes,
     canonicalMetrics,
-    programCards,
     filters: { q, program, status, payout },
+    sourceHealth: [
+      {
+        id: "referral_codes",
+        label: "referral_codes",
+        ok: !codesResult.error,
+        rowCount: allCodes.length,
+      },
+      {
+        id: "pawperks_account_referral_codes",
+        label: "pawperks_account_referral_codes",
+        ok: !canonicalCodesResult.error,
+        rowCount: allCanonicalCodes.length,
+      },
+      {
+        id: "ambassadors",
+        label: "ambassadors",
+        ok: !ambassadorsResult.error,
+        rowCount: ambassadorCodes.length,
+      },
+      {
+        id: "admin_referral_tracking",
+        label: "admin_referral_tracking",
+        ok: !relationshipsResult.error,
+        rowCount: relationships.length,
+      },
+      {
+        id: "pawperks_referral_events",
+        label: "pawperks_referral_events",
+        ok: !eventsResult.error,
+        rowCount: events.length,
+      },
+      {
+        id: "pawperks_referral_audit_log",
+        label: "pawperks_referral_audit_log",
+        ok: !auditResult.error,
+        rowCount: audits.length,
+      },
+    ],
     warnings: [
       codesResult.error ? `referral_codes: ${codesResult.error.message}` : "",
       activityResult.error
@@ -797,6 +817,9 @@ async function getReferralData(
         : "",
       auditResult.error
         ? `pawperks_referral_audit_log: ${auditResult.error.message}`
+        : "",
+      ambassadorsResult.error
+        ? `ambassadors: ${ambassadorsResult.error.message}`
         : "",
     ].filter(Boolean),
   };
@@ -1136,163 +1159,249 @@ export default async function AdminReferralCodesPage({
   const actor = await getAdminIdentity();
   if (!actor?.canAccessAdmin) {
     return (
-      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
-        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
-            Access Restricted
-          </p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
-            Admin access required.
-          </h1>
-          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-            Sign in with an authorized SitGuru admin account to manage referral
-            codes.
-          </p>
-        </div>
-      </div>
+      <AdminWorkplaceDenied
+        title="Admin access required."
+        detail="Sign in with an authorized SitGuru admin account to manage referral codes."
+      />
     );
   }
 
   const resolvedParams = await Promise.resolve(searchParams || {});
   const data = await getReferralData(resolvedParams);
+  const reviewCodes = data.allCodes.filter(isNeedsReview).slice(0, 8);
+  const missingAmbassadorCodes = data.ambassadorCodes.filter(
+    (row) => !row.inRegistry,
+  );
 
   return (
-    <main className="w-full min-w-0 space-y-5">
-      <section className="rounded-[28px] border border-green-100 bg-gradient-to-br from-white via-[#f7fbf4] to-white p-4 shadow-sm sm:p-6">
-        <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
-          <div className="min-w-0">
-            <Link
-              href={adminRoutes.hub}
-              className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-2 text-xs font-black text-green-800 shadow-sm ring-1 ring-green-100 transition hover:bg-green-50 hover:text-green-950 sm:text-sm"
-            >
-              ← Back to Growth & Referrals
-            </Link>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl xl:text-5xl">
-                Referral Code Registry
-              </h1>
-              <span className="rounded-full bg-green-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-green-800 sm:text-xs">
-                Code Ops
-              </span>
-            </div>
-
-            <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-              Generate and manage existing codes while monitoring the new
-              universal referral registry, tracked links, QR scans, canonical
-              signup relationships, account progress, rewards, and Admin audit
-              history across every SitGuru role and campaign.
-            </p>
-          </div>
-
-          <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 xl:w-auto">
-            <Link
-              href={adminRoutes.inventory}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-black text-amber-900 shadow-sm transition hover:bg-amber-100"
-            >
-              <Search size={17} />
-              PawPerks Inventory
-            </Link>
-
-            <Link
-              href={adminRoutes.rewards}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
-            >
-              <Gift size={17} />
-              Rewards Auditor
-            </Link>
-
-            <a
-              href="#generate-code"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-            >
-              <Plus size={17} />
-              Generate Code
-            </a>
-
-            <a
-              href="#add-activity"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-            >
-              <MousePointerClick size={17} />
-              Add Activity
-            </a>
-          </div>
-        </div>
-      </section>
+    <GrowthPageFrame
+      kicker="Referral Code Workplace"
+      title="Issue, fix, and track every SitGuru code."
+      detail="Generate a code, clear the review queue, and keep Ambassador, Guru, and PawPerks attribution on one board."
+      action={
+        <a
+          href="#generate-code"
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-green-950"
+        >
+          <Plus size={17} />
+          Generate code
+        </a>
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={adminRoutes.hub}
+          className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+        >
+          <ArrowLeft size={14} />
+          Referrals workplace
+        </Link>
+        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
+          {actor.email}
+        </span>
+      </div>
 
       {data.warnings.length ? (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900">
-          {data.warnings.map((warning) => (
-            <p key={warning}>{warning}</p>
-          ))}
-        </section>
+        <GrowthCard className="border-amber-200 bg-amber-50">
+          <p className="text-sm font-black text-amber-950">
+            Some referral reads were skipped
+          </p>
+          <ul className="mt-2 list-disc pl-5 text-sm font-semibold text-amber-900">
+            {data.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </GrowthCard>
       ) : null}
 
-      <section className="grid w-full min-w-0 gap-3 rounded-[28px] border border-green-100 bg-white p-3 shadow-sm sm:grid-cols-2 sm:p-4 lg:grid-cols-4 2xl:grid-cols-8">
-        <MetricTile label="Total Codes" value={number(data.metrics.totalCodes)} />
-        <MetricTile label="Active Codes" value={number(data.metrics.activeCodes)} />
-        <MetricTile label="Needs Review" value={number(data.metrics.needsReview)} />
-        <MetricTile label="Converted" value={number(data.metrics.convertedCount)} />
-        <MetricTile label="Approved" value={number(data.metrics.approvedCount)} />
-        <MetricTile label="Bookings" value={number(data.metrics.bookings)} />
-        <MetricTile label="Revenue" value={money(data.metrics.revenue)} />
-        <MetricTile
-          label="Payout Review"
-          value={number(data.metrics.pendingPayouts)}
+      <section className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-3">
+        <AdminThemeCard
+          label="Active codes"
+          value={data.metrics.activeCodes}
+          helper={`${number(data.metrics.totalCodes)} in registry`}
+          tone="emerald"
+          icon={<Sparkles size={18} />}
+        />
+        <AdminThemeCard
+          label="Needs review"
+          value={data.metrics.needsReview}
+          helper="Missing owner or marked"
+          tone="amber"
+          icon={<Search size={18} />}
+        />
+        <AdminThemeCard
+          label="Ambassador live"
+          value={data.metrics.liveAmbassadorCodes}
+          helper={
+            data.metrics.missingAmbassadorCodes
+              ? `${data.metrics.missingAmbassadorCodes} not in registry`
+              : "Workspace codes connected"
+          }
+          tone="sky"
+          icon={<HeartHandshake size={18} />}
+        />
+        <AdminThemeCard
+          label="Canonical codes"
+          value={data.canonicalMetrics.totalCodes}
+          helper={`${number(data.canonicalMetrics.relationships)} relationships`}
+          tone="violet"
+          icon={<QrCode size={18} />}
+        />
+        <AdminThemeCard
+          label="Reward review"
+          value={data.canonicalMetrics.rewardReview}
+          helper={`${number(data.canonicalMetrics.paidRewards)} paid with reference`}
+          tone="rose"
+          icon={<BadgeDollarSign size={18} />}
+        />
+        <AdminThemeCard
+          label="Tracked visits"
+          value={data.canonicalMetrics.linkVisits}
+          helper={`${number(data.canonicalMetrics.qrScans)} QR scans`}
+          tone="slate"
+          icon={<MousePointerClick size={18} />}
         />
       </section>
 
-      <section className="rounded-[28px] border border-emerald-200 bg-gradient-to-br from-emerald-950 via-green-950 to-slate-950 p-4 text-white shadow-lg sm:p-6">
-        <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
+      <AdminWorkplaceActions
+        actions={[
+          {
+            href: "#generate-code",
+            label: "Generate code",
+            detail: "Issue a Guru, Ambassador, or campaign code",
+            icon: Plus,
+            primary: true,
+          },
+          {
+            href: "#review-queue",
+            label: "Review queue",
+            detail: `${number(data.metrics.needsReview)} codes need an owner or program`,
+            icon: Search,
+          },
+          {
+            href: "#add-activity",
+            label: "Add activity",
+            detail: "Log a signup, approval, or payout stage",
+            icon: MousePointerClick,
+          },
+          {
+            href: adminRoutes.inventory,
+            label: "PawPerks inventory",
+            detail: "Find missing, duplicate, and conflict codes",
+            icon: Gift,
+          },
+          {
+            href: adminRoutes.ambassadors,
+            label: "Ambassador codes",
+            detail: `${number(data.metrics.liveAmbassadorCodes)} live workspace codes`,
+            icon: HeartHandshake,
+          },
+          {
+            href: adminRoutes.rewards,
+            label: "Rewards auditor",
+            detail: `${number(data.canonicalMetrics.rewardReview)} payouts to review`,
+            icon: HandCoins,
+          },
+        ]}
+      />
+
+      <GrowthCard id="review-queue">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="h-7 w-7 text-emerald-300" />
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-300">
-                  Universal Referral Tracking
-                </p>
-                <h2 className="mt-1 text-2xl font-black sm:text-3xl">
-                  Canonical code, link, QR, signup, and reward accountability
-                </h2>
-              </div>
-            </div>
-            <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-emerald-50/85">
-              These totals come from the universal referral registry, canonical
-              relationships, and append-only event stream. Visits and scans do
-              not create rewards by themselves.
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">
+              Work queue
+            </p>
+            <h2 className="mt-1 text-xl font-black text-slate-950">
+              Codes that need an owner or program
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Fix these first so attribution and payouts stay attached to a real
+              person.
             </p>
           </div>
-
-          <span className="inline-flex w-fit items-center rounded-full bg-white/10 px-4 py-2 text-xs font-black text-emerald-100 ring-1 ring-white/15">
-            {number(data.canonicalMetrics.relationships)} durable relationships
+          <span className="rounded-full bg-amber-50 px-4 py-2 text-xs font-black text-amber-800 ring-1 ring-amber-100">
+            {number(data.metrics.needsReview)} open
           </span>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <CanonicalMetricTile label="Canonical Codes" value={number(data.canonicalMetrics.totalCodes)} icon={<QrCode size={18} />} />
-          <CanonicalMetricTile label="Link Visits" value={number(data.canonicalMetrics.linkVisits)} icon={<MousePointerClick size={18} />} />
-          <CanonicalMetricTile label="QR Scans" value={number(data.canonicalMetrics.qrScans)} icon={<ScanLine size={18} />} />
-          <CanonicalMetricTile label="Signup Captures" value={number(data.canonicalMetrics.signupCaptures)} icon={<UserPlus size={18} />} />
-          <CanonicalMetricTile label="Qualified" value={number(data.canonicalMetrics.qualified)} icon={<CheckCircle2 size={18} />} />
-          <CanonicalMetricTile label="First Bookings" value={number(data.canonicalMetrics.completedBookings)} icon={<ReceiptText size={18} />} />
-          <CanonicalMetricTile label="Reward Review" value={number(data.canonicalMetrics.rewardReview)} icon={<BadgeDollarSign size={18} />} />
-          <CanonicalMetricTile label="Paid + Reference" value={number(data.canonicalMetrics.paidRewards)} icon={<HandCoins size={18} />} />
-          <CanonicalMetricTile label="Active Codes" value={number(data.canonicalMetrics.activeCodes)} icon={<Sparkles size={18} />} />
-          <CanonicalMetricTile label="Audit Entries" value={number(data.audits.length)} icon={<ClipboardList size={18} />} />
-        </div>
-      </section>
+        {reviewCodes.length ? (
+          <div className="mt-4 grid min-w-0 gap-3">
+            {reviewCodes.map((code) => (
+              <div
+                key={code.id}
+                className="flex min-w-0 flex-col justify-between gap-3 rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3 sm:flex-row sm:items-center"
+              >
+                <div className="min-w-0">
+                  <p className="font-black text-slate-950">{code.code}</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-slate-600">
+                    {getOwnerLabel(code)} · {reviewReason(code)}
+                  </p>
+                </div>
+                <Link
+                  href={`${adminRoutes.codes}?q=${encodeURIComponent(code.code)}#editable-registry`}
+                  className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-white px-4 text-xs font-black text-amber-900 ring-1 ring-amber-200"
+                >
+                  Open registry
+                </Link>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 text-sm font-semibold text-slate-500">
+            Review queue is clear. New codes will land here if they are missing
+            an owner or still marked general.
+          </p>
+        )}
+      </GrowthCard>
 
-      <section className="grid w-full min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-6">
-        {data.programCards.map((card) => (
-          <ProgramCard key={card.title} card={card} />
-        ))}
-      </section>
+      {missingAmbassadorCodes.length ? (
+        <GrowthCard>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-sky-700">
+                Ambassador circuit
+              </p>
+              <h2 className="mt-1 text-xl font-black text-slate-950">
+                Live codes missing from the editable registry
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                These Ambassadors already have workspace codes. Issue or sync
+                them here so Admin can edit and audit the same string.
+              </p>
+            </div>
+            <span className="rounded-full bg-sky-50 px-4 py-2 text-xs font-black text-sky-800 ring-1 ring-sky-100">
+              {number(missingAmbassadorCodes.length)} missing
+            </span>
+          </div>
+          <div className="mt-4 grid min-w-0 gap-3">
+            {missingAmbassadorCodes.slice(0, 8).map((row) => (
+              <div
+                key={row.id}
+                className="flex min-w-0 flex-col justify-between gap-3 rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-3 sm:flex-row sm:items-center"
+              >
+                <div className="min-w-0">
+                  <p className="font-black text-slate-950">{row.code}</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-slate-600">
+                    {row.name}
+                    {row.email ? ` · ${row.email}` : ""}
+                  </p>
+                </div>
+                <a
+                  href="#generate-code"
+                  className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-white px-4 text-xs font-black text-sky-900 ring-1 ring-sky-200"
+                >
+                  Issue in registry
+                </a>
+              </div>
+            ))}
+          </div>
+        </GrowthCard>
+      ) : null}
 
       <section className="grid w-full min-w-0 items-start gap-4 xl:grid-cols-12">
         <div className="min-w-0 xl:col-span-7">
-          <DashboardCard>
-            <div id="generate-code" className="mb-5">
+          <DashboardCard id="generate-code">
+            <div className="mb-5">
               <h2 className="text-xl font-black text-slate-950">
                 Generate / Issue Referral Code
               </h2>
@@ -1399,8 +1508,8 @@ export default async function AdminReferralCodesPage({
         </div>
 
         <div className="min-w-0 xl:col-span-5">
-          <DashboardCard>
-            <div id="add-activity" className="mb-5">
+          <DashboardCard id="add-activity">
+            <div className="mb-5">
               <h2 className="text-xl font-black text-slate-950">
                 Add Referral Activity
               </h2>
@@ -1515,7 +1624,7 @@ export default async function AdminReferralCodesPage({
         <CanonicalCodeRegistry codes={data.canonicalCodes.slice(0, 250)} />
       </DashboardCard>
 
-      <DashboardCard>
+      <DashboardCard id="editable-registry">
         <div className="mb-5 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
           <div>
             <h2 className="text-xl font-black text-slate-950">
@@ -1812,33 +1921,34 @@ export default async function AdminReferralCodesPage({
           </DashboardCard>
         </div>
       </section>
-    </main>
-  );
-}
 
-function CanonicalMetricTile({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon: ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-200 sm:text-xs">
-            {label}
-          </p>
-          <p className="mt-2 text-2xl font-black text-white">{value}</p>
-        </div>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-200 ring-1 ring-white/10">
-          {icon}
-        </div>
-      </div>
-    </div>
+      <AdminWorkplaceHealth
+        sources={data.sourceHealth}
+        helper="Live tables that feed this workplace"
+        links={
+          <>
+            <Link
+              href={adminRoutes.gurus}
+              className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+            >
+              Guru desk
+            </Link>
+            <Link
+              href={adminRoutes.petParents}
+              className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+            >
+              Pet Parent desk
+            </Link>
+            <Link
+              href={adminRoutes.payouts}
+              className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+            >
+              Payouts
+            </Link>
+          </>
+        }
+      />
+    </GrowthPageFrame>
   );
 }
 
@@ -2142,66 +2252,17 @@ function ReferralAuditFeed({ audits }: { audits: ReferralAuditRow[] }) {
   );
 }
 
-function DashboardCard({ children }: { children: ReactNode }) {
+function DashboardCard({
+  children,
+  id,
+}: {
+  children: ReactNode;
+  id?: string;
+}) {
   return (
-    <div className="w-full min-w-0 rounded-[24px] border border-[#e3ece5] bg-white p-4 shadow-sm sm:rounded-[28px] sm:p-5">
+    <GrowthCard id={id} className="min-w-0">
       {children}
-    </div>
-  );
-}
-
-function MetricTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-green-100 bg-[#fbfcf9] px-4 py-3 shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 sm:text-xs">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-black text-green-950 sm:text-xl">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function ProgramCard({ card }: { card: ProgramCard }) {
-  const Icon = card.icon;
-
-  const toneClasses = {
-    green: "bg-green-50 text-green-800 border-green-100",
-    emerald: "bg-emerald-50 text-emerald-800 border-emerald-100",
-    blue: "bg-blue-50 text-blue-800 border-blue-100",
-    purple: "bg-purple-50 text-purple-800 border-purple-100",
-    amber: "bg-amber-50 text-amber-800 border-amber-100",
-    rose: "bg-rose-50 text-rose-800 border-rose-100",
-  };
-
-  return (
-    <Link
-      href={card.href}
-      className="group rounded-[24px] border border-[#e3ece5] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-lg sm:rounded-[28px] sm:p-5"
-    >
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${toneClasses[card.tone]}`}
-        >
-          <Icon size={22} />
-        </div>
-
-        <span className="text-3xl font-black text-green-950">
-          {number(card.count)}
-        </span>
-      </div>
-
-      <h2 className="text-xl font-black tracking-tight text-slate-950">
-        {card.title}
-      </h2>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-        {card.description}
-      </p>
-      <p className="mt-3 text-sm font-black text-green-900 group-hover:text-green-700">
-        {card.detail} →
-      </p>
-    </Link>
+    </GrowthCard>
   );
 }
 
