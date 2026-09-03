@@ -46,13 +46,16 @@ export function GrowthPageFrame({
 export function GrowthCard({
   children,
   className = "",
+  id,
 }: {
   children: ReactNode;
   className?: string;
+  id?: string;
 }) {
   return (
     <section
-      className={`rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5 ${className}`}
+      id={id}
+      className={`scroll-mt-24 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5 ${className}`}
     >
       {children}
     </section>

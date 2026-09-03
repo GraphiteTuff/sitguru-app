@@ -6,15 +6,24 @@ import {
   ClipboardCheck,
   Copy,
   DatabaseZap,
+  Gift,
   Link2,
+  Plus,
   SearchX,
+  ShieldAlert,
   ShieldCheck,
   TableProperties,
   TrendingUp,
   UserRoundX,
   Users,
 } from "lucide-react";
-
+import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
+import {
+  GrowthCard,
+  GrowthPageFrame,
+  StatusPill,
+} from "@/components/admin/growth/GrowthPageFrame";
+import { getAdminIdentity } from "@/lib/admin/access";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -690,33 +699,6 @@ async function getInventory() {
   };
 }
 
-function StatCard({
-  title,
-  value,
-  detail,
-  icon: Icon,
-}: {
-  title: string;
-  value: number;
-  detail: string;
-  icon: typeof Users;
-}) {
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-slate-500">{title}</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {value.toLocaleString()}
-          </p>
-        </div>
-        <Icon className="h-8 w-8 text-emerald-600" />
-      </div>
-      <p className="mt-3 text-sm text-slate-600">{detail}</p>
-    </div>
-  );
-}
-
 function CodeBadges({ codes }: { codes: CodeSource[] }) {
   if (!codes.length)
     return <span className="text-sm text-rose-700">No code found</span>;
@@ -736,409 +718,540 @@ function CodeBadges({ codes }: { codes: CodeSource[] }) {
 }
 
 export default async function ReferralInventoryPage() {
+  const actor = await getAdminIdentity();
+  if (!actor?.canAccessAdmin) {
+    return (
+      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
+        <h1 className="text-3xl font-black">Admin access required.</h1>
+      </div>
+    );
+  }
+
   const inventory = await getInventory();
+  const workCount =
+    inventory.openConflicts.length +
+    inventory.profilesWithNoCode.length +
+    inventory.duplicateCodes.length +
+    inventory.unresolvedActivity.length;
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900 lg:px-10">
-      <div className="mx-auto max-w-7xl space-y-8">
+    <GrowthPageFrame
+      kicker="PawPerks Inventory Workplace"
+      title="Give every SitGuru account one clean referral code."
+      detail="Read-only cleanup board. Find missing codes, duplicates, and conflicts — then jump to Registry to fix them. This page does not write codes or payouts."
+      action={
+        <Link
+          href="/admin/referrals/codes#generate-code"
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-green-950"
+        >
+          <Plus size={17} />
+          Generate code
+        </Link>
+      }
+    >
+      <div className="flex flex-wrap gap-2">
         <Link
           href="/admin/referrals"
-          className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700 hover:text-emerald-900"
+          className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to Growth & Referrals
+          <ArrowLeft size={14} />
+          Referrals workplace
         </Link>
-
-        <section className="rounded-[2rem] bg-slate-950 p-8 text-white shadow-xl">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-4 py-2 text-sm font-bold text-emerald-200">
-                <ShieldCheck className="h-4 w-4" /> Admin-only read-only cleanup
-                report
-              </p>
-              <h1 className="mt-5 text-4xl font-black tracking-tight">
-                PawPerks referral inventory report
-              </h1>
-              <p className="mt-4 text-lg text-slate-200">
-                This is a read-only PawPerks cleanup report. It does not change
-                referral codes, signup behavior, generation behavior, payouts,
-                or referral program operations. PawPerks is SitGuru’s branded
-                referral/rewards program for Pet Parents, Gurus, Ambassadors,
-                and multi-role accounts; PetPerks appears here only as a
-                legacy/alternate label where existing tables or code already use
-                it. Use this report to prepare SitGuru for the future
-                one-code-per-account PawPerks system.
-              </p>
-            </div>
-            <div className="rounded-3xl border border-white/10 bg-white/10 p-5 text-sm text-slate-100">
-              <p className="font-black uppercase tracking-wide text-emerald-200">
-                Sources read
-              </p>
-              <p className="mt-3">
-                pawperks_referral_conflicts and
-                pawperks_referral_backfill_audit, plus legacy inventory tables
-                for comparison. Reads are inventory-only; no database rows are
-                inserted, updated, or deleted.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {inventory.warnings.length > 0 ? (
-          <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-            <p className="font-black">
-              Some optional referral inventory reads were skipped or limited by
-              Supabase:
-            </p>
-            <ul className="mt-2 list-disc pl-5">
-              {inventory.warnings.map((warning) => (
-                <li key={warning.table}>
-                  {warning.table}: {warning.error}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            title="Open conflicts"
-            value={inventory.openConflicts.length}
-            detail="Canonical conflict rows with open/reviewing status."
-            icon={AlertTriangle}
-          />
-          <StatCard
-            title="Resolved conflicts"
-            value={inventory.resolvedConflicts.length}
-            detail="Canonical conflict rows marked resolved or ignored."
-            icon={CheckCircle2}
-          />
-          <StatCard
-            title="Profiles with no code"
-            value={inventory.canonicalProfilesWithNoCode.length}
-            detail="missing_legacy_referral_code conflicts."
-            icon={UserRoundX}
-          />
-          <StatCard
-            title="Profiles with multiple codes"
-            value={inventory.canonicalProfilesWithMultipleCodes.length}
-            detail="multiple_legacy_referral_codes conflicts."
-            icon={Copy}
-          />
-          <StatCard
-            title="Duplicate codes across owners"
-            value={inventory.canonicalDuplicateCodes.length}
-            detail="duplicate_legacy_referral_code conflicts."
-            icon={DatabaseZap}
-          />
-          <StatCard
-            title="Unresolved owners/activity"
-            value={inventory.canonicalUnresolvedActivity.length}
-            detail="unresolved_referral_activity conflicts."
-            icon={ClipboardCheck}
-          />
-          <StatCard
-            title="Audit imported/flagged/skipped"
-            value={
-              inventory.auditImported +
-              inventory.auditFlagged +
-              inventory.auditSkipped
-            }
-            detail={`${inventory.auditImported.toLocaleString()} imported · ${inventory.auditFlagged.toLocaleString()} flagged · ${inventory.auditSkipped.toLocaleString()} skipped`}
-            icon={TableProperties}
-          />
-          <StatCard
-            title="Audit rows"
-            value={inventory.auditRows.length}
-            detail="Rows read from pawperks_referral_backfill_audit."
-            icon={ShieldCheck}
-          />
-        </section>
-
-        <section className="rounded-3xl border border-emerald-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="flex items-center gap-2 text-2xl font-black">
-                <ShieldCheck className="h-6 w-6 text-emerald-600" /> Canonical
-                Backfill Dry Run
-              </h2>
-              <p className="mt-2 text-sm font-semibold text-slate-600">
-                Read-only validation report from
-                pawperks_referral_backfill_audit. These counts describe what a
-                later write-enabled canonical code and alias backfill would do;
-                this admin page does not create, approve, or mutate referral
-                records.
-              </p>
-            </div>
-            <span className="rounded-full bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-wide text-emerald-700">
-              Dry-run results only
-            </span>
-          </div>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <StatCard
-              title="Safe canonical candidates"
-              value={inventory.canonicalDryRunSummary.safeCanonicalCandidates}
-              detail="Profiles with exactly one safe canonical PawPerks code candidate."
-              icon={CheckCircle2}
-            />
-            <StatCard
-              title="Skipped: missing code"
-              value={inventory.canonicalDryRunSummary.missingCode}
-              detail="Profiles without a readable source referral code."
-              icon={SearchX}
-            />
-            <StatCard
-              title="Skipped: multiple codes"
-              value={inventory.canonicalDryRunSummary.multipleCodes}
-              detail="Profiles with more than one distinct source code."
-              icon={Copy}
-            />
-            <StatCard
-              title="Skipped: duplicate ownership"
-              value={inventory.canonicalDryRunSummary.duplicateOwnership}
-              detail="Candidate code is associated with more than one owner."
-              icon={Users}
-            />
-            <StatCard
-              title="Skipped: canonical exists"
-              value={
-                inventory.canonicalDryRunSummary.canonicalCodeAlreadyExists
-              }
-              detail="Canonical PawPerks code already exists for the profile/code."
-              icon={Link2}
-            />
-            <StatCard
-              title="Skipped: alias/canonical collision"
-              value={
-                inventory.canonicalDryRunSummary.aliasCanonicalCollisionExists
-              }
-              detail="Candidate collides with an existing canonical code or alias."
-              icon={AlertTriangle}
-            />
-          </div>
-
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            <DistributionCard
-              title="Proposed canonical source distribution by table"
-              rows={
-                inventory.canonicalDryRunSummary.canonicalSourceDistribution
-              }
-            />
-            <DistributionCard
-              title="Proposed alias source distribution by table"
-              rows={inventory.canonicalDryRunSummary.aliasSourceDistribution}
-            />
-          </div>
-
-          <div className="mt-6">
-            <h3 className="flex items-center gap-2 text-lg font-black text-slate-950">
-              <TableProperties className="h-5 w-5 text-purple-600" /> Recent
-              dry-run audit rows
-            </h3>
-            <AuditTable
-              rows={inventory.canonicalDryRunAuditRows.slice(0, 25)}
-            />
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-2xl font-black">
-            <AlertTriangle className="h-6 w-6 text-amber-600" /> Open canonical
-            PawPerks referral conflicts
-          </h2>
-          <p className="mt-2 text-sm font-semibold text-slate-600">
-            Read-only rows from pawperks_referral_conflicts that need review
-            before canonical code backfill. No approve or resolve actions are
-            available here yet.
-          </p>
-          <ConflictTable rows={inventory.openConflicts.slice(0, 250)} />
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-2xl font-black">
-            <TableProperties className="h-6 w-6 text-purple-600" /> Recent
-            PawPerks referral backfill audit
-          </h2>
-          <p className="mt-2 text-sm font-semibold text-slate-600">
-            Latest read-only audit entries from pawperks_referral_backfill_audit
-            for imported, flagged, skipped, and recorded cleanup decisions.
-          </p>
-          <AuditTable rows={inventory.auditRows.slice(0, 25)} />
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <StatCard
-            title="Legacy profiles scanned"
-            value={inventory.profiles.length}
-            detail="Rows from referral_profiles."
-            icon={Users}
-          />
-          <StatCard
-            title="Legacy codes found"
-            value={inventory.allCodes.length}
-            detail="Existing PawPerks/PetPerks codes across legacy inventory sources."
-            icon={Link2}
-          />
-          <StatCard
-            title="Legacy no code"
-            value={inventory.profilesWithNoCode.length}
-            detail="Profiles without a detected legacy code."
-            icon={UserRoundX}
-          />
-          <StatCard
-            title="Legacy multiple codes"
-            value={inventory.profilesWithMultipleCodes.length}
-            detail="Profiles with more than one unique legacy code."
-            icon={Copy}
-          />
-          <StatCard
-            title="Legacy duplicate codes"
-            value={inventory.duplicateCodes.length}
-            detail="Legacy code strings shared by different owners."
-            icon={AlertTriangle}
-          />
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-2xl font-black">
-            <Users className="h-6 w-6 text-emerald-600" /> All scanned PawPerks
-            profiles and detected codes
-          </h2>
-          <p className="mt-2 text-sm font-semibold text-slate-600">
-            Inventory view of referral_profiles with any matched code from
-            referral_profiles, ambassadors, referral_codes, or
-            guru_referral_campaigns.
-          </p>
-          <InventoryTable
-            rows={inventory.profiles.slice(0, 250)}
-            empty="No referral_profiles rows were available to scan."
-          />
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-2xl font-black">
-            <Link2 className="h-6 w-6 text-blue-600" /> All detected
-            PawPerks/PetPerks code records
-          </h2>
-          <p className="mt-2 text-sm font-semibold text-slate-600">
-            Read-only list of referral code strings found directly in
-            referral_profiles, ambassadors, referral_codes, and
-            guru_referral_campaigns, including available owner and role context.
-          </p>
-          <CodeSourceTable rows={inventory.allCodes.slice(0, 250)} />
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-2xl font-black">
-            <SearchX className="h-6 w-6 text-rose-600" /> Profiles with no
-            referral code found
-          </h2>
-          <InventoryTable
-            rows={inventory.profilesWithNoCode.slice(0, 100)}
-            empty="Every scanned profile has at least one detected code."
-          />
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-2xl font-black">
-            <Copy className="h-6 w-6 text-amber-600" /> Profiles with multiple
-            referral codes found
-          </h2>
-          <InventoryTable
-            rows={inventory.profilesWithMultipleCodes.slice(0, 100)}
-            empty="No scanned profile has multiple unique referral codes."
-          />
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-2xl font-black">
-            <DatabaseZap className="h-6 w-6 text-purple-600" /> Duplicate code
-            strings across owners
-          </h2>
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="py-3 pr-4">Code</th>
-                  <th className="py-3 pr-4">Owners</th>
-                  <th className="py-3 pr-4">Sources</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {inventory.duplicateCodes.length ? (
-                  inventory.duplicateCodes.slice(0, 100).map((item) => (
-                    <tr key={item.code} className="align-top">
-                      <td className="py-3 pr-4 font-black text-slate-950">
-                        {item.code}
-                      </td>
-                      <td className="py-3 pr-4 text-slate-700">
-                        {item.owners}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <CodeBadges codes={item.sources} />
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="py-6 text-slate-500">
-                      No duplicate code strings found across different owners.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="flex items-center gap-2 text-2xl font-black">
-            <ClipboardCheck className="h-6 w-6 text-blue-600" /> Referral
-            activity that cannot resolve to an owner
-          </h2>
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="py-3 pr-4">Code</th>
-                  <th className="py-3 pr-4">Reason</th>
-                  <th className="py-3 pr-4">Activity</th>
-                  <th className="py-3 pr-4">Referred email</th>
-                  <th className="py-3 pr-4">Created</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {inventory.unresolvedActivity.length ? (
-                  inventory.unresolvedActivity.map((item) => (
-                    <tr key={item.id || `${item.code}:${item.createdAt}`}>
-                      <td className="py-3 pr-4 font-black text-slate-950">
-                        {item.code || "—"}
-                      </td>
-                      <td className="py-3 pr-4 text-rose-700">{item.reason}</td>
-                      <td className="py-3 pr-4 text-slate-700">
-                        {item.activityType || item.source || "—"}
-                      </td>
-                      <td className="py-3 pr-4 text-slate-700">
-                        {item.referredEmail || "—"}
-                      </td>
-                      <td className="py-3 pr-4 text-slate-500">
-                        {item.createdAt || "—"}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="py-6 text-slate-500">
-                      No unresolved referral activity found in the scanned rows.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
+          {actor.email}
+        </span>
       </div>
-    </main>
+
+      {inventory.warnings.length > 0 ? (
+        <GrowthCard className="border-amber-200 bg-amber-50">
+          <p className="text-sm font-black text-amber-950">
+            Some inventory reads were skipped
+          </p>
+          <ul className="mt-2 list-disc pl-5 text-sm font-semibold text-amber-900">
+            {inventory.warnings.map((warning) => (
+              <li key={warning.table}>
+                {warning.table}: {warning.error}
+              </li>
+            ))}
+          </ul>
+        </GrowthCard>
+      ) : null}
+
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <AdminThemeCard
+          label="Open conflicts"
+          value={inventory.openConflicts.length}
+          helper="Need review"
+          tone="rose"
+          icon={<AlertTriangle size={18} />}
+        />
+        <AdminThemeCard
+          label="Resolved"
+          value={inventory.resolvedConflicts.length}
+          helper="Closed or ignored"
+          tone="emerald"
+          icon={<CheckCircle2 size={18} />}
+        />
+        <AdminThemeCard
+          label="No code"
+          value={inventory.profilesWithNoCode.length}
+          helper="Legacy profiles"
+          tone="amber"
+          icon={<UserRoundX size={18} />}
+        />
+        <AdminThemeCard
+          label="Multiple codes"
+          value={inventory.profilesWithMultipleCodes.length}
+          helper="More than one code"
+          tone="violet"
+          icon={<Copy size={18} />}
+        />
+        <AdminThemeCard
+          label="Duplicate owners"
+          value={inventory.duplicateCodes.length}
+          helper="Same code, two people"
+          tone="rose"
+          icon={<DatabaseZap size={18} />}
+        />
+        <AdminThemeCard
+          label="Unresolved activity"
+          value={inventory.unresolvedActivity.length}
+          helper="No owner match"
+          tone="sky"
+          icon={<ClipboardCheck size={18} />}
+        />
+        <AdminThemeCard
+          label="Audit decisions"
+          value={
+            inventory.auditImported +
+            inventory.auditFlagged +
+            inventory.auditSkipped
+          }
+          helper={`${inventory.auditImported} in · ${inventory.auditFlagged} flag · ${inventory.auditSkipped} skip`}
+          tone="slate"
+          icon={<TableProperties size={18} />}
+        />
+        <AdminThemeCard
+          label="Codes scanned"
+          value={inventory.allCodes.length}
+          helper={`${inventory.profiles.length} profiles`}
+          tone="emerald"
+          icon={<Gift size={18} />}
+        />
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {[
+          {
+            href: "#conflicts",
+            label: "Review conflicts",
+            detail: `${inventory.openConflicts.length} open rows`,
+            icon: ShieldAlert,
+            primary: inventory.openConflicts.length > 0,
+          },
+          {
+            href: "#no-code",
+            label: "Assign missing codes",
+            detail: `${inventory.profilesWithNoCode.length} profiles`,
+            icon: UserRoundX,
+          },
+          {
+            href: "#duplicates",
+            label: "Split duplicate codes",
+            detail: `${inventory.duplicateCodes.length} shared strings`,
+            icon: DatabaseZap,
+          },
+          {
+            href: "#activity",
+            label: "Match activity owners",
+            detail: `${inventory.unresolvedActivity.length} unmatched`,
+            icon: ClipboardCheck,
+          },
+          {
+            href: "/admin/referrals/codes",
+            label: "Open Code Registry",
+            detail: "Edit or issue a code",
+            icon: Plus,
+          },
+          {
+            href: "#dry-run",
+            label: "Canonical dry run",
+            detail: "What a later backfill would do",
+            icon: ShieldCheck,
+          },
+        ].map((action) => {
+          const Icon = action.icon;
+          return (
+            <Link
+              key={action.href}
+              href={action.href}
+              className={
+                action.primary
+                  ? "flex min-h-24 items-center gap-4 rounded-[1.6rem] px-5 py-4 text-white shadow-sm"
+                  : "flex min-h-24 items-center gap-4 rounded-[1.6rem] border border-emerald-100 bg-white px-5 py-4 shadow-sm"
+              }
+              style={action.primary ? { background: "#0D5C3A" } : undefined}
+            >
+              <span
+                className={
+                  action.primary
+                    ? "flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15"
+                    : "flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-[#0D5C3A]"
+                }
+              >
+                <Icon size={26} />
+              </span>
+              <span>
+                <span
+                  className={`block text-lg font-black ${
+                    action.primary ? "!text-white" : "text-slate-950"
+                  }`}
+                >
+                  {action.label}
+                </span>
+                <span
+                  className={`mt-1 block text-sm font-semibold ${
+                    action.primary ? "!text-white/85" : "text-slate-500"
+                  }`}
+                >
+                  {action.detail}
+                </span>
+              </span>
+            </Link>
+          );
+        })}
+      </section>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <GrowthCard>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-black text-slate-950">Today’s cleanup</h2>
+            <StatusPill value={workCount > 0 ? "Review" : "Ready"} />
+          </div>
+          <div className="mt-4 space-y-3">
+            {inventory.openConflicts.length ? (
+              <Link
+                href="#conflicts"
+                className="block rounded-2xl bg-rose-50 px-3 py-3 text-sm font-black text-rose-900"
+              >
+                {inventory.openConflicts.length} open PawPerks conflicts
+              </Link>
+            ) : null}
+            {inventory.profilesWithNoCode.length ? (
+              <Link
+                href="#no-code"
+                className="block rounded-2xl bg-amber-50 px-3 py-3 text-sm font-black text-amber-900"
+              >
+                {inventory.profilesWithNoCode.length} profiles still need a code
+              </Link>
+            ) : null}
+            {inventory.duplicateCodes.length ? (
+              <Link
+                href="#duplicates"
+                className="block rounded-2xl bg-violet-50 px-3 py-3 text-sm font-black text-violet-900"
+              >
+                {inventory.duplicateCodes.length} codes shared by more than one owner
+              </Link>
+            ) : null}
+            {inventory.unresolvedActivity.length ? (
+              <Link
+                href="#activity"
+                className="block rounded-2xl bg-sky-50 px-3 py-3 text-sm font-black text-sky-900"
+              >
+                {inventory.unresolvedActivity.length} activity rows without an owner
+              </Link>
+            ) : null}
+            {workCount === 0 ? (
+              <p className="text-sm font-semibold text-slate-500">
+                Inventory is clean. Scan the dry-run report before any future
+                backfill.
+              </p>
+            ) : null}
+          </div>
+        </GrowthCard>
+
+        <GrowthCard>
+          <h2 className="text-lg font-black text-slate-950">Canonical dry run</h2>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            What a later one-code-per-account backfill would do. No writes here.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <p className="rounded-2xl bg-emerald-50 px-3 py-3 text-sm font-black text-emerald-900">
+              {inventory.canonicalDryRunSummary.safeCanonicalCandidates} safe
+            </p>
+            <p className="rounded-2xl bg-amber-50 px-3 py-3 text-sm font-black text-amber-900">
+              {inventory.canonicalDryRunSummary.missingCode} missing
+            </p>
+            <p className="rounded-2xl bg-violet-50 px-3 py-3 text-sm font-black text-violet-900">
+              {inventory.canonicalDryRunSummary.multipleCodes} multiple
+            </p>
+            <p className="rounded-2xl bg-rose-50 px-3 py-3 text-sm font-black text-rose-900">
+              {inventory.canonicalDryRunSummary.duplicateOwnership} duplicate
+            </p>
+          </div>
+          <Link
+            href="#dry-run"
+            className="mt-4 inline-block text-sm font-black text-emerald-800"
+          >
+            Open dry-run detail →
+          </Link>
+        </GrowthCard>
+      </div>
+
+      <GrowthCard id="conflicts">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">
+              Open conflicts
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Decide these before SitGuru can keep one official code per
+              account. This queue is read-only.
+            </p>
+          </div>
+          <StatusPill
+            value={
+              inventory.openConflicts.length > 0 ? "Needs review" : "Ready"
+            }
+          />
+        </div>
+        <ConflictTable rows={inventory.openConflicts.slice(0, 250)} />
+      </GrowthCard>
+
+      <GrowthCard id="no-code">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">
+              Profiles with no code
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Issue a PawPerks code from Registry for anyone still missing one.
+            </p>
+          </div>
+          <Link
+            href="/admin/referrals/codes#generate-code"
+            className="text-sm font-black text-emerald-800"
+          >
+            Generate code →
+          </Link>
+        </div>
+        <InventoryTable
+          rows={inventory.profilesWithNoCode.slice(0, 100)}
+          empty="Every scanned profile already has a code."
+        />
+      </GrowthCard>
+
+      <GrowthCard>
+        <h2 className="text-lg font-black text-slate-950">
+          Profiles with more than one code
+        </h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          Keep the official code and retire extras in Registry.
+        </p>
+        <InventoryTable
+          rows={inventory.profilesWithMultipleCodes.slice(0, 100)}
+          empty="No scanned profile has more than one unique code."
+        />
+      </GrowthCard>
+
+      <GrowthCard id="duplicates">
+        <h2 className="text-lg font-black text-slate-950">
+          Codes shared by more than one owner
+        </h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          Split or retire these so each code belongs to one person.
+        </p>
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="text-xs uppercase text-slate-500">
+              <tr>
+                <th className="py-3 pr-4">Code</th>
+                <th className="py-3 pr-4">Owners</th>
+                <th className="py-3 pr-4">Sources</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {inventory.duplicateCodes.length ? (
+                inventory.duplicateCodes.slice(0, 100).map((item) => (
+                  <tr key={item.code} className="align-top">
+                    <td className="py-3 pr-4 font-black text-slate-950">
+                      {item.code}
+                    </td>
+                    <td className="py-3 pr-4 text-slate-700">{item.owners}</td>
+                    <td className="py-3 pr-4">
+                      <CodeBadges codes={item.sources} />
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="py-6 text-slate-500">
+                    No code is shared by more than one owner.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </GrowthCard>
+
+      <GrowthCard id="activity">
+        <h2 className="text-lg font-black text-slate-950">
+          Activity without an owner
+        </h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          These referral hits could not be matched to a SitGuru account.
+        </p>
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="text-xs uppercase text-slate-500">
+              <tr>
+                <th className="py-3 pr-4">Code</th>
+                <th className="py-3 pr-4">Reason</th>
+                <th className="py-3 pr-4">Activity</th>
+                <th className="py-3 pr-4">Referred email</th>
+                <th className="py-3 pr-4">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {inventory.unresolvedActivity.length ? (
+                inventory.unresolvedActivity.map((item) => (
+                  <tr key={item.id || `${item.code}:${item.createdAt}`}>
+                    <td className="py-3 pr-4 font-black text-slate-950">
+                      {item.code || "—"}
+                    </td>
+                    <td className="py-3 pr-4 text-rose-700">{item.reason}</td>
+                    <td className="py-3 pr-4 text-slate-700">
+                      {item.activityType || item.source || "—"}
+                    </td>
+                    <td className="py-3 pr-4 text-slate-700">
+                      {item.referredEmail || "—"}
+                    </td>
+                    <td className="py-3 pr-4 text-slate-500">
+                      {item.createdAt || "—"}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="py-6 text-slate-500">
+                    Every scanned activity row already has an owner.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </GrowthCard>
+
+      <GrowthCard id="dry-run">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">
+              Canonical dry-run detail
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              What a later one-code-per-account backfill would do. This page
+              does not write codes, aliases, or payouts.
+            </p>
+          </div>
+          <StatusPill value="Read only" />
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+          <AdminThemeCard
+            label="Safe to keep"
+            value={inventory.canonicalDryRunSummary.safeCanonicalCandidates}
+            helper="One clean candidate"
+            tone="emerald"
+            icon={<CheckCircle2 size={18} />}
+          />
+          <AdminThemeCard
+            label="Missing code"
+            value={inventory.canonicalDryRunSummary.missingCode}
+            helper="Would skip"
+            tone="amber"
+            icon={<SearchX size={18} />}
+          />
+          <AdminThemeCard
+            label="Multiple codes"
+            value={inventory.canonicalDryRunSummary.multipleCodes}
+            helper="Would skip"
+            tone="violet"
+            icon={<Copy size={18} />}
+          />
+          <AdminThemeCard
+            label="Duplicate owners"
+            value={inventory.canonicalDryRunSummary.duplicateOwnership}
+            helper="Would skip"
+            tone="rose"
+            icon={<Users size={18} />}
+          />
+          <AdminThemeCard
+            label="Already official"
+            value={inventory.canonicalDryRunSummary.canonicalCodeAlreadyExists}
+            helper="Would skip"
+            tone="sky"
+            icon={<Link2 size={18} />}
+          />
+          <AdminThemeCard
+            label="Name collision"
+            value={
+              inventory.canonicalDryRunSummary.aliasCanonicalCollisionExists
+            }
+            helper="Would skip"
+            tone="slate"
+            icon={<AlertTriangle size={18} />}
+          />
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <DistributionCard
+            title="Where official codes would come from"
+            rows={inventory.canonicalDryRunSummary.canonicalSourceDistribution}
+          />
+          <DistributionCard
+            title="Where aliases would come from"
+            rows={inventory.canonicalDryRunSummary.aliasSourceDistribution}
+          />
+        </div>
+
+        <h3 className="mt-6 text-sm font-black uppercase tracking-wide text-slate-500">
+          Latest dry-run rows
+        </h3>
+        <AuditTable rows={inventory.canonicalDryRunAuditRows.slice(0, 25)} />
+      </GrowthCard>
+
+      <GrowthCard>
+        <h2 className="text-lg font-black text-slate-950">Recent audit</h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          Imported, flagged, and skipped decisions from the last cleanup pass.
+        </p>
+        <AuditTable rows={inventory.auditRows.slice(0, 25)} />
+      </GrowthCard>
+
+      <GrowthCard>
+        <h2 className="text-lg font-black text-slate-950">
+          Scanned profiles
+        </h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          Referral profiles and any codes found on the account.
+        </p>
+        <InventoryTable
+          rows={inventory.profiles.slice(0, 250)}
+          empty="No referral profiles were available to scan."
+        />
+      </GrowthCard>
+
+      <GrowthCard>
+        <h2 className="text-lg font-black text-slate-950">Detected codes</h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          Every code string found across profiles, ambassadors, registry, and
+          Guru campaigns.
+        </p>
+        <CodeSourceTable rows={inventory.allCodes.slice(0, 250)} />
+      </GrowthCard>
+    </GrowthPageFrame>
   );
 }
 

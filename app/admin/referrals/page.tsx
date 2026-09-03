@@ -193,7 +193,7 @@ export default async function AdminGrowthReferralsHubPage() {
     {
       href: routes.inventory,
       label: "PawPerks inventory",
-      detail: "Conflicts and backfill",
+      detail: "Conflicts, missing codes, cleanup",
       icon: ShieldAlert,
     },
     {
