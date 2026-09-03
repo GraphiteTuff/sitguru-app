@@ -1,32 +1,31 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft,
   BadgeDollarSign,
   ClipboardList,
-  ExternalLink,
   Gift,
   HandCoins,
   HeartHandshake,
   Megaphone,
+  MousePointerClick,
   PawPrint,
   Plus,
+  QrCode,
   ShieldAlert,
   Sparkles,
-  Target,
   Users,
 } from "lucide-react";
-import { getAdminIdentity } from "@/lib/admin/access";
+import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
 import {
-  getReferralsDashboardData,
-  type ReferralsRecentItem,
-} from "@/lib/admin/referrals/dashboard";
+  GrowthCard,
+  GrowthPageFrame,
+  StatusPill,
+} from "@/components/admin/growth/GrowthPageFrame";
+import { getAdminIdentity } from "@/lib/admin/access";
+import { getReferralsDashboardData } from "@/lib/admin/referrals/dashboard";
 
 export const dynamic = "force-dynamic";
 
 const routes = {
-  dashboard: "/admin",
-  hub: "/admin/referrals",
   codes: "/admin/referrals/codes",
   gurus: "/admin/referrals/gurus",
   petParents: "/admin/referrals/pet-parents",
@@ -41,160 +40,33 @@ const routes = {
   ambassadorLeads: "/admin/ambassador-leads",
 };
 
-type ModuleCard = {
-  eyebrow: string;
-  title: string;
-  description: string;
-  href: string;
-  wiring: "live" | "next";
-  value?: string;
-  icon: ReactNode;
-};
-
 function number(value: number) {
   return new Intl.NumberFormat("en-US").format(
     Number.isFinite(value) ? value : 0,
   );
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "—";
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+function prettyWeekday(value: string) {
+  return new Date(`${value}T12:00:00`).toLocaleDateString("en-US", {
+    weekday: "short",
   });
 }
 
-function MetricTile({
-  label,
-  value,
-  helper,
-}: {
-  label: string;
-  value: string;
-  helper: string;
-}) {
-  return (
-    <div className="rounded-[1.35rem] border border-emerald-100 bg-white p-4 shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
-      <p className="mt-1 text-xs font-semibold text-slate-500">{helper}</p>
-    </div>
-  );
+function formatWhen(value?: string | null) {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
-function ModuleLinkCard({ card }: { card: ModuleCard }) {
-  return (
-    <Link
-      href={card.href}
-      className="group flex h-full flex-col rounded-[1.6rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-[#0D5C3A]">
-          {card.icon}
-        </div>
-        <span
-          className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
-            card.wiring === "live"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-amber-200 bg-amber-50 text-amber-800"
-          }`}
-        >
-          {card.wiring === "live" ? "Live" : "Next"}
-        </span>
-      </div>
-      <p className="mt-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-        {card.eyebrow}
-      </p>
-      <h3 className="mt-1 text-lg font-black text-slate-950">{card.title}</h3>
-      {card.value ? (
-        <p className="mt-2 text-2xl font-black text-[#0D5C3A]">{card.value}</p>
-      ) : null}
-      <p className="mt-2 flex-1 text-sm font-semibold leading-6 text-slate-600">
-        {card.description}
-      </p>
-      <span className="mt-4 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
-        Open
-        <ExternalLink
-          size={14}
-          className="transition group-hover:translate-x-0.5"
-        />
-      </span>
-    </Link>
-  );
-}
-
-function RecentList({
-  title,
-  subtitle,
-  href,
-  items,
-  emptyTitle,
-  emptyDetail,
-}: {
-  title: string;
-  subtitle: string;
-  href: string;
-  items: ReferralsRecentItem[];
-  emptyTitle: string;
-  emptyDetail: string;
-}) {
-  return (
-    <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-black text-slate-950">{title}</h2>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{subtitle}</p>
-        </div>
-        <Link
-          href={href}
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
-        >
-          Open
-        </Link>
-      </div>
-      <div className="mt-4 grid gap-3">
-        {items.length ? (
-          items.map((item) => (
-            <Link
-              key={item.id}
-              href={item.href}
-              className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/50"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-black text-slate-950">
-                    {item.title}
-                  </p>
-                  <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-                    {item.subtitle}
-                  </p>
-                </div>
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">
-                  {item.status}
-                </span>
-              </div>
-              <p className="mt-3 text-xs font-bold text-slate-500">
-                {formatDate(item.date)}
-              </p>
-            </Link>
-          ))
-        ) : (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5">
-            <p className="font-black text-slate-950">{emptyTitle}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              {emptyDetail}
-            </p>
-          </div>
-        )}
-      </div>
-    </section>
-  );
+function eventLabel(value: string) {
+  const raw = value.replace(/_/g, " ");
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 export default async function AdminGrowthReferralsHubPage() {
@@ -210,386 +82,436 @@ export default async function AdminGrowthReferralsHubPage() {
           <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
             Admin access required.
           </h1>
-          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-            Sign in with an authorized SitGuru admin account to open Growth &amp;
-            Referrals.
-          </p>
         </div>
       </div>
     );
   }
 
   const data = await getReferralsDashboardData();
+  const today = new Date().toISOString().slice(0, 10);
+  const todayBucket = data.weekDays.find((day) => day.day === today);
+  const todayHits = (todayBucket?.visits || 0) + (todayBucket?.scans || 0);
+  const healthy = data.sourceHealth.filter((source) => source.ok).length;
 
-  const modules: ModuleCard[] = [
+  const tiles = [
     {
-      eyebrow: "Registry",
-      title: "Code Registry",
-      description:
-        "Generate, edit, archive, and audit referral codes across all programs.",
-      href: routes.codes,
-      wiring: "live",
+      label: "Link visits",
+      value: number(data.metrics.linkVisits),
+      helper: `${number(data.weekVisits)} this week`,
+      tone: "violet" as const,
+      icon: <MousePointerClick size={18} />,
+    },
+    {
+      label: "QR scans",
+      value: number(data.metrics.qrScans),
+      helper: `${number(data.weekScans)} this week`,
+      tone: "sky" as const,
+      icon: <QrCode size={18} />,
+    },
+    {
+      label: "Active codes",
       value: number(data.metrics.activeCodes),
-      icon: <ClipboardList size={20} />,
+      helper: `${number(data.metrics.totalCodes)} in registry`,
+      tone: "emerald" as const,
+      icon: <ClipboardList size={18} />,
     },
     {
-      eyebrow: "Guru",
-      title: "Guru Referrals",
-      description: "Guru lead and referral program ledger.",
-      href: routes.gurus,
-      wiring: "live",
-      value: number(data.metrics.guruCodes),
-      icon: <PawPrint size={20} />,
+      label: "PawPerks codes",
+      value: number(data.metrics.canonicalCodes),
+      helper: "Canonical account codes",
+      tone: "emerald" as const,
+      icon: <Gift size={18} />,
     },
     {
-      eyebrow: "PawPerks",
-      title: "Pet Parent / PawPerks",
-      description: "Pet Parent referral codes and PawPerks attribution.",
-      href: routes.petParents,
-      wiring: "live",
-      value: number(data.metrics.petParentCodes),
-      icon: <Gift size={20} />,
+      label: "Relationships",
+      value: number(data.metrics.relationships),
+      helper: "First-touch pairs",
+      tone: "slate" as const,
+      icon: <Users size={18} />,
     },
     {
-      eyebrow: "Ambassadors",
-      title: "Ambassador Referrals",
-      description: "Ambassador referral codes, links, and conversion tracking.",
-      href: routes.ambassadors,
-      wiring: "live",
-      value: number(data.metrics.ambassadorCodes),
-      icon: <HeartHandshake size={20} />,
+      label: "Needs review",
+      value: number(data.metrics.needsReview),
+      helper: "Codes or payouts",
+      tone: "amber" as const,
+      icon: <ClipboardList size={18} />,
     },
     {
-      eyebrow: "Partners",
-      title: "Partners / Clinics",
-      description: "Partner and clinic referral relationships.",
-      href: routes.partners,
-      wiring: "live",
-      value: number(data.metrics.partnerCodes),
-      icon: <Users size={20} />,
-    },
-    {
-      eyebrow: "Applications",
-      title: "Applications / Signups",
-      description: "Program and partner applications tied to referral growth.",
-      href: routes.applications,
-      wiring: "live",
-      value: number(data.metrics.applications),
-      icon: <Target size={20} />,
-    },
-    {
-      eyebrow: "Payouts",
-      title: "Payout Accountability",
-      description: "Referral rewards and payout readiness.",
-      href: routes.payouts,
-      wiring: "live",
-      value: number(data.metrics.rewardReview),
-      icon: <HandCoins size={20} />,
-    },
-    {
-      eyebrow: "Inventory",
-      title: "PawPerks Inventory",
-      description: "Conflict and backfill inventory for PawPerks codes.",
-      href: routes.inventory,
-      wiring: "live",
+      label: "Conflicts",
       value: number(data.metrics.openConflicts),
-      icon: <ShieldAlert size={20} />,
+      helper: "PawPerks inventory",
+      tone: "rose" as const,
+      icon: <ShieldAlert size={18} />,
     },
     {
-      eyebrow: "Auditor",
-      title: "Rewards Auditor",
-      description: "Cross-check rewards, liability, and payout exceptions.",
-      href: routes.rewards,
-      wiring: "live",
-      value: number(data.metrics.paidRewards),
-      icon: <BadgeDollarSign size={20} />,
+      label: "Reward review",
+      value: number(data.metrics.rewardReview),
+      helper: `${number(data.metrics.paidRewards)} paid`,
+      tone: "amber" as const,
+      icon: <HandCoins size={18} />,
+    },
+  ];
+
+  const actions = [
+    {
+      href: `${routes.codes}#generate-code`,
+      label: "Generate a code",
+      detail: "Issue a live referral code now",
+      icon: Plus,
+      primary: true,
     },
     {
-      eyebrow: "Field CRM",
-      title: "Sales & Marketing",
-      description: "Field lead intake and marketing CRM outside code registry.",
-      href: routes.salesMarketing,
-      wiring: "live",
-      icon: <Megaphone size={20} />,
+      href: routes.codes,
+      label: "Code Registry",
+      detail: "Edit, archive, and audit codes",
+      icon: ClipboardList,
     },
     {
-      eyebrow: "Finance",
-      title: "Financials Growth ROI",
-      description:
-        "Growth expense, reward liability, and attributed revenue live in Financials.",
-      href: routes.financials,
-      wiring: actor.canAccessFinancials ? "live" : "next",
-      icon: <Sparkles size={20} />,
+      href: routes.petParents,
+      label: "PawPerks / Pet Parents",
+      detail: "Parent codes and attribution",
+      icon: Gift,
     },
     {
-      eyebrow: "Mutations",
-      title: "Reward Approve Writes",
-      description:
-        "Canonical reward approve / conflict resolve write flows stay Next on drilldowns.",
+      href: routes.ambassadors,
+      label: "Ambassador referrals",
+      detail: "Codes, links, conversions",
+      icon: HeartHandshake,
+    },
+    {
+      href: routes.gurus,
+      label: "Guru referrals",
+      detail: "Guru ledger and payouts",
+      icon: PawPrint,
+    },
+    {
+      href: routes.partners,
+      label: "Partner / clinic codes",
+      detail: "Clinic and partner programs",
+      icon: Users,
+    },
+    {
+      href: routes.inventory,
+      label: "PawPerks inventory",
+      detail: "Conflicts and backfill",
+      icon: ShieldAlert,
+    },
+    {
       href: routes.payouts,
-      wiring: "next",
-      icon: <HandCoins size={20} />,
+      label: "Payouts",
+      detail: "Reward readiness",
+      icon: HandCoins,
+    },
+    {
+      href: routes.rewards,
+      label: "Rewards auditor",
+      detail: "Shared links and exceptions",
+      icon: BadgeDollarSign,
+    },
+  ];
+
+  const programs = [
+    {
+      href: routes.gurus,
+      label: "Guru",
+      value: data.metrics.guruCodes,
+      tone: "sky" as const,
+      icon: <PawPrint size={18} />,
+    },
+    {
+      href: routes.petParents,
+      label: "Pet Parent",
+      value: data.metrics.petParentCodes,
+      tone: "emerald" as const,
+      icon: <Gift size={18} />,
+    },
+    {
+      href: routes.ambassadors,
+      label: "Ambassador",
+      value: data.metrics.ambassadorCodes,
+      tone: "violet" as const,
+      icon: <HeartHandshake size={18} />,
+    },
+    {
+      href: routes.partners,
+      label: "Partner",
+      value: data.metrics.partnerCodes,
+      tone: "amber" as const,
+      icon: <Users size={18} />,
     },
   ];
 
   return (
-    <main className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1640px] space-y-6">
-        <section className="rounded-[2rem] border border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(13,92,58,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_55%,#f8fafc_100%)] p-5 shadow-sm sm:p-7">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div className="min-w-0">
-              <Link
-                href={routes.dashboard}
-                className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
-              >
-                <ArrowLeft size={16} />
-                Back to Admin
-              </Link>
+    <GrowthPageFrame
+      kicker="Growth & Referrals Workplace"
+      title="Turn codes, QR, and links into real SitGuru signups."
+      detail="This is the workbench. Issue a code, watch this week’s scans and clicks, then clear review, conflicts, and payouts."
+      action={
+        <Link
+          href={`${routes.codes}#generate-code`}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-green-950"
+        >
+          <Plus size={17} />
+          Generate code
+        </Link>
+      }
+    >
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {tiles.map((tile) => (
+          <AdminThemeCard
+            key={tile.label}
+            label={tile.label}
+            value={tile.value}
+            helper={tile.helper}
+            tone={tile.tone}
+            icon={tile.icon}
+          />
+        ))}
+      </section>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl xl:text-5xl">
-                  Growth &amp; Referrals
-                </h1>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  Referral Command Center
-                </span>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {actions.map((action) => {
+          const Icon = action.icon;
+          return (
+            <Link
+              key={action.href}
+              href={action.href}
+              className={
+                action.primary
+                  ? "flex min-h-24 items-center gap-4 rounded-[1.6rem] px-5 py-4 text-white shadow-sm"
+                  : "flex min-h-24 items-center gap-4 rounded-[1.6rem] border border-emerald-100 bg-white px-5 py-4 shadow-sm"
+              }
+              style={action.primary ? { background: "#0D5C3A" } : undefined}
+            >
+              <span
+                className={
+                  action.primary
+                    ? "flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15"
+                    : "flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-[#0D5C3A]"
+                }
+              >
+                <Icon size={26} />
+              </span>
+              <span>
                 <span
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
-                    data.isLive
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-amber-200 bg-amber-50 text-amber-800"
+                  className={`block text-lg font-black ${
+                    action.primary ? "!text-white" : "text-slate-950"
                   }`}
                 >
-                  {data.isLive ? "Live Sources" : "Preview Sources"}
+                  {action.label}
                 </span>
+                <span
+                  className={`mt-1 block text-sm font-semibold ${
+                    action.primary ? "!text-white/85" : "text-slate-500"
+                  }`}
+                >
+                  {action.detail}
+                </span>
+              </span>
+            </Link>
+          );
+        })}
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {programs.map((program) => (
+          <Link key={program.href} href={program.href}>
+            <AdminThemeCard
+              label={`${program.label} codes`}
+              value={number(program.value)}
+              helper="Open this ledger"
+              tone={program.tone}
+              icon={program.icon}
+            />
+          </Link>
+        ))}
+      </section>
+
+      <GrowthCard>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
+              This week
+            </p>
+            <h2 className="text-lg font-black text-slate-950">
+              Referral activity calendar
+            </h2>
+          </div>
+          <p className="text-sm font-semibold text-slate-500">
+            {number(data.weekVisits)} visits · {number(data.weekScans)} QR
+          </p>
+        </div>
+        <div className="mt-4 grid grid-cols-7 gap-1">
+          {data.weekDays.map((item) => {
+            const hits = item.visits + item.scans + item.other;
+            const isToday = item.day === today;
+            return (
+              <div
+                key={item.day}
+                className={`min-h-[92px] rounded-xl border p-2 sm:min-h-[118px] ${
+                  isToday
+                    ? "border-emerald-400 bg-emerald-50"
+                    : "border-slate-100 bg-slate-50"
+                }`}
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.08em] text-slate-500">
+                  {prettyWeekday(item.day)}
+                </p>
+                <p className="text-sm font-black text-slate-950">
+                  {Number(item.day.slice(8))}
+                </p>
+                <p className="mt-2 text-lg font-black text-emerald-800">
+                  {hits || "·"}
+                </p>
+                <p className="hidden text-[10px] font-bold text-slate-500 sm:block">
+                  {item.visits} link · {item.scans} QR
+                </p>
               </div>
+            );
+          })}
+        </div>
+      </GrowthCard>
 
-              <p className="mt-3 max-w-4xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-                Manage referral codes, program ledgers, PawPerks inventory,
-                payout accountability, and growth handoffs from one hub. Code
-                CRUD lives in the Code Registry.
+      <div className="grid gap-4 md:grid-cols-2">
+        <GrowthCard>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-black text-slate-950">Today’s work</h2>
+            <StatusPill
+              value={
+                data.metrics.needsReview + data.metrics.openConflicts > 0
+                  ? "Review"
+                  : "Ready"
+              }
+            />
+          </div>
+          <div className="mt-4 space-y-3">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+              <p className="font-black text-slate-950">
+                {todayHits} scans + clicks today
               </p>
-
-              <p className="mt-3 text-xs font-bold text-slate-500">
-                Signed in as {actor.email} · Role {actor.role}
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                Live from PawPerks referral events
               </p>
             </div>
-
-            <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
-              <Link
-                href={`${routes.codes}#generate-code`}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-900"
-              >
-                <Plus size={17} />
-                Generate Code
-              </Link>
+            {data.metrics.needsReview > 0 ? (
               <Link
                 href={routes.codes}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+                className="block rounded-2xl bg-amber-50 px-3 py-3 text-sm font-black text-amber-900"
               >
-                <ClipboardList size={17} />
-                Code Registry
+                {data.metrics.needsReview} codes waiting for review
               </Link>
+            ) : null}
+            {data.metrics.openConflicts > 0 ? (
               <Link
                 href={routes.inventory}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+                className="block rounded-2xl bg-rose-50 px-3 py-3 text-sm font-black text-rose-900"
               >
-                <ShieldAlert size={17} />
-                PawPerks Inventory
+                {data.metrics.openConflicts} PawPerks conflicts to clean
               </Link>
+            ) : null}
+            {data.metrics.rewardReview > 0 ? (
               <Link
-                href={routes.rewards}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
+                href={routes.payouts}
+                className="block rounded-2xl bg-emerald-50 px-3 py-3 text-sm font-black text-emerald-900"
               >
-                <BadgeDollarSign size={17} />
-                Rewards Auditor
+                {data.metrics.rewardReview} rewards ready to decide
               </Link>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-          <MetricTile
-            label="Active Codes"
-            value={number(data.metrics.activeCodes)}
-            helper={`${number(data.metrics.totalCodes)} total`}
-          />
-          <MetricTile
-            label="Needs Review"
-            value={number(data.metrics.needsReview)}
-            helper="Codes / payouts in review"
-          />
-          <MetricTile
-            label="Canonical Codes"
-            value={number(data.metrics.canonicalCodes)}
-            helper="PawPerks account codes"
-          />
-          <MetricTile
-            label="Relationships"
-            value={number(data.metrics.relationships)}
-            helper="Tracked referral pairs"
-          />
-          <MetricTile
-            label="Signup Captures"
-            value={number(data.metrics.signupCaptures)}
-            helper="Event stream captures"
-          />
-          <MetricTile
-            label="Reward Review"
-            value={number(data.metrics.rewardReview)}
-            helper="Pending reward decisions"
-          />
-          <MetricTile
-            label="Open Conflicts"
-            value={number(data.metrics.openConflicts)}
-            helper="PawPerks inventory"
-          />
-          <MetricTile
-            label="Applications"
-            value={number(data.metrics.applications)}
-            helper="Program + partner apps"
-          />
-        </section>
-
-        <section>
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                Manage growth from live modules
+            ) : null}
+            {data.needsReviewCodes.length === 0 &&
+            data.openConflicts.length === 0 &&
+            data.metrics.rewardReview === 0 ? (
+              <p className="text-sm font-semibold text-slate-500">
+                Queue is clear. Generate a code or check this week’s QR board.
               </p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">
-                Referral command center
-              </h2>
-            </div>
-            <p className="text-sm font-semibold text-slate-500">
-              Live = wired ledgers · Next = approve/resolve writes
-            </p>
+            ) : null}
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {modules.map((card) => (
-              <ModuleLinkCard key={card.title} card={card} />
-            ))}
+        </GrowthCard>
+
+        <GrowthCard>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-black text-slate-950">Latest activity</h2>
+            <Link
+              href={routes.codes}
+              className="text-sm font-black text-emerald-800"
+            >
+              Registry →
+            </Link>
           </div>
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-4">
-          <RecentList
-            title="Recent codes"
-            subtitle="Newest editable registry codes."
-            href={routes.codes}
-            items={data.recentCodes}
-            emptyTitle="No referral codes yet"
-            emptyDetail="Generate codes from the Code Registry."
-          />
-          <RecentList
-            title="Needs review"
-            subtitle="Codes or payout states waiting on review."
-            href={routes.codes}
-            items={data.needsReviewCodes}
-            emptyTitle="Nothing in review"
-            emptyDetail="Review queue is clear."
-          />
-          <RecentList
-            title="Relationships"
-            subtitle="Latest tracked referral relationships."
-            href={routes.codes}
-            items={data.recentRelationships}
-            emptyTitle="No relationships yet"
-            emptyDetail="Relationships appear as referrals are tracked."
-          />
-          <RecentList
-            title="Open conflicts"
-            subtitle="PawPerks inventory conflicts needing cleanup."
-            href={routes.inventory}
-            items={data.openConflicts}
-            emptyTitle="No open conflicts"
-            emptyDetail="Inventory conflicts will show here when detected."
-          />
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-xl font-black text-slate-950">Source health</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              Hub reads live referral registry, PawPerks, relationship, event,
-              and conflict tables.
-            </p>
-            <div className="mt-4 grid gap-3">
-              {data.sourceHealth.map((source) => (
-                <div
-                  key={source.id}
-                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-black text-slate-900">{source.label}</p>
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
-                        source.ok
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : "border-amber-200 bg-amber-50 text-amber-800"
-                      }`}
-                    >
-                      {source.ok ? "Connected" : "Pending"}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm font-semibold text-slate-600">
-                    {source.message}
+          <div className="mt-4 space-y-3">
+            {data.recentEvents.map((item) => (
+              <Link
+                key={item.id}
+                href={item.href}
+                className="block rounded-2xl border border-slate-100 bg-slate-50 p-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-black text-slate-950">
+                    {eventLabel(item.title)}
                   </p>
-                  <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
-                    {number(source.rowCount)} rows
-                  </p>
+                  <StatusPill value={item.status} />
                 </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-[#0D5C3A]">
-              <Sparkles size={20} />
-            </div>
-            <h2 className="text-xl font-black text-slate-950">
-              How to manage Growth &amp; Referrals
-            </h2>
-            <ul className="mt-3 space-y-3 text-sm font-semibold leading-6 text-slate-600">
-              <li>
-                Use this hub for KPIs and routing. Create and edit codes in Code
-                Registry.
-              </li>
-              <li>
-                Work program ledgers (Guru / PawPerks / Ambassador / Partners)
-                for accountability.
-              </li>
-              <li>
-                Resolve PawPerks conflicts in Inventory. Audit rewards separately.
-              </li>
-              <li>
-                Field marketing leads stay in Sales &amp; Marketing; recruiting
-                stays in HR / Ambassador Leads.
-              </li>
-            </ul>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Link
-                href={routes.ambassadorLeads}
-                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
-              >
-                Ambassador Leads
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  {item.subtitle} · {formatWhen(item.date)}
+                </p>
               </Link>
-              <Link
-                href={routes.salesMarketing}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-800 transition hover:bg-slate-50"
-              >
-                Sales &amp; Marketing
-              </Link>
-              <Link
-                href={routes.financials}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-800 transition hover:bg-slate-50"
-              >
-                Financials
-              </Link>
-            </div>
-          </section>
-        </section>
+            ))}
+            {data.recentEvents.length === 0 ? (
+              <p className="text-sm font-semibold text-slate-500">
+                No referral events yet. Share a code or QR to start the stream.
+              </p>
+            ) : null}
+          </div>
+        </GrowthCard>
       </div>
-    </main>
+
+      <GrowthCard>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-slate-950">Source health</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              {healthy} of {data.sourceHealth.length} live · signed in as{" "}
+              {actor.email}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={routes.salesMarketing}
+              className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900"
+            >
+              <Megaphone size={13} className="mr-1 inline" />
+              Sales &amp; Marketing
+            </Link>
+            <Link
+              href={routes.ambassadorLeads}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
+            >
+              Ambassador Leads
+            </Link>
+            <Link
+              href={routes.financials}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
+            >
+              Financials
+            </Link>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {data.sourceHealth.map((source) => (
+            <div
+              key={source.id}
+              className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-black text-slate-950">{source.label}</p>
+                <StatusPill value={source.ok ? "Connected" : "Pending"} />
+              </div>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                {number(source.rowCount)} rows
+              </p>
+            </div>
+          ))}
+        </div>
+      </GrowthCard>
+    </GrowthPageFrame>
   );
 }

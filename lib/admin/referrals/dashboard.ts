@@ -39,6 +39,13 @@ export type ReferralsRecentItem = {
   href: string;
 };
 
+export type ReferralWeekDay = {
+  day: string;
+  visits: number;
+  scans: number;
+  other: number;
+};
+
 export type ReferralsDashboardData = {
   metrics: ReferralsMetrics;
   sourceHealth: ReferralsSourceHealth[];
@@ -46,6 +53,10 @@ export type ReferralsDashboardData = {
   needsReviewCodes: ReferralsRecentItem[];
   recentRelationships: ReferralsRecentItem[];
   openConflicts: ReferralsRecentItem[];
+  recentEvents: ReferralsRecentItem[];
+  weekDays: ReferralWeekDay[];
+  weekVisits: number;
+  weekScans: number;
   isLive: boolean;
 };
 
@@ -202,16 +213,20 @@ export async function getReferralsDashboardData(): Promise<ReferralsDashboardDat
     ),
     safeSelect("pawperks_account_referral_codes", "id, created_at, updated_at, status, code", 300),
     safeSelect(
-      "admin_referral_tracking",
-      "id, created_at, updated_at, status, referrer_name, referred_name, program_type, relationship_type",
+      "pawperks_referral_relationships",
+      "id, created_at, updated_at, status, referral_code, referrer_display_name, referred_display_name, referrer_role, referred_role, referral_stage",
       300,
     ),
     safeSelect(
       "pawperks_referral_events",
-      "id, created_at, event_type, event_name, status, referral_code",
+      "id, created_at, occurred_at, event_type, conversion_status, submitted_code",
       500,
     ),
-    safeSelect("referral_activity", "id, created_at, code, activity_type, status", 200),
+    safeSelect(
+      "referral_activity",
+      "id, created_at, code, activity_type, conversion_status, payout_status",
+      200,
+    ),
     safeSelect(
       "pawperks_referral_conflicts",
       "id, created_at, updated_at, status, conflict_type, referral_code, notes",
@@ -242,6 +257,42 @@ export async function getReferralsDashboardData(): Promise<ReferralsDashboardDat
 
   const eventType = (row: AnyRow) =>
     getText(row, ["event_type", "event_name", "status"]).toLowerCase();
+
+  const eventDay = (row: AnyRow) =>
+    (getText(row, ["occurred_at", "created_at"]) || "").slice(0, 10);
+
+  const weekStart = (() => {
+    const next = new Date();
+    next.setHours(0, 0, 0, 0);
+    next.setDate(next.getDate() - next.getDay());
+    return next;
+  })();
+  const weekDays: ReferralWeekDay[] = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + index);
+    return {
+      day: date.toISOString().slice(0, 10),
+      visits: 0,
+      scans: 0,
+      other: 0,
+    };
+  });
+  const weekSet = new Set(weekDays.map((item) => item.day));
+  for (const row of eventsResult.data) {
+    const day = eventDay(row);
+    if (!weekSet.has(day)) continue;
+    const bucket = weekDays.find((item) => item.day === day);
+    if (!bucket) continue;
+    const kind = eventType(row);
+    if (kind.includes("qr")) bucket.scans += 1;
+    else if (kind.includes("visit") || kind.includes("click") || kind.includes("link")) {
+      bucket.visits += 1;
+    } else {
+      bucket.other += 1;
+    }
+  }
+  const weekVisits = weekDays.reduce((sum, item) => sum + item.visits, 0);
+  const weekScans = weekDays.reduce((sum, item) => sum + item.scans, 0);
 
   const metrics: ReferralsMetrics = {
     totalCodes: codesResult.count,
@@ -309,7 +360,7 @@ export async function getReferralsDashboardData(): Promise<ReferralsDashboardDat
       message: canonicalResult.message,
     },
     {
-      id: "admin_referral_tracking",
+      id: "pawperks_referral_relationships",
       label: "Referral Relationships",
       ok: relationshipsResult.ok,
       rowCount: relationshipsResult.count,
@@ -375,13 +426,31 @@ export async function getReferralsDashboardData(): Promise<ReferralsDashboardDat
     .map((row, index) => ({
       id: getText(row, ["id"], `rel-${index}`),
       title:
-        getText(row, ["referrer_name"]) ||
-        getText(row, ["relationship_type"], "Referral relationship"),
+        getText(row, ["referrer_display_name"]) ||
+        getText(row, ["referral_code"], "Referral relationship"),
       subtitle:
-        getText(row, ["referred_name"]) ||
-        getText(row, ["program_type"], "Tracked relationship"),
+        getText(row, ["referred_display_name"]) ||
+        getText(row, ["referral_stage", "referrer_role"], "Tracked relationship"),
       status: getText(row, ["status"], "tracked"),
       date: getDate(row),
+      href: "/admin/referrals/codes",
+    }));
+
+  const recentEvents = [...eventsResult.data]
+    .sort(
+      (a, b) =>
+        new Date(getText(b, ["occurred_at", "created_at"]) || 0).getTime() -
+        new Date(getText(a, ["occurred_at", "created_at"]) || 0).getTime(),
+    )
+    .slice(0, 8)
+    .map((row, index) => ({
+      id: getText(row, ["id"], `event-${index}`),
+      title: getText(row, ["event_type"], "Referral event"),
+      subtitle:
+        getText(row, ["submitted_code"]) ||
+        getText(row, ["conversion_status"], "Tracked"),
+      status: getText(row, ["conversion_status"], "recorded"),
+      date: getText(row, ["occurred_at", "created_at"]) || null,
       href: "/admin/referrals/codes",
     }));
 
@@ -407,6 +476,10 @@ export async function getReferralsDashboardData(): Promise<ReferralsDashboardDat
     needsReviewCodes,
     recentRelationships,
     openConflicts,
+    recentEvents,
+    weekDays,
+    weekVisits,
+    weekScans,
     isLive: sourceHealth.some((source) => source.ok),
   };
 }
