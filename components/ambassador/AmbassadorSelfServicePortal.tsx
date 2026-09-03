@@ -21,6 +21,11 @@ type MePayload = {
   };
 };
 
+type PortalProps = {
+  referralCode?: string | null;
+  referralLink?: string | null;
+};
+
 function money(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -33,9 +38,22 @@ function hasReferralCode(payload: MePayload | null) {
   return typeof code === "string" && code.trim().length > 0;
 }
 
-export default function AmbassadorSelfServicePortal() {
-  const [data, setData] = useState<MePayload | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function AmbassadorSelfServicePortal({
+  referralCode = "",
+  referralLink = "",
+}: PortalProps) {
+  const seedCode = String(referralCode || "").trim();
+  const seedLink = String(referralLink || "").trim();
+  const [data, setData] = useState<MePayload | null>(
+    seedCode
+      ? {
+          ok: true,
+          referralLink: seedLink || undefined,
+          profile: { referral_code_slug: seedCode },
+        }
+      : null,
+  );
+  const [loading, setLoading] = useState(!seedCode);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -46,9 +64,23 @@ export default function AmbassadorSelfServicePortal() {
         const res = await fetch("/api/ambassador/ledger/me");
         const json = (await res.json()) as MePayload;
         if (!res.ok || !json.ok) {
-          throw new Error(json.error || "Unable to load ledger.");
+          if (seedCode) {
+            if (!cancelled) {
+              setData((current) => current);
+              setError("");
+            }
+            return;
+          }
+          throw new Error(
+            json.error && json.error !== "Forbidden"
+              ? json.error
+              : "Unable to load Ambassador tracking for this login.",
+          );
         }
-        if (!cancelled) setData(json);
+        if (!cancelled) {
+          setData(json);
+          setError("");
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Load failed");
@@ -60,11 +92,13 @@ export default function AmbassadorSelfServicePortal() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [seedCode]);
 
-  const frozen = !hasReferralCode(data);
+  const frozen = !hasReferralCode(data) && !seedCode;
   const displayLink = (
-    data?.referralLink || "https://sitguru.com/r/YOUR_CODE"
+    data?.referralLink ||
+    seedLink ||
+    (seedCode ? `https://sitguru.com/r/${seedCode}` : "https://sitguru.com/r/YOUR_CODE")
   ).replace(/^https?:\/\//, "://");
 
   async function copyLink() {
@@ -90,7 +124,10 @@ export default function AmbassadorSelfServicePortal() {
 
   return (
     <div className="w-full space-y-4">
-      <AmbassadorMetricsCircuit initHref="/ambassador/dashboard/referrals" />
+      <AmbassadorMetricsCircuit
+        initHref="/ambassador/dashboard/referrals"
+        seedReferralCode={seedCode || data?.profile?.referral_code_slug}
+      />
 
       <section
         data-brand-green={frozen ? undefined : true}
@@ -108,12 +145,12 @@ export default function AmbassadorSelfServicePortal() {
           Your referral link
         </p>
         <p
-          className={`mt-2 break-all font-mono text-sm font-bold ${
+          className={`mt-2 break-words font-mono text-sm font-bold ${
             frozen ? "text-amber-950" : "text-emerald-50"
           }`}
         >
           {frozen
-            ? "Circuit offline — initialize tracking to unlock link"
+            ? "Circuit offline — initialize tracking to unlock your link"
             : displayLink}
         </p>
         <button

@@ -3,7 +3,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
 import { createClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/utils/supabase/admin";
+import {
+  buildAmbassadorReferralLink,
+  canAccessAmbassadorLedger,
+  ensureAmbassadorLedgerForUser,
+} from "@/lib/ambassador/ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -12,38 +16,6 @@ export const metadata: Metadata = {
   description:
     "Mobile referral link, weekly signups, and payout receipts for SitGuru Ambassadors.",
 };
-
-async function assertAmbassadorAccess(userId: string) {
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("role,account_type")
-    .eq("id", userId)
-    .maybeSingle();
-
-  const role = String(
-    (profile as { role?: string } | null)?.role || "",
-  ).toLowerCase();
-  const accountType = String(
-    (profile as { account_type?: string } | null)?.account_type || "",
-  ).toLowerCase();
-
-  if (
-    role === "admin" ||
-    role === "super_admin" ||
-    role === "ambassador" ||
-    accountType.includes("ambassador")
-  ) {
-    return true;
-  }
-
-  const { data: ledger } = await supabaseAdmin
-    .from("ambassador_profiles")
-    .select("id")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  return Boolean(ledger?.id);
-}
 
 /**
  * Mobile-first self-service performance portal.
@@ -59,10 +31,16 @@ export default async function AmbassadorPerformancePortalPage() {
     redirect("/ambassador/login");
   }
 
-  const allowed = await assertAmbassadorAccess(user.id);
+  const allowed = await canAccessAmbassadorLedger({
+    userId: user.id,
+    email: user.email,
+  });
   if (!allowed) {
     redirect("/ambassador/login?error=ambassador-required");
   }
+
+  const ledger = await ensureAmbassadorLedgerForUser(user.id, user.email);
+  const referralCode = ledger?.referral_code_slug || "";
 
   return (
     <div className="mx-auto max-w-lg px-4 py-5 pb-24">
@@ -82,7 +60,12 @@ export default async function AmbassadorPerformancePortalPage() {
           Full dashboard
         </Link>
       </div>
-      <AmbassadorSelfServicePortal />
+      <AmbassadorSelfServicePortal
+        referralCode={referralCode}
+        referralLink={
+          referralCode ? buildAmbassadorReferralLink(referralCode) : ""
+        }
+      />
     </div>
   );
 }

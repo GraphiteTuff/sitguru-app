@@ -17,6 +17,7 @@ type AmbassadorMetricsCircuitProps = {
   initHref?: string;
   /** Optional server-seeded signup count when ledger is still catching up. */
   seedReferralCount?: number;
+  seedReferralCode?: string | null;
   className?: string;
 };
 
@@ -24,10 +25,15 @@ export default function AmbassadorMetricsCircuit({
   userSessionId,
   initHref = "/ambassador/dashboard/referrals",
   seedReferralCount,
+  seedReferralCode,
   className = "",
 }: AmbassadorMetricsCircuitProps) {
-  const metrics = useConnectedAmbassadorMetrics(userSessionId);
-  const frozen = !metrics.isCircuitConnected;
+  const metrics = useConnectedAmbassadorMetrics(
+    userSessionId,
+    seedReferralCode,
+  );
+  const liveCode = metrics.referralCode || String(seedReferralCode || "").trim();
+  const frozen = !liveCode;
   const referralCount = frozen
     ? 0
     : Math.max(metrics.referralCount, seedReferralCount || 0);
@@ -47,14 +53,14 @@ export default function AmbassadorMetricsCircuit({
     <div className={`w-full space-y-4 ${className}`}>
       {frozen ? <CircuitBrokenAlert initHref={initHref} /> : null}
 
-      {!frozen && metrics.referralCode ? (
+      {!frozen && liveCode ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-100 bg-white px-4 py-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700">
               Tracking circuit live
             </p>
             <p className="mt-0.5 font-mono text-sm font-black text-slate-950">
-              {metrics.referralCode}
+              {liveCode}
             </p>
           </div>
           <p className="text-xs font-semibold text-slate-500">

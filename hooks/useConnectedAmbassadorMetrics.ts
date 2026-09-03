@@ -57,10 +57,16 @@ function normalizeCode(value: unknown): string | null {
  * Pulls ambassador tracking metrics through the authenticated ledger.
  * Circuit is connected only when a non-empty `referralCode` is present.
  */
-export function useConnectedAmbassadorMetrics(userSessionId?: string | null) {
+export function useConnectedAmbassadorMetrics(
+  userSessionId?: string | null,
+  seedReferralCode?: string | null,
+) {
+  const seedCode = normalizeCode(seedReferralCode);
   const [metrics, setMetrics] = useState<ConnectedMetrics>({
     ...ZERO_STATE,
-    loading: true,
+    referralCode: seedCode,
+    isCircuitConnected: Boolean(seedCode),
+    loading: !seedCode,
     error: null,
     milestones: AMBASSADOR_SOCIAL_MILESTONES,
   });
@@ -70,7 +76,6 @@ export function useConnectedAmbassadorMetrics(userSessionId?: string | null) {
 
     const checkTrackingCircuit = async () => {
       try {
-        // 1) Session-bound ledger — never trust a bare public code query.
         const response = await fetch("/api/ambassador/ledger/me", {
           method: "GET",
           credentials: "same-origin",
@@ -80,26 +85,20 @@ export function useConnectedAmbassadorMetrics(userSessionId?: string | null) {
 
         if (cancelled) return;
 
-        if (!response.ok || !payload.ok) {
-          setMetrics({
-            ...ZERO_STATE,
-            loading: false,
-            error:
-              payload.error ||
-              "Unable to sync ambassador metrics. Initialize your tracking code.",
-            milestones: AMBASSADOR_SOCIAL_MILESTONES,
-          });
-          return;
-        }
+        const referralCode =
+          normalizeCode(payload.profile?.referral_code_slug) || seedCode;
 
-        const referralCode = normalizeCode(
-          payload.profile?.referral_code_slug,
-        );
-
-        // 2) Empty / null code → circuit broken, charts held at zero.
-        if (!referralCode) {
+        if (referralCode) {
           setMetrics({
-            ...ZERO_STATE,
+            referralCode,
+            isCircuitConnected: true,
+            clicksCount: Number(payload.clicksTotal) || 0,
+            referralCount: Number(payload.referralsTotal) || 0,
+            unlockedCommissions:
+              Number(payload.pendingCommissions) ||
+              Number(payload.lifetimePaid) ||
+              0,
+            referralLink: payload.referralLink || null,
             loading: false,
             error: null,
             milestones: AMBASSADOR_SOCIAL_MILESTONES,
@@ -108,17 +107,12 @@ export function useConnectedAmbassadorMetrics(userSessionId?: string | null) {
         }
 
         setMetrics({
-          referralCode,
-          isCircuitConnected: true,
-          clicksCount: Number(payload.clicksTotal) || 0,
-          referralCount: Number(payload.referralsTotal) || 0,
-          unlockedCommissions:
-            Number(payload.pendingCommissions) ||
-            Number(payload.lifetimePaid) ||
-            0,
-          referralLink: payload.referralLink || null,
+          ...ZERO_STATE,
           loading: false,
-          error: null,
+          error:
+            payload.error && payload.error !== "Forbidden"
+              ? payload.error
+              : null,
           milestones: AMBASSADOR_SOCIAL_MILESTONES,
         });
       } catch (err) {
@@ -126,8 +120,10 @@ export function useConnectedAmbassadorMetrics(userSessionId?: string | null) {
         if (!cancelled) {
           setMetrics({
             ...ZERO_STATE,
+            referralCode: seedCode,
+            isCircuitConnected: Boolean(seedCode),
             loading: false,
-            error: "Metrics sync fallback pipeline error.",
+            error: seedCode ? null : "Metrics sync fallback pipeline error.",
             milestones: AMBASSADOR_SOCIAL_MILESTONES,
           });
         }
@@ -138,7 +134,7 @@ export function useConnectedAmbassadorMetrics(userSessionId?: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [userSessionId]);
+  }, [userSessionId, seedCode]);
 
   return metrics;
 }

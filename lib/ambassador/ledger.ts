@@ -5,6 +5,7 @@
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { getAppOrigin } from "@/lib/config/site";
+import { isSitGuruSuperUser } from "@/lib/sitguru/display";
 import type {
   AmbassadorNetworkKpis,
   AmbassadorPerformanceRow,
@@ -30,100 +31,251 @@ export function buildAmbassadorReferralLink(slug: string) {
   return `${getAppOrigin()}/r/${encodeURIComponent(code)}`;
 }
 
+function isRetiredAmbassadorStatus(value: unknown) {
+  const status = String(value || "").trim().toLowerCase();
+  return (
+    status === "archived" ||
+    status === "inactive" ||
+    status === "rejected" ||
+    status === "denied" ||
+    status === "not_a_fit"
+  );
+}
+
+function firstText(...values: unknown[]) {
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function mapToLedgerProfile(
+  row: Record<string, unknown> | null | undefined,
+): AmbassadorProfileRow | null {
+  if (!row) return null;
+
+  const userId = firstText(row.user_id);
+  const code = normalizeSlug(
+    firstText(row.referral_code_slug, row.referral_code, row.code),
+  );
+  const id = firstText(row.id, row.ambassador_record_id, userId);
+  if (!userId || !code || !id) return null;
+  if (isRetiredAmbassadorStatus(row.status)) return null;
+  if (row.is_active === false) return null;
+
+  return {
+    id,
+    user_id: userId,
+    ambassador_record_id: firstText(row.ambassador_record_id, row.id) || null,
+    referral_code_slug: code,
+    display_name:
+      firstText(row.display_name, row.full_name, row.email, code) || null,
+    region: firstText(row.region, row.city, row.state) || null,
+    commission_rate_per_booking: asNumber(
+      row.commission_rate_per_booking ?? row.commission_rate,
+    ),
+    lifetime_payouts_sum: asNumber(
+      row.lifetime_payouts_sum ?? row.total_commission_paid,
+    ),
+    is_active: true,
+  };
+}
+
+export async function canAccessAmbassadorLedger(input: {
+  userId: string;
+  email?: string | null;
+}) {
+  if (isSitGuruSuperUser(input.email)) return true;
+
+  const email = String(input.email || "").trim().toLowerCase();
+
+  const [{ data: profile }, { data: roleRows }, { data: ambassador }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("role, account_type")
+        .eq("id", input.userId)
+        .maybeSingle(),
+      supabaseAdmin.from("user_roles").select("role").eq("user_id", input.userId),
+      supabaseAdmin
+        .from("ambassadors")
+        .select("id, status, dashboard_enabled, login_enabled")
+        .eq("user_id", input.userId)
+        .maybeSingle(),
+    ]);
+
+  const tokens = [
+    (profile as { role?: string } | null)?.role,
+    (profile as { account_type?: string } | null)?.account_type,
+    ...((roleRows || []) as Array<{ role?: string | null }>).map((row) => row.role),
+  ].map((value) => String(value || "").trim().toLowerCase());
+
+  if (
+    tokens.some(
+      (role) =>
+        role.includes("ambassador") ||
+        role === "admin" ||
+        role === "super_admin" ||
+        role === "founder",
+    )
+  ) {
+    return true;
+  }
+
+  if (ambassador?.id && !isRetiredAmbassadorStatus(ambassador.status)) {
+    return true;
+  }
+
+  if (email && !email.includes(",") && !email.includes("(")) {
+    const { data: byEmail } = await supabaseAdmin
+      .from("ambassadors")
+      .select("id, status")
+      .or(
+        `email.eq.${email},login_email.eq.${email},contact_email.eq.${email}`,
+      )
+      .maybeSingle();
+
+    if (byEmail?.id && !isRetiredAmbassadorStatus(byEmail.status)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /**
- * Resolve ledger profile by slug, creating it from public.ambassadors when needed
- * so the performance ledger extends the live workspace table.
+ * Resolve ledger profile by slug from the live ambassadors workspace first.
+ * The production ambassador_profiles table uses different column names than
+ * the original ledger sketch, so we map instead of failing the circuit.
  */
 export async function findAmbassadorProfileBySlug(slug: string) {
   const code = normalizeSlug(slug);
   if (!code) return null;
 
-  const { data, error } = await supabaseAdmin
-    .from("ambassador_profiles")
-    .select("*")
-    .eq("referral_code_slug", code)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (!error && data) return data as AmbassadorProfileRow;
-
-  // Fallback: live ambassadors.referral_code → upsert ledger profile
   const { data: ambassador } = await supabaseAdmin
     .from("ambassadors")
     .select("id,user_id,full_name,email,referral_code,status,dashboard_enabled")
     .ilike("referral_code", code)
     .maybeSingle();
 
-  const row = ambassador as {
-    id?: string;
-    user_id?: string;
-    full_name?: string;
-    email?: string;
-    referral_code?: string;
-    status?: string;
-    dashboard_enabled?: boolean;
-  } | null;
+  const fromAmbassador = mapToLedgerProfile(
+    ambassador as Record<string, unknown> | null,
+  );
+  if (fromAmbassador) return fromAmbassador;
 
-  if (!row?.user_id || !row.id) return null;
-  const status = String(row.status || "").toLowerCase();
-  if (status === "archived" || status === "inactive" || status === "rejected") {
-    return null;
-  }
-
-  const payload = {
-    user_id: row.user_id,
-    ambassador_record_id: row.id,
-    referral_code_slug: code,
-    display_name: row.full_name || row.email || code,
-    is_active: true,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { data: upserted, error: upsertError } = await supabaseAdmin
+  const { data: ledger } = await supabaseAdmin
     .from("ambassador_profiles")
-    .upsert(payload, { onConflict: "user_id" })
     .select("*")
+    .or(`referral_code.eq.${code},referral_code.ilike.${code}`)
     .maybeSingle();
 
-  if (upsertError || !upserted) {
-    console.warn(
-      "[ambassador-ledger] profile upsert from ambassadors failed:",
-      upsertError?.message,
-    );
-    return null;
-  }
-
-  return upserted as AmbassadorProfileRow;
+  return mapToLedgerProfile(ledger as Record<string, unknown> | null);
 }
 
 export async function findAmbassadorProfileByUserId(userId: string) {
-  const { data, error } = await supabaseAdmin
-    .from("ambassador_profiles")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
+  return ensureAmbassadorLedgerForUser(userId);
+}
 
-  if (!error && data) return data as AmbassadorProfileRow;
+function proposeAmbassadorCode(input: {
+  name?: string | null;
+  email?: string | null;
+  userId: string;
+}) {
+  const fromName = normalizeSlug(firstText(input.name));
+  const fromEmail = normalizeSlug(
+    firstText(input.email).split("@")[0] || "",
+  );
+  const base = (fromName || fromEmail || "AMB").slice(0, 10);
+  const suffix = input.userId.replace(/-/g, "").slice(0, 4).toUpperCase();
+  return `${base}${suffix}`.slice(0, 16);
+}
 
-  // Bootstrap ledger row from live ambassadors workspace if missing
-  const { data: ambassador } = await supabaseAdmin
+/**
+ * Every live Ambassador is ledger-connected. If the workspace exists but
+ * the referral code is blank, one is created instead of breaking the circuit.
+ */
+export async function ensureAmbassadorLedgerForUser(
+  userId: string,
+  email?: string | null,
+) {
+  const cleanEmail = String(email || "").trim().toLowerCase();
+
+  let ambassador: Record<string, unknown> | null = null;
+
+  const { data: byUser } = await supabaseAdmin
     .from("ambassadors")
     .select("id,user_id,full_name,email,referral_code,status")
     .eq("user_id", userId)
     .maybeSingle();
 
-  const row = ambassador as {
-    id?: string;
-    user_id?: string;
-    full_name?: string;
-    email?: string;
-    referral_code?: string;
-    status?: string;
-  } | null;
+  ambassador = (byUser as Record<string, unknown> | null) || null;
 
-  if (!row?.user_id || !row.referral_code) return null;
+  if (
+    !ambassador &&
+    cleanEmail &&
+    !cleanEmail.includes(",") &&
+    !cleanEmail.includes("(")
+  ) {
+    const { data: byEmail } = await supabaseAdmin
+      .from("ambassadors")
+      .select("id,user_id,full_name,email,referral_code,status")
+      .or(
+        `email.eq.${cleanEmail},login_email.eq.${cleanEmail},contact_email.eq.${cleanEmail}`,
+      )
+      .maybeSingle();
+    ambassador = (byEmail as Record<string, unknown> | null) || null;
+  }
 
-  return findAmbassadorProfileBySlug(String(row.referral_code));
+  if (ambassador && !isRetiredAmbassadorStatus(ambassador.status)) {
+    let mapped = mapToLedgerProfile(ambassador);
+
+    if (!mapped) {
+      const nextCode = proposeAmbassadorCode({
+        name: firstText(ambassador.full_name),
+        email: firstText(ambassador.email, cleanEmail),
+        userId: firstText(ambassador.user_id, userId),
+      });
+
+      const { data: updated } = await supabaseAdmin
+        .from("ambassadors")
+        .update({
+          referral_code: nextCode,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", firstText(ambassador.id))
+        .select("id,user_id,full_name,email,referral_code,status")
+        .maybeSingle();
+
+      mapped = mapToLedgerProfile(updated as Record<string, unknown> | null);
+    }
+
+    if (mapped) {
+      await ensureLegacyReferralCodeId({
+        code: mapped.referral_code_slug,
+        ambassadorRecordId: mapped.ambassador_record_id,
+        userId: mapped.user_id,
+      });
+      return mapped;
+    }
+  }
+
+  const { data: ledger } = await supabaseAdmin
+    .from("ambassador_profiles")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const fromLedger = mapToLedgerProfile(ledger as Record<string, unknown> | null);
+  if (fromLedger) {
+    await ensureLegacyReferralCodeId({
+      code: fromLedger.referral_code_slug,
+      ambassadorRecordId: fromLedger.ambassador_record_id,
+      userId: fromLedger.user_id,
+    });
+  }
+
+  return fromLedger;
 }
 
 async function ensureLegacyReferralCodeId(params: {
@@ -590,36 +742,63 @@ export async function batchUpdateReferralStatus(params: {
   return { ok: true as const, updated: (data || []).length };
 }
 
-export async function loadSelfServiceStats(userId: string) {
-  const profile = await findAmbassadorProfileByUserId(userId);
+async function countClicksForCode(code: string) {
+  try {
+    const { data: codeRow } = await supabaseAdmin
+      .from("referral_codes")
+      .select("id")
+      .ilike("code", code)
+      .maybeSingle();
+
+    const codeId = (codeRow as { id?: string } | null)?.id;
+    if (!codeId) return 0;
+
+    const { count } = await supabaseAdmin
+      .from("referral_clicks")
+      .select("id", { count: "exact", head: true })
+      .eq("referral_code_id", codeId);
+
+    return count || 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function loadLiveReferralRows(profile: AmbassadorProfileRow) {
+  const code = profile.referral_code_slug;
+  const { data: byCode, error: byCodeError } = await supabaseAdmin
+    .from("ambassador_referrals")
+    .select("id, created_at, status, referral_code, ambassador_id")
+    .ilike("referral_code", code)
+    .limit(500);
+
+  if (!byCodeError && byCode) return byCode;
+
+  const { data: byId, error: byIdError } = await supabaseAdmin
+    .from("ambassador_referrals")
+    .select("id, created_at, status, referral_code, ambassador_id")
+    .eq("ambassador_id", profile.id)
+    .limit(500);
+
+  if (!byIdError && byId) return byId;
+  return [];
+}
+
+export async function loadSelfServiceStats(
+  userId: string,
+  email?: string | null,
+) {
+  const profile = await ensureAmbassadorLedgerForUser(userId, email);
   if (!profile) return null;
 
   const since = new Date();
   since.setDate(since.getDate() - 56);
 
-  const [{ data: clicks }, { data: referrals }, { data: payouts }] =
-    await Promise.all([
-      supabaseAdmin
-        .from("ambassador_clicks")
-        .select("created_at")
-        .eq("ambassador_id", profile.id)
-        .gte("created_at", since.toISOString()),
-      supabaseAdmin
-        .from("ambassador_referrals")
-        .select(
-          "created_at,commission_earned,payout_status,total_booking_value,referred_role",
-        )
-        .eq("ambassador_id", profile.id)
-        .order("created_at", { ascending: false })
-        .limit(500),
-      supabaseAdmin
-        .from("ambassador_referrals")
-        .select("commission_earned,paid_at,payout_batch_id,payout_status")
-        .eq("ambassador_id", profile.id)
-        .eq("payout_status", "PAID")
-        .order("paid_at", { ascending: false })
-        .limit(50),
-    ]);
+  const [clicksTotal, referrals] = await Promise.all([
+    countClicksForCode(profile.referral_code_slug),
+    loadLiveReferralRows(profile),
+  ]);
+  const payouts: Array<Record<string, unknown>> = [];
 
   // Weekly signup buckets (last 8 weeks)
   const weeks: Array<{ label: string; signups: number; earnings: number }> = [];
@@ -659,7 +838,7 @@ export async function loadSelfServiceStats(userId: string) {
   return {
     profile,
     referralLink: buildAmbassadorReferralLink(profile.referral_code_slug),
-    clicksTotal: (clicks || []).length,
+    clicksTotal,
     referralsTotal: (referrals || []).length,
     pendingCommissions,
     lifetimePaid: asNumber(profile.lifetime_payouts_sum),

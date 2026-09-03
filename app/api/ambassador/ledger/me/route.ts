@@ -1,12 +1,15 @@
 // app/api/ambassador/ledger/me/route.ts
 /**
- * Self-service ledger stats for authenticated AMBASSADOR / ADMIN accounts.
+ * Self-service ledger stats for authenticated Ambassador / Admin accounts.
+ * Access is additive: user_roles, live ambassadors row, or founder email.
  */
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { supabaseAdmin } from "@/utils/supabase/admin";
-import { loadSelfServiceStats } from "@/lib/ambassador/ledger";
+import {
+  canAccessAmbassadorLedger,
+  loadSelfServiceStats,
+} from "@/lib/ambassador/ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -20,41 +23,30 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("role,account_type")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const role = String(
-    (profile as { role?: string } | null)?.role || "",
-  ).toLowerCase();
-  const accountType = String(
-    (profile as { account_type?: string } | null)?.account_type || "",
-  ).toLowerCase();
-
-  const allowed =
-    role === "admin" ||
-    role === "super_admin" ||
-    role === "ambassador" ||
-    accountType.includes("ambassador");
+  const allowed = await canAccessAmbassadorLedger({
+    userId: user.id,
+    email: user.email,
+  });
 
   if (!allowed) {
-    // Also allow if they have an ambassador_profiles row
-    const { data: ledgerProfile } = await supabaseAdmin
-      .from("ambassador_profiles")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!ledgerProfile?.id) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "This login does not have an Ambassador workspace yet. Ask SitGuru Admin to connect your Ambassador profile.",
+      },
+      { status: 403 },
+    );
   }
 
-  const stats = await loadSelfServiceStats(user.id);
+  const stats = await loadSelfServiceStats(user.id, user.email);
   if (!stats) {
     return NextResponse.json(
-      { ok: false, error: "No ambassador ledger profile found." },
+      {
+        ok: false,
+        error:
+          "Your Ambassador referral code is not connected yet. Open Ambassador referrals to initialize tracking.",
+      },
       { status: 404 },
     );
   }

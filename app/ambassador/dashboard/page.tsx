@@ -29,6 +29,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import AmbassadorSelfServicePortal from "@/components/ambassador/AmbassadorSelfServicePortal";
 import AmbassadorMetricsChartsPanel from "@/components/ambassador/metrics/AmbassadorMetricsChartsPanel";
+import { buildAmbassadorReferralLink } from "@/lib/ambassador/ledger";
 import UniversalRoleDashboard from "@/components/UniversalRoleDashboard";
 import {
   ThemeStatCard,
@@ -1158,7 +1159,10 @@ export default async function AmbassadorDashboardPage() {
     <main className="min-h-[100svh] bg-[#f8fbf6] px-3 py-4 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
         <div className="lg:hidden">
-          <AmbassadorSelfServicePortal />
+          <AmbassadorSelfServicePortal
+            referralCode={referralCode}
+            referralLink={buildAmbassadorReferralLink(referralCode)}
+          />
         </div>
         <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-4">
           <div className="min-w-0 space-y-4">
@@ -1588,7 +1592,10 @@ export default async function AmbassadorDashboardPage() {
           </div>
           <aside className="hidden min-w-0 lg:block">
             <div className="sticky top-4">
-              <AmbassadorSelfServicePortal />
+              <AmbassadorSelfServicePortal
+                referralCode={referralCode}
+                referralLink={buildAmbassadorReferralLink(referralCode)}
+              />
             </div>
           </aside>
         </div>
