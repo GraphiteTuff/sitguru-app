@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { notifyHqReferralAttributed } from "@/lib/admin/referrals/hq-alerts";
 import {
   enqueueProfileCompletionReminders,
   sendImmediateProfileCompletionNotice,
@@ -1198,6 +1199,7 @@ async function writeCanonicalReferralEvent({
 
   if (existing) return true;
 
+  const occurredAt = new Date().toISOString();
   const result = await safeInsert({
     table: "pawperks_referral_events",
     payload: {
@@ -1227,14 +1229,15 @@ async function writeCanonicalReferralEvent({
       conversion_stage: "signup",
       conversion_status: "pending",
       source_table: owner.sourceTable,
+      occurred_at: occurredAt,
       metadata: {
         referral_code_id: owner.referralCodeId || null,
         ambassador_id: owner.ambassadorId || null,
         guru_id: owner.guruId || null,
         partner_id: owner.partnerId || null,
       },
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: occurredAt,
+      updated_at: occurredAt,
     },
     requiredColumns: [
       "canonical_code_id",
@@ -1248,6 +1251,20 @@ async function writeCanonicalReferralEvent({
       "Canonical referral event insert failed:",
       result.error,
     );
+  }
+
+  if (result.ok) {
+    void notifyHqReferralAttributed({
+      code: owner.code,
+      referredName,
+      referredEmail,
+      referredRole: getReferredRole(intent),
+      ownerName: owner.ownerDisplayName || owner.ownerEmail || owner.ownerType,
+      ownerType: owner.ownerType,
+      program: owner.campaignType || owner.ownerType,
+    }).catch((error) => {
+      console.warn("Referral HQ alert skipped:", error);
+    });
   }
 
   return result.ok;

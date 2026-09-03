@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { notifyHqReferralAttributed } from "@/lib/admin/referrals/hq-alerts";
 import { requireAuthenticatedUser } from "@/lib/supabase/admin";
 
 type PetPerksReferralType = "pet_parent" | "guru" | "ambassador" | "community";
@@ -559,6 +560,21 @@ export async function POST(request: Request) {
       });
 
       ambassadorResults.push(ambassadorResult);
+    }
+
+    const captured = [...petPerksResults, ...ambassadorResults].some(
+      (result) => "action" in result && result.action === "inserted",
+    );
+    if (captured) {
+      void notifyHqReferralAttributed({
+        code: cleanReferralCode,
+        referredName,
+        referredEmail: user.email,
+        referredRole: signupSelection,
+        program: signupSelection,
+      }).catch((error) => {
+        console.warn("Referral HQ alert skipped:", error);
+      });
     }
 
     return NextResponse.json({

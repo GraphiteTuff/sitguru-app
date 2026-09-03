@@ -22,6 +22,7 @@ import {
 } from "@/components/admin/growth/GrowthPageFrame";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { getReferralsDashboardData } from "@/lib/admin/referrals/dashboard";
+import { loadReferralAccounting } from "@/lib/admin/referrals/accounting";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,10 @@ export default async function AdminGrowthReferralsHubPage() {
     );
   }
 
-  const data = await getReferralsDashboardData();
+  const [data, accounting] = await Promise.all([
+    getReferralsDashboardData(),
+    loadReferralAccounting(),
+  ]);
   const today = new Date().toISOString().slice(0, 10);
   const todayBucket = data.weekDays.find((day) => day.day === today);
   const todayHits = (todayBucket?.visits || 0) + (todayBucket?.scans || 0);
@@ -417,9 +421,38 @@ export default async function AdminGrowthReferralsHubPage() {
                 {data.metrics.rewardReview} rewards ready to decide
               </Link>
             ) : null}
+            {accounting.totals.missingOwners > 0 ? (
+              <Link
+                href={routes.codes}
+                className="block rounded-2xl bg-amber-50 px-3 py-3 text-sm font-black text-amber-900"
+              >
+                {accounting.totals.missingOwners} codes need an owner before
+                payout
+              </Link>
+            ) : null}
+            {accounting.totals.unconvertedTraffic > 0 ? (
+              <Link
+                href={routes.rewards}
+                className="block rounded-2xl bg-violet-50 px-3 py-3 text-sm font-black text-violet-900"
+              >
+                {accounting.totals.unconvertedTraffic} codes have traffic but no
+                signup yet
+              </Link>
+            ) : null}
+            {accounting.totals.signups > 0 ? (
+              <Link
+                href={routes.payouts}
+                className="block rounded-2xl bg-sky-50 px-3 py-3 text-sm font-black text-sky-900"
+              >
+                {accounting.totals.signups} captured signups ready to reward
+              </Link>
+            ) : null}
             {data.needsReviewCodes.length === 0 &&
             data.openConflicts.length === 0 &&
-            data.metrics.rewardReview === 0 ? (
+            data.metrics.rewardReview === 0 &&
+            accounting.totals.missingOwners === 0 &&
+            accounting.totals.unconvertedTraffic === 0 &&
+            accounting.totals.signups === 0 ? (
               <p className="text-sm font-semibold text-slate-500">
                 Queue is clear. Generate a code or check this week’s QR board.
               </p>

@@ -78,7 +78,7 @@ export default function RewardsAuditor({
             </span>
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700">
-                Shared links generated
+                Tracked visits + QR
               </p>
               <p className="mt-1 text-3xl font-black tabular-nums text-slate-950">
                 {sharedLinksGenerated.toLocaleString()}
@@ -86,7 +86,7 @@ export default function RewardsAuditor({
             </div>
           </div>
           <p className="mt-3 text-xs font-semibold text-slate-500">
-            Viral expansion volume across PetPerks / PawPerks referral codes.
+            Live PawPerks events. Rewards wait for a captured signup.
           </p>
         </article>
 
