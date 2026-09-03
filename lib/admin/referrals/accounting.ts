@@ -61,6 +61,14 @@ function text(value: unknown) {
   return String(value).trim();
 }
 
+export function searchQuery(
+  params?: Record<string, string | string[] | undefined>,
+) {
+  const raw = params?.q;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return String(value || "").trim();
+}
+
 export function normalizeReferralCode(value: unknown) {
   return text(value)
     .toUpperCase()

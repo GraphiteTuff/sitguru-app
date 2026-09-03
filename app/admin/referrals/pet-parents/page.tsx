@@ -5,6 +5,7 @@ import { getAdminIdentity } from "@/lib/admin/access";
 import {
   filterAccounting,
   loadReferralAccounting,
+  searchQuery,
 } from "@/lib/admin/referrals/accounting";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +26,7 @@ export default async function AdminPetParentReferralsPage({
     );
   }
 
-  const params = await Promise.resolve(searchParams || {});
-  const query = String(params.q || "").trim();
+  const query = searchQuery(await Promise.resolve(searchParams));
   const desk = filterAccounting(
     await loadReferralAccounting(),
     "pet_parent",
