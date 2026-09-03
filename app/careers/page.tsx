@@ -121,7 +121,7 @@ const opportunityTypes = [
   {
     title: "Company careers & internships",
     description:
-      "Paid SitGuru roles and the SitGuru Internship Program — searchable below. Interns support a paid manager and can earn college credit.",
+      "Paid SitGuru roles and internships across any team funnel — searchable below. Interns earn experience and college credit while supporting a paid teammate.",
   },
 ];
 
@@ -322,9 +322,9 @@ export default async function CareersPage() {
             </p>
 
             <p className="mt-4 max-w-3xl text-base font-semibold leading-8 !text-white/80">
-              Internships are paid hourly and academic-credit eligible. They
-              support a paid Social Media &amp; Community Growth Manager — they
-              do not replace that hire.
+              Internships are paid, remote, and credit-eligible — across
+              marketing, community, events, design, product, and more. Students
+              join a live SitGuru team. They do not replace a paid hire.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -374,36 +374,44 @@ export default async function CareersPage() {
           </div>
 
           <div className="rounded-[34px] border border-white/15 bg-white/10 p-4 shadow-2xl shadow-black/20 backdrop-blur sm:p-5">
-            <div className="rounded-[28px] bg-white p-5 text-slate-950 sm:p-6">
+            <div className="rounded-[28px] bg-white p-5 sm:p-6">
               <div className="mb-5 flex items-center gap-3">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-800 text-white">
                   <Trophy size={24} />
                 </div>
 
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-green-700">
+                  <div
+                    className="text-xs font-black uppercase tracking-[0.14em]"
+                    style={{ color: "#0D5C3A" }}
+                  >
                     Opportunity Path
-                  </p>
-                  <h2 className="text-2xl font-black text-green-950">
+                  </div>
+                  <div
+                    className="text-2xl font-black"
+                    style={{ color: "#052e16" }}
+                  >
                     Start. Serve. Grow.
-                  </h2>
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-3">
                 {[
-                  "Search paid careers and internships below",
+                  "Search paid careers and internships in any SitGuru track",
                   "Or start as a Guru / apply to a hire program",
-                  "Interns get mentoring, portfolio work, and college credit options",
-                  "The best interns can grow into paid SitGuru roles",
+                  "Interns get mentoring, portfolio work, and college credit",
+                  "Standout interns can grow into paid SitGuru roles",
                 ].map((item) => (
                   <div
                     key={item}
-                    className="flex items-start gap-3 rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4 text-sm font-bold text-slate-600"
+                    className="flex items-start gap-3 rounded-2xl border border-[#edf3ee] bg-[#fbfcf9] p-4 text-sm font-bold"
+                    style={{ color: "#475569" }}
                   >
                     <CheckCircle2
-                      className="mt-0.5 shrink-0 text-green-700"
+                      className="mt-0.5 shrink-0"
                       size={17}
+                      style={{ color: "#0D5C3A" }}
                     />
                     <span>{item}</span>
                   </div>
@@ -479,14 +487,22 @@ export default async function CareersPage() {
             SitGuru Internship Program
           </p>
           <h2 className="mt-2 text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-            Paid, remote, academic-credit eligible — not free labor.
+            Build your portfolio with a real startup — and earn college credit.
           </h2>
           <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-slate-600">
-            Interns work 8–12 hours a week with SitGuru leadership and support
-            the Social Media &amp; Community Growth Manager. Preferred model:
-            paid hourly plus college credit through the student&apos;s school
-            (for example Bucks County Community College MKTG-280). Semester
-            rotations keep the program educational and recurring.
+            Students, you&apos;ll join a live SitGuru team for a semester:
+            paid hourly, fully remote, and scheduled around class. Pick the
+            funnel that matches your major — social, community, events, design,
+            product, data, or another opening we post. You get mentoring,
+            real work for your résumé, and credit through your college when
+            your school approves it.
+          </p>
+          <p className="mt-3 max-w-4xl text-base font-semibold leading-7 text-slate-600">
+            Career centers and faculty: SitGuru is glad to serve as an
+            internship site. We can align with courses such as marketing
+            internships, communications, design, and computer science, with
+            learning goals, a semester calendar, and a SitGuru mentor. Interns
+            support a paid teammate. They do not replace one.
           </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {[
@@ -496,6 +512,9 @@ export default async function CareersPage() {
               "Graphic Design / Content",
               "Software Development",
               "Data / Analytics",
+              "Guru Success",
+              "Pet Parent Growth",
+              "Operations",
             ].map((track) => (
               <div
                 key={track}
