@@ -1,14 +1,11 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
-  Archive,
-  ArrowLeft,
   BadgeCheck,
   BookOpenCheck,
   BriefcaseBusiness,
   ClipboardCheck,
   ClipboardList,
-  ExternalLink,
   GraduationCap,
   HeartHandshake,
   MapPin,
@@ -22,6 +19,14 @@ import {
   Users,
   WalletCards,
 } from "lucide-react";
+import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
+import {
+  AdminWorkplaceActions,
+  AdminWorkplaceDenied,
+  AdminWorkplaceHealth,
+  GrowthCard,
+  GrowthPageFrame,
+} from "@/components/admin/growth/GrowthPageFrame";
 import { getAdminIdentity } from "@/lib/admin/access";
 import {
   getHrDashboardData,
@@ -62,16 +67,6 @@ const routes = {
 };
 
 const VETERANS_PROGRAM_LABEL = VETERANS_MILITARY_FAMILIES_PROGRAM.shortName;
-
-type ModuleCard = {
-  eyebrow: string;
-  title: string;
-  description: string;
-  href: string;
-  wiring: "live" | "next";
-  value?: string;
-  icon: ReactNode;
-};
 
 function number(value: number) {
   return new Intl.NumberFormat("en-US").format(
@@ -129,64 +124,6 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function MetricTile({
-  label,
-  value,
-  helper,
-}: {
-  label: string;
-  value: string;
-  helper: string;
-}) {
-  return (
-    <div className="rounded-[1.35rem] border border-emerald-100 bg-white p-4 shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
-      <p className="mt-1 text-xs font-semibold text-slate-500">{helper}</p>
-    </div>
-  );
-}
-
-function ModuleLinkCard({ card }: { card: ModuleCard }) {
-  return (
-    <Link
-      href={card.href}
-      className="group flex h-full flex-col rounded-[1.6rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-[#0D5C3A]">
-          {card.icon}
-        </div>
-        <span
-          className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
-            card.wiring === "live"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-amber-200 bg-amber-50 text-amber-800"
-          }`}
-        >
-          {card.wiring === "live" ? "Live" : "Next"}
-        </span>
-      </div>
-      <p className="mt-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-        {card.eyebrow}
-      </p>
-      <h3 className="mt-1 text-lg font-black text-slate-950">{card.title}</h3>
-      {card.value ? (
-        <p className="mt-2 text-2xl font-black text-[#0D5C3A]">{card.value}</p>
-      ) : null}
-      <p className="mt-2 flex-1 text-sm font-semibold leading-6 text-slate-600">
-        {card.description}
-      </p>
-      <span className="mt-4 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
-        Open
-        <ExternalLink size={14} className="transition group-hover:translate-x-0.5" />
-      </span>
-    </Link>
-  );
-}
-
 function LeadTable({
   title,
   subtitle,
@@ -205,10 +142,10 @@ function LeadTable({
   showProgram?: boolean;
 }) {
   return (
-    <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+    <GrowthCard className="min-w-0">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-black text-slate-950">{title}</h2>
+        <div className="min-w-0">
+          <h2 className="text-lg font-black text-slate-950">{title}</h2>
           <p className="mt-1 text-sm font-semibold text-slate-500">{subtitle}</p>
         </div>
         <Link
@@ -325,7 +262,7 @@ function LeadTable({
           </tbody>
         </table>
       </div>
-    </section>
+    </GrowthCard>
   );
 }
 
@@ -334,20 +271,9 @@ export default async function AdminHrPage() {
 
   if (!actor?.canAccessAdmin) {
     return (
-      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
-        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
-            Access Restricted
-          </p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
-            Admin access required.
-          </h1>
-          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-            Sign in with an authorized SitGuru admin or HR account to open Hiring
-            &amp; People Ops.
-          </p>
-        </div>
-      </div>
+      <AdminWorkplaceDenied
+        detail="Sign in with an authorized SitGuru admin or HR account to open Hiring & People."
+      />
     );
   }
 
@@ -357,592 +283,392 @@ export default async function AdminHrPage() {
     countCareerJobs(),
   ]);
 
-  const liveModules: ModuleCard[] = [
+  const pendingReview =
+    data.metrics.pendingGuruApplicants +
+    data.metrics.pendingBackgroundChecks +
+    data.metrics.needsReviewBackgroundChecks;
+  const healthy = data.sourceHealth.filter((source) => source.ok).length;
+
+  const tiles = [
     {
-      eyebrow: "Recruiting",
-      title: "Ambassador Leads",
-      description:
-        "Indeed, PA CareerLink, campus, referral, and website ambassador applicants.",
-      href: routes.ambassadorLeads,
-      wiring: "live",
+      label: "Active leads",
       value: number(data.metrics.activeAmbassadorLeads),
-      icon: <HeartHandshake size={20} />,
+      helper: "Ambassador pipeline",
+      tone: "emerald" as const,
+      icon: <HeartHandshake size={18} />,
     },
     {
-      eyebrow: "Dashboards",
-      title: "Ambassador Dashboards",
-      description:
-        "Active ambassador records, referral codes, and early referral tracking.",
-      href: routes.ambassadors,
-      wiring: "live",
+      label: "Dashboards",
       value: number(data.metrics.activeAmbassadorDashboards),
-      icon: <ClipboardCheck size={20} />,
+      helper: "Enabled ambassadors",
+      tone: "sky" as const,
+      icon: <ClipboardCheck size={18} />,
     },
     {
-      eyebrow: "Guru Hiring",
-      title: "Guru Applicants",
-      description:
-        "Pet Guru applications, onboarding progress, and approval readiness.",
-      href: routes.gurus,
-      wiring: "live",
+      label: "Guru applicants",
       value: number(data.metrics.activeGuruApplicants),
-      icon: <PawPrint size={20} />,
+      helper: "Active applicant records",
+      tone: "violet" as const,
+      icon: <PawPrint size={18} />,
     },
     {
-      eyebrow: "Approvals",
-      title: "Guru Approvals",
-      description:
-        "Final bookable review queue before Gurus go live on SitGuru.",
-      href: routes.guruApprovals,
-      wiring: "live",
-      value: number(data.metrics.pendingGuruApplicants),
-      icon: <BadgeCheck size={20} />,
+      label: "Pending review",
+      value: number(pendingReview),
+      helper: "Approvals + Trust & Safety",
+      tone: "amber" as const,
+      icon: <BadgeCheck size={18} />,
     },
     {
-      eyebrow: "Trust & Safety",
-      title: "Background Checks",
-      description:
-        "Checkr / Trust & Safety watchlist for pending and needs-review Gurus.",
-      href: routes.backgroundChecks,
-      wiring: "live",
+      label: "Approved / clear",
       value: number(
+        data.metrics.approvedGuruApplicants +
+          data.metrics.approvedBackgroundChecks,
+      ),
+      helper: "Ready for next step",
+      tone: "emerald" as const,
+      icon: <ShieldCheck size={18} />,
+    },
+    {
+      label: "Student Hire",
+      value: number(data.metrics.activeStudentHire),
+      helper: "Active student pathway",
+      tone: "sky" as const,
+      icon: <GraduationCap size={18} />,
+    },
+    {
+      label: "Community / Vets",
+      value: number(
+        data.metrics.activeCommunityHire + data.metrics.activeMilitaryHire,
+      ),
+      helper: `${VETERANS_PROGRAM_LABEL} included`,
+      tone: "violet" as const,
+      icon: <Users size={18} />,
+    },
+    {
+      label: "Recent 14 days",
+      value: number(data.metrics.recentApplicants),
+      helper: "New leads + applicants",
+      tone: "slate" as const,
+      icon: <Sparkles size={18} />,
+    },
+  ];
+
+  const actions = [
+    {
+      href: routes.ambassadorLeads,
+      label: "Ambassador leads",
+      detail: `${number(data.metrics.activeAmbassadorLeads)} in the pipeline`,
+      icon: HeartHandshake,
+    },
+    {
+      href: routes.guruApprovals,
+      label: "Guru approvals",
+      detail: `${number(data.metrics.pendingGuruApplicants)} waiting`,
+      icon: BadgeCheck,
+      primary: pendingReview > 0,
+    },
+    {
+      href: routes.backgroundChecks,
+      label: "Background checks",
+      detail: `${number(
         data.metrics.pendingBackgroundChecks +
           data.metrics.needsReviewBackgroundChecks,
-      ),
-      icon: <ShieldCheck size={20} />,
+      )} on the watchlist`,
+      icon: ShieldCheck,
     },
     {
-      eyebrow: "Training",
-      title: "SitGuru University",
-      description:
-        "Mass update onboarding modules, documents, videos, and certifications.",
-      href: routes.ambassadorTraining,
-      wiring: "live",
-      icon: <GraduationCap size={20} />,
-    },
-    {
-      eyebrow: "Programs",
-      title: "Hire Programs",
-      description: `Student Hire, Community Hire, and ${VETERANS_PROGRAM_LABEL} pathways.`,
       href: routes.programs,
-      wiring: "live",
-      value: number(
-        data.metrics.activeStudentHire +
-          data.metrics.activeCommunityHire +
-          data.metrics.activeMilitaryHire,
-      ),
-      icon: <BriefcaseBusiness size={20} />,
+      label: "Hire programs",
+      detail: `Student, Community, and ${VETERANS_PROGRAM_LABEL}`,
+      icon: BriefcaseBusiness,
     },
     {
-      eyebrow: "Growth Hire",
-      title: "Social & Community Manager",
-      description: `${growthHire.approvedSchools} schools approved, ${growthHire.pendingSchools} pending on Handshake. ${growthHire.messaged} messaged, ${growthHire.notMessaged} still to contact.`,
-      href: `${routes.growthHire}#schools`,
-      wiring: "live",
-      value: `${growthHire.approvedSchools} / ${growthHire.schools}`,
-      icon: <Sparkles size={20} />,
-    },
-    {
-      eyebrow: "Careers",
-      title: "Job & Internship Board",
-      description: `${careerCounts.published} published on sitguru.com/careers — ${careerCounts.careers} careers, ${careerCounts.internships} internships. Add roles by track.`,
       href: routes.careers,
-      wiring: "live",
-      value: String(careerCounts.published),
-      icon: <BriefcaseBusiness size={20} />,
+      label: "Careers job board",
+      detail: `${careerCounts.published} published roles`,
+      icon: ClipboardList,
     },
     {
-      eyebrow: "HQ People",
-      title: "Admin Access Control",
-      description:
-        "HR / People roles, password support, MFA visibility, and HQ department access.",
-      href: routes.settings,
-      wiring: "live",
-      icon: <Settings2 size={20} />,
+      href: `${routes.growthHire}#schools`,
+      label: "Growth hire",
+      detail: `${growthHire.approvedSchools} of ${growthHire.schools} schools approved`,
+      icon: Sparkles,
     },
     {
-      eyebrow: "Directory",
-      title: "User Directory",
-      description:
-        "Look up Pet Parents, Gurus, Ambassadors, and internal accounts.",
+      href: routes.ambassadorTraining,
+      label: "University",
+      detail: "Modules, assignments, and progress",
+      icon: GraduationCap,
+    },
+    {
       href: routes.users,
-      wiring: "live",
-      icon: <Users size={20} />,
+      label: "User directory",
+      detail: "Parents, Gurus, Ambassadors, HQ",
+      icon: Users,
     },
     {
-      eyebrow: "Archives",
-      title: "Archived Leads",
-      description:
-        "Declined or closed ambassador applicant records retained for history.",
-      href: routes.ambassadorLeadsArchived,
-      wiring: "live",
-      value: number(data.metrics.archivedAmbassadorLeads),
-      icon: <Archive size={20} />,
-    },
-    {
-      eyebrow: "Messaging",
-      title: "Applicant Messages",
-      description: "Follow up with leads, Gurus, and Ambassadors in Admin Messages.",
-      href: routes.messages,
-      wiring: "live",
-      icon: <MessageCircle size={20} />,
-    },
-    {
-      eyebrow: "Payroll",
-      title: "Employee Payroll",
-      description:
-        "W-2 / employee payroll stays in Financials. Contractor payouts stay under Payouts.",
-      href: routes.payroll,
-      wiring: "next",
-      icon: <WalletCards size={20} />,
+      href: routes.ambassadors,
+      label: "Ambassador dashboards",
+      detail: `${number(data.metrics.activeAmbassadorDashboards)} live accounts`,
+      icon: ClipboardCheck,
     },
   ];
 
   return (
-    <main className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1640px] space-y-6">
-        <section className="rounded-[2rem] border border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(13,92,58,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_55%,#f8fafc_100%)] p-5 shadow-sm sm:p-7">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div className="min-w-0">
-              <Link
-                href={routes.dashboard}
-                className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
-              >
-                <ArrowLeft size={16} />
-                Back to Admin
-              </Link>
+    <GrowthPageFrame
+      kicker="Hiring & People Workplace"
+      title="Move leads to Gurus, Ambassadors, and HQ hires."
+      detail="Work the ambassador pipeline, clear Guru approvals and Checkr, then send people into programs, University, or the job board."
+      action={
+        pendingReview > 0 ? (
+          <Link
+            href={routes.guruApprovals}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black !text-green-950"
+          >
+            <BadgeCheck size={17} />
+            Guru Approvals
+          </Link>
+        ) : (
+          <Link
+            href={routes.ambassadorLeads}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black !text-green-950"
+          >
+            <Plus size={17} />
+            Add lead
+          </Link>
+        )
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={routes.dashboard}
+          className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+        >
+          Admin HQ
+        </Link>
+        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
+          {actor.email}
+        </span>
+      </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl xl:text-5xl">
-                  Human Resources
-                </h1>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  Hiring & People Ops
-                </span>
-                <span
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
-                    data.isLive
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-amber-200 bg-amber-50 text-amber-800"
-                  }`}
-                >
-                  {data.isLive ? "Live Sources" : "Preview Sources"}
-                </span>
+      <section className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
+        {tiles.map((tile) => (
+          <AdminThemeCard
+            key={tile.label}
+            label={tile.label}
+            value={tile.value}
+            helper={tile.helper}
+            tone={tile.tone}
+            icon={tile.icon}
+          />
+        ))}
+      </section>
+
+      <AdminWorkplaceActions actions={actions} />
+
+      <section className="grid min-w-0 gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-7">
+          <LeadTable
+            title="Recent Ambassador Leads"
+            subtitle="Active recruiting pipeline across Student, Community, and Veterans pathways."
+            href={routes.ambassadorLeads}
+            leads={data.recentAmbassadorLeads}
+            emptyTitle="No active ambassador leads yet"
+            emptyDetail="Add Indeed, PA CareerLink, campus, or referral leads to start the pipeline."
+            showProgram
+          />
+        </div>
+
+        <div className="min-w-0 space-y-4 xl:col-span-5">
+          <GrowthCard className="min-w-0">
+            <div className="flex items-end justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-black text-slate-950">
+                  Program mix
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Active ambassador leads by pathway.
+                </p>
               </div>
-
-              <p className="mt-3 max-w-4xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-                Manage SitGuru hiring as a hub over live ops modules — ambassador
-                recruiting, Guru applicants/approvals, Trust &amp; Safety,
-                SitGuru University, programs, and HQ people access. Employee
-                payroll stays Next in Financials.
-              </p>
-
-              <p className="mt-3 text-xs font-bold text-slate-500">
-                Signed in as {actor.email} · Role {actor.role}
-                {actor.canManageUsers ? " · Can manage people access" : ""}
-              </p>
+              <Link
+                href={routes.programs}
+                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+              >
+                Programs
+              </Link>
             </div>
-
-            <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
-              <Link
-                href={routes.ambassadorLeads}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
-              >
-                <Plus size={17} />
-                Add Lead
-              </Link>
-              <Link
-                href={routes.guruApprovals}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
-              >
-                <BadgeCheck size={17} />
-                Guru Approvals
-              </Link>
-              <Link
-                href={routes.ambassadorTraining}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
-              >
-                <GraduationCap size={17} />
-                University
-              </Link>
-              <Link
-                href={routes.growthHire}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-900"
-              >
-                <Sparkles size={17} />
-                Hire Social
-              </Link>
-              <Link
-                href={routes.careers}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
-              >
-                <BriefcaseBusiness size={17} />
-                Post a Job
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-          <MetricTile
-            label="Active Leads"
-            value={number(data.metrics.activeAmbassadorLeads)}
-            helper="Ambassador pipeline"
-          />
-          <MetricTile
-            label="Dashboards"
-            value={number(data.metrics.activeAmbassadorDashboards)}
-            helper="Enabled ambassadors"
-          />
-          <MetricTile
-            label="Guru Applicants"
-            value={number(data.metrics.activeGuruApplicants)}
-            helper="Active applicant records"
-          />
-          <MetricTile
-            label="Pending Review"
-            value={number(
-              data.metrics.pendingGuruApplicants +
-                data.metrics.pendingBackgroundChecks +
-                data.metrics.needsReviewBackgroundChecks,
-            )}
-            helper="Approvals + Trust & Safety"
-          />
-          <MetricTile
-            label="Approved / Clear"
-            value={number(
-              data.metrics.approvedGuruApplicants +
-                data.metrics.approvedBackgroundChecks,
-            )}
-            helper="Ready for next step"
-          />
-          <MetricTile
-            label="Student Hire"
-            value={number(data.metrics.activeStudentHire)}
-            helper="Active student pathway"
-          />
-          <MetricTile
-            label="Community / Vets"
-            value={number(
-              data.metrics.activeCommunityHire + data.metrics.activeMilitaryHire,
-            )}
-            helper={`${VETERANS_PROGRAM_LABEL} included`}
-          />
-          <MetricTile
-            label="Recent 14 Days"
-            value={number(data.metrics.recentApplicants)}
-            helper="New leads + applicants"
-          />
-        </section>
-
-        <section>
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                Manage HR from live modules
-              </p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">
-                Hiring command center
-              </h2>
-            </div>
-            <p className="text-sm font-semibold text-slate-500">
-              Live = wired ops pages · Next = planned employee payroll
-            </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {liveModules.map((card) => (
-              <ModuleLinkCard key={card.title} card={card} />
-            ))}
-          </div>
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-7">
-            <LeadTable
-              title="Recent Ambassador Leads"
-              subtitle="Active recruiting pipeline across Student, Community, and Veterans pathways."
-              href={routes.ambassadorLeads}
-              leads={data.recentAmbassadorLeads}
-              emptyTitle="No active ambassador leads yet"
-              emptyDetail="Add Indeed, PA CareerLink, campus, or referral leads to start the pipeline."
-              showProgram
-            />
-          </div>
-
-          <div className="space-y-4 xl:col-span-5">
-            <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-black text-slate-950">
-                    Program mix
-                  </h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    Active ambassador leads by pathway.
-                  </p>
-                </div>
-                <Link
-                  href={routes.programs}
-                  className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
-                >
-                  Programs
-                </Link>
-              </div>
-              <div className="mt-4 grid gap-3">
-                {[
-                  ["Student Hire", data.metrics.activeStudentHire],
-                  ["Community Hire", data.metrics.activeCommunityHire],
-                  [VETERANS_PROGRAM_LABEL, data.metrics.activeMilitaryHire],
-                ].map(([label, value]) => (
-                  <div
-                    key={String(label)}
-                    className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
-                  >
-                    <p className="font-black text-slate-900">{label}</p>
-                    <p className="text-lg font-black text-[#0D5C3A]">
-                      {number(Number(value))}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-black text-slate-950">
-                    University tools
-                  </h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    Training, assignments, and progress.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 grid gap-3">
-                {[
-                  [
-                    "SitGuru University Hub",
-                    routes.ambassadorTraining,
-                    <GraduationCap key="t" size={16} />,
-                  ],
-                  [
-                    "Training Manager",
-                    routes.ambassadorTrainingManage,
-                    <BookOpenCheck key="m" size={16} />,
-                  ],
-                  [
-                    "Academy Assignments",
-                    routes.universityAssignments,
-                    <ClipboardList key="a" size={16} />,
-                  ],
-                  [
-                    "Progress Tracker",
-                    routes.universityProgress,
-                    <ClipboardCheck key="p" size={16} />,
-                  ],
-                  [
-                    "Move leads into onboarding",
-                    routes.ambassadorLeads,
-                    <UserPlus key="l" size={16} />,
-                  ],
-                ].map(([label, href, icon]) => (
-                  <Link
-                    key={String(href)}
-                    href={String(href)}
-                    className="inline-flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm font-black text-slate-900 transition hover:border-emerald-200 hover:bg-emerald-50"
-                  >
-                    <span className="text-emerald-800">{icon as ReactNode}</span>
-                    {label as string}
-                  </Link>
-                ))}
-              </div>
-            </section>
-          </div>
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-7">
-            <LeadTable
-              title="Recent Guru Applicants"
-              subtitle="Applications and onboarding activity feeding Guru Approvals."
-              href={routes.gurus}
-              leads={data.recentGuruApplicants}
-              emptyTitle="No Guru applicants yet"
-              emptyDetail="Guru applications and onboarding activity will appear here."
-            />
-          </div>
-
-          <div className="xl:col-span-5">
-            <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-black text-slate-950">
-                    Trust &amp; Safety watchlist
-                  </h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    Pending and needs-review background checks.
-                  </p>
-                </div>
-                <Link
-                  href={routes.backgroundChecks}
-                  className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-black text-sky-900 transition hover:bg-sky-100"
-                >
-                  Open Checks
-                </Link>
-              </div>
-
-              <div className="mt-4 grid gap-3">
-                {data.pendingBackgroundChecks.length ? (
-                  data.pendingBackgroundChecks.map((check) => (
-                    <Link
-                      key={`${check.id}-${check.email}`}
-                      href={check.href}
-                      className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 transition hover:border-sky-200 hover:bg-sky-50"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-800">
-                          <ShieldCheck size={18} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-black text-slate-950">{check.name}</p>
-                          <p className="truncate text-xs font-semibold text-slate-500">
-                            {check.email}
-                          </p>
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <StatusBadge status={check.status} />
-                            <span className="text-xs font-bold text-slate-500">
-                              {formatDate(check.date)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5">
-                    <p className="font-black text-slate-950">No pending checks</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">
-                      Pending Guru trust and safety checks will show here once
-                      `guru_background_checks` has live rows.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-2">
-          <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-xl font-black text-slate-950">Source health</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              HR hub reads live ops tables — it does not invent a separate employee
-              database.
-            </p>
             <div className="mt-4 grid gap-3">
-              {data.sourceHealth.map((source) => (
+              {[
+                ["Student Hire", data.metrics.activeStudentHire],
+                ["Community Hire", data.metrics.activeCommunityHire],
+                [VETERANS_PROGRAM_LABEL, data.metrics.activeMilitaryHire],
+              ].map(([label, value]) => (
                 <div
-                  key={source.id}
-                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                  key={String(label)}
+                  className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-black text-slate-900">{source.label}</p>
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
-                        source.ok
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : "border-amber-200 bg-amber-50 text-amber-800"
-                      }`}
-                    >
-                      {source.ok ? "Connected" : "Pending"}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm font-semibold text-slate-600">
-                    {source.message}
-                  </p>
-                  <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
-                    {number(source.rowCount)} rows
+                  <p className="font-black text-slate-900">{label}</p>
+                  <p className="text-lg font-black text-[#0D5C3A]">
+                    {number(Number(value))}
                   </p>
                 </div>
               ))}
             </div>
-          </section>
+          </GrowthCard>
 
-          <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-[#0D5C3A]">
-              <Sparkles size={20} />
+          <GrowthCard className="min-w-0">
+            <div className="min-w-0">
+              <h2 className="text-lg font-black text-slate-950">
+                University tools
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Training, assignments, and progress.
+              </p>
             </div>
-            <h2 className="text-xl font-black text-slate-950">
-              How to manage HR here
-            </h2>
-            <ul className="mt-3 space-y-3 text-sm font-semibold leading-6 text-slate-600">
-              <li>
-                Use this page as the hub. Keep CRUD on Ambassador Leads, Gurus,
-                Approvals, Trust &amp; Safety, University, Programs, and Settings.
-              </li>
-              <li>
-                Track Handshake requested schools and shortlisted candidates on
-                Hire Social & Community. Grant portal access only when the
-                contractor starts the 30-day trial.
-              </li>
-              <li>
-                Publish company careers and SitGuru Internship Program roles on
-                the Job &amp; Internship Board. Those listings feed
-                sitguru.com/careers. Prefer paid internships plus college credit.
-              </li>
-              <li>
-                Other HQ people access (roles, passwords, MFA) still lives in
-                Admin Settings.
-              </li>
-              <li>
-                Contractor payouts stay in Payouts / Financials. Employee payroll
-                is marked Next until W-2 tooling is real.
-              </li>
-              <li>
-                Export applicant or roster CSVs from Exports when you need CPA /
-                ops handoff packages.
-              </li>
-            </ul>
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-4 grid gap-3">
+              {[
+                [
+                  "SitGuru University Hub",
+                  routes.ambassadorTraining,
+                  <GraduationCap key="t" size={16} />,
+                ],
+                [
+                  "Training Manager",
+                  routes.ambassadorTrainingManage,
+                  <BookOpenCheck key="m" size={16} />,
+                ],
+                [
+                  "Academy Assignments",
+                  routes.universityAssignments,
+                  <ClipboardList key="a" size={16} />,
+                ],
+                [
+                  "Progress Tracker",
+                  routes.universityProgress,
+                  <ClipboardCheck key="p" size={16} />,
+                ],
+                [
+                  "Move leads into onboarding",
+                  routes.ambassadorLeads,
+                  <UserPlus key="l" size={16} />,
+                ],
+              ].map(([label, href, icon]) => (
+                <Link
+                  key={String(href)}
+                  href={String(href)}
+                  className="inline-flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm font-black text-slate-900 transition hover:border-emerald-200 hover:bg-emerald-50"
+                >
+                  <span className="text-emerald-800">{icon as ReactNode}</span>
+                  {label as string}
+                </Link>
+              ))}
+            </div>
+          </GrowthCard>
+        </div>
+      </section>
+
+      <section className="grid min-w-0 gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-7">
+          <LeadTable
+            title="Recent Guru Applicants"
+            subtitle="Applications and onboarding activity feeding Guru Approvals."
+            href={routes.gurus}
+            leads={data.recentGuruApplicants}
+            emptyTitle="No Guru applicants yet"
+            emptyDetail="Guru applications and onboarding activity will appear here."
+          />
+        </div>
+
+        <div className="min-w-0 xl:col-span-5">
+          <GrowthCard className="min-w-0">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-black text-slate-950">
+                  Trust &amp; Safety watchlist
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Pending and needs-review background checks.
+                </p>
+              </div>
               <Link
-                href={routes.growthHire}
-                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
+                href={routes.backgroundChecks}
+                className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-black text-sky-900 transition hover:bg-sky-100"
               >
-                Hire Social & Community
-              </Link>
-              <Link
-                href={routes.careers}
-                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
-              >
-                Careers board
-              </Link>
-              <Link
-                href={routes.growthPortal}
-                className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-50"
-              >
-                Growth Portal
-              </Link>
-              <Link
-                href={routes.settings}
-                className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-50"
-              >
-                HQ People Access
-              </Link>
-              <Link
-                href={routes.payouts}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-800 transition hover:bg-slate-50"
-              >
-                Contractor Payouts
-              </Link>
-              <Link
-                href={routes.exports}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-800 transition hover:bg-slate-50"
-              >
-                Exports
+                Open Checks
               </Link>
             </div>
-          </section>
-        </section>
-      </div>
-    </main>
+
+            <div className="mt-4 grid gap-3">
+              {data.pendingBackgroundChecks.length ? (
+                data.pendingBackgroundChecks.map((check) => (
+                  <Link
+                    key={`${check.id}-${check.email}`}
+                    href={check.href}
+                    className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 transition hover:border-sky-200 hover:bg-sky-50"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-800">
+                        <ShieldCheck size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-black text-slate-950">{check.name}</p>
+                        <p className="truncate text-xs font-semibold text-slate-500">
+                          {check.email}
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <StatusBadge status={check.status} />
+                          <span className="text-xs font-bold text-slate-500">
+                            {formatDate(check.date)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5">
+                  <p className="font-black text-slate-950">No pending checks</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    Pending Guru trust and safety checks will show here.
+                  </p>
+                </div>
+              )}
+            </div>
+          </GrowthCard>
+        </div>
+      </section>
+
+      <AdminWorkplaceHealth
+        sources={data.sourceHealth}
+        helper={`${healthy} of ${data.sourceHealth.length} live${
+          data.isLive ? "" : " · preview sources"
+        }`}
+        links={
+          <>
+            <Link
+              href={routes.payroll}
+              className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900"
+            >
+              <WalletCards size={13} className="mr-1 inline" />
+              Payroll
+            </Link>
+            <Link
+              href={routes.messages}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
+            >
+              <MessageCircle size={13} className="mr-1 inline" />
+              Messages
+            </Link>
+            <Link
+              href={routes.settings}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
+            >
+              <Settings2 size={13} className="mr-1 inline" />
+              Settings
+            </Link>
+          </>
+        }
+      />
+    </GrowthPageFrame>
   );
 }

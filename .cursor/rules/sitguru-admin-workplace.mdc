@@ -1,0 +1,28 @@
+---
+description: Keep every Admin page on the same SitGuru workplace look
+globs: app/admin/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# SitGuru Admin workplace look
+
+New or restyled Admin pages must match Growth / Referrals / Programs — not the old white “command center” walls.
+
+## Required chrome
+- Use `GrowthPageFrame` (or `AdminWorkplaceFrame` from `@/components/admin/AdminWorkplace`).
+- Green header `#0D5C3A` with `public-dark-section` / `data-brand-green` and `!text-white` on titles. Never dark text on brand green.
+- Color KPI tiles via `AdminThemeCard` (emerald / sky / amber / rose / violet / slate).
+- Big action tiles via `AdminWorkplaceActions` — icon, short label, one-line detail. One primary green tile when there is work to do.
+- Work queues and lists live in `GrowthCard` / `AdminWorkplaceCard`.
+- Source health is a compact footer (`AdminWorkplaceHealth`), not a second hero.
+
+## Do not ship
+- Pale gradient “Pathways Command Center” heroes
+- 12–16 identical white module cards with Live/Next badges
+- Eight tiny white metric tiles in one row
+- Long technical copy as the first thing on the page
+- Grids that overflow the admin pane — use `min-w-0`, wrap text, stack before `xl`
+
+## Copy
+- Punchy workplace titles (“Turn X into Y”), not department slogans.
+- Keep contractor / SkillBridge / Checkr legal notes short and in a notes card.

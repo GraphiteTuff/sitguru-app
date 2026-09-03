@@ -1,13 +1,10 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft,
   BadgeCheck,
   BriefcaseBusiness,
   Building2,
   ClipboardList,
   Download,
-  ExternalLink,
   GraduationCap,
   Handshake,
   HeartHandshake,
@@ -17,18 +14,21 @@ import {
   Users,
   UsersRound,
 } from "lucide-react";
-import { getAdminIdentity } from "@/lib/admin/access";
+import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
 import {
-  getProgramsDashboardData,
-  type ProgramsRecentItem,
-} from "@/lib/admin/programs/dashboard";
+  AdminWorkplaceActions,
+  GrowthCard,
+  GrowthPageFrame,
+  StatusPill,
+} from "@/components/admin/growth/GrowthPageFrame";
+import { getAdminIdentity } from "@/lib/admin/access";
+import { getProgramsDashboardData } from "@/lib/admin/programs/dashboard";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 export const dynamic = "force-dynamic";
 
 const routes = {
   dashboard: "/admin",
-  hub: "/admin/programs",
   overview: "/admin/programs/overview",
   applications: "/admin/program-applications",
   studentHire: "/admin/programs/student-hire",
@@ -39,21 +39,10 @@ const routes = {
   ambassadorLeads: "/admin/ambassador-leads",
   partners: "/admin/partners",
   referrals: "/admin/referrals",
-  salesMarketing: "/admin/sales-marketing",
   hr: "/admin/hr",
   exports: "/admin/exports",
   gurus: "/admin/gurus",
   backgroundChecks: "/admin/background-checks",
-};
-
-type ModuleCard = {
-  eyebrow: string;
-  title: string;
-  description: string;
-  href: string;
-  wiring: "live" | "next";
-  value?: string;
-  icon: ReactNode;
 };
 
 function number(value: number) {
@@ -62,144 +51,14 @@ function number(value: number) {
   );
 }
 
-function formatDate(value?: string | null) {
+function formatWhen(value?: string | null) {
   if (!value) return "—";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "—";
   return parsed.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
   });
-}
-
-function MetricTile({
-  label,
-  value,
-  helper,
-}: {
-  label: string;
-  value: string;
-  helper: string;
-}) {
-  return (
-    <div className="rounded-[1.35rem] border border-emerald-100 bg-white p-4 shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
-      <p className="mt-1 text-xs font-semibold text-slate-500">{helper}</p>
-    </div>
-  );
-}
-
-function ModuleLinkCard({ card }: { card: ModuleCard }) {
-  return (
-    <Link
-      href={card.href}
-      className="group flex h-full flex-col rounded-[1.6rem] border border-emerald-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-[#0D5C3A]">
-          {card.icon}
-        </div>
-        <span
-          className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
-            card.wiring === "live"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-amber-200 bg-amber-50 text-amber-800"
-          }`}
-        >
-          {card.wiring === "live" ? "Live" : "Next"}
-        </span>
-      </div>
-      <p className="mt-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-        {card.eyebrow}
-      </p>
-      <h3 className="mt-1 text-lg font-black text-slate-950">{card.title}</h3>
-      {card.value ? (
-        <p className="mt-2 text-2xl font-black text-[#0D5C3A]">{card.value}</p>
-      ) : null}
-      <p className="mt-2 flex-1 text-sm font-semibold leading-6 text-slate-600">
-        {card.description}
-      </p>
-      <span className="mt-4 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
-        Open
-        <ExternalLink
-          size={14}
-          className="transition group-hover:translate-x-0.5"
-        />
-      </span>
-    </Link>
-  );
-}
-
-function RecentList({
-  title,
-  subtitle,
-  href,
-  items,
-  emptyTitle,
-  emptyDetail,
-}: {
-  title: string;
-  subtitle: string;
-  href: string;
-  items: ProgramsRecentItem[];
-  emptyTitle: string;
-  emptyDetail: string;
-}) {
-  return (
-    <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-black text-slate-950">{title}</h2>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{subtitle}</p>
-        </div>
-        <Link
-          href={href}
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100"
-        >
-          Open
-        </Link>
-      </div>
-      <div className="mt-4 grid gap-3">
-        {items.length ? (
-          items.map((item) => (
-            <Link
-              key={item.id}
-              href={item.href}
-              className="rounded-2xl border border-slate-100 bg-slate-50 p-4 transition hover:border-emerald-200 hover:bg-emerald-50/50"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-black text-slate-950">
-                    {item.title}
-                  </p>
-                  <p className="mt-1 truncate text-xs font-semibold text-slate-500">
-                    {item.subtitle}
-                  </p>
-                </div>
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">
-                  {item.status}
-                </span>
-              </div>
-              <p className="mt-3 text-xs font-bold text-slate-500">
-                {formatDate(item.date)}
-              </p>
-            </Link>
-          ))
-        ) : (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5">
-            <p className="font-black text-slate-950">{emptyTitle}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              {emptyDetail}
-            </p>
-          </div>
-        )}
-      </div>
-    </section>
-  );
 }
 
 export default async function AdminProgramsHubPage() {
@@ -215,386 +74,431 @@ export default async function AdminProgramsHubPage() {
           <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
             Admin access required.
           </h1>
-          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-            Sign in with an authorized SitGuru admin account to open Growth
-            Programs.
-          </p>
         </div>
       </div>
     );
   }
 
   const data = await getProgramsDashboardData();
+  const healthy = data.sourceHealth.filter((source) => source.ok).length;
+  const queueCount =
+    data.metrics.pendingApplications + data.metrics.ambassadorLeads;
+  const latest = [...data.recentApplications, ...data.recentAmbassadorLeads]
+    .sort((a, b) => {
+      const dateA = new Date(a.date || 0).getTime();
+      const dateB = new Date(b.date || 0).getTime();
+      return dateB - dateA;
+    })
+    .slice(0, 6);
 
-  const modules: ModuleCard[] = [
+  const tiles = [
     {
-      eyebrow: "Catalog",
-      title: "Programs Overview",
-      description:
-        "Pathway definitions, readiness scores, and full program metrics.",
-      href: routes.overview,
-      wiring: "live",
+      label: "Applications",
       value: number(data.metrics.applications),
-      icon: <BriefcaseBusiness size={20} />,
+      helper: `${number(data.metrics.pendingApplications)} pending`,
+      tone: "emerald" as const,
+      icon: <ClipboardList size={18} />,
     },
     {
-      eyebrow: "Intake",
-      title: "Program Applications",
-      description:
-        "Review Student, Community, Veterans, and Ambassador applications.",
-      href: routes.applications,
-      wiring: "live",
+      label: "Pending review",
       value: number(data.metrics.pendingApplications),
-      icon: <ClipboardList size={20} />,
+      helper: "Needs a decision",
+      tone: "amber" as const,
+      icon: <ClipboardList size={18} />,
     },
     {
-      eyebrow: "Earn",
-      title: "Student Hire Ops",
-      description: "Campus and student applicant queue for flexible Guru work.",
-      href: routes.studentHire,
-      wiring: "live",
-      value: number(data.metrics.studentHire),
-      icon: <GraduationCap size={20} />,
+      label: "Approved",
+      value: number(data.metrics.approvedApplications),
+      helper: "Ready to onboard",
+      tone: "sky" as const,
+      icon: <BadgeCheck size={18} />,
     },
     {
-      eyebrow: "Work",
-      title: "Community Hire Ops",
-      description:
-        "Workforce and nonprofit referral pathway with fair Checkr review.",
-      href: routes.communityHire,
-      wiring: "live",
-      value: number(data.metrics.communityHire),
-      icon: <Building2 size={20} />,
-    },
-    {
-      eyebrow: "Serve",
-      title: VETERANS_MILITARY_FAMILIES_PROGRAM.shortName,
-      description:
-        "Veterans, military families, and transition pathway ops desk.",
-      href: routes.militaryHire,
-      wiring: "live",
-      value: number(data.metrics.militaryHire),
-      icon: <Medal size={20} />,
-    },
-    {
-      eyebrow: "Interest",
-      title: "SkillBridge Interest",
-      description:
-        "Track SkillBridge interest without promising placement or enrollment.",
-      href: routes.skillbridge,
-      wiring: "live",
-      value: number(data.metrics.skillbridgeInterest),
-      icon: <ShieldCheck size={20} />,
-    },
-    {
-      eyebrow: "Lead",
-      title: "Ambassadors",
-      description: "Active Ambassador dashboards, Pack Leaders, and referral growth.",
-      href: routes.ambassadors,
-      wiring: "live",
-      value: number(data.metrics.ambassadors),
-      icon: <HeartHandshake size={20} />,
-    },
-    {
-      eyebrow: "Recruit",
-      title: "Ambassador Leads",
-      description: "Recruiting pipeline feeding hire pathways and Pack growth.",
-      href: routes.ambassadorLeads,
-      wiring: "live",
+      label: "Ambassador leads",
       value: number(data.metrics.ambassadorLeads),
-      icon: <UsersRound size={20} />,
+      helper: "Recruiting pipeline",
+      tone: "violet" as const,
+      icon: <UsersRound size={18} />,
     },
     {
-      eyebrow: "Partners",
-      title: "Partners Hub",
-      description: "Partner applications and community growth sources.",
-      href: routes.partners,
-      wiring: "live",
+      label: "Ambassadors",
+      value: number(data.metrics.ambassadors),
+      helper: "Active growth network",
+      tone: "emerald" as const,
+      icon: <HeartHandshake size={18} />,
+    },
+    {
+      label: "Partners",
       value: number(data.metrics.partnerApplications),
-      icon: <Handshake size={20} />,
+      helper: "Clinic and community",
+      tone: "slate" as const,
+      icon: <Handshake size={18} />,
     },
     {
-      eyebrow: "Growth",
-      title: "Growth & Referrals",
-      description: "Referral codes, PawPerks, and reward attribution.",
-      href: routes.referrals,
-      wiring: "live",
-      icon: <Sparkles size={20} />,
+      label: "SkillBridge",
+      value: number(data.metrics.skillbridgeInterest),
+      helper: "Interest only",
+      tone: "rose" as const,
+      icon: <ShieldCheck size={18} />,
     },
     {
-      eyebrow: "People",
-      title: "Hiring & People Ops",
-      description: "HR desk for leads, Guru approvals, and Trust & Safety.",
-      href: routes.hr,
-      wiring: "live",
-      icon: <Users size={20} />,
+      label: "Sources live",
+      value: `${healthy}/${data.sourceHealth.length}`,
+      helper: "Applications and leads",
+      tone: "sky" as const,
+      icon: <Sparkles size={18} />,
+    },
+  ];
+
+  const actions = [
+    {
+      href: routes.applications,
+      label: "Review applications",
+      detail: `${number(data.metrics.pendingApplications)} waiting`,
+      icon: ClipboardList,
+      primary: data.metrics.pendingApplications > 0,
     },
     {
-      eyebrow: "Trust",
-      title: "Background Checks",
-      description: "Checkr and Trust & Safety status across hire pathways.",
-      href: routes.backgroundChecks,
-      wiring: "live",
-      icon: <BadgeCheck size={20} />,
+      href: routes.ambassadorLeads,
+      label: "Ambassador leads",
+      detail: `${number(data.metrics.ambassadorLeads)} in the pipeline`,
+      icon: UsersRound,
     },
     {
-      eyebrow: "Export",
-      title: "Export Center",
-      description: "CSV and ops exports for program and growth reporting.",
-      href: routes.exports,
-      wiring: "live",
-      icon: <Download size={20} />,
+      href: routes.studentHire,
+      label: "Student Hire",
+      detail: `${number(data.metrics.studentHire)} campus applicants`,
+      icon: GraduationCap,
     },
     {
-      eyebrow: "Gurus",
-      title: "Guru Directory",
-      description: "Approved and onboarding Gurus coming out of program pathways.",
-      href: routes.gurus,
-      wiring: "live",
-      icon: <Users size={20} />,
+      href: routes.communityHire,
+      label: "Community Hire",
+      detail: `${number(data.metrics.communityHire)} workforce applicants`,
+      icon: Building2,
+    },
+    {
+      href: routes.militaryHire,
+      label: "Veterans pathway",
+      detail: VETERANS_MILITARY_FAMILIES_PROGRAM.shortName,
+      icon: Medal,
+    },
+    {
+      href: routes.skillbridge,
+      label: "SkillBridge interest",
+      detail: "Track interest, no placement promise",
+      icon: ShieldCheck,
+    },
+    {
+      href: routes.ambassadors,
+      label: "Ambassadors",
+      detail: `${number(data.metrics.ambassadors)} live accounts`,
+      icon: HeartHandshake,
+    },
+    {
+      href: routes.partners,
+      label: "Partners",
+      detail: "Clinics and community sources",
+      icon: Handshake,
+    },
+    {
+      href: routes.overview,
+      label: "Programs overview",
+      detail: "Definitions and readiness",
+      icon: BriefcaseBusiness,
+    },
+  ];
+
+  const pathways = [
+    {
+      href: routes.studentHire,
+      label: "Student Hire",
+      value: data.metrics.studentHire,
+      helper: "Earn with the Pack",
+      tone: "sky" as const,
+      icon: <GraduationCap size={18} />,
+    },
+    {
+      href: routes.communityHire,
+      label: "Community Hire",
+      value: data.metrics.communityHire,
+      helper: "Work with the Pack",
+      tone: "emerald" as const,
+      icon: <Building2 size={18} />,
+    },
+    {
+      href: routes.militaryHire,
+      label: "Veterans",
+      value: data.metrics.militaryHire,
+      helper: "Serve with the Pack",
+      tone: "violet" as const,
+      icon: <Medal size={18} />,
+    },
+    {
+      href: routes.skillbridge,
+      label: "SkillBridge",
+      value: data.metrics.skillbridgeInterest,
+      helper: "Interest list only",
+      tone: "amber" as const,
+      icon: <ShieldCheck size={18} />,
     },
   ];
 
   return (
-    <main className="min-h-screen bg-[#f7fbf8] px-3 py-4 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto min-w-0 max-w-[1640px] space-y-6">
-        <section className="rounded-[2rem] border border-emerald-100 bg-[radial-gradient(circle_at_top_left,rgba(13,92,58,0.12),transparent_34%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_55%,#f8fafc_100%)] p-5 shadow-sm sm:p-7">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div className="min-w-0">
-              <Link
-                href={routes.dashboard}
-                className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
-              >
-                <ArrowLeft size={16} />
-                Back to Admin
-              </Link>
+    <GrowthPageFrame
+      kicker="Growth Programs Workplace"
+      title="Turn applications into Gurus, Ambassadors, and partners."
+      detail="Review who applied, walk each hire pathway, then send people on to Checkr, HR, or the Ambassador desk."
+      action={
+        <Link
+          href={routes.applications}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-green-950"
+        >
+          <ClipboardList size={17} />
+          Review applications
+        </Link>
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={routes.dashboard}
+          className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+        >
+          Admin HQ
+        </Link>
+        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
+          {actor.email}
+        </span>
+      </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl xl:text-5xl">
-                  Growth Programs
-                </h1>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  Pathways Command Center
-                </span>
-                <span
-                  className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
-                    data.isLive
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-amber-200 bg-amber-50 text-amber-800"
-                  }`}
-                >
-                  {data.isLive ? "Live Sources" : "Preview Sources"}
-                </span>
-              </div>
+      <section className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
+        {tiles.map((tile) => (
+          <AdminThemeCard
+            key={tile.label}
+            label={tile.label}
+            value={tile.value}
+            helper={tile.helper}
+            tone={tile.tone}
+            icon={tile.icon}
+          />
+        ))}
+      </section>
 
-              <p className="mt-3 max-w-4xl text-sm font-semibold leading-6 text-slate-600 sm:text-base sm:leading-7">
-                Run Student Hire, Community Hire,{" "}
-                {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}, SkillBridge
-                interest, and Ambassador growth from one hub — with deep links
-                into applications, partners, referrals, and Trust &amp; Safety.
-              </p>
+      <AdminWorkplaceActions actions={actions} />
 
-              <p className="mt-3 text-xs font-bold text-slate-500">
-                Signed in as {actor.email} · Role {actor.role}
-              </p>
-            </div>
+      <section className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {pathways.map((pathway) => (
+          <Link key={pathway.href} href={pathway.href} className="min-w-0">
+            <AdminThemeCard
+              label={pathway.label}
+              value={number(pathway.value)}
+              helper={pathway.helper}
+              tone={pathway.tone}
+              icon={pathway.icon}
+            />
+          </Link>
+        ))}
+      </section>
 
-            <div className="grid w-full shrink-0 gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
+      <div className="grid min-w-0 gap-4 md:grid-cols-2">
+        <GrowthCard className="min-w-0">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-black text-slate-950">Today’s queue</h2>
+            <StatusPill value={queueCount > 0 ? "Review" : "Ready"} />
+          </div>
+          <div className="mt-4 space-y-3">
+            {data.metrics.pendingApplications > 0 ? (
               <Link
                 href={routes.applications}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-900"
+                className="block rounded-2xl bg-amber-50 px-3 py-3 text-sm font-black text-amber-900"
               >
-                <ClipboardList size={17} />
-                Review Applications
+                {number(data.metrics.pendingApplications)} applications waiting
+                for review
               </Link>
-              <Link
-                href={routes.overview}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
-              >
-                <BriefcaseBusiness size={17} />
-                Overview
-              </Link>
+            ) : null}
+            {data.metrics.ambassadorLeads > 0 ? (
               <Link
                 href={routes.ambassadorLeads}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50"
+                className="block rounded-2xl bg-violet-50 px-3 py-3 text-sm font-black text-violet-900"
               >
-                <UsersRound size={17} />
-                Ambassador Leads
+                {number(data.metrics.ambassadorLeads)} ambassador leads to work
               </Link>
+            ) : null}
+            {data.metrics.skillbridgeInterest > 0 ? (
               <Link
-                href={routes.exports}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-black text-emerald-900 shadow-sm transition hover:bg-emerald-100"
+                href={routes.skillbridge}
+                className="block rounded-2xl bg-rose-50 px-3 py-3 text-sm font-black text-rose-900"
               >
-                <Download size={17} />
-                Export Center
+                {number(data.metrics.skillbridgeInterest)} SkillBridge interest
+                notes
               </Link>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-          <MetricTile
-            label="Applications"
-            value={number(data.metrics.applications)}
-            helper="All program applications"
-          />
-          <MetricTile
-            label="Pending Review"
-            value={number(data.metrics.pendingApplications)}
-            helper="Needs ops follow-up"
-          />
-          <MetricTile
-            label="Approved"
-            value={number(data.metrics.approvedApplications)}
-            helper="Approved / active signals"
-          />
-          <MetricTile
-            label="Student Hire"
-            value={number(data.metrics.studentHire)}
-            helper="Earn with the Pack"
-          />
-          <MetricTile
-            label="Community Hire"
-            value={number(data.metrics.communityHire)}
-            helper="Work with the Pack"
-          />
-          <MetricTile
-            label="Veterans Pathway"
-            value={number(data.metrics.militaryHire)}
-            helper="Serve with the Pack"
-          />
-          <MetricTile
-            label="Ambassador Leads"
-            value={number(data.metrics.ambassadorLeads)}
-            helper="Recruiting pipeline"
-          />
-          <MetricTile
-            label="Ambassadors"
-            value={number(data.metrics.ambassadors)}
-            helper="Active growth network"
-          />
-        </section>
-
-        <section>
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
-                Manage pathways from live modules
-              </p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">
-                Growth Programs command center
-              </h2>
-            </div>
-            <p className="text-sm font-semibold text-slate-500">
-              Live = readable ops · Next = deferred write surfaces
-            </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {modules.map((card) => (
-              <ModuleLinkCard key={card.title} card={card} />
-            ))}
-          </div>
-        </section>
-
-        <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-3">
-          <RecentList
-            title="Recent applications"
-            subtitle="Newest pathway applicants."
-            href={routes.applications}
-            items={data.recentApplications}
-            emptyTitle="No applications yet"
-            emptyDetail="Public program apply forms and partner referrals will land here."
-          />
-          <RecentList
-            title="Pending review queue"
-            subtitle="Applications waiting on ops."
-            href={routes.applications}
-            items={data.pendingQueue}
-            emptyTitle="Queue clear"
-            emptyDetail="No pending program applications right now."
-          />
-          <RecentList
-            title="Recent ambassador leads"
-            subtitle="Recruiting leads feeding hire pathways."
-            href={routes.ambassadorLeads}
-            items={data.recentAmbassadorLeads}
-            emptyTitle="No ambassador leads yet"
-            emptyDetail="Capture leads from sales, partners, or CareerLink outreach."
-          />
-        </section>
-
-        <section className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">
-          <section className="min-w-0 overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-xl font-black text-slate-950">Source health</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              Hub reads live applications, ambassadors, partners, and programs
-              tables.
-            </p>
-            <div className="mt-4 grid gap-3">
-              {data.sourceHealth.map((source) => (
-                <div
-                  key={source.id}
-                  className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-black text-slate-950">{source.label}</p>
-                    <p className="mt-1 break-words text-xs font-semibold text-slate-500">
-                      {source.message}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${
-                        source.ok
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : "border-amber-200 bg-amber-50 text-amber-800"
-                      }`}
-                    >
-                      {source.ok ? "Live" : "Next"}
-                    </span>
-                    <p className="mt-2 text-sm font-black text-slate-700">
-                      {number(source.rowCount)}
-                    </p>
-                  </div>
+            ) : null}
+            {data.pendingQueue.slice(0, 3).map((item) => (
+              <Link
+                key={item.id}
+                href={item.href}
+                className="block rounded-2xl border border-slate-100 bg-slate-50 p-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate font-black text-slate-950">
+                    {item.title}
+                  </p>
+                  <StatusPill value={item.status} />
                 </div>
-              ))}
-            </div>
-          </section>
+                <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                  {item.subtitle} · {formatWhen(item.date)}
+                </p>
+              </Link>
+            ))}
+            {data.metrics.pendingApplications === 0 &&
+            data.metrics.ambassadorLeads === 0 ? (
+              <p className="text-sm font-semibold text-slate-500">
+                Queue is clear. Open overview or check a hire pathway.
+              </p>
+            ) : null}
+          </div>
+        </GrowthCard>
 
-          <section className="min-w-0 overflow-hidden rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="break-words text-xl font-black text-slate-950">
-              Pathway operating notes
-            </h2>
-            <p className="mt-1 text-sm font-semibold leading-6 text-slate-500">
-              Keep public program promises aligned with contractor marketplace
-              reality.
-            </p>
-            <div className="mt-4 grid gap-3">
-              <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <p className="font-black text-slate-950">Independent contractors</p>
-                <p className="mt-1 text-sm font-semibold leading-6 break-words text-slate-600">
-                  Program participation does not guarantee employment, placement,
-                  bookings, commissions, or full Guru status.
+        <GrowthCard className="min-w-0">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-black text-slate-950">Latest activity</h2>
+            <Link
+              href={routes.applications}
+              className="text-sm font-black text-emerald-800"
+            >
+              Applications →
+            </Link>
+          </div>
+          <div className="mt-4 space-y-3">
+            {latest.map((item) => (
+              <Link
+                key={item.id}
+                href={item.href}
+                className="block rounded-2xl border border-slate-100 bg-slate-50 p-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate font-black text-slate-950">
+                    {item.title}
+                  </p>
+                  <StatusPill value={item.status} />
+                </div>
+                <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                  {item.subtitle} · {formatWhen(item.date)}
                 </p>
-              </div>
-              <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <p className="font-black text-slate-950">Fair Checkr review</p>
-                <p className="mt-1 text-sm font-semibold leading-6 break-words text-slate-600">
-                  Community Hire and related pathways use role-related background
-                  review guided by EEOC principles.
-                </p>
-              </div>
-              <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <p className="font-black text-slate-950">SkillBridge interest only</p>
-                <p className="mt-1 text-sm font-semibold leading-6 break-words text-slate-600">
-                  SkillBridge remains an interest list unless SitGuru later
-                  creates a formally approved training program.
-                </p>
-              </div>
-            </div>
-          </section>
-        </section>
+              </Link>
+            ))}
+            {latest.length === 0 ? (
+              <p className="text-sm font-semibold text-slate-500">
+                No applications or leads yet. Public apply forms land here.
+              </p>
+            ) : null}
+          </div>
+        </GrowthCard>
       </div>
-    </main>
+
+      <GrowthCard className="min-w-0">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-lg font-black text-slate-950">
+              Pathway notes
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Keep public promises aligned with contractor marketplace reality.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-sm font-black text-slate-950">
+              Independent contractors
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              A program does not guarantee employment, bookings, or full Guru
+              status.
+            </p>
+          </div>
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-sm font-black text-slate-950">Fair Checkr review</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              Community Hire uses role-related background review guided by EEOC
+              principles.
+            </p>
+          </div>
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-sm font-black text-slate-950">
+              SkillBridge interest only
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              This stays an interest list unless SitGuru later creates an
+              approved training program.
+            </p>
+          </div>
+        </div>
+      </GrowthCard>
+
+      <GrowthCard className="min-w-0">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-lg font-black text-slate-950">Source health</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              {healthy} of {data.sourceHealth.length} live
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={routes.referrals}
+              className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900"
+            >
+              <Sparkles size={13} className="mr-1 inline" />
+              Referrals
+            </Link>
+            <Link
+              href={routes.hr}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
+            >
+              <Users size={13} className="mr-1 inline" />
+              HR
+            </Link>
+            <Link
+              href={routes.backgroundChecks}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
+            >
+              <BadgeCheck size={13} className="mr-1 inline" />
+              Checkr
+            </Link>
+            <Link
+              href={routes.gurus}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
+            >
+              Gurus
+            </Link>
+            <Link
+              href={routes.exports}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
+            >
+              <Download size={13} className="mr-1 inline" />
+              Export
+            </Link>
+          </div>
+        </div>
+        <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {data.sourceHealth.map((source) => (
+            <div
+              key={source.id}
+              className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate text-sm font-black text-slate-950">
+                  {source.label}
+                </p>
+                <StatusPill value={source.ok ? "Connected" : "Pending"} />
+              </div>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                {number(source.rowCount)} rows
+              </p>
+            </div>
+          ))}
+        </div>
+      </GrowthCard>
+    </GrowthPageFrame>
   );
 }

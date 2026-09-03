@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { loadMarketDensity } from "@/lib/admin/load-market-density";
 import MarketGrowthBoard from "@/components/admin/MarketGrowthBoard";
+import { GrowthPageFrame } from "@/components/admin/growth/GrowthPageFrame";
 
 export const dynamic = "force-dynamic";
 
@@ -120,7 +121,7 @@ function Section({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+    <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl font-black tracking-[-0.03em] text-slate-950">
@@ -472,78 +473,51 @@ export default async function AdminOperationsDashboard() {
   ];
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <div className="on-dark-surface overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-950 via-emerald-950 to-slate-900 p-6 text-white shadow-xl sm:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-100">
-                SitGuru Admin Portal · {todayLabel}
-              </p>
-              <h1 className="mt-3 text-3xl font-black tracking-[-0.05em] !text-white sm:text-5xl">
-                Operations Dashboard
-              </h1>
-              <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-emerald-50 sm:text-base">
-                Daily dashboard for marketplace operations, people queues,
-                bookings, messages, reviews, payouts, readiness, Trust & Safety,
-                and growth work. Use Market Density to decide where marketing
-                dollars can actually convert.
-              </p>
-            </div>
-
-            <div className="grid w-full grid-cols-2 gap-3 sm:max-w-md">
-              <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-[10px] font-black uppercase tracking-wide text-emerald-100">
-                  Needs Attention
-                </p>
-                <p className="mt-1 text-3xl font-black text-white">
-                  {needsAttentionCount.toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-[10px] font-black uppercase tracking-wide text-emerald-100">
-                  Bookable Gurus
-                </p>
-                <p className="mt-1 text-3xl font-black text-white">
-                  {formatCount(bookableGurus, "—")}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Link
-              href="/admin/guru-approvals"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-4 py-2 text-sm font-black text-emerald-950 transition hover:bg-emerald-50"
-            >
-              Guru Approvals
-            </Link>
-            <Link
-              href="/admin/messages"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
-            >
-              Messages
-            </Link>
-            <Link
-              href="/admin/users"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
-            >
-              User Directory
-            </Link>
-            <Link
-              href="/admin/market-growth"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
-            >
-              Market Growth Map
-            </Link>
-            <Link
-              href="/admin/customers"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/15"
-            >
-              Pet Parents
-            </Link>
-          </div>
-        </div>
+    <GrowthPageFrame
+      kicker={`Admin HQ Workplace · ${todayLabel}`}
+      title="Clear queues, then grow where the pack is dense."
+      detail="Daily workbench for people, bookings, messages, payouts, Trust & Safety, and market density."
+      action={
+        <Link
+          href="/admin/guru-approvals"
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-green-950"
+        >
+          Guru Approvals
+        </Link>
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/admin/messages"
+          className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+        >
+          Messages
+        </Link>
+        <Link
+          href="/admin/users"
+          className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+        >
+          User Directory
+        </Link>
+        <Link
+          href="/admin/market-growth"
+          className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+        >
+          Market Growth Map
+        </Link>
+        <Link
+          href="/admin/customers"
+          className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+        >
+          Pet Parents
+        </Link>
+        <span className="rounded-full border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800">
+          {needsAttentionCount.toLocaleString()} need attention
+        </span>
+        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
+          {formatCount(bookableGurus, "—")} bookable Gurus
+        </span>
+      </div>
 
         {attentionItems.length > 0 ? (
           <Section
@@ -695,7 +669,6 @@ export default async function AdminOperationsDashboard() {
             ))}
           </div>
         </Section>
-      </div>
-    </main>
+    </GrowthPageFrame>
   );
 }
