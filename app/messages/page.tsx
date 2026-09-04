@@ -334,6 +334,7 @@ function getDashboardHref(role?: string | null) {
   const normalized = normalizeRoleValue(role);
 
   if (normalized === "guru") return "/guru/dashboard";
+  if (normalized === "ambassador") return "/ambassador/dashboard";
   if (normalized === "admin") return "/admin";
 
   return "/customer/dashboard";
@@ -384,10 +385,6 @@ export default async function MessagesPage({ searchParams }: PageProps) {
   const currentUserRole = normalizeRoleValue(
     currentProfile?.role || currentProfile?.account_type || ""
   );
-
-  if (currentUserRole === "guru") {
-    redirect("/guru/dashboard/messages");
-  }
 
   if (currentUserRole === "admin") {
     redirect("/admin/messages");
@@ -657,12 +654,24 @@ export default async function MessagesPage({ searchParams }: PageProps) {
 
   const adminMessageHref = adminThread?.href || "/messages/admin";
 
-  const filterLinks = [
-    { label: "All", value: "all", href: "/messages" },
-    { label: "Guru", value: "guru", href: "/messages?filter=guru" },
-    { label: "Admin", value: "admin", href: "/messages?filter=admin" },
-    { label: "Unread", value: "unread", href: "/messages?filter=unread" },
-  ];
+  const filterLinks =
+    currentUserRole === "guru"
+      ? [
+          { label: "All", value: "all", href: "/messages?role=guru" },
+          {
+            label: "Pet Parents",
+            value: "guru",
+            href: "/messages?filter=guru&role=guru",
+          },
+          { label: "Admin", value: "admin", href: "/messages?filter=admin&role=guru" },
+          { label: "Unread", value: "unread", href: "/messages?filter=unread&role=guru" },
+        ]
+      : [
+          { label: "All", value: "all", href: "/messages" },
+          { label: "Guru", value: "guru", href: "/messages?filter=guru" },
+          { label: "Admin", value: "admin", href: "/messages?filter=admin" },
+          { label: "Unread", value: "unread", href: "/messages?filter=unread" },
+        ];
 
   return (
     <main
@@ -694,9 +703,11 @@ export default async function MessagesPage({ searchParams }: PageProps) {
             </h1>
 
             <p className="mt-4 max-w-4xl text-base font-semibold leading-8 text-slate-700">
-              Keep care details, booking questions, and support conversations
-              organized in one place. Choose a conversation below to continue
-              messaging SitGuru Admin, a Guru, or a customer.
+              {currentUserRole === "guru"
+                ? "Message Pet Parents and SitGuru Admin in one place. Gurus cannot message other Gurus."
+                : currentUserRole === "ambassador"
+                  ? "Message SitGuru Admin from this inbox. Care conversations stay between Pet Parents, Gurus, and Admin."
+                  : "Keep care details, booking questions, and support conversations organized in one place. Message Gurus and SitGuru Admin here."}
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">

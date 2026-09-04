@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function GuruMessagesRedirectPage() {
-  redirect("/guru/dashboard/messages");
+  redirect("/messages?role=guru&returnTo=/guru/dashboard");
 }

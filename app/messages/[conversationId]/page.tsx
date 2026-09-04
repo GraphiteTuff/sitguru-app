@@ -889,7 +889,7 @@ export default async function MessageConversationPage({
 
   const inboxHref =
     currentUserRole === "guru"
-      ? "/guru/dashboard/messages?role=guru"
+      ? "/messages?role=guru&returnTo=/guru/dashboard"
       : currentUserRole === "ambassador"
         ? "/ambassador/dashboard/messages?role=ambassador"
         : currentUserRole === "admin"

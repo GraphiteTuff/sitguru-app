@@ -10,6 +10,7 @@ import {
 } from "@/lib/supabase/request-auth";
 import { scanMessageForOffPlatformContact } from "@/lib/messaging/contact-guard";
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
+import { resolveMessagingPair, collectMessagingRoles } from "@/lib/messaging/role-policy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -559,6 +560,23 @@ async function resolveRole(params: {
   if (guru?.user_id) return "guru";
 
   return "customer";
+}
+
+async function getMessagingRolesForUser(userId: string) {
+  const [profile, roleRows, guru] = await Promise.all([
+    getProfile(userId),
+    getUserRoles(userId),
+    getGuruByUserId(userId),
+  ]);
+
+  return collectMessagingRoles([
+    profile?.role,
+    profile?.user_role,
+    profile?.account_type,
+    profile?.type,
+    ...roleRows.map((row) => row.role),
+    guru?.user_id ? "guru" : null,
+  ]);
 }
 
 async function buildContact(userId: string, role: string): Promise<RecipientContact> {
@@ -1125,16 +1143,26 @@ async function ensureDirectConversation(params: {
   const recipientRole = normalizeRole(params.recipient.role);
   const currentUserRole = normalizeRole(params.currentUserRole);
 
-  const customerId =
-    requestedCustomerId ||
-    (currentUserRole === "customer" ? params.currentUserId : "") ||
-    (recipientRole === "customer" ? params.recipient.userId : "") ||
-    params.currentUserId;
+  let customerId = requestedCustomerId;
+  let guruId = isProbablyUuid(requestedGuruId) ? requestedGuruId : "";
 
-  const guruId =
-    (recipientRole === "guru" ? params.recipient.userId : "") ||
-    (currentUserRole === "guru" ? params.currentUserId : "") ||
-    (isProbablyUuid(requestedGuruId) ? requestedGuruId : "");
+  if (currentUserRole === "guru" && recipientRole !== "admin") {
+    guruId = guruId || params.currentUserId;
+    customerId = customerId || params.recipient.userId;
+  } else if (recipientRole === "guru" && currentUserRole !== "admin") {
+    guruId = guruId || params.recipient.userId;
+    customerId = customerId || params.currentUserId;
+  } else {
+    customerId =
+      customerId ||
+      (currentUserRole === "customer" ? params.currentUserId : "") ||
+      (recipientRole === "customer" ? params.recipient.userId : "") ||
+      params.currentUserId;
+    guruId =
+      guruId ||
+      (recipientRole === "guru" ? params.recipient.userId : "") ||
+      (currentUserRole === "guru" ? params.currentUserId : "");
+  }
 
   const existingConversation = await findExistingDirectConversation({
     customerId,
@@ -1457,6 +1485,23 @@ export async function POST(req: NextRequest) {
     const { conversation, recipient, currentUserRole } = context;
 
     delivery.recipientFound = Boolean(recipient.userId);
+
+    const messagingPolicy = resolveMessagingPair({
+      senderId: user.id,
+      recipientId: recipient.userId,
+      senderRole: currentUserRole,
+      recipientRole: recipient.role,
+      senderRoles: await getMessagingRolesForUser(user.id),
+      recipientRoles: await getMessagingRolesForUser(recipient.userId),
+      conversation,
+    });
+
+    if (!messagingPolicy.ok) {
+      return NextResponse.json(
+        { ok: false, error: messagingPolicy.error, delivery },
+        { status: 403, headers: cors },
+      );
+    }
 
     const senderGuru = await getGuruByUserId(user.id);
     const senderName =

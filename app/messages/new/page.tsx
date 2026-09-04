@@ -73,6 +73,7 @@ function NewMessagePageContent() {
   const subjectParam = safeValue(searchParams.get("subject"));
   const topicParam = safeValue(searchParams.get("topic")) || subjectParam;
   const adminMode = safeValue(searchParams.get("admin")) === "true";
+  const roleContext = safeValue(searchParams.get("role"));
 
   const derivedGuruName = guruSlug ? titleFromSlug(guruSlug) : "";
   const recipientName = safeValue(
@@ -211,6 +212,7 @@ function NewMessagePageContent() {
           guruSlug: guruSlug || undefined,
           customerId: customerId || undefined,
           adminMode,
+          roleContext: roleContext || undefined,
         }),
       });
 

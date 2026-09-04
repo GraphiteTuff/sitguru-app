@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { CANONICAL_ROLE } from "@/lib/sitguru/display";
+import {
+  collectMessagingRoles,
+  resolveMessagingPair,
+} from "@/lib/messaging/role-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -355,6 +360,35 @@ export async function POST(req: NextRequest) {
 
     if (guru.user_id === user.id) {
       return NextResponse.json({ error: "You cannot message yourself." }, { status: 400 });
+    }
+
+    const senderProfile = await supabaseAdmin
+      .from("profiles")
+      .select("role, account_type")
+      .eq("id", user.id)
+      .maybeSingle<{ role?: string | null; account_type?: string | null }>();
+    const senderRoleRows = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+    const senderRoles = collectMessagingRoles([
+      senderProfile.data?.role,
+      senderProfile.data?.account_type,
+      ...((senderRoleRows.data || []).map((row) => row.role)),
+    ]);
+    const senderActingRole = senderRoles.includes(CANONICAL_ROLE.ADMIN)
+      ? CANONICAL_ROLE.ADMIN
+      : senderRoles.includes(CANONICAL_ROLE.PET_PARENT)
+        ? CANONICAL_ROLE.PET_PARENT
+        : senderRoles[0] || CANONICAL_ROLE.PET_PARENT;
+    const startPolicy = resolveMessagingPair({
+      senderId: user.id,
+      recipientId: guru.user_id,
+      senderRole: senderActingRole,
+      recipientRole: CANONICAL_ROLE.GURU,
+    });
+    if (!startPolicy.ok) {
+      return NextResponse.json({ error: startPolicy.error }, { status: 403 });
     }
 
     const bookingId = bookingIdRaw || null;

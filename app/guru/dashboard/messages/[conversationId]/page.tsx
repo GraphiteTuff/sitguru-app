@@ -1,43 +1,33 @@
 import { redirect } from "next/navigation";
 
-type SearchParams = Record<string, string | string[] | undefined>;
+export const dynamic = "force-dynamic";
 
-function getParam(params: SearchParams, key: string) {
-  const value = params[key];
+type PageProps = {
+  params?: Promise<{ conversationId?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
 
-  if (Array.isArray(value)) {
-    return value[0];
-  }
-
-  return value;
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] || "" : value || "";
 }
 
-export default async function GuruDashboardConversationRedirectPage({
+export default async function GuruDashboardConversationPage({
+  params,
   searchParams,
-}: {
-  searchParams?: Promise<SearchParams>;
-}) {
-  const resolvedSearchParams = searchParams ? await searchParams : {};
+}: PageProps) {
+  const resolvedParams = params ? await params : {};
+  const conversationId = String(resolvedParams.conversationId || "").trim();
+  const queryParams = searchParams ? await searchParams : {};
+  const query = new URLSearchParams();
+  query.set("role", "guru");
+  query.set("returnTo", "/guru/dashboard");
 
-  const recipient = getParam(resolvedSearchParams, "recipient");
-  const email = getParam(resolvedSearchParams, "email");
-  const booking = getParam(resolvedSearchParams, "booking");
+  const recipient = firstParam(queryParams.recipient || queryParams.recipientId);
+  if (recipient) query.set("recipientId", recipient);
 
-  const params = new URLSearchParams();
-
-  if (recipient) {
-    params.set("recipient", recipient);
+  if (conversationId) {
+    redirect(`/messages/${encodeURIComponent(conversationId)}?${query.toString()}`);
   }
 
-  if (email) {
-    params.set("email", email);
-  }
-
-  if (booking) {
-    params.set("booking", booking);
-  }
-
-  const query = params.toString();
-
-  redirect(query ? `/guru/dashboard/messages?${query}` : "/guru/dashboard/messages");
+  redirect(`/messages?${query.toString()}`);
 }
