@@ -9,8 +9,14 @@ import {
 } from "lucide-react";
 import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
 import { MarketplaceSalesTaxStates } from "@/components/admin/financials/MarketplaceSalesTaxStates";
+import { QuickBooksConnectPanel } from "@/components/admin/financials/QuickBooksConnectPanel";
 import { TaxFilingCalendar } from "@/components/admin/financials/TaxFilingCalendar";
 import { marketplaceSalesTaxStateLabel } from "@/lib/admin/financials/marketplace-sales-tax-states";
+import {
+  getQuickBooksPublicStatus,
+  getQuickBooksSafeConnection,
+  loadQuickBooksConnection,
+} from "@/lib/admin/financials/quickbooks-online";
 import {
   AdminWorkplaceActions,
   AdminWorkplaceDenied,
@@ -828,9 +834,9 @@ async function getTaxCenterData() {
     },
     {
       id: "quickbooks",
-      label: "QuickBooks tax feed",
-      ok: true,
-      rowCount: 1,
+      label: "QuickBooks Online",
+      ok: false,
+      rowCount: 0,
     },
   ];
 
@@ -874,7 +880,10 @@ async function getTaxCenterData() {
   };
 }
 
-function getReadinessItems(live: TaxLiveTotals): ReadinessItem[] {
+function getReadinessItems(
+  live: TaxLiveTotals,
+  quickbooksConnected: boolean,
+): ReadinessItem[] {
   return [
     {
       label: "Bookings / payments",
@@ -932,10 +941,11 @@ function getReadinessItems(live: TaxLiveTotals): ReadinessItem[] {
         : `Automatic Tax is on. Register Stripe Tax in ${marketplaceSalesTaxStateLabel()} — not MN only. Collected tax is still $0 until a paid checkout in those states.`,
     },
     {
-      label: "QuickBooks tax feed",
-      status: "ready",
-      detail:
-        "QBO journal CSV and Desktop IIF are live from SitGuru ledgers. Import, then send the package through CPA Handoff.",
+      label: "QuickBooks Online",
+      status: quickbooksConnected ? "ready" : "needs_review",
+      detail: quickbooksConnected
+        ? "Live company connected. Push the tax journal from Tax Center, then send the same package through CPA Handoff."
+        : "Connect the live Graff Enterprises QuickBooks Online company, then push the tax journal. CSV / IIF stay available.",
     },
   ];
 }
@@ -1152,7 +1162,20 @@ export default async function AdminFinancialsTaxReportsPage({
 
   const taxData = await getTaxCenterData();
   const { live } = taxData;
-  const readinessItems = getReadinessItems(live);
+  const quickbooksSetup = getQuickBooksPublicStatus();
+  const quickbooksConnection = getQuickBooksSafeConnection(
+    await loadQuickBooksConnection(),
+  );
+  live.sourceHealth = live.sourceHealth.map((item) =>
+    item.id === "quickbooks"
+      ? {
+          ...item,
+          ok: Boolean(quickbooksConnection),
+          rowCount: quickbooksConnection ? 1 : 0,
+        }
+      : item,
+  );
+  const readinessItems = getReadinessItems(live, Boolean(quickbooksConnection));
   const quarterlyChecklist = buildQuarterlyChecklist(live);
   const annualChecklist = buildAnnualChecklist(live);
   const marketingDeductions =
@@ -1172,10 +1195,14 @@ export default async function AdminFinancialsTaxReportsPage({
       detail="Organize quarterly and annual tax records from live Stripe bookings, NFCU cash, payouts, and campaigns. Sales tax is a SitGuru remittance job — not something Gurus add to their rates."
       action={
         <Link
-          href="/admin/financials/tax-reports/marketplace-tax"
+          href={
+            quickbooksSetup.configured
+              ? "/api/admin/financials/quickbooks/connect"
+              : "/admin/financials/tax-reports/quickbooks"
+          }
           className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-green-950"
         >
-          Marketplace tax
+          Connect QuickBooks
         </Link>
       }
     >
@@ -1251,12 +1278,24 @@ export default async function AdminFinancialsTaxReportsPage({
             icon: Receipt,
           },
           {
-            href: "/admin/financials/tax-reports/quickbooks",
-            label: "QuickBooks feed",
-            detail: "QBO journal + Desktop IIF for CPA",
+            href: quickbooksSetup.configured
+              ? "/api/admin/financials/quickbooks/connect"
+              : "/admin/financials/tax-reports/quickbooks",
+            label: quickbooksConnection ? "Push to QuickBooks" : "Connect QuickBooks",
+            detail: quickbooksConnection
+              ? `Live · ${quickbooksConnection.companyName}`
+              : "Live QBO company for tax season",
             icon: BookOpen,
           },
         ]}
+      />
+
+      <QuickBooksConnectPanel
+        setup={quickbooksSetup}
+        connection={quickbooksConnection}
+        lineCount={0}
+        queryError={undefined}
+        justConnected={false}
       />
 
       <TaxFilingCalendar />
@@ -1651,6 +1690,17 @@ export default async function AdminFinancialsTaxReportsPage({
         helper={`${live.sourceHealth.filter((item) => item.ok).length} of ${live.sourceHealth.length} SitGuru sources connected`}
         links={
           <>
+            <Link
+              href={
+                quickbooksSetup.configured
+                  ? "/api/admin/financials/quickbooks/connect"
+                  : "/admin/financials/tax-reports/quickbooks"
+              }
+              className="rounded-2xl px-3 py-2 text-xs font-black !text-white"
+              style={{ background: "#0D5C3A" }}
+            >
+              Connect QuickBooks
+            </Link>
             <Link
               href="/admin/financials/payment-gateway"
               className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900"

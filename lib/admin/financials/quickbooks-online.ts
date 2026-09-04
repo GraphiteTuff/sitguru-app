@@ -36,9 +36,10 @@ function asTrimmed(value: unknown) {
 }
 
 export function getQuickBooksEnvironment(): QuickBooksEnvironment {
-  return asTrimmed(process.env.QUICKBOOKS_ENVIRONMENT).toLowerCase() === "production"
-    ? "production"
-    : "sandbox";
+  const explicit = asTrimmed(process.env.QUICKBOOKS_ENVIRONMENT).toLowerCase();
+  if (explicit === "sandbox") return "sandbox";
+  if (explicit === "production") return "production";
+  return process.env.VERCEL_ENV === "production" ? "production" : "sandbox";
 }
 
 export function getQuickBooksConfig() {

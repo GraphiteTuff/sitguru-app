@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { notifyHqLaunchSignup } from "@/lib/admin/customers/signup-alerts";
 
 export const dynamic = "force-dynamic";
 
@@ -175,6 +176,15 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    void notifyHqLaunchSignup({
+      name: fullName,
+      email,
+      phone,
+      interestType,
+    }).catch((notifyError) => {
+      console.warn("Launch signup HQ bell skipped:", notifyError);
+    });
 
     return NextResponse.json({
       success: true,

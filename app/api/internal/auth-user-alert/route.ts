@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
-import { notifyHqNewPetParent } from "@/lib/admin/customers/signup-alerts";
+import { notifyHqNewSignup } from "@/lib/admin/customers/signup-alerts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -815,14 +815,14 @@ export async function POST(request: NextRequest) {
     const [emailResult, smsResult, inApp] = await Promise.all([
       sendEmailAlert({ subject, html, text }),
       sendSmsAlert(smsMessage, getSignupSmsNumbers(role)),
-      role === "pet_parent" || role === "both"
-        ? notifyHqNewPetParent({
-            userId: id,
-            name,
-            email,
-            phone,
-          })
-        : Promise.resolve({ notified: 0 }),
+      notifyHqNewSignup({
+        role,
+        userId: id,
+        guruId,
+        name,
+        email,
+        phone,
+      }),
     ]);
 
     return NextResponse.json({

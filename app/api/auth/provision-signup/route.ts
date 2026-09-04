@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { notifyHqNewSignup } from "@/lib/admin/customers/signup-alerts";
 import { notifyHqReferralAttributed } from "@/lib/admin/referrals/hq-alerts";
 import {
   enqueueProfileCompletionReminders,
@@ -2060,6 +2061,15 @@ export async function POST(request: NextRequest) {
     const reminder = await queueAndSendSignupNotice({
       userId,
       intent: requestedIntent,
+    });
+
+    void notifyHqNewSignup({
+      role: requestedIntent,
+      userId,
+      name: referredName || "A new SitGuru member",
+      email: referredEmail,
+    }).catch((error) => {
+      console.warn("HQ signup bell skipped:", error);
     });
 
     return NextResponse.json({

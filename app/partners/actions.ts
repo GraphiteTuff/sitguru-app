@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { notifyHqPartnerApplication } from "@/lib/admin/customers/signup-alerts";
 
 export type PartnerApplicantType =
   | "local_partner"
@@ -100,22 +101,26 @@ export async function submitPartnerApplication(
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { error } = await supabase.from("partner_applications").insert({
-    applicant_user_id: user?.id ?? null,
-    applicant_type: applicantType,
-    business_name: businessName || null,
-    contact_name: contactName,
-    email,
-    phone: phone || null,
-    website: website || null,
-    social_url: socialUrl || null,
-    business_type: businessType || null,
-    city,
-    state: state || null,
-    zip_code: zipCode || null,
-    message: message || null,
-    status: "pending",
-  });
+  const { data, error } = await supabase
+    .from("partner_applications")
+    .insert({
+      applicant_user_id: user?.id ?? null,
+      applicant_type: applicantType,
+      business_name: businessName || null,
+      contact_name: contactName,
+      email,
+      phone: phone || null,
+      website: website || null,
+      social_url: socialUrl || null,
+      business_type: businessType || null,
+      city,
+      state: state || null,
+      zip_code: zipCode || null,
+      message: message || null,
+      status: "pending",
+    })
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     console.error("Partner application submit error:", error);
@@ -126,6 +131,17 @@ export async function submitPartnerApplication(
         "Something went wrong while submitting your application. Please try again.",
     };
   }
+
+  void notifyHqPartnerApplication({
+    id: typeof data?.id === "string" ? data.id : undefined,
+    applicantType,
+    name: contactName,
+    businessName,
+    email,
+    phone,
+  }).catch((notifyError) => {
+    console.warn("Partner application HQ bell skipped:", notifyError);
+  });
 
   revalidatePath("/partners");
   revalidatePath("/partners/local");

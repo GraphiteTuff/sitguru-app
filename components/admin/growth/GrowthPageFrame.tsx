@@ -235,9 +235,12 @@ export function AdminWorkplaceHealth({
 export function StatusPill({ value }: { value: string }) {
   const tone = value.toLowerCase();
   const classes =
-    tone.includes("ready") || tone.includes("active") || tone.includes("posted")
+    tone.includes("ready") ||
+    tone.includes("active") ||
+    tone.includes("posted") ||
+    tone.includes("connected")
       ? "bg-emerald-50 text-emerald-800"
-      : tone.includes("review")
+      : tone.includes("review") || tone.includes("pending")
         ? "bg-amber-50 text-amber-800"
         : tone.includes("pause") || tone.includes("draft")
           ? "bg-slate-100 text-slate-700"

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
+import { notifyHqCareerApplication } from "@/lib/admin/customers/signup-alerts";
 
 export const runtime = "nodejs";
 
@@ -777,6 +778,16 @@ export async function POST(request: NextRequest) {
     }
 
     const savedApplication = data as SavedApplication;
+
+    void notifyHqCareerApplication({
+      id: savedApplication.id,
+      program: savedApplication.program,
+      name: fullName,
+      email,
+      phone: phone || undefined,
+    }).catch((notifyError) => {
+      console.warn("Career application HQ bell skipped:", notifyError);
+    });
 
     const emailResult = await sendApplicantConfirmationEmail({
       to: email,

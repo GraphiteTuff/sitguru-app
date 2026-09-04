@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
+import { notifyHqCareerApplication } from "@/lib/admin/customers/signup-alerts";
 
 export const dynamic = "force-dynamic";
 
@@ -454,6 +455,16 @@ export async function POST(request: Request) {
         leadError,
       );
     }
+
+    void notifyHqCareerApplication({
+      id: typeof data?.id === "string" ? data.id : undefined,
+      program: "ambassador-program",
+      name: fullName,
+      email,
+      phone: phone || undefined,
+    }).catch((notifyError) => {
+      console.warn("Ambassador application HQ bell skipped:", notifyError);
+    });
 
     await Promise.allSettled([
       sendConfirmationEmail({
