@@ -30,6 +30,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 import AdminMessageRealtimeNotifier from "@/components/admin/AdminMessageRealtimeNotifier";
+import AdminQueueCardActions from "@/components/admin/AdminQueueCardActions";
 import AdminMessageComposer from "@/components/admin/messages/AdminMessageComposer";
 import AdminInboxWorkspace from "@/components/admin/messages/AdminInboxWorkspace";
 import {
