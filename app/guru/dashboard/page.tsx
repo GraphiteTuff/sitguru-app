@@ -15,6 +15,7 @@ import {
   isTrustSafetyScreeningBypassed,
   TRUST_SAFETY_SCREENING_BYPASS,
 } from "@/lib/config/trust-safety";
+import { loadGuruProfileForUser } from "@/lib/gurus/load-guru-profile-for-user";
 
 export const dynamic = "force-dynamic";
 
@@ -507,67 +508,8 @@ async function getGuruProfile(
   userId: string,
   email?: string | null,
 ): Promise<GuruProfile | null> {
-  const byUserId = await supabaseAdmin
-    .from("gurus")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (!byUserId.error && byUserId.data) {
-    return byUserId.data as GuruProfile;
-  }
-
-  if (email) {
-    const byEmail = await supabaseAdmin
-      .from("gurus")
-      .select("*")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (!byEmail.error && byEmail.data) {
-      return byEmail.data as GuruProfile;
-    }
-  }
-
-  const profileFallback = await supabaseAdmin
-    .from("profiles")
-    .select(
-      "id, full_name, display_name, name, email, role, account_type, profile_photo_url, avatar_url, image_url",
-    )
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (!profileFallback.error && profileFallback.data) {
-    const role = normalizeRole(
-      profileFallback.data.role || profileFallback.data.account_type,
-    );
-
-    if (role === "guru") {
-      return {
-        id: profileFallback.data.id,
-        user_id: userId,
-        email: profileFallback.data.email || email,
-        full_name:
-          profileFallback.data.full_name ||
-          profileFallback.data.display_name ||
-          profileFallback.data.name,
-        profile_photo_url: profileFallback.data.profile_photo_url,
-        avatar_url: profileFallback.data.avatar_url,
-        image_url: profileFallback.data.image_url,
-        services: null,
-        rate: null,
-        hourly_rate: null,
-        price: null,
-        profile_completion: null,
-        application_status: "profile_incomplete",
-        status: "profile_incomplete",
-        is_bookable: false,
-        is_public: false,
-      };
-    }
-  }
-
-  return null;
+  const row = await loadGuruProfileForUser(userId, email);
+  return row ? (row as GuruProfile) : null;
 }
 
 async function applyTrustSafetyBypassToGuruProfile(

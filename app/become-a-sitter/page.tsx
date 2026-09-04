@@ -518,7 +518,7 @@ export default function BecomeGuruPage() {
               </span>
               <input
                 type="text"
-                placeholder="Bethany Staab"
+                placeholder="Your name"
                 value={displayName}
                 onChange={(event) => {
                   setDisplayName(event.target.value);
