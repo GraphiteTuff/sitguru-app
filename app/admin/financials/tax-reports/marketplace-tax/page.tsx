@@ -15,6 +15,7 @@ import {
   GrowthCard,
   GrowthPageFrame,
 } from "@/components/admin/growth/GrowthPageFrame";
+import { MarketplaceSalesTaxStates } from "@/components/admin/financials/MarketplaceSalesTaxStates";
 import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
 import { loadMarketplaceTaxReport } from "@/lib/admin/financials/marketplace-tax";
 
@@ -131,10 +132,22 @@ export default async function MarketplaceTaxPage() {
         ]}
       />
 
+      <MarketplaceSalesTaxStates
+        activity={Object.fromEntries(
+          report.byState
+            .filter((row) => row.state !== "UNASSIGNED")
+            .map((row) => [
+              row.state,
+              { bookingCount: row.bookingCount, taxCollected: row.taxCollected },
+            ]),
+        )}
+      />
+
       <GrowthCard>
         <h2 className="text-lg font-black text-slate-950">Guru-easy rule</h2>
         <p className="mt-1 text-sm font-semibold text-slate-500">
-          Same model Rover uses in Minnesota: platform collects and remits.
+          Same model Rover uses: SitGuru collects and remits in every required
+          state. Gurus do not add tax to their rates.
         </p>
         <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
           <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
@@ -152,8 +165,8 @@ export default async function MarketplaceTaxPage() {
           <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
             <p className="text-sm font-black text-slate-950">SitGuru remits</p>
             <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-              Tax stays on SitGuru books. Confirm MN and other Stripe Tax
-              registrations before promising a state to a Guru.
+              Tax stays on SitGuru books. Register AR, CT, DC, HI, KY, MN, NE,
+              NJ, NM, RI, SD, and WV in Stripe Tax before promising coverage.
             </p>
           </div>
         </div>

@@ -1,13 +1,16 @@
 import Link from "next/link";
 import {
   BadgeDollarSign,
+  BookOpen,
   CalendarClock,
   Landmark,
   Receipt,
   ShieldCheck,
 } from "lucide-react";
 import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
+import { MarketplaceSalesTaxStates } from "@/components/admin/financials/MarketplaceSalesTaxStates";
 import { TaxFilingCalendar } from "@/components/admin/financials/TaxFilingCalendar";
+import { marketplaceSalesTaxStateLabel } from "@/lib/admin/financials/marketplace-sales-tax-states";
 import {
   AdminWorkplaceActions,
   AdminWorkplaceDenied,
@@ -259,6 +262,24 @@ const taxReports: TaxReportCard[] = [
     ],
     liveHint: "Live desk: download each tax schedule",
   },
+  {
+    eyebrow: "QuickBooks",
+    title: "QuickBooks Tax Season Feed",
+    description:
+      "Push Graff Enterprises LLC books into QuickBooks Online or Desktop, then hand the same package to your CPA. Sales tax stays a payable. Tips stay out of income.",
+    href: "/admin/financials/tax-reports/quickbooks",
+    tone: "blue",
+    included: [
+      "QBO journal CSV",
+      "Desktop IIF import",
+      "Account mapping",
+      "Sales tax payable",
+      "Guru 1099 payouts",
+      "Expense and reward lines",
+      "CPA handoff",
+    ],
+    liveHint: "Live desk: /admin/financials/tax-reports/quickbooks",
+  },
 ];
 
 const taxAuthorityCards: TaxAuthorityCard[] = [
@@ -290,13 +311,13 @@ const taxAuthorityCards: TaxAuthorityCard[] = [
     href: "https://www.pa.gov/services/revenue/make-a-business-tax-payment",
   },
   {
-    title: "Minnesota Sales Tax",
-    level: "State",
+    title: "Pet-care sales tax states",
+    level: "Marketplace",
     description:
-      "James and other MN Gurus need SitGuru to collect 6.875% state plus local on pet care at checkout, then remit. Tips stay out of that tax.",
-    cadence: "As collected, then periodic remittance",
-    action: "Open MN sales and use tax",
-    href: "https://www.revenue.state.mn.us/sales-and-use-tax",
+      "Collect and remit in AR, CT, DC, HI, KY, MN, NE, NJ, NM, RI, SD, and WV. Scope differs by state (all services, boarding/daycare only, or fees only). Tips are never taxed.",
+    cadence: "As collected, then each state's remittance calendar",
+    action: "Open all required states",
+    href: "/admin/financials/tax-reports/marketplace-tax#sales-tax-states",
   },
   {
     title: "New Jersey Tax Payments",
@@ -360,6 +381,18 @@ const exportCards = [
     description:
       "Prepare broader annual tax PDF, Excel, CSV, and ZIP packages from the Export Center workflow.",
     href: "/admin/financials/exports?type=tax&period=annual",
+  },
+  {
+    title: "QuickBooks Online journal",
+    description:
+      "Import SitGuru tax-year journal entries into QuickBooks Online. Balanced debits and credits with Sales Tax Payable.",
+    href: "/api/admin/financials/tax-reports/quickbooks?format=qbo",
+  },
+  {
+    title: "QuickBooks Desktop IIF",
+    description:
+      "Classic IIF for QuickBooks Desktop. File → Utilities → Import → IIF Files.",
+    href: "/api/admin/financials/tax-reports/quickbooks?format=iif",
   },
 ];
 
@@ -793,6 +826,12 @@ async function getTaxCenterData() {
       ok: roiRows.length > 0,
       rowCount: roiRows.length,
     },
+    {
+      id: "quickbooks",
+      label: "QuickBooks tax feed",
+      ok: true,
+      rowCount: 1,
+    },
   ];
 
   const live: TaxLiveTotals = {
@@ -853,7 +892,7 @@ function getReadinessItems(live: TaxLiveTotals): ReadinessItem[] {
       detail: `${live.expenseCount.toLocaleString()} expense_ledger rows (${moneyExact(live.expenseLedgerTotal)}) · growth marketing ${moneyExact(live.growthMarketingTotal + live.marketingSummaryTotal)}.`,
     },
     {
-      label: "1099 / payout support",
+      label: "1099 / guru_payouts",
       status:
         live.payoutCount > 0 || live.commissionCount > 0
           ? "ready"
@@ -890,7 +929,13 @@ function getReadinessItems(live: TaxLiveTotals): ReadinessItem[] {
       status: live.taxCollectedSupport > 0 ? "ready" : "needs_review",
       detail: live.taxCollectedSupport
         ? `Stripe collected ${moneyExact(live.taxCollectedSupport)}. Tips stay optional gratuity and are not taxed.`
-        : "Automatic Tax is on, but collected tax is still $0 until service address + Stripe Tax registrations (MN) land.",
+        : `Automatic Tax is on. Register Stripe Tax in ${marketplaceSalesTaxStateLabel()} — not MN only. Collected tax is still $0 until a paid checkout in those states.`,
+    },
+    {
+      label: "QuickBooks tax feed",
+      status: "ready",
+      detail:
+        "QBO journal CSV and Desktop IIF are live from SitGuru ledgers. Import, then send the package through CPA Handoff.",
     },
   ];
 }
@@ -1206,22 +1251,24 @@ export default async function AdminFinancialsTaxReportsPage({
             icon: Receipt,
           },
           {
-            href: "/admin/financials/tax-reports/1099",
-            label: "1099 desk",
-            detail: "Guru and partner $600 review",
-            icon: BadgeDollarSign,
+            href: "/admin/financials/tax-reports/quickbooks",
+            label: "QuickBooks feed",
+            detail: "QBO journal + Desktop IIF for CPA",
+            icon: BookOpen,
           },
         ]}
       />
 
       <TaxFilingCalendar />
 
+      <MarketplaceSalesTaxStates />
+
       <GrowthCard>
         <h2 className="text-lg font-black text-slate-950">Guru-easy sales tax</h2>
         <p className="mt-1 text-sm font-semibold text-slate-500">
-          Checkout now collects a service address and marks tips as Stripe
-          Optional Gratuity. Register MN in Stripe Tax before promising James
-          remittance.
+          Checkout collects a service address and marks tips as optional
+          gratuity. Register every required state in Stripe Tax — not Minnesota
+          only — before promising a Guru that SitGuru remits for them.
         </p>
         <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
           <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">

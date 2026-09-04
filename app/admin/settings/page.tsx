@@ -1732,6 +1732,12 @@ async function getAdminSettingsData() {
       sensitive: true,
     },
     {
+      label: "QuickBooks Online",
+      status: Boolean(process.env.QUICKBOOKS_CLIENT_ID && process.env.QUICKBOOKS_CLIENT_SECRET),
+      detail: "Required for Tax Center Connect and Push to QuickBooks.",
+      sensitive: true,
+    },
+    {
       label: "Email Sending",
       status: Boolean(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY),
       detail: "Required for Admin alerts, reset support, and marketplace emails.",

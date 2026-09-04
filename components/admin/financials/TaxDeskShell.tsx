@@ -14,6 +14,9 @@ export function TaxDeskShell({
   detail,
   actorEmail,
   exportHref,
+  exportLabel = "Download CSV",
+  secondaryHref,
+  secondaryLabel = "PDF",
   children,
 }: {
   kicker: string;
@@ -21,8 +24,16 @@ export function TaxDeskShell({
   detail: string;
   actorEmail: string;
   exportHref: string;
+  exportLabel?: string;
+  secondaryHref?: string;
+  secondaryLabel?: string;
   children: ReactNode;
 }) {
+  const fallbackSecondary = exportHref.includes("format=csv")
+    ? exportHref.replace("format=csv", "format=pdf")
+    : "";
+  const nextSecondaryHref = secondaryHref || fallbackSecondary;
+
   return (
     <GrowthPageFrame
       kicker={kicker}
@@ -33,7 +44,7 @@ export function TaxDeskShell({
           href={exportHref}
           className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-green-950"
         >
-          Download CSV
+          {exportLabel}
         </Link>
       }
     >
@@ -47,12 +58,14 @@ export function TaxDeskShell({
         <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
           {actorEmail}
         </span>
-        <Link
-          href={`${exportHref.replace("format=csv", "format=pdf")}`}
-          className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
-        >
-          PDF
-        </Link>
+        {nextSecondaryHref ? (
+          <Link
+            href={nextSecondaryHref}
+            className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+          >
+            {secondaryLabel}
+          </Link>
+        ) : null}
       </div>
       {children}
     </GrowthPageFrame>
