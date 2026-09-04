@@ -121,7 +121,7 @@ function signupHref(input: {
   if (input.role === "partner") {
     return "/admin/partners/applications";
   }
-  return lookup ? `/admin/customers/${encodeURIComponent(lookup)}` : "/admin/customers#new";
+  return lookup ? `/admin/petparents/${encodeURIComponent(lookup)}` : "/admin/petparents#new";
 }
 
 export async function notifyHqNewSignup(input: {

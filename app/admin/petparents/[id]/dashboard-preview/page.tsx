@@ -863,7 +863,7 @@ export default async function AdminCustomerDashboardPreviewPage({
         <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap gap-3">
             <Link
-              href={`/admin/customers/${encodeURIComponent(
+              href={`/admin/petparents/${encodeURIComponent(
                 relatedCustomerId || lookupKey,
               )}`}
               className="inline-flex items-center gap-2 text-sm font-extrabold text-emerald-800 hover:text-emerald-950"
@@ -873,7 +873,7 @@ export default async function AdminCustomerDashboardPreviewPage({
             </Link>
 
             <Link
-              href={`/admin/customers/${encodeURIComponent(
+              href={`/admin/petparents/${encodeURIComponent(
                 relatedCustomerId || lookupKey,
               )}/public-profile-preview`}
               className="inline-flex items-center gap-2 text-sm font-extrabold text-slate-600 hover:text-slate-950"

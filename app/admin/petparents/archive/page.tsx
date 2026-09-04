@@ -464,11 +464,11 @@ async function updatePetParentArchiveStatusAction(formData: FormData) {
   ];
 
   if (!isUuid(customerId)) {
-    redirect("/admin/customers/archive?status=invalid-id");
+    redirect("/admin/petparents/archive?status=invalid-id");
   }
 
   if (!allowedStatuses.includes(requestedStatus as AdminStatus)) {
-    redirect("/admin/customers/archive?status=invalid-status");
+    redirect("/admin/petparents/archive?status=invalid-status");
   }
 
   const now = new Date().toISOString();
@@ -488,15 +488,14 @@ async function updatePetParentArchiveStatusAction(formData: FormData) {
 
   if (error) {
     console.warn("Could not update Pet Parent archive status:", error);
-    redirect("/admin/customers/archive?status=update-failed");
+    redirect("/admin/petparents/archive?status=update-failed");
   }
 
-  revalidatePath("/admin/customers");
-  revalidatePath(`/admin/customers/${customerId}`);
-  revalidatePath("/admin/customers/archive");
-  revalidatePath("/admin/customer-intelligence");
+  revalidatePath("/admin/petparents");
+  revalidatePath(`/admin/petparents/${customerId}`);
+  revalidatePath("/admin/petparents/archive");
 
-  redirect("/admin/customers/archive?status=updated");
+  redirect("/admin/petparents/archive?status=updated");
 }
 
 async function permanentlyDeleteArchivedPetParentAction(formData: FormData) {
@@ -505,7 +504,7 @@ async function permanentlyDeleteArchivedPetParentAction(formData: FormData) {
   const customerId = String(formData.get("customerId") || "").trim();
 
   if (!isUuid(customerId)) {
-    redirect("/admin/customers/archive?delete=invalid-id");
+    redirect("/admin/petparents/archive?delete=invalid-id");
   }
 
   const [authUser, bookings, pets, sentMessages, receivedMessages] = await Promise.all([
@@ -537,7 +536,7 @@ async function permanentlyDeleteArchivedPetParentAction(formData: FormData) {
   });
 
   if (!deleteState.safeToDelete) {
-    redirect("/admin/customers/archive?delete=blocked");
+    redirect("/admin/petparents/archive?delete=blocked");
   }
 
   const { error: profileError } = await supabaseAdmin
@@ -547,7 +546,7 @@ async function permanentlyDeleteArchivedPetParentAction(formData: FormData) {
 
   if (profileError) {
     console.warn("Could not permanently delete archived Pet Parent profile:", profileError);
-    redirect("/admin/customers/archive?delete=profile-failed");
+    redirect("/admin/petparents/archive?delete=profile-failed");
   }
 
   if (authUser) {
@@ -555,15 +554,14 @@ async function permanentlyDeleteArchivedPetParentAction(formData: FormData) {
       await supabaseAdmin.auth.admin.deleteUser(customerId);
     } catch (error) {
       console.warn("Profile deleted, but Auth user could not be deleted:", error);
-      redirect("/admin/customers/archive?delete=auth-failed-profile-deleted");
+      redirect("/admin/petparents/archive?delete=auth-failed-profile-deleted");
     }
   }
 
-  revalidatePath("/admin/customers");
-  revalidatePath("/admin/customers/archive");
-  revalidatePath("/admin/customer-intelligence");
+  revalidatePath("/admin/petparents");
+  revalidatePath("/admin/petparents/archive");
 
-  redirect("/admin/customers/archive?delete=permanently-deleted");
+  redirect("/admin/petparents/archive?delete=permanently-deleted");
 }
 
 async function getArchiveCustomers() {
@@ -707,18 +705,11 @@ export default async function AdminCustomerArchivePage() {
         <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/admin/customers"
+              href="/admin/petparents"
               className="inline-flex items-center gap-2 text-sm font-extrabold text-emerald-800 hover:text-emerald-950"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Pet Parents
-            </Link>
-
-            <Link
-              href="/admin/customer-intelligence"
-              className="inline-flex items-center gap-2 text-sm font-extrabold text-slate-600 hover:text-slate-950"
-            >
-              Back to Customer Intelligence
             </Link>
           </div>
 
@@ -903,7 +894,7 @@ function ArchiveCustomerCard({ customer }: { customer: ArchiveCustomer }) {
         <div className="space-y-3">
           <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
             <Link
-              href={`/admin/customers/${encodeURIComponent(customer.id)}`}
+              href={`/admin/petparents/${encodeURIComponent(customer.id)}`}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50"
             >
               <Database className="h-4 w-4" />

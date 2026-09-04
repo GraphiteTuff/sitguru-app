@@ -85,7 +85,7 @@ export const CUSTOMER_INTELLIGENCE_METRICS: Array<{
   },
   {
     id: "social_customers",
-    label: "Social Customers",
+    label: "Social Pet Parents",
     description: "Pet Parents attributed to Instagram, Facebook, TikTok, and related social sources.",
     drillKind: "customers",
   },
@@ -135,10 +135,10 @@ export function getCustomerIntelligenceMetricMeta(
 
 export function getCustomerIntelligenceMetricHref(
   metric: CustomerIntelligenceMetricId,
-  basePath = "/admin/customers",
+  basePath = "/admin/petparents",
 ) {
   if (metric === "rows_excluded") {
-    return "/admin/customers/archive";
+    return "/admin/petparents/archive";
   }
 
   return `${basePath}?metric=${encodeURIComponent(metric)}#ci-drill-down`;
@@ -294,7 +294,7 @@ export function buildCustomerIntelligenceDigest(input: {
     lines.push(
       ``,
       `## Next hop`,
-      `- Open cleanup queue: /admin/customers/archive`,
+      `- Open cleanup queue: /admin/petparents/archive`,
     );
   } else if (metric) {
     lines.push(``, `## Drill-down`, `_No matching Pet Parent rows for this metric yet._`);
@@ -303,9 +303,9 @@ export function buildCustomerIntelligenceDigest(input: {
   lines.push(
     ``,
     `## Admin routes`,
-    `- Registry: /admin/customers`,
-    `- Archive / spam: /admin/customers/archive`,
-    `- Export: /admin/customer-intelligence/export`,
+    `- Registry: /admin/petparents`,
+    `- Archive / spam: /admin/petparents/archive`,
+    `- Export: /admin/petparents/export`,
   );
 
   return lines.join("\n");

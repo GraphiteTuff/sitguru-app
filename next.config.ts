@@ -99,6 +99,26 @@ const nextConfig: NextConfig = {
         destination: "/events/:slug",
         permanent: true,
       },
+      {
+        source: "/admin/customer-intelligence",
+        destination: "/admin/petparents",
+        permanent: true,
+      },
+      {
+        source: "/admin/customer-intelligence/export",
+        destination: "/admin/petparents/export",
+        permanent: true,
+      },
+      {
+        source: "/admin/customers",
+        destination: "/admin/petparents",
+        permanent: true,
+      },
+      {
+        source: "/admin/customers/:path*",
+        destination: "/admin/petparents/:path*",
+        permanent: true,
+      },
     ];
   },
 

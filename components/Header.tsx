@@ -150,7 +150,7 @@ const ambassadorNavLinks: NavLink[] = [
 const adminNavLinks: NavLink[] = [
   { label: "Admin", href: "/admin" },
   { label: "Messages", href: "/admin/messages" },
-  { label: "Pet Parents", href: "/admin/customers" },
+  { label: "Pet Parents", href: "/admin/petparents" },
   { label: "Gurus", href: "/admin/gurus" },
   { label: "Ambassadors", href: "/admin/ambassadors" },
   { label: "Referrals", href: "/admin/referrals" },
@@ -702,7 +702,7 @@ export default function Header({ user = null }: HeaderProps) {
             { label: "Dashboard", href: "/admin" },
             { label: "Update Profile", href: "/admin/settings" },
             { label: "Messages", href: "/admin/messages" },
-            { label: "Pet Parents", href: "/admin/customers" },
+            { label: "Pet Parents", href: "/admin/petparents" },
             { label: "Gurus", href: "/admin/gurus" },
             { label: "Ambassadors", href: "/admin/ambassadors" },
             { label: "Referrals", href: "/admin/referrals" },

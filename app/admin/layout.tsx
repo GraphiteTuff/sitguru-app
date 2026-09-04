@@ -50,7 +50,7 @@ const adminRoutes = {
   dashboard: "/admin",
   liveWalks: "/admin/dashboard/live-walks",
   bookings: "/admin/bookings",
-  petParents: "/admin/customers",
+  petParents: "/admin/petparents",
   gurus: "/admin/gurus",
   ambassadors: "/admin/ambassadors",
   ambassadorLedger: "/admin/ambassadors/ledger",

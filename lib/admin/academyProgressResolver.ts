@@ -588,7 +588,7 @@ function profileHref(person: AdminPerson | null) {
   if (person.role === "ambassador") return person.ambassadorId ? `/admin/ambassadors?highlight=${person.ambassadorId}` : "/admin/ambassadors";
   if (person.role === "pet_parent") {
     const id = person.profileId || person.userId || person.petParentId;
-    return id ? `/admin/customers?highlight=${encodeURIComponent(id)}` : "/admin/customers";
+    return id ? `/admin/petparents?highlight=${encodeURIComponent(id)}` : "/admin/petparents";
   }
   return "/admin/users";
 }

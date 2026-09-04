@@ -752,7 +752,7 @@ export async function POST(request: NextRequest) {
         : role === "guru" && guruId
           ? `${baseUrl}/admin/gurus/${encodeURIComponent(guruId)}`
           : role === "pet_parent" && id
-            ? `${baseUrl}/admin/customers/${encodeURIComponent(id)}`
+            ? `${baseUrl}/admin/petparents/${encodeURIComponent(id)}`
             : reviewLookup
               ? `${baseUrl}/admin/account-lifecycle/${encodeURIComponent(reviewLookup)}`
               : `${baseUrl}/admin/account-lifecycle`;

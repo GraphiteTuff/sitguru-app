@@ -66,6 +66,7 @@ type GuruDisplayRow = {
   setupStepLabel?: string;
   joined: string;
   lastActivity?: string;
+  lastLogin?: string;
   href: string;
   publicHref: string;
   messageHref?: string;
@@ -512,6 +513,9 @@ export default function GuruRecordsTable({
                       Last activity: {guru.lastActivity || guru.joined || "—"}
                     </p>
                     <p className="mt-1 text-xs font-semibold text-slate-500">
+                      Last login: {guru.lastLogin || "—"}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
                       Source: {guru.recordSourceLabel || "Guru workspace"}
                     </p>
                   </div>
@@ -534,7 +538,7 @@ export default function GuruRecordsTable({
                     {(guru.roles || []).includes("Pet Parent") &&
                     (guru.userId || guru.guruUserId) ? (
                       <Link
-                        href={`/admin/customers/${encodeURIComponent(
+                        href={`/admin/petparents/${encodeURIComponent(
                           guru.userId || guru.guruUserId || "",
                         )}`}
                         className="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs font-black text-sky-800 transition hover:bg-sky-100"

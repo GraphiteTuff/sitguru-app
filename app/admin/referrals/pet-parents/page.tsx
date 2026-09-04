@@ -43,7 +43,7 @@ export default async function AdminPetParentReferralsPage({
       query={query}
       extraActions={[
         {
-          href: "/admin/customers",
+          href: "/admin/petparents",
           label: "Pet Parents",
           detail: "Open the customer roster",
           icon: Users,

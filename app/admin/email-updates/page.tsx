@@ -278,7 +278,7 @@ export default async function AdminEmailUpdatesPage({
                       <td className="px-4 py-3 font-semibold text-slate-600">
                         {row.user_id ? (
                           <Link
-                            href={`/admin/customers/${row.user_id}`}
+                            href={`/admin/petparents/${row.user_id}`}
                             className="text-emerald-800 hover:underline"
                           >
                             View profile

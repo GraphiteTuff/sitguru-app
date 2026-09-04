@@ -105,7 +105,7 @@ export default async function AdminGrowthHomePage() {
       {parents.new24h > 0 ? (
         access.actor.isSuperUser ? (
           <Link
-            href="/admin/customers#new"
+            href="/admin/petparents#new"
             className="flex items-center justify-between gap-3 rounded-[1.4rem] border border-amber-200 bg-amber-50 px-4 py-4"
           >
             <div>

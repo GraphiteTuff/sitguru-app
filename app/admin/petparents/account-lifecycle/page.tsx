@@ -7,7 +7,7 @@ export default function CustomerAccountLifecyclePage() {
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-8 flex flex-wrap items-center gap-3">
           <Link
-            href="/admin/customers"
+            href="/admin/petparents"
             className="text-sm font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
           >
             ← Back to Customers

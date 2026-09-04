@@ -43,7 +43,7 @@ type AdminNavItem = {
 const primaryNav: AdminNavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
   { label: "Bookings", href: "/admin/bookings", icon: CalendarDays },
-  { label: "Customers", href: "/admin/customers", icon: Users },
+  { label: "Pet Parents", href: "/admin/petparents", icon: Users },
   { label: "Gurus", href: "/admin/gurus", icon: ShieldCheck },
   { label: "Messages", href: "/admin/messages", icon: MessageCircle },
   {

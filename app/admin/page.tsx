@@ -283,8 +283,8 @@ export default async function AdminOperationsDashboard() {
     {
       label: "Pet Parents",
       value: formatCount(petParents, "Needs setup"),
-      helper: "Customer accounts and lifecycle",
-      href: "/admin/customers",
+      helper: "Pet Parent accounts and lifecycle",
+      href: "/admin/petparents",
       tone: "emerald",
     },
     {
@@ -394,7 +394,7 @@ export default async function AdminOperationsDashboard() {
     {
       title: "Review Pet Parents",
       description: "Customer intelligence, lifecycle, and account cleanup.",
-      href: "/admin/customers",
+      href: "/admin/petparents",
       priority: "Review",
     },
     {
@@ -428,7 +428,7 @@ export default async function AdminOperationsDashboard() {
     {
       title: "People",
       links: [
-        ["Pet Parents", "/admin/customers"],
+        ["Pet Parents", "/admin/petparents"],
         ["User Directory", "/admin/users"],
         ["Gurus", "/admin/gurus"],
         ["Guru Approvals", "/admin/guru-approvals"],
@@ -506,7 +506,7 @@ export default async function AdminOperationsDashboard() {
           Market Growth Map
         </Link>
         <Link
-          href="/admin/customers"
+          href="/admin/petparents"
           className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
         >
           Pet Parents

@@ -76,7 +76,7 @@ const QUICK_CHIPS = [
     label: "Customer Intelligence",
     period: "monthly" as const,
     prompt:
-      "Pull Customer Intelligence for Pet Parents. Use fetchCustomerIntelligence and report Pet Parents, lifetime value, repeat rate, active last 30 days, excluded rows, plus social signups, social customers, social bookings, social revenue, and social clicks. Include drill-down highlights and next hops to /admin/customers.",
+      "Pull Pet Parent intelligence. Use fetchCustomerIntelligence and report Pet Parents, lifetime value, repeat rate, active last 30 days, excluded rows, plus social signups, social Pet Parents, social bookings, social revenue, and social clicks. Include drill-down highlights and next hops to /admin/petparents.",
   },
   {
     id: "system_audit",

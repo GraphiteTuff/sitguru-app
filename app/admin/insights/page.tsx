@@ -33,7 +33,7 @@ const routes = {
   dashboard: "/admin",
   chat: "/admin/insights/chat",
   analytics: "/admin/analytics",
-  customerIntelligence: "/admin/customer-intelligence",
+  customerIntelligence: "/admin/petparents",
   petAnalytics: "/admin/pet-analytics",
   messages: "/admin/messages",
   support: "/admin/support",
@@ -238,7 +238,7 @@ export default async function AdminInsightsHubPage() {
     },
     {
       href: routes.customerIntelligence,
-      label: "Customer intelligence",
+      label: "Pet Parents",
       detail: "Cohorts, retention, bookings",
       icon: Users,
     },

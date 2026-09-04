@@ -26,6 +26,7 @@ export type AmbassadorDisplayRow = {
   nextAction: string;
   lastActivity?: string;
   lastActivityAt?: string | null;
+  lastLogin?: string;
   recordSourceLabel?: string;
   completionPercentage: number;
   missingRequirements?: string[];
@@ -411,6 +412,9 @@ export default function AmbassadorRecordsTable({
                       Last activity: {ambassador.lastActivity || "—"}
                     </p>
                     <p className="mt-1 text-xs font-semibold text-slate-500">
+                      Last login: {ambassador.lastLogin || "—"}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
                       Source: {ambassador.recordSourceLabel || "Ambassador workspace"}
                     </p>
                   </div>
@@ -426,7 +430,7 @@ export default function AmbassadorRecordsTable({
 
                     {roles.includes("Pet Parent") && ambassador.userId ? (
                       <Link
-                        href={`/admin/customers/${encodeURIComponent(ambassador.userId)}`}
+                        href={`/admin/petparents/${encodeURIComponent(ambassador.userId)}`}
                         className="inline-flex items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs font-black text-sky-800 transition hover:bg-sky-100"
                       >
                         <UserRoundCheck size={15} /> Review Pet Parent

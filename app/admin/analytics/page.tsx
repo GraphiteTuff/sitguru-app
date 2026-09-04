@@ -34,7 +34,7 @@ const routes = {
   petAnalytics: "/admin/pet-analytics",
   insights: "/admin/insights",
   reports: "/admin/reports",
-  customerIntelligence: "/admin/customer-intelligence",
+  customerIntelligence: "/admin/petparents",
   guruPerformance: "/admin/guru-performance",
   bookings: "/admin/bookings",
   referrals: "/admin/referrals",
@@ -212,7 +212,7 @@ export default async function AdminAnalyticsHubPage() {
     },
     {
       href: routes.customerIntelligence,
-      label: "Customer intelligence",
+      label: "Pet Parents",
       detail: "Cohorts and booking behavior",
       icon: Users,
     },

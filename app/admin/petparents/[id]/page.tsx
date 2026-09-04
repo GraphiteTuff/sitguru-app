@@ -1169,11 +1169,11 @@ async function updatePetParentAdminStatusAction(formData: FormData) {
   ];
 
   if (!isUuid(customerId)) {
-    redirect("/admin/customers?admin_status=invalid-id");
+    redirect("/admin/petparents?admin_status=invalid-id");
   }
 
   if (!allowedStatuses.includes(requestedStatus as AdminStatus)) {
-    redirect(`/admin/customers/${customerId}?admin_status=invalid-status`);
+    redirect(`/admin/petparents/${customerId}?admin_status=invalid-status`);
   }
 
   const now = new Date().toISOString();
@@ -1200,15 +1200,13 @@ async function updatePetParentAdminStatusAction(formData: FormData) {
 
   if (error) {
     console.warn("Could not update Pet Parent admin status:", error);
-    redirect(`/admin/customers/${customerId}?admin_status=update-failed`);
+    redirect(`/admin/petparents/${customerId}?admin_status=update-failed`);
   }
 
-  revalidatePath("/admin/customers");
-  revalidatePath(`/admin/customers/${customerId}`);
-  revalidatePath("/admin/customer-intelligence");
-  revalidatePath("/admin/customers/customer-intelligence");
+  revalidatePath("/admin/petparents");
+  revalidatePath(`/admin/petparents/${customerId}`);
 
-  redirect(`/admin/customers/${customerId}?admin_status=updated`);
+  redirect(`/admin/petparents/${customerId}?admin_status=updated`);
 }
 
 async function deleteIncompletePetParentAction(formData: FormData) {
@@ -1217,7 +1215,7 @@ async function deleteIncompletePetParentAction(formData: FormData) {
   const customerId = String(formData.get("customerId") || "");
 
   if (!isUuid(customerId)) {
-    redirect("/admin/customers?cleanup=invalid-id");
+    redirect("/admin/petparents?cleanup=invalid-id");
   }
 
   const [profile, authUser, bookings, pets, sentMessages, receivedMessages] = await Promise.all([
@@ -1253,7 +1251,7 @@ async function deleteIncompletePetParentAction(formData: FormData) {
     !verifiedFields.hasConfirmedPhone;
 
   if (!safeToDelete) {
-    redirect(`/admin/customers/${customerId}?cleanup=blocked`);
+    redirect(`/admin/petparents/${customerId}?cleanup=blocked`);
   }
 
   await supabaseAdmin.from("profiles").delete().eq("id", customerId);
@@ -1266,10 +1264,8 @@ async function deleteIncompletePetParentAction(formData: FormData) {
     }
   }
 
-  revalidatePath("/admin/customers");
-  revalidatePath("/admin/customer-intelligence");
-  revalidatePath("/admin/customers/customer-intelligence");
-  redirect("/admin/customers?cleanup=deleted-incomplete-pet-parent");
+  revalidatePath("/admin/petparents");
+  redirect("/admin/petparents?cleanup=deleted-incomplete-pet-parent");
 }
 
 export default async function AdminCustomerDetailPage({ params }: PageProps) {
@@ -1424,7 +1420,7 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
       <main className="min-h-screen bg-[#f7fbf7] px-4 py-6 text-[#062f2b] sm:px-6 lg:px-8">
         <section className="mx-auto max-w-6xl rounded-[2rem] border border-red-100 bg-white p-6 shadow-sm">
           <Link
-            href="/admin/customers"
+            href="/admin/petparents"
             className="inline-flex items-center gap-2 text-sm font-extrabold text-emerald-800 hover:text-emerald-950"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -1451,18 +1447,11 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
         <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/admin/customers"
+              href="/admin/petparents"
               className="inline-flex items-center gap-2 text-sm font-extrabold text-emerald-800 hover:text-emerald-950"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Pet Parents
-            </Link>
-
-            <Link
-              href="/admin/customer-intelligence"
-              className="inline-flex items-center gap-2 text-sm font-extrabold text-slate-600 hover:text-slate-950"
-            >
-              Back to Customer Intelligence
             </Link>
           </div>
 

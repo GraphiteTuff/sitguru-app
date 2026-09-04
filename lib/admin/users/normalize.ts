@@ -358,7 +358,7 @@ export function getProfileHref(user: {
   }
 
   if (user.role.includes("Pet Parent") && !user.role.includes("Lead")) {
-    return `/admin/customers?user=${encodeURIComponent(user.id)}`;
+    return `/admin/petparents?user=${encodeURIComponent(user.id)}`;
   }
 
   if (user.source === "Launch" || user.role.includes("Lead")) {
@@ -369,7 +369,7 @@ export function getProfileHref(user: {
     return "/admin/launch-signups";
   }
 
-  return `/admin/customers/${encodeURIComponent(user.id)}`;
+  return `/admin/petparents/${encodeURIComponent(user.id)}`;
 }
 
 export function getSettingsHref(user: {

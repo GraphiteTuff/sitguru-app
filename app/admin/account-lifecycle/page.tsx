@@ -427,8 +427,8 @@ async function updatePetParentAdminStatusFromLifecycle(formData: FormData) {
   }
 
   revalidatePath("/admin/account-lifecycle");
-  revalidatePath("/admin/customers");
-  revalidatePath(`/admin/customers/${customerId}`);
+  revalidatePath("/admin/petparents");
+  revalidatePath(`/admin/petparents/${customerId}`);
   redirect(
     `/admin/account-lifecycle?query=${encodeURIComponent(returnQuery)}&refresh=${Date.now()}`,
   );
@@ -972,8 +972,8 @@ export default async function AccountLifecyclePage({
       )}`
     : "/admin/ambassadors";
   const customerHref = userId
-    ? `/admin/customers/${encodeURIComponent(userId)}`
-    : "/admin/customers";
+    ? `/admin/petparents/${encodeURIComponent(userId)}`
+    : "/admin/petparents";
   const petParentAdminStatus = normalizeAccountRole(
     profile?.admin_status || "needs_review",
   );
@@ -1094,7 +1094,7 @@ export default async function AccountLifecyclePage({
                 <Link
                   href={
                     petParentRolePresent && !guruRolePresent
-                      ? "/admin/customers"
+                      ? "/admin/petparents"
                       : "/admin/gurus"
                   }
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50 sm:w-auto"
@@ -1662,7 +1662,7 @@ export default async function AccountLifecyclePage({
                         href={customerHref}
                         className="font-black text-sky-800 underline underline-offset-2"
                       >
-                        /admin/customers
+                        /admin/petparents
                       </Link>
                       . Mark Active when the signup is a real Pet Parent.
                     </p>

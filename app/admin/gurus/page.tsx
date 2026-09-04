@@ -123,6 +123,7 @@ type GuruDisplayRow = {
   setupStepLabel: string;
   joined: string;
   lastActivity: string;
+  lastLogin: string;
   href: string;
   publicHref: string;
   inferredFromFallback: boolean;
@@ -1294,6 +1295,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       setupStepLabel: getSetupStepLabel(setupStep),
       joined: formatDateShort(asTrimmedString(guru.created_at)),
       lastActivity: formatDateShort(lastActivityRaw),
+      lastLogin: formatDateShort(asTrimmedString(authUser?.last_sign_in_at)),
       href: id ? `/admin/gurus/${encodeURIComponent(id)}` : "/admin/gurus",
       publicHref: publicIdentifier
         ? `/guru/${encodeURIComponent(publicIdentifier)}`
@@ -1411,6 +1413,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       lastActivity: formatDateShort(
         authUser?.last_sign_in_at || asTrimmedString(profile?.updated_at),
       ),
+      lastLogin: formatDateShort(asTrimmedString(authUser?.last_sign_in_at)),
       href: `/admin/account-lifecycle/${encodeURIComponent(userId)}`,
       publicHref: "/search",
       inferredFromFallback: true,

@@ -430,13 +430,13 @@ export default function AdminAccountMenu() {
             </Link>
 
             <Link
-              href="/admin/customers"
+              href="/admin/petparents"
               role="menuitem"
               onClick={() => setOpen(false)}
               className="flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-black text-slate-800 transition hover:bg-green-50 hover:text-green-800"
             >
               <Users size={19} className="text-green-800" />
-              Customers
+              Pet Parents
             </Link>
 
             <Link

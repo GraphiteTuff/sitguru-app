@@ -64,7 +64,7 @@ export default function PetParentAlertPulse({
       </p>
       {latest.newest[0] ? (
         <Link
-          href={`/admin/customers/${latest.newest[0].id}`}
+          href={`/admin/petparents/${latest.newest[0].id}`}
           className="mt-2 inline-flex min-h-11 items-center text-sm font-black text-[#0D5C3A]"
         >
           Open {latest.newest[0].name} →

@@ -246,7 +246,7 @@ type ChartItem = {
 const adminRoutes = {
   dashboard: "/admin",
   messages: "/admin/messages",
-  customers: "/admin/customers",
+  customers: "/admin/petparents",
   gurus: "/admin/gurus",
   bookings: "/admin/bookings",
   users: "/admin/users",

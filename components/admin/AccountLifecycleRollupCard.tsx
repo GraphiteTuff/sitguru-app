@@ -260,7 +260,7 @@ export default function AccountLifecycleRollupCard({
 
       <div className="mt-5 grid gap-3 lg:grid-cols-3">
         <Link
-          href="/admin/customers/account-lifecycle"
+          href="/admin/petparents/account-lifecycle"
           className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 transition hover:bg-emerald-100"
         >
           <div className="flex items-center gap-2 text-emerald-700">

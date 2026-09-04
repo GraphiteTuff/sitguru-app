@@ -159,7 +159,7 @@ type BookingCard = {
 const adminRoutes = {
   dashboard: "/admin",
   bookings: "/admin/bookings",
-  customers: "/admin/customers",
+  customers: "/admin/petparents",
   gurus: "/admin/gurus",
   messages: "/admin/messages",
   financials: "/admin/financials",

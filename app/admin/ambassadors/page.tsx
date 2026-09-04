@@ -90,6 +90,7 @@ type AmbassadorSummaryRow = {
   needs_attention?: boolean;
   attention_items?: string[];
   auth_created_at?: string | null;
+  last_sign_in_at?: string | null;
   profile_updated_at?: string | null;
   onboarding_step?: number | null;
   onboarding_percent?: number | null;
@@ -170,6 +171,7 @@ type AuthUserSnapshot = {
   email?: string | null;
   phone?: string | null;
   created_at?: string | null;
+  last_sign_in_at?: string | null;
   email_confirmed_at?: string | null;
   phone_confirmed_at?: string | null;
   confirmed_at?: string | null;
@@ -1221,6 +1223,7 @@ function buildUnifiedAmbassadorRows({
       needs_attention: attentionItems.length > 0,
       attention_items: attentionItems,
       auth_created_at: authUser?.created_at || null,
+      last_sign_in_at: authUser?.last_sign_in_at || null,
       profile_updated_at: firstString(profile, ["updated_at"]) || null,
       referral_clicks: metrics.referralClicks,
       qualified_referrals: metrics.qualifiedReferrals,
@@ -1417,6 +1420,7 @@ function buildUnifiedAmbassadorRows({
       needs_attention: true,
       attention_items: attentionItems,
       auth_created_at: authUser?.created_at || null,
+      last_sign_in_at: authUser?.last_sign_in_at || null,
       profile_updated_at: firstString(profile, ["updated_at"]) || null,
       onboarding_step: 0,
       onboarding_percent: 0,
@@ -1847,6 +1851,9 @@ function toAmbassadorDisplayRow(
       : getAmbassadorNextAction(ambassador),
     lastActivity: formatDateTime(activityRaw),
     lastActivityAt: activityRaw,
+    lastLogin: ambassador.last_sign_in_at
+      ? formatDateTime(ambassador.last_sign_in_at)
+      : "—",
     recordSourceLabel: missingWorkspace
       ? "Signup intent / no workspace"
       : getSourceLabel(ambassador),

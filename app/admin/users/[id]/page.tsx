@@ -11,5 +11,5 @@ type PageProps = {
 export default async function AdminUserDetailRedirectPage({ params }: PageProps) {
   const resolvedParams = await params;
 
-  redirect(`/admin/customers/${resolvedParams.id}`);
+  redirect(`/admin/petparents/${resolvedParams.id}`);
 }

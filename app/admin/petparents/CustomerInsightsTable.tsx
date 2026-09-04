@@ -49,6 +49,7 @@ type CustomerInsight = {
   possibleDuplicate?: boolean;
   nextAction?: string;
   lastActivity?: string;
+  lastLogin?: string;
   recordSourceLabel?: string;
 };
 
@@ -543,9 +544,9 @@ export default function CustomerInsightsTable({
             const contactMethod = getContactMethod(customer);
             const phone = String(customer.phone || "").trim();
             const canMessage = Boolean(customer.id);
-            const adminHref = `/admin/customers/${encodeURIComponent(customer.id)}`;
+            const adminHref = `/admin/petparents/${encodeURIComponent(customer.id)}`;
             const messageHref = `/admin/messages?userId=${encodeURIComponent(customer.id)}`;
-            const publicHref = `/admin/customers/${encodeURIComponent(customer.id)}/public-profile-preview`;
+            const publicHref = `/admin/petparents/${encodeURIComponent(customer.id)}/public-profile-preview`;
 
             return (
               <article
@@ -634,6 +635,9 @@ export default function CustomerInsightsTable({
                     </p>
                     <p className="mt-1 text-xs font-semibold text-slate-500">
                       Last activity: {getLastActivity(customer)}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      Last login: {customer.lastLogin || "—"}
                     </p>
                     <p className="mt-1 text-xs font-semibold text-slate-500">
                       Source: {getRecordSourceLabel(customer)}
