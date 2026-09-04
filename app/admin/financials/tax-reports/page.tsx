@@ -9,9 +9,18 @@ import {
 } from "lucide-react";
 import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
 import { MarketplaceSalesTaxStates } from "@/components/admin/financials/MarketplaceSalesTaxStates";
-import { QuickBooksConnectPanel } from "@/components/admin/financials/QuickBooksConnectPanel";
+import { AccountingConnectionsPanel } from "@/components/admin/financials/AccountingConnectionsPanel";
 import { TaxFilingCalendar } from "@/components/admin/financials/TaxFilingCalendar";
 import { marketplaceSalesTaxStateLabel } from "@/lib/admin/financials/marketplace-sales-tax-states";
+import { isWaveAccountingEnabled } from "@/lib/admin/financials/accounting/catalog";
+import {
+  loadAccountingConnection,
+  readConnectionTokens,
+  toSafeConnection,
+} from "@/lib/admin/financials/accounting/connections";
+import { loadTaxProfessional } from "@/lib/admin/financials/accounting/tax-entity";
+import { getWavePublicStatus } from "@/lib/admin/financials/accounting/wave/config";
+import { listWaveBusinesses } from "@/lib/admin/financials/accounting/wave/provider";
 import {
   getQuickBooksPublicStatus,
   getQuickBooksSafeConnection,
@@ -285,6 +294,24 @@ const taxReports: TaxReportCard[] = [
       "CPA handoff",
     ],
     liveHint: "Live desk: /admin/financials/tax-reports/quickbooks",
+  },
+  {
+    eyebrow: "Wave",
+    title: "Wave tax-ready books",
+    description:
+      "Lower-cost bookkeeping through Wave, which H&R Block promotes for small-business records. SitGuru connects with OAuth. Block Advisors still prepares returns from the exported package — there is no H&R Block filing API.",
+    href: "/admin/financials/tax-reports#accounting",
+    tone: "green",
+    included: [
+      "Connect Wave",
+      "Wave business picker",
+      "Read-only account check",
+      "Tax package CSV",
+      "Block Advisors handoff",
+      "Keeps QuickBooks",
+      "No H&R Block API",
+    ],
+    liveHint: "Live desk: Accounting & Tax Prep Connections",
   },
 ];
 
@@ -883,6 +910,7 @@ async function getTaxCenterData() {
 function getReadinessItems(
   live: TaxLiveTotals,
   quickbooksConnected: boolean,
+  waveConnected: boolean,
 ): ReadinessItem[] {
   return [
     {
@@ -946,6 +974,13 @@ function getReadinessItems(
       detail: quickbooksConnected
         ? "Live company connected. Push the tax journal from Tax Center, then send the same package through CPA Handoff."
         : "Connect the live Graff Enterprises QuickBooks Online company, then push the tax journal. CSV / IIF stay available.",
+    },
+    {
+      label: "Wave Accounting",
+      status: waveConnected ? "ready" : "needs_review",
+      detail: waveConnected
+        ? "Wave is connected for tax-ready bookkeeping. Sync is read-only until ledger writes are verified."
+        : "Optional lower-cost books path. Connect Wave after registering a Wave developer application, or export the tax package for Block Advisors by hand.",
     },
   ];
 }
@@ -1146,6 +1181,8 @@ export default async function AdminFinancialsTaxReportsPage({
   searchParams?: Promise<{
     section?: string;
     period?: string;
+    wave?: string;
+    detail?: string;
   }>;
 }) {
   const actor = await getFinanceAdminIdentity();
@@ -1159,6 +1196,10 @@ export default async function AdminFinancialsTaxReportsPage({
   const params = (await searchParams) || {};
   const section = asTrimmedString(params.section).toLowerCase();
   const period = asTrimmedString(params.period) || "2026";
+  const waveNotice =
+    asTrimmedString(params.wave) === "error"
+      ? asTrimmedString(params.detail) || "Wave authorization did not finish."
+      : asTrimmedString(params.wave);
 
   const taxData = await getTaxCenterData();
   const { live } = taxData;
@@ -1166,6 +1207,20 @@ export default async function AdminFinancialsTaxReportsPage({
   const quickbooksConnection = getQuickBooksSafeConnection(
     await loadQuickBooksConnection(),
   );
+  const waveSetup = getWavePublicStatus();
+  const waveEnabled = isWaveAccountingEnabled();
+  const waveRow = await loadAccountingConnection("wave").catch(() => null);
+  const waveConnection = toSafeConnection(waveRow);
+  let waveBusinesses: Array<{ id: string; name: string; isPersonal?: boolean }> = [];
+  if (waveRow && (waveNotice === "pick" || waveRow.status === "action_required")) {
+    try {
+      const tokens = readConnectionTokens(waveRow);
+      waveBusinesses = await listWaveBusinesses(tokens.accessToken);
+    } catch {
+      waveBusinesses = [];
+    }
+  }
+  const taxProfessional = await loadTaxProfessional(Number(period) || new Date().getFullYear());
   live.sourceHealth = live.sourceHealth.map((item) =>
     item.id === "quickbooks"
       ? {
@@ -1175,7 +1230,11 @@ export default async function AdminFinancialsTaxReportsPage({
         }
       : item,
   );
-  const readinessItems = getReadinessItems(live, Boolean(quickbooksConnection));
+  const readinessItems = getReadinessItems(
+    live,
+    Boolean(quickbooksConnection),
+    Boolean(waveConnection && waveConnection.status === "connected"),
+  );
   const quarterlyChecklist = buildQuarterlyChecklist(live);
   const annualChecklist = buildAnnualChecklist(live);
   const marketingDeductions =
@@ -1198,11 +1257,11 @@ export default async function AdminFinancialsTaxReportsPage({
           href={
             quickbooksSetup.configured
               ? "/api/admin/financials/quickbooks/connect"
-              : "/admin/financials/tax-reports/quickbooks"
+              : "/admin/financials/tax-reports#accounting"
           }
           className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-green-950"
         >
-          Connect QuickBooks
+          Accounting connections
         </Link>
       }
     >
@@ -1278,25 +1337,29 @@ export default async function AdminFinancialsTaxReportsPage({
             icon: Receipt,
           },
           {
-            href: quickbooksSetup.configured
-              ? "/api/admin/financials/quickbooks/connect"
-              : "/admin/financials/tax-reports/quickbooks",
-            label: quickbooksConnection ? "Push to QuickBooks" : "Connect QuickBooks",
+            href: "/admin/financials/tax-reports#accounting",
+            label: quickbooksConnection ? "Accounting connections" : "Connect books",
             detail: quickbooksConnection
-              ? `Live · ${quickbooksConnection.companyName}`
-              : "Live QBO company for tax season",
+              ? `QuickBooks · ${quickbooksConnection.companyName}`
+              : "QuickBooks, Wave, or a manual tax package",
             icon: BookOpen,
           },
         ]}
       />
 
-      <QuickBooksConnectPanel
-        setup={quickbooksSetup}
-        connection={quickbooksConnection}
-        lineCount={0}
-        queryError={undefined}
-        justConnected={false}
-      />
+      <div id="accounting">
+        <AccountingConnectionsPanel
+          qboSetup={quickbooksSetup}
+          qboConnection={quickbooksConnection}
+          waveSetup={waveSetup}
+          waveEnabled={waveEnabled}
+          waveConnection={waveConnection}
+          waveBusinesses={waveBusinesses}
+          waveNotice={waveNotice}
+          taxProfessional={taxProfessional}
+          taxYear={Number(period) || new Date().getFullYear()}
+        />
+      </div>
 
       <TaxFilingCalendar />
 
@@ -1691,15 +1754,11 @@ export default async function AdminFinancialsTaxReportsPage({
         links={
           <>
             <Link
-              href={
-                quickbooksSetup.configured
-                  ? "/api/admin/financials/quickbooks/connect"
-                  : "/admin/financials/tax-reports/quickbooks"
-              }
+              href="/admin/financials/tax-reports#accounting"
               className="rounded-2xl px-3 py-2 text-xs font-black !text-white"
               style={{ background: "#0D5C3A" }}
             >
-              Connect QuickBooks
+              Accounting connections
             </Link>
             <Link
               href="/admin/financials/payment-gateway"

@@ -1738,6 +1738,13 @@ async function getAdminSettingsData() {
       sensitive: true,
     },
     {
+      label: "Wave Accounting",
+      status: Boolean(process.env.WAVE_CLIENT_ID && process.env.WAVE_CLIENT_SECRET),
+      detail:
+        "Optional lower-cost Tax Center books path. Register a Wave app, then set WAVE_CLIENT_ID, WAVE_CLIENT_SECRET, WAVE_REDIRECT_URI, and WAVE_ACCOUNTING_ENABLED.",
+      sensitive: true,
+    },
+    {
       label: "Email Sending",
       status: Boolean(process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY),
       detail: "Required for Admin alerts, reset support, and marketplace emails.",

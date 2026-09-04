@@ -131,11 +131,11 @@ export default function AdminOperationsScreen() {
             <BubblePressable
               accessibilityRole="button"
               onPress={() =>
-                Linking.openURL('https://www.sitguru.com/admin/growth')
+                Linking.openURL('https://www.sitguru.com/admin/financials/tax-reports')
               }
               style={styles.socialButton}
             >
-              <Text style={styles.socialButtonText}>Social Media Manager</Text>
+              <Text style={styles.socialButtonText}>Tax Center</Text>
             </BubblePressable>
           </View>
 
@@ -245,6 +245,11 @@ export default function AdminOperationsScreen() {
               actions={[
                 { label: 'Payments & Payouts', href: '/payments' },
                 { label: 'Bookings', href: '/bookings' },
+                {
+                  label: 'Tax Center',
+                  alert:
+                    'Open SitGuru Tax Center on the web for QuickBooks, Wave, and the Block Advisors tax package.',
+                },
                 { label: 'Guru Pricing', href: '/guru-pricing' },
                 { label: 'Review payout' },
                 { label: 'Flag payment issue' },
