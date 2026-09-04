@@ -28,12 +28,12 @@ export default async function GrowthAnalyticsPage() {
   ]);
 
   const kpis = [
-    { label: "Pet Parents +", value: String(stats.petParents), helper: "New this week", tone: "emerald" as const, icon: <PawPrint size={18} /> },
-    { label: "Gurus +", value: String(stats.gurus), helper: "New this week", tone: "sky" as const, icon: <Users size={18} /> },
-    { label: "Referral clicks", value: String(stats.referrals), helper: "Links used", tone: "violet" as const, icon: <MousePointerClick size={18} /> },
-    { label: "Social visits", value: String(stats.visits), helper: "Clicks + views", tone: "sky" as const, icon: <Megaphone size={18} /> },
-    { label: "Social signups", value: String(stats.signups), helper: "Attributed", tone: "emerald" as const, icon: <CheckCircle2 size={18} /> },
-    { label: "Conversion", value: String(stats.conversion), helper: "Signups ÷ visits", tone: "slate" as const, icon: <BarChart3 size={18} /> },
+    { label: "Pet Parents +", value: String(stats.petParents), helper: "New this week", tone: "emerald" as const, icon: <PawPrint size={18} />, trend: stats.trends.petParents },
+    { label: "Gurus +", value: String(stats.gurus), helper: "New this week", tone: "sky" as const, icon: <Users size={18} />, trend: stats.trends.gurus },
+    { label: "Referral clicks", value: String(stats.referrals), helper: "Links used", tone: "violet" as const, icon: <MousePointerClick size={18} />, trend: stats.trends.referrals },
+    { label: "Social visits", value: String(stats.visits), helper: "Clicks + views", tone: "sky" as const, icon: <Megaphone size={18} />, trend: stats.trends.visits },
+    { label: "Social signups", value: String(stats.signups), helper: "Attributed", tone: "emerald" as const, icon: <CheckCircle2 size={18} />, trend: stats.trends.signups },
+    { label: "Conversion", value: String(stats.conversion), helper: "Signups ÷ visits", tone: "slate" as const, icon: <BarChart3 size={18} />, trend: stats.trends.conversion },
   ];
 
   return (
@@ -50,6 +50,7 @@ export default async function GrowthAnalyticsPage() {
             helper={tile.helper}
             tone={tile.tone}
             icon={tile.icon}
+            trend={tile.trend}
           />
         ))}
       </section>

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { weekOverWeekTrend, type KpiTrend } from "@/lib/sitguru/kpi-trend";
 
 export type SalesMarketingSourceHealth = {
   id: string;
@@ -41,6 +42,16 @@ export type SalesMarketingDashboardData = {
   reviewQueue: SalesMarketingRecentItem[];
   recentOutreach: SalesMarketingRecentItem[];
   isLive: boolean;
+  trends: {
+    signupLeads: KpiTrend;
+    referrals: KpiTrend;
+    outreachContacts: KpiTrend;
+    tasksTotal: KpiTrend;
+    tasksAwaitingCeo: KpiTrend;
+    tasksBlockedOrHelp: KpiTrend;
+    campaigns: KpiTrend;
+    launchSignups: KpiTrend;
+  };
 };
 
 type AnyRow = Record<string, unknown>;
@@ -382,6 +393,26 @@ export async function getSalesMarketingDashboardData(): Promise<SalesMarketingDa
       href: "/admin/sales-marketing/outreach",
     }));
 
+  const ceoTaskDates = tasksResult.data
+    .filter((row) => getText(row, ["status"]).toLowerCase() === "ceo review")
+    .map(getDate);
+  const blockedTaskDates = tasksResult.data
+    .filter((row) => {
+      const status = getText(row, ["status"]).toLowerCase();
+      const review = getText(row, ["ceo_review_status"]).toLowerCase();
+      const needsHelp =
+        row.needs_help === true ||
+        getText(row, ["needs_help"]).toLowerCase() === "true";
+      return (
+        needsHelp ||
+        status === "blocked" ||
+        status === "needs follow-up" ||
+        review === "needs help" ||
+        review === "needs follow-up"
+      );
+    })
+    .map(getDate);
+
   return {
     metrics,
     sourceHealth,
@@ -389,5 +420,15 @@ export async function getSalesMarketingDashboardData(): Promise<SalesMarketingDa
     reviewQueue,
     recentOutreach,
     isLive: sourceHealth.some((source) => source.ok),
+    trends: {
+      signupLeads: weekOverWeekTrend(leadsResult.data.map(getDate)),
+      referrals: weekOverWeekTrend(referralsResult.data.map(getDate)),
+      outreachContacts: weekOverWeekTrend(outreachResult.data.map(getDate)),
+      tasksTotal: weekOverWeekTrend(tasksResult.data.map(getDate)),
+      tasksAwaitingCeo: weekOverWeekTrend(ceoTaskDates, { invert: true }),
+      tasksBlockedOrHelp: weekOverWeekTrend(blockedTaskDates, { invert: true }),
+      campaigns: weekOverWeekTrend(campaignsResult.data.map(getDate)),
+      launchSignups: weekOverWeekTrend(launchResult.data.map(getDate)),
+    },
   };
 }

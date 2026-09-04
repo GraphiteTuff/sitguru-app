@@ -8,6 +8,7 @@ import {
   kindMeta,
   slugifyCampaign,
 } from "@/lib/admin/growth/constants";
+import { compareKpi, isoDaysAgo, type KpiTrend } from "@/lib/sitguru/kpi-trend";
 
 type AnyRow = Record<string, unknown>;
 
@@ -15,8 +16,8 @@ function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function asIsoWeekAgo() {
-  return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+function inWindow(iso: string, start: string, end: string) {
+  return Boolean(iso) && iso >= start && iso < end;
 }
 
 async function safeRows<T>(
@@ -288,10 +289,22 @@ export type GrowthHomeStats = {
   conversion: string;
   campaigns: number;
   pendingReview: number;
+  trends: {
+    petParents: KpiTrend;
+    gurus: KpiTrend;
+    referrals: KpiTrend;
+    visits: KpiTrend;
+    signups: KpiTrend;
+    conversion: KpiTrend | null;
+    campaigns: KpiTrend;
+    pendingReview: KpiTrend;
+  };
 };
 
 export async function getGrowthHomeStats(): Promise<GrowthHomeStats> {
-  const since = asIsoWeekAgo();
+  const nowIso = new Date().toISOString();
+  const thisWeekStart = isoDaysAgo(7);
+  const priorWeekStart = isoDaysAgo(14);
 
   const [parentRows, guruRows, referralRows, events, campaigns, content] =
     await Promise.all([
@@ -301,59 +314,119 @@ export async function getGrowthHomeStats(): Promise<GrowthHomeStats> {
           .select(
             "id,role,account_type,signup_role,admin_status,is_demo,is_test_account,is_archived,archived_at,deleted_at,created_at",
           )
-          .gte("created_at", since)
-          .limit(2000),
+          .gte("created_at", priorWeekStart)
+          .limit(4000),
         "growth_week_profiles",
       ),
       safeRows<AnyRow>(
         supabaseAdmin
           .from("gurus")
           .select("id,created_at")
-          .gte("created_at", since)
-          .limit(500),
+          .gte("created_at", priorWeekStart)
+          .limit(1000),
         "growth_week_gurus",
       ),
       safeRows<AnyRow>(
         supabaseAdmin
           .from("referral_clicks")
           .select("id,created_at")
-          .gte("created_at", since)
-          .limit(2000),
+          .gte("created_at", priorWeekStart)
+          .limit(4000),
         "growth_week_referrals",
       ),
       safeRows<AnyRow>(
         supabaseAdmin
           .from("growth_campaign_events")
           .select("id,event_type,created_at")
-          .gte("created_at", since)
-          .limit(4000),
+          .gte("created_at", priorWeekStart)
+          .limit(8000),
         "growth_week_events",
       ),
       listGrowthCampaigns(),
       listGrowthContent(),
     ]);
 
-  const petParents = parentRows.filter(isLivePetParentProfile).length;
-  const visits = events.filter((row) => {
+  const countRows = (
+    rows: AnyRow[],
+    start: string,
+    end: string,
+    predicate?: (row: AnyRow) => boolean,
+  ) =>
+    rows.filter((row) => {
+      if (!inWindow(text(row.created_at), start, end)) return false;
+      return predicate ? predicate(row) : true;
+    }).length;
+
+  const isVisit = (row: AnyRow) => {
     const type = text(row.event_type).toLowerCase();
     return type === "click" || type === "page_view";
-  }).length;
-  const signups = events.filter(
-    (row) => text(row.event_type).toLowerCase() === "signup",
-  ).length;
+  };
+  const isSignup = (row: AnyRow) =>
+    text(row.event_type).toLowerCase() === "signup";
+
+  const liveParents = parentRows.filter(isLivePetParentProfile);
+  const petParents = countRows(liveParents, thisWeekStart, nowIso);
+  const priorPetParents = countRows(liveParents, priorWeekStart, thisWeekStart);
+  const gurus = countRows(guruRows, thisWeekStart, nowIso);
+  const priorGurus = countRows(guruRows, priorWeekStart, thisWeekStart);
+  const referrals = countRows(referralRows, thisWeekStart, nowIso);
+  const priorReferrals = countRows(referralRows, priorWeekStart, thisWeekStart);
+  const visits = countRows(events, thisWeekStart, nowIso, isVisit);
+  const priorVisits = countRows(events, priorWeekStart, thisWeekStart, isVisit);
+  const signups = countRows(events, thisWeekStart, nowIso, isSignup);
+  const priorSignups = countRows(
+    events,
+    priorWeekStart,
+    thisWeekStart,
+    isSignup,
+  );
+  const conversionRate = visits === 0 ? null : (signups / visits) * 100;
+  const priorConversionRate =
+    priorVisits === 0 ? null : (priorSignups / priorVisits) * 100;
   const conversion =
-    visits === 0 ? "—" : `${((signups / visits) * 100).toFixed(1)}%`;
+    conversionRate == null ? "—" : `${conversionRate.toFixed(1)}%`;
+
+  const activeCampaigns = campaigns.filter((item) => item.status === "active");
+  const pending = content.filter((item) => item.status === "Needs CEO Review");
+  const campaignsThisWeek = activeCampaigns.filter((item) =>
+    inWindow(item.createdAt || "", thisWeekStart, nowIso),
+  ).length;
+  const campaignsPriorWeek = activeCampaigns.filter((item) =>
+    inWindow(item.createdAt || "", priorWeekStart, thisWeekStart),
+  ).length;
+  const pendingThisWeek = pending.filter((item) =>
+    inWindow(item.createdAt || "", thisWeekStart, nowIso),
+  ).length;
+  const pendingPriorWeek = pending.filter((item) =>
+    inWindow(item.createdAt || "", priorWeekStart, thisWeekStart),
+  ).length;
 
   return {
     petParents,
-    gurus: guruRows.length,
-    referrals: referralRows.length,
+    gurus,
+    referrals,
     visits,
     signups,
     conversion,
-    campaigns: campaigns.filter((item) => item.status === "active").length,
-    pendingReview: content.filter((item) => item.status === "Needs CEO Review")
-      .length,
+    campaigns: activeCampaigns.length,
+    pendingReview: pending.length,
+    trends: {
+      petParents: compareKpi(petParents, priorPetParents),
+      gurus: compareKpi(gurus, priorGurus),
+      referrals: compareKpi(referrals, priorReferrals),
+      visits: compareKpi(visits, priorVisits),
+      signups: compareKpi(signups, priorSignups),
+      conversion:
+        conversionRate == null && priorConversionRate == null
+          ? null
+          : compareKpi(conversionRate ?? 0, priorConversionRate ?? 0, {
+              decimals: 1,
+            }),
+      campaigns: compareKpi(campaignsThisWeek, campaignsPriorWeek),
+      pendingReview: compareKpi(pendingThisWeek, pendingPriorWeek, {
+        invert: true,
+      }),
+    },
   };
 }
 

@@ -148,6 +148,7 @@ export default async function SalesMarketingAdminPage() {
       helper: "Field + signup intake",
       tone: "emerald" as const,
       icon: <Users size={18} />,
+      trend: data.trends.signupLeads,
     },
     {
       label: "Referrals logged",
@@ -155,6 +156,7 @@ export default async function SalesMarketingAdminPage() {
       helper: "Marketing CRM referrals",
       tone: "violet" as const,
       icon: <TrendingUp size={18} />,
+      trend: data.trends.referrals,
     },
     {
       label: "Outreach",
@@ -162,6 +164,7 @@ export default async function SalesMarketingAdminPage() {
       helper: "Contacts in pipeline",
       tone: "sky" as const,
       icon: <Handshake size={18} />,
+      trend: data.trends.outreachContacts,
     },
     {
       label: "Tasks",
@@ -169,6 +172,7 @@ export default async function SalesMarketingAdminPage() {
       helper: "Daily tracker rows",
       tone: "slate" as const,
       icon: <ClipboardCheck size={18} />,
+      trend: data.trends.tasksTotal,
     },
     {
       label: "CEO review",
@@ -176,6 +180,7 @@ export default async function SalesMarketingAdminPage() {
       helper: "Awaiting decision",
       tone: "amber" as const,
       icon: <Flag size={18} />,
+      trend: data.trends.tasksAwaitingCeo,
     },
     {
       label: "Blocked / help",
@@ -183,6 +188,7 @@ export default async function SalesMarketingAdminPage() {
       helper: "Needs follow-up",
       tone: "rose" as const,
       icon: <Flag size={18} />,
+      trend: data.trends.tasksBlockedOrHelp,
     },
     {
       label: "Campaigns",
@@ -190,6 +196,7 @@ export default async function SalesMarketingAdminPage() {
       helper: "Campaign records",
       tone: "emerald" as const,
       icon: <Megaphone size={18} />,
+      trend: data.trends.campaigns,
     },
     {
       label: "Launch signups",
@@ -197,6 +204,7 @@ export default async function SalesMarketingAdminPage() {
       helper: "Sibling growth demand",
       tone: "sky" as const,
       icon: <Rocket size={18} />,
+      trend: data.trends.launchSignups,
     },
   ];
 
@@ -297,6 +305,7 @@ export default async function SalesMarketingAdminPage() {
             helper={tile.helper}
             tone={tile.tone}
             icon={tile.icon}
+            trend={tile.trend}
           />
         ))}
       </section>

@@ -186,16 +186,23 @@ export function AccountingConnectionsPanel({
     }
   }
 
+  const cardClass =
+    "rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6";
+  const titleClass = "mt-1 text-xl font-black !text-slate-950";
+  const bodyClass = "mt-2 text-sm font-semibold leading-6 !text-slate-700";
+  const kickerClass =
+    "text-[10px] font-black uppercase tracking-[0.18em] !text-emerald-800";
+
   return (
     <section className="space-y-4">
-      <div className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 dark:border-emerald-900/40 dark:bg-slate-950">
-        <p className="text-xs font-black uppercase tracking-[0.28em] text-emerald-800">
+      <div className={cardClass}>
+        <p className="text-xs font-black uppercase tracking-[0.28em] !text-emerald-800">
           Accounting & Tax Prep Connections
         </p>
-        <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
+        <p className="mt-2 text-2xl font-black leading-tight !text-slate-950">
           Keep books in QuickBooks, Wave, or a manual tax package.
-        </h2>
-        <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+        </p>
+        <p className={`max-w-3xl ${bodyClass}`}>
           SitGuru stays the source of truth for marketplace activity. QuickBooks is
           the premium books path. Wave is the lower-cost bookkeeping path H&amp;R
           Block promotes, so Block Advisors can prepare returns from tax-ready
@@ -208,8 +215,8 @@ export function AccountingConnectionsPanel({
         <p
           className={`rounded-2xl border px-4 py-3 text-sm font-bold ${
             failed
-              ? "border-rose-200 bg-rose-50 text-rose-800"
-              : "border-emerald-100 bg-emerald-50 text-emerald-900"
+              ? "border-rose-200 bg-rose-50 !text-rose-800"
+              : "border-emerald-100 bg-emerald-50 !text-emerald-900"
           }`}
         >
           {toast}
@@ -217,26 +224,22 @@ export function AccountingConnectionsPanel({
       ) : null}
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-        <article className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 dark:border-emerald-900/40 dark:bg-slate-950">
+        <article className={cardClass}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-                Premium option
-              </p>
-              <h3 className="mt-1 text-xl font-black text-slate-950 dark:text-white">
-                QuickBooks Online
-              </h3>
+              <p className={kickerClass}>Premium option</p>
+              <p className={titleClass}>QuickBooks Online</p>
             </div>
             {qboConnection
               ? syncBadge("Connected to QuickBooks", "ok")
               : syncBadge("Not connected", "idle")}
           </div>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+          <p className={bodyClass}>
             Keep the current Intuit company for businesses that already live in
             QuickBooks. Existing SitGuru journal push is unchanged.
           </p>
           {qboConnection ? (
-            <p className="mt-3 text-xs font-semibold text-slate-500">
+            <p className="mt-3 text-xs font-semibold !text-slate-600">
               {qboConnection.companyName} · {qboConnection.environment}
               {qboConnection.lastPushedAt
                 ? ` · Last push ${new Date(qboConnection.lastPushedAt).toLocaleString()}`
@@ -292,15 +295,11 @@ export function AccountingConnectionsPanel({
           </div>
         </article>
 
-        <article className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 dark:border-emerald-900/40 dark:bg-slate-950">
+        <article className={cardClass}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-                Lower-cost option
-              </p>
-              <h3 className="mt-1 text-xl font-black text-slate-950 dark:text-white">
-                Wave Accounting
-              </h3>
+              <p className={kickerClass}>Lower-cost option</p>
+              <p className={titleClass}>Wave Accounting</p>
             </div>
             {waveConnected
               ? syncBadge("Connected to Wave", "ok")
@@ -308,16 +307,16 @@ export function AccountingConnectionsPanel({
                 ? syncBadge("Action required", "warn")
                 : syncBadge("Not connected", "idle")}
           </div>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+          <p className={bodyClass}>
             Affordable bookkeeping and tax-ready financial records. Wave is H&amp;R
             Block&apos;s self-service books tool — not a tax filing service.
           </p>
-          <p className="mt-2 text-xs font-semibold text-slate-500">
+          <p className="mt-2 text-xs font-semibold !text-slate-600">
             Wave Pro subscription required for direct SitGuru connection. Check
             Wave for current pricing.
           </p>
           {waveConnection ? (
-            <p className="mt-3 text-xs font-semibold text-slate-500">
+            <p className="mt-3 text-xs font-semibold !text-slate-600">
               {waveConnection.businessName || "Business not selected"}
               {waveConnection.lastSyncAt
                 ? ` · Last synchronized ${waveConnection.lastSyncLabel}`
@@ -395,14 +394,10 @@ export function AccountingConnectionsPanel({
       </div>
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-        <article className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 dark:border-emerald-900/40 dark:bg-slate-950">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-            Works with any CPA
-          </p>
-          <h3 className="mt-1 text-xl font-black text-slate-950 dark:text-white">
-            Prepare Tax Package
-          </h3>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+        <article className={cardClass}>
+          <p className={kickerClass}>Works with any CPA</p>
+          <p className={titleClass}>Prepare Tax Package</p>
+          <p className={bodyClass}>
             Export SitGuru records even if neither QuickBooks nor Wave is
             connected. Give the file to Block Advisors, a CPA, or an Enrolled
             Agent. This is not an IRS return.
@@ -424,14 +419,12 @@ export function AccountingConnectionsPanel({
           </div>
         </article>
 
-        <article className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 dark:border-emerald-900/40 dark:bg-slate-950">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-            Tax professional
-          </p>
-          <h3 className="mt-1 text-xl font-black text-slate-950 dark:text-white">
+        <article className={cardClass}>
+          <p className={kickerClass}>Tax professional</p>
+          <p className={titleClass}>
             {taxProfessional.name || taxProfessional.firm || "Not assigned"}
-          </h3>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+          </p>
+          <p className={bodyClass}>
             {taxYear} status:{" "}
             {taxProfessional.returnStatus.replace(/_/g, " ")}. For 2025 cleanup,
             send the package to Block Advisors manually. SitGuru does not connect

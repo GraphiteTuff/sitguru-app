@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { weekOverWeekTrend, type KpiTrend } from "@/lib/sitguru/kpi-trend";
 
 export type InsightsSourceHealth = {
   id: string;
@@ -41,6 +42,15 @@ export type InsightsDashboardData = {
   topCategory: string;
   topCategoryCount: number;
   isLive: boolean;
+  trends: {
+    communications: KpiTrend;
+    frictionFlags: KpiTrend;
+    openLeakVectors: KpiTrend;
+    convertedArticles: KpiTrend;
+    insightRows: KpiTrend;
+    helpArticles: KpiTrend;
+    supportCases: KpiTrend;
+  };
 };
 
 type AnyRow = Record<string, unknown>;
@@ -308,5 +318,20 @@ export async function getInsightsDashboardData(): Promise<InsightsDashboardData>
     topCategory,
     topCategoryCount,
     isLive: sourceHealth.some((item) => item.ok),
+    trends: {
+      communications: weekOverWeekTrend(insights.map(getDate)),
+      frictionFlags: weekOverWeekTrend(frictionRows.map(getDate), {
+        invert: true,
+      }),
+      openLeakVectors: weekOverWeekTrend(leakRows.map(getDate), {
+        invert: true,
+      }),
+      convertedArticles: weekOverWeekTrend(convertedRows.map(getDate)),
+      insightRows: weekOverWeekTrend(insights.map(getDate)),
+      helpArticles: weekOverWeekTrend(helpResult.data.map(getDate)),
+      supportCases: weekOverWeekTrend(supportResult.data.map(getDate), {
+        invert: true,
+      }),
+    },
   };
 }

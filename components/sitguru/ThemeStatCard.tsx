@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+import type { KpiTrend } from "@/lib/sitguru/kpi-trend";
 
 export type ThemeTone =
   | "emerald"
@@ -44,12 +46,39 @@ const tones: Record<
   },
 };
 
+function TrendBadge({ trend }: { trend: KpiTrend }) {
+  const color =
+    trend.tone === "up"
+      ? "text-emerald-700"
+      : trend.tone === "down"
+        ? "text-rose-600"
+        : "text-slate-400";
+  const Icon =
+    trend.direction === "up"
+      ? ArrowUp
+      : trend.direction === "down"
+        ? ArrowDown
+        : Minus;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 text-sm font-black ${color}`}
+      title="vs last week"
+      aria-label={trend.srLabel}
+    >
+      <Icon size={18} strokeWidth={3} aria-hidden="true" />
+      <span>{trend.label}</span>
+    </span>
+  );
+}
+
 export function ThemeStatCard({
   label,
   value,
   helper,
   tone = "emerald",
   icon,
+  trend,
   className = "",
 }: {
   label: string;
@@ -57,6 +86,7 @@ export function ThemeStatCard({
   helper?: string;
   tone?: ThemeTone;
   icon?: ReactNode;
+  trend?: KpiTrend | null;
   className?: string;
 }) {
   const theme = tones[tone];
@@ -79,7 +109,10 @@ export function ThemeStatCard({
           </span>
         ) : null}
       </div>
-      <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
+      <div className="mt-2 flex items-end justify-between gap-2">
+        <p className="text-3xl font-black leading-none text-slate-950">{value}</p>
+        {trend ? <TrendBadge trend={trend} /> : null}
+      </div>
       {helper ? (
         <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
           {helper}

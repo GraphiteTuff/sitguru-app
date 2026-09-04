@@ -71,14 +71,14 @@ export default async function AdminGrowthHomePage() {
     calendarItems.set(day, list);
   }
   const tiles = [
-    { label: "Pet Parents +", value: String(stats.petParents), helper: "New this week", tone: "emerald" as const, icon: <PawPrint size={18} /> },
-    { label: "Gurus +", value: String(stats.gurus), helper: "New this week", tone: "sky" as const, icon: <Users size={18} /> },
-    { label: "Referral clicks", value: String(stats.referrals), helper: "Links used", tone: "violet" as const, icon: <MousePointerClick size={18} /> },
-    { label: "Social visits", value: String(stats.visits), helper: "Clicks + views", tone: "sky" as const, icon: <Megaphone size={18} /> },
-    { label: "Social signups", value: String(stats.signups), helper: "Attributed", tone: "emerald" as const, icon: <CheckCircle2 size={18} /> },
-    { label: "Conversion", value: stats.conversion, helper: "Signups ÷ visits", tone: "slate" as const, icon: <BarChart3 size={18} /> },
-    { label: "Live campaigns", value: String(stats.campaigns), helper: "Ready to share", tone: "emerald" as const, icon: <Sparkles size={18} /> },
-    { label: "Needs review", value: String(stats.pendingReview), helper: "Waiting on Jason", tone: "rose" as const, icon: <ClipboardCheck size={18} /> },
+    { label: "Pet Parents +", value: String(stats.petParents), helper: "New this week", tone: "emerald" as const, icon: <PawPrint size={18} />, trend: stats.trends.petParents },
+    { label: "Gurus +", value: String(stats.gurus), helper: "New this week", tone: "sky" as const, icon: <Users size={18} />, trend: stats.trends.gurus },
+    { label: "Referral clicks", value: String(stats.referrals), helper: "Links used", tone: "violet" as const, icon: <MousePointerClick size={18} />, trend: stats.trends.referrals },
+    { label: "Social visits", value: String(stats.visits), helper: "Clicks + views", tone: "sky" as const, icon: <Megaphone size={18} />, trend: stats.trends.visits },
+    { label: "Social signups", value: String(stats.signups), helper: "Attributed", tone: "emerald" as const, icon: <CheckCircle2 size={18} />, trend: stats.trends.signups },
+    { label: "Conversion", value: stats.conversion, helper: "Signups ÷ visits", tone: "slate" as const, icon: <BarChart3 size={18} />, trend: stats.trends.conversion },
+    { label: "Live campaigns", value: String(stats.campaigns), helper: "Ready to share", tone: "emerald" as const, icon: <Sparkles size={18} />, trend: stats.trends.campaigns },
+    { label: "Needs review", value: String(stats.pendingReview), helper: "Waiting on Jason", tone: "rose" as const, icon: <ClipboardCheck size={18} />, trend: stats.trends.pendingReview },
   ];
 
   const actions = [
@@ -142,6 +142,7 @@ export default async function AdminGrowthHomePage() {
             helper={tile.helper}
             tone={tile.tone}
             icon={tile.icon}
+            trend={tile.trend}
           />
         ))}
       </section>

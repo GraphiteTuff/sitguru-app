@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { weekOverWeekTrend, type KpiTrend } from "@/lib/sitguru/kpi-trend";
 
 export type AnalyticsSourceHealth = {
   id: string;
@@ -39,6 +40,16 @@ export type AnalyticsDashboardData = {
   recentBookings: AnalyticsRecentItem[];
   recentLeads: AnalyticsRecentItem[];
   isLive: boolean;
+  trends: {
+    events: KpiTrend;
+    bookings: KpiTrend;
+    gurus: KpiTrend;
+    pets: KpiTrend;
+    chatInsights: KpiTrend;
+    launchSignups: KpiTrend;
+    ambassadorLeads: KpiTrend;
+    growthCampaigns: KpiTrend;
+  };
 };
 
 type AnyRow = Record<string, unknown>;
@@ -341,5 +352,15 @@ export async function getAnalyticsDashboardData(): Promise<AnalyticsDashboardDat
     recentBookings: sortedBookings.slice(0, 6).map(toBookingItem),
     recentLeads: sortedLeads.slice(0, 6).map(toLeadItem),
     isLive: sourceHealth.some((item) => item.ok),
+    trends: {
+      events: weekOverWeekTrend(eventsResult.data.map(getDate)),
+      bookings: weekOverWeekTrend(bookingsResult.data.map(getDate)),
+      gurus: weekOverWeekTrend(gurusResult.data.map(getDate)),
+      pets: weekOverWeekTrend(petsResult.data.map(getDate)),
+      chatInsights: weekOverWeekTrend(insightsResult.data.map(getDate)),
+      launchSignups: weekOverWeekTrend(launchResult.data.map(getDate)),
+      ambassadorLeads: weekOverWeekTrend(leadsResult.data.map(getDate)),
+      growthCampaigns: weekOverWeekTrend(campaignsResult.data.map(getDate)),
+    },
   };
 }

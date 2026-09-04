@@ -138,6 +138,7 @@ export default async function AdminAnalyticsHubPage() {
       helper: "Live event stream",
       tone: "emerald" as const,
       icon: <Activity size={18} />,
+      trend: data.trends.events,
     },
     {
       label: "Bookings",
@@ -145,6 +146,7 @@ export default async function AdminAnalyticsHubPage() {
       helper: `${number(data.metrics.completedBookings)} completed`,
       tone: "sky" as const,
       icon: <Sparkles size={18} />,
+      trend: data.trends.bookings,
     },
     {
       label: "Gurus",
@@ -152,6 +154,7 @@ export default async function AdminAnalyticsHubPage() {
       helper: "Supply network",
       tone: "violet" as const,
       icon: <LineChart size={18} />,
+      trend: data.trends.gurus,
     },
     {
       label: "Pets",
@@ -159,6 +162,7 @@ export default async function AdminAnalyticsHubPage() {
       helper: "Pet analytics base",
       tone: "emerald" as const,
       icon: <PawPrint size={18} />,
+      trend: data.trends.pets,
     },
     {
       label: "Chat insights",
@@ -166,6 +170,7 @@ export default async function AdminAnalyticsHubPage() {
       helper: "Friction + FAQ demand",
       tone: "amber" as const,
       icon: <MessageCircleQuestion size={18} />,
+      trend: data.trends.chatInsights,
     },
     {
       label: "Launch signups",
@@ -173,6 +178,7 @@ export default async function AdminAnalyticsHubPage() {
       helper: "Early demand",
       tone: "rose" as const,
       icon: <Sparkles size={18} />,
+      trend: data.trends.launchSignups,
     },
     {
       label: "Ambassador leads",
@@ -180,6 +186,7 @@ export default async function AdminAnalyticsHubPage() {
       helper: "Growth recruiting",
       tone: "violet" as const,
       icon: <Users size={18} />,
+      trend: data.trends.ambassadorLeads,
     },
     {
       label: "Campaigns",
@@ -187,6 +194,7 @@ export default async function AdminAnalyticsHubPage() {
       helper: "Growth campaign rows",
       tone: "slate" as const,
       icon: <Megaphone size={18} />,
+      trend: data.trends.growthCampaigns,
     },
   ];
 
@@ -287,6 +295,7 @@ export default async function AdminAnalyticsHubPage() {
             helper={tile.helper}
             tone={tile.tone}
             icon={tile.icon}
+            trend={tile.trend}
           />
         ))}
       </section>

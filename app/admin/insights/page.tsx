@@ -145,6 +145,7 @@ export default async function AdminInsightsHubPage() {
       helper: "Weighted question tally",
       tone: "emerald" as const,
       icon: <MessageCircleQuestion size={18} />,
+      trend: data.trends.communications,
     },
     {
       label: "Friction flags",
@@ -152,6 +153,7 @@ export default async function AdminInsightsHubPage() {
       helper: "Conversion risk signals",
       tone: "amber" as const,
       icon: <AlertTriangle size={18} />,
+      trend: data.trends.frictionFlags,
     },
     {
       label: "Leak vectors",
@@ -159,6 +161,7 @@ export default async function AdminInsightsHubPage() {
       helper: "Unconverted · 2×+",
       tone: "rose" as const,
       icon: <AlertTriangle size={18} />,
+      trend: data.trends.openLeakVectors,
     },
     {
       label: "Converted",
@@ -166,6 +169,7 @@ export default async function AdminInsightsHubPage() {
       helper: "Promoted to Help Center",
       tone: "sky" as const,
       icon: <BookOpenCheck size={18} />,
+      trend: data.trends.convertedArticles,
     },
     {
       label: "Chat ledger",
@@ -173,6 +177,7 @@ export default async function AdminInsightsHubPage() {
       helper: "Omnichannel questions",
       tone: "violet" as const,
       icon: <MessageCircle size={18} />,
+      trend: data.trends.insightRows,
     },
     {
       label: "Help articles",
@@ -180,6 +185,7 @@ export default async function AdminInsightsHubPage() {
       helper: "Published answers",
       tone: "emerald" as const,
       icon: <BookOpenCheck size={18} />,
+      trend: data.trends.helpArticles,
     },
     {
       label: "Support cases",
@@ -187,6 +193,7 @@ export default async function AdminInsightsHubPage() {
       helper: "support@sitguru.com",
       tone: "slate" as const,
       icon: <Handshake size={18} />,
+      trend: data.trends.supportCases,
     },
     {
       label: "Top category",
@@ -287,6 +294,7 @@ export default async function AdminInsightsHubPage() {
             helper={tile.helper}
             tone={tile.tone}
             icon={tile.icon}
+            trend={tile.trend}
           />
         ))}
       </section>

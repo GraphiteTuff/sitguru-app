@@ -980,7 +980,7 @@ function getReadinessItems(
       status: waveConnected ? "ready" : "needs_review",
       detail: waveConnected
         ? "Wave is connected for tax-ready bookkeeping. Sync is read-only until ledger writes are verified."
-        : "Optional lower-cost books path. Connect Wave after registering a Wave developer application, or export the tax package for Block Advisors by hand.",
+        : "Optional lower-cost books path. Use Connect Wave above, or export the tax package for Block Advisors by hand.",
     },
   ];
 }
