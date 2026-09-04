@@ -30,9 +30,8 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 import AdminMessageRealtimeNotifier from "@/components/admin/AdminMessageRealtimeNotifier";
-import AdminQueueCardActions from "@/components/admin/AdminQueueCardActions";
-import ClearAllMessagesForm from "@/components/admin/ClearAllMessagesForm";
 import AdminMessageComposer from "@/components/admin/messages/AdminMessageComposer";
+import AdminInboxWorkspace from "@/components/admin/messages/AdminInboxWorkspace";
 import {
   clearAdminMessageCenter,
   hardDeleteConversation,
@@ -71,6 +70,7 @@ type SearchParams = {
   compose_error?: string;
   compose_success?: string;
   conversationId?: string;
+  c?: string;
 };
 
 type PageProps = {
@@ -254,50 +254,36 @@ const adminRoutes = {
 };
 
 const filterLinks = [
-  { key: "all", label: "All", href: "/admin/messages" },
-  {
-    key: "internal",
-    label: "Internal",
-    href: "/admin/messages?filter=internal",
-  },
-  {
-    key: "guru-customer",
-    label: "Guru ↔ Pet Parent",
-    href: "/admin/messages?filter=guru-customer",
-  },
-  {
-    key: "guru-admin",
-    label: "Guru ↔ Admin",
-    href: "/admin/messages?filter=guru-admin",
-  },
+  { key: "all", label: "Inbox", href: "/admin/messages" },
+  { key: "unread", label: "Unread", href: "/admin/messages?filter=unread" },
+  { key: "internal", label: "Internal", href: "/admin/messages?filter=internal" },
+  { key: "guru-admin", label: "Gurus", href: "/admin/messages?filter=guru-admin" },
   {
     key: "customer-admin",
-    label: "Pet Parent ↔ Admin",
+    label: "Pet Parents",
     href: "/admin/messages?filter=customer-admin",
   },
   {
     key: "ambassador-admin",
-    label: "Ambassador ↔ Admin",
+    label: "Ambassadors",
     href: "/admin/messages?filter=ambassador-admin",
   },
   {
+    key: "guru-customer",
+    label: "Care",
+    href: "/admin/messages?filter=guru-customer",
+  },
+  {
     key: "event-admin",
-    label: "Pet Events",
+    label: "Events",
     href: "/admin/messages?filter=event-admin",
   },
   {
     key: "homepage-visitor",
-    label: "Homepage Visitors",
+    label: "Visitors",
     href: "/admin/messages?filter=homepage-visitor",
   },
-  { key: "unread", label: "Unread", href: "/admin/messages?filter=unread" },
-  { key: "read", label: "Read", href: "/admin/messages?filter=read" },
   { key: "archived", label: "Archived", href: "/admin/messages?filter=archived" },
-  {
-    key: "escalations",
-    label: "Escalations",
-    href: "/admin/messages?filter=escalations",
-  },
 ];
 
 const inquiryTypes: Array<{
@@ -1045,13 +1031,69 @@ function isEscalationThread(thread: AdminThreadCard) {
 
 function getThreadTypeLabel(type: AdminThreadCard["type"]) {
   if (type === "internal") return "Internal";
-  if (type === "guru-admin") return "Guru ↔ Admin";
-  if (type === "guru-customer") return "Guru ↔ Pet Parent";
-  if (type === "customer-admin") return "Pet Parent ↔ Admin";
-  if (type === "ambassador-admin") return "Ambassador ↔ Admin";
+  if (type === "guru-admin") return "Guru";
+  if (type === "guru-customer") return "Care";
+  if (type === "customer-admin") return "Pet Parent";
+  if (type === "ambassador-admin") return "Ambassador";
   if (type === "event-admin") return "Pet Event";
-  if (type === "homepage-visitor") return "Homepage Visitor";
+  if (type === "homepage-visitor") return "Visitor";
   return "General";
+}
+
+function getThreadTitle(thread: AdminThreadCard) {
+  if (thread.type === "guru-customer") {
+    return (
+      [thread.guruName, thread.customerName].filter(Boolean).join(" · ") ||
+      thread.contactName
+    );
+  }
+  if (thread.type === "guru-admin") return thread.guruName || thread.contactName;
+  if (thread.type === "customer-admin") {
+    return thread.customerName || thread.contactName;
+  }
+  if (thread.type === "ambassador-admin") {
+    return thread.ambassadorName || thread.contactName;
+  }
+  if (thread.type === "homepage-visitor") {
+    return thread.visitorName || thread.contactName;
+  }
+  if (thread.type === "event-admin") {
+    return thread.communityEventTitle || thread.subject;
+  }
+  if (thread.type === "internal") {
+    return thread.subject || thread.adminName || "Internal";
+  }
+  return thread.contactName || thread.subject || "SitGuru conversation";
+}
+
+function getThreadAvatar(thread: AdminThreadCard) {
+  if (thread.type === "guru-admin" || thread.type === "guru-customer") {
+    return thread.guruAvatar;
+  }
+  if (thread.type === "customer-admin") return thread.customerAvatar;
+  if (thread.type === "ambassador-admin") return thread.ambassadorAvatar;
+  if (thread.type === "homepage-visitor") return thread.visitorAvatar;
+  if (thread.type === "internal") return thread.adminAvatar;
+  return (
+    thread.customerAvatar ||
+    thread.guruAvatar ||
+    thread.ambassadorAvatar ||
+    thread.adminAvatar ||
+    ""
+  );
+}
+
+function buildInboxHref(params: {
+  conversationId?: string;
+  filter?: string;
+  query?: string;
+}) {
+  const next = new URLSearchParams();
+  if (params.conversationId) next.set("c", params.conversationId);
+  if (params.filter && params.filter !== "all") next.set("filter", params.filter);
+  if (params.query) next.set("q", params.query);
+  const qs = next.toString();
+  return qs ? `/admin/messages?${qs}` : "/admin/messages";
 }
 
 function getThreadTypeClasses(type: AdminThreadCard["type"]) {
@@ -1880,7 +1922,7 @@ function buildComposeErrorRedirect(reason: string) {
 }
 
 function buildComposeSuccessRedirect(conversationId: string) {
-  return `/admin/messages/${encodeURIComponent(conversationId)}`;
+  return `/admin/messages?c=${encodeURIComponent(conversationId)}&compose_success=sent`;
 }
 
 async function safeAdminQuery(
@@ -2580,26 +2622,12 @@ function AdminComposeNotice({
     const success = successMessages[successKey] || successMessages.sent;
 
     return (
-      <section className="sticky top-3 z-30 rounded-[26px] border border-emerald-200 bg-emerald-50 p-5 text-emerald-950 shadow-lg shadow-emerald-900/10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex gap-3">
-            <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-700" />
-            <div>
-              <h2 className="text-lg font-black">{success.title}</h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-emerald-900">
-                {success.body}
-              </p>
-            </div>
+      <section className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-700" />
+            <p className="truncate text-sm font-black">{success.title}</p>
           </div>
-
-          {conversationId && !isDeletedSuccess ? (
-            <Link
-              href={`/admin/messages/${conversationId}`}
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
-            >
-              Open Chat
-            </Link>
-          ) : null}
         </div>
       </section>
     );
@@ -3842,354 +3870,137 @@ export default async function AdminMessagesPage({ searchParams }: PageProps) {
     0,
   );
   const unreadThreads = kpiThreads.filter((thread) => thread.unreadCount > 0).length;
-  const escalationThreads = kpiThreads.filter(isEscalationThread).length;
-  const internalThreads = kpiThreads.filter((thread) => thread.type === "internal").length;
-  const homepageVisitorThreads = kpiThreads.filter((thread) => thread.type === "homepage-visitor").length;
-  const activeMessagesLoaded = kpiThreads.reduce(
-    (sum, thread) => sum + thread.messageCount,
-    0,
-  );
   const latestLoadedMessageId = safeMessages[0]?.id || "";
-  const threadTypeChart = buildThreadTypeChart(kpiThreads);
-  const inquiryChart = buildInquiryChart(kpiThreads);
-  const unreadInquiryChart = buildUnreadInquiryChart(kpiThreads);
+
+  const selectedThreadId = asString(params.c || params.conversationId);
+  const selectedCard =
+    allThreads.find((thread) => thread.id === selectedThreadId) || null;
+  const selectedMessages = selectedThreadId
+    ? (threadMessageMap.get(selectedThreadId) || []).sort((a, b) => {
+        const aTime = new Date(a.created_at || "").getTime();
+        const bTime = new Date(b.created_at || "").getTime();
+        return (Number.isFinite(aTime) ? aTime : 0) - (Number.isFinite(bTime) ? bTime : 0);
+      })
+    : [];
+
+  const selectedThread = selectedCard
+    ? {
+        id: selectedCard.id,
+        title: getThreadTitle(selectedCard),
+        subtitle: getThreadTypeLabel(selectedCard.type),
+        avatar: getThreadAvatar(selectedCard),
+        topic: selectedCard.topic,
+        contactEmail: selectedCard.contactEmail,
+        messages: selectedMessages.map((message) => {
+          const senderRole = getMessageSenderRole(message);
+          const isAdminSender =
+            senderRole === "admin" || asString(message.sender_id) === user.id;
+          const senderProfile = message.sender_id
+            ? profileMap.get(message.sender_id) || null
+            : null;
+          const senderName = isAdminSender
+            ? "SitGuru Admin"
+            : asString(message.sender_name_snapshot) ||
+              (senderProfile ? getProfileName(senderProfile) : "") ||
+              selectedCard.contactName;
+          const senderAvatar = isAdminSender
+            ? defaultAdminAvatar
+            : (senderProfile ? getProfileAvatar(senderProfile) : "") ||
+              getThreadAvatar(selectedCard);
+
+          return {
+            id: message.id,
+            body: getMessageBody(message) || "",
+            createdAt: message.created_at || null,
+            isAdmin: isAdminSender,
+            senderName,
+            senderAvatar,
+            senderRole: senderRole || "user",
+          };
+        }),
+      }
+    : null;
+
+  const inboxFilters = filterLinks.map((filter) => {
+    const count =
+      filter.key === "all"
+        ? kpiThreads.length
+        : filter.key === "unread"
+          ? unreadThreads
+          : filter.key === "archived"
+            ? allThreads.filter(
+                (thread) => asString(thread.status).toLowerCase() === "archived",
+              ).length
+            : kpiThreads.filter((thread) => thread.type === filter.key).length;
+
+    return { ...filter, count };
+  });
+
+  const inboxThreads = filteredThreads.map((thread) => ({
+    id: thread.id,
+    href: thread.id.startsWith("direct-message-")
+      ? `${adminRoutes.messages}/${encodeURIComponent(thread.id)}`
+      : buildInboxHref({
+          conversationId: thread.id,
+          filter: activeFilter,
+          query: params.q,
+        }),
+    title: getThreadTitle(thread),
+    preview: thread.preview || "No messages yet",
+    subtitle: getThreadTypeLabel(thread.type),
+    avatar: getThreadAvatar(thread),
+    unreadCount: thread.unreadCount,
+    timeLabel: formatRelativeTime(thread.lastActivity).replace(" ago", ""),
+  }));
 
   return (
-    <main className="min-h-screen bg-[#f9faf5] px-4 py-5 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1600px] space-y-5">
-        <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-            <div>
-              <Link
-                href={adminRoutes.dashboard}
-                className="mb-4 inline-flex items-center gap-2 text-sm font-black text-green-800 transition hover:text-green-950"
-              >
-                ← Back to Admin Dashboard
-              </Link>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-green-800 text-white">
-                  <MessagesSquare size={26} />
-                </div>
-
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700">
-                    Admin / Message Center
-                  </p>
-                  <h1 className="text-3xl font-black tracking-tight text-green-950 sm:text-4xl">
-                    SitGuru Message Center
-                  </h1>
-                  <p className="mt-1 max-w-4xl text-base font-semibold text-slate-600">
-                    Manage Pet Parent, Guru, Ambassador, support, safety,
-                    payment, technical, partner, and internal staff conversations
-                    from one Admin inbox. Archive hides threads from KPIs;
-                    Delete forever permanently removes them.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Link
-                href={adminRoutes.users}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-              >
-                <UsersRound size={17} />
-                User Directory
-              </Link>
-
-              <Link
-                href="/admin/messages/export"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-200 bg-white px-5 py-3 text-sm font-black text-green-900 shadow-sm transition hover:bg-green-50"
-              >
-                <Download size={17} />
-                Export
-              </Link>
-
-              <Link
-                href="/admin/messages?threadType=internal&messageCategory=direct"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-900/15 transition hover:bg-green-900"
-              >
-                <Send size={17} />
-                Start Message
-              </Link>
-            </div>
-          </div>
-
-          <ClearAllMessagesForm />
-        </section>
-
-        <AdminMessageRealtimeNotifier
-          currentUserId={user.id}
-          latestMessageId={latestLoadedMessageId}
-          initialUnreadCount={unreadMessages}
-        />
-
-        <AdminComposeNotice
-          composeError={params.compose_error}
-          composeSuccess={params.compose_success}
-          conversationId={params.conversationId}
-        />
-
-        {composeIntent ? (
-          <AdminMessageComposer
-            action={createInternalThread}
-            intent={composeIntent}
-            currentUser={{
-              id: user.id,
-              email: user.email || "",
-              name:
-                getProfileName(adminProfile) ||
-                user.email ||
-                "SitGuru Admin",
-            }}
-            inquiryTypes={inquiryTypes.map((inquiry) => ({
-              key: inquiry.key,
-              label: inquiry.label,
-            }))}
-          />
-        ) : null}
-
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-          <StatCard
-            icon={<Inbox size={22} />}
-            label="Threads"
-            value={number(kpiThreads.length)}
-            detail={`${number(filteredThreads.length)} visible with current filters`}
-            href="/admin/messages"
-          />
-          <StatCard
-            icon={<Clock3 size={22} />}
-            label="Unread"
-            value={number(unreadMessages)}
-            detail={`${number(unreadThreads)} threads need attention`}
-            href="/admin/messages?filter=unread"
-          />
-          <StatCard
-            icon={<ShieldAlert size={22} />}
-            label="Escalations"
-            value={number(escalationThreads)}
-            detail="Refund, payout, dispute, support, or safety review"
-            href="/admin/messages?filter=escalations"
-          />
-          <StatCard
-            icon={<MessagesSquare size={22} />}
-            label="Internal"
-            value={number(internalThreads)}
-            detail="Department and staff conversations"
-            href="/admin/messages?filter=internal"
-          />
-          <StatCard
-            icon={<MessageCircle size={22} />}
-            label="Messages Loaded"
-            value={number(activeMessagesLoaded)}
-            detail="Active (non-archived / non-deleted) messages"
-          />
-        </section>
-
-        <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h2 className="text-xl font-black text-slate-950">
-                Admin Department Messaging
-              </h2>
-              <p className="mt-1 max-w-4xl text-sm font-semibold text-slate-500">
-                Start internal conversations with SitGuru departments directly
-                from the Message Center.
-              </p>
-            </div>
-
-            <Link
-              href={adminRoutes.settings}
-              className="inline-flex items-center justify-center rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-black text-green-900 transition hover:bg-green-100"
-            >
-              Manage Admin Access
-            </Link>
-          </div>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {departmentShortcuts.map((department) => (
-              <Link
-                key={department.key}
-                href={getDepartmentMessageHref({
-                  department: department.key,
-                  departmentLabel: department.label,
-                })}
-                className="rounded-[24px] border border-[#edf3ee] bg-[#fbfcf9] p-4 transition hover:border-green-200 hover:bg-green-50"
-              >
-                <h3 className="text-lg font-black text-slate-950">
-                  {department.label}
-                </h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-                  {department.description}
-                </p>
-                <p className="mt-4 text-sm font-black text-green-800">
-                  Message department →
-                </p>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="grid items-start gap-5 xl:grid-cols-12">
-          <div className="xl:col-span-4">
-            <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-              <div className="mb-5">
-                <h2 className="text-xl font-black text-slate-950">
-                  Thread Types
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Conversation mix by contact relationship and support route.
-                </p>
-              </div>
-
-              <HorizontalBarChart
-                title="Thread Mix"
-                valueLabel="Threads"
-                items={threadTypeChart}
-              />
-            </div>
-          </div>
-
-          <div className="xl:col-span-8">
-            <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-              <div className="mb-5">
-                <h2 className="text-xl font-black text-slate-950">
-                  Inquiry Type KPIs
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Measure what people are communicating about so SitGuru can
-                  reduce recurring booking, payment, safety, technical, and
-                  support issues.
-                </p>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {inquiryTypes.map((inquiry) => {
-                  const matching = kpiThreads.filter(
-                    (thread) => thread.inquiryType === inquiry.key,
-                  );
-                  const unread = matching.reduce(
-                    (sum, thread) => sum + thread.unreadCount,
-                    0,
-                  );
-                  const reviewCount = matching.filter(isEscalationThread).length;
-
-                  return (
-                    <InquiryStatCard
-                      key={inquiry.key}
-                      inquiry={inquiry}
-                      value={matching.length}
-                      unread={unread}
-                      reviewCount={reviewCount}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h2 className="text-xl font-black text-slate-950">
-                Message Queues
-              </h2>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                Filter by thread type, unread status, escalation level, inquiry
-                type, or search terms. Open a thread to continue the same chat.
-              </p>
-            </div>
-
-            <form className="flex w-full max-w-xl items-center gap-2 rounded-2xl border border-[#e3ece5] bg-white px-4 py-3 shadow-sm">
-              <Search size={17} className="text-slate-400" />
-              <input
-                name="q"
-                defaultValue={params.q || ""}
-                placeholder="Search messages, names, subjects..."
-                className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
-              />
-              {activeFilter !== "all" ? (
-                <input type="hidden" name="filter" value={activeFilter} />
-              ) : null}
-              {activeInquiry !== "all" ? (
-                <input type="hidden" name="inquiry" value={activeInquiry} />
-              ) : null}
-            </form>
-          </div>
-
-          <div className="mb-5 flex flex-wrap gap-2">
-            {filterLinks.map((filter) => (
-              <Link
-                key={filter.key}
-                href={filter.href}
-                className={filterButtonClasses(activeFilter === filter.key)}
-              >
-                {filter.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="grid gap-4">
-            {filteredThreads.length ? (
-              filteredThreads.map((thread) => (
-                <MessageBubblePreview key={thread.id} thread={thread} />
-              ))
-            ) : (
-              <EmptyState />
-            )}
-          </div>
-        </section>
-
-        <section className="grid gap-5 xl:grid-cols-2">
-          <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-            <div className="mb-5">
-              <h2 className="text-xl font-black text-slate-950">
-                Inquiry Distribution
-              </h2>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                Threads grouped by business function.
-              </p>
-            </div>
-
-            <HorizontalBarChart
-              title="Inquiry Types"
-              valueLabel="Threads"
-              items={inquiryChart}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <AdminMessageRealtimeNotifier
+        currentUserId={user.id}
+        latestMessageId={latestLoadedMessageId}
+        initialUnreadCount={unreadMessages}
+      />
+      <AdminInboxWorkspace
+        threads={inboxThreads}
+        filters={inboxFilters}
+        activeFilter={activeFilter}
+        query={params.q || ""}
+        unreadTotal={unreadThreads}
+        selectedThreadId={selectedThreadId || undefined}
+        selectedThread={selectedThread}
+        composeOpen={Boolean(composeIntent)}
+        inboxHref={buildInboxHref({ filter: activeFilter, query: params.q })}
+        composeHref="/admin/messages?threadType=internal&messageCategory=direct"
+        noticeSlot={
+          params.compose_error || params.compose_success ? (
+            <AdminComposeNotice
+              composeError={params.compose_error}
+              composeSuccess={params.compose_success}
+              conversationId={params.conversationId || params.c}
             />
-          </div>
-
-          <div className="rounded-[30px] border border-[#e3ece5] bg-white p-5 shadow-sm">
-            <div className="mb-5">
-              <h2 className="text-xl font-black text-slate-950">
-                Unread Priority
-              </h2>
-              <p className="mt-1 text-sm font-semibold text-slate-500">
-                Unread messages grouped by inquiry type.
-              </p>
-            </div>
-
-            <HorizontalBarChart
-              title="Unread by Type"
-              valueLabel="Unread"
-              items={unreadInquiryChart}
-              emptyLabel="No unread message queues found."
+          ) : null
+        }
+        composeSlot={
+          composeIntent ? (
+            <AdminMessageComposer
+              action={createInternalThread}
+              intent={composeIntent}
+              currentUser={{
+                id: user.id,
+                email: user.email || "",
+                name:
+                  getProfileName(adminProfile) ||
+                  user.email ||
+                  "SitGuru Admin",
+              }}
+              inquiryTypes={inquiryTypes.map((inquiry) => ({
+                key: inquiry.key,
+                label: inquiry.label,
+              }))}
             />
-          </div>
-        </section>
-
-        <div className="rounded-[26px] border border-green-100 bg-white p-4 text-sm font-semibold text-slate-500 shadow-sm">
-          <span className="font-black text-green-900">
-            Supabase coordination:
-          </span>{" "}
-          this page reads `conversations`, `messages`,
-          `conversation_participants`, and `profiles`. Admin messaging writes
-          clean message threads for Gurus, Pet Parents, Ambassadors, departments,
-          and staff. Message rows are treated as permanent support history and
-          should not be deleted during Pet Parent, Guru, or Ambassador cleanup.
-        </div>
-      </div>
-    </main>
+          ) : null
+        }
+      />
+    </div>
   );
 }

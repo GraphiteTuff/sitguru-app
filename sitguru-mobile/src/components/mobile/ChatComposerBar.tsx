@@ -23,7 +23,7 @@ import { useKeyboardSafe } from '@/components/mobile/KeyboardSafeHost';
 import { AppFonts } from '@/constants/fonts';
 import { MobileSpace, TOUCH_MIN } from '@/constants/mobile-layout';
 import { useThemeMode } from '@/hooks/use-theme';
-import { MAX_FONT_SIZE_MULTIPLIER } from '@/lib/a11y/type-scale';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type ChatAttachment = {
   uri: string;
@@ -60,6 +60,7 @@ export default function ChatComposerBar({
   const palette = getComposerPalette(isDark);
   const styles = createComposerStyles(palette);
   const { revealFocusedInput } = useKeyboardSafe();
+  const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const [attachment, setAttachment] = useState<ChatAttachment | null>(null);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -180,7 +181,17 @@ export default function ChatComposerBar({
   const canSend = !sending && (!!value.trim() || !!attachment);
 
   return (
-    <View style={styles.wrap}>
+    <View
+      style={[
+        styles.wrap,
+        {
+          paddingBottom: Math.max(
+            insets.bottom,
+            Platform.OS === 'ios' ? 8 : MobileSpace.sm,
+          ),
+        },
+      ]}
+    >
       {attachment ? (
         <View style={styles.preview}>
           {attachment.kind === 'photo' ? (
@@ -330,7 +341,7 @@ function createComposerStyles(palette: ReturnType<typeof getComposerPalette>) {
       alignItems: 'center',
       height: TOUCH_MIN,
       justifyContent: 'center',
-      width: 36,
+      width: TOUCH_MIN,
     },
     iconRecording: {
       backgroundColor: '#E5484D',
@@ -360,10 +371,10 @@ function createComposerStyles(palette: ReturnType<typeof getComposerPalette>) {
       alignItems: 'center',
       backgroundColor: palette.send,
       borderRadius: 999,
-      height: 36,
+      height: TOUCH_MIN,
       justifyContent: 'center',
       marginBottom: 0,
-      width: 36,
+      width: TOUCH_MIN,
     },
     preview: {
       alignItems: 'center',

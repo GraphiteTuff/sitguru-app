@@ -1426,11 +1426,13 @@ export default async function AdminMessageThreadPage({
     });
 
     if (recoveredConversationId) {
-      redirect(`/admin/messages/${encodeURIComponent(recoveredConversationId)}`);
+      redirect(`/admin/messages?c=${encodeURIComponent(recoveredConversationId)}`);
     }
 
-    redirect("/admin/messages?error=thread_not_found");
+    redirect("/admin/messages?compose_error=missing_conversation");
   }
+
+  redirect(`/admin/messages?c=${encodeURIComponent(conversation.id)}`);
 
   const participantRows = (participants || []) as ParticipantRow[];
   const messageRows = (messages || []) as MessageRow[];

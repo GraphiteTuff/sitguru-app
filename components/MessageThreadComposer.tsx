@@ -281,11 +281,11 @@ export default function MessageThreadComposer({
   const deliveryWarnings = deliveryStatus?.warnings || [];
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-3">
       <div>
         <label
           htmlFor="message-topic"
-          className="mb-3 block text-sm font-black uppercase tracking-[0.18em] text-emerald-600"
+          className="mb-2 hidden text-sm font-black uppercase tracking-[0.18em] text-emerald-600 sm:block"
         >
           Topic
         </label>
@@ -302,7 +302,7 @@ export default function MessageThreadComposer({
             clearRequestIdentity();
           }}
           disabled={isBusy}
-          className="w-full rounded-[1.35rem] border border-emerald-100 bg-white px-4 py-4 text-base font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-70"
+          className="min-h-12 w-full rounded-2xl border border-emerald-100 bg-white px-4 text-base font-bold text-slate-950 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {topicOptions.map((option) => (
             <option
@@ -314,17 +314,12 @@ export default function MessageThreadComposer({
             </option>
           ))}
         </select>
-
-        <p className="mt-2 text-xs font-semibold text-slate-500">
-          Choose the topic that best matches this message so SitGuru can route
-          and review it faster.
-        </p>
       </div>
 
       <div>
         <label
           htmlFor="message-body"
-          className="mb-3 block text-sm font-black uppercase tracking-[0.18em] text-emerald-600"
+          className="mb-2 hidden text-sm font-black uppercase tracking-[0.18em] text-emerald-600 sm:block"
         >
           Message
         </label>
@@ -342,18 +337,19 @@ export default function MessageThreadComposer({
           }}
           onKeyDown={handleMessageKeyDown}
           placeholder="Write a clear, friendly message..."
-          rows={5}
+          rows={2}
           disabled={isBusy}
-          className="w-full rounded-[1.35rem] border border-emerald-100 bg-white px-5 py-4 text-base font-semibold leading-7 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-70"
+          enterKeyHint="send"
+          className="w-full rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-base font-semibold leading-6 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-70"
         />
 
-        <p className="mt-2 text-xs font-semibold text-slate-500">
+        <p className="mt-2 hidden text-xs font-semibold text-slate-500 sm:block">
           Press Enter to send. Press Shift + Enter for a new line.
         </p>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <p className="text-sm font-semibold leading-6 text-slate-600">
+      <div className="flex items-center justify-end gap-3">
+        <p className="hidden text-sm font-semibold leading-6 text-slate-600 sm:block">
           Keep communication clear, friendly, and specific. Include dates,
           booking details, profile issues, or verification questions when
           helpful.
@@ -363,7 +359,7 @@ export default function MessageThreadComposer({
           type="submit"
           disabled={isDisabled}
           aria-busy={isBusy}
-          className="inline-flex min-h-12 min-w-[150px] items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-base font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-12 min-w-12 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 text-base font-black text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isBusy ? (
             <Loader2 className="h-4 w-4 animate-spin" />

@@ -6,11 +6,13 @@ import { Archive, Loader2, Trash2, X } from "lucide-react";
 type AdminQueueCardActionsProps = {
   conversationId: string;
   threadSubject?: string;
+  compact?: boolean;
 };
 
 export default function AdminQueueCardActions({
   conversationId,
   threadSubject,
+  compact = false,
 }: AdminQueueCardActionsProps) {
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState(false);
@@ -73,14 +75,18 @@ export default function AdminQueueCardActions({
 
   const busy = pendingDelete || pendingArchive;
 
+  const buttonClass = compact
+    ? "inline-flex h-9 items-center justify-center gap-1 rounded-lg border px-2.5 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-45"
+    : "inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-black transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45";
+
   return (
-    <div className="flex w-full flex-col gap-2">
-      <div className="grid w-full gap-2 sm:grid-cols-2">
+    <div className={`flex w-full flex-col gap-2 ${compact ? "items-end" : ""}`}>
+      <div className={compact ? "flex gap-1.5" : "grid w-full gap-2 sm:grid-cols-2"}>
         <button
           type="button"
           onClick={handleArchive}
           disabled={busy}
-          className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45"
+          className={`${buttonClass} border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100`}
         >
           {pendingArchive ? (
             <Loader2 size={14} className="animate-spin" />
@@ -98,7 +104,7 @@ export default function AdminQueueCardActions({
           }}
           disabled={busy}
           title="Permanently delete this conversation and its messages"
-          className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-45"
+          className={`${buttonClass} border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100`}
         >
           <Trash2 size={14} />
           Delete

@@ -2161,9 +2161,9 @@ function createStyles(isDark: boolean) {
       borderColor: palette.border,
       borderRadius: 999,
       borderWidth: 1,
-      height: 38,
+      height: 48,
       justifyContent: 'center',
-      width: 38,
+      width: 48,
     },
     headerIdentity: {
       alignItems: 'center',

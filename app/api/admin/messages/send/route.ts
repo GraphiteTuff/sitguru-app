@@ -218,34 +218,39 @@ function getPrimaryRecipient({
     .filter((participant) => participant.id && !adminIds.has(participant.id))
     .filter((participant) => !isAdminRole(participant.role));
 
-  const customerParticipant = nonAdminParticipants.find(
-    (participant) => participant.role === "customer"
-  );
+  const otherAdmins = participants
+    .map((participant) => ({
+      id: getParticipantUserId(participant),
+      role: normalizeRole(participant.role),
+    }))
+    .filter((participant) => participant.id && !adminIds.has(participant.id))
+    .filter((participant) => isAdminRole(participant.role));
 
-  if (customerParticipant?.id) {
+  const rolePriority = ["customer", "guru", "ambassador", "visitor", "partner"];
+
+  for (const role of rolePriority) {
+    const match = nonAdminParticipants.find((participant) => participant.role === role);
+    if (match?.id) {
+      return {
+        recipientId: match.id,
+        recipientRole: role,
+      };
+    }
+  }
+
+  const firstNonAdmin = nonAdminParticipants[0];
+  if (firstNonAdmin?.id) {
     return {
-      recipientId: customerParticipant.id,
-      recipientRole: "customer",
+      recipientId: firstNonAdmin.id,
+      recipientRole: firstNonAdmin.role || "user",
     };
   }
 
-  const guruParticipant = nonAdminParticipants.find(
-    (participant) => participant.role === "guru"
-  );
-
-  if (guruParticipant?.id) {
+  const otherAdmin = otherAdmins[0];
+  if (otherAdmin?.id) {
     return {
-      recipientId: guruParticipant.id,
-      recipientRole: "guru",
-    };
-  }
-
-  const firstParticipant = nonAdminParticipants[0];
-
-  if (firstParticipant?.id) {
-    return {
-      recipientId: firstParticipant.id,
-      recipientRole: firstParticipant.role || "",
+      recipientId: otherAdmin.id,
+      recipientRole: otherAdmin.role || "admin",
     };
   }
 
@@ -404,16 +409,6 @@ export async function POST(req: NextRequest) {
       adminProfileId: adminProfile.id,
     });
 
-    if (!recipientId) {
-      return NextResponse.json(
-        {
-          error:
-            "Unable to send admin message. No customer or Guru recipient was found for this conversation.",
-        },
-        { status: 400 }
-      );
-    }
-
     const topic =
       requestedTopic ||
       safeString(safeConversation.topic) ||
@@ -426,9 +421,9 @@ export async function POST(req: NextRequest) {
       await insertMessageWithColumnFallback({
         conversation_id: conversationId,
         sender_id: senderId,
-        recipient_id: recipientId,
+        recipient_id: recipientId || null,
         sender_role: "admin",
-        recipient_role: recipientRole || "customer",
+        recipient_role: recipientRole || "user",
         content: body,
         body,
         topic,
@@ -484,14 +479,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await writeCommunicationLog({
-      actorId: senderId,
-      recipientId,
-      conversationId,
-      recipientRole: recipientRole || "customer",
-      topic,
-      body,
-    });
+    if (recipientId) {
+      await writeCommunicationLog({
+        actorId: senderId,
+        recipientId,
+        conversationId,
+        recipientRole: recipientRole || "user",
+        topic,
+        body,
+      });
+    }
 
     return NextResponse.json(
       {

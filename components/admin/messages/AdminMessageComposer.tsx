@@ -344,10 +344,10 @@ export default function AdminMessageComposer({
           <p className="text-xs font-black uppercase tracking-[0.18em] text-green-700">
             Message Draft
           </p>
-          <h2 className="mt-2 text-2xl font-black tracking-tight text-green-950">
+          <h2 className="mt-1 text-xl font-black tracking-tight text-green-950 sm:mt-2 sm:text-2xl">
             Compose SitGuru outreach
           </h2>
-          <p className="mt-2 max-w-4xl text-sm font-semibold leading-6 text-green-900">
+          <p className="mt-2 hidden max-w-4xl text-sm font-semibold leading-6 text-green-900 sm:block">
             Pick who the message is from, choose a SitGuru user or external email,
             optionally add CC/BCC, then send. SitGuru users also get an in-app
             unread thread.
@@ -434,7 +434,7 @@ export default function AdminMessageComposer({
           value={deliveryMode === "external" ? "external" : "sitguru"}
         />
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,380px)]">
+          <div className="grid gap-4 xl:grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,380px)]">
           <div className="grid gap-4">
             <label className="grid gap-2">
               <span className="text-xs font-black uppercase tracking-[0.16em] text-green-800">
@@ -443,7 +443,7 @@ export default function AdminMessageComposer({
               <select
                 value={senderId}
                 onChange={(event) => setSenderId(event.target.value)}
-                className="min-h-12 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
+                className="min-h-12 rounded-2xl border border-green-200 bg-white px-4 py-3 text-base font-black text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
               >
                 {brandSender ? (
                   <option value={brandSender.id}>
@@ -527,7 +527,7 @@ export default function AdminMessageComposer({
                         value={recipientQuery}
                         onChange={(event) => setRecipientQuery(event.target.value)}
                         placeholder="Search name or email…"
-                        className="min-h-12 w-full rounded-2xl border border-green-200 bg-[#fcfffd] pl-11 pr-4 text-sm font-semibold text-slate-900 outline-none focus:border-green-400 focus:ring-4 focus:ring-green-100"
+                        className="min-h-12 w-full rounded-2xl border border-green-200 bg-[#fcfffd] pl-11 pr-4 text-base font-semibold text-slate-900 outline-none focus:border-green-400 focus:ring-4 focus:ring-green-100"
                       />
                     </div>
                   </label>
@@ -638,7 +638,7 @@ export default function AdminMessageComposer({
               <select
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
-                className="min-h-12 rounded-2xl border border-green-200 bg-white px-4 py-3 text-sm font-black text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
+                className="min-h-12 rounded-2xl border border-green-200 bg-white px-4 py-3 text-base font-black text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
               >
                 {inquiryTypes.map((inquiry) => (
                   <option key={inquiry.key} value={inquiry.key}>
@@ -710,9 +710,17 @@ export default function AdminMessageComposer({
                 className="rounded-2xl border border-green-200 bg-white px-4 py-3 text-base font-semibold leading-7 text-slate-900 outline-none transition focus:border-green-400 focus:ring-4 focus:ring-green-100"
               />
             </label>
+
+            <button
+              type="submit"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 py-3 text-base font-black text-white shadow-sm 2xl:hidden"
+            >
+              <Send size={17} />
+              Send message
+            </button>
           </div>
 
-          <div className="rounded-[26px] border border-green-200 bg-white p-4">
+          <div className="hidden rounded-[26px] border border-green-200 bg-white p-4 2xl:block">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
               Send preview
             </p>

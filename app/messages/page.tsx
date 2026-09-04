@@ -348,14 +348,6 @@ function getActiveFilterClasses(isActive: boolean) {
   return "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700";
 }
 
-function SidebarMetric({ value }: { value: string }) {
-  return (
-    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-black text-slate-800">
-      {value}
-    </div>
-  );
-}
-
 export default async function MessagesPage({ searchParams }: PageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const activeFilter = String(resolvedSearchParams?.filter || "all").toLowerCase();
@@ -641,12 +633,6 @@ export default async function MessagesPage({ searchParams }: PageProps) {
   const unreadCount = inboxConversations.filter(
     (conversation) => conversation.unread
   ).length;
-  const guruCount = inboxConversations.filter(
-    (conversation) => conversation.threadKind === "guru"
-  ).length;
-  const adminCount = inboxConversations.filter(
-    (conversation) => conversation.threadKind === "admin"
-  ).length;
 
   const adminThread = inboxConversations.find(
     (conversation) => conversation.threadKind === "admin"
@@ -675,7 +661,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
 
   return (
     <main
-      className="min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fffc_40%,#ecfdf5_100%)] font-light text-slate-950"
+      className="min-h-dvh bg-[#f7fcfa] pb-[max(1rem,env(safe-area-inset-bottom))] font-light text-slate-950"
       style={{
         fontFamily:
           '"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -684,303 +670,114 @@ export default async function MessagesPage({ searchParams }: PageProps) {
     >
       <Header />
 
-      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <section className="overflow-hidden rounded-[2.25rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-          <div className="bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_30%),linear-gradient(135deg,#ffffff,#ecfdf5)] p-6 sm:p-8">
+      <section className="mx-auto max-w-3xl px-3 py-3 sm:px-6 sm:py-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <Link
               href={dashboardHref}
-              className="inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
+              className="text-sm font-black text-emerald-700"
             >
-              ← Back to dashboard
+              ← Dashboard
             </Link>
-
-            <p className="mt-5 text-xs font-black uppercase tracking-[0.28em] text-emerald-600">
-              SitGuru Messaging
-            </p>
-
-            <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">
-              Message Center
+            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+              Messages
             </h1>
-
-            <p className="mt-4 max-w-4xl text-base font-semibold leading-8 text-slate-700">
-              {currentUserRole === "guru"
-                ? "Message Pet Parents and SitGuru Admin in one place. Gurus cannot message other Gurus."
-                : currentUserRole === "ambassador"
-                  ? "Message SitGuru Admin from this inbox. Care conversations stay between Pet Parents, Gurus, and Admin."
-                  : "Keep care details, booking questions, and support conversations organized in one place. Message Gurus and SitGuru Admin here."}
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              {unreadCount} unread · {totalConversations} conversations
             </p>
-
-            <div className="mt-7 flex flex-wrap gap-3">
-              <div className="rounded-[1.3rem] border border-emerald-100 bg-white px-6 py-4 shadow-sm">
-                <p className="text-3xl font-black text-slate-950">
-                  {totalConversations}
-                </p>
-                <p className="mt-1 text-sm font-black text-slate-600">
-                  conversations
-                </p>
-              </div>
-
-              <div className="rounded-[1.3rem] border border-emerald-100 bg-white px-6 py-4 shadow-sm">
-                <p className="text-3xl font-black text-slate-950">
-                  {unreadCount}
-                </p>
-                <p className="mt-1 text-sm font-black text-slate-600">
-                  unread
-                </p>
-              </div>
-
-              <Link
-                href="/search"
-                className="inline-flex min-h-[86px] items-center justify-center rounded-[1.3rem] bg-emerald-500 px-7 text-base font-black text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-600"
-              >
-                Find a Guru
-              </Link>
-
-              <Link
-                href={adminMessageHref}
-                className="inline-flex min-h-[86px] items-center justify-center rounded-[1.3rem] border border-emerald-200 bg-white px-7 text-base font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
-              >
-                Message Admin
-              </Link>
-            </div>
           </div>
+          <Link
+            href={adminMessageHref}
+            className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black text-white"
+          >
+            Admin
+          </Link>
+        </div>
 
-          <div className="grid gap-6 bg-[#f7fcfa] p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
-                    Inbox
-                  </p>
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {filterLinks.map((filter) => (
+            <Link
+              key={filter.value}
+              href={filter.href}
+              className={`inline-flex min-h-12 shrink-0 items-center rounded-2xl border px-4 text-sm font-black ${getActiveFilterClasses(
+                activeFilter === filter.value ||
+                  (!resolvedSearchParams?.filter && filter.value === "all"),
+              )}`}
+            >
+              {filter.label}
+            </Link>
+          ))}
+        </div>
 
-                  <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-                    Your conversations
-                  </h2>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {filterLinks.map((filter) => (
-                    <Link
-                      key={filter.value}
-                      href={filter.href}
-                      className={`rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${getActiveFilterClasses(
-                        activeFilter === filter.value ||
-                          (!resolvedSearchParams?.filter && filter.value === "all")
-                      )}`}
+        <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-emerald-100 bg-white">
+          {filteredConversations.length ? (
+            filteredConversations.map((conversation) => (
+              <Link
+                key={conversation.id}
+                href={conversation.href}
+                className="flex min-h-16 items-center gap-3 border-b border-emerald-50 px-3 py-3 last:border-b-0 active:bg-emerald-50 sm:px-4"
+              >
+                <Avatar
+                  name={conversation.otherUserName}
+                  imageUrl={conversation.otherUserPhotoUrl}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p
+                      className={`truncate text-[17px] ${
+                        conversation.unread
+                          ? "font-black text-slate-950"
+                          : "font-bold text-slate-800"
+                      }`}
                     >
-                      {filter.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-6 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/60 p-4 sm:p-5">
-                {filteredConversations.length ? (
-                  <div className="space-y-4">
-                    {filteredConversations.map((conversation) => (
-                      <article
-                        key={conversation.id}
-                        className="rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md sm:p-5"
-                      >
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="flex gap-4">
-                            <Avatar
-                              name={conversation.otherUserName}
-                              imageUrl={conversation.otherUserPhotoUrl}
-                            />
-
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="text-xl font-black text-slate-950">
-                                  {conversation.otherUserName}
-                                </h3>
-
-                                {conversation.unread ? (
-                                  <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">
-                                    New
-                                  </span>
-                                ) : null}
-                              </div>
-
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                <span
-                                  className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${getThreadKindClasses(
-                                    conversation.threadKind
-                                  )}`}
-                                >
-                                  {getThreadKindLabel(conversation.threadKind)}
-                                </span>
-
-                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-700">
-                                  {conversation.otherUserRole}
-                                </span>
-
-                                <span
-                                  className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${getStatusClasses(
-                                    conversation.status
-                                  )}`}
-                                >
-                                  {conversation.status}
-                                </span>
-
-                                {conversation.bookingLabel ? (
-                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-700">
-                                    {conversation.bookingLabel}
-                                  </span>
-                                ) : null}
-                              </div>
-
-                              <p className="mt-3 text-base font-black text-slate-950">
-                                {conversation.subject}
-                              </p>
-
-                              <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
-                                {conversation.preview}
-                              </p>
-
-                              <p className="mt-4 text-xs font-bold text-slate-500">
-                                {formatDateTime(conversation.lastActivity)}
-                              </p>
-                            </div>
-                          </div>
-
-                          <Link
-                            href={conversation.href}
-                            className="inline-flex shrink-0 items-center justify-center rounded-full bg-emerald-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-600"
-                          >
-                            Open thread →
-                          </Link>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-[1.5rem] border border-dashed border-emerald-200 bg-white px-6 py-12 text-center">
-                    <h3 className="text-2xl font-black text-slate-950">
-                      No conversations found
-                    </h3>
-                    <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-6 text-slate-600">
-                      Your message center will show conversations with SitGuru
-                      Admin, Gurus, and booking contacts as they are created.
+                      {conversation.otherUserName}
                     </p>
-                    <div className="mt-6 flex flex-wrap justify-center gap-3">
-                      <Link
-                        href={adminMessageHref}
-                        className="rounded-full bg-emerald-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-600"
-                      >
-                        Message Admin
-                      </Link>
-
-                      <Link
-                        href="/search"
-                        className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
-                      >
-                        Find a Guru
-                      </Link>
-
-                      <Link
-                        href={dashboardHref}
-                        className="rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
-                      >
-                        Back to dashboard
-                      </Link>
-                    </div>
+                    <span className="shrink-0 text-xs font-bold text-slate-400">
+                      {formatDateTime(conversation.lastActivity)}
+                    </span>
                   </div>
-                )}
-              </div>
-            </section>
-
-            <aside className="space-y-6">
-              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
-                <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
-                  Communication Center
-                </p>
-
-                <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950">
-                  Need help or care?
-                </h2>
-
-                <p className="mt-4 text-sm font-semibold leading-7 text-slate-600">
-                  Start with SitGuru Admin for account, safety, booking, or
-                  platform support. To message a Guru, choose the Guru first from
-                  Find a Guru.
-                </p>
-
-                <div className="mt-6 grid gap-3">
-                  <Link
-                    href={adminMessageHref}
-                    className="inline-flex items-center justify-center rounded-full bg-emerald-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-600"
-                  >
-                    Message Admin
-                  </Link>
-
-                  <Link
-                    href="/customer/dashboard/pets"
-                    className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
-                  >
-                    Go to My Pets
-                  </Link>
-
-                  <Link
-                    href="/search"
-                    className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-700 shadow-sm transition hover:bg-emerald-50"
-                  >
-                    Find a Guru
-                  </Link>
-                </div>
-              </section>
-
-              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
-                <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
-                  Messaging Overview
-                </p>
-
-                <div className="mt-5 grid gap-3">
-                  <SidebarMetric
-                    value={`${guruCount} Guru conversation${
-                      guruCount === 1 ? "" : "s"
-                    } active`}
-                  />
-                  <SidebarMetric
-                    value={`${adminCount} Admin support thread${
-                      adminCount === 1 ? "" : "s"
+                  <p className="truncate text-xs font-bold text-emerald-700">
+                    {getThreadKindLabel(conversation.threadKind)}
+                    {conversation.bookingLabel ? ` · ${conversation.bookingLabel}` : ""}
+                  </p>
+                  <p
+                    className={`mt-0.5 truncate text-sm ${
+                      conversation.unread
+                        ? "font-semibold text-slate-700"
+                        : "font-medium text-slate-500"
                     }`}
-                  />
-                  <SidebarMetric
-                    value={`${unreadCount} unread update${
-                      unreadCount === 1 ? "" : "s"
-                    } waiting`}
-                  />
+                  >
+                    {conversation.preview || conversation.subject}
+                  </p>
                 </div>
-              </section>
-
-              <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
-                <p className="text-xs font-black uppercase tracking-[0.26em] text-emerald-600">
-                  Helpful Reminder
-                </p>
-
-                <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950">
-                  Clear messages save time
-                </h2>
-
-                <div className="mt-5 space-y-3">
-                  {[
-                    "Include pet names, care dates, and the kind of help you need.",
-                    "Use Admin for account, booking, refund, verification, or safety questions.",
-                    "Use Find a Guru first if you want to message a specific Guru.",
-                  ].map((tip) => (
-                    <div
-                      key={tip}
-                      className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold leading-7 text-slate-700"
-                    >
-                      {tip}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </aside>
-          </div>
-        </section>
+                {conversation.unread ? (
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#0D5C3A]" />
+                ) : null}
+              </Link>
+            ))
+          ) : (
+            <div className="px-6 py-12 text-center">
+              <h2 className="text-xl font-black text-slate-950">No conversations yet</h2>
+              <p className="mt-2 text-sm font-semibold text-slate-600">
+                Message SitGuru Admin, or find a Guru to start care chat.
+              </p>
+              <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
+                <Link
+                  href={adminMessageHref}
+                  className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black text-white"
+                >
+                  Message Admin
+                </Link>
+                <Link
+                  href="/search"
+                  className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-5 text-sm font-black text-emerald-700"
+                >
+                  Find a Guru
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
       </section>
     </main>
   );

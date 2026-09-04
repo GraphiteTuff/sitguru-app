@@ -876,6 +876,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const [isSuperUser, setIsSuperUser] = useState(false);
   const [openSection, setOpenSection] = useState<string>("Operations");
   const onGrowthPortal = pathname.startsWith("/admin/growth");
+  const isMessagesWorkspace = pathname.startsWith("/admin/messages");
   const isGrowthChrome = workspace === "growth" || onGrowthPortal;
   const visibleNavSections = isGrowthChrome ? growthNavSections : navSections;
   const visibleHeaderLinks = isGrowthChrome
@@ -984,14 +985,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-col overflow-x-hidden">
+        <div className={`flex min-w-0 flex-col overflow-x-hidden ${isMessagesWorkspace ? "h-dvh min-h-0" : ""}`}>
           <header className="sticky top-0 z-40 border-b border-[#e5ebe2] bg-[#fcfdfb]/95 backdrop-blur">
-            <div className="px-3 py-3 sm:px-5 lg:px-6">
+            <div className={`px-3 sm:px-5 lg:px-6 ${isMessagesWorkspace ? "py-2" : "py-3"}`}>
               <div className="flex items-center gap-3 xl:gap-4">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <div className="flex shrink-0 items-center justify-between gap-3 lg:hidden">
                     <AdminLogo />
-                    {isGrowthChrome ? null : (
+                    {isGrowthChrome || isMessagesWorkspace ? null : (
                       <Link
                         href={adminRoutes.growth}
                         className="inline-flex min-h-12 items-center gap-2 rounded-xl px-3 text-xs font-black text-white"
@@ -1025,7 +1026,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
-                  {isGrowthChrome ? null : (
+                  {isGrowthChrome || isMessagesWorkspace ? null : (
                     <Link
                       href={adminRoutes.growth}
                       className="hidden min-h-11 shrink-0 items-center gap-2 rounded-xl px-4 text-sm font-black text-white shadow-sm lg:inline-flex"
@@ -1035,7 +1036,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                       Social Media Manager
                     </Link>
                   )}
-                  <div className="flex items-center gap-2 rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm">
+                  <div className={`items-center gap-2 rounded-2xl border border-[#dfe7df] bg-white p-1 shadow-sm ${isMessagesWorkspace ? "hidden lg:flex" : "flex"}`}>
                     <SearchBar />
 
                     {isGrowthChrome ? null : (
@@ -1080,15 +1081,29 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            {isGrowthChrome ? null : (
+            {isGrowthChrome || isMessagesWorkspace ? null : (
               <MobileNav pathname={pathname} growthOnly={false} />
             )}
           </header>
 
-          <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-5 lg:px-6 xl:px-6 2xl:px-7">
-            <div className="w-full max-w-none">{children}</div>
+          <main
+            className={
+              isMessagesWorkspace
+                ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+                : "min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-5 lg:px-6 xl:px-6 2xl:px-7"
+            }
+          >
+            <div
+              className={
+                isMessagesWorkspace
+                  ? "flex min-h-0 flex-1 flex-col"
+                  : "w-full max-w-none"
+              }
+            >
+              {children}
+            </div>
 
-            {isGrowthChrome ? null : <AdminFooter />}
+            {isMessagesWorkspace || isGrowthChrome ? null : <AdminFooter />}
             {isGrowthChrome ? <GrowthPhoneBar pathname={pathname} /> : null}
           </main>
         </div>

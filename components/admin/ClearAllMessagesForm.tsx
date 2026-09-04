@@ -29,7 +29,7 @@ export default function ClearAllMessagesForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="mt-5 flex flex-col gap-3 rounded-[24px] border border-rose-200 bg-rose-50/70 p-4 sm:flex-row sm:items-end"
+            className="mt-2 flex min-w-0 flex-col gap-2"
     >
       <label className="grid min-w-0 flex-1 gap-2">
         <span className="text-xs font-black uppercase tracking-[0.16em] text-rose-800">
