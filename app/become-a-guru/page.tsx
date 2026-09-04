@@ -238,6 +238,11 @@ const faqs = [
       "Eligible paid bookings and Guru payouts are handled through SitGuru after the required payout setup is completed.",
   },
   {
+    question: "Does SitGuru collect sales tax for me?",
+    answer:
+      "Yes. SitGuru collects sales tax on card bookings at checkout in states that tax pet-care marketplace services, including Minnesota. List your rates without tax — SitGuru remits it. Tips are not taxed and go to you. You still handle your own income taxes.",
+  },
+  {
     question: "Do I need professional pet care experience?",
     answer:
       "You should describe your experience honestly. SitGuru welcomes experienced providers and responsible local pet lovers who are prepared to complete all required profile and trust steps.",

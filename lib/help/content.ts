@@ -155,7 +155,12 @@ export const billingFaqs: HelpFaqItem[] = [
   {
     question: "How do tips work?",
     answer:
-      "When tips are available, Pet Parents should add tips through SitGuru checkout or the SitGuru booking flow only. Tip records stay connected to the booking so Admin and Guru payout views can track them correctly.",
+      "When tips are available, Pet Parents should add tips through SitGuru checkout or the SitGuru booking flow only. Tip records stay connected to the booking so Admin and Guru payout views can track them correctly. Tips are optional gratuity and are not taxed.",
+  },
+  {
+    question: "Does SitGuru collect sales tax?",
+    answer:
+      "Yes on card checkout. SitGuru collects sales tax on the service and SitGuru fee in states that tax pet-care marketplace bookings, including Minnesota. Gurus list rates without tax and do not file that sales tax. Optional tips are not taxed. Gurus still handle their own income taxes.",
   },
   {
     question: "How do credits, promo codes, and gift cards work?",
@@ -181,7 +186,7 @@ export const paymentFlows: HelpStepBlock[] = [
     steps: [
       "Choose a Guru from SitGuru search or a Guru profile.",
       "Select the service, dates, pet, care location, notes, and any available pricing options.",
-      "Review the SitGuru checkout summary before payment, including service subtotal, SitGuru fees when applicable, credits, promo codes, gift cards, and optional Guru tip.",
+      "Review the SitGuru checkout summary before payment, including service subtotal, SitGuru fees when applicable, sales tax when it applies, credits, promo codes, gift cards, and optional Guru tip.",
       "Pay through SitGuru checkout only using secure options such as card, Apple Pay, Google Pay, Link by Stripe, saved methods, ACH when available, or credits/promo codes.",
       "Return to your Pet Parent dashboard for booking status, receipts, messages, live PawReport tracking, instant potty push alerts, and the automated email report when the walk ends.",
     ],
@@ -192,7 +197,7 @@ export const paymentFlows: HelpStepBlock[] = [
     steps: [
       "Complete Guru onboarding, profile, service area, services, pricing, and My Calendar setup.",
       "Connect Stripe payout setup from the Guru dashboard before eligible payouts can be sent.",
-      "Keep all SitGuru booking payments inside SitGuru checkout. Do not ask Pet Parents to pay off-platform.",
+      "List rates without sales tax. SitGuru collects and remits sales tax on card bookings in states that tax pet-care marketplace services. Do not ask Pet Parents to pay off-platform.",
       "Use the booking dashboard to track payment status, payout status, estimated Guru payout, tips, booking history, PawReports, and reviews.",
       "Contact SitGuru support if a payout, Stripe account, booking total, or tip looks incorrect.",
     ],

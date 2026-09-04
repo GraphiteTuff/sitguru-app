@@ -102,6 +102,20 @@ export const SCOUT_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
       "Eligible paid bookings and Guru payouts are handled through SitGuru after the required payout setup is completed.",
   },
   {
+    question: "Does SitGuru collect sales tax for me?",
+    aliases: [
+      "does guru collect sales tax",
+      "does sitguru collect sales tax",
+      "do i collect sales tax",
+      "do i need to charge sales tax",
+      "sales tax on my behalf",
+      "does sitguru remit sales tax",
+      "minnesota sales tax",
+    ],
+    answer:
+      "Yes. SitGuru collects sales tax on card bookings at checkout in states that tax pet-care marketplace services, including Minnesota. List your rates without tax — SitGuru remits it. Tips are not taxed and go to you. You still handle your own income taxes.",
+  },
+  {
     question: "Do I need professional pet care experience?",
     aliases: [
       "do i need experience",
@@ -226,6 +240,18 @@ export const SCOUT_DASHBOARD_FAQS: readonly MarketingFaqEntry[] = [
       "Eligible paid bookings pay out through SitGuru after you complete payout setup (Stripe or PayPal). Review **Earnings** on your dashboard and finish any incomplete payout steps before you expect transfers.",
   },
   {
+    question: "Does SitGuru collect sales tax for me?",
+    aliases: [
+      "does guru collect sales tax",
+      "do i charge sales tax",
+      "do i file sales tax",
+      "sales tax on my behalf",
+      "minnesota sales tax",
+    ],
+    answer:
+      "Yes. SitGuru collects sales tax on card bookings at checkout in states that tax pet-care marketplace services, including Minnesota. List your rates without tax — SitGuru remits it. Tips are not taxed and go to you. You still handle your own income taxes.",
+  },
+  {
     question: COMPANION_BENEFITS_USER_PROMPT.scout,
     aliases: ["guru benefits", "tell me about guru benefits"],
     answer: COMPANION_BENEFITS_RESPONSE.scout,
@@ -246,6 +272,16 @@ export const ROGUE_PUBLIC_MARKETING_FAQS: readonly MarketingFaqEntry[] = [
     question: "How do bookings work on SitGuru?",
     answer:
       "Book through SitGuru — service, timing, pet, Guru, payment, messages, and PawReport stay in one place. [[cta:parent]]",
+  },
+  {
+    question: "Will I pay sales tax?",
+    aliases: [
+      "is there sales tax",
+      "does sitguru charge sales tax",
+      "are tips taxed",
+    ],
+    answer:
+      "Card checkout may add sales tax on the service and SitGuru fee based on the care address. Optional tips are not taxed. [[cta:parent]]",
   },
   {
     question: "What is PawReport Live?",
