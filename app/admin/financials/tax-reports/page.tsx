@@ -112,9 +112,19 @@ type ReferralRewardLiabilityRow = {
   paid_at?: string | null;
 };
 
+type TaxSourceHealth = {
+  id: string;
+  label: string;
+  ok: boolean;
+  rowCount: number;
+};
+
 type TaxLiveTotals = {
   paidBookingCount: number;
+  bookingCount: number;
   bookingPaymentCount: number;
+  referralEventCount: number;
+  sourceHealth: TaxSourceHealth[];
   grossBookingVolume: number;
   platformRevenue: number;
   taxCollectedSupport: number;
@@ -517,6 +527,9 @@ async function getTaxCenterData() {
     growthMarketingRows,
     payoutRows,
     commissionRows,
+    guruPayoutRows,
+    bookingRows,
+    referralEventRows,
     stripePayouts,
     plaidAccounts,
   ] = await Promise.all([
@@ -573,6 +586,23 @@ async function getTaxCenterData() {
     safeRows<AnyRow>(
       supabaseAdmin.from("commissions").select("*").limit(2500),
       "commissions",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("guru_payouts").select("*").limit(2500),
+      "guru_payouts",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin
+        .from("bookings")
+        .select(
+          "id,status,payment_status,total_amount,sales_tax_amount,tip_amount,marketplace_fee_amount",
+        )
+        .limit(2500),
+      "bookings",
+    ),
+    safeRows<AnyRow>(
+      supabaseAdmin.from("pawperks_referral_events").select("id").limit(5000),
+      "pawperks_referral_events",
     ),
     safeRows<AnyRow>(
       supabaseAdmin
@@ -661,12 +691,15 @@ async function getTaxCenterData() {
     return sum + Math.abs(toNumber(row.amount || row.reward_amount || row.total_amount));
   }, 0);
 
-  const payoutTotal = payoutRows.reduce(
+  const payoutRowsForTotals = payoutRows.length ? payoutRows : guruPayoutRows;
+  const payoutTotal = payoutRowsForTotals.reduce(
     (sum, row) =>
       sum +
       Math.abs(
         toNumber(row.amount) ||
           toNumber(row.payout_amount) ||
+          toNumber(row.net_amount) ||
+          toNumber(row.gross_amount) ||
           centsToDollars(row.amount_cents),
       ),
     0,
@@ -717,9 +750,57 @@ async function getTaxCenterData() {
       ? ((totalAttributedRevenue - totalCampaignCost) / totalCampaignCost) * 100
       : null;
 
+  const sourceHealth: TaxSourceHealth[] = [
+    {
+      id: "bookings",
+      label: "Bookings / payments",
+      ok: bookingRows.length > 0 || bookingPayments.length > 0,
+      rowCount: Math.max(bookingRows.length, bookingPayments.length),
+    },
+    {
+      id: "deductions",
+      label: "Deduction support",
+      ok: expenseRows.length > 0 || growthMarketingRows.length > 0,
+      rowCount: expenseRows.length + growthMarketingRows.length,
+    },
+    {
+      id: "payouts",
+      label: "1099 / guru_payouts",
+      ok: payoutRowsForTotals.length > 0 || commissionRows.length > 0,
+      rowCount: payoutRowsForTotals.length + commissionRows.length,
+    },
+    {
+      id: "reconciliation",
+      label: "Bank / Stripe reconciliation",
+      ok: businessAccounts.length > 0 || stripePayouts.length > 0,
+      rowCount: stripePayouts.length + businessAccounts.length,
+    },
+    {
+      id: "referrals",
+      label: "Referral / PawPerks events",
+      ok: referralEventRows.length > 0 || rewardRows.length > 0,
+      rowCount: Math.max(referralEventRows.length, rewardRows.length),
+    },
+    {
+      id: "marketplace",
+      label: "Marketplace sales tax",
+      ok: taxCollectedSupport > 0,
+      rowCount: bookingRows.length + paid.length,
+    },
+    {
+      id: "campaigns",
+      label: "Growth campaign ROI",
+      ok: roiRows.length > 0,
+      rowCount: roiRows.length,
+    },
+  ];
+
   const live: TaxLiveTotals = {
     paidBookingCount: paid.length,
+    bookingCount: bookingRows.length,
     bookingPaymentCount: stripePayments.length,
+    referralEventCount: referralEventRows.length,
+    sourceHealth,
     grossBookingVolume,
     platformRevenue,
     taxCollectedSupport,
@@ -729,7 +810,7 @@ async function getTaxCenterData() {
     growthMarketingTotal,
     marketingSummaryTotal,
     payoutTotal,
-    payoutCount: payoutRows.length,
+      payoutCount: payoutRowsForTotals.length,
     commissionTotal,
     commissionCount: commissionRows.length,
     stripePayoutCount: stripePayouts.length,
@@ -757,11 +838,11 @@ async function getTaxCenterData() {
 function getReadinessItems(live: TaxLiveTotals): ReadinessItem[] {
   return [
     {
-      label: "Stripe booking_payments",
-      status: live.paidBookingCount > 0 ? "ready" : "needs_review",
+      label: "Bookings / payments",
+      status: live.bookingCount > 0 || live.paidBookingCount > 0 ? "ready" : "needs_review",
       detail: live.paidBookingCount
         ? `${live.paidBookingCount.toLocaleString()} paid payments · platform fees ${moneyExact(live.platformRevenue)} · tax support ${moneyExact(live.taxCollectedSupport)}.`
-        : "No paid booking_payments yet for revenue / marketplace tax calibration.",
+        : `${live.bookingCount.toLocaleString()} booking row${live.bookingCount === 1 ? "" : "s"} on SitGuru. booking_payments is still empty until checkout completes.`,
     },
     {
       label: "Deduction support",
@@ -788,12 +869,14 @@ function getReadinessItems(live: TaxLiveTotals): ReadinessItem[] {
       detail: `${live.connectedBusinessAccounts} NFCU business account${live.connectedBusinessAccounts === 1 ? "" : "s"} · ${live.stripePayoutCount.toLocaleString()} Stripe payouts · cash ${moneyExact(live.liveCashBalance)}.`,
     },
     {
-      label: "Referral / PawPerks liabilities",
+      label: "Referral / PawPerks events",
       status:
-        live.pendingRewardLiability > 0 || live.issuedReferralRewards > 0
+        live.referralEventCount > 0 ||
+        live.pendingRewardLiability > 0 ||
+        live.issuedReferralRewards > 0
           ? "ready"
           : "needs_review",
-      detail: `Pending ${moneyExact(live.pendingRewardLiability)} · issued ${moneyExact(live.issuedReferralRewards)}.`,
+      detail: `${live.referralEventCount.toLocaleString()} live hits · pending ${moneyExact(live.pendingRewardLiability)} · issued ${moneyExact(live.issuedReferralRewards)}.`,
     },
     {
       label: "Growth campaign ROI",
@@ -1037,8 +1120,6 @@ export default async function AdminFinancialsTaxReportsPage({
       toNumber(b.bookings) - toNumber(a.bookings) ||
       toNumber(b.attributed_revenue) - toNumber(a.attributed_revenue),
   );
-  const healthySources = readinessItems.filter((item) => item.status === "ready").length;
-
   return (
     <GrowthPageFrame
       kicker="Tax Center"
@@ -1519,13 +1600,8 @@ export default async function AdminFinancialsTaxReportsPage({
         </section>
 
       <AdminWorkplaceHealth
-        sources={readinessItems.map((item) => ({
-          id: item.label,
-          label: item.label,
-          ok: item.status === "ready",
-          rowCount: item.status === "ready" ? 1 : 0,
-        }))}
-        helper={`${healthySources} of ${readinessItems.length} tax package sources ready`}
+        sources={live.sourceHealth}
+        helper={`${live.sourceHealth.filter((item) => item.ok).length} of ${live.sourceHealth.length} SitGuru sources connected`}
         links={
           <>
             <Link

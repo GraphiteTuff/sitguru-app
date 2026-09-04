@@ -191,12 +191,12 @@ async function buildRows(): Promise<ExportRow[]> {
       "admin_referral_reward_liability",
     ),
     safeRows<AnyRow>(
-      supabaseAdmin.from("payouts").select("*").limit(2500),
-      "payouts",
+      supabaseAdmin.from("guru_payouts").select("*").limit(2500),
+      "guru_payouts",
     ),
     safeRows<AnyRow>(
-      supabaseAdmin.from("commissions").select("*").limit(2500),
-      "commissions",
+      supabaseAdmin.from("commission_ledger").select("*").limit(2500),
+      "commission_ledger",
     ),
     safeRows<AnyRow>(
       supabaseAdmin
@@ -314,6 +314,8 @@ async function buildRows(): Promise<ExportRow[]> {
       Math.abs(
         toNumber(row.amount) ||
           toNumber(row.payout_amount) ||
+          toNumber(row.net_amount) ||
+          toNumber(row.gross_amount) ||
           centsToDollars(row.amount_cents),
       ),
     0,

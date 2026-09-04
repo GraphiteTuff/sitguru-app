@@ -177,8 +177,12 @@ export async function loadTaxCenterBundle() {
     growthExpenses,
     growthSummary,
     rewards,
-    payouts,
-    commissions,
+    guruPayouts,
+    partnerPayouts,
+    commissionLedger,
+    bookings,
+    gurus,
+    referralEvents,
     stripePayouts,
     plaidAccounts,
     marketplace,
@@ -207,8 +211,26 @@ export async function loadTaxCenterBundle() {
       supabaseAdmin.from("admin_referral_reward_liability").select("*").limit(2500),
       "admin_referral_reward_liability",
     ),
-    safeRows(supabaseAdmin.from("payouts").select("*").limit(2500), "payouts"),
-    safeRows(supabaseAdmin.from("commissions").select("*").limit(2500), "commissions"),
+    safeRows(supabaseAdmin.from("guru_payouts").select("*").limit(2500), "guru_payouts"),
+    safeRows(supabaseAdmin.from("partner_payouts").select("*").limit(2500), "partner_payouts"),
+    safeRows(supabaseAdmin.from("commission_ledger").select("*").limit(2500), "commission_ledger"),
+    safeRows(
+      supabaseAdmin
+        .from("bookings")
+        .select(
+          "id,status,payment_status,total_amount,subtotal_amount,tip_amount,sales_tax_amount,marketplace_fee_amount,guru_name,care_state,created_at",
+        )
+        .limit(2500),
+      "bookings",
+    ),
+    safeRows(
+      supabaseAdmin.from("gurus").select("id,user_id,name,display_name,full_name,email").limit(2000),
+      "gurus",
+    ),
+    safeRows(
+      supabaseAdmin.from("pawperks_referral_events").select("id").limit(5000),
+      "pawperks_referral_events",
+    ),
     safeRows(
       supabaseAdmin.from("stripe_payouts").select("*").order("created_at", { ascending: false }).limit(1000),
       "stripe_payouts",
@@ -224,10 +246,22 @@ export async function loadTaxCenterBundle() {
     loadMarketplaceTaxReport(),
   ]);
 
+  const guruDirectory = new Map<string, { name: string; email: string }>();
+  for (const guru of gurus) {
+    const name = firstText(guru, ["display_name", "full_name", "name"], "Guru");
+    const email = firstText(guru, ["email"]).toLowerCase();
+    const info = { name, email };
+    const id = firstText(guru, ["id"]);
+    const userId = firstText(guru, ["user_id"]);
+    if (id) guruDirectory.set(id, info);
+    if (userId) guruDirectory.set(userId, info);
+  }
+
   const paid = bookingPayments.filter((row) => {
     const provider = firstText(row, ["provider", "payment_provider"]).toLowerCase();
     return (!provider || provider === "stripe") && isPaid(row);
   });
+  const paidBookings = bookings.filter(isPaid);
 
   let gross = 0;
   let fees = 0;
@@ -250,6 +284,14 @@ export async function loadTaxCenterBundle() {
       centsToDollars(row.refund_amount_cents) ||
       centsToDollars(row.dispute_amount_cents) ||
       rowAmount(row, ["refund_amount"]);
+  }
+
+  if (!paid.length) {
+    for (const row of paidBookings) {
+      gross += rowAmount(row, ["total_amount", "subtotal_amount", "total_customer_paid"]);
+      fees += rowAmount(row, ["marketplace_fee_amount", "sitguru_fee_amount"]);
+      tax += rowAmount(row, ["sales_tax_amount", "tax_amount"]);
+    }
   }
 
   const expenseItems: TaxExpenseItem[] = expenses.map((row, index) => ({
@@ -310,20 +352,28 @@ export async function loadTaxCenterBundle() {
     .reduce((sum, row) => sum + rowAmount(row, ["amount", "reward_amount", "total_amount"]), 0);
 
   const contractors = new Map<string, TaxContractor>();
-  for (const row of payouts) {
+  for (const row of guruPayouts) {
+    const guru = guruDirectory.get(firstText(row, ["guru_id"])) || {
+      name: "",
+      email: "",
+    };
     addContractor(
       contractors,
       "Guru / contractor",
-      row,
-      rowAmount(row, ["amount", "payout_amount"]),
+      {
+        ...row,
+        recipient_name: guru.name || firstText(row, ["guru_name"], "Guru"),
+        recipient_email: guru.email,
+      },
+      rowAmount(row, ["net_amount", "gross_amount", "amount", "payout_amount"]),
     );
   }
-  for (const row of commissions) {
+  for (const row of [...partnerPayouts, ...commissionLedger]) {
     addContractor(
       contractors,
       "Partner commission",
       row,
-      rowAmount(row, ["amount", "commission_amount"]),
+      rowAmount(row, ["amount", "commission_amount", "net_amount"]),
     );
   }
   const contractorRows = [...contractors.values()].sort((a, b) => b.amount - a.amount);
@@ -521,14 +571,30 @@ export async function loadTaxCenterBundle() {
     auditIndex,
     marketplace,
     sourceHealth: [
-      { id: "booking_payments", label: "Paid booking payments", ok: paid.length > 0, rowCount: paid.length },
+      {
+        id: "bookings",
+        label: "Bookings / payments",
+        ok: bookings.length > 0 || bookingPayments.length > 0,
+        rowCount: Math.max(bookings.length, bookingPayments.length),
+      },
       { id: "expenses", label: "Expense + growth rows", ok: expenseItems.length > 0, rowCount: expenseItems.length },
-      { id: "payouts", label: "1099 payees", ok: contractorRows.length > 0, rowCount: contractorRows.length },
+      {
+        id: "payouts",
+        label: "1099 / guru_payouts",
+        ok: contractorRows.length > 0,
+        rowCount: contractorRows.length,
+      },
       {
         id: "tax",
         label: "Sales tax collected",
         ok: (marketplace.taxCollected || tax) > 0,
-        rowCount: marketplace.taxedBookingCount,
+        rowCount: marketplace.taxedBookingCount || bookings.length,
+      },
+      {
+        id: "referrals",
+        label: "Referral / PawPerks events",
+        ok: referralEvents.length > 0 || rewards.length > 0,
+        rowCount: Math.max(referralEvents.length, rewards.length),
       },
       {
         id: "cash",
