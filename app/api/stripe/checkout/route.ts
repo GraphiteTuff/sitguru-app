@@ -7,6 +7,13 @@ import {
   getCurrencyIsoForCountry,
   resolveRegionalConfig,
 } from "@/lib/i18n/regional-config";
+import {
+  STRIPE_TAX_CODE_OPTIONAL_GRATUITY,
+  STRIPE_TAX_CODE_PET_SERVICES,
+  buildStripeServiceTaxAddress,
+  createStripeTaxCustomer,
+  stripeCheckoutTaxCollectionParams,
+} from "@/lib/payments/stripe-tax";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +32,7 @@ const MIN_SITGURU_FEE_PERCENT = 15;
 const MAX_SITGURU_FEE_PERCENT = 20;
 const TIP_PRESET_PERCENTAGES = [0, 10, 15, 18, 20] as const;
 const MAX_TIP_CENTS = 50_000;
-const SITGURU_STRIPE_TAX_CODE = "txcd_20030000";
+const SITGURU_STRIPE_TAX_CODE = STRIPE_TAX_CODE_PET_SERVICES;
 
 type BookingRow = Record<string, unknown>;
 
@@ -687,6 +694,26 @@ function getBookingCustomerEmail(booking: BookingRow) {
     booking.email,
     booking.user_email,
     booking.owner_email,
+  );
+}
+
+function getBookingCustomerName(booking: BookingRow) {
+  return firstNonEmpty(
+    booking.customer_name,
+    booking.owner_name,
+    booking.pet_parent_name,
+    booking.full_name,
+    booking.name,
+  );
+}
+
+function getBookingStreetAddress(booking: BookingRow) {
+  return firstNonEmpty(
+    booking.care_address,
+    booking.care_street,
+    booking.address_line1,
+    booking.street_address,
+    booking.service_address,
   );
 }
 
@@ -1666,12 +1693,20 @@ export async function POST(req: NextRequest) {
           product_data: {
             name: "Tip your Guru",
             description: "100% of your tip goes directly to your Guru.",
-            tax_code: SITGURU_STRIPE_TAX_CODE,
+            tax_code: STRIPE_TAX_CODE_OPTIONAL_GRATUITY,
           },
         },
         quantity: 1,
       });
     }
+
+    const serviceTaxAddress = buildStripeServiceTaxAddress({
+      line1: getBookingStreetAddress(booking),
+      city: bookingCareCity,
+      state: bookingCareState,
+      postalCode: bookingCareZipCode,
+      country: regional.countryCode,
+    });
 
     const checkoutMetadata = {
       booking_id: bookingIdString,
@@ -1743,20 +1778,35 @@ export async function POST(req: NextRequest) {
       custom_quote_requested: String(paymentOptions.customQuoteRequested),
       tax_behavior: "exclusive",
       tax_code: SITGURU_STRIPE_TAX_CODE,
+      tip_tax_code: STRIPE_TAX_CODE_OPTIONAL_GRATUITY,
+      tax_address_source: serviceTaxAddress
+        ? "booking_care_address"
+        : "checkout_collected",
       customer_fee_message:
         "SitGuru keeps marketplace fees lower than many major care platforms.",
       tip_message: "100% of your tip goes directly to your Guru.",
     };
 
+    let stripeCustomerId = "";
+    if (serviceTaxAddress) {
+      stripeCustomerId = await createStripeTaxCustomer({
+        stripe,
+        email: user.email || getBookingCustomerEmail(booking),
+        name: getBookingCustomerName(booking),
+        address: serviceTaxAddress,
+      });
+    }
+
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
         client_reference_id: bookingIdString,
-        customer_email: user.email ?? undefined,
-
-        automatic_tax: {
-          enabled: true,
-        },
+        ...(stripeCustomerId
+          ? { customer: stripeCustomerId }
+          : { customer_email: user.email ?? undefined }),
+        ...stripeCheckoutTaxCollectionParams({
+          customerId: stripeCustomerId || undefined,
+        }),
 
         line_items: checkoutLineItems,
 

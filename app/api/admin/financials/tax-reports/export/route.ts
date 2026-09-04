@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireFinanceAdminApi } from "@/lib/admin/financials/access";
 import { getPlaidEnvironment } from "@/lib/plaid";
+import { loadTaxCenterBundle } from "@/lib/admin/financials/tax-center";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -561,13 +562,77 @@ function getExtension(format: string) {
   return "html";
 }
 
+function sectionRows(section: string, bundle: Awaited<ReturnType<typeof loadTaxCenterBundle>>): ExportRow[] {
+  if (section === "deductions") {
+    return bundle.expenseItems.map((item) => ({
+      section: "Deductions",
+      category: item.category,
+      source: item.source,
+      count: 1,
+      amount: item.amount,
+      taxTreatment: "Deductibility depends on category and substantiation.",
+      notes: `${item.name} · ${item.date || "no date"}`,
+    }));
+  }
+
+  if (section === "1099") {
+    return bundle.contractors.map((item) => ({
+      section: "1099 Support",
+      category: item.kind,
+      source: item.email || "missing-email",
+      count: item.paymentCount,
+      amount: item.amount,
+      taxTreatment: item.reviewFor1099 ? "Review for 1099-NEC ($600+)." : "Under $600 review threshold.",
+      notes: item.name,
+    }));
+  }
+
+  if (section === "marketplace") {
+    return bundle.marketplace.byState.map((item) => ({
+      section: "Marketplace Tax",
+      category: item.stateName,
+      source: item.state,
+      count: item.bookingCount,
+      amount: item.taxCollected,
+      taxTreatment: "SitGuru remits. Tips excluded.",
+      notes: `Taxable base ${item.taxableBase.toFixed(2)} · tips ${item.tipsExcluded.toFixed(2)}`,
+    }));
+  }
+
+  if (section === "reconciliation") {
+    return bundle.reconItems.map((item) => ({
+      section: "Reconciliation",
+      category: item.label,
+      source: item.source,
+      count: 1,
+      amount: item.amount,
+      taxTreatment: "Cash movement. Match to NFCU.",
+      notes: `${item.date || "no date"} · ${item.status}`,
+    }));
+  }
+
+  return bundle.annualLines.map((item) => ({
+    section: item.section,
+    category: item.category,
+    source: item.source,
+    count: item.count,
+    amount: item.amount,
+    taxTreatment: item.treatment,
+    notes: item.notes,
+  }));
+}
+
 export async function GET(request: Request) {
   const financeCheck = await requireFinanceAdminApi();
   if (!financeCheck.identity) return financeCheck.response;
 
   const url = new URL(request.url);
   const format = normalizeFormat(url.searchParams.get("format"));
-  const rows = await buildRows();
+  const section = asTrimmedString(url.searchParams.get("section")).toLowerCase();
+  const useSection = Boolean(section && section !== "all" && section !== "audit");
+  const rows = useSection
+    ? sectionRows(section, await loadTaxCenterBundle())
+    : await buildRows();
   const body =
     format === "csv"
       ? buildCsv(rows)
@@ -576,7 +641,7 @@ export async function GET(request: Request) {
           format === "excel" ? "excel" : format === "word" ? "word" : "html",
         );
 
-  const filename = `sitguru-tax-center-${new Date()
+  const filename = `sitguru-tax-center-${section || "all"}-${new Date()
     .toISOString()
     .slice(0, 10)}.${getExtension(format)}`;
 

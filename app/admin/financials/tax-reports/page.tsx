@@ -1,4 +1,20 @@
 import Link from "next/link";
+import {
+  BadgeDollarSign,
+  CalendarClock,
+  Landmark,
+  Receipt,
+  ShieldCheck,
+} from "lucide-react";
+import { AdminThemeCard } from "@/components/admin/AdminThemeCard";
+import { TaxFilingCalendar } from "@/components/admin/financials/TaxFilingCalendar";
+import {
+  AdminWorkplaceActions,
+  AdminWorkplaceDenied,
+  AdminWorkplaceHealth,
+  GrowthCard,
+  GrowthPageFrame,
+} from "@/components/admin/growth/GrowthPageFrame";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getFinanceAdminIdentity } from "@/lib/admin/financials/access";
 import { getPlaidEnvironment } from "@/lib/plaid";
@@ -141,7 +157,7 @@ const taxReports: TaxReportCard[] = [
       "Owner contributions",
       "Owner distributions",
     ],
-    liveHint: "Live support: booking_payments + P&L",
+    liveHint: "Live desk: annual tax summary + CSV/PDF",
   },
   {
     eyebrow: "Deductions",
@@ -159,7 +175,7 @@ const taxReports: TaxReportCard[] = [
       "Banking and card fees",
       "Office and admin expenses",
     ],
-    liveHint: "Live support: expense_ledger + growth costs",
+    liveHint: "Live desk: expense_ledger + growth costs",
   },
   {
     eyebrow: "1099 Support",
@@ -177,25 +193,25 @@ const taxReports: TaxReportCard[] = [
       "1099 threshold review",
       "Exception list",
     ],
-    liveHint: "Live support: payouts + commissions",
+    liveHint: "Live desk: payouts + commissions · 1099-NEC Feb 1, 2027",
   },
   {
     eyebrow: "Sales / Local Tax",
     title: "Marketplace Tax Review",
     description:
-      "Review marketplace activity, booking fees, local tax exposure, customer charges, and any tax collection/remittance support needed.",
+      "SitGuru collects sales tax on the booking and remits it. Tips stay nontaxable optional gratuity and go 100% to the Guru.",
     href: "/admin/financials/tax-reports/marketplace-tax",
     tone: "purple",
     included: [
-      "Customer charges",
-      "Booking fee review",
-      "Location-based activity",
-      "Sales tax support",
-      "Local tax support",
+      "Sales tax collected",
+      "Tips excluded from tax",
+      "Service-location activity",
+      "Stripe Tax address collection",
       "Marketplace fee review",
-      "CPA notes",
+      "PayPal tax gap",
+      "CPA remittance notes",
     ],
-    liveHint: "Live support: booking_payments tax cents",
+    liveHint: "Live desk: bookings + booking_payments tax",
   },
   {
     eyebrow: "Reconciliation",
@@ -213,7 +229,7 @@ const taxReports: TaxReportCard[] = [
       "Deposit matching",
       "Unmatched transactions",
     ],
-    liveHint: "Live module: /admin/financials/reconciliation",
+    liveHint: "Live desk: stripe_payouts + NFCU",
   },
   {
     eyebrow: "Audit Support",
@@ -231,7 +247,7 @@ const taxReports: TaxReportCard[] = [
       "Campaign and referral support",
       "CPA questions log",
     ],
-    liveHint: "Live support: GL + Export Center",
+    liveHint: "Live desk: download each tax schedule",
   },
 ];
 
@@ -264,6 +280,15 @@ const taxAuthorityCards: TaxAuthorityCard[] = [
     href: "https://www.pa.gov/services/revenue/make-a-business-tax-payment",
   },
   {
+    title: "Minnesota Sales Tax",
+    level: "State",
+    description:
+      "James and other MN Gurus need SitGuru to collect 6.875% state plus local on pet care at checkout, then remit. Tips stay out of that tax.",
+    cadence: "As collected, then periodic remittance",
+    action: "Open MN sales and use tax",
+    href: "https://www.revenue.state.mn.us/sales-and-use-tax",
+  },
+  {
     title: "New Jersey Tax Payments",
     level: "State",
     description:
@@ -294,8 +319,8 @@ const taxAuthorityCards: TaxAuthorityCard[] = [
     title: "Marketplace Tax Exposure",
     level: "Marketplace",
     description:
-      "Review whether SitGuru booking charges, marketplace fees, local services, or customer charges create sales, use, or local tax obligations.",
-    cadence: "CPA review before launch and annually",
+      "SitGuru is the collector: tax on service + fee, remitted by HQ. Gurus do not calculate or file sales tax. Tips are excluded.",
+    cadence: "Review after each taxed market and annually",
     action: "Open marketplace tax review",
     href: "/admin/financials/tax-reports/marketplace-tax",
   },
@@ -777,6 +802,13 @@ function getReadinessItems(live: TaxLiveTotals): ReadinessItem[] {
         ? `${live.campaignCount.toLocaleString()} campaigns · ROI ${formatPercent(live.overallRoi)}.`
         : "No campaign ROI rows yet for marketing deduction backup.",
     },
+    {
+      label: "Marketplace sales tax",
+      status: live.taxCollectedSupport > 0 ? "ready" : "needs_review",
+      detail: live.taxCollectedSupport
+        ? `Stripe collected ${moneyExact(live.taxCollectedSupport)}. Tips stay optional gratuity and are not taxed.`
+        : "Automatic Tax is on, but collected tax is still $0 until service address + Stripe Tax registrations (MN) land.",
+    },
   ];
 }
 
@@ -894,36 +926,6 @@ function buildAnnualChecklist(live: TaxLiveTotals): TaxChecklistItem[] {
   ];
 }
 
-function ActionLink({
-  href,
-  label,
-  primary = false,
-}: {
-  href: string;
-  label: string;
-  primary?: boolean;
-}) {
-  if (primary) {
-    return (
-      <Link
-        href={href}
-        className="inline-flex items-center justify-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-700/10 transition hover:bg-emerald-800"
-      >
-        {label}
-      </Link>
-    );
-  }
-
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center justify-center rounded-xl border border-slate-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-950 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
-    >
-      {label}
-    </Link>
-  );
-}
-
 function ArrowCircle() {
   return (
     <span className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-100 bg-white text-emerald-700 shadow-sm transition group-hover:border-emerald-200 group-hover:bg-emerald-700 group-hover:text-white">
@@ -1012,20 +1014,7 @@ export default async function AdminFinancialsTaxReportsPage({
 
   if (!actor) {
     return (
-      <div className="min-h-screen bg-[#f7fbf8] px-6 py-10 text-slate-950">
-        <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-100 bg-white p-8 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-rose-700">
-            Access Restricted
-          </p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
-            Financial access required.
-          </h1>
-          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
-            Sign in with a finance-enabled admin account to view SitGuru Tax
-            Center records.
-          </p>
-        </div>
-      </div>
+      <AdminWorkplaceDenied detail="Sign in with a finance-enabled admin account to view SitGuru Tax Center records." />
     );
   }
 
@@ -1043,178 +1032,137 @@ export default async function AdminFinancialsTaxReportsPage({
     live.growthMarketingTotal +
     live.totalCampaignCost;
 
-  const taxSummaryCards: TaxSummaryCard[] = [
-    {
-      label: "Tax Year Package",
-      value: period === "annual" ? "2026" : period,
-      helper:
-        "Launch-year package can support Jun 1–Dec 31, 2026, subject to CPA confirmation.",
-      tone: "green",
-    },
-    {
-      label: "Platform Revenue",
-      value: moneyExact(live.platformRevenue),
-      helper: `${live.paidBookingCount.toLocaleString()} paid booking_payments · gross ${moneyExact(live.grossBookingVolume)}.`,
-      tone: "green",
-    },
-    {
-      label: "Marketing Deductions",
-      value: moneyExact(marketingDeductions),
-      helper: "Campaign costs, ads, print, QR, and growth marketing expense support.",
-      tone: "blue",
-    },
-    {
-      label: "1099 Payout Support",
-      value: moneyExact(live.payoutTotal + live.commissionTotal),
-      helper: `${live.payoutCount.toLocaleString()} payouts · ${live.commissionCount.toLocaleString()} commissions.`,
-      tone: "amber",
-    },
-    {
-      label: "Tax / Local Support",
-      value: moneyExact(live.taxCollectedSupport),
-      helper: "Customer tax cents captured on booking payments when present.",
-      tone: "purple",
-    },
-    {
-      label: "Live NFCU Cash",
-      value: moneyExact(live.liveCashBalance),
-      helper: `${live.connectedBusinessAccounts} business account${live.connectedBusinessAccounts === 1 ? "" : "s"} · Plaid ${taxData.plaidEnvironment}.`,
-      tone: live.connectedBusinessAccounts > 0 ? "green" : "rose",
-    },
-  ];
-
   const topCampaigns = [...taxData.roiRows].sort(
     (a, b) =>
       toNumber(b.bookings) - toNumber(a.bookings) ||
       toNumber(b.attributed_revenue) - toNumber(a.attributed_revenue),
   );
+  const healthySources = readinessItems.filter((item) => item.status === "ready").length;
 
   return (
-    <main className="min-h-screen bg-[#f7fbf8] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1500px] space-y-6">
-        <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
-          <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(340px,480px)] 2xl:items-start">
-            <div>
-              <Link
-                href="/admin/financials"
-                className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100"
-              >
-                ← Back to Financial Overview
-              </Link>
+    <GrowthPageFrame
+      kicker="Tax Center"
+      title="SitGuru collects sales tax. Gurus keep the tip."
+      detail="Organize quarterly and annual tax records from live Stripe bookings, NFCU cash, payouts, and campaigns. Sales tax is a SitGuru remittance job — not something Gurus add to their rates."
+      action={
+        <Link
+          href="/admin/financials/tax-reports/marketplace-tax"
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-black text-green-950"
+        >
+          Marketplace tax
+        </Link>
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/admin/financials"
+          className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800"
+        >
+          Financials
+        </Link>
+        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
+          {actor.email}
+        </span>
+        <span className="rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-black text-emerald-800">
+          Tax year {period === "annual" ? "2026" : period}
+        </span>
+      </div>
 
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <h1 className="text-4xl font-black tracking-tight text-slate-950">
-                  SitGuru Tax Center
-                </h1>
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-700">
-                  Quarterly · Annual · Federal · State · Local
-                </span>
-              </div>
+      {section === "local" ? (
+        <GrowthCard>
+          <p className="text-sm font-black text-slate-950">Local tax review mode</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            Capture city, township, borough, payroll locality, and operating
+            license questions by market, then send them through CPA Handoff.
+          </p>
+        </GrowthCard>
+      ) : null}
 
-              <p className="mt-3 max-w-5xl text-sm font-semibold leading-6 text-slate-600">
-                Prepare tax-ready records from live Stripe booking_payments,
-                NFCU cash, expense ledgers, Guru payouts, commissions, growth
-                campaigns, referral liabilities, and reconciliation support.
-                This organizes the tax workflow; final filing and tax treatment
-                should be confirmed by your CPA.
-              </p>
+      <section className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
+        <AdminThemeCard
+          label="Platform revenue"
+          value={moneyExact(live.platformRevenue)}
+          helper={`${live.paidBookingCount.toLocaleString()} paid payments · gross ${moneyExact(live.grossBookingVolume)}`}
+          tone="emerald"
+          icon={<Receipt size={18} />}
+        />
+        <AdminThemeCard
+          label="Sales tax collected"
+          value={moneyExact(live.taxCollectedSupport)}
+          helper="SitGuru remits. Tips are optional gratuity and are not in this total."
+          tone="violet"
+          icon={<Landmark size={18} />}
+        />
+        <AdminThemeCard
+          label="1099 payout support"
+          value={moneyExact(live.payoutTotal + live.commissionTotal)}
+          helper={`${live.payoutCount.toLocaleString()} payouts · ${live.commissionCount.toLocaleString()} commissions`}
+          tone="amber"
+          icon={<BadgeDollarSign size={18} />}
+        />
+        <AdminThemeCard
+          label="NFCU cash"
+          value={moneyExact(live.liveCashBalance)}
+          helper={`${live.connectedBusinessAccounts} business account${live.connectedBusinessAccounts === 1 ? "" : "s"} · Plaid ${taxData.plaidEnvironment}`}
+          tone={live.connectedBusinessAccounts > 0 ? "emerald" : "rose"}
+          icon={<ShieldCheck size={18} />}
+        />
+      </section>
 
-              {section === "local" ? (
-                <div className="mt-5 rounded-2xl border border-purple-100 bg-purple-50 p-4">
-                  <p className="text-sm font-black text-purple-950">
-                    Local tax review mode
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-purple-700">
-                    Capture city, township, borough, payroll locality, and
-                    operating license questions by market, then send them through
-                    CPA Handoff.
-                  </p>
-                </div>
-              ) : null}
-            </div>
+      <AdminWorkplaceActions
+        actions={[
+          {
+            href: "#filings",
+            label: "IRS & PA filings",
+            detail: "Graff Enterprises LLC due dates",
+            icon: CalendarClock,
+            primary: true,
+          },
+          {
+            href: "/admin/financials/tax-reports/annual-summary",
+            label: "Annual summary",
+            detail: "Live 2026 income and tax rollup",
+            icon: Receipt,
+          },
+          {
+            href: "/admin/financials/tax-reports/1099",
+            label: "1099 desk",
+            detail: "Guru and partner $600 review",
+            icon: BadgeDollarSign,
+          },
+        ]}
+      />
 
-            <div className="rounded-[1.5rem] border border-emerald-100 bg-[#fbfefd] p-4 shadow-sm">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
-                Tax Actions
-              </p>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <ActionLink href="/admin/financials" label="Financials" />
-                <ActionLink href="/admin/financials/profit-loss" label="P&L" />
-                <ActionLink href="/admin/financials/cash-flow" label="Cash Flow" />
-                <ActionLink
-                  href="/admin/financials/balance-sheet"
-                  label="Balance Sheet"
-                />
-                <ActionLink href="/admin/financials/payment-gateway" label="Payment Gateway" />
-                <ActionLink href="/admin/financials/plaid" label="Banking" />
-                <ActionLink
-                  href="/admin/financials/general-ledger"
-                  label="Ledger"
-                />
-                <ActionLink
-                  href="/admin/financials/reconciliation"
-                  label="Reconcile"
-                />
-                <ActionLink href="/admin/financials/payouts" label="Payouts" />
-                <ActionLink
-                  href="/admin/financials/cpa-handoff"
-                  label="CPA Handoff"
-                  primary
-                />
-              </div>
+      <TaxFilingCalendar />
 
-              <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
-                  Export Tax Support
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <ActionLink
-                    href="/api/admin/financials/tax-reports/export?format=csv"
-                    label="CSV"
-                  />
-                  <ActionLink
-                    href="/api/admin/financials/tax-reports/export?format=excel"
-                    label="Excel"
-                  />
-                  <ActionLink
-                    href="/api/admin/financials/tax-reports/export?format=word"
-                    label="Word"
-                  />
-                  <ActionLink
-                    href="/api/admin/financials/tax-reports/export?format=pdf"
-                    label="PDF"
-                    primary
-                  />
-                </div>
-              </div>
-            </div>
+      <GrowthCard>
+        <h2 className="text-lg font-black text-slate-950">Guru-easy sales tax</h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          Checkout now collects a service address and marks tips as Stripe
+          Optional Gratuity. Register MN in Stripe Tax before promising James
+          remittance.
+        </p>
+        <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-sm font-black text-slate-950">Guru lists the rate</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              Tax is exclusive. A $40 walk stays $40 on the Guru&apos;s card.
+            </p>
           </div>
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-          {taxSummaryCards.map((card) => (
-            <div
-              key={card.label}
-              className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm"
-            >
-              <span
-                className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${toneClasses(
-                  card.tone,
-                )}`}
-              >
-                {card.label}
-              </span>
-
-              <p className="mt-4 text-3xl font-black text-slate-950">
-                {card.value}
-              </p>
-
-              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                {card.helper}
-              </p>
-            </div>
-          ))}
-        </section>
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-sm font-black text-slate-950">Tips are not taxed</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              Pet parent generosity is not a taxable service line.
+            </p>
+          </div>
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-sm font-black text-slate-950">SitGuru remits</p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              Sales tax payable stays on SitGuru books, not the Guru 1099.
+            </p>
+          </div>
+        </div>
+      </GrowthCard>
 
         <section className="rounded-[2rem] border border-emerald-100 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
           <SectionHeader
@@ -1569,7 +1517,32 @@ export default async function AdminFinancialsTaxReportsPage({
             ))}
           </div>
         </section>
-      </div>
-    </main>
+
+      <AdminWorkplaceHealth
+        sources={readinessItems.map((item) => ({
+          id: item.label,
+          label: item.label,
+          ok: item.status === "ready",
+          rowCount: item.status === "ready" ? 1 : 0,
+        }))}
+        helper={`${healthySources} of ${readinessItems.length} tax package sources ready`}
+        links={
+          <>
+            <Link
+              href="/admin/financials/payment-gateway"
+              className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900"
+            >
+              Payment gateway
+            </Link>
+            <Link
+              href="/api/admin/financials/tax-reports/export?format=pdf"
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800"
+            >
+              Tax PDF
+            </Link>
+          </>
+        }
+      />
+    </GrowthPageFrame>
   );
 }

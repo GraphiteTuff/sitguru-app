@@ -3,6 +3,13 @@ import Stripe from "stripe";
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
+import {
+  STRIPE_TAX_CODE_OPTIONAL_GRATUITY,
+  STRIPE_TAX_CODE_PET_SERVICES,
+  buildStripeServiceTaxAddress,
+  createStripeTaxCustomer,
+  stripeCheckoutTaxCollectionParams,
+} from "@/lib/payments/stripe-tax";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -537,12 +544,40 @@ export async function POST(req: NextRequest) {
         ? booking.currency.trim().toLowerCase()
         : "usd";
 
+    const serviceTaxAddress = buildStripeServiceTaxAddress({
+      line1:
+        booking.care_address ||
+        booking.address_line1 ||
+        booking.street_address,
+      city: booking.care_city || booking.city,
+      state: booking.care_state || booking.state,
+      postalCode:
+        booking.care_zip_code ||
+        booking.postal_code ||
+        booking.zip_code,
+      country: booking.care_country || booking.country_code || "US",
+    });
+
+    let stripeCustomerId = "";
+    if (serviceTaxAddress) {
+      stripeCustomerId = await createStripeTaxCustomer({
+        stripe,
+        email: user.email,
+        name:
+          typeof booking.customer_name === "string"
+            ? booking.customer_name
+            : null,
+        address: serviceTaxAddress,
+      });
+    }
+
     const lineItems = [
       {
         quantity: 1,
         price_data: {
           currency,
           unit_amount: toCents(serviceAmount),
+          tax_behavior: "exclusive" as const,
           product_data: {
             name:
               typeof booking.service === "string" &&
@@ -559,6 +594,7 @@ export async function POST(req: NextRequest) {
                 ? booking.booking_date
                 : ""
             }`,
+            tax_code: STRIPE_TAX_CODE_PET_SERVICES,
           },
         },
       },
@@ -570,9 +606,11 @@ export async function POST(req: NextRequest) {
         price_data: {
           currency,
           unit_amount: toCents(tipAmount),
+          tax_behavior: "exclusive" as const,
           product_data: {
             name: "Optional Guru Tip",
-            description: "Optional appreciation for your Guru.",
+            description: "100% of your tip goes directly to your Guru.",
+            tax_code: STRIPE_TAX_CODE_OPTIONAL_GRATUITY,
           },
         },
       });
@@ -593,7 +631,12 @@ export async function POST(req: NextRequest) {
           PayPal and Venmo use a separate approved PayPal marketplace
           integration and must not be routed through this Stripe session.
         */
-        customer_email: user.email || undefined,
+        ...(stripeCustomerId
+          ? { customer: stripeCustomerId }
+          : { customer_email: user.email || undefined }),
+        ...stripeCheckoutTaxCollectionParams({
+          customerId: stripeCustomerId || undefined,
+        }),
         line_items: lineItems,
 
         metadata: {
@@ -616,6 +659,11 @@ export async function POST(req: NextRequest) {
           checkout_amount: String(checkoutAmount),
           fee_status: "free",
           checkout_model: "sitguru_unified_v1",
+          tax_code: STRIPE_TAX_CODE_PET_SERVICES,
+          tip_tax_code: STRIPE_TAX_CODE_OPTIONAL_GRATUITY,
+          tax_address_source: serviceTaxAddress
+            ? "booking_care_address"
+            : "checkout_collected",
         },
 
         success_url: `${getBaseUrl()}/bookings/success?session_id={CHECKOUT_SESSION_ID}`,

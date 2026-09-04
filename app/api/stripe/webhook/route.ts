@@ -3,6 +3,7 @@ import Stripe from "stripe";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { upsertStripeTransactionFromBalanceTxn } from "@/lib/stripe/sync-ledger";
+import { getCheckoutSessionTaxAddress } from "@/lib/payments/stripe-tax";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -964,10 +965,35 @@ async function updateBookingFromCheckoutSession(
   });
 
   const now = new Date().toISOString();
+  const taxAddress = getCheckoutSessionTaxAddress(session);
+  const addressPayload: Record<string, unknown> = {};
+
+  if (taxAddress) {
+    if (!firstNonEmpty(booking?.care_city, booking?.city) && taxAddress.city) {
+      addressPayload.care_city = taxAddress.city;
+    }
+    if (
+      !firstNonEmpty(booking?.care_state, booking?.state) &&
+      taxAddress.state
+    ) {
+      addressPayload.care_state = taxAddress.state;
+    }
+    if (
+      !firstNonEmpty(
+        booking?.care_zip_code,
+        booking?.postal_code,
+        booking?.zip_code,
+      ) &&
+      taxAddress.postal_code
+    ) {
+      addressPayload.care_zip_code = taxAddress.postal_code;
+    }
+  }
 
   const basePayload: Record<string, unknown> = {
     ...paymentReferencePayload({ session, payment }),
     ...financialPayload(financial),
+    ...addressPayload,
     updated_at: now,
   };
 
