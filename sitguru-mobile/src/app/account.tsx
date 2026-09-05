@@ -15,6 +15,7 @@ import {
   MapPin,
   MessageCircle,
   PawPrint,
+  GraduationCap,
   RefreshCw,
   ScanFace,
   Settings,
@@ -710,6 +711,18 @@ export default function AccountScreen() {
                           onPress={() =>
                             router.push('/guru-dashboard')
                           }
+                          styles={styles}
+                        />
+                        <ActionRow
+                          icon={
+                            <GraduationCap
+                              color={palette.primary}
+                              size={18}
+                              strokeWidth={2.3}
+                            />
+                          }
+                          label="Intern Portal"
+                          onPress={() => router.push('/intern-portal')}
                           styles={styles}
                         />
                         <ActionRow

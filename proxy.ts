@@ -113,6 +113,14 @@ function isProtectedAmbassadorDashboardPath(pathname: string) {
   );
 }
 
+function isInternLoginPath(pathname: string) {
+  return pathname === "/intern/login";
+}
+
+function isProtectedInternPath(pathname: string) {
+  return pathname === "/intern" || pathname.startsWith("/intern/");
+}
+
 function isPasswordRecoveryPath(pathname: string) {
   return (
     pathname === "/forgot-password" ||
@@ -371,11 +379,14 @@ export async function proxy(request: NextRequest) {
   const requiresAmbassadorAccess =
     isProtectedAmbassadorDashboardPath(pathname) &&
     !isAmbassadorLoginPath(pathname);
+  const requiresInternAccess =
+    isProtectedInternPath(pathname) && !isInternLoginPath(pathname);
 
   if (
     !requiresAdminAccess &&
     !requiresGuruAccess &&
-    !requiresAmbassadorAccess
+    !requiresAmbassadorAccess &&
+    !requiresInternAccess
   ) {
     const passthrough = NextResponse.next();
     if (normalizedRef) {
@@ -433,6 +444,16 @@ export async function proxy(request: NextRequest) {
         makeRedirectUrl({
           request,
           pathname: "/ambassador/login",
+          nextPath: pathname,
+        }),
+      );
+    }
+
+    if (requiresInternAccess) {
+      return NextResponse.redirect(
+        makeRedirectUrl({
+          request,
+          pathname: "/intern/login",
           nextPath: pathname,
         }),
       );
@@ -509,7 +530,14 @@ export async function proxy(request: NextRequest) {
     return redirectResponse;
   }
 
-  if ((requiresGuruAccess || requiresAmbassadorAccess) && (isSuperUser || isFounderPersonalMarketplaceEmail(userEmail))) {
+  if (
+    (requiresGuruAccess || requiresAmbassadorAccess || requiresInternAccess) &&
+    (isSuperUser || isFounderPersonalMarketplaceEmail(userEmail))
+  ) {
+    return responseRef.current;
+  }
+
+  if (requiresInternAccess && user) {
     return responseRef.current;
   }
 

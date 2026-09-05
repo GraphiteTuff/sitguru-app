@@ -23,7 +23,7 @@ import TurnstileWidget from "@/components/TurnstileWidget";
 import { supabase } from "@/lib/supabase";
 
 type LoginMethod = "phone" | "email";
-type LoginAudience = "one" | "pet_parent" | "guru" | "ambassador";
+type LoginAudience = "one" | "pet_parent" | "guru" | "ambassador" | "intern";
 
 function GoogleIcon() {
   return (
@@ -80,6 +80,10 @@ function getRequestedAudience(value?: string | null): LoginAudience {
     return "ambassador";
   }
 
+  if (normalized === "intern" || normalized === "internship") {
+    return "intern";
+  }
+
   if (
     normalized === "customer" ||
     normalized === "pet_parent" ||
@@ -111,6 +115,7 @@ function getRequestedMode(value?: string | null): LoginMethod {
 function getDefaultDashboardForAudience(audience: LoginAudience) {
   if (audience === "guru") return "/login/route?preferred=guru";
   if (audience === "ambassador") return "/login/route?preferred=ambassador";
+  if (audience === "intern") return "/login/route?preferred=intern";
   if (audience === "pet_parent") return "/login/route?preferred=pet_parent";
   return "/login/route";
 }
@@ -129,6 +134,10 @@ function isAudienceCompatiblePath(
       path === "/community" ||
       path === "/login/route?preferred=ambassador"
     );
+  }
+
+  if (audience === "intern") {
+    return path === "/intern" || path.startsWith("/intern/");
   }
 
   if (audience === "guru") {
@@ -183,6 +192,7 @@ function getSafeNextPath(nextValue: string | null, audience: LoginAudience) {
 
 function getPhoneAccessLabel(audience: LoginAudience) {
   if (audience === "ambassador") return "Ambassador account";
+  if (audience === "intern") return "Intern account";
   if (audience === "guru") return "Guru account";
   if (audience === "pet_parent") return "Pet Parent account";
   return "Existing SitGuru account";
@@ -190,6 +200,7 @@ function getPhoneAccessLabel(audience: LoginAudience) {
 
 function getAudienceTitle(audience: LoginAudience) {
   if (audience === "ambassador") return "Ambassador login";
+  if (audience === "intern") return "Intern login";
   if (audience === "guru") return "Guru login";
   if (audience === "pet_parent") return "Pet Parent login";
   return "Log in or join";
@@ -198,6 +209,10 @@ function getAudienceTitle(audience: LoginAudience) {
 function getAudienceDescription(audience: LoginAudience) {
   if (audience === "ambassador") {
     return "Use your SitGuru account to open referrals, training, rewards, outreach, and Ambassador support.";
+  }
+
+  if (audience === "intern") {
+    return "Use your SitGuru intern account to open tasks, campaigns, metrics, and supervisor review.";
   }
 
   if (audience === "guru") {

@@ -434,6 +434,7 @@ export default async function AdminOperationsDashboard() {
         ["Guru Approvals", "/admin/guru-approvals"],
         ["Ambassadors", "/admin/ambassadors"],
         ["HR", "/admin/hr"],
+        ["Internship Program", "/admin/internship"],
       ],
     },
     {

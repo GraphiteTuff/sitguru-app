@@ -46,7 +46,7 @@ const tones: Record<
   },
 };
 
-function TrendBadge({ trend }: { trend: KpiTrend }) {
+function TrendBadge({ trend, title = "vs last week" }: { trend: KpiTrend; title?: string }) {
   const color =
     trend.tone === "up"
       ? "text-emerald-700"
@@ -63,7 +63,7 @@ function TrendBadge({ trend }: { trend: KpiTrend }) {
   return (
     <span
       className={`inline-flex items-center gap-0.5 text-sm font-black ${color}`}
-      title="vs last week"
+      title={title}
       aria-label={trend.srLabel}
     >
       <Icon size={18} strokeWidth={3} aria-hidden="true" />
@@ -79,6 +79,7 @@ export function ThemeStatCard({
   tone = "emerald",
   icon,
   trend,
+  trendTitle,
   className = "",
 }: {
   label: string;
@@ -87,6 +88,7 @@ export function ThemeStatCard({
   tone?: ThemeTone;
   icon?: ReactNode;
   trend?: KpiTrend | null;
+  trendTitle?: string;
   className?: string;
 }) {
   const theme = tones[tone];
@@ -111,7 +113,7 @@ export function ThemeStatCard({
       </div>
       <div className="mt-2 flex items-end justify-between gap-2">
         <p className="text-3xl font-black leading-none text-slate-950">{value}</p>
-        {trend ? <TrendBadge trend={trend} /> : null}
+        {trend ? <TrendBadge trend={trend} title={trendTitle} /> : null}
       </div>
       {helper ? (
         <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">

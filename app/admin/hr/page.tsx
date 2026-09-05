@@ -34,9 +34,8 @@ import {
 } from "@/lib/admin/hr/dashboard";
 import { getGrowthHirePipelineSummary } from "@/lib/admin/growth/pipeline";
 import { countCareerJobs } from "@/lib/careers/jobs";
-import {
-  VETERANS_MILITARY_FAMILIES_PROGRAM,
-} from "@/lib/programs/veterans-military-families";
+import { getActiveCohort, listCohortMilestones } from "@/lib/internship/queries";
+import InternshipTimelineBoard from "@/components/internship/InternshipTimelineBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +57,7 @@ const routes = {
   settings: "/admin/settings",
   growthHire: "/admin/hr/growth-hire",
   careers: "/admin/hr/careers",
+  internship: "/admin/internship",
   growthPortal: "/admin/growth",
   users: "/admin/users",
   messages: "/admin/messages",
@@ -277,11 +277,15 @@ export default async function AdminHrPage() {
     );
   }
 
-  const [data, growthHire, careerCounts] = await Promise.all([
+  const [data, growthHire, careerCounts, internshipCohort] = await Promise.all([
     getHrDashboardData(),
     getGrowthHirePipelineSummary(),
     countCareerJobs(),
+    getActiveCohort(),
   ]);
+  const internshipMilestones = internshipCohort
+    ? await listCohortMilestones(internshipCohort.id)
+    : [];
 
   const pendingReview =
     data.metrics.pendingGuruApplicants +
@@ -389,6 +393,12 @@ export default async function AdminHrPage() {
       icon: ClipboardList,
     },
     {
+      href: routes.internship,
+      label: "Internship Program",
+      detail: "College intern workspace and employer review",
+      icon: GraduationCap,
+    },
+    {
       href: `${routes.growthHire}#schools`,
       label: "Growth hire",
       detail: `${growthHire.approvedSchools} of ${growthHire.schools} schools approved`,
@@ -465,6 +475,29 @@ export default async function AdminHrPage() {
       </section>
 
       <AdminWorkplaceActions actions={actions} />
+
+      {internshipMilestones.length ? (
+        <GrowthCard className="min-w-0">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">
+                Internship Program timeline
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Spring 2027 employer execution. Intern portal and Employer HQ
+                share the same milestones, SMART goals, and verified metrics.
+              </p>
+            </div>
+            <Link
+              href="/admin/internship/timeline"
+              className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900"
+            >
+              Open timeline
+            </Link>
+          </div>
+          <InternshipTimelineBoard milestones={internshipMilestones.slice(0, 6)} compact />
+        </GrowthCard>
+      ) : null}
 
       <section className="grid min-w-0 gap-4 xl:grid-cols-12">
         <div className="min-w-0 xl:col-span-7">

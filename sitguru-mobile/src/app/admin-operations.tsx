@@ -274,6 +274,7 @@ export default function AdminOperationsScreen() {
                 { label: 'Pet Parent Dashboard', href: '/pet-parent-dashboard' },
                 { label: 'Guru Dashboard', href: '/guru-dashboard' },
                 { label: 'Ambassador Dashboard', href: '/ambassador-dashboard' },
+                { label: 'Internship Program', href: '/intern-portal' },
                 { label: 'Account', href: '/account' },
               ]}
             />

@@ -9,12 +9,13 @@ import {
 } from "@/lib/auth/guru-access";
 import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
 import { canUseMarketplaceRoleWorkspaces } from "@/lib/dashboard/founder-workspaces";
+import { findInternByAccount, linkInternUserId } from "@/lib/internship/queries";
 
 export const dynamic = "force-dynamic";
 
 type LoginSearchParams = Record<string, string | string[] | undefined>;
 
-type PreferredWorkspace = "pet_parent" | "guru" | "ambassador" | "admin";
+type PreferredWorkspace = "pet_parent" | "guru" | "ambassador" | "admin" | "intern";
 
 type AmbassadorAccessRow = {
   id: string;
@@ -73,6 +74,10 @@ function normalizePreferredWorkspace(
     preferred === "representative"
   ) {
     return "ambassador";
+  }
+
+  if (preferred === "intern" || preferred === "internship") {
+    return "intern";
   }
 
   if (
@@ -173,6 +178,10 @@ function getSafeNextPath(
     preferred === "ambassador" &&
     !nextPath.startsWith("/ambassador/")
   ) {
+    return "";
+  }
+
+  if (preferred === "intern" && nextPath !== "/intern" && !nextPath.startsWith("/intern/")) {
     return "";
   }
 
@@ -540,6 +549,26 @@ export default async function LoginRoutePage({
         error:
           suppliedError ||
           ambassadorAccessMessage(ambassador),
+      }).toString()}`,
+    );
+  }
+
+  if (preferred === "intern") {
+    const intern = await findInternByAccount({
+      userId: user.id,
+      email: userEmail,
+    });
+    if (intern) {
+      if (!intern.userId) {
+        await linkInternUserId(intern.id, user.id);
+      }
+      redirect(safeNextPath || "/intern");
+    }
+    redirect(
+      `/intern/login?${new URLSearchParams({
+        error:
+          suppliedError ||
+          "This SitGuru account is not assigned to the Internship Program.",
       }).toString()}`,
     );
   }
