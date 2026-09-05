@@ -36,6 +36,7 @@ import { getGrowthHirePipelineSummary } from "@/lib/admin/growth/pipeline";
 import { countCareerJobs } from "@/lib/careers/jobs";
 import { getActiveCohort, listCohortMilestones } from "@/lib/internship/queries";
 import InternshipTimelineBoard from "@/components/internship/InternshipTimelineBoard";
+import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 
 export const dynamic = "force-dynamic";
 
