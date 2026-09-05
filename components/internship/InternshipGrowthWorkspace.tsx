@@ -78,12 +78,15 @@ export default function InternshipGrowthWorkspace({
   data,
   mode,
   notice,
+  preview = false,
 }: {
   data: InternshipWorkspaceData;
   mode: "intern" | "supervisor";
   notice?: { kind: "ok" | "error"; message: string } | null;
+  preview?: boolean;
 }) {
   const supervisor = mode === "supervisor";
+  const readOnly = preview;
   const process = useMemo(() => buildInternshipProcess(data), [data]);
   const pendingApproval = process.pendingApprovals;
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>(
@@ -242,7 +245,7 @@ export default function InternshipGrowthWorkspace({
                         <p className="text-sm font-black text-slate-950">{tool.name}</p>
                         <p className="text-xs font-semibold text-slate-500">{tool.purpose}</p>
                       </div>
-                      {supervisor ? (
+                      {supervisor && !readOnly ? (
                         <form action={saveAccessGrant} className="flex items-center gap-2">
                           <input type="hidden" name="internId" value={data.intern.id} />
                           <input type="hidden" name="toolKey" value={tool.key} />
@@ -265,38 +268,44 @@ export default function InternshipGrowthWorkspace({
               </div>
             </article>
           </div>
-          <form
-            action={saveSmartGoal}
-            className="space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-5 lg:col-span-5"
-          >
-            <h3 className="font-black text-slate-950">Write a SMART goal</h3>
-            <input type="hidden" name="internId" value={data.intern.id} />
-            <input type="hidden" name="mode" value={mode} />
-            {SMART_CHECKLIST.map((item) => (
-              <Input
-                key={item.letter}
-                name={
-                  item.letter === "S"
-                    ? "specific"
-                    : item.letter === "M"
-                      ? "measurable"
-                      : item.letter === "A"
-                        ? "achievable"
-                        : item.letter === "R"
-                          ? "relevant"
-                          : "timeBound"
-                }
-                label={`${item.letter} — ${item.label}`}
-                placeholder={item.prompt}
-              />
-            ))}
-            <Input name="baselineValue" label="Baseline (from SitGuru-controlled source)" />
-            <Input name="targetValue" label="Target" />
-            <Input name="metricKey" label="Metric key" placeholder="pet_parent_registrations" />
-            <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
-              Save SMART goal to both portals
-            </button>
-          </form>
+          {readOnly ? (
+            <p className="rounded-[1.5rem] border border-dashed border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-900 lg:col-span-5">
+              HQ preview is view-only. Interns write SMART goals here; Employer review grades the results.
+            </p>
+          ) : (
+            <form
+              action={saveSmartGoal}
+              className="space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-5 lg:col-span-5"
+            >
+              <h3 className="font-black text-slate-950">Write a SMART goal</h3>
+              <input type="hidden" name="internId" value={data.intern.id} />
+              <input type="hidden" name="mode" value={mode} />
+              {SMART_CHECKLIST.map((item) => (
+                <Input
+                  key={item.letter}
+                  name={
+                    item.letter === "S"
+                      ? "specific"
+                      : item.letter === "M"
+                        ? "measurable"
+                        : item.letter === "A"
+                          ? "achievable"
+                          : item.letter === "R"
+                            ? "relevant"
+                            : "timeBound"
+                  }
+                  label={`${item.letter} — ${item.label}`}
+                  placeholder={item.prompt}
+                />
+              ))}
+              <Input name="baselineValue" label="Baseline (from SitGuru-controlled source)" />
+              <Input name="targetValue" label="Target" />
+              <Input name="metricKey" label="Metric key" placeholder="pet_parent_registrations" />
+              <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+                Save SMART goal to both portals
+              </button>
+            </form>
+          )}
           {process.relevantMilestones.length ? (
             <div className="xl:col-span-12">
               <InternshipTimelineBoard
@@ -327,6 +336,7 @@ export default function InternshipGrowthWorkspace({
                   employerLetter={task.employerLetter}
                   kpiTier={task.kpiTier}
                   comments={data.comments || []}
+                  preview={preview}
                 />
               ))
             ) : (
@@ -335,38 +345,44 @@ export default function InternshipGrowthWorkspace({
               </p>
             )}
           </div>
-          <form
-            action={saveInternTask}
-            className="lg:col-span-5 space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm"
-          >
-            <h3 className="font-black text-slate-950">New assignment</h3>
-            <input type="hidden" name="internId" value={data.intern.id} />
-            <input type="hidden" name="mode" value={mode} />
-            <Input name="title" label="Task" required />
-            <Input name="dueOn" label="Due date" type="date" />
-            <label className="block">
-              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                Status
-              </span>
-              <select
-                name="status"
-                defaultValue="todo"
-                className="mt-1 min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
-              >
-                <option value="todo">To do</option>
-                <option value="in_progress">In progress</option>
-                <option value="submitted">Submitted</option>
-                <option value="blocked">Blocked</option>
-              </select>
-            </label>
-            <Input name="workUrl" label="Link to completed work" />
-            <Input name="businessObjective" label="Business objective" />
-            <Input name="metricAffected" label="Metric affected" />
-            <Input name="studentNotes" label="Student notes" />
-            <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
-              Save task
-            </button>
-          </form>
+          {readOnly ? (
+            <p className="lg:col-span-5 rounded-[1.5rem] border border-dashed border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+              HQ preview is view-only. Assignments are added from Employer review.
+            </p>
+          ) : (
+            <form
+              action={saveInternTask}
+              className="lg:col-span-5 space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm"
+            >
+              <h3 className="font-black text-slate-950">New assignment</h3>
+              <input type="hidden" name="internId" value={data.intern.id} />
+              <input type="hidden" name="mode" value={mode} />
+              <Input name="title" label="Task" required />
+              <Input name="dueOn" label="Due date" type="date" />
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                  Status
+                </span>
+                <select
+                  name="status"
+                  defaultValue="todo"
+                  className="mt-1 min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
+                >
+                  <option value="todo">To do</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="submitted">Submitted</option>
+                  <option value="blocked">Blocked</option>
+                </select>
+              </label>
+              <Input name="workUrl" label="Link to completed work" />
+              <Input name="businessObjective" label="Business objective" />
+              <Input name="metricAffected" label="Metric affected" />
+              <Input name="studentNotes" label="Student notes" />
+              <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+                Save task
+              </button>
+            </form>
+          )}
         </section>
       ) : null}
 
@@ -389,25 +405,32 @@ export default function InternshipGrowthWorkspace({
                   employerLetter={item.employerLetter}
                   kpiTier={item.kpiTier}
                   comments={data.comments || []}
+                  preview={preview}
                 />
               ))}
           </div>
-          <form
-            action={saveInternContent}
-            className="lg:col-span-5 space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm"
-          >
-            <h3 className="font-black text-slate-950">Log content</h3>
-            <input type="hidden" name="internId" value={data.intern.id} />
-            <input type="hidden" name="mode" value={mode} />
-            <Input name="title" label="Title" required />
-            <Input name="platform" label="Platform" placeholder="Instagram, TikTok, blog…" />
-            <Input name="draftUrl" label="Draft link" />
-            <Input name="publishedUrl" label="Published link" />
-            <Input name="studentNotes" label="Notes" />
-            <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
-              Save content
-            </button>
-          </form>
+          {readOnly ? (
+            <p className="lg:col-span-5 rounded-[1.5rem] border border-dashed border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+              HQ preview is view-only. Content logs stay on the intern’s portal.
+            </p>
+          ) : (
+            <form
+              action={saveInternContent}
+              className="lg:col-span-5 space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm"
+            >
+              <h3 className="font-black text-slate-950">Log content</h3>
+              <input type="hidden" name="internId" value={data.intern.id} />
+              <input type="hidden" name="mode" value={mode} />
+              <Input name="title" label="Title" required />
+              <Input name="platform" label="Platform" placeholder="Instagram, TikTok, blog…" />
+              <Input name="draftUrl" label="Draft link" />
+              <Input name="publishedUrl" label="Published link" />
+              <Input name="studentNotes" label="Notes" />
+              <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+                Save content
+              </button>
+            </form>
+          )}
         </section>
       ) : null}
 
@@ -438,30 +461,33 @@ export default function InternshipGrowthWorkspace({
               </article>
             ))}
           </div>
-          <form
-            action={saveInternCampaign}
-            className="lg:col-span-5 space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm"
-          >
-            <h3 className="font-black text-slate-950">New campaign</h3>
-            <input type="hidden" name="internId" value={data.intern.id} />
-            <input type="hidden" name="mode" value={mode} />
-            <Input name="name" label="Campaign name" required />
-            <Input name="utmSource" label="utm_source" placeholder="instagram" />
-            <Input name="utmCampaign" label="utm_campaign" placeholder="spring27_growth" />
-            <Input name="referralCode" label="Referral / campaign code" />
-            <Input name="trackingUrl" label="Tracking URL (optional override)" />
-            <Input name="objective" label="Business objective" />
-            <p className="text-xs font-semibold leading-5 text-slate-500">
-              {ATTRIBUTION_RULE}
+          {readOnly ? (
+            <p className="lg:col-span-5 rounded-[1.5rem] border border-dashed border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+              HQ preview is view-only. Campaigns and experiments stay on the intern’s portal until Employer review.
             </p>
-            <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
-              Save campaign
-            </button>
-          </form>
-          <form
-            action={saveExperiment}
-            className="xl:col-span-12 space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm"
-          >
+          ) : (
+            <form
+              action={saveInternCampaign}
+              className="lg:col-span-5 space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm"
+            >
+              <h3 className="font-black text-slate-950">New campaign</h3>
+              <input type="hidden" name="internId" value={data.intern.id} />
+              <input type="hidden" name="mode" value={mode} />
+              <Input name="name" label="Campaign name" required />
+              <Input name="utmSource" label="utm_source" placeholder="instagram" />
+              <Input name="utmCampaign" label="utm_campaign" placeholder="spring27_growth" />
+              <Input name="referralCode" label="Referral / campaign code" />
+              <Input name="trackingUrl" label="Tracking URL (optional override)" />
+              <Input name="objective" label="Business objective" />
+              <p className="text-xs font-semibold leading-5 text-slate-500">
+                {ATTRIBUTION_RULE}
+              </p>
+              <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+                Save campaign
+              </button>
+            </form>
+          )}
+          <div className="xl:col-span-12 space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm">
             <h3 className="font-black text-slate-950">Experiment log (synced)</h3>
             <p className="text-sm font-semibold text-slate-500">
               Hypothesis, action, audience, result, lesson, next step. Intern and HQ share this log.
@@ -473,20 +499,28 @@ export default function InternshipGrowthWorkspace({
                 <p>Result: {row.result || "—"} · Lesson: {row.lesson || "—"}</p>
               </article>
             ))}
-            <input type="hidden" name="internId" value={data.intern.id} />
-            <input type="hidden" name="mode" value={mode} />
-            <div className="grid gap-3 md:grid-cols-2">
-              <Input name="hypothesis" label="Hypothesis" required />
-              <Input name="action" label="Action" />
-              <Input name="audience" label="Audience" />
-              <Input name="result" label="Result" />
-              <Input name="lesson" label="Lesson" />
-              <Input name="nextStep" label="Next step" />
-            </div>
-            <button className="min-h-11 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">
-              Log experiment
-            </button>
-          </form>
+            {readOnly ? (
+              <p className="rounded-2xl border border-dashed border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+                HQ preview is view-only. Interns log experiments here.
+              </p>
+            ) : (
+              <form action={saveExperiment} className="space-y-3">
+                <input type="hidden" name="internId" value={data.intern.id} />
+                <input type="hidden" name="mode" value={mode} />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input name="hypothesis" label="Hypothesis" required />
+                  <Input name="action" label="Action" />
+                  <Input name="audience" label="Audience" />
+                  <Input name="result" label="Result" />
+                  <Input name="lesson" label="Lesson" />
+                  <Input name="nextStep" label="Next step" />
+                </div>
+                <button className="min-h-11 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">
+                  Log experiment
+                </button>
+              </form>
+            )}
+          </div>
         </section>
       ) : null}
 
@@ -517,7 +551,7 @@ export default function InternshipGrowthWorkspace({
                   Source: {metricSourceLabel(metric.sourceSystem)}
                   {metric.selfReported ? " · intern-submitted" : ""}
                 </p>
-                {supervisor && !metric.isVerified ? (
+                {supervisor && !readOnly && !metric.isVerified ? (
                   <form action={verifyInternMetric} className="mt-3">
                     <input type="hidden" name="internId" value={data.intern.id} />
                     <input type="hidden" name="id" value={metric.id} />
@@ -530,49 +564,55 @@ export default function InternshipGrowthWorkspace({
             ))}
             <p className="text-xs font-semibold leading-5 text-slate-500">{ATTRIBUTION_RULE}</p>
           </div>
-          <form
-            action={saveInternMetric}
-            className="lg:col-span-5 space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm"
-          >
-            <h3 className="font-black text-slate-950">
-              {supervisor ? "Record verified metric" : "Submit metric for verification"}
-            </h3>
-            <input type="hidden" name="internId" value={data.intern.id} />
-            <input type="hidden" name="mode" value={mode} />
-            <Input name="label" label="Metric" required placeholder="Pet Parent registrations" />
-            <Input name="valueNumeric" label="Value" type="number" />
-            <label className="block">
-              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                Approved source
-              </span>
-              <select
-                name="sourceSystem"
-                required
-                className="mt-1 min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
-              >
-                {METRIC_SOURCE_SYSTEMS.map((source) => (
-                  <option key={source} value={source}>
-                    {metricSourceLabel(source)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Input name="sourceNote" label="Source note / report link" />
-            {supervisor ? (
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                <input type="checkbox" name="verify" />
-                Mark verified from SitGuru-controlled systems
+          {readOnly ? (
+            <p className="lg:col-span-5 rounded-[1.5rem] border border-dashed border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+              HQ preview is view-only. Interns submit numbers here; verification still happens in Employer review.
+            </p>
+          ) : (
+            <form
+              action={saveInternMetric}
+              className="lg:col-span-5 space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm"
+            >
+              <h3 className="font-black text-slate-950">
+                {supervisor ? "Record verified metric" : "Submit metric for verification"}
+              </h3>
+              <input type="hidden" name="internId" value={data.intern.id} />
+              <input type="hidden" name="mode" value={mode} />
+              <Input name="label" label="Metric" required placeholder="Pet Parent registrations" />
+              <Input name="valueNumeric" label="Value" type="number" />
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                  Approved source
+                </span>
+                <select
+                  name="sourceSystem"
+                  required
+                  className="mt-1 min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
+                >
+                  {METRIC_SOURCE_SYSTEMS.map((source) => (
+                    <option key={source} value={source}>
+                      {metricSourceLabel(source)}
+                    </option>
+                  ))}
+                </select>
               </label>
-            ) : (
-              <p className="text-xs font-semibold text-amber-800">
-                Interns can prepare numbers. Attributable results require supervisor
-                verification from SitGuru Admin, GA4, social analytics, or another approved source.
-              </p>
-            )}
-            <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
-              Save metric
-            </button>
-          </form>
+              <Input name="sourceNote" label="Source note / report link" />
+              {supervisor ? (
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <input type="checkbox" name="verify" />
+                  Mark verified from SitGuru-controlled systems
+                </label>
+              ) : (
+                <p className="text-xs font-semibold text-amber-800">
+                  Interns can prepare numbers. Attributable results require supervisor
+                  verification from SitGuru Admin, GA4, social analytics, or another approved source.
+                </p>
+              )}
+              <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+                Save metric
+              </button>
+            </form>
+          )}
         </section>
       ) : null}
 
@@ -602,6 +642,7 @@ export default function InternshipGrowthWorkspace({
                       employerLetter={task.employerLetter}
                       kpiTier={task.kpiTier}
                       comments={data.comments || []}
+                      preview={preview}
                     />
                   ))}
                 {data.content
@@ -622,6 +663,7 @@ export default function InternshipGrowthWorkspace({
                       employerLetter={item.employerLetter}
                       kpiTier={item.kpiTier}
                       comments={data.comments || []}
+                      preview={preview}
                     />
                   ))}
               </div>
@@ -649,24 +691,30 @@ export default function InternshipGrowthWorkspace({
                 </p>
               </article>
             ))}
-            <form action={saveWeeklyReview} className="space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4">
-              <input type="hidden" name="internId" value={data.intern.id} />
-              <input type="hidden" name="mode" value={mode} />
-              <Input name="weekOf" label="Week of" type="date" required />
-              <Input name="accomplished" label="What did you accomplish?" />
-              <Input name="dataShowed" label="What did the data show?" />
-              <Input name="didntWork" label="What didn’t work?" />
-              <Input name="changingNextWeek" label="What are you changing next week?" />
-              {supervisor ? (
-                <label className="flex items-center gap-2 text-sm font-semibold">
-                  <input type="checkbox" name="upcomingApproved" />
-                  Approve upcoming work
-                </label>
-              ) : null}
-              <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
-                Save weekly review
-              </button>
-            </form>
+            {readOnly ? (
+              <p className="rounded-[1.5rem] border border-dashed border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+                HQ preview is view-only. Weekly reviews are written on the intern’s portal.
+              </p>
+            ) : (
+              <form action={saveWeeklyReview} className="space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4">
+                <input type="hidden" name="internId" value={data.intern.id} />
+                <input type="hidden" name="mode" value={mode} />
+                <Input name="weekOf" label="Week of" type="date" required />
+                <Input name="accomplished" label="What did you accomplish?" />
+                <Input name="dataShowed" label="What did the data show?" />
+                <Input name="didntWork" label="What didn’t work?" />
+                <Input name="changingNextWeek" label="What are you changing next week?" />
+                {supervisor ? (
+                  <label className="flex items-center gap-2 text-sm font-semibold">
+                    <input type="checkbox" name="upcomingApproved" />
+                    Approve upcoming work
+                  </label>
+                ) : null}
+                <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+                  Save weekly review
+                </button>
+              </form>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -691,7 +739,7 @@ export default function InternshipGrowthWorkspace({
                 <p>Improve: {card.improvementRequired || "—"}</p>
               </article>
             ))}
-            {supervisor ? (
+            {supervisor && !readOnly ? (
               <form action={saveScorecard} className="space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-4">
                 <input type="hidden" name="internId" value={data.intern.id} />
                 <div className="grid grid-cols-2 gap-2">

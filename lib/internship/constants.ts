@@ -12,6 +12,10 @@ export const INTERNSHIP_PROGRAM_SHORT_NAME = "Internship Program";
 export const INTERNSHIP_PORTAL_PATH = "/intern";
 export const INTERNSHIP_ADMIN_PATH = "/admin/internship";
 
+export function internPortalPreviewPath(internId: string) {
+  return `${INTERNSHIP_PORTAL_PATH}?view=${encodeURIComponent(internId)}`;
+}
+
 export const UNIVERSITY_STATUSES = [
   "research_needed",
   "potential_partner",

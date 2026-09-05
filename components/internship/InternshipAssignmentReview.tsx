@@ -45,6 +45,7 @@ export default function InternshipAssignmentReview({
   employerLetter,
   kpiTier,
   comments,
+  preview = false,
 }: {
   internId: string;
   mode: "intern" | "supervisor";
@@ -60,6 +61,7 @@ export default function InternshipAssignmentReview({
   employerLetter?: string;
   kpiTier?: string;
   comments: InternshipWorkComment[];
+  preview?: boolean;
 }) {
   const supervisor = mode === "supervisor";
   const closed = status === "approved" || status === "not_accepted";
@@ -127,7 +129,7 @@ export default function InternshipAssignmentReview({
         </div>
       ) : null}
 
-      {!closed ? (
+      {!closed && !preview ? (
         <form action={commentInternWork} className="mt-3 flex flex-col gap-2 sm:flex-row">
           <input type="hidden" name="internId" value={internId} />
           <input type="hidden" name="mode" value={mode} />
@@ -145,7 +147,7 @@ export default function InternshipAssignmentReview({
         </form>
       ) : null}
 
-      {!supervisor && !closed ? (
+      {!supervisor && !preview && !closed ? (
         <form action={submitInternWork} className="mt-4 grid gap-3">
           <input type="hidden" name="internId" value={internId} />
           <input type="hidden" name="mode" value={mode} />
@@ -213,7 +215,7 @@ export default function InternshipAssignmentReview({
         </form>
       ) : null}
 
-      {supervisor && !closed ? (
+      {supervisor && !preview && !closed ? (
         <form action={reviewInternWork} className="mt-4 grid gap-3">
           <input type="hidden" name="internId" value={internId} />
           <input type="hidden" name="itemType" value={itemType} />

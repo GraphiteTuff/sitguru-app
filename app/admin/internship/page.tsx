@@ -7,7 +7,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { getAdminIdentity } from "@/lib/admin/access";
-import { INTERNSHIP_PROGRAM_NAME } from "@/lib/internship/constants";
+import { INTERNSHIP_PROGRAM_NAME, internPortalPreviewPath } from "@/lib/internship/constants";
 import {
   formatCohortHeadline,
   formatInstitutionLine,
@@ -69,8 +69,14 @@ export default async function InternshipProgramDashboardPage() {
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
           <Link
-            href="/admin/internship/interns"
+            href="/admin/internship/portal"
             className="inline-flex min-h-11 items-center rounded-2xl bg-white px-4 text-sm font-black text-green-950"
+          >
+            Intern Portal
+          </Link>
+          <Link
+            href="/admin/internship/interns"
+            className="inline-flex min-h-11 items-center rounded-2xl border border-white/30 px-4 text-sm font-black !text-white"
           >
             Review interns
           </Link>
@@ -204,10 +210,9 @@ export default async function InternshipProgramDashboardPage() {
               dashboard.interns.map((intern) => {
                 const university = universityById.get(intern.universityId);
                 return (
-                  <Link
+                  <div
                     key={intern.id}
-                    href={`/admin/internship/interns/${intern.id}`}
-                    className="block rounded-2xl border border-slate-100 px-4 py-3 hover:border-emerald-200"
+                    className="rounded-2xl border border-slate-100 px-4 py-3"
                   >
                     <p className="font-black text-slate-950">{intern.fullName}</p>
                     <p className="text-xs font-semibold text-slate-500">
@@ -216,7 +221,21 @@ export default async function InternshipProgramDashboardPage() {
                       {" · "}
                       {internStatusLabel(intern.status)}
                     </p>
-                  </Link>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link
+                        href={internPortalPreviewPath(intern.id)}
+                        className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
+                      >
+                        Intern Portal
+                      </Link>
+                      <Link
+                        href={`/admin/internship/interns/${intern.id}`}
+                        className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900"
+                      >
+                        Employer review
+                      </Link>
+                    </div>
+                  </div>
                 );
               })
             ) : (

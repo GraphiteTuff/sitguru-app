@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { saveIntern } from "@/lib/internship/actions";
+import { internPortalPreviewPath } from "@/lib/internship/constants";
 import { internStatusLabel } from "@/lib/internship/labels";
 import {
   getActiveCohort,
@@ -47,17 +48,30 @@ export default async function InternshipInternsPage({
       <section className="grid gap-4 xl:grid-cols-12">
         <div className="xl:col-span-6 space-y-2">
           {interns.map((intern) => (
-            <Link
+            <div
               key={intern.id}
-              href={`/admin/internship/interns/${intern.id}`}
-              className="block rounded-2xl border border-emerald-100 bg-white px-4 py-4 shadow-sm"
+              className="rounded-2xl border border-emerald-100 bg-white px-4 py-4 shadow-sm"
             >
               <p className="font-black text-slate-950">{intern.fullName}</p>
               <p className="text-xs font-semibold text-slate-500">
                 {intern.email} · {internStatusLabel(intern.status)} ·{" "}
                 {intern.requiredHours != null ? `${intern.requiredHours} hours` : "hours unverified"}
               </p>
-            </Link>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  href={internPortalPreviewPath(intern.id)}
+                  className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
+                >
+                  Intern Portal
+                </Link>
+                <Link
+                  href={`/admin/internship/interns/${intern.id}`}
+                  className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 px-4 text-sm font-black text-emerald-900"
+                >
+                  Employer review
+                </Link>
+              </div>
+            </div>
           ))}
         </div>
 

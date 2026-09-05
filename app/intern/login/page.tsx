@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAdminIdentity } from "@/lib/admin/access";
 import { findInternByAccount } from "@/lib/internship/queries";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,8 @@ export default async function InternLoginPage({
       email: user.email,
     });
     if (intern) redirect("/intern");
+    const admin = await getAdminIdentity();
+    if (admin?.canAccessAdmin) redirect("/admin/internship/portal");
 
     return (
       <main className="mx-auto max-w-lg px-4 py-16">

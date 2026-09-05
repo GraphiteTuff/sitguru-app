@@ -9,7 +9,7 @@ import {
   matchRequirementForProgram,
   packetDocumentsForRequirement,
 } from "@/lib/internship/queries";
-import { INTERNSHIP_PROGRAM_NAME } from "@/lib/internship/constants";
+import { INTERNSHIP_PROGRAM_NAME, internPortalPreviewPath } from "@/lib/internship/constants";
 import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
 import { buildInternshipProcess } from "@/lib/internship/process";
 
@@ -65,6 +65,14 @@ export default async function InternshipInternDetailPage({
           </Link>{" "}
           with {workspace.intern.email}. Assignments and approvals sync both ways.
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href={internPortalPreviewPath(workspace.intern.id)}
+            className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
+          >
+            View intern portal
+          </Link>
+        </div>
       </div>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

@@ -336,7 +336,7 @@ const mobileQuickLinks = [
     label: "Internship Program",
     href: adminRoutes.internship,
     icon: BriefcaseBusiness,
-    description: "College intern growth dashboard",
+    description: "Intern portal and employer review",
     featured: false,
   },
   {
