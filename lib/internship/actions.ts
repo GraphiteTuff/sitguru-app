@@ -251,6 +251,10 @@ export async function saveIntern(formData: FormData) {
     semester: text(formData, "semester"),
     academicStartDate: text(formData, "academicStartDate") || null,
     academicEndDate: text(formData, "academicEndDate") || null,
+    studentId: text(formData, "studentId"),
+    studentEmail: text(formData, "studentEmail").toLowerCase(),
+    academicLevel: text(formData, "academicLevel"),
+    phone: text(formData, "phone"),
   };
 
   const snapshot = freezeAcademicProfile({
@@ -263,7 +267,10 @@ export async function saveIntern(formData: FormData) {
   const payload = {
     full_name: fullName,
     email,
-    phone: text(formData, "phone"),
+    student_id: internFields.studentId,
+    student_email: internFields.studentEmail,
+    phone: internFields.phone,
+    academic_level: internFields.academicLevel,
     cohort_id: cohortId,
     university_id: universityId,
     campus_id: campusId,

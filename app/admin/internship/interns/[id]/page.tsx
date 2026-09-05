@@ -10,6 +10,7 @@ import {
   packetDocumentsForRequirement,
 } from "@/lib/internship/queries";
 import { INTERNSHIP_PROGRAM_NAME, internPortalPreviewPath } from "@/lib/internship/constants";
+import { academicLevelLabel } from "@/lib/internship/labels";
 import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
 import { buildInternshipProcess } from "@/lib/internship/process";
 
@@ -54,6 +55,18 @@ export default async function InternshipInternDetailPage({
         <h1 className="mt-2 text-2xl font-black text-slate-950 sm:text-3xl">
           {workspace.intern.fullName}
         </h1>
+        <p className="mt-2 text-sm font-semibold text-slate-600">
+          {[
+            workspace.intern.academicLevel
+              ? academicLevelLabel(workspace.intern.academicLevel)
+              : "",
+            workspace.intern.studentId ? `Student ID ${workspace.intern.studentId}` : "",
+            workspace.intern.studentEmail,
+            workspace.intern.phone,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
         <p className="mt-2 text-sm font-semibold text-slate-600">
           {MARKET_GROWTH_PROJECT_NAME} · Week {process.weekNumber}: {process.deliverable.title}.
           Same Plan, Tasks, Campaigns, Metrics, and Review the intern sees at /intern.

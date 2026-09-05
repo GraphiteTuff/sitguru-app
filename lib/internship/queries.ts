@@ -220,6 +220,10 @@ export function freezeAcademicProfile(input: {
     | "semester"
     | "academicStartDate"
     | "academicEndDate"
+    | "studentId"
+    | "studentEmail"
+    | "academicLevel"
+    | "phone"
   >;
   requirement: AcademicRequirement | null;
 }): FrozenAcademicProfile {
@@ -240,6 +244,10 @@ export function freezeAcademicProfile(input: {
     semester: input.intern.semester,
     academicStartDate: input.intern.academicStartDate,
     academicEndDate: input.intern.academicEndDate,
+    studentId: input.intern.studentId,
+    studentEmail: input.intern.studentEmail,
+    academicLevel: input.intern.academicLevel,
+    phone: input.intern.phone,
     requirementId: input.requirement?.id || null,
     copiedAt: new Date().toISOString(),
   };

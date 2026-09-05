@@ -72,6 +72,16 @@ export const INTERNSHIP_PATH_TYPE_SLUGS = [
   "university_sponsored_project",
 ] as const;
 
+export const ACADEMIC_LEVELS = [
+  "freshman",
+  "sophomore",
+  "junior",
+  "senior",
+  "graduate",
+  "doctoral",
+  "other",
+] as const;
+
 export const INTERN_STATUSES = [
   "applicant",
   "accepted",

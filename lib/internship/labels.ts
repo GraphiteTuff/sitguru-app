@@ -88,6 +88,19 @@ export function internStatusLabel(status: string) {
   return map[status] || status;
 }
 
+export function academicLevelLabel(level: string) {
+  const map: Record<string, string> = {
+    freshman: "Freshman",
+    sophomore: "Sophomore",
+    junior: "Junior",
+    senior: "Senior",
+    graduate: "Graduate",
+    doctoral: "Doctoral",
+    other: "Other",
+  };
+  return map[level] || level;
+}
+
 export function taskStatusLabel(status: string) {
   const map: Record<string, string> = {
     todo: "To do",

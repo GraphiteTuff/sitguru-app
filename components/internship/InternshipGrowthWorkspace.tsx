@@ -18,6 +18,7 @@ import { ATTRIBUTION_RULE, METRIC_SOURCE_SYSTEMS } from "@/lib/internship/consta
 import {
   contributionLabel,
   internStatusLabel,
+  academicLevelLabel,
   metricSourceLabel,
 } from "@/lib/internship/labels";
 import {
@@ -119,6 +120,12 @@ export default function InternshipGrowthWorkspace({
             </h2>
             <p className="mt-2 text-sm font-semibold text-slate-600">
               {[
+                data.intern.academicLevel
+                  ? academicLevelLabel(data.intern.academicLevel)
+                  : "",
+                data.intern.studentId ? `Student ID ${data.intern.studentId}` : "",
+                data.intern.studentEmail,
+                data.intern.phone,
                 data.intern.courseCode,
                 data.intern.credits != null ? `${data.intern.credits} credits` : "",
                 data.intern.requiredHours != null

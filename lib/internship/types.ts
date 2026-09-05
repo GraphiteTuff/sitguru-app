@@ -113,7 +113,10 @@ export type InternshipIntern = {
   userId: string | null;
   fullName: string;
   email: string;
+  studentId: string;
+  studentEmail: string;
   phone: string;
+  academicLevel: string;
   cohortId: string;
   universityId: string;
   campusId: string | null;
@@ -260,6 +263,10 @@ export type FrozenAcademicProfile = {
   semester: string;
   academicStartDate: string | null;
   academicEndDate: string | null;
+  studentId: string;
+  studentEmail: string;
+  academicLevel: string;
+  phone: string;
   requirementId: string | null;
   copiedAt: string;
 };

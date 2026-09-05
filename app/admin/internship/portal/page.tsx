@@ -5,7 +5,7 @@ import {
   INTERNSHIP_ADMIN_PATH,
   internPortalPreviewPath,
 } from "@/lib/internship/constants";
-import { internStatusLabel } from "@/lib/internship/labels";
+import { internStatusLabel, academicLevelLabel } from "@/lib/internship/labels";
 import { getActiveCohort, listInterns } from "@/lib/internship/queries";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,15 @@ export default async function InternshipPortalAccessPage() {
               <div>
                 <p className="font-black text-slate-950">{intern.fullName}</p>
                 <p className="text-xs font-semibold text-slate-500">
-                  {intern.email} · {internStatusLabel(intern.status)}
+                  {[
+                    intern.studentId ? `ID ${intern.studentId}` : "",
+                    intern.studentEmail || intern.email,
+                    intern.phone,
+                    intern.academicLevel ? academicLevelLabel(intern.academicLevel) : "",
+                    internStatusLabel(intern.status),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">

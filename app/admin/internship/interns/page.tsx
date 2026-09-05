@@ -2,8 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { saveIntern } from "@/lib/internship/actions";
-import { internPortalPreviewPath } from "@/lib/internship/constants";
-import { internStatusLabel } from "@/lib/internship/labels";
+import { internPortalPreviewPath, ACADEMIC_LEVELS } from "@/lib/internship/constants";
+import { academicLevelLabel, internStatusLabel } from "@/lib/internship/labels";
 import {
   getActiveCohort,
   listInterns,
@@ -51,8 +51,16 @@ export default async function InternshipInternsPage({
             >
               <p className="font-black text-slate-950">{intern.fullName}</p>
               <p className="text-xs font-semibold text-slate-500">
-                {intern.email} · {internStatusLabel(intern.status)} ·{" "}
-                {intern.requiredHours != null ? `${intern.requiredHours} hours` : "hours unverified"}
+                {[
+                  intern.studentId ? `ID ${intern.studentId}` : "",
+                  intern.studentEmail || intern.email,
+                  intern.phone,
+                  intern.academicLevel ? academicLevelLabel(intern.academicLevel) : "",
+                  internStatusLabel(intern.status),
+                  intern.requiredHours != null ? `${intern.requiredHours} hours` : "hours unverified",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link
@@ -80,7 +88,16 @@ export default async function InternshipInternsPage({
             <input type="hidden" name="cohortId" value={cohort.id} />
           )}
           <input name="fullName" required placeholder="Student name" className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
-          <input name="email" type="email" required placeholder="Student email" className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
+          <input name="studentId" placeholder="Student ID" className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
+          <input name="studentEmail" type="email" placeholder="Student email" className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
+          <input name="email" type="email" required placeholder="SitGuru login email" className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
+          <input name="phone" type="tel" placeholder="Phone number" className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
+          <select name="academicLevel" className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold">
+            <option value="">Academic level</option>
+            {ACADEMIC_LEVELS.map((level) => (
+              <option key={level} value={level}>{academicLevelLabel(level)}</option>
+            ))}
+          </select>
           <InternshipRequirementChecker universities={universities} />
           <select name="pathType" className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold">
             {pathTypes.map((path) => (
