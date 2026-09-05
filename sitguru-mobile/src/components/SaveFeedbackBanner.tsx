@@ -251,7 +251,7 @@ function getPalette(tone: SaveFeedbackTone, isDark: boolean) {
     background: isDark ? '#0D3222' : '#ECF9F0',
     border: isDark ? '#2C7450' : '#A9DEBA',
     iconBackground: isDark ? '#154A31' : '#D6F2DF',
-    icon: isDark ? '#39D982' : '#087449',
+    icon: isDark ? '#4CD98A' : '#1B7A52',
     title: isDark ? '#F0FFF6' : '#075A39',
     text: isDark ? '#BFE2CC' : '#3C6855',
   };

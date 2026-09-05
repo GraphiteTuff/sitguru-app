@@ -6,6 +6,7 @@ import {
 
 import BubblePressable from '@/components/BubblePressable';
 import SocialAuthBrandIcon from '@/components/SocialAuthBrandIcon';
+import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 
 type SocialAuthButtonProps = {
@@ -58,7 +59,7 @@ export default function SocialAuthButton({
     >
       {loading ? (
         <ActivityIndicator
-          color={isApple ? '#FFFFFF' : '#087449'}
+          color={isApple ? '#FFFFFF' : SitGuruColors.primary}
           size="small"
         />
       ) : (
@@ -87,23 +88,23 @@ const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderColor: '#D7E0DA',
-    borderRadius: 17,
+    borderColor: SitGuruColors.border,
+    borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 11,
+    gap: 12,
     justifyContent: 'center',
-    minHeight: 53,
-    paddingHorizontal: 16,
+    minHeight: 56,
+    paddingHorizontal: 18,
   },
   appleButton: {
     backgroundColor: '#000000',
     borderColor: '#000000',
   },
   label: {
-    color: '#142019',
+    color: SitGuruColors.text,
     fontFamily: AppFonts.extraBold,
-    fontSize: 14,
+    fontSize: 16,
   },
   appleLabel: {
     color: '#FFFFFF',

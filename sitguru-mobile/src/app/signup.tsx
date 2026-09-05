@@ -28,6 +28,7 @@ import SitGuruScreen from '@/components/SitGuruScreen';
 import SocialAuthButton from '@/components/SocialAuthButton';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
+import { WORKSPACES } from '@/constants/workspaces';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 
@@ -318,6 +319,12 @@ export default function SignupScreen() {
       return;
     }
 
+    if (signupIntent) {
+      await supabase.auth.updateUser({
+        data: { signup_intent: signupIntent },
+      });
+    }
+
     setSuccess(
       `${provider === 'google' ? 'Google' : 'Apple'} sign-in successful. Opening your SitGuru setup…`,
     );
@@ -409,7 +416,12 @@ export default function SignupScreen() {
                   </Text>
                 </View>
 
-                <View style={styles.signupCard}>
+                <View
+                  style={[
+                    styles.signupCard,
+                    !isWebPreview && styles.signupCardFlat,
+                  ]}
+                >
                   {!isConfigured ? (
                     <View style={styles.warningCard}>
                       <LockKeyhole
@@ -654,9 +666,11 @@ export default function SignupScreen() {
                               >
                                 {option.label}
                               </Text>
-                              <Text style={styles.intentText}>
-                                {option.short}
-                              </Text>
+                              {isWebPreview ? (
+                                <Text style={styles.intentText}>
+                                  {option.short}
+                                </Text>
+                              ) : null}
                             </View>
                           </BubblePressable>
                         );
@@ -701,7 +715,12 @@ export default function SignupScreen() {
                   </View>
                 </View>
 
-                <View style={styles.loginCard}>
+                <View
+                  style={[
+                    styles.loginCard,
+                    !isWebPreview && styles.loginCardFlat,
+                  ]}
+                >
                   <Text style={styles.loginCardText}>
                     Already have an account?
                   </Text>
@@ -715,6 +734,21 @@ export default function SignupScreen() {
                     <Text style={styles.loginCardButtonText}>Log In</Text>
                   </BubblePressable>
                 </View>
+
+                <BubblePressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/login',
+                      params: { intent: 'admin' },
+                    })
+                  }
+                  style={styles.adminLink}
+                >
+                  <Text style={styles.adminLinkText}>
+                    SitGuru admin sign in
+                  </Text>
+                </BubblePressable>
 
                 <Text style={styles.legalText}>
                   By creating an account, you agree to SitGuru’s Terms and
@@ -943,6 +977,12 @@ const styles = StyleSheet.create({
     gap: 13,
     padding: 16,
   },
+  signupCardFlat: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    gap: 14,
+    padding: 0,
+  },
   dividerRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1024,14 +1064,14 @@ const styles = StyleSheet.create({
   },
   inputShell: {
     alignItems: 'center',
-    backgroundColor: SitGuruColors.background,
+    backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.border,
-    borderRadius: 17,
+    borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 9,
-    minHeight: 52,
-    paddingHorizontal: 13,
+    minHeight: 56,
+    paddingHorizontal: 14,
   },
   input: {
     color: SitGuruColors.text,
@@ -1050,18 +1090,23 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   intentGrid: {
-    gap: 7,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   intentCard: {
     alignItems: 'center',
-    backgroundColor: SitGuruColors.background,
+    backgroundColor: SitGuruColors.surface,
     borderColor: SitGuruColors.border,
-    borderRadius: 15,
+    borderRadius: 16,
     borderWidth: 1,
+    flexBasis: '48%',
     flexDirection: 'row',
-    gap: 9,
+    flexGrow: 1,
+    gap: 8,
+    minWidth: '46%',
     paddingHorizontal: 10,
-    paddingVertical: 9,
+    paddingVertical: 12,
   },
   intentCardActive: {
     backgroundColor: SitGuruColors.surfaceSoft,
@@ -1087,7 +1132,7 @@ const styles = StyleSheet.create({
   intentTitle: {
     color: SitGuruColors.text,
     fontFamily: AppFonts.extraBold,
-    fontSize: 11,
+    fontSize: 13,
   },
   intentTitleActive: {
     color: SitGuruColors.primary,
@@ -1100,12 +1145,12 @@ const styles = StyleSheet.create({
   createAccountButton: {
     alignItems: 'center',
     backgroundColor: SitGuruColors.primary,
-    borderRadius: 999,
+    borderRadius: 18,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    minHeight: 52,
-    paddingHorizontal: 17,
+    minHeight: 58,
+    paddingHorizontal: 20,
   },
   createAccountButtonDisabled: {
     opacity: 0.45,
@@ -1113,7 +1158,7 @@ const styles = StyleSheet.create({
   createAccountText: {
     color: '#FFFFFF',
     fontFamily: AppFonts.extraBold,
-    fontSize: 14,
+    fontSize: 17,
   },
   securityRow: {
     alignItems: 'flex-start',
@@ -1141,6 +1186,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 13,
   },
+  loginCardFlat: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    justifyContent: 'center',
+    paddingHorizontal: 0,
+    paddingVertical: 4,
+  },
   loginCardText: {
     color: SitGuruColors.text,
     fontFamily: AppFonts.bold,
@@ -1155,7 +1207,19 @@ const styles = StyleSheet.create({
   loginCardButtonText: {
     color: SitGuruColors.primary,
     fontFamily: AppFonts.extraBold,
-    fontSize: 12,
+    fontSize: 15,
+  },
+  adminLink: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingVertical: 8,
+  },
+  adminLinkText: {
+    color: SitGuruColors.textMuted,
+    fontFamily: AppFonts.bold,
+    fontSize: 14,
+    textDecorationLine: 'underline',
   },
   legalText: {
     color: SitGuruColors.textSoft,

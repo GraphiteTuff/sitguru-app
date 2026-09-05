@@ -582,33 +582,35 @@ function MarketingHomeScreen() {
                   until they accept.
                 </Text>
 
-                <View style={styles.heroButtonRow}>
-                  <BubblePressable
-                    accessibilityRole="button"
-                    onPress={() => openFindCare()}
-                    style={styles.heroPrimaryButton}
-                  >
-                    <Text style={styles.heroPrimaryButtonText}>
-                      Book care near you
-                    </Text>
-                    <ArrowRight color="#FFFFFF" size={18} strokeWidth={2.5} />
-                  </BubblePressable>
+                {isWebPreview ? (
+                  <View style={styles.heroButtonRow}>
+                    <BubblePressable
+                      accessibilityRole="button"
+                      onPress={() => openFindCare()}
+                      style={styles.heroPrimaryButton}
+                    >
+                      <Text style={styles.heroPrimaryButtonText}>
+                        Book care near you
+                      </Text>
+                      <ArrowRight color="#FFFFFF" size={18} strokeWidth={2.5} />
+                    </BubblePressable>
 
-                  <BubblePressable
-                    accessibilityRole="button"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/signup',
-                        params: { role: 'parent' },
-                      } as never)
-                    }
-                    style={styles.heroLoginButtonOnVideo}
-                  >
-                    <Text style={styles.heroLoginButtonOnVideoText}>
-                      Join free
-                    </Text>
-                  </BubblePressable>
-                </View>
+                    <BubblePressable
+                      accessibilityRole="button"
+                      onPress={() =>
+                        router.push({
+                          pathname: '/signup',
+                          params: { role: 'parent' },
+                        } as never)
+                      }
+                      style={styles.heroLoginButtonOnVideo}
+                    >
+                      <Text style={styles.heroLoginButtonOnVideoText}>
+                        Join free
+                      </Text>
+                    </BubblePressable>
+                  </View>
+                ) : null}
               </View>
             </View>
           </View>

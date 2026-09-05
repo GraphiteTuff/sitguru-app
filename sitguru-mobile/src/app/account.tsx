@@ -43,7 +43,9 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import SocialAuthButton from '@/components/SocialAuthButton';
 import { AppFonts } from '@/constants/fonts';
+import { getMobileChromePalette } from '@/constants/mobile-palette';
 import {
   setThemePreference,
   useThemePreference,
@@ -106,6 +108,10 @@ export default function AccountScreen() {
     profileLoading,
     profileError,
     reloadProfileAndRoles,
+    signInWithApple,
+    signInWithGoogle,
+    socialLoading,
+    isConfigured,
   } = useAuth();
 
   const isWebPreview = Platform.OS === 'web';
@@ -433,43 +439,54 @@ export default function AccountScreen() {
                   </View>
                 </View>
 
-                <View style={styles.profileHero}>
+                <View
+                  style={[
+                    styles.profileHero,
+                    !isAuthenticated && !isWebPreview
+                      ? styles.profileHeroGuestFlat
+                      : null,
+                  ]}
+                >
                   <View style={styles.profileTopRow}>
                     <Avatar
                       fallback={initials(profileName)}
                       imageUrl={avatarUrl}
                       palette={palette}
-                      size={66}
+                      size={isAuthenticated ? 66 : 52}
                     />
 
                     <View style={styles.profileHeroCopy}>
                       <Text style={styles.profileGreeting}>
-                        Hi, {firstName}.
+                        {isAuthenticated
+                          ? `Hi, ${firstName}.`
+                          : 'Sign in to SitGuru'}
                       </Text>
                       <Text style={styles.profileEmail}>
                         {isAuthenticated
                           ? user?.email || 'Signed in'
-                          : 'Guest preview'}
+                          : 'Bookings, messages, and payments unlock after login'}
                       </Text>
 
-                      <View style={styles.statusRow}>
-                        <View style={styles.statusPill}>
-                          <View style={styles.statusDot} />
-                          <Text style={styles.statusPillText}>
-                            {statusLabel}
-                          </Text>
-                        </View>
+                      {isAuthenticated ? (
+                        <View style={styles.statusRow}>
+                          <View style={styles.statusPill}>
+                            <View style={styles.statusDot} />
+                            <Text style={styles.statusPillText}>
+                              {statusLabel}
+                            </Text>
+                          </View>
 
-                        <View style={styles.rolePillPrimary}>
-                          <Text style={styles.rolePillPrimaryText}>
-                            {roleLabel(currentRole)}
-                          </Text>
+                          <View style={styles.rolePillPrimary}>
+                            <Text style={styles.rolePillPrimaryText}>
+                              {roleLabel(currentRole)}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
+                      ) : null}
                     </View>
                   </View>
 
-                  {location ? (
+                  {isAuthenticated && location ? (
                     <View style={styles.locationRow}>
                       <MapPin
                         color={palette.primary}
@@ -491,7 +508,12 @@ export default function AccountScreen() {
                     </View>
                   ) : null}
 
-                  <View style={styles.profileHeroActions}>
+                  <View
+                    style={[
+                      styles.profileHeroActions,
+                      !isAuthenticated && styles.profileHeroActionsStack,
+                    ]}
+                  >
                     {isAuthenticated ? (
                       <>
                         <ActionButton
@@ -539,15 +561,47 @@ export default function AccountScreen() {
                       </>
                     ) : (
                       <>
+                        {Platform.OS === 'ios' && isConfigured ? (
+                          <SocialAuthButton
+                            disabled={loading || Boolean(socialLoading)}
+                            loading={socialLoading === 'apple'}
+                            mode="login"
+                            onPress={() => {
+                              void (async () => {
+                                const result = await signInWithApple();
+                                if (!result.error && !result.cancelled) {
+                                  router.replace('/role-selection');
+                                }
+                              })();
+                            }}
+                            provider="apple"
+                          />
+                        ) : null}
+                        {isConfigured ? (
+                          <SocialAuthButton
+                            disabled={loading || Boolean(socialLoading)}
+                            loading={socialLoading === 'google'}
+                            mode="login"
+                            onPress={() => {
+                              void (async () => {
+                                const result = await signInWithGoogle();
+                                if (!result.error && !result.cancelled) {
+                                  router.replace('/role-selection');
+                                }
+                              })();
+                            }}
+                            provider="google"
+                          />
+                        ) : null}
                         <ActionButton
                           icon={
                             <UserRound
                               color="#FFFFFF"
-                              size={17}
+                              size={18}
                               strokeWidth={2.4}
                             />
                           }
-                          label="Log in"
+                          label="Log in with email"
                           onPress={() => router.push('/login')}
                           primary
                           styles={styles}
@@ -557,7 +611,7 @@ export default function AccountScreen() {
                           icon={
                             <UsersRound
                               color={palette.primary}
-                              size={17}
+                              size={18}
                               strokeWidth={2.4}
                             />
                           }
@@ -1407,22 +1461,23 @@ function initials(name: string) {
 }
 
 function getPalette(isDark: boolean) {
+  const chrome = getMobileChromePalette(isDark);
   return {
-    avatarBackground: isDark ? '#173527' : '#EEF5EE',
-    avatarBorder: isDark ? '#2E6C4B' : '#FFFFFF',
-    background: isDark ? '#06140F' : '#FFF9F1',
-    border: isDark ? '#234B38' : '#EADDCB',
-    danger: isDark ? '#FF8F7A' : '#B43D2F',
-    muted: isDark ? '#9DB0A5' : '#738078',
-    navMuted: isDark ? '#9BAAA1' : '#748079',
-    primary: isDark ? '#39D982' : '#087449',
-    primaryDark: isDark ? '#1C9F5E' : '#075D3B',
-    primarySoft: isDark ? '#123E2A' : '#E4F5E9',
-    surface: isDark ? '#0B2118' : '#FFFEFA',
-    surfaceSoft: isDark ? '#102D21' : '#FFF6E9',
-    text: isDark ? '#E8EEE9' : '#27483E',
-    title: isDark ? '#FFF5E8' : '#123F31',
-    warning: isDark ? '#F4C76A' : '#A86900',
+    avatarBackground: chrome.avatarBg,
+    avatarBorder: chrome.avatarBorder,
+    background: chrome.background,
+    border: chrome.border,
+    danger: chrome.danger,
+    muted: chrome.muted,
+    navMuted: chrome.navMuted,
+    primary: chrome.primary,
+    primaryDark: chrome.primaryDark,
+    primarySoft: chrome.primarySoft,
+    surface: chrome.surface,
+    surfaceSoft: chrome.surfaceSoft,
+    text: chrome.text,
+    title: chrome.title,
+    warning: chrome.warning,
     warningBackground: isDark ? '#3B2D12' : '#FFF5DF',
   };
 }
@@ -1671,6 +1726,14 @@ function createStyles(isDark: boolean, isTablet: boolean) {
       shadowOpacity: isDark ? 0.2 : 0.07,
       shadowRadius: 16,
     },
+    profileHeroGuestFlat: {
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      gap: 14,
+      paddingHorizontal: 0,
+      paddingVertical: 4,
+      shadowOpacity: 0,
+    },
     profileTopRow: {
       alignItems: 'center',
       flexDirection: 'row',
@@ -1764,18 +1827,23 @@ function createStyles(isDark: boolean, isTablet: boolean) {
       flexDirection: 'row',
       gap: 8,
     },
+    profileHeroActionsStack: {
+      flexDirection: 'column',
+      gap: 10,
+    },
     actionButton: {
       alignItems: 'center',
       backgroundColor: palette.surface,
       borderColor: palette.border,
-      borderRadius: 14,
+      borderRadius: 16,
       borderWidth: 1,
       flex: 1,
       flexDirection: 'row',
-      gap: 6,
+      gap: 8,
       justifyContent: 'center',
-      minHeight: 46,
-      paddingHorizontal: 10,
+      minHeight: 54,
+      paddingHorizontal: 14,
+      width: '100%',
     },
     actionButtonPrimary: {
       backgroundColor: palette.primary,
@@ -1784,7 +1852,7 @@ function createStyles(isDark: boolean, isTablet: boolean) {
     actionButtonText: {
       color: palette.primary,
       fontFamily: AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 15,
     },
     actionButtonTextPrimary: {
       color: '#FFFFFF',
