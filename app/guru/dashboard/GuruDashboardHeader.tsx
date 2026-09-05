@@ -11,6 +11,7 @@ import {
   resolveAuthorizedRolesFromProfile,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
+import { fetchInternPortalAccess } from "@/lib/internship/portal-access";
 import {
   Bell,
   BookOpen,
@@ -321,7 +322,7 @@ export default function GuruDashboardHeader({
         );
       }
 
-      const [{ data: profileData }, { data: roleRows }, { data: ambassadorRow }] =
+      const [{ data: profileData }, { data: roleRows }, { data: ambassadorRow }, hasInternRecord] =
         await Promise.all([
           supabase
             .from("profiles")
@@ -335,6 +336,7 @@ export default function GuruDashboardHeader({
             .eq("user_id", user.id)
             .limit(1)
             .maybeSingle(),
+          fetchInternPortalAccess(),
         ]);
 
       if (profileData) {
@@ -375,6 +377,7 @@ export default function GuruDashboardHeader({
         email: profileEmail || user.email,
         hasGuruRecord: Boolean(guruData),
         hasAmbassadorRecord: Boolean(ambassadorRow?.id),
+        hasInternRecord,
       });
 
       // Guru header viewers always retain the guru track in their session mask.

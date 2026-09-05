@@ -10,6 +10,7 @@ export type DashboardSwitchRole =
   | "parent"
   | "guru"
   | "ambassador"
+  | "intern"
   | "admin";
 
 export type DashboardSwitchTarget = {
@@ -43,6 +44,13 @@ export const DASHBOARD_SWITCH_TARGETS: readonly DashboardSwitchTarget[] = [
     helper: "Referrals, training, rewards, and outreach",
   },
   {
+    id: "intern",
+    label: "Switch to Intern",
+    shortLabel: "Intern",
+    path: "/intern",
+    helper: "Internship portal, weekly tasks, and growth work",
+  },
+  {
     id: "admin",
     label: "Admin Dashboard",
     shortLabel: "Admin",
@@ -55,10 +63,19 @@ export type DashboardAccessFlags = {
   parent?: boolean;
   guru?: boolean;
   ambassador?: boolean;
+  intern?: boolean;
   admin?: boolean;
 };
 
 const ROLE_ORDER: DashboardSwitchRole[] = [
+  "parent",
+  "guru",
+  "ambassador",
+  "intern",
+  "admin",
+];
+
+const SUPER_USER_SWITCH_ROLES: DashboardSwitchRole[] = [
   "parent",
   "guru",
   "ambassador",
@@ -99,6 +116,10 @@ function expandRoleToken(value: unknown): DashboardSwitchRole[] {
     return uniqueOrderedRoles(roles);
   }
 
+  if (raw === "intern" || raw === "internship" || raw === "internship_intern") {
+    return ["intern"];
+  }
+
   if (
     raw.includes("founder") ||
     raw === "owner" ||
@@ -106,7 +127,7 @@ function expandRoleToken(value: unknown): DashboardSwitchRole[] {
     raw.includes("super_admin") ||
     raw.includes("super_user")
   ) {
-    return [...ROLE_ORDER];
+    return [...SUPER_USER_SWITCH_ROLES];
   }
 
   if (raw.includes("admin")) {
@@ -182,6 +203,7 @@ export function accessFlagsFromAuthorizedRoles(
     parent: roles.includes("parent"),
     guru: roles.includes("guru"),
     ambassador: roles.includes("ambassador"),
+    intern: roles.includes("intern"),
     admin: roles.includes("admin"),
   };
 }
@@ -194,6 +216,7 @@ export function authorizedRolesFromAccessFlags(
   if (access.parent) roles.push("parent");
   if (access.guru) roles.push("guru");
   if (access.ambassador) roles.push("ambassador");
+  if (access.intern) roles.push("intern");
   if (access.admin) roles.push("admin");
   return roles;
 }
@@ -209,6 +232,7 @@ export function resolveAuthorizedRolesFromProfile(input: {
   email?: string | null;
   hasGuruRecord?: boolean;
   hasAmbassadorRecord?: boolean;
+  hasInternRecord?: boolean;
 }): DashboardSwitchRole[] {
   const profile = input.profile || {};
   const metadata = input.metadata || {};
@@ -218,11 +242,13 @@ export function resolveAuthorizedRolesFromProfile(input: {
     (typeof metadata.email === "string" ? metadata.email : null);
 
   if (isSitGuruSuperUser(email)) {
-    return [...ROLE_ORDER];
+    const roles = [...SUPER_USER_SWITCH_ROLES];
+    if (input.hasInternRecord) roles.splice(3, 0, "intern");
+    return uniqueOrderedRoles(roles);
   }
 
   if (isFounderPersonalMarketplaceEmail(email)) {
-    return ["parent", "guru", "ambassador"];
+    return ["parent", "guru", "ambassador", "intern"];
   }
 
   const explicit = uniqueOrderedRoles([
@@ -239,6 +265,9 @@ export function resolveAuthorizedRolesFromProfile(input: {
     }
     if (input.hasAmbassadorRecord && !withRecords.includes("ambassador")) {
       withRecords.push("ambassador");
+    }
+    if (input.hasInternRecord && !withRecords.includes("intern")) {
+      withRecords.push("intern");
     }
     return uniqueOrderedRoles(withRecords);
   }
@@ -271,6 +300,7 @@ export function resolveAuthorizedRolesFromProfile(input: {
   }
   if (input.hasGuruRecord) derived.push("guru");
   if (input.hasAmbassadorRecord) derived.push("ambassador");
+  if (input.hasInternRecord) derived.push("intern");
 
   if (derived.includes("admin") && !derived.includes("parent")) {
     derived.push("parent");
@@ -303,6 +333,7 @@ export function resolveDashboardRoleFromPath(
 ): DashboardSwitchRole | null {
   const path = String(pathname || "");
   if (path.startsWith("/admin")) return "admin";
+  if (path.startsWith("/intern")) return "intern";
   if (path.startsWith("/ambassador")) return "ambassador";
   if (path.startsWith("/guru")) return "guru";
   if (

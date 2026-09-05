@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
+import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
 import { findInternByAccount } from "@/lib/internship/queries";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export default async function InternLoginPage({
     if (intern) redirect("/intern");
     const admin = await getAdminIdentity();
     if (admin?.canAccessAdmin) redirect("/admin/internship/portal");
+    if (isFounderPersonalMarketplaceEmail(user.email)) redirect("/intern");
 
     return (
       <main className="mx-auto max-w-lg px-4 py-16">

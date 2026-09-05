@@ -12,6 +12,7 @@ import {
   resolveDashboardRoleFromPath,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
+import { fetchInternPortalAccess } from "@/lib/internship/portal-access";
 import {
   normalizePetParentAvatarUrl,
   resolvePetParentAvatarUrl,
@@ -50,7 +51,7 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
       }
 
       const email = user.email || "";
-      const [{ data: profile }, { data: roleRows }, { data: guru }, { data: ambassador }] =
+      const [{ data: profile }, { data: roleRows }, { data: guru }, { data: ambassador }, hasInternRecord] =
         await Promise.all([
           supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
           supabase.from("user_roles").select("role").eq("user_id", user.id),
@@ -70,6 +71,7 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
             .select("id")
             .eq("user_id", user.id)
             .maybeSingle(),
+          fetchInternPortalAccess(),
         ]);
 
       const authorizedRoles = resolveAuthorizedRolesFromProfile({
@@ -84,6 +86,7 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
         email,
         hasGuruRecord: Boolean(guru?.id),
         hasAmbassadorRecord: Boolean(ambassador?.id),
+        hasInternRecord,
       });
 
       const firstLast = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim();
@@ -143,19 +146,23 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
       ? "SitGuru Guru"
       : currentRole === "ambassador"
         ? "SitGuru Ambassador"
-        : currentRole === "parent"
-          ? "SitGuru Pet Parent"
-          : currentRole === "admin"
-            ? "SitGuru Admin"
-            : "SitGuru";
+        : currentRole === "intern"
+          ? "SitGuru Intern"
+          : currentRole === "parent"
+            ? "SitGuru Pet Parent"
+            : currentRole === "admin"
+              ? "SitGuru Admin"
+              : "SitGuru";
   const dashboardHref =
     currentRole === "guru"
       ? "/guru/dashboard"
       : currentRole === "ambassador"
         ? "/ambassador/dashboard"
-        : currentRole === "admin"
-          ? "/admin"
-          : "/customer/dashboard";
+        : currentRole === "intern"
+          ? "/intern"
+          : currentRole === "admin"
+            ? "/admin"
+            : "/customer/dashboard";
 
   async function handleLogout() {
     setOpen(false);

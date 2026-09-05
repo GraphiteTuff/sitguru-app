@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
+import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
 import InternshipGrowthWorkspace from "@/components/internship/InternshipGrowthWorkspace";
 import InternshipBackToProgram from "@/components/internship/InternshipBackToProgram";
 import { INTERNSHIP_ADMIN_PATH, INTERNSHIP_PROGRAM_NAME } from "@/lib/internship/constants";
@@ -47,6 +48,50 @@ export default async function InternPortalPage({
 
   if (!intern) {
     if (admin?.canAccessAdmin) redirect(`${INTERNSHIP_ADMIN_PATH}/portal`);
+    if (isFounderPersonalMarketplaceEmail(user.email)) {
+      return (
+        <main className="mx-auto w-full max-w-3xl space-y-5 px-4 py-5 sm:px-6 sm:py-8">
+          <section
+            className="public-dark-section rounded-[1.75rem] p-5 sm:p-7"
+            data-brand-green
+            style={{ background: "#0D5C3A" }}
+          >
+            <p className="text-xs font-black uppercase tracking-[0.24em] !text-white">
+              Intern portal
+            </p>
+            <h1 className="mt-3 text-2xl font-black !text-white sm:text-3xl">
+              {INTERNSHIP_PROGRAM_NAME}
+            </h1>
+            <p className="mt-2 text-sm font-semibold !text-white/90">
+              This SitGuru login can open Intern Portal alongside Pet Parent,
+              Guru, and Ambassador. Employer HQ still needs to assign the intern
+              record before weekly tasks appear.
+            </p>
+          </section>
+          <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-semibold leading-6 text-slate-600">
+              Use Switch Portal in the account menu to go back to Pet Parent,
+              Guru, or Ambassador. After Employer HQ assigns this email, reload
+              this page to open the live intern plan.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                href="/customer/dashboard"
+                className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
+              >
+                Pet Parent dashboard
+              </Link>
+              <Link
+                href="/guru/dashboard"
+                className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-900"
+              >
+                Guru dashboard
+              </Link>
+            </div>
+          </section>
+        </main>
+      );
+    }
     redirect("/intern/login?error=This account is not assigned to the SitGuru Internship Program.");
   }
 

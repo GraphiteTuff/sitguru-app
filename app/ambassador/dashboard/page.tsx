@@ -44,6 +44,7 @@ import {
   resolveAuthorizedRolesFromProfile,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
+import { findInternByAccount } from "@/lib/internship/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -1010,7 +1011,7 @@ export default async function AmbassadorDashboardPage() {
     redirect("/customer/dashboard");
   }
 
-  const [profileResult, roleRowsResult, guruAccessResult] = await Promise.all([
+  const [profileResult, roleRowsResult, guruAccessResult, internRecord] = await Promise.all([
     supabaseAdmin
       .from("profiles")
       .select("*")
@@ -1018,6 +1019,7 @@ export default async function AmbassadorDashboardPage() {
       .maybeSingle(),
     supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
     supabaseAdmin.from("gurus").select("id").eq("user_id", user.id).limit(1),
+    findInternByAccount({ userId: user.id, email: user.email }),
   ]);
 
   const ambassadorRecord = ambassador;
@@ -1038,6 +1040,7 @@ export default async function AmbassadorDashboardPage() {
     email: user.email,
     hasGuruRecord: Boolean(guruAccessResult.data?.length),
     hasAmbassadorRecord: Boolean(ambassadorRecord.id),
+    hasInternRecord: Boolean(internRecord),
   });
 
   const withAmbassadorTrack = authorizedRoles.includes("ambassador")

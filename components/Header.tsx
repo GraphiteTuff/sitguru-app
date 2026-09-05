@@ -23,13 +23,14 @@ import {
   resolveAuthorizedRolesFromProfile,
   type DashboardSwitchRole,
 } from "@/lib/dashboard/role-switch";
+import { fetchInternPortalAccess } from "@/lib/internship/portal-access";
 import { VETERANS_MILITARY_FAMILIES_PROGRAM } from "@/lib/programs/veterans-military-families";
 import {
   normalizePetParentAvatarUrl,
   resolvePetParentAvatarUrl,
 } from "@/lib/pet-parent-avatar";
 
-type HeaderMode = "public" | "customer" | "guru" | "ambassador" | "admin";
+type HeaderMode = "public" | "customer" | "guru" | "ambassador" | "intern" | "admin";
 
 type HeaderUser = {
   id?: string | null;
@@ -138,6 +139,10 @@ const guruNavLinks: NavLink[] = [
   { label: "Earnings", href: "/guru/dashboard/earnings" },
 ];
 
+const internNavLinks: NavLink[] = [
+  { label: "Intern Portal", href: "/intern" },
+];
+
 const ambassadorNavLinks: NavLink[] = [
   { label: "Dashboard", href: "/ambassador/dashboard" },
   { label: "Referrals", href: "/ambassador/dashboard/referrals" },
@@ -244,6 +249,7 @@ function getHeaderMode({
   const path = pathname || "";
   if (!isLoggedIn) return "public";
   if (path.startsWith("/admin")) return "admin";
+  if (path.startsWith("/intern")) return "intern";
   if (path.startsWith("/ambassador")) return "ambassador";
   if (
     path.startsWith("/guru") ||
@@ -414,6 +420,7 @@ function headerModeToSwitchRole(
   if (headerMode === "customer") return "parent";
   if (headerMode === "guru") return "guru";
   if (headerMode === "ambassador") return "ambassador";
+  if (headerMode === "intern") return "intern";
   if (headerMode === "admin") return "admin";
   return null;
 }
@@ -500,8 +507,12 @@ export default function Header({ user = null }: HeaderProps) {
               .neq("status", "archived")
               .maybeSingle();
 
+        const [ambassadorResult, hasInternRecord] = await Promise.all([
+          ambassadorQuery,
+          fetchInternPortalAccess(),
+        ]);
         const { data: ambassadorData, error: ambassadorError } =
-          await ambassadorQuery;
+          ambassadorResult;
         if (!mounted) return;
 
         const profile = !profileError
@@ -544,6 +555,7 @@ export default function Header({ user = null }: HeaderProps) {
           email: activeEmail,
           hasGuruRecord: Boolean(guru?.id),
           hasAmbassadorRecord: Boolean(ambassador?.id),
+          hasInternRecord,
         });
 
         const accessFlags = accessFlagsFromAuthorizedRoles(authorizedRoles);
@@ -639,6 +651,7 @@ export default function Header({ user = null }: HeaderProps) {
   const isCustomer = headerMode === "customer";
   const isGuru = headerMode === "guru";
   const isAmbassador = headerMode === "ambassador";
+  const isIntern = headerMode === "intern";
   const isAdmin = headerMode === "admin";
 
   const authorizedRoles = activeUser?.authorizedRoles || [];
@@ -646,11 +659,12 @@ export default function Header({ user = null }: HeaderProps) {
 
   const navLinks = useMemo(() => {
     if (isAdmin) return adminNavLinks;
+    if (isIntern) return internNavLinks;
     if (isAmbassador) return ambassadorNavLinks;
     if (isGuru) return guruNavLinks;
     if (isCustomer) return customerNavLinks;
     return publicNavLinks;
-  }, [isAdmin, isAmbassador, isCustomer, isGuru]);
+  }, [isAdmin, isAmbassador, isCustomer, isGuru, isIntern]);
 
   const bookingsHref = isGuru
     ? "/guru/dashboard/bookings"
@@ -665,7 +679,9 @@ export default function Header({ user = null }: HeaderProps) {
       ? "SitGuru Admin"
       : isAmbassador
         ? "SitGuru Ambassador"
-        : "SitGuru Pet Parent";
+        : isIntern
+          ? "SitGuru Intern"
+          : "SitGuru Pet Parent";
 
   const logoHref = "/";
   const userName = activeUser?.name || (isAdmin ? "SitGuru Admin" : "My Account");
@@ -697,6 +713,8 @@ export default function Header({ user = null }: HeaderProps) {
             href: "/ambassador/dashboard/onboarding-packet",
           },
         ]
+      : isIntern
+        ? [{ label: "Intern Portal", href: "/intern" }]
       : isAdmin
         ? [
             { label: "Dashboard", href: "/admin" },
@@ -726,6 +744,7 @@ export default function Header({ user = null }: HeaderProps) {
     if (href === "/guru/dashboard") return path === "/guru/dashboard";
     if (href === "/ambassador/dashboard")
       return path === "/ambassador/dashboard";
+    if (href === "/intern") return path === "/intern" || path.startsWith("/intern/");
     if (href === "/admin") return path === "/admin";
     const aliases = getActiveAliases(href);
     return aliases.some((alias) => pathMatches(path, alias));
