@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import InternshipPlaybook from "@/components/internship/InternshipPlaybook";
@@ -12,9 +11,6 @@ export default async function InternshipPlaybookPage() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-5 pb-8">
-      <Link href="/admin/internship" className="text-xs font-black text-emerald-800">
-        Internship Program
-      </Link>
       <div>
         <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-800">
           Educational structure · any university

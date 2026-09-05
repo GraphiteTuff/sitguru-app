@@ -34,9 +34,6 @@ export default async function InternshipInternsPage({
 
   return (
     <main className="mx-auto max-w-6xl space-y-5 pb-8">
-      <Link href="/admin/internship" className="text-xs font-black text-emerald-800">
-        Internship Program
-      </Link>
       <h1 className="text-3xl font-black text-slate-950">Interns</h1>
       <p className="max-w-3xl text-sm font-semibold text-slate-600">
         Each intern keeps a frozen academic profile for their own university. Do not

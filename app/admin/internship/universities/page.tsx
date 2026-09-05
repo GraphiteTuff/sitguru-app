@@ -51,10 +51,7 @@ export default async function InternshipUniversitiesPage({
     <main className="mx-auto max-w-6xl space-y-5 pb-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/admin/internship" className="text-xs font-black text-emerald-800">
-            Internship Program
-          </Link>
-          <h1 className="mt-2 text-3xl font-black text-slate-950">University Directory</h1>
+          <h1 className="text-3xl font-black text-slate-950">University Directory</h1>
           <p className="mt-2 max-w-3xl text-sm font-semibold text-slate-600">
             Add any eligible college. A Student Institution is where the intern attends.
             A University Partner is only a school with a real SitGuru relationship.

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
 import InternshipGrowthWorkspace from "@/components/internship/InternshipGrowthWorkspace";
+import InternshipBackToProgram from "@/components/internship/InternshipBackToProgram";
 import { INTERNSHIP_ADMIN_PATH, INTERNSHIP_PROGRAM_NAME } from "@/lib/internship/constants";
 import {
   findInternByAccount,
@@ -60,18 +61,13 @@ export default async function InternPortalPage({
   return (
     <main className="mx-auto w-full max-w-6xl space-y-5 px-4 py-5 sm:px-6 sm:py-6 lg:pb-10">
       {preview ? (
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-sm font-semibold text-amber-950">
-            Employer HQ preview of {workspace.intern.fullName}’s Intern Portal.
-            This is the student view. Grade and approve from Employer review.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={INTERNSHIP_ADMIN_PATH}
-              className="inline-flex min-h-11 items-center rounded-2xl border border-amber-300 bg-white px-4 text-xs font-black text-amber-950"
-            >
-              Internship Program
-            </Link>
+        <section className="space-y-3">
+          <InternshipBackToProgram />
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-950">
+              Employer HQ preview of {workspace.intern.fullName}’s Intern Portal.
+              This is the student view. Grade and approve from Employer review.
+            </p>
             <Link
               href={`${INTERNSHIP_ADMIN_PATH}/interns/${intern.id}`}
               className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-xs font-black !text-white"

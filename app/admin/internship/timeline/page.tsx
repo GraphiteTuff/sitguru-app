@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import InternshipTimelineBoard from "@/components/internship/InternshipTimelineBoard";
@@ -22,9 +21,6 @@ export default async function InternshipTimelinePage({
 
   return (
     <main className="mx-auto max-w-6xl space-y-5 pb-8">
-      <Link href="/admin/internship" className="text-xs font-black text-emerald-800">
-        Internship Program
-      </Link>
       <div>
         <h1 className="text-3xl font-black text-slate-950">
           Spring 2027 execution timeline

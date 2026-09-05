@@ -23,9 +23,6 @@ export default async function InternshipPortalAccessPage() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-5 px-4 pb-8">
-      <Link href={INTERNSHIP_ADMIN_PATH} className="text-xs font-black text-emerald-800">
-        Internship Program
-      </Link>
       <h1 className="text-3xl font-black text-slate-950">Intern Portal</h1>
       <p className="max-w-3xl text-sm font-semibold text-slate-600">
         Open the student Intern Portal from Employer HQ. You will see the intern’s
