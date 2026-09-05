@@ -13,6 +13,7 @@ import {
   linkInternUserId,
 } from "@/lib/internship/queries";
 import { lookupProfileAvatarForUser } from "@/lib/internship/avatar";
+import { listInternPromoteEvents } from "@/lib/internship/intern-promote-events";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -116,6 +117,8 @@ export default async function InternPortalPage({
   const workspace = await getInternWorkspace(intern.id);
   if (!workspace) redirect("/intern/login");
 
+  const promoteEvents = await listInternPromoteEvents();
+
   return (
     <main className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 sm:max-w-5xl sm:px-6 sm:py-6">
       {preview ? (
@@ -136,6 +139,7 @@ export default async function InternPortalPage({
       ) : null}
       <InternStudentDashboard
         data={workspace}
+        events={promoteEvents}
         preview={preview}
         notice={
           ok

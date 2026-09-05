@@ -2,19 +2,28 @@
 
 import { useMemo, useState } from "react";
 import {
+  BarChart3,
   CalendarDays,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  GraduationCap,
   Home,
+  Share2,
 } from "lucide-react";
 import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipAssignmentReview from "@/components/internship/InternshipAssignmentReview";
 import InternshipKpiLetterBoard from "@/components/internship/InternshipKpiLetterBoard";
-import { saveWeeklyReview } from "@/lib/internship/actions";
-import { internStatusLabel } from "@/lib/internship/labels";
+import InternStudentTools from "@/components/internship/InternStudentTools";
+import { saveInternCampaign, saveInternContent, saveInternMetric, saveWeeklyReview } from "@/lib/internship/actions";
+import { ATTRIBUTION_RULE, METRIC_SOURCE_SYSTEMS } from "@/lib/internship/constants";
+import { internStatusLabel, metricSourceLabel } from "@/lib/internship/labels";
+import {
+  INTERN_HOME_TOOLS,
+  INTERN_SOCIAL_PLATFORMS,
+  type InternHomeToolId,
+  type InternPromoteEvent,
+} from "@/lib/internship/intern-tools";
 import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
 import { buildInternshipProcess } from "@/lib/internship/process";
 import {
@@ -28,10 +37,11 @@ const TABS = [
   { id: "home", label: "Home", icon: Home },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "work", label: "Work", icon: ClipboardList },
-  { id: "grades", label: "Grades", icon: GraduationCap },
+  { id: "metrics", label: "Metrics", icon: BarChart3 },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
+type WorkFilter = "all" | "tasks" | "content" | "campaigns";
 
 function toDateKey(value: Date) {
   const year = value.getFullYear();
@@ -62,38 +72,72 @@ function kindLabel(kind: string) {
   return "Check-in";
 }
 
+function Field({
+  name,
+  label,
+  placeholder,
+  required,
+  type = "text",
+}: {
+  name: string;
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  type?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+        {label}
+      </span>
+      <input
+        name={name}
+        type={type}
+        required={required}
+        placeholder={placeholder}
+        className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold text-slate-950"
+      />
+    </label>
+  );
+}
+
 export default function InternStudentDashboard({
   data,
+  events = [],
   notice,
   preview = false,
 }: {
   data: InternshipWorkspaceData;
+  events?: InternPromoteEvent[];
   notice?: { kind: "ok" | "error"; message: string } | null;
   preview?: boolean;
 }) {
   const process = useMemo(() => buildInternshipProcess(data), [data]);
-  const events = useMemo(() => internCalendarEvents(data), [data]);
+  const calendarEvents = useMemo(() => internCalendarEvents(data), [data]);
   const firstName = internFirstName(data.intern.fullName);
   const todayKey = toDateKey(new Date());
   const [tab, setTab] = useState<TabId>("home");
+  const [tool, setTool] = useState<InternHomeToolId | null>(null);
+  const [workFilter, setWorkFilter] = useState<WorkFilter>("all");
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(todayKey);
 
   const eventsByDate = useMemo(() => {
-    const map = new Map<string, typeof events>();
-    for (const event of events) {
+    const map = new Map<string, typeof calendarEvents>();
+    for (const event of calendarEvents) {
       const list = map.get(event.date) || [];
       list.push(event);
       map.set(event.date, list);
     }
     return map;
-  }, [events]);
+  }, [calendarEvents]);
 
   const selectedEvents = eventsByDate.get(selectedDate) || [];
-  const upcoming = events.filter((event) => event.date >= todayKey).slice(0, 4);
+  const upcoming = calendarEvents.filter((event) => event.date >= todayKey).slice(0, 4);
   const openWork = data.tasks.filter(
     (task) => !["approved", "not_accepted"].includes(task.status),
   );
+  const verifiedMetrics = data.metrics.filter((metric) => metric.isVerified);
   const pacing = internHourPacing({
     requiredHours: data.intern.requiredHours,
     startDate: data.intern.academicStartDate || data.cohort?.startsOn || null,
@@ -105,6 +149,14 @@ export default function InternStudentDashboard({
     return toDateKey(start);
   })();
   const days = monthGrid(calendarMonth);
+  const showTasks = workFilter === "all" || workFilter === "tasks";
+  const showContent = workFilter === "all" || workFilter === "content";
+  const showCampaigns = workFilter === "all" || workFilter === "campaigns";
+
+  function openTab(next: TabId) {
+    setTab(next);
+    setTool(null);
+  }
 
   return (
     <div className="space-y-4 pb-24 sm:pb-8">
@@ -167,7 +219,7 @@ export default function InternStudentDashboard({
           <button
             key={item.id}
             type="button"
-            onClick={() => setTab(item.id)}
+            onClick={() => openTab(item.id)}
             className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-black ${
               tab === item.id
                 ? "bg-[#0D5C3A] !text-white"
@@ -180,9 +232,19 @@ export default function InternStudentDashboard({
         ))}
       </div>
 
-      {tab === "home" ? (
+      {tab === "home" && tool ? (
+        <InternStudentTools
+          data={data}
+          events={events}
+          tool={tool}
+          onBack={() => setTool(null)}
+          preview={preview}
+        />
+      ) : null}
+
+      {tab === "home" && !tool ? (
         <div className="space-y-4">
-          <section className="grid grid-cols-2 gap-3">
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
                 This week
@@ -198,6 +260,45 @@ export default function InternStudentDashboard({
               </p>
               <p className="mt-1 text-2xl font-black text-slate-950">{openWork.length}</p>
               <p className="mt-1 text-xs font-semibold text-slate-500">Tasks to finish</p>
+            </div>
+            <div className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                Metrics
+              </p>
+              <p className="mt-1 text-2xl font-black text-slate-950">{verifiedMetrics.length}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">Verified KPIs</p>
+            </div>
+            <div className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                Social
+              </p>
+              <p className="mt-1 text-2xl font-black text-slate-950">{data.content.length}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">Posts logged</p>
+            </div>
+          </section>
+
+          <section className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-black text-slate-950">Tools</h2>
+              <Share2 size={16} className="text-emerald-800" />
+            </div>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Intern-only. No Admin login.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {INTERN_HOME_TOOLS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setTool(item.id)}
+                  className="flex min-h-[4.75rem] flex-col items-start justify-center rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-left"
+                >
+                  <span className="text-sm font-black text-slate-950">{item.label}</span>
+                  <span className="mt-0.5 text-[11px] font-semibold text-slate-500">
+                    {item.blurb}
+                  </span>
+                </button>
+              ))}
             </div>
           </section>
 
@@ -236,7 +337,7 @@ export default function InternStudentDashboard({
               <h2 className="font-black text-slate-950">Up next</h2>
               <button
                 type="button"
-                onClick={() => setTab("calendar")}
+                onClick={() => openTab("calendar")}
                 className="text-xs font-black text-emerald-800"
               >
                 Open calendar
@@ -446,42 +547,273 @@ export default function InternStudentDashboard({
       {tab === "work" ? (
         <section className="space-y-3">
           <p className="px-1 text-sm font-semibold text-slate-600">
-            Open a task, add your link or notes, and submit. Jason grades it in Employer HQ.
+            Tasks, social posts, and campaigns live here. Jason grades submitted work in
+            Employer HQ — you do not need Admin.
           </p>
-          {data.tasks.length ? (
-            data.tasks.map((task) => (
-              <InternshipAssignmentReview
-                key={task.id}
-                internId={data.intern.id}
-                mode="intern"
-                itemType="task"
-                id={task.id}
-                title={task.title}
-                status={task.status}
-                workUrl={task.workUrl}
-                studentNotes={task.studentNotes}
-                supervisorNotes={task.supervisorNotes}
-                employerLetter={task.employerLetter}
-                kpiTier={task.kpiTier}
-                comments={data.comments || []}
-                preview={preview}
-              />
-            ))
-          ) : (
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ["all", "All"],
+                ["tasks", "Tasks"],
+                ["content", "Social"],
+                ["campaigns", "Campaigns"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setWorkFilter(id)}
+                className={`inline-flex min-h-11 items-center rounded-2xl px-4 text-xs font-black ${
+                  workFilter === id
+                    ? "bg-[#0D5C3A] !text-white"
+                    : "border border-emerald-100 bg-white text-emerald-900"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {showTasks ? (
+            data.tasks.length ? (
+              data.tasks.map((task) => (
+                <InternshipAssignmentReview
+                  key={task.id}
+                  internId={data.intern.id}
+                  mode="intern"
+                  itemType="task"
+                  id={task.id}
+                  title={task.title}
+                  status={task.status}
+                  workUrl={task.workUrl}
+                  studentNotes={task.studentNotes}
+                  supervisorNotes={task.supervisorNotes}
+                  employerLetter={task.employerLetter}
+                  kpiTier={task.kpiTier}
+                  comments={data.comments || []}
+                  preview={preview}
+                />
+              ))
+            ) : workFilter === "tasks" ? (
+              <p className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white p-5 text-sm font-semibold text-slate-500">
+                No assignments yet. Your supervisor will drop work here.
+              </p>
+            ) : null
+          ) : null}
+
+          {showContent ? (
+            <>
+              {data.content.length ? (
+                data.content.map((item) => (
+                  <InternshipAssignmentReview
+                    key={item.id}
+                    internId={data.intern.id}
+                    mode="intern"
+                    itemType="content"
+                    id={item.id}
+                    title={item.platform ? `${item.platform}: ${item.title}` : item.title}
+                    status={item.status}
+                    draftUrl={item.draftUrl}
+                    publishedUrl={item.publishedUrl}
+                    studentNotes={item.studentNotes}
+                    supervisorNotes={item.supervisorNotes}
+                    employerLetter={item.employerLetter}
+                    kpiTier={item.kpiTier}
+                    comments={data.comments || []}
+                    preview={preview}
+                  />
+                ))
+              ) : workFilter === "content" ? (
+                <p className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white p-5 text-sm font-semibold text-slate-500">
+                  No social posts yet. Log one below or from Home → Social media.
+                </p>
+              ) : null}
+              {!preview && (workFilter === "content" || workFilter === "all") ? (
+                <form
+                  action={saveInternContent}
+                  className="space-y-3 rounded-[1.4rem] border border-emerald-100 bg-white p-4"
+                >
+                  <h3 className="font-black text-slate-950">Log a social post</h3>
+                  <input type="hidden" name="internId" value={data.intern.id} />
+                  <input type="hidden" name="mode" value="intern" />
+                  <Field name="title" label="Title" required />
+                  <label className="block">
+                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                      Platform
+                    </span>
+                    <select
+                      name="platform"
+                      required
+                      defaultValue="Instagram"
+                      className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold text-slate-950"
+                    >
+                      {INTERN_SOCIAL_PLATFORMS.map((platform) => (
+                        <option key={platform} value={platform}>
+                          {platform}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Field name="draftUrl" label="Draft link" />
+                  <Field name="publishedUrl" label="Published link" />
+                  <button className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+                    Save social post
+                  </button>
+                </form>
+              ) : null}
+            </>
+          ) : null}
+
+          {showCampaigns ? (
+            <>
+              {data.campaigns.length ? (
+                data.campaigns.map((campaign) => (
+                  <article
+                    key={campaign.id}
+                    className="rounded-[1.4rem] border border-emerald-100 bg-white p-4"
+                  >
+                    <h3 className="font-black text-slate-950">{campaign.name}</h3>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      {campaign.utmSource && campaign.utmCampaign
+                        ? `utm_source=${campaign.utmSource}&utm_campaign=${campaign.utmCampaign}`
+                        : "Add tracking before counting results"}
+                    </p>
+                    {campaign.trackingUrl ? (
+                      <p className="mt-2 break-all text-sm font-semibold text-emerald-800">
+                        {campaign.trackingUrl}
+                      </p>
+                    ) : null}
+                    {campaign.objective ? (
+                      <p className="mt-2 text-sm font-semibold text-slate-600">
+                        {campaign.objective}
+                      </p>
+                    ) : null}
+                  </article>
+                ))
+              ) : workFilter === "campaigns" ? (
+                <p className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white p-5 text-sm font-semibold text-slate-500">
+                  No campaigns yet. Create a tracking link below.
+                </p>
+              ) : null}
+              {!preview && (workFilter === "campaigns" || workFilter === "all") ? (
+                <form
+                  action={saveInternCampaign}
+                  className="space-y-3 rounded-[1.4rem] border border-emerald-100 bg-white p-4"
+                >
+                  <h3 className="font-black text-slate-950">New campaign</h3>
+                  <input type="hidden" name="internId" value={data.intern.id} />
+                  <input type="hidden" name="mode" value="intern" />
+                  <Field name="name" label="Campaign name" required />
+                  <Field name="utmSource" label="utm_source" placeholder="instagram" />
+                  <Field name="utmCampaign" label="utm_campaign" placeholder="spring27_growth" />
+                  <Field name="referralCode" label="Referral code" />
+                  <Field name="objective" label="Business objective" />
+                  <p className="text-xs font-semibold leading-5 text-slate-500">
+                    {ATTRIBUTION_RULE}
+                  </p>
+                  <button className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+                    Save campaign
+                  </button>
+                </form>
+              ) : null}
+            </>
+          ) : null}
+
+          {!data.tasks.length && !data.content.length && !data.campaigns.length ? (
             <p className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white p-5 text-sm font-semibold text-slate-500">
-              No assignments yet. Your supervisor will drop work here.
+              Your work will show here — tasks, social posts, and tracking campaigns.
             </p>
-          )}
+          ) : null}
         </section>
       ) : null}
 
-      {tab === "grades" ? (
+      {tab === "metrics" ? (
         <section className="space-y-4">
           <p className="px-1 text-sm font-semibold text-slate-600">
             Letters come from verified KPI output vs your SMART targets — not from
-            posting more.
+            posting more. Self-reported numbers wait for Jason.
           </p>
           <InternshipKpiLetterBoard data={data} />
+          {data.metrics.length ? (
+            <ul className="space-y-2">
+              {data.metrics.map((metric) => (
+                <li
+                  key={metric.id}
+                  className="rounded-[1.4rem] border border-emerald-100 bg-white p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-black text-slate-950">{metric.label}</h3>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${
+                        metric.isVerified
+                          ? "bg-emerald-50 text-emerald-800"
+                          : "bg-amber-50 text-amber-800"
+                      }`}
+                    >
+                      {metric.isVerified ? "Verified" : "Unverified"}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-2xl font-black text-slate-950">
+                    {metric.valueNumeric ?? "—"}
+                  </p>
+                  <p className="text-xs font-semibold text-slate-500">
+                    Source: {metricSourceLabel(metric.sourceSystem)}
+                    {metric.selfReported ? " · intern-submitted" : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white p-5 text-sm font-semibold text-slate-500">
+              No metrics yet. Submit a number from an approved source.
+            </p>
+          )}
+          {preview ? (
+            <p className="rounded-[1.4rem] border border-dashed border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+              Preview is view-only. Interns submit metrics here.
+            </p>
+          ) : (
+            <form
+              action={saveInternMetric}
+              className="space-y-3 rounded-[1.4rem] border border-emerald-100 bg-white p-4"
+            >
+              <h3 className="font-black text-slate-950">Submit metric for verification</h3>
+              <input type="hidden" name="internId" value={data.intern.id} />
+              <input type="hidden" name="mode" value="intern" />
+              <Field
+                name="label"
+                label="Metric"
+                required
+                placeholder="Pet Parent registrations"
+              />
+              <Field name="metricKey" label="Metric key" placeholder="pet_parent_signups" />
+              <Field name="valueNumeric" label="Value" type="number" />
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                  Approved source
+                </span>
+                <select
+                  name="sourceSystem"
+                  required
+                  className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold text-slate-950"
+                >
+                  {METRIC_SOURCE_SYSTEMS.map((source) => (
+                    <option key={source} value={source}>
+                      {metricSourceLabel(source)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Field name="sourceNote" label="Source note / report link" />
+              <p className="text-xs font-semibold text-amber-800">
+                Self-reported until Jason verifies it from a SitGuru-controlled source.
+              </p>
+              <p className="text-xs font-semibold leading-5 text-slate-500">{ATTRIBUTION_RULE}</p>
+              <button className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+                Submit metric
+              </button>
+            </form>
+          )}
         </section>
       ) : null}
 
@@ -491,7 +823,7 @@ export default function InternStudentDashboard({
             <button
               key={item.id}
               type="button"
-              onClick={() => setTab(item.id)}
+              onClick={() => openTab(item.id)}
               className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-black ${
                 tab === item.id ? "bg-emerald-50 text-emerald-900" : "text-slate-500"
               }`}

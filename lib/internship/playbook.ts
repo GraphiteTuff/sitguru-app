@@ -184,6 +184,21 @@ export const INTERN_ACCESS_TOOLS = [
     path: "/intern",
   },
   {
+    key: "social_accounts",
+    name: "SitGuru official social",
+    access: "Intern",
+    purpose:
+      "Promote @SitGuruOfficial. Draft and log posts in the intern portal. Account passwords stay with SitGuru.",
+    path: "/intern",
+  },
+  {
+    key: "public_events",
+    name: "Events to promote",
+    access: "Intern",
+    purpose: "Public pet events and tracking links only. No Events admin and no partner contact emails.",
+    path: "/intern",
+  },
+  {
     key: "limited_admin",
     name: "Role-based SitGuru tools",
     access: "Granted per intern",
