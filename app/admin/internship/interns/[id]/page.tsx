@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getAdminIdentity } from "@/lib/admin/access";
 import InternshipGrowthWorkspace from "@/components/internship/InternshipGrowthWorkspace";
+import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipKpiLetterBoard from "@/components/internship/InternshipKpiLetterBoard";
 import {
   getInternWorkspace,
@@ -48,7 +49,15 @@ export default async function InternshipInternDetailPage({
       <Link href="/admin/internship/interns" className="text-xs font-black text-emerald-800">
         Interns
       </Link>
-      <div>
+      <div className="flex items-start gap-4">
+        <InternAvatar
+          name={workspace.intern.fullName}
+          email={workspace.intern.email}
+          src={workspace.intern.avatarUrl}
+          size="lg"
+          className="ring-emerald-100"
+        />
+        <div>
         <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-800">
           Employer review · {INTERNSHIP_PROGRAM_NAME}
         </p>
@@ -85,6 +94,7 @@ export default async function InternshipInternDetailPage({
           >
             View intern portal
           </Link>
+        </div>
         </div>
       </div>
 

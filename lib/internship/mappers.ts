@@ -169,6 +169,7 @@ export function mapIntern(row: Record<string, unknown>): InternshipIntern {
     portalEnabled: row.portal_enabled !== false,
     academicSnapshot: snapshot,
     notes: text(row.notes),
+    avatarUrl: text(row.avatar_url),
   };
 }
 

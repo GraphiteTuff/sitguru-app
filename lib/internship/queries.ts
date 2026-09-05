@@ -24,6 +24,7 @@ import type {
   InternshipUniversity,
   InternshipWorkspaceData,
 } from "@/lib/internship/types";
+import { attachInternAvatar, attachInternAvatars } from "@/lib/internship/avatar";
 
 function rows(data: unknown) {
   return (Array.isArray(data) ? data : []) as Record<string, unknown>[];
@@ -340,7 +341,7 @@ export async function listInterns(cohortId?: string) {
     console.error("[internship] interns", error.message);
     return [] as InternshipIntern[];
   }
-  return rows(data).map(mapIntern);
+  return attachInternAvatars(rows(data).map(mapIntern));
 }
 
 export async function findInternById(id: string) {
@@ -349,7 +350,7 @@ export async function findInternById(id: string) {
     .select("*")
     .eq("id", id)
     .maybeSingle();
-  return data ? mapIntern(data as Record<string, unknown>) : null;
+  return attachInternAvatar(data ? mapIntern(data as Record<string, unknown>) : null);
 }
 
 export async function findInternByAccount(input: {
@@ -366,7 +367,9 @@ export async function findInternByAccount(input: {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (data) return mapIntern(data as Record<string, unknown>);
+    if (data) {
+      return attachInternAvatar(mapIntern(data as Record<string, unknown>));
+    }
   }
 
   const email = String(input.email || "")
@@ -383,7 +386,7 @@ export async function findInternByAccount(input: {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return data ? mapIntern(data as Record<string, unknown>) : null;
+  return attachInternAvatar(data ? mapIntern(data as Record<string, unknown>) : null);
 }
 
 export async function getInternWorkspace(

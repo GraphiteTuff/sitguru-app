@@ -10,6 +10,7 @@ import {
   listPathTypes,
   listUniversities,
 } from "@/lib/internship/queries";
+import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipRequirementChecker from "@/components/internship/InternshipRequirementChecker";
 
 export const dynamic = "force-dynamic";
@@ -47,8 +48,15 @@ export default async function InternshipInternsPage({
           {interns.map((intern) => (
             <div
               key={intern.id}
-              className="rounded-2xl border border-emerald-100 bg-white px-4 py-4 shadow-sm"
+              className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-white px-4 py-4 shadow-sm"
             >
+              <InternAvatar
+                name={intern.fullName}
+                email={intern.email}
+                src={intern.avatarUrl}
+                size="sm"
+              />
+              <div className="min-w-0 flex-1">
               <p className="font-black text-slate-950">{intern.fullName}</p>
               <p className="text-xs font-semibold text-slate-500">
                 {[
@@ -75,6 +83,7 @@ export default async function InternshipInternsPage({
                 >
                   Employer review
                 </Link>
+              </div>
               </div>
             </div>
           ))}

@@ -2,17 +2,17 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
-import InternshipGrowthWorkspace from "@/components/internship/InternshipGrowthWorkspace";
+import InternStudentDashboard from "@/components/internship/InternStudentDashboard";
+import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipBackToProgram from "@/components/internship/InternshipBackToProgram";
-import { INTERNSHIP_ADMIN_PATH, INTERNSHIP_PROGRAM_NAME } from "@/lib/internship/constants";
+import { INTERNSHIP_ADMIN_PATH } from "@/lib/internship/constants";
 import {
   findInternByAccount,
   findInternById,
   getInternWorkspace,
   linkInternUserId,
 } from "@/lib/internship/queries";
-import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
-import { buildInternshipProcess } from "@/lib/internship/process";
+import { lookupProfileAvatarForUser } from "@/lib/internship/avatar";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -49,41 +49,55 @@ export default async function InternPortalPage({
   if (!intern) {
     if (admin?.canAccessAdmin) redirect(`${INTERNSHIP_ADMIN_PATH}/portal`);
     if (isFounderPersonalMarketplaceEmail(user.email)) {
+      const avatarUrl = await lookupProfileAvatarForUser({
+        userId: user.id,
+        email: user.email,
+        metadata: {
+          ...(user.app_metadata || {}),
+          ...(user.user_metadata || {}),
+        },
+      });
+      const firstName =
+        String(user.user_metadata?.full_name || user.user_metadata?.name || "")
+          .trim()
+          .split(/\s+/)[0] || "there";
       return (
-        <main className="mx-auto w-full max-w-3xl space-y-5 px-4 py-5 sm:px-6 sm:py-8">
+        <main className="mx-auto w-full max-w-lg space-y-5 px-4 py-6 sm:px-6">
           <section
-            className="public-dark-section rounded-[1.75rem] p-5 sm:p-7"
+            className="public-dark-section rounded-[1.75rem] p-5 sm:p-6"
             data-brand-green
             style={{ background: "#0D5C3A" }}
           >
-            <p className="text-xs font-black uppercase tracking-[0.24em] !text-white">
-              Intern portal
-            </p>
-            <h1 className="mt-3 text-2xl font-black !text-white sm:text-3xl">
-              {INTERNSHIP_PROGRAM_NAME}
-            </h1>
-            <p className="mt-2 text-sm font-semibold !text-white/90">
-              This SitGuru login can open Intern Portal alongside Pet Parent,
-              Guru, and Ambassador. Employer HQ still needs to assign the intern
-              record before weekly tasks appear.
+            <div className="flex items-center gap-4">
+              <InternAvatar
+                name={firstName}
+                email={user.email}
+                src={avatarUrl}
+                size="lg"
+              />
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] !text-white/80">
+                  Intern portal
+                </p>
+                <h1 className="mt-1 text-2xl font-black !text-white">Hey, {firstName}</h1>
+              </div>
+            </div>
+            <p className="mt-4 text-sm font-semibold !text-white/90">
+              Your intern workspace is ready as soon as Employer HQ assigns this
+              login. Until then, hop back to Pet Parent or Guru.
             </p>
           </section>
           <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold leading-6 text-slate-600">
-              Use Switch Portal in the account menu to go back to Pet Parent,
-              Guru, or Ambassador. After Employer HQ assigns this email, reload
-              this page to open the live intern plan.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2">
               <Link
                 href="/customer/dashboard"
-                className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
+                className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
               >
                 Pet Parent dashboard
               </Link>
               <Link
                 href="/guru/dashboard"
-                className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-900"
+                className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-900"
               >
                 Guru dashboard
               </Link>
@@ -101,17 +115,15 @@ export default async function InternPortalPage({
 
   const workspace = await getInternWorkspace(intern.id);
   if (!workspace) redirect("/intern/login");
-  const process = buildInternshipProcess(workspace);
 
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-5 px-4 py-5 sm:px-6 sm:py-6 lg:pb-10">
+    <main className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 sm:max-w-5xl sm:px-6 sm:py-6">
       {preview ? (
         <section className="space-y-3">
           <InternshipBackToProgram />
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3">
             <p className="text-sm font-semibold text-amber-950">
-              Employer HQ preview of {workspace.intern.fullName}’s Intern Portal.
-              This is the student view. Grade and approve from Employer review.
+              Student view for {workspace.intern.fullName}. Grade work from Employer review.
             </p>
             <Link
               href={`${INTERNSHIP_ADMIN_PATH}/interns/${intern.id}`}
@@ -122,23 +134,8 @@ export default async function InternPortalPage({
           </div>
         </section>
       ) : null}
-      <section
-        className="public-dark-section rounded-[1.75rem] p-5 sm:p-7"
-        data-brand-green
-        style={{ background: "#0D5C3A" }}
-      >
-        <p className="text-xs font-black uppercase tracking-[0.24em] !text-white">
-          Intern portal
-        </p>
-        <h1 className="mt-3 text-2xl font-black !text-white sm:text-3xl">{INTERNSHIP_PROGRAM_NAME}</h1>
-        <p className="mt-2 text-sm font-semibold !text-white/90">
-          {MARKET_GROWTH_PROJECT_NAME}. Week {process.weekNumber}: {process.deliverable.title}.
-          Tasks, SMART goals, experiments, and metrics sync live with Employer HQ.
-        </p>
-      </section>
-      <InternshipGrowthWorkspace
+      <InternStudentDashboard
         data={workspace}
-        mode="intern"
         preview={preview}
         notice={
           ok

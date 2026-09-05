@@ -138,6 +138,7 @@ export type InternshipIntern = {
   portalEnabled: boolean;
   academicSnapshot: Record<string, unknown>;
   notes: string;
+  avatarUrl: string;
 };
 
 export type InternshipTask = {
