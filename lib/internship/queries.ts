@@ -1,5 +1,8 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
+  internshipUniversitySlug,
+} from "@/lib/internship/constants";
+import {
   mapCampaign,
   mapCampus,
   mapCohort,
@@ -87,6 +90,75 @@ export async function getUniversity(id: string) {
     .maybeSingle();
   if (error || !data) return null;
   return mapUniversity(data as Record<string, unknown>);
+}
+
+export async function findUniversityByNameOrSlug(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  const slug = internshipUniversitySlug(trimmed);
+  if (!slug) return null;
+
+  const { data: bySlug } = await supabaseAdmin
+    .from("internship_universities")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (bySlug) return mapUniversity(bySlug as Record<string, unknown>);
+
+  const { data: byName } = await supabaseAdmin
+    .from("internship_universities")
+    .select("*")
+    .ilike("name", trimmed)
+    .maybeSingle();
+  if (byName) return mapUniversity(byName as Record<string, unknown>);
+
+  const { data: byDisplay } = await supabaseAdmin
+    .from("internship_universities")
+    .select("*")
+    .ilike("display_name", trimmed)
+    .maybeSingle();
+  if (byDisplay) return mapUniversity(byDisplay as Record<string, unknown>);
+  return null;
+}
+
+export async function findOrCreateStudentInstitution(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+
+  const existing = await findUniversityByNameOrSlug(trimmed);
+  if (existing) return existing;
+
+  const baseSlug = internshipUniversitySlug(trimmed) || "student-institution";
+  let slug = baseSlug;
+  for (let i = 2; i < 12; i += 1) {
+    const { data, error } = await supabaseAdmin
+      .from("internship_universities")
+      .insert({
+        slug,
+        name: trimmed,
+        display_name: trimmed,
+        status: "research_needed",
+        is_university_partner: false,
+        academic_credit_status: "unknown",
+        internship_eligibility_status: "unknown",
+        funding_status: "unknown",
+        notes:
+          "Added from intern assignment (Other). Student Institution only. Requirements not verified.",
+      })
+      .select("*")
+      .maybeSingle();
+
+    if (!error && data) return mapUniversity(data as Record<string, unknown>);
+    if (error?.message && /duplicate|unique/i.test(error.message)) {
+      slug = `${baseSlug}-${i}`;
+      continue;
+    }
+    if (error) {
+      console.error("[internship] create university", error.message);
+      return null;
+    }
+  }
+  return null;
 }
 
 export async function listCampuses(universityId: string) {

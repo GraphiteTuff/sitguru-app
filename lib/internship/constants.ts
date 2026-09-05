@@ -16,6 +16,16 @@ export function internPortalPreviewPath(internId: string) {
   return `${INTERNSHIP_PORTAL_PATH}?view=${encodeURIComponent(internId)}`;
 }
 
+export const OTHER_UNIVERSITY_VALUE = "__other__";
+
+export function internshipUniversitySlug(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+}
+
 export const UNIVERSITY_STATUSES = [
   "research_needed",
   "potential_partner",

@@ -7,12 +7,14 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   findInternByAccount,
+  findOrCreateStudentInstitution,
   freezeAcademicProfile,
   getUniversity,
   listCampuses,
   listRequirements,
   matchRequirementForProgram,
 } from "@/lib/internship/queries";
+import { OTHER_UNIVERSITY_VALUE } from "@/lib/internship/constants";
 import { SEMESTER_DELIVERABLES } from "@/lib/internship/playbook";
 import {
   addInternWorkComment,
@@ -199,15 +201,30 @@ export async function saveUniversityContact(formData: FormData) {
 export async function saveIntern(formData: FormData) {
   await requireInternshipAdmin();
   const cohortId = text(formData, "cohortId");
-  const universityId = text(formData, "universityId");
+  const selectedUniversityId = text(formData, "universityId");
+  const otherUniversityName = text(formData, "otherUniversityName");
   const fullName = text(formData, "fullName");
   const email = text(formData, "email").toLowerCase();
-  if (!cohortId || !universityId || !fullName || !email) {
+  if (!cohortId || !fullName || !email) {
     bounce("/admin/internship/interns", "error", "Name, email, university, and cohort are required.");
   }
 
-  const university = await getUniversity(universityId);
-  if (!university) bounce("/admin/internship/interns", "error", "University not found.");
+  const university =
+    selectedUniversityId && selectedUniversityId !== OTHER_UNIVERSITY_VALUE
+      ? await getUniversity(selectedUniversityId)
+      : await findOrCreateStudentInstitution(otherUniversityName);
+  if (!university) {
+    bounce(
+      "/admin/internship/interns",
+      "error",
+      selectedUniversityId === OTHER_UNIVERSITY_VALUE || !selectedUniversityId
+        ? "Type the intern’s university name under Other."
+        : "University not found.",
+    );
+    return;
+  }
+
+  const universityId = university.id;
 
   const campuses = await listCampuses(universityId);
   const campusId = text(formData, "campusId") || null;
