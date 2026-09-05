@@ -22,7 +22,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
-  canUseAllRoleWorkspaces,
+  canUseMarketplaceRoleWorkspaces,
   getFounderAmbassadorPreview,
 } from "@/lib/dashboard/founder-workspaces";
 
@@ -426,7 +426,7 @@ async function getLoggedInAmbassador() {
     status !== "inactive" &&
     status !== "not_a_fit";
 
-  if (canUseAllRoleWorkspaces(userEmail)) {
+  if (canUseMarketplaceRoleWorkspaces(userEmail)) {
     return (
       ambassador ||
       getFounderAmbassadorPreview({

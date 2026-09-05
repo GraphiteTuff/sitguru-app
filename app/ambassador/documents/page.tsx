@@ -18,7 +18,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
-  canUseAllRoleWorkspaces,
+  canUseMarketplaceRoleWorkspaces,
   getFounderAmbassadorPreview,
 } from "@/lib/dashboard/founder-workspaces";
 
@@ -166,7 +166,7 @@ async function getLoggedInAmbassador() {
     .neq("status", "archived")
     .maybeSingle();
 
-  if (canUseAllRoleWorkspaces(userEmail) && (ambassadorError || !ambassador)) {
+  if (canUseMarketplaceRoleWorkspaces(userEmail) && (ambassadorError || !ambassador)) {
     return getFounderAmbassadorPreview({
       userId: user.id,
       email: userEmail,

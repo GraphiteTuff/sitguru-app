@@ -26,6 +26,11 @@ import {
   normalizeRoleAlias,
   phoneFallback,
 } from "@/lib/sitguru/display";
+import {
+  isFounderPersonalMarketplaceEmail,
+  isHardcodedSuperUserEmail,
+  skipNameOnlyDuplicateMatch,
+} from "@/lib/admin/super-users";
 
 export const dynamic = "force-dynamic";
 
@@ -716,12 +721,14 @@ function getRoleBadges({
   roleMap,
   ambassadorUserIds,
   hasGuruWorkspace,
+  email,
 }: {
   userId: string;
   profile?: ProfileRow;
   roleMap: Map<string, Set<string>>;
   ambassadorUserIds: Set<string>;
   hasGuruWorkspace: boolean;
+  email?: string;
 }) {
   const roles = new Set<string>();
   if (hasGuruWorkspace) roles.add("Guru");
@@ -746,8 +753,10 @@ function getRoleBadges({
   }
 
   if (ambassadorUserIds.has(userId)) roles.add("Ambassador");
+  if (isHardcodedSuperUserEmail(email)) roles.add("Super Admin");
+  if (isFounderPersonalMarketplaceEmail(email)) roles.add("Ambassador");
 
-  const order = ["Guru", PET_PARENT_DISPLAY_LABEL, "Ambassador"];
+  const order = ["Super Admin", "Guru", PET_PARENT_DISPLAY_LABEL, "Ambassador"];
   return Array.from(roles).sort((a, b) => order.indexOf(a) - order.indexOf(b));
 }
 
@@ -930,7 +939,8 @@ function getNormalizedDuplicateKeys(name: string, email: string, phone: string) 
   if (hasUsableEmail(email)) keys.push(`email:${normalizedEmail}`);
   if (hasUsablePhone(phone)) keys.push(`phone:${normalizedPhone}`);
   // Name-only collisions on defaults like "SitGuru Member" caused false positives.
-  if (isStrongPersonalName(name)) {
+  // Founder HQ vs personal marketplace logins also share a legal name on purpose.
+  if (isStrongPersonalName(name) && !skipNameOnlyDuplicateMatch(email)) {
     keys.push(`name:${normalizeText(name)}`);
   }
 
@@ -1170,6 +1180,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       roleMap,
       ambassadorUserIds,
       hasGuruWorkspace: true,
+      email,
     });
     const contactMethod = getContactMethod(email, phone);
     const applicationStatus = normalizeApplicationStatus(guru);
@@ -1372,6 +1383,7 @@ async function getGuruManagementData(searchParams: SearchParams) {
       roleMap,
       ambassadorUserIds,
       hasGuruWorkspace: false,
+      email,
     });
     if (!roles.includes("Guru")) roles.unshift("Guru");
 

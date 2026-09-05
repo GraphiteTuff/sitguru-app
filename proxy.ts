@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import {
+  isFounderPersonalMarketplaceEmail,
   isHardcodedSuperUserEmail,
   normalizeAdminEmail,
 } from "@/lib/admin/super-users";
@@ -508,7 +509,7 @@ export async function proxy(request: NextRequest) {
     return redirectResponse;
   }
 
-  if ((requiresGuruAccess || requiresAmbassadorAccess) && isSuperUser) {
+  if ((requiresGuruAccess || requiresAmbassadorAccess) && (isSuperUser || isFounderPersonalMarketplaceEmail(userEmail))) {
     return responseRef.current;
   }
 

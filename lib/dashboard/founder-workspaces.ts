@@ -1,7 +1,23 @@
 import { isSitGuruSuperUser } from "@/lib/sitguru/display";
+import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
+
+export const FOUNDER_PERSONAL_MARKETPLACE_ROLES = [
+  "parent",
+  "guru",
+  "ambassador",
+] as const;
 
 export function canUseAllRoleWorkspaces(email: string | null | undefined) {
   return isSitGuruSuperUser(email);
+}
+
+/** Pet Parent + Guru + Ambassador — HQ founders and Jason's personal marketplace login. */
+export function canUseMarketplaceRoleWorkspaces(
+  email: string | null | undefined,
+) {
+  return (
+    isSitGuruSuperUser(email) || isFounderPersonalMarketplaceEmail(email)
+  );
 }
 
 export function getFounderAmbassadorPreview(input: {
@@ -19,7 +35,11 @@ export function getFounderAmbassadorPreview(input: {
     user_id: input.userId,
     full_name:
       input.name ||
-      (isDanette ? "Danette" : email.startsWith("jason@") ? "Jason" : "SitGuru Founder"),
+      (isDanette
+        ? "Danette"
+        : email.startsWith("jason@") || email.startsWith("jasongraff")
+          ? "Jason Graff"
+          : "SitGuru Founder"),
     email,
     login_email: email,
     contact_email: email,

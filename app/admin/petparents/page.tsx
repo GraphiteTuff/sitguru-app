@@ -30,6 +30,11 @@ import {
   type CustomerIntelligenceMetricId,
 } from "@/lib/admin/customer-intelligence/metrics";
 import { getPetParentReadiness } from "@/lib/pet-parent-readiness";
+import {
+  isFounderPersonalMarketplaceEmail,
+  isHardcodedSuperUserEmail,
+  skipNameOnlyDuplicateMatch,
+} from "@/lib/admin/super-users";
 import CustomerInsightsTable from "./CustomerInsightsTable";
 
 export const dynamic = "force-dynamic";
@@ -798,7 +803,7 @@ function getNormalizedCustomerDuplicateKeys(
 
   if (hasUsableCustomerEmail(email)) keys.push(`email:${normalizedEmail}`);
   if (hasUsableCustomerPhone(phone)) keys.push(`phone:${normalizedPhone}`);
-  if (isStrongCustomerDuplicateName(name)) {
+  if (isStrongCustomerDuplicateName(name) && !skipNameOnlyDuplicateMatch(email)) {
     keys.push(`name:${normalizeCustomerDuplicateText(name)}`);
   }
 
@@ -826,9 +831,11 @@ function describeCustomerDuplicateMatch(keys: string[]) {
 function getCustomerRoleBadges({
   role,
   hasGuruWorkspace,
+  email,
 }: {
   role: string;
   hasGuruWorkspace: boolean;
+  email?: string;
 }) {
   const roles = new Set<string>(["Pet Parent"]);
   const normalized = role.toLowerCase().replace(/[\s-]+/g, "_");
@@ -844,6 +851,13 @@ function getCustomerRoleBadges({
     ["ambassador", "partner", "community_ambassador"].includes(normalized) ||
     normalized.includes("ambassador")
   ) {
+    roles.add("Ambassador");
+  }
+
+  if (isHardcodedSuperUserEmail(email)) {
+    roles.add("Super Admin");
+  }
+  if (isFounderPersonalMarketplaceEmail(email)) {
     roles.add("Ambassador");
   }
 
@@ -1789,6 +1803,7 @@ async function getCustomerIntelligenceData() {
     const roles = getCustomerRoleBadges({
       role: profileRole,
       hasGuruWorkspace: guruLocationByUserId.has(profile.id),
+      email,
     });
 
     customerMap.set(profile.id, {
@@ -2042,6 +2057,7 @@ async function getCustomerIntelligenceData() {
           : getCustomerRoleBadges({
               role: profileRoleById.get(customer.id) || "",
               hasGuruWorkspace: guruLocationByUserId.has(customer.id),
+              email: customer.email,
             });
       const contactMethod =
         enriched.contactMethod ||

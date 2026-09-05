@@ -35,6 +35,7 @@ import {
 } from "@/lib/admin/ambassadors/purge-test-ambassadors";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { skipNameOnlyDuplicateMatch } from "@/lib/admin/super-users";
 import AmbassadorRecordsTable, {
   type AmbassadorDisplayRow,
 } from "@/app/admin/ambassadors/AmbassadorRecordsTable";
@@ -1809,7 +1810,13 @@ function getAmbassadorDuplicateKeys(ambassador: AmbassadorSummaryRow) {
 
   if (email.includes("@")) keys.push(`email:${email}`);
   if (phone.length >= 7) keys.push(`phone:${phone}`);
-  if (name && name !== "unnamed ambassador") keys.push(`name:${name}`);
+  if (
+    name &&
+    name !== "unnamed ambassador" &&
+    !skipNameOnlyDuplicateMatch(email)
+  ) {
+    keys.push(`name:${name}`);
+  }
 
   return keys;
 }

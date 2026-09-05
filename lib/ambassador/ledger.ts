@@ -5,7 +5,7 @@
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
 import { getAppOrigin } from "@/lib/config/site";
-import { isSitGuruSuperUser } from "@/lib/sitguru/display";
+import { canUseMarketplaceRoleWorkspaces } from "@/lib/dashboard/founder-workspaces";
 import type {
   AmbassadorNetworkKpis,
   AmbassadorPerformanceRow,
@@ -86,7 +86,7 @@ export async function canAccessAmbassadorLedger(input: {
   userId: string;
   email?: string | null;
 }) {
-  if (isSitGuruSuperUser(input.email)) return true;
+  if (canUseMarketplaceRoleWorkspaces(input.email)) return true;
 
   const email = String(input.email || "").trim().toLowerCase();
 

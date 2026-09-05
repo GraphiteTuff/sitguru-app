@@ -7,6 +7,8 @@ import {
   isEligibleGuruProfile,
   shouldRepairMissingGuruRole,
 } from "@/lib/auth/guru-access";
+import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
+import { canUseMarketplaceRoleWorkspaces } from "@/lib/dashboard/founder-workspaces";
 
 export const dynamic = "force-dynamic";
 
@@ -373,22 +375,64 @@ export default async function LoginRoutePage({
   const hasAdminAccess =
     isSuperUserEmail(userEmail) || roles.some(isAdminRole);
 
+  const marketplaceFounder = isFounderPersonalMarketplaceEmail(userEmail);
+
+  if (marketplaceFounder) {
+    const now = new Date().toISOString();
+    for (const role of ["customer", "guru", "ambassador"] as const) {
+      const { error: roleRepairError } = await supabaseAdmin
+        .from("user_roles")
+        .upsert(
+          {
+            user_id: user.id,
+            role,
+            updated_at: now,
+          },
+          { onConflict: "user_id,role" },
+        );
+      if (roleRepairError) {
+        console.error(
+          `LOGIN ROUTE FOUNDER PERSONAL ${role.toUpperCase()} ROLE REPAIR ERROR:`,
+          roleRepairError.message,
+        );
+      }
+    }
+
+    const authorizedRoles = ["parent", "guru", "ambassador"];
+    const { error: metadataRepairError } =
+      await supabaseAdmin.auth.admin.updateUserById(user.id, {
+        user_metadata: {
+          ...(user.user_metadata || {}),
+          authorizedRoles,
+          authorized_roles: authorizedRoles,
+        },
+      });
+    if (metadataRepairError) {
+      console.error(
+        "LOGIN ROUTE FOUNDER PERSONAL METADATA REPAIR ERROR:",
+        metadataRepairError.message,
+      );
+    }
+  }
+
   const guruRow = (guruResult.data || [])[0] || null;
   const hasEligibleGuruProfile = isEligibleGuruProfile(guruRow);
   const hasGuruRole = roles.some(isGuruRole);
 
-  const hasGuruAccess = hasGuruRole || hasEligibleGuruProfile;
+  const hasGuruAccess =
+    hasGuruRole || hasEligibleGuruProfile || marketplaceFounder;
 
-  const hasPetParentAccess = roles.some(isPetParentRole);
+  const hasPetParentAccess = roles.some(isPetParentRole) || marketplaceFounder;
 
   const hasAmbassadorRole = roles.some(isAmbassadorRole);
   const hasAmbassadorWorkspace =
-    Boolean(ambassador?.id) &&
-    ambassador?.dashboard_enabled === true &&
-    ambassador?.login_enabled === true &&
-    ambassadorStatus !== "archived" &&
-    ambassadorStatus !== "inactive" &&
-    ambassadorStatus !== "not_a_fit";
+    marketplaceFounder ||
+    (Boolean(ambassador?.id) &&
+      ambassador?.dashboard_enabled === true &&
+      ambassador?.login_enabled === true &&
+      ambassadorStatus !== "archived" &&
+      ambassadorStatus !== "inactive" &&
+      ambassadorStatus !== "not_a_fit");
 
   if (hasAmbassadorWorkspace && !hasAmbassadorRole) {
     const { error: roleRepairError } = await supabaseAdmin
@@ -483,7 +527,7 @@ export default async function LoginRoutePage({
   }
 
   if (preferred === "ambassador") {
-    if (hasAmbassadorWorkspace || isSuperUserEmail(userEmail)) {
+    if (hasAmbassadorWorkspace || canUseMarketplaceRoleWorkspaces(userEmail)) {
       redirect(safeNextPath || "/ambassador/dashboard");
     }
 
@@ -534,6 +578,10 @@ export default async function LoginRoutePage({
 
   if (hasAdminAccess) {
     redirect("/admin");
+  }
+
+  if (marketplaceFounder) {
+    redirect("/customer/dashboard");
   }
 
   if (hasAmbassadorWorkspace) {

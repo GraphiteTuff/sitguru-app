@@ -4,6 +4,7 @@
  */
 
 import { isSitGuruSuperUser } from "@/lib/sitguru/display";
+import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
 
 export type DashboardSwitchRole =
   | "parent"
@@ -218,6 +219,10 @@ export function resolveAuthorizedRolesFromProfile(input: {
 
   if (isSitGuruSuperUser(email)) {
     return [...ROLE_ORDER];
+  }
+
+  if (isFounderPersonalMarketplaceEmail(email)) {
+    return ["parent", "guru", "ambassador"];
   }
 
   const explicit = uniqueOrderedRoles([

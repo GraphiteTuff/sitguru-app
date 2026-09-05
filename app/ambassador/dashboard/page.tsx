@@ -36,7 +36,7 @@ import {
   type ThemeTone,
 } from "@/components/sitguru/ThemeStatCard";
 import {
-  canUseAllRoleWorkspaces,
+  canUseMarketplaceRoleWorkspaces,
   getFounderAmbassadorPreview,
 } from "@/lib/dashboard/founder-workspaces";
 import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
@@ -991,7 +991,7 @@ export default async function AmbassadorDashboardPage() {
   }
 
   const ambassadorStatus = asString(ambassador?.status).toLowerCase();
-  const founderWorkspace = canUseAllRoleWorkspaces(userEmail);
+  const founderWorkspace = canUseMarketplaceRoleWorkspaces(userEmail);
   const hasWorkspaceAccess =
     founderWorkspace ||
     (Boolean(ambassador?.id) &&
