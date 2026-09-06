@@ -1,4 +1,7 @@
-import { SEMESTER_DELIVERABLES } from "@/lib/internship/playbook";
+import {
+  capstoneWeekForNumber,
+  type CapstoneWeek,
+} from "@/lib/internship/final-project";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
 
 function startOfDay(value: Date) {
@@ -15,14 +18,18 @@ export function internshipWeekNumber(startDate?: string | null, today = new Date
   return Math.min(16, Math.floor(diff / 7) + 1);
 }
 
+export function currentCapstoneWeek(startDate?: string | null, today = new Date()): CapstoneWeek {
+  return capstoneWeekForNumber(internshipWeekNumber(startDate, today));
+}
+
 export function currentSemesterDeliverable(startDate?: string | null, today = new Date()) {
-  const week = internshipWeekNumber(startDate, today);
-  if (week <= 2) return SEMESTER_DELIVERABLES[0];
-  if (week <= 4) return SEMESTER_DELIVERABLES[1];
-  if (week <= 8) return SEMESTER_DELIVERABLES[2];
-  if (week <= 11) return SEMESTER_DELIVERABLES[3];
-  if (week <= 15) return SEMESTER_DELIVERABLES[4];
-  return SEMESTER_DELIVERABLES[5];
+  const week = currentCapstoneWeek(startDate, today);
+  return {
+    id: week.section,
+    timing: `Week ${week.week}`,
+    title: week.work,
+    demonstrates: week.buildsToward,
+  };
 }
 
 export function buildInternshipProcess(data: InternshipWorkspaceData, today = new Date()) {

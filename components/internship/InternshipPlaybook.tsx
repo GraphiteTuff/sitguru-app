@@ -16,6 +16,7 @@ import {
   SUPERVISION_CONTROLS,
   WEEKLY_RHYTHM,
 } from "@/lib/internship/playbook";
+import { CAPSTONE_WEEK_PLAN } from "@/lib/internship/final-project";
 import { ATTRIBUTION_RULE } from "@/lib/internship/constants";
 import { ThemeStatCard } from "@/components/sitguru/ThemeStatCard";
 import { KPI_LETTER_RUBRIC, rubricTrend } from "@/lib/internship/grading";
@@ -58,7 +59,12 @@ export default function InternshipPlaybook() {
 
       <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5">
         <h3 className="font-black text-slate-950">Semester deliverables</h3>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          All work builds the Business Growth Report: measurable outcomes and
+          lessons learned. The Playbook and portfolio are supporting outputs from
+          the same approved record — not separate busywork.
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
           {SEMESTER_DELIVERABLES.map((item) => (
             <div key={item.id} className="rounded-2xl border border-slate-100 p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
@@ -68,6 +74,23 @@ export default function InternshipPlaybook() {
               <p className="mt-2 text-sm font-semibold text-slate-600">
                 {item.demonstrates}
               </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5">
+        <h3 className="font-black text-slate-950">15-week build path</h3>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          Each week has a job and a destination in the Business Growth Report.
+        </p>
+        <div className="mt-4 grid gap-2 md:grid-cols-2">
+          {CAPSTONE_WEEK_PLAN.map((week) => (
+            <div key={week.week} className="rounded-2xl border border-slate-100 px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">
+                Week {week.week} · {week.buildsToward}
+              </p>
+              <p className="mt-1 text-sm font-black text-slate-950">{week.work}</p>
             </div>
           ))}
         </div>

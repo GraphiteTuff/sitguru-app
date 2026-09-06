@@ -32,6 +32,9 @@ import { buildInternshipProcess } from "@/lib/internship/process";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
 import InternshipTimelineBoard from "@/components/internship/InternshipTimelineBoard";
 import InternshipKpiLetterBoard from "@/components/internship/InternshipKpiLetterBoard";
+import InternshipFinalProjectBoard, {
+  FinalSectionSelect,
+} from "@/components/internship/InternshipFinalProjectBoard";
 import InternshipAssignmentReview from "@/components/internship/InternshipAssignmentReview";
 import InternAvatar from "@/components/internship/InternAvatar";
 
@@ -41,6 +44,7 @@ const TABS = [
   { id: "content", label: "Content" },
   { id: "campaigns", label: "Campaigns" },
   { id: "metrics", label: "Metrics" },
+  { id: "project", label: "Growth Report" },
   { id: "review", label: "Review & Grades" },
 ] as const;
 
@@ -394,6 +398,8 @@ export default function InternshipGrowthWorkspace({
               <Input name="workUrl" label="Link to completed work" />
               <Input name="businessObjective" label="Business objective" />
               <Input name="metricAffected" label="Metric affected" />
+              <FinalSectionSelect />
+              <Input name="internReportedValue" label="Intern reported result" />
               <Input name="studentNotes" label="Student notes" />
               <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
                 Save task
@@ -443,6 +449,7 @@ export default function InternshipGrowthWorkspace({
               <Input name="draftUrl" label="Draft link" />
               <Input name="publishedUrl" label="Published link" />
               <Input name="studentNotes" label="Notes" />
+              <FinalSectionSelect defaultValue="content_system" />
               <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
                 Save content
               </button>
@@ -496,6 +503,7 @@ export default function InternshipGrowthWorkspace({
               <Input name="referralCode" label="Referral / campaign code" />
               <Input name="trackingUrl" label="Tracking URL (optional override)" />
               <Input name="objective" label="Business objective" />
+              <FinalSectionSelect defaultValue="campaign_system" />
               <p className="text-xs font-semibold leading-5 text-slate-500">
                 {ATTRIBUTION_RULE}
               </p>
@@ -532,6 +540,17 @@ export default function InternshipGrowthWorkspace({
                   <Input name="lesson" label="Lesson" />
                   <Input name="nextStep" label="Next step" />
                 </div>
+                <FinalSectionSelect defaultValue="pet_parent_growth" />
+                <Input name="internReportedResult" label="Intern reported result" />
+                {supervisor ? (
+                  <>
+                    <Input name="verifiedResult" label="SitGuru verified result" />
+                    <label className="flex items-center gap-2 text-sm font-semibold">
+                      <input type="checkbox" name="includedInFinal" />
+                      Include in Business Growth Report
+                    </label>
+                  </>
+                ) : null}
                 <button className="min-h-11 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">
                   Log experiment
                 </button>
@@ -614,6 +633,7 @@ export default function InternshipGrowthWorkspace({
                 </select>
               </label>
               <Input name="sourceNote" label="Source note / report link" />
+              <FinalSectionSelect defaultValue="analytics_attribution" />
               {supervisor ? (
                 <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                   <input type="checkbox" name="verify" />
@@ -631,6 +651,15 @@ export default function InternshipGrowthWorkspace({
             </form>
           )}
         </section>
+      ) : null}
+
+      {tab === "project" ? (
+        <InternshipFinalProjectBoard
+          data={data}
+          weekNumber={process.weekNumber}
+          mode={mode}
+          preview={preview}
+        />
       ) : null}
 
       {tab === "review" ? (
@@ -699,12 +728,26 @@ export default function InternshipGrowthWorkspace({
                 className="rounded-2xl border border-slate-100 bg-white p-4 text-sm font-semibold text-slate-600"
               >
                 <p className="font-black text-slate-950">Week of {review.weekOf}</p>
+                {review.contributionAdded ? (
+                  <p className="mt-2 font-black text-emerald-900">
+                    Final project: {review.contributionAdded}
+                  </p>
+                ) : null}
                 <p className="mt-2">Accomplished: {review.accomplished}</p>
                 <p>Data: {review.dataShowed}</p>
                 <p>Didn’t work: {review.didntWork}</p>
                 <p>Next week: {review.changingNextWeek}</p>
+                {review.internReportedKpi ? (
+                  <p>Intern reported: {review.internReportedKpi}</p>
+                ) : null}
+                {review.verifiedKpi ? <p>SitGuru verified: {review.verifiedKpi}</p> : null}
                 <p className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-emerald-800">
-                  {review.upcomingApproved ? "Upcoming work approved" : "Upcoming work pending approval"}
+                  {review.contributionApproved
+                    ? "Final-project contribution approved"
+                    : "Final-project contribution pending"}
+                  {review.hoursApproved && review.hoursLogged != null
+                    ? ` · Hours ${review.hoursLogged} approved`
+                    : ""}
                 </p>
               </article>
             ))}
@@ -717,15 +760,35 @@ export default function InternshipGrowthWorkspace({
                 <input type="hidden" name="internId" value={data.intern.id} />
                 <input type="hidden" name="mode" value={mode} />
                 <Input name="weekOf" label="Week of" type="date" required />
+                <FinalSectionSelect />
+                <Input name="contributionAdded" label="What did you add or improve this week?" />
                 <Input name="accomplished" label="What did you accomplish?" />
                 <Input name="dataShowed" label="What did the data show?" />
                 <Input name="didntWork" label="What didn’t work?" />
                 <Input name="changingNextWeek" label="What are you changing next week?" />
+                <Input name="hoursLogged" label="Hours this week" type="number" />
+                <Input name="internReportedKpi" label="Intern-reported KPI" />
                 {supervisor ? (
-                  <label className="flex items-center gap-2 text-sm font-semibold">
-                    <input type="checkbox" name="upcomingApproved" />
-                    Approve upcoming work
-                  </label>
+                  <div className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                    <label className="flex items-center gap-2 text-sm font-semibold">
+                      <input type="checkbox" name="workApproved" /> Weekly work: Approved
+                    </label>
+                    <label className="flex items-center gap-2 text-sm font-semibold">
+                      <input type="checkbox" name="hoursApproved" /> Hours: Approved
+                    </label>
+                    <label className="flex items-center gap-2 text-sm font-semibold">
+                      <input type="checkbox" name="evidenceApproved" /> Evidence: Approved
+                    </label>
+                    <label className="flex items-center gap-2 text-sm font-semibold">
+                      <input type="checkbox" name="contributionApproved" /> Final-project
+                      contribution: Approved for inclusion
+                    </label>
+                    <Input name="verifiedKpi" label="SitGuru verified KPI" />
+                    <label className="flex items-center gap-2 text-sm font-semibold">
+                      <input type="checkbox" name="upcomingApproved" />
+                      Approve upcoming work
+                    </label>
+                  </div>
                 ) : null}
                 <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
                   Save weekly review

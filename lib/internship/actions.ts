@@ -16,7 +16,7 @@ import {
   matchRequirementForProgram,
 } from "@/lib/internship/queries";
 import { OTHER_UNIVERSITY_VALUE } from "@/lib/internship/constants";
-import { SEMESTER_DELIVERABLES } from "@/lib/internship/playbook";
+import { CAPSTONE_WEEK_PLAN } from "@/lib/internship/final-project";
 import {
   INTERN_GROWTH_KPIS,
   INTERN_KPI_BASELINE_NOTE,
@@ -331,16 +331,19 @@ export async function saveIntern(formData: FormData) {
         granted,
         notes,
         granted_at: granted ? new Date().toISOString() : null,
+        grant_status: granted ? "active" : "not_granted",
       })),
     );
     await supabaseAdmin.from("internship_tasks").insert(
-      SEMESTER_DELIVERABLES.map((item) => ({
+      CAPSTONE_WEEK_PLAN.map((week) => ({
         intern_id: internId,
-        title: item.title,
+        title: `Week ${week.week}: ${week.work}`,
         status: "todo",
-        business_objective: item.demonstrates,
-        metric_affected: "Tier 1 or Tier 2 SitGuru-verified KPI",
-        student_notes: `${item.timing} · Shared SitGuru semester deliverable`,
+        business_objective: week.buildsToward,
+        metric_affected: "SitGuru Market Growth Project",
+        student_notes: `${week.work} · Builds ${week.buildsToward}`,
+        final_section: week.section,
+        week_number: week.week,
       })),
     );
   }
@@ -387,6 +390,10 @@ export async function saveInternTask(formData: FormData) {
     metric_affected: text(formData, "metricAffected"),
     student_notes: text(formData, "studentNotes"),
     project_id: text(formData, "projectId") || null,
+    final_section: text(formData, "finalSection"),
+    week_number: optionalNumber(formData, "weekNumber"),
+    intern_reported_value: text(formData, "internReportedValue"),
+    verified_value: text(formData, "verifiedValue"),
   };
   if (!payload.title) {
     bounce(workspacePath(internId, mode), "error", "Task title is required.");
@@ -499,6 +506,7 @@ export async function saveInternContent(formData: FormData) {
     status: text(formData, "status") || "draft",
     due_on: text(formData, "dueOn") || null,
     student_notes: text(formData, "studentNotes"),
+    final_section: text(formData, "finalSection"),
   });
   if (error) bounce(workspacePath(internId, mode), "error", error.message);
   refreshInternship(workspacePath(internId, mode));
@@ -527,6 +535,7 @@ export async function saveInternCampaign(formData: FormData) {
     tracking_url: trackingUrl,
     objective: text(formData, "objective"),
     status: "active",
+    final_section: text(formData, "finalSection") || "campaign_system",
   });
   if (error) bounce(workspacePath(internId, mode), "error", error.message);
   refreshInternship(workspacePath(internId, mode));
@@ -555,6 +564,7 @@ export async function saveInternMetric(formData: FormData) {
     period_end: text(formData, "periodEnd") || null,
     source_system: sourceSystem,
     source_note: text(formData, "sourceNote"),
+    final_section: text(formData, "finalSection") || "analytics_attribution",
     self_reported: !isSupervisor,
     is_verified: isSupervisor && formData.get("verify") === "on",
     verified_at:
@@ -679,26 +689,73 @@ export async function saveWeeklyReview(formData: FormData) {
   const internId = text(formData, "internId");
   const mode = text(formData, "mode") || "intern";
   await assertWorkspaceActor(internId, mode);
-  const review = {
+  const weekOf = text(formData, "weekOf");
+  const finalSection = text(formData, "finalSection");
+  const contributionAdded = text(formData, "contributionAdded");
+  if (!finalSection) {
+    bounce(
+      workspacePath(internId, mode),
+      "error",
+      "Choose which Business Growth Report section this week advanced.",
+    );
+  }
+  if (!contributionAdded) {
+    bounce(
+      workspacePath(internId, mode),
+      "error",
+      "Describe what you added or improved on the Business Growth Report this week.",
+    );
+  }
+
+  const internFields = {
     intern_id: internId,
-    week_of: text(formData, "weekOf"),
+    week_of: weekOf,
     accomplished: text(formData, "accomplished"),
     data_showed: text(formData, "dataShowed"),
     didnt_work: text(formData, "didntWork"),
     changing_next_week: text(formData, "changingNextWeek"),
+    final_section: finalSection,
+    contribution_added: contributionAdded,
+    hours_logged: optionalNumber(formData, "hoursLogged"),
+    intern_reported_kpi: text(formData, "internReportedKpi"),
   };
-  const { error } = await supabaseAdmin.from("internship_weekly_reviews").upsert(
+
+  const supervisorFields =
     mode === "supervisor"
       ? {
-          ...review,
           upcoming_approved: formData.get("upcomingApproved") === "on",
+          work_approved: formData.get("workApproved") === "on",
+          hours_approved: formData.get("hoursApproved") === "on",
+          evidence_approved: formData.get("evidenceApproved") === "on",
+          contribution_approved: formData.get("contributionApproved") === "on",
+          verified_kpi: text(formData, "verifiedKpi"),
         }
-      : review,
-    { onConflict: "intern_id,week_of" },
-  );
+      : {};
+
+  const { data: existing } = await supabaseAdmin
+    .from("internship_weekly_reviews")
+    .select("id")
+    .eq("intern_id", internId)
+    .eq("week_of", weekOf)
+    .maybeSingle();
+
+  const payload = { ...internFields, ...supervisorFields };
+  const { error } = existing?.id
+    ? await supabaseAdmin
+        .from("internship_weekly_reviews")
+        .update(payload)
+        .eq("id", existing.id)
+    : await supabaseAdmin.from("internship_weekly_reviews").insert(payload);
+
   if (error) bounce(workspacePath(internId, mode), "error", error.message);
   refreshInternship(workspacePath(internId, mode));
-  bounce(workspacePath(internId, mode), "ok", "Weekly review saved.");
+  bounce(
+    workspacePath(internId, mode),
+    "ok",
+    mode === "supervisor"
+      ? "Weekly work reviewed for the Business Growth Report."
+      : "Weekly check-in saved to the Business Growth Report.",
+  );
 }
 
 export async function saveSmartGoal(formData: FormData) {
@@ -735,6 +792,10 @@ export async function saveExperiment(formData: FormData) {
     result: text(formData, "result"),
     lesson: text(formData, "lesson"),
     next_step: text(formData, "nextStep"),
+    final_section: text(formData, "finalSection") || "pet_parent_growth",
+    intern_reported_result: text(formData, "internReportedResult"),
+    verified_result: text(formData, "verifiedResult"),
+    included_in_final: mode === "supervisor" && formData.get("includedInFinal") === "on",
   });
   if (error) bounce(workspacePath(internId, mode), "error", error.message);
   refreshInternship(workspacePath(internId, mode));
@@ -753,6 +814,7 @@ export async function saveAccessGrant(formData: FormData) {
       granted,
       notes: text(formData, "notes"),
       granted_at: granted ? new Date().toISOString() : null,
+      grant_status: granted ? "active" : "revoked",
     },
     { onConflict: "intern_id,tool_key" },
   );

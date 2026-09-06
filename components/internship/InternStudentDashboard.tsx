@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   BarChart3,
+  BookOpen,
   CalendarDays,
   CheckCircle2,
   ChevronLeft,
@@ -20,6 +21,9 @@ import InternshipAssignmentReview from "@/components/internship/InternshipAssign
 import InternshipKpiLetterBoard from "@/components/internship/InternshipKpiLetterBoard";
 import InternStudentTools from "@/components/internship/InternStudentTools";
 import InternKpiBoard from "@/components/internship/InternKpiBoard";
+import InternshipFinalProjectBoard, {
+  FinalSectionSelect,
+} from "@/components/internship/InternshipFinalProjectBoard";
 import { ThemeStatCard } from "@/components/sitguru/ThemeStatCard";
 import { saveInternCampaign, saveInternContent, saveInternMetric, saveWeeklyReview } from "@/lib/internship/actions";
 import { ATTRIBUTION_RULE, METRIC_SOURCE_SYSTEMS } from "@/lib/internship/constants";
@@ -35,7 +39,11 @@ import {
   type InternHomeToolId,
   type InternPromoteEvent,
 } from "@/lib/internship/intern-tools";
-import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
+import {
+  assembleBusinessGrowthReport,
+  assembleFinalProjectWorkspace,
+  defaultFinalSectionForWeek,
+} from "@/lib/internship/final-project";
 import { buildInternshipProcess } from "@/lib/internship/process";
 import {
   internCalendarEvents,
@@ -48,6 +56,7 @@ const TABS = [
   { id: "home", label: "Home", icon: Home, active: "bg-emerald-700 !text-white", chip: "bg-emerald-50 text-emerald-900" },
   { id: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-sky-600 !text-white", chip: "bg-sky-50 text-sky-900" },
   { id: "work", label: "Work", icon: ClipboardList, active: "bg-violet-600 !text-white", chip: "bg-violet-50 text-violet-900" },
+  { id: "project", label: "Report", icon: BookOpen, active: "bg-[#0D5C3A] !text-white", chip: "bg-emerald-50 text-emerald-900" },
   { id: "metrics", label: "Metrics", icon: BarChart3, active: "bg-amber-500 !text-white", chip: "bg-amber-50 text-amber-900" },
 ] as const;
 
@@ -169,6 +178,11 @@ export default function InternStudentDashboard({
     intern: data.intern,
     cohort: data.cohort,
   });
+  const finalProject = useMemo(() => assembleFinalProjectWorkspace(data), [data]);
+  const growthReport = useMemo(
+    () => assembleBusinessGrowthReport(finalProject),
+    [finalProject],
+  );
   const toolIcons = {
     brand: Palette,
     tracking: Link2,
@@ -350,8 +364,17 @@ export default function InternStudentDashboard({
               </div>
             </div>
             <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-3 text-xs font-bold leading-5 text-emerald-900">
-              {MARKET_GROWTH_PROJECT_NAME}
+              Business Growth Report · {growthReport.percent}% assembled ·{" "}
+              {growthReport.outcomes.length} verified outcomes ·{" "}
+              {growthReport.lessons.length} lessons
             </p>
+            <button
+              type="button"
+              onClick={() => openTab("project")}
+              className="mt-3 text-left text-xs font-black text-emerald-800 underline"
+            >
+              Open Business Growth Report
+            </button>
           </div>
         </div>
       </section>
@@ -526,15 +549,29 @@ export default function InternStudentDashboard({
             >
               <h2 className="font-black text-slate-950">This week’s check-in</h2>
               <p className="text-sm font-semibold text-slate-500">
-                Four short answers. That’s the whole update.
+                This update builds the Business Growth Report: measurable outcomes
+                and lessons learned. Tell Jason which Report section it advanced.
               </p>
               <input type="hidden" name="internId" value={data.intern.id} />
               <input type="hidden" name="mode" value="intern" />
               <input type="hidden" name="weekOf" value={weekOf} />
+              <FinalSectionSelect defaultValue={defaultFinalSectionForWeek(process.weekNumber)} />
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                  What did you add or improve this week?
+                </span>
+                <textarea
+                  name="contributionAdded"
+                  required
+                  rows={3}
+                  placeholder="This becomes a section of the Business Growth Report — outcomes, methods, or lessons."
+                  className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-sm font-semibold text-slate-950"
+                />
+              </label>
               {[
                 ["accomplished", "What did you finish?"],
                 ["dataShowed", "What did the numbers show?"],
-                ["didntWork", "What didn’t work?"],
+                ["didntWork", "What didn’t work? (lessons learned)"],
                 ["changingNextWeek", "What’s next?"],
               ].map(([name, label]) => (
                 <label key={name} className="block">
@@ -548,6 +585,16 @@ export default function InternStudentDashboard({
                   />
                 </label>
               ))}
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+                  Intern-reported KPI
+                </span>
+                <input
+                  name="internReportedKpi"
+                  placeholder="27 Pet Parent registrations — waits for SitGuru verification"
+                  className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold text-slate-950"
+                />
+              </label>
               <button className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
                 <CheckCircle2 size={16} />
                 Save check-in
@@ -799,6 +846,7 @@ export default function InternStudentDashboard({
                   </label>
                   <Field name="draftUrl" label="Draft link" />
                   <Field name="publishedUrl" label="Published link" />
+                  <FinalSectionSelect defaultValue="content_system" />
                   <button className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
                     Save social post
                   </button>
@@ -851,6 +899,7 @@ export default function InternStudentDashboard({
                   <Field name="utmCampaign" label="utm_campaign" placeholder="spring27_growth" />
                   <Field name="referralCode" label="Referral code" />
                   <Field name="objective" label="Business objective" />
+                  <FinalSectionSelect defaultValue={defaultFinalSectionForWeek(process.weekNumber)} />
                   <p className="text-xs font-semibold leading-5 text-slate-500">
                     {ATTRIBUTION_RULE}
                   </p>
@@ -868,6 +917,15 @@ export default function InternStudentDashboard({
             </p>
           ) : null}
         </section>
+      ) : null}
+
+      {tab === "project" ? (
+        <InternshipFinalProjectBoard
+          data={data}
+          weekNumber={process.weekNumber}
+          mode="intern"
+          preview={preview}
+        />
       ) : null}
 
       {tab === "metrics" ? (
@@ -949,6 +1007,7 @@ export default function InternStudentDashboard({
                 </select>
               </label>
               <Field name="sourceNote" label="Source note / report link" />
+              <FinalSectionSelect defaultValue="analytics_attribution" />
               <p className="text-xs font-semibold text-amber-800">
                 Self-reported until Jason verifies it from a SitGuru-controlled source.
               </p>
@@ -962,7 +1021,7 @@ export default function InternStudentDashboard({
       ) : null}
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-100 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur sm:hidden">
-        <div className="grid grid-cols-4 gap-1">
+        <div className="grid grid-cols-5 gap-1">
           {TABS.map((item) => (
             <button
               key={item.id}

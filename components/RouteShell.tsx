@@ -64,9 +64,13 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     isPublicGuruProfilePage ||
     isPublicShortGuruProfilePage;
 
+  const isInternPrivatePage =
+    pathname === "/intern" || pathname.startsWith("/intern/");
+
   const isGuruPrivatePage =
     !isPublicPage &&
     !isAuthPage &&
+    !isInternPrivatePage &&
     (isGuruWorkspacePath(pathname) ||
       (pathname.startsWith("/guru/") &&
         !isPublicGuruOnboardingPath(pathname) &&
@@ -139,6 +143,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     !isPublicGuruOnboardingPath(pathname) &&
     pathname !== "/become-a-guru" &&
     !pathname.startsWith("/become-a-guru/") &&
+    !isInternPrivatePage &&
     (isHomePage || isPublicPage || isPetParentCompanionPage);
 
   const shouldShowScoutOrTaco =
@@ -175,7 +180,12 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (isGuruPrivatePage || isCustomerPrivatePage || isAmbassadorPrivatePage) {
+  if (
+    isGuruPrivatePage ||
+    isCustomerPrivatePage ||
+    isAmbassadorPrivatePage ||
+    isInternPrivatePage
+  ) {
     return (
       <>
         <div className="site-main min-h-screen bg-white">{children}</div>

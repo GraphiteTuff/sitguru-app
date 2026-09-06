@@ -23,8 +23,8 @@ export const HOURS_RULE =
 
 export const WEEKLY_RHYTHM = [
   "30-minute supervisor check-in: learning, decisions, roadblocks, and KPI review.",
-  "One written weekly update: completed work, metrics, insight, next week’s priorities, and hours logged against the approved university requirement.",
-  "Update the experiment log: hypothesis, action, audience, result, lesson, next step.",
+  "One written weekly update: completed work, metrics, insight, next week’s priorities, hours, and how this week advances the Business Growth Report.",
+  "Update the experiment log: hypothesis, action, audience, result, lesson, next step. Verified results and lessons learned feed the final report.",
 ] as const;
 
 export const LEARNING_OBJECTIVES = [
@@ -33,52 +33,31 @@ export const LEARNING_OBJECTIVES = [
   "Use analytics to evaluate campaign performance and make evidence-based decisions.",
   "Apply audience research, message testing, conversion concepts, and basic marketing attribution.",
   "Practice professional communication with community partners and internal stakeholders.",
-  "Present business recommendations in a concise executive format and defend them with data.",
-  "Build a portfolio-ready case study that shows contribution, process, and measurable results.",
+  "Present a Business Growth Report documenting measurable outcomes and lessons learned, then defend it with data.",
+  "Build a portfolio-ready case study from that same approved report — no Pet Parent PII or unpublished internals.",
 ] as const;
 
 export const SEMESTER_DELIVERABLES = [
   {
-    id: "baseline",
-    timing: "Weeks 1–2",
-    title: "Baseline & Growth Brief",
-    demonstrates:
-      "Market definition, current metrics, audience segments, risks, opportunities, KPI baseline, proposed SMART targets.",
-  },
-  {
-    id: "campaign_system",
-    timing: "Weeks 2–4",
-    title: "Campaign System",
-    demonstrates:
-      "Content pillars, 8–12 week calendar, channel plan, tracking links, creative templates, approval workflow.",
-  },
-  {
-    id: "execution",
-    timing: "Weeks 4–11",
-    title: "Campaign Execution",
-    demonstrates:
-      "Publish/schedule approved content, support community campaigns, test messages, document partner opportunities, track results.",
-  },
-  {
-    id: "midpoint",
-    timing: "Mid-semester",
-    title: "Midpoint Review",
-    demonstrates:
-      "Performance summary, experiments completed, lessons learned, revised targets, next-phase plan.",
-  },
-  {
-    id: "optimization",
-    timing: "Weeks 12–15",
-    title: "Optimization & Handoff",
-    demonstrates:
-      "Double down on high-performing channels, document repeatable processes, prepare asset library and recommendations.",
-  },
-  {
-    id: "final_report",
-    timing: "Final week",
+    id: "report",
+    timing: "Weeks 1–15 · Destination",
     title: "Business Growth Report",
     demonstrates:
-      "Baseline vs. final results, attributable business outcomes, campaign case study, lessons learned, and 90-day recommendations.",
+      "The document all weekly work builds: starting point, SMART goals, how the work was done, experiments, verified measurable outcomes, lessons learned, and recommendations.",
+  },
+  {
+    id: "playbook",
+    timing: "Weeks 1–14 · Supporting",
+    title: "SitGuru Market Growth Playbook",
+    demonstrates:
+      "Audience, campaigns, conversion, community growth, what works, and SOPs the next intern can inherit — assembled from the same approved work as the Report.",
+  },
+  {
+    id: "portfolio",
+    timing: "Week 15 · Supporting",
+    title: "Portfolio Case Study",
+    demonstrates:
+      "A sanitized professional version of the Report. No Pet Parent PII, passwords, or unpublished SitGuru internals.",
   },
 ] as const;
 
@@ -272,12 +251,12 @@ export const SUCCESS_DEFINITION = [
   {
     area: "Student value",
     definition:
-      "The intern completes a meaningful portfolio case study, receives structured supervision, and demonstrates career-relevant skills.",
+      "The intern completes a Business Growth Report with verified outcomes and lessons learned, plus a sanitized portfolio case study.",
   },
   {
     area: "Business growth",
     definition:
-      "The final report documents measurable movement in at least one Tier 1 business outcome and supporting conversion metrics.",
+      "The Business Growth Report documents measurable movement in at least one Tier 1 business outcome and supporting conversion metrics, plus what did not work.",
   },
   {
     area: "Funding readiness",
@@ -297,5 +276,5 @@ export const SUCCESS_DEFINITION = [
 ] as const;
 
 export function internshipPositioningSummary() {
-  return `${INTERNSHIP_TITLE} works a structured ${MARKET_GROWTH_PROJECT_NAME}: research a target market, establish baseline metrics, execute multi-platform content and community campaigns, analyze results, and present a final report demonstrating measurable business impact. ${HOURS_RULE}`;
+  return `${INTERNSHIP_TITLE} works a structured ${MARKET_GROWTH_PROJECT_NAME}: research a target market, establish baseline metrics, execute multi-platform content and community campaigns, analyze results, and document measurable outcomes and lessons learned in a Business Growth Report. ${HOURS_RULE}`;
 }

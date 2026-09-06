@@ -45,6 +45,12 @@ export type InternshipUniversity = {
   verifiedAt: string | null;
   notes: string;
   archived: boolean;
+  recruitingStatus?: string;
+  requirementsStatus?: string;
+  lastContactOn?: string | null;
+  nextAction?: string;
+  institutionContactStatus?: string;
+  isTest?: boolean;
 };
 
 export type InternshipCampus = {
@@ -139,6 +145,9 @@ export type InternshipIntern = {
   academicSnapshot: Record<string, unknown>;
   notes: string;
   avatarUrl: string;
+  isTest?: boolean;
+  baselineLockedAt?: string | null;
+  baselineLockReason?: string;
 };
 
 export type InternshipTask = {
@@ -159,6 +168,11 @@ export type InternshipTask = {
   employerLetter: string;
   kpiTier: string;
   outputVsTarget: number | null;
+  finalSection?: string;
+  weekNumber?: number | null;
+  campaignId?: string | null;
+  internReportedValue?: string;
+  verifiedValue?: string;
 };
 
 export type InternshipContentItem = {
@@ -177,6 +191,7 @@ export type InternshipContentItem = {
   employerLetter: string;
   kpiTier: string;
   outputVsTarget: number | null;
+  finalSection?: string;
 };
 
 export type InternshipWorkComment = {
@@ -201,6 +216,7 @@ export type InternshipCampaign = {
   objective: string;
   status: string;
   primaryOwnerInternId: string | null;
+  finalSection?: string;
 };
 
 export type InternshipMetric = {
@@ -217,6 +233,7 @@ export type InternshipMetric = {
   sourceNote: string;
   isVerified: boolean;
   selfReported: boolean;
+  finalSection?: string;
 };
 
 export type InternshipScorecard = {
@@ -246,6 +263,15 @@ export type InternshipWeeklyReview = {
   didntWork: string;
   changingNextWeek: string;
   upcomingApproved: boolean;
+  finalSection?: string;
+  contributionAdded?: string;
+  hoursLogged?: number | null;
+  workApproved?: boolean;
+  hoursApproved?: boolean;
+  evidenceApproved?: boolean;
+  contributionApproved?: boolean;
+  internReportedKpi?: string;
+  verifiedKpi?: string;
 };
 
 export type FrozenAcademicProfile = {
@@ -306,6 +332,11 @@ export type InternshipSmartGoal = {
   targetValue: string;
   sourceSystem: string;
   status: string;
+  submittedAt?: string | null;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
+  lockedAt?: string | null;
+  changeReason?: string;
 };
 
 export type InternshipExperiment = {
@@ -317,12 +348,18 @@ export type InternshipExperiment = {
   result: string;
   lesson: string;
   nextStep: string;
+  finalSection?: string;
+  campaignId?: string | null;
+  internReportedResult?: string;
+  verifiedResult?: string;
+  includedInFinal?: boolean;
 };
 
 export type InternshipAccessGrant = {
   toolKey: string;
   granted: boolean;
   notes: string;
+  grantStatus?: string;
 };
 
 export type InternshipWorkspaceData = {

@@ -62,6 +62,12 @@ export function mapUniversity(row: Record<string, unknown>): InternshipUniversit
     verifiedAt: text(row.verified_at) || null,
     notes: text(row.notes),
     archived: bool(row.archived),
+    recruitingStatus: text(row.recruiting_status) || "not_started",
+    requirementsStatus: text(row.requirements_status) || "not_researched",
+    lastContactOn: text(row.last_contact_on) || null,
+    nextAction: text(row.next_action),
+    institutionContactStatus: text(row.institution_contact_status),
+    isTest: bool(row.is_test),
   };
 }
 
@@ -170,6 +176,9 @@ export function mapIntern(row: Record<string, unknown>): InternshipIntern {
     academicSnapshot: snapshot,
     notes: text(row.notes),
     avatarUrl: text(row.avatar_url),
+    isTest: bool(row.is_test),
+    baselineLockedAt: text(row.baseline_locked_at) || null,
+    baselineLockReason: text(row.baseline_lock_reason),
   };
 }
 
@@ -192,6 +201,11 @@ export function mapTask(row: Record<string, unknown>): InternshipTask {
     employerLetter: text(row.employer_letter),
     kpiTier: text(row.kpi_tier),
     outputVsTarget: num(row.output_vs_target),
+    finalSection: text(row.final_section),
+    weekNumber: num(row.week_number),
+    campaignId: text(row.campaign_id) || null,
+    internReportedValue: text(row.intern_reported_value),
+    verifiedValue: text(row.verified_value),
   };
 }
 
@@ -212,6 +226,7 @@ export function mapContent(row: Record<string, unknown>): InternshipContentItem 
     employerLetter: text(row.employer_letter),
     kpiTier: text(row.kpi_tier),
     outputVsTarget: num(row.output_vs_target),
+    finalSection: text(row.final_section),
   };
 }
 
@@ -228,6 +243,7 @@ export function mapCampaign(row: Record<string, unknown>): InternshipCampaign {
     objective: text(row.objective),
     status: text(row.status) || "draft",
     primaryOwnerInternId: text(row.primary_owner_intern_id) || null,
+    finalSection: text(row.final_section) || "campaign_system",
   };
 }
 
@@ -246,6 +262,7 @@ export function mapMetric(row: Record<string, unknown>): InternshipMetric {
     sourceNote: text(row.source_note),
     isVerified: bool(row.is_verified),
     selfReported: bool(row.self_reported),
+    finalSection: text(row.final_section),
   };
 }
 
@@ -279,5 +296,14 @@ export function mapWeeklyReview(row: Record<string, unknown>): InternshipWeeklyR
     didntWork: text(row.didnt_work),
     changingNextWeek: text(row.changing_next_week),
     upcomingApproved: bool(row.upcoming_approved),
+    finalSection: text(row.final_section),
+    contributionAdded: text(row.contribution_added),
+    hoursLogged: num(row.hours_logged),
+    workApproved: bool(row.work_approved),
+    hoursApproved: bool(row.hours_approved),
+    evidenceApproved: bool(row.evidence_approved),
+    contributionApproved: bool(row.contribution_approved),
+    internReportedKpi: text(row.intern_reported_kpi),
+    verifiedKpi: text(row.verified_kpi),
   };
 }

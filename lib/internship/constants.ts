@@ -28,14 +28,54 @@ export function internshipUniversitySlug(name: string) {
 
 export const UNIVERSITY_STATUSES = [
   "research_needed",
+  "potential",
   "potential_partner",
   "contacted",
   "requirements_identified",
   "internship_eligible",
   "academic_credit_confirmed",
+  "formal_partner",
   "active_partner",
   "inactive",
 ] as const;
+
+export const UNIVERSITY_RECRUITING_STATUSES = [
+  "not_started",
+  "researching",
+  "contacted",
+  "awaiting_response",
+  "posting_preparation",
+  "posting_submitted",
+  "posting_approved",
+  "recruiting_active",
+  "applications_received",
+  "candidate_selected",
+  "closed",
+] as const;
+
+export const UNIVERSITY_REQUIREMENTS_STATUSES = [
+  "not_researched",
+  "researching",
+  "partially_verified",
+  "verified",
+  "needs_reverification",
+] as const;
+
+export const ACCESS_GRANT_STATUSES = [
+  "not_granted",
+  "requested",
+  "active",
+  "revoked",
+] as const;
+
+export const SMART_GOAL_STATUSES = [
+  "draft",
+  "submitted",
+  "approved",
+  "locked",
+] as const;
+
+export const PROJECT_RECORD_KINDS = ["track", "intern_project"] as const;
 
 export const ACADEMIC_CREDIT_STATUSES = [
   "confirmed",
@@ -52,10 +92,19 @@ export const INTERNSHIP_ELIGIBILITY_STATUSES = [
 ] as const;
 
 export const FUNDING_DIRECTORY_STATUSES = [
+  "unknown",
+  "research_needed",
+  "not_yet_open",
+  "open",
+  "student_eligible",
+  "student_applying",
+  "submitted",
+  "approved",
+  "declined",
+  "closed",
   "available",
   "possible",
   "none_found",
-  "unknown",
 ] as const;
 
 export const INTERNSHIP_PATH_TYPE_SLUGS = [
