@@ -59,12 +59,11 @@ export async function GET(req: NextRequest) {
       const ack = await getInternOnboarding(intern.id);
       if (!internOnboardingComplete(ack)) {
         return json(req, {
+          ...internOnboardingPublicState(ack),
           mode: "intern",
-          onboarded: false,
           onboardingRequired: true,
           intern: { id: intern.id, fullName: intern.fullName },
           workspace: null,
-          ...internOnboardingPublicState(ack),
         });
       }
     }
@@ -81,12 +80,11 @@ export async function GET(req: NextRequest) {
     const ack = await getInternOnboarding(intern.id);
     if (!internOnboardingComplete(ack)) {
       return json(req, {
+        ...internOnboardingPublicState(ack),
         mode: "intern",
-        onboarded: false,
         onboardingRequired: true,
         intern: { id: intern.id, fullName: intern.fullName },
         workspace: null,
-        ...internOnboardingPublicState(ack),
       });
     }
     const workspace = await getInternWorkspace(intern.id);
