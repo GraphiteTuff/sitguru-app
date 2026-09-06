@@ -476,7 +476,7 @@ export async function approveInternWork(formData: FormData) {
     .eq("id", id);
   if (error) bounce(`/admin/internship/interns/${internId}`, "error", error.message);
   refreshInternship(`/admin/internship/interns/${internId}`);
-  bounce(`/admin/internship/interns/${internId}`, "ok", "Jason approval recorded.");
+  bounce(`/admin/internship/interns/${internId}`, "ok", "SitGuru approval recorded.");
 }
 
 export async function submitInternWork(formData: FormData) {
@@ -1125,7 +1125,7 @@ export async function uploadInternConfidentialityScan(formData: FormData) {
   bounce(
     INTERNSHIP_ONBOARDING_PATH,
     "ok",
-    "Signed page uploaded. Submit it to intern@sitguru.com to finish onboarding.",
+    "Signed page uploaded. Submit next. Email confirmation will be sent to your email on file.",
   );
 }
 
@@ -1172,6 +1172,6 @@ export async function submitInternConfidentialityScan(formData: FormData) {
   bounce(
     "/intern",
     "ok",
-    "Submitted. intern@sitguru.com has the signed page, and a confirmation was sent to your email.",
+    "Submitted. Email confirmation will be sent to your email on file.",
   );
 }

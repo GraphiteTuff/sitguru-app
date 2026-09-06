@@ -482,7 +482,7 @@ export default function InternStudentDashboard({
                   {INTERN_GROWTH_WORKPLACE.label}
                 </h2>
                 <p className="mt-1 max-w-xl text-sm font-semibold text-slate-600">
-                  {INTERN_GROWTH_WORKPLACE.blurb} Drafts wait for Jason. No Admin
+                  {INTERN_GROWTH_WORKPLACE.blurb} Drafts wait for SitGuru approval. No Admin
                   HQ, passwords, or Pet Parent records.
                 </p>
               </div>
@@ -602,7 +602,7 @@ export default function InternStudentDashboard({
               <h2 className="font-black text-slate-950">This week’s check-in</h2>
               <p className="text-sm font-semibold text-slate-500">
                 This update builds the Business Growth Report: measurable outcomes
-                and lessons learned. Tell Jason which Report section it advanced.
+                and lessons learned. Choose which Report section it advanced.
               </p>
               <input type="hidden" name="internId" value={data.intern.id} />
               <input type="hidden" name="mode" value="intern" />
@@ -803,7 +803,7 @@ export default function InternStudentDashboard({
       {tab === "work" ? (
         <section className="space-y-3">
           <p className="px-1 text-sm font-semibold text-slate-600">
-            Tasks, social posts, and campaigns live here. Jason grades submitted work in
+            Tasks, social posts, and campaigns live here. SitGuru grades submitted work in
             Employer HQ — you do not need Admin.
           </p>
           <div className="flex flex-wrap gap-2">
@@ -1006,7 +1006,7 @@ export default function InternStudentDashboard({
           <InternKpiBoard internId={data.intern.id} />
           <p className="px-1 text-sm font-semibold text-slate-600">
             Letters come from verified KPI output vs your SMART targets — not from
-            posting more. Self-reported numbers wait for Jason.
+            posting more. Self-reported numbers wait for SitGuru.
           </p>
           <InternshipKpiLetterBoard data={data} />
           {data.metrics.length ? (
@@ -1090,7 +1090,7 @@ export default function InternStudentDashboard({
               <Field name="sourceNote" label="Source note / report link" />
               <FinalSectionSelect defaultValue="analytics_attribution" />
               <p className="text-xs font-semibold text-amber-800">
-                Self-reported until Jason verifies it from a SitGuru-controlled source.
+                Self-reported until SitGuru verifies it from a SitGuru-controlled source.
               </p>
               <p className="text-xs font-semibold leading-5 text-slate-500">{ATTRIBUTION_RULE}</p>
               <button className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">

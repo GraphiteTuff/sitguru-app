@@ -124,7 +124,7 @@ export default function InternshipAssignmentReview({
           {itemComments.map((row) => (
             <p key={row.id} className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
               <span className="font-black text-slate-950">
-                {row.authorRole === "supervisor" ? "Jason" : "Intern"}:{" "}
+                {row.authorRole === "supervisor" ? "SitGuru" : "Intern"}:{" "}
               </span>
               {row.body}
             </p>
@@ -202,7 +202,7 @@ export default function InternshipAssignmentReview({
           )}
           <label className="block">
             <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-              What should Jason review?
+              What should SitGuru review?
             </span>
             <textarea
               name="studentNotes"
@@ -222,7 +222,7 @@ export default function InternshipAssignmentReview({
             />
           </label>
           <button className="min-h-12 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
-            {awaiting ? "Resubmit for review" : "Submit for Jason’s review"}
+            {awaiting ? "Resubmit for review" : "Submit for SitGuru review"}
           </button>
         </form>
       ) : null}

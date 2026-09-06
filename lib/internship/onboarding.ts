@@ -22,12 +22,12 @@ export const INTERN_ONBOARDING_STEPS = [
   {
     id: "wetink",
     title: "Print, sign, upload",
-    blurb: "Print the one-page signature sheet, sign in ink, and upload it.",
+    blurb: "Print, sign, and upload the page.",
   },
   {
     id: "submit",
     title: "Submit",
-    blurb: "Send the signed page to intern@sitguru.com and unlock the portal.",
+    blurb: "Email confirmation will be sent to your email on file.",
   },
 ] as const;
 
@@ -38,7 +38,7 @@ export const INTERN_ACCESS_RULES = [
   "Keep customer and Pet Parent personally identifiable information out of drafts, screenshots, campus work, and portfolio materials. Use aggregated or anonymized results.",
   "Do not count a growth result as attributable until the supervisor verifies it from an approved SitGuru source.",
   "University logos and marks stay off intern work unless SitGuru records that the school granted permission.",
-  "Drafts wait for Jason. Do not publish, boost, or send SitGuru communications until they are approved.",
+  "Drafts wait for SitGuru approval. Do not publish, boost, or send SitGuru communications until they are approved.",
 ] as const;
 
 export const INTERN_CONFIDENTIALITY_NOTICE = {
@@ -55,11 +55,11 @@ export const INTERN_CONFIDENTIALITY_NOTICE = {
     },
     {
       heading: "2. Student duties",
-      body: "Use protected information only for assigned internship work. Limit access to SitGuru-approved tools. Store files only in the intern portal or other locations Jason designates. Do not mix SitGuru confidential files into personal drives, group chats, or campus shared folders. Report suspected loss or misuse to the site supervisor immediately.",
+      body: "Use protected information only for assigned internship work. Limit access to SitGuru-approved tools. Store files only in the intern portal or other locations SitGuru designates. Do not mix SitGuru confidential files into personal drives, group chats, or campus shared folders. Report suspected loss or misuse to the site supervisor immediately.",
     },
     {
       heading: "3. Prohibited conduct",
-      body: "Do not copy, screenshot, download, forward, post, or discuss protected information outside the internship. Do not use it for class projects, job applications, social media, or competing work unless Jason has approved a sanitized version in writing. Do not attempt to access accounts, data, or admin tools that are not assigned to this role.",
+      body: "Do not copy, screenshot, download, forward, post, or discuss protected information outside the internship. Do not use it for class projects, job applications, social media, or competing work unless SitGuru has approved a sanitized version in writing. Do not attempt to access accounts, data, or admin tools that are not assigned to this role.",
     },
     {
       heading: "4. Ownership and work product",
@@ -176,5 +176,5 @@ export function internOnboardingStatusLabel(ack: InternshipOnboarding | null | u
   if (step === "access") return "Access rules pending";
   if (step === "esign") return "Electronic signature pending";
   if (step === "wetink") return "Signed page upload pending";
-  return "Submit to intern@sitguru.com pending";
+  return "Submit pending";
 }

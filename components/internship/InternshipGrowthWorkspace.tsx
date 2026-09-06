@@ -157,7 +157,7 @@ export default function InternshipGrowthWorkspace({
           </div>
           {supervisor ? (
             <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-800">
-              {pendingApproval} awaiting Jason approval
+              {pendingApproval} awaiting SitGuru approval
             </span>
           ) : null}
         </div>

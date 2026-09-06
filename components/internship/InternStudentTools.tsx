@@ -271,7 +271,7 @@ export default function InternStudentTools({
             </p>
             <p className="mt-1 text-2xl font-black text-slate-950">{snapshot.verifiedCount}</p>
             <p className="text-xs font-semibold text-slate-500">
-              {snapshot.pendingCount} waiting on Jason
+              {snapshot.pendingCount} waiting on SitGuru
             </p>
           </div>
           <div className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
@@ -304,7 +304,7 @@ export default function InternStudentTools({
           </ul>
         ) : (
           <p className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white p-4 text-sm font-semibold text-slate-500">
-            Verified KPIs show here after Jason confirms them from SitGuru sources.
+            Verified KPIs show here after SitGuru confirms them from SitGuru sources.
           </p>
         )}
         {snapshot.goals.length ? (
@@ -385,7 +385,7 @@ export default function InternStudentTools({
   return (
     <ToolShell
       title="Social media"
-      blurb="Promote @SitGuruOfficial. Draft posts here — SitGuru publishes from official accounts unless Jason grants a channel."
+      blurb="Promote @SitGuruOfficial. Draft posts here — SitGuru publishes from official accounts unless SitGuru grants a channel."
       tool={tool}
       onBack={onBack}
     >

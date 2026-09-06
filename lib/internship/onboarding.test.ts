@@ -103,7 +103,7 @@ describe("intern onboarding gate", () => {
     assert.equal(internOnboardingStatusLabel(null), "Access rules pending");
     assert.equal(
       internOnboardingStatusLabel(ack({ wetInkSubmittedAt: null })),
-      "Submit to intern@sitguru.com pending",
+      "Submit pending",
     );
     assert.equal(internOnboardingStatusLabel(ack()), "Complete");
   });

@@ -1,15 +1,14 @@
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import InternConfidentialityNotice from "@/components/internship/InternConfidentialityNotice";
+import InternSignedPageUpload from "@/components/internship/InternSignedPageUpload";
 import {
   acceptInternAccessRules,
   signInternConfidentiality,
   submitInternConfidentialityScan,
-  uploadInternConfidentialityScan,
 } from "@/lib/internship/actions";
 import {
   INTERN_ACCESS_RULES,
-  INTERN_ONBOARDING_INBOX,
   INTERN_ONBOARDING_STEPS,
   INTERNSHIP_ONBOARDING_PRINT_PATH,
   internOnboardingComplete,
@@ -36,7 +35,6 @@ export default function InternOnboardingForm({
   const signed = Boolean(onboarding?.electronicSignedAt);
   const uploaded = Boolean(onboarding?.wetInkUploadedAt && onboarding?.wetInkStoragePath);
   const submitted = Boolean(onboarding?.wetInkSubmittedAt);
-  const internEmail = intern.email || intern.studentEmail;
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 px-3 py-5 sm:px-5">
@@ -50,10 +48,9 @@ export default function InternOnboardingForm({
         </p>
         <h1 className="mt-2 text-3xl font-black !text-white">Intern onboarding</h1>
         <p className="mt-3 text-sm font-semibold leading-6 !text-white/90">
-          SitGuru unlocks the intern portal only after you accept access rules, sign
-          electronically, upload the one-page signed sheet, and submit it.{" "}
-          {INTERN_ONBOARDING_INBOX} receives the signed page, and a confirmation goes to{" "}
-          {internEmail || "your intern email"}.
+          SitGuru unlocks the intern portal after you accept the access rules, sign,
+          print and upload the signed page, then submit. Email confirmation will be
+          sent to your email on file.
         </p>
       </section>
 
@@ -106,8 +103,8 @@ export default function InternOnboardingForm({
             Onboarding complete
           </p>
           <p className="mt-2 text-sm font-semibold text-slate-600">
-            Signed electronically as {onboarding?.typedLegalName}. {INTERN_ONBOARDING_INBOX}{" "}
-            has {onboarding?.wetInkFileName}, and a confirmation was sent to {internEmail}.
+            Signed electronically as {onboarding?.typedLegalName}. Email confirmation
+            was sent to your email on file.
           </p>
           <Link
             href="/intern"
@@ -192,15 +189,14 @@ export default function InternOnboardingForm({
       <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5">
         <h2 className="font-black text-slate-950">3. Print, sign, and upload</h2>
         <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-          Open the printable signature page — it prints as one sheet, without the SitGuru
-          website footer. Sign in ink, then upload the PDF or a photo.
+          Print the signature page, sign it, then upload a PDF or photo.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link
             href={INTERNSHIP_ONBOARDING_PRINT_PATH}
             className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
           >
-            Open printable page
+            Print
           </Link>
         </div>
         {uploaded ? (
@@ -208,34 +204,14 @@ export default function InternOnboardingForm({
             Uploaded {onboarding?.wetInkFileName}.
           </p>
         ) : (
-          <form
-            action={uploadInternConfidentialityScan}
-            encType="multipart/form-data"
-            className="mt-4 space-y-3"
-          >
-            <input type="hidden" name="internId" value={intern.id} />
-            <input
-              name="file"
-              type="file"
-              required
-              accept="application/pdf,image/jpeg,image/png,image/webp"
-              className="block w-full text-sm font-semibold text-slate-700"
-            />
-            <button
-              disabled={!signed}
-              className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white disabled:opacity-50"
-            >
-              Upload signed page
-            </button>
-          </form>
+          <InternSignedPageUpload internId={intern.id} disabled={!signed} />
         )}
       </section>
 
       <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5">
         <h2 className="font-black text-slate-950">4. Submit</h2>
         <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-          Submit sends the signed page to {INTERN_ONBOARDING_INBOX} and emails a confirmation
-          to {internEmail || "your intern email"} that it is on file. The intern portal
+          Email confirmation will be sent to your email on file. The intern portal
           unlocks after this step.
         </p>
         {submitted ? (

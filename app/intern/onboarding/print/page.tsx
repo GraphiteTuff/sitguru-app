@@ -50,13 +50,13 @@ export default async function InternOnboardingPrintPage() {
         <a href={INTERNSHIP_ONBOARDING_PATH} className="text-sm font-black text-emerald-800">
           Back to onboarding
         </a>
-        <InternPrintButton label="Print this one-page signature sheet" />
+        <InternPrintButton label="Print" />
       </div>
       <section className="border border-emerald-100 bg-white p-4 print:border-0 print:p-0">
         <div className="flex items-start justify-between gap-3 border-b border-emerald-100 pb-2">
           <SiteLogo href="" wrapperClassName="w-[140px]" imageClassName="h-10 w-auto" />
           <p className="text-right text-[9px] font-black uppercase tracking-[0.14em] text-emerald-800">
-            One-page signature sheet
+            Signature page
             <br />
             Return to {INTERN_ONBOARDING_INBOX}
           </p>
@@ -83,8 +83,8 @@ export default async function InternOnboardingPrintPage() {
           </div>
         </div>
         <p className="mt-3 text-[9px] font-semibold text-slate-500">
-          After signing, upload this one page at sitguru.com/intern/onboarding and click
-          Submit. SitGuru emails {INTERN_ONBOARDING_INBOX} and sends you a confirmation.
+          After signing, upload this page and click Submit. Email confirmation will
+          be sent to your email on file.
         </p>
       </section>
     </main>
