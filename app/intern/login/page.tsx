@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
+import { internSafeNext } from "@/lib/internship/intern-growth";
 import { findInternByAccount } from "@/lib/internship/queries";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export default async function InternLoginPage({
 }) {
   const params = searchParams ? await searchParams : {};
   const error = first(params.error);
+  const nextPath = internSafeNext(first(params.next));
   const supabase = await createClient();
   const {
     data: { user },
@@ -28,7 +30,7 @@ export default async function InternLoginPage({
       userId: user.id,
       email: user.email,
     });
-    if (intern) redirect("/intern");
+    if (intern) redirect(nextPath);
     const admin = await getAdminIdentity();
     if (admin?.canAccessAdmin) redirect("/admin/internship/portal");
     if (isFounderPersonalMarketplaceEmail(user.email)) redirect("/intern");
@@ -59,7 +61,7 @@ export default async function InternLoginPage({
 
   const login = new URLSearchParams({
     role: "intern",
-    next: "/intern",
+    next: nextPath,
   });
   if (error) login.set("error", error);
   redirect(`/login?${login.toString()}`);

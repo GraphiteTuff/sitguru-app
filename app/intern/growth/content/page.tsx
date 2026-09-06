@@ -3,8 +3,8 @@ import { GrowthContentScreen } from "@/components/admin/growth/GrowthWorkplacePa
 
 export const dynamic = "force-dynamic";
 
-export default async function GrowthContentPage() {
-  const access = await requireGrowthWorkplace("admin");
+export default async function InternGrowthContentPage() {
+  const access = await requireGrowthWorkplace("intern");
   if (!access.ok) return access.ui;
   return <GrowthContentScreen workplace={access} />;
 }

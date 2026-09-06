@@ -9,12 +9,14 @@ import {
 } from "@/lib/admin/growth/constants";
 
 export default function GrowthWorkForm({
+  basePath = "/admin/growth",
   defaultKind = "post",
   defaultTitle = "",
   defaultMarket = "",
   defaultDestination = "",
   sourceHref = "",
 }: {
+  basePath?: string;
   defaultKind?: string;
   defaultTitle?: string;
   defaultMarket?: string;
@@ -38,7 +40,7 @@ export default function GrowthWorkForm({
             setError(result.error || "Could not save.");
             return;
           }
-          router.push(`/admin/growth/campaigns/${result.campaignId}`);
+          router.push(`${basePath}/campaigns/${result.campaignId}`);
         });
       }}
     >

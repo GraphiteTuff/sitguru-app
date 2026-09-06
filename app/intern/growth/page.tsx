@@ -3,8 +3,8 @@ import { GrowthWorkplaceHome } from "@/components/admin/growth/GrowthWorkplaceHo
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminGrowthHomePage() {
-  const access = await requireGrowthWorkplace("admin");
+export default async function InternGrowthHomePage() {
+  const access = await requireGrowthWorkplace("intern");
   if (!access.ok) return access.ui;
   return <GrowthWorkplaceHome workplace={access} />;
 }

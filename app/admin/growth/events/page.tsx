@@ -1,26 +1,10 @@
-import { requireGrowthPortal } from "@/lib/admin/growth/access";
-import { listPromotableEvents } from "@/lib/admin/growth/data";
-import PromoteList from "@/components/admin/growth/PromoteList";
-import { GrowthPageFrame } from "@/components/admin/growth/GrowthPageFrame";
+import { requireGrowthWorkplace } from "@/lib/admin/growth/workplace";
+import { GrowthPromoteScreen } from "@/components/admin/growth/GrowthWorkplacePages";
 
 export const dynamic = "force-dynamic";
 
 export default async function GrowthEventsPage() {
-  const access = await requireGrowthPortal();
+  const access = await requireGrowthWorkplace("admin");
   if (!access.ok) return access.ui;
-
-  const items = await listPromotableEvents();
-
-  return (
-    <GrowthPageFrame
-      title="Events"
-      detail="Promote local pet events. Send people to the event page with a tracking link."
-    >
-      <PromoteList
-        items={items}
-        kind="event"
-        empty="No published events yet. Add one in Community Events, then come back here."
-      />
-    </GrowthPageFrame>
-  );
+  return <GrowthPromoteScreen workplace={access} kind="event" />;
 }

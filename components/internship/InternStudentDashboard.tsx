@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   BarChart3,
   BookOpen,
@@ -13,6 +14,7 @@ import {
   Home,
   Link2,
   MapPinned,
+  Megaphone,
   Palette,
   Share2,
 } from "lucide-react";
@@ -34,6 +36,7 @@ import {
 } from "@/lib/internship/labels";
 import {
   INTERN_HOME_TOOLS,
+  INTERN_GROWTH_WORKPLACE,
   INTERN_SOCIAL_PLATFORMS,
   internSchoolEmphasis,
   type InternHomeToolId,
@@ -316,6 +319,13 @@ export default function InternStudentDashboard({
               the Canvas card. SitGuru tools stay intern-only — no Admin login.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                href={INTERN_GROWTH_WORKPLACE.href}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[#0D5C3A] px-4 text-sm font-black !text-white shadow-sm"
+              >
+                <Megaphone size={14} />
+                {INTERN_GROWTH_WORKPLACE.label}
+              </Link>
               <button
                 type="button"
                 onClick={() => openTool("social")}
@@ -442,6 +452,30 @@ export default function InternStudentDashboard({
           </section>
 
           <InternKpiBoard internId={data.intern.id} />
+
+          <section className="overflow-hidden rounded-[1.8rem] border border-emerald-200 bg-white shadow-sm">
+            <span className="block h-2.5 w-full bg-[#0D5C3A]" />
+            <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
+                  On-the-project training
+                </p>
+                <h2 className="mt-1 font-black text-slate-950">
+                  {INTERN_GROWTH_WORKPLACE.label}
+                </h2>
+                <p className="mt-1 max-w-xl text-sm font-semibold text-slate-600">
+                  {INTERN_GROWTH_WORKPLACE.blurb} Drafts wait for Jason. No Admin
+                  HQ, passwords, or Pet Parent records.
+                </p>
+              </div>
+              <Link
+                href={INTERN_GROWTH_WORKPLACE.href}
+                className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black !text-white"
+              >
+                Open workplace
+              </Link>
+            </div>
+          </section>
 
           <section className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex items-center justify-between gap-2">

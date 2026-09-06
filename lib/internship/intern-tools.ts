@@ -1,4 +1,5 @@
 import { formatCohortHeadline, formatInstitutionLine } from "@/lib/internship/labels";
+import { INTERNSHIP_GROWTH_PATH } from "@/lib/internship/intern-growth";
 import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
 
 export const INTERN_HOME_TOOLS = [
@@ -50,6 +51,13 @@ export const INTERN_HOME_TOOLS = [
 ] as const;
 
 export type InternHomeToolId = (typeof INTERN_HOME_TOOLS)[number]["id"];
+
+/** Live SitGuru Market Growth workbench — intern chrome, not Admin HQ. */
+export const INTERN_GROWTH_WORKPLACE = {
+  href: INTERNSHIP_GROWTH_PATH,
+  label: "Growth workplace",
+  blurb: "Create posts, tracking links, and campaigns for the Market Growth Project.",
+} as const;
 
 export const INTERN_SOCIAL_PLATFORMS = [
   "Instagram",

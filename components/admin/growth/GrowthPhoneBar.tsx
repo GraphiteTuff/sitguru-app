@@ -14,28 +14,49 @@ import {
   Handshake,
 } from "lucide-react";
 
-const primary = [
-  { href: "/admin/growth", label: "Home", icon: Home },
-  { href: "/admin/growth/campaigns", label: "Campaigns", icon: Megaphone },
-  { href: "/admin/growth/media", label: "Media", icon: Images },
-];
+const suffixes = {
+  home: "",
+  campaigns: "/campaigns",
+  media: "/media",
+  create: "/create",
+  content: "/content",
+  gurus: "/gurus",
+  events: "/events",
+  partners: "/partners",
+  analytics: "/analytics",
+} as const;
 
-const moreLinks = [
-  { href: "/admin/growth/create", label: "Create", icon: Plus },
-  { href: "/admin/growth/content", label: "Content", icon: FolderOpen },
-  { href: "/admin/growth/gurus", label: "Gurus", icon: Users },
-  { href: "/admin/growth/events", label: "Events", icon: CalendarDays },
-  { href: "/admin/growth/partners", label: "Partners", icon: Handshake },
-  { href: "/admin/growth/analytics", label: "Analytics", icon: BarChart3 },
-];
-
-function isActive(pathname: string, href: string) {
-  if (href === "/admin/growth") return pathname === "/admin/growth";
-  return pathname === href || pathname.startsWith(`${href}/`);
+function href(basePath: string, suffix: string) {
+  return `${basePath}${suffix}`;
 }
 
-export default function GrowthPhoneBar({ pathname }: { pathname: string }) {
+function isActive(pathname: string, basePath: string, suffix: string) {
+  const target = href(basePath, suffix);
+  if (!suffix) return pathname === basePath;
+  return pathname === target || pathname.startsWith(`${target}/`);
+}
+
+export default function GrowthPhoneBar({
+  pathname,
+  basePath = "/admin/growth",
+}: {
+  pathname: string;
+  basePath?: string;
+}) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const primary = [
+    { suffix: suffixes.home, label: "Home", icon: Home },
+    { suffix: suffixes.campaigns, label: "Campaigns", icon: Megaphone },
+    { suffix: suffixes.media, label: "Media", icon: Images },
+  ];
+  const moreLinks = [
+    { suffix: suffixes.create, label: "Create", icon: Plus },
+    { suffix: suffixes.content, label: "Content", icon: FolderOpen },
+    { suffix: suffixes.gurus, label: "Gurus", icon: Users },
+    { suffix: suffixes.events, label: "Events", icon: CalendarDays },
+    { suffix: suffixes.partners, label: "Partners", icon: Handshake },
+    { suffix: suffixes.analytics, label: "Analytics", icon: BarChart3 },
+  ];
 
   return (
     <div className="lg:hidden">
@@ -46,11 +67,12 @@ export default function GrowthPhoneBar({ pathname }: { pathname: string }) {
             <div className="grid grid-cols-2 gap-2">
               {moreLinks.map((item) => {
                 const Icon = item.icon;
-                const active = isActive(pathname, item.href);
+                const target = href(basePath, item.suffix);
+                const active = isActive(pathname, basePath, item.suffix);
                 return (
                   <Link
-                    key={item.href}
-                    href={item.href}
+                    key={target}
+                    href={target}
                     onClick={() => setMoreOpen(false)}
                     className={
                       active
@@ -72,11 +94,12 @@ export default function GrowthPhoneBar({ pathname }: { pathname: string }) {
         <div className="mx-auto flex max-w-lg items-end justify-between gap-1">
           {primary.slice(0, 2).map((item) => {
             const Icon = item.icon;
-            const active = isActive(pathname, item.href);
+            const target = href(basePath, item.suffix);
+            const active = isActive(pathname, basePath, item.suffix);
             return (
               <Link
-                key={item.href}
-                href={item.href}
+                key={target}
+                href={target}
                 className={`flex min-h-14 flex-1 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
                   active ? "text-[#0D5C3A]" : "text-slate-500"
                 }`}
@@ -88,7 +111,7 @@ export default function GrowthPhoneBar({ pathname }: { pathname: string }) {
           })}
 
           <Link
-            href="/admin/growth/create"
+            href={href(basePath, suffixes.create)}
             aria-label="Create"
             className="mb-1 flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-white shadow-lg"
             style={{ background: "#0D5C3A" }}
@@ -98,11 +121,12 @@ export default function GrowthPhoneBar({ pathname }: { pathname: string }) {
 
           {primary.slice(2).map((item) => {
             const Icon = item.icon;
-            const active = isActive(pathname, item.href);
+            const target = href(basePath, item.suffix);
+            const active = isActive(pathname, basePath, item.suffix);
             return (
               <Link
-                key={item.href}
-                href={item.href}
+                key={target}
+                href={target}
                 className={`flex min-h-14 flex-1 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
                   active ? "text-[#0D5C3A]" : "text-slate-500"
                 }`}

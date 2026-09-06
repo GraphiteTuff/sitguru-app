@@ -5,10 +5,12 @@ export default function PromoteList({
   items,
   kind,
   empty,
+  basePath = "/admin/growth",
 }: {
   items: GrowthPromoteItem[];
   kind: string;
   empty: string;
+  basePath?: string;
 }) {
   if (!items.length) {
     return <p className="font-semibold text-slate-600">{empty}</p>;
@@ -17,7 +19,7 @@ export default function PromoteList({
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {items.map((item) => {
-        const createHref = `/admin/growth/create?type=${kind}&title=${encodeURIComponent(
+        const createHref = `${basePath}/create?type=${kind}&title=${encodeURIComponent(
           item.name,
         )}&market=${encodeURIComponent(item.market)}&href=${encodeURIComponent(item.href)}`;
 

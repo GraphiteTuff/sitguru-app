@@ -3,8 +3,8 @@ import { GrowthCampaignsScreen } from "@/components/admin/growth/GrowthWorkplace
 
 export const dynamic = "force-dynamic";
 
-export default async function GrowthCampaignsPage() {
-  const access = await requireGrowthWorkplace("admin");
+export default async function InternGrowthCampaignsPage() {
+  const access = await requireGrowthWorkplace("intern");
   if (!access.ok) return access.ui;
   return <GrowthCampaignsScreen workplace={access} />;
 }

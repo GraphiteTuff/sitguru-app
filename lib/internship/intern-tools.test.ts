@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   INTERN_HOME_TOOLS,
+  INTERN_GROWTH_WORKPLACE,
   internContentByPlatform,
   internMarketSnapshot,
   internSchoolEmphasis,
@@ -12,6 +13,11 @@ describe("intern home tools", () => {
   it("stays intern-scoped, including social", () => {
     const ids = INTERN_HOME_TOOLS.map((tool) => tool.id);
     assert.deepEqual(ids, ["brand", "tracking", "snapshot", "events", "social"]);
+  });
+
+  it("opens the live growth workplace inside the intern portal", () => {
+    assert.equal(INTERN_GROWTH_WORKPLACE.href, "/intern/growth");
+    assert.equal(INTERN_GROWTH_WORKPLACE.href.startsWith("/admin"), false);
   });
 
   it("color-codes each tool like Ambassador social/referrals", () => {

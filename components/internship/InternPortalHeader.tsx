@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, Megaphone } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
+import { INTERN_GROWTH_WORKPLACE } from "@/lib/internship/intern-tools";
 
 export default function InternPortalHeader() {
   return (
@@ -17,7 +18,17 @@ export default function InternPortalHeader() {
             Student Portal
           </p>
         </Link>
-        <SiteAccountMenu compact />
+        <div className="flex items-center gap-2">
+          <Link
+            href={INTERN_GROWTH_WORKPLACE.href}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-2xl bg-[#0D5C3A] px-3 text-xs font-black !text-white sm:px-4"
+          >
+            <Megaphone size={14} />
+            <span className="hidden sm:inline">{INTERN_GROWTH_WORKPLACE.label}</span>
+            <span className="sm:hidden">Growth</span>
+          </Link>
+          <SiteAccountMenu compact />
+        </div>
       </div>
     </header>
   );

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { requireGrowthPortal } from "@/lib/admin/growth/access";
+import { requireGrowthActor } from "@/lib/admin/growth/workplace";
 import {
   GROWTH_CAMPAIGN_STATUSES,
   GROWTH_CONTENT_STATUSES,
@@ -42,16 +42,13 @@ async function writeGrowthAudit(input: {
 }
 
 function refreshGrowth() {
-  revalidatePath("/admin/growth");
-  revalidatePath("/admin/growth/campaigns");
-  revalidatePath("/admin/growth/content");
-  revalidatePath("/admin/growth/media");
-  revalidatePath("/admin/growth/analytics");
+  revalidatePath("/admin/growth", "layout");
+  revalidatePath("/intern/growth", "layout");
 }
 
 export async function createGrowthWork(formData: FormData) {
-  const access = await requireGrowthPortal();
-  if (!access.ok) return { ok: false, error: "Not allowed." };
+  const access = await requireGrowthActor();
+  if (!access.ok) return { ok: false, error: access.error };
 
   const kind = field(formData, "kind") || "post";
   const title = field(formData, "title");
@@ -127,8 +124,8 @@ export async function createGrowthWork(formData: FormData) {
 }
 
 export async function updateGrowthCampaignStatus(formData: FormData) {
-  const access = await requireGrowthPortal();
-  if (!access.ok) return { ok: false, error: "Not allowed." };
+  const access = await requireGrowthActor();
+  if (!access.ok) return { ok: false, error: access.error };
 
   const id = field(formData, "id");
   const status = field(formData, "status").toLowerCase();
@@ -157,8 +154,8 @@ export async function updateGrowthCampaignStatus(formData: FormData) {
 }
 
 export async function updateGrowthContentStatus(formData: FormData) {
-  const access = await requireGrowthPortal();
-  if (!access.ok) return { ok: false, error: "Not allowed." };
+  const access = await requireGrowthActor();
+  if (!access.ok) return { ok: false, error: access.error };
 
   const id = field(formData, "id");
   const status = field(formData, "status");
@@ -195,8 +192,8 @@ export async function updateGrowthContentStatus(formData: FormData) {
 }
 
 export async function saveGrowthMedia(formData: FormData) {
-  const access = await requireGrowthPortal();
-  if (!access.ok) return { ok: false, error: "Not allowed." };
+  const access = await requireGrowthActor();
+  if (!access.ok) return { ok: false, error: access.error };
 
   const title = field(formData, "title");
   const source = field(formData, "source");
@@ -233,8 +230,8 @@ export async function saveGrowthMedia(formData: FormData) {
 }
 
 export async function submitFridayReport(formData: FormData) {
-  const access = await requireGrowthPortal();
-  if (!access.ok) return { ok: false, error: "Not allowed." };
+  const access = await requireGrowthActor();
+  if (!access.ok) return { ok: false, error: access.error };
 
   const today = new Date();
   const weekStart = new Date(today);

@@ -3,7 +3,7 @@ import { GrowthCreateScreen } from "@/components/admin/growth/GrowthWorkplacePag
 
 export const dynamic = "force-dynamic";
 
-export default async function GrowthCreatePage({
+export default async function InternGrowthCreatePage({
   searchParams,
 }: {
   searchParams?: Promise<{
@@ -14,7 +14,7 @@ export default async function GrowthCreatePage({
     href?: string;
   }>;
 }) {
-  const access = await requireGrowthWorkplace("admin");
+  const access = await requireGrowthWorkplace("intern");
   if (!access.ok) return access.ui;
   return <GrowthCreateScreen workplace={access} searchParams={(await searchParams) || {}} />;
 }
