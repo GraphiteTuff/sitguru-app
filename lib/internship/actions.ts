@@ -39,7 +39,7 @@ function optionalNumber(formData: FormData, key: string) {
   return Number.isFinite(n) ? n : null;
 }
 
-function bounce(path: string, kind: "ok" | "error", message: string) {
+function bounce(path: string, kind: "ok" | "error", message: string): never {
   const params = new URLSearchParams({ [kind]: message });
   redirect(`${path}?${params.toString()}`);
 }
