@@ -19,6 +19,7 @@ import {
   Share2,
 } from "lucide-react";
 import InternAvatar from "@/components/internship/InternAvatar";
+import InternKpiBoard from "@/components/internship/InternKpiBoard";
 import InternshipAssignmentReview from "@/components/internship/InternshipAssignmentReview";
 import InternshipKpiLetterBoard from "@/components/internship/InternshipKpiLetterBoard";
 import InternStudentTools from "@/components/internship/InternStudentTools";
