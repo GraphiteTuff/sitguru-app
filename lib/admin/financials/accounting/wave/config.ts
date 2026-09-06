@@ -17,6 +17,34 @@ export const WAVE_SYNC_SCOPES = [
   "transaction:write",
 ].join(" ");
 
+export function waveWebBusinessId(providerBusinessId: string) {
+  const raw = asTrimmed(providerBusinessId);
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)
+  ) {
+    return raw;
+  }
+  try {
+    const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    const decoded =
+      typeof atob === "function"
+        ? atob(padded)
+        : Buffer.from(padded, "base64").toString("utf8");
+    const match = decoded.match(/^Business:(.+)$/i);
+    if (match?.[1]) return match[1].trim();
+  } catch {
+    // Keep the original id if it is not a Wave GraphQL global id.
+  }
+  return raw;
+}
+
+export function waveAppUrl(providerBusinessId?: string | null) {
+  const id = waveWebBusinessId(asTrimmed(providerBusinessId));
+  if (!id) return "https://next.waveapps.com";
+  return `https://next.waveapps.com/${id}/reports/account-transactions`;
+}
+
 export function hasWaveWriteScope(scopes: string) {
   const parts = String(scopes || "")
     .split(/[\s,]+/)

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SafeAccountingConnection, AccountingBusiness, TaxProfessionalRecord } from "@/lib/admin/financials/accounting/types";
+import { waveAppUrl } from "@/lib/admin/financials/accounting/wave/config";
 
 type QboSetup = {
   configured: boolean;
@@ -368,11 +369,7 @@ export function AccountingConnectionsPanel({
                   {busy === "wave-sync" ? "Posting to Wave…" : "Sync Now"}
                 </button>
                 <a
-                  href={
-                    waveConnection?.businessId
-                      ? `https://next.waveapps.com/${waveConnection.businessId}/accounting/transactions`
-                      : "https://next.waveapps.com"
-                  }
+                  href={waveAppUrl(waveConnection?.businessId)}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800"

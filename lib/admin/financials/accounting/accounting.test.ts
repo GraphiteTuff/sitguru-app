@@ -7,7 +7,7 @@ import {
   resolveAccountingEncryptionKey,
 } from "./encryption";
 import { isValidWaveOAuthStateFormat } from "./wave/oauth";
-import { hasWaveWriteScope } from "./wave/config";
+import { hasWaveWriteScope, waveAppUrl, waveWebBusinessId } from "./wave/config";
 import { suggestAccountMappings } from "./mapping";
 import {
   buildCanonicalAccountingEvent,
@@ -110,6 +110,23 @@ describe("wave write scopes", () => {
     assert.equal(
       hasWaveWriteScope("user:read business:read account:read transaction:write"),
       true,
+    );
+  });
+});
+
+describe("wave web app urls", () => {
+  it("turns a GraphQL Business id into the next.waveapps.com UUID path", () => {
+    const graphqlId = Buffer.from(
+      "Business:6c952c3e-29da-412e-b77c-f599bb826825",
+      "utf8",
+    ).toString("base64");
+    assert.equal(
+      waveWebBusinessId(graphqlId),
+      "6c952c3e-29da-412e-b77c-f599bb826825",
+    );
+    assert.equal(
+      waveAppUrl(graphqlId),
+      "https://next.waveapps.com/6c952c3e-29da-412e-b77c-f599bb826825/reports/account-transactions",
     );
   });
 });
