@@ -12,7 +12,6 @@ const TONE: Record<InternKpiCard["tone"], string> = {
   violet: "border-violet-200 bg-violet-50",
   rose: "border-rose-200 bg-rose-50",
   slate: "border-slate-200 bg-slate-50",
-  amber: "border-amber-200 bg-amber-50",
 };
 
 function impactClass(impact: number | null) {
