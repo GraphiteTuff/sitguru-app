@@ -32,6 +32,11 @@ import {
   INTERN_ONBOARDING_POLICY_VERSION,
 } from "@/lib/internship/onboarding";
 import { uploadInternshipAsset, uploadInternshipConfidential } from "@/lib/internship/storage";
+import {
+  addInternWorkComment,
+  reviewInternWorkRecord,
+  submitInternWorkRecord,
+} from "@/lib/internship/work";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
