@@ -19,6 +19,7 @@ import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipAssignmentReview from "@/components/internship/InternshipAssignmentReview";
 import InternshipKpiLetterBoard from "@/components/internship/InternshipKpiLetterBoard";
 import InternStudentTools from "@/components/internship/InternStudentTools";
+import InternKpiBoard from "@/components/internship/InternKpiBoard";
 import { ThemeStatCard } from "@/components/sitguru/ThemeStatCard";
 import { saveInternCampaign, saveInternContent, saveInternMetric, saveWeeklyReview } from "@/lib/internship/actions";
 import { ATTRIBUTION_RULE, METRIC_SOURCE_SYSTEMS } from "@/lib/internship/constants";
@@ -416,6 +417,8 @@ export default function InternStudentDashboard({
               icon={<Share2 size={18} />}
             />
           </section>
+
+          <InternKpiBoard internId={data.intern.id} />
 
           <section className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex items-center justify-between gap-2">
@@ -869,6 +872,7 @@ export default function InternStudentDashboard({
 
       {tab === "metrics" ? (
         <section className="space-y-4">
+          <InternKpiBoard internId={data.intern.id} />
           <p className="px-1 text-sm font-semibold text-slate-600">
             Letters come from verified KPI output vs your SMART targets — not from
             posting more. Self-reported numbers wait for Jason.

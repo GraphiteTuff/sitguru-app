@@ -9,6 +9,7 @@ import {
   findInternByAccount,
   findOrCreateStudentInstitution,
   freezeAcademicProfile,
+  getInternWorkspace,
   getUniversity,
   listCampuses,
   listRequirements,
@@ -16,6 +17,11 @@ import {
 } from "@/lib/internship/queries";
 import { OTHER_UNIVERSITY_VALUE } from "@/lib/internship/constants";
 import { SEMESTER_DELIVERABLES } from "@/lib/internship/playbook";
+import {
+  INTERN_GROWTH_KPIS,
+  INTERN_KPI_BASELINE_NOTE,
+} from "@/lib/internship/intern-kpis";
+import { internSnapshotValues, loadInternSafeKpiSnapshot } from "@/lib/internship/intern-kpi-snapshot";
 import {
   addInternWorkComment,
   reviewInternWorkRecord,
@@ -586,6 +592,62 @@ export async function verifyInternMetric(formData: FormData) {
     `/admin/internship/interns/${internId}`,
     "ok",
     "Metric verified. Intern Portal now shows it as SitGuru-attributable.",
+  );
+}
+
+export async function snapshotInternKpiBaseline(formData: FormData) {
+  const actor = await requireInternshipAdmin();
+  const internId = text(formData, "internId");
+  const workspace = await getInternWorkspace(internId);
+  if (!workspace) bounce("/admin/internship/interns", "error", "Intern not found.");
+
+  const snapshot = await loadInternSafeKpiSnapshot({
+    region: workspace.university?.region,
+    campaigns: workspace.campaigns,
+    includeMarket: false,
+  });
+  const live = internSnapshotValues(snapshot);
+  const capturedAt = new Date().toISOString().slice(0, 10);
+
+  for (const kpi of INTERN_GROWTH_KPIS) {
+    const override = optionalNumber(formData, kpi.key);
+    const value = override ?? live[kpi.key];
+    const { data: existing } = await supabaseAdmin
+      .from("internship_metrics")
+      .select("id")
+      .eq("intern_id", internId)
+      .eq("metric_key", kpi.key)
+      .eq("source_note", INTERN_KPI_BASELINE_NOTE)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    const row = {
+      intern_id: internId,
+      metric_key: kpi.key,
+      label: `${kpi.label} baseline`,
+      value_numeric: value,
+      period_start: capturedAt,
+      period_end: capturedAt,
+      source_system: "sitguru_admin",
+      source_note: INTERN_KPI_BASELINE_NOTE,
+      self_reported: false,
+      is_verified: true,
+      verified_by: actor.id,
+      verified_at: new Date().toISOString(),
+    };
+
+    const id = existing?.[0]?.id;
+    const { error } = id
+      ? await supabaseAdmin.from("internship_metrics").update(row).eq("id", id)
+      : await supabaseAdmin.from("internship_metrics").insert(row);
+    if (error) bounce(workspacePath(internId, "supervisor"), "error", error.message);
+  }
+
+  refreshInternship(workspacePath(internId, "supervisor"));
+  bounce(
+    workspacePath(internId, "supervisor"),
+    "ok",
+    "Baseline captured from live SitGuru counts. Interns see growth against this pack.",
   );
 }
 

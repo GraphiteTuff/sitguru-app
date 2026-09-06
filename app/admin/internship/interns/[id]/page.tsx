@@ -4,6 +4,7 @@ import { getAdminIdentity } from "@/lib/admin/access";
 import InternshipGrowthWorkspace from "@/components/internship/InternshipGrowthWorkspace";
 import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipKpiLetterBoard from "@/components/internship/InternshipKpiLetterBoard";
+import InternKpiBoard from "@/components/internship/InternKpiBoard";
 import {
   getInternWorkspace,
   listRequirements,
@@ -113,6 +114,8 @@ export default async function InternshipInternDetailPage({
           </div>
         ))}
       </section>
+
+      <InternKpiBoard internId={workspace.intern.id} capture />
 
       <InternshipKpiLetterBoard data={workspace} />
 
