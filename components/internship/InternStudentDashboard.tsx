@@ -23,7 +23,9 @@ import InternKpiBoard from "@/components/internship/InternKpiBoard";
 import InternshipAssignmentReview from "@/components/internship/InternshipAssignmentReview";
 import InternshipKpiLetterBoard from "@/components/internship/InternshipKpiLetterBoard";
 import InternStudentTools from "@/components/internship/InternStudentTools";
-import InternProfileCard from "@/components/internship/InternProfileCard";
+import InternProfileCard, {
+  InternPageTrigger,
+} from "@/components/internship/InternProfileCard";
 import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
 import InternshipFinalProjectBoard, {
   FinalSectionSelect,
@@ -145,6 +147,7 @@ export default function InternStudentDashboard({
   const firstName = internPortalFirstName(data.intern);
   const todayKey = toDateKey(new Date());
   const [tab, setTab] = useState<TabId>("home");
+  const [profileOpen, setProfileOpen] = useState(false);
   const [tool, setTool] = useState<InternHomeToolId | null>(null);
   const [workFilter, setWorkFilter] = useState<WorkFilter>("all");
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
@@ -320,6 +323,8 @@ export default function InternStudentDashboard({
                 src={data.intern.avatarUrl}
                 size="lg"
                 className="ring-white/70"
+                onClick={() => setProfileOpen(true)}
+                label="Open intern page"
               />
               <div className="min-w-0">
                 <h1 className="truncate text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl">
@@ -331,10 +336,11 @@ export default function InternStudentDashboard({
               </div>
             </div>
             <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-slate-800">
-              Color-coded like Ambassador Social and Referrals. School stays on
-              the Canvas card. SitGuru tools stay intern-only — no Admin login.
+              This is your intern workspace for weekly check-ins, assignments, and
+              the Market Growth Project.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
+              <InternPageTrigger onOpen={() => setProfileOpen(true)} />
               <Link
                 href={INTERN_GROWTH_WORKPLACE.href}
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[#0D5C3A] px-4 text-sm font-black !text-white shadow-sm"
@@ -469,8 +475,6 @@ export default function InternStudentDashboard({
 
           <InternKpiBoard internId={data.intern.id} />
 
-          <InternProfileCard intern={data.intern} preview={preview} />
-
           <section className="overflow-hidden rounded-[1.8rem] border border-emerald-200 bg-white shadow-sm">
             <span className="block h-2.5 w-full bg-[#0D5C3A]" />
             <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
@@ -482,8 +486,7 @@ export default function InternStudentDashboard({
                   {INTERN_GROWTH_WORKPLACE.label}
                 </h2>
                 <p className="mt-1 max-w-xl text-sm font-semibold text-slate-600">
-                  {INTERN_GROWTH_WORKPLACE.blurb} Drafts wait for SitGuru approval. No Admin
-                  HQ, passwords, or Pet Parent records.
+                  {INTERN_GROWTH_WORKPLACE.blurb} Drafts wait for SitGuru approval.
                 </p>
               </div>
               <Link
@@ -503,7 +506,7 @@ export default function InternStudentDashboard({
                 </p>
                 <h2 className="mt-1 font-black text-slate-950">Intern toolkit</h2>
               </div>
-              <p className="text-xs font-semibold text-slate-500">No Admin login</p>
+              <p className="text-xs font-semibold text-slate-500">Intern tools</p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {INTERN_HOME_TOOLS.map((item) => {
@@ -803,8 +806,7 @@ export default function InternStudentDashboard({
       {tab === "work" ? (
         <section className="space-y-3">
           <p className="px-1 text-sm font-semibold text-slate-600">
-            Tasks, social posts, and campaigns live here. SitGuru grades submitted work in
-            Employer HQ — you do not need Admin.
+            Tasks, social posts, and campaigns live here. SitGuru reviews what you submit.
           </p>
           <div className="flex flex-wrap gap-2">
             {(
@@ -1100,6 +1102,13 @@ export default function InternStudentDashboard({
           )}
         </section>
       ) : null}
+
+      <InternProfileCard
+        intern={data.intern}
+        preview={preview}
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+      />
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-emerald-100 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur sm:hidden">
         <div className="grid grid-cols-5 gap-1">

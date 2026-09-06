@@ -45,6 +45,8 @@ const ALLOWED_UPLOAD_EXT = new Set([
   "jpeg",
   "png",
   "webp",
+  "heic",
+  "heif",
   "svg",
   "pdf",
   "doc",
@@ -59,6 +61,8 @@ const ALLOWED_UPLOAD_MIME = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/heic",
+  "image/heif",
   "image/svg+xml",
   "application/pdf",
   "application/msword",
@@ -106,6 +110,8 @@ export function internUploadExtension(fileName: string, mimeType = "") {
   if (ALLOWED_UPLOAD_EXT.has(fromName)) return fromName;
   if (mimeType === "image/png") return "png";
   if (mimeType === "image/webp") return "webp";
+  if (mimeType === "image/heic") return "heic";
+  if (mimeType === "image/heif") return "heif";
   if (mimeType === "image/svg+xml") return "svg";
   if (mimeType === "application/pdf") return "pdf";
   if (mimeType.includes("wordprocessingml")) return "docx";

@@ -136,7 +136,7 @@ export default function InternKpiBoard({
           </p>
           <h2 className="mt-1 text-xl font-black text-slate-950">Growth vs baseline</h2>
           <p className="mt-1 text-sm font-semibold text-slate-500">
-            People counts and per-site tracking. No names, queues, or Admin login.
+            People counts and per-site tracking. Totals only — no customer names.
           </p>
         </div>
         <p className="inline-flex min-h-10 items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 text-xs font-black text-emerald-800">

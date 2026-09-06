@@ -653,7 +653,7 @@ export default function InternshipGrowthWorkspace({
               ) : (
                 <p className="text-xs font-semibold text-amber-800">
                   Interns can prepare numbers. Attributable results require supervisor
-                  verification from SitGuru Admin, GA4, social analytics, or another approved source.
+                  verification from SitGuru, Google Analytics, social analytics, or another approved source.
                 </p>
               )}
               <button className="min-h-11 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
@@ -728,7 +728,9 @@ export default function InternshipGrowthWorkspace({
               </div>
             ) : (
               <p className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm font-semibold text-slate-500">
-                Nothing is waiting for a letter grade. Interns submit work; Employer HQ grades KPI output, comments, and approves or sends it back.
+                {supervisor
+                  ? "Nothing is waiting for a letter grade. Interns submit work; SitGuru grades KPI output, comments, and approves or sends it back."
+                  : "Nothing is waiting for a grade. After you submit work, SitGuru reviews it, comments, and approves or sends it back."}
               </p>
             )}
           </div>

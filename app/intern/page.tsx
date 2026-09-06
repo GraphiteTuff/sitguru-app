@@ -86,7 +86,7 @@ export default async function InternPortalPage({
               </div>
             </div>
             <p className="mt-4 text-sm font-semibold !text-white/90">
-              Your intern workspace is ready as soon as Employer HQ assigns this
+              Your intern workspace is ready as soon as SitGuru assigns this
               login. Until then, hop back to Pet Parent or Guru.
             </p>
           </section>

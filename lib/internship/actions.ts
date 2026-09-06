@@ -496,7 +496,7 @@ export async function submitInternWork(formData: FormData) {
   });
   if (result.error) bounce(workspacePath(internId, mode), "error", result.error);
   refreshInternship(workspacePath(internId, mode));
-  bounce(workspacePath(internId, mode), "ok", "Work submitted. Employer HQ can now grade, comment, and approve or send it back.");
+  bounce(workspacePath(internId, mode), "ok", "Work submitted. SitGuru will review, comment, and approve or send it back.");
 }
 
 export async function reviewInternWork(formData: FormData) {
@@ -533,7 +533,7 @@ export async function commentInternWork(formData: FormData) {
   });
   if (result.error) bounce(workspacePath(internId, mode), "error", result.error);
   refreshInternship(workspacePath(internId, mode));
-  bounce(workspacePath(internId, mode), "ok", "Comment posted to both portals.");
+  bounce(workspacePath(internId, mode), "ok", "Comment posted.");
 }
 
 export async function saveInternContent(formData: FormData) {

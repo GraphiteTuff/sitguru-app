@@ -37,6 +37,7 @@ describe("intern work attachments", () => {
 
   it("rejects oversized or unknown files", () => {
     assert.equal(internAllowedUpload({ name: "notes.pdf", type: "application/pdf", size: 12 }), "");
+    assert.equal(internAllowedUpload({ name: "headshot.heic", type: "image/heic", size: 12 }), "");
     assert.match(
       internAllowedUpload({ name: "notes.exe", type: "application/octet-stream", size: 12 }),
       /PDF/,

@@ -152,7 +152,7 @@ export default function InternPortalScreen() {
     return (
       <MobileScreen>
         <Text style={styles.title}>Intern Portal</Text>
-        <Text style={styles.body}>Sign in with the email Employer HQ assigned.</Text>
+        <Text style={styles.body}>Sign in with the intern email SitGuru assigned.</Text>
         <TouchTarget
           onPress={() => router.push('/login')}
           style={styles.primaryBtn}

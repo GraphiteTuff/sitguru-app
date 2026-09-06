@@ -50,7 +50,7 @@ export default async function InternLoginPage({
           </h1>
           <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
             {error ||
-              "This SitGuru account is not assigned as an intern. Employer HQ assigns portal access from Internship Program."}
+              "This SitGuru account is not assigned as an intern. SitGuru assigns intern portal access from the Internship Program."}
           </p>
           <Link
             href="/customer/dashboard"
