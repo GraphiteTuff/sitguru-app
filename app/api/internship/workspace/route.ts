@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRole } from "@/lib/admin/access";
 import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
+import { internOnboardingComplete, internOnboardingPublicState } from "@/lib/internship/onboarding";
 import {
   findInternByAccount,
+  getInternOnboarding,
   getInternWorkspace,
   listInterns,
   linkInternUserId,
@@ -53,6 +55,19 @@ export async function GET(req: NextRequest) {
     if (!supervisor && intern?.id !== internId) {
       return json(req, { error: "Not assigned to this internship workspace." }, 403);
     }
+    if (!supervisor && intern) {
+      const ack = await getInternOnboarding(intern.id);
+      if (!internOnboardingComplete(ack)) {
+        return json(req, {
+          mode: "intern",
+          onboarded: false,
+          onboardingRequired: true,
+          intern: { id: intern.id, fullName: intern.fullName },
+          workspace: null,
+          ...internOnboardingPublicState(ack),
+        });
+      }
+    }
     const workspace = await getInternWorkspace(internId);
     if (!workspace) return json(req, { error: "Intern workspace not found." }, 404);
     return json(req, {
@@ -63,10 +78,23 @@ export async function GET(req: NextRequest) {
   }
 
   if (intern) {
+    const ack = await getInternOnboarding(intern.id);
+    if (!internOnboardingComplete(ack)) {
+      return json(req, {
+        mode: "intern",
+        onboarded: false,
+        onboardingRequired: true,
+        intern: { id: intern.id, fullName: intern.fullName },
+        workspace: null,
+        ...internOnboardingPublicState(ack),
+      });
+    }
     const workspace = await getInternWorkspace(intern.id);
     if (!workspace) return json(req, { error: "Intern workspace not found." }, 404);
     return json(req, {
       mode: "intern",
+      onboarded: true,
+      onboardingRequired: false,
       workspace,
       standing: workspaceKpiStanding(workspace),
     });

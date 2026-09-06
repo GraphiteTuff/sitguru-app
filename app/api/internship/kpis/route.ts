@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { buildInternKpiBoard } from "@/lib/internship/intern-kpis";
 import { loadInternSafeKpiSnapshot } from "@/lib/internship/intern-kpi-snapshot";
+import { internOnboardingComplete } from "@/lib/internship/onboarding";
 import {
   findInternByAccount,
+  getInternOnboarding,
   getInternWorkspace,
 } from "@/lib/internship/queries";
 import {
@@ -40,6 +42,12 @@ export async function GET(req: NextRequest) {
   }
   if (requestedId && intern?.id !== requestedId && !admin?.canAccessAdmin) {
     return json(req, { error: "Not assigned to this internship workspace." }, 403);
+  }
+  if (!admin?.canAccessAdmin && intern) {
+    const ack = await getInternOnboarding(intern.id);
+    if (!internOnboardingComplete(ack)) {
+      return json(req, { error: "Complete intern onboarding first.", onboardingRequired: true }, 403);
+    }
   }
 
   const workspace = await getInternWorkspace(internId);

@@ -10,7 +10,6 @@ import {
   findInternById,
   findOrCreateStudentInstitution,
   freezeAcademicProfile,
-  getInternOnboarding,
   getInternWorkspace,
   getUniversity,
   listCampuses,
@@ -25,18 +24,14 @@ import {
 } from "@/lib/internship/intern-kpis";
 import { internSnapshotValues, loadInternSafeKpiSnapshot } from "@/lib/internship/intern-kpi-snapshot";
 import { internPortalTheme, internSafeLinkedInUrl, internWorkItemType } from "@/lib/internship/portal";
+import { INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/onboarding";
 import {
-  internAllowedConfidentialUpload,
-  internNamesMatch,
-  INTERNSHIP_ONBOARDING_PATH,
-  INTERN_ONBOARDING_POLICY_VERSION,
-} from "@/lib/internship/onboarding";
-import { sendInternConfidentialityReceipts } from "@/lib/internship/onboarding-mail";
-import {
-  downloadInternshipConfidential,
-  uploadInternshipAsset,
-  uploadInternshipConfidential,
-} from "@/lib/internship/storage";
+  recordInternAccessRules,
+  recordInternElectronicSignature,
+  recordInternOnboardingSubmit,
+  recordInternSignedUpload,
+} from "@/lib/internship/onboarding-service";
+import { uploadInternshipAsset } from "@/lib/internship/storage";
 import {
   addInternWorkComment,
   reviewInternWorkRecord,
@@ -1010,40 +1005,16 @@ export async function deleteInternAttachment(formData: FormData) {
   bounce(workspacePath(internId, mode), "ok", "Attachment removed.");
 }
 
-async function upsertOnboarding(internId: string, patch: Record<string, unknown>) {
-  const now = new Date().toISOString();
-  const { data } = await supabaseAdmin
-    .from("internship_onboarding_acknowledgments")
-    .select("id")
-    .eq("intern_id", internId)
-    .maybeSingle();
-  if (data?.id) {
-    return supabaseAdmin
-      .from("internship_onboarding_acknowledgments")
-      .update({ ...patch, updated_at: now })
-      .eq("intern_id", internId);
-  }
-  return supabaseAdmin.from("internship_onboarding_acknowledgments").insert({
-    intern_id: internId,
-    policy_version: INTERN_ONBOARDING_POLICY_VERSION,
-    ...patch,
-    updated_at: now,
-  });
-}
-
 export async function acceptInternAccessRules(formData: FormData) {
   const internId = text(formData, "internId");
   await assertWorkspaceActor(internId, "intern");
   if (formData.get("agreeAccess") !== "on") {
     bounce(INTERNSHIP_ONBOARDING_PATH, "error", "Confirm the intern access rules to continue.");
   }
-  const { error } = await upsertOnboarding(internId, {
-    policy_version: INTERN_ONBOARDING_POLICY_VERSION,
-    access_rules_accepted_at: new Date().toISOString(),
-  });
-  if (error) bounce(INTERNSHIP_ONBOARDING_PATH, "error", error.message);
+  const result = await recordInternAccessRules(internId);
+  if (!result.ok) bounce(INTERNSHIP_ONBOARDING_PATH, "error", result.error);
   refreshInternship(INTERNSHIP_ONBOARDING_PATH);
-  bounce(INTERNSHIP_ONBOARDING_PATH, "ok", "Access rules accepted. Sign the confidentiality notice next.");
+  bounce(INTERNSHIP_ONBOARDING_PATH, "ok", result.message);
 }
 
 export async function signInternConfidentiality(formData: FormData) {
@@ -1054,124 +1025,36 @@ export async function signInternConfidentiality(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/intern/login");
   await assertWorkspaceActor(internId, "intern");
-  const intern = await findInternByAccount({
+  const result = await recordInternElectronicSignature({
+    internId,
     userId: user.id,
-    email: user.email,
+    email: String(user.email || ""),
+    typedLegalName: text(formData, "typedLegalName"),
+    agreeConfidential: formData.get("agreeConfidential") === "on",
+    agreeOwnership: formData.get("agreeOwnership") === "on",
+    agreeTools: formData.get("agreeTools") === "on",
   });
-  if (!intern) redirect("/intern/login");
-
-  const ack = await getInternOnboarding(internId);
-  if (!ack?.accessRulesAcceptedAt) {
-    bounce(INTERNSHIP_ONBOARDING_PATH, "error", "Accept the intern access rules first.");
-  }
-  if (formData.get("agreeConfidential") !== "on" || formData.get("agreeOwnership") !== "on") {
-    bounce(
-      INTERNSHIP_ONBOARDING_PATH,
-      "error",
-      "Check both acknowledgment boxes before signing.",
-    );
-  }
-  const typedName = text(formData, "typedLegalName");
-  if (!internNamesMatch(typedName, intern.fullName)) {
-    bounce(
-      INTERNSHIP_ONBOARDING_PATH,
-      "error",
-      `Type your legal name as it appears on your intern record (${intern.fullName}).`,
-    );
-  }
-  const { error } = await upsertOnboarding(internId, {
-    policy_version: INTERN_ONBOARDING_POLICY_VERSION,
-    typed_legal_name: typedName,
-    electronic_signed_at: new Date().toISOString(),
-    signer_user_id: user.id,
-    signer_email: String(user.email || intern.email || "").toLowerCase(),
-  });
-  if (error) bounce(INTERNSHIP_ONBOARDING_PATH, "error", error.message);
+  if (!result.ok) bounce(INTERNSHIP_ONBOARDING_PATH, "error", result.error);
   refreshInternship(INTERNSHIP_ONBOARDING_PATH);
-  bounce(
-    INTERNSHIP_ONBOARDING_PATH,
-    "ok",
-    "Electronic signature saved. Print, sign in ink, and upload that page.",
-  );
+  bounce(INTERNSHIP_ONBOARDING_PATH, "ok", result.message);
 }
 
 export async function uploadInternConfidentialityScan(formData: FormData) {
   const internId = text(formData, "internId");
   await assertWorkspaceActor(internId, "intern");
-  const ack = await getInternOnboarding(internId);
-  if (!ack?.electronicSignedAt) {
-    bounce(
-      INTERNSHIP_ONBOARDING_PATH,
-      "error",
-      "Sign electronically before uploading the printed page.",
-    );
-  }
   const file = formFile(formData, "file");
   if (!file) bounce(INTERNSHIP_ONBOARDING_PATH, "error", "Choose the signed PDF or photo.");
-  const blocked = internAllowedConfidentialUpload(file);
-  if (blocked) bounce(INTERNSHIP_ONBOARDING_PATH, "error", blocked);
-  const uploaded = await uploadInternshipConfidential({ file, internId });
-  if (uploaded.error) bounce(INTERNSHIP_ONBOARDING_PATH, "error", uploaded.error);
-  const { error } = await upsertOnboarding(internId, {
-    policy_version: INTERN_ONBOARDING_POLICY_VERSION,
-    wet_ink_file_name: file.name,
-    wet_ink_storage_path: uploaded.path,
-    wet_ink_mime_type: file.type || "",
-    wet_ink_file_size: file.size,
-    wet_ink_uploaded_at: new Date().toISOString(),
-  });
-  if (error) bounce(INTERNSHIP_ONBOARDING_PATH, "error", error.message);
+  const result = await recordInternSignedUpload(internId, file);
+  if (!result.ok) bounce(INTERNSHIP_ONBOARDING_PATH, "error", result.error);
   refreshInternship(INTERNSHIP_ONBOARDING_PATH);
-  bounce(
-    INTERNSHIP_ONBOARDING_PATH,
-    "ok",
-    "Signed page uploaded. Submit next. Email confirmation will be sent to your email on file.",
-  );
+  bounce(INTERNSHIP_ONBOARDING_PATH, "ok", result.message);
 }
 
 export async function submitInternConfidentialityScan(formData: FormData) {
   const internId = text(formData, "internId");
   await assertWorkspaceActor(internId, "intern");
-  const intern = await findInternById(internId);
-  const ack = await getInternOnboarding(internId);
-  if (!intern || !ack?.electronicSignedAt) {
-    bounce(INTERNSHIP_ONBOARDING_PATH, "error", "Sign electronically before submitting.");
-  }
-  if (!ack.wetInkStoragePath || !ack.wetInkUploadedAt) {
-    bounce(INTERNSHIP_ONBOARDING_PATH, "error", "Upload the signed page before submitting.");
-  }
-  const downloaded = await downloadInternshipConfidential(ack.wetInkStoragePath);
-  if (downloaded.error || !downloaded.bytes) {
-    bounce(INTERNSHIP_ONBOARDING_PATH, "error", downloaded.error || "Could not open the signed page.");
-  }
-  try {
-    await sendInternConfidentialityReceipts({
-      intern,
-      onboarding: ack,
-      fileName: ack.wetInkFileName,
-      fileBytes: downloaded.bytes,
-      contentType: ack.wetInkMimeType || downloaded.contentType,
-    });
-  } catch (error) {
-    bounce(
-      INTERNSHIP_ONBOARDING_PATH,
-      "error",
-      error instanceof Error
-        ? error.message
-        : "The signed page is uploaded, but email could not be sent. Try Submit again.",
-    );
-  }
-  const now = new Date().toISOString();
-  const { error } = await upsertOnboarding(internId, {
-    policy_version: INTERN_ONBOARDING_POLICY_VERSION,
-    wet_ink_submitted_at: now,
-    wet_ink_emailed_at: now,
-  });
-  if (error) bounce(INTERNSHIP_ONBOARDING_PATH, "error", error.message);
+  const result = await recordInternOnboardingSubmit(internId);
+  if (!result.ok) bounce(INTERNSHIP_ONBOARDING_PATH, "error", result.error);
   refreshInternship("/intern");
-  bounce(
-    "/intern",
-    "ok",
-    "Submitted. Email confirmation will be sent to your email on file.",
-  );
+  bounce("/intern", "ok", result.message);
 }

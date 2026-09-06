@@ -5,7 +5,7 @@ import InternPrintButton from "@/components/internship/InternPrintButton";
 import SiteLogo from "@/components/SiteLogo";
 import { internSchoolEmphasis } from "@/lib/internship/intern-tools";
 import {
-  INTERN_ONBOARDING_INBOX,
+  INTERN_ONBOARDING_POLICY_VERSION,
   INTERNSHIP_ONBOARDING_PATH,
 } from "@/lib/internship/onboarding";
 import { findInternByAccount, getInternWorkspace } from "@/lib/internship/queries";
@@ -56,17 +56,26 @@ export default async function InternOnboardingPrintPage() {
         <div className="flex items-start justify-between gap-3 border-b border-emerald-100 pb-2">
           <SiteLogo href="" wrapperClassName="w-[140px]" imageClassName="h-10 w-auto" />
           <p className="text-right text-[9px] font-black uppercase tracking-[0.14em] text-emerald-800">
-            Signature page
+            Acknowledgment
             <br />
-            Return to {INTERN_ONBOARDING_INBOX}
+            Agreement {INTERN_ONBOARDING_POLICY_VERSION}
           </p>
         </div>
         <InternConfidentialityNotice printSheet />
-        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3 text-[10px] font-semibold text-slate-700">
-          <p>Intern legal name: {intern.fullName}</p>
-          <p>School: {school.school || "SitGuru intern"}</p>
-          <p>Program: {school.program || intern.academicProgram || "—"}</p>
-          <p>Date: {signedOn}</p>
+        <div className="mt-3 border-t border-slate-200 pt-3 text-[10px] font-semibold text-slate-700">
+          <p>
+            I have read this notice and agree to its confidentiality, data-security, and
+            ownership and assignment terms. SitGuru policy also requires this printed
+            wet-ink copy as an extra record.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <p>Printed name: {intern.fullName}</p>
+            <p>University: {school.school || "SitGuru intern"}</p>
+            <p>Academic program: {school.program || intern.academicProgram || "—"}</p>
+            <p>Intern email on file: {intern.email || intern.studentEmail || "—"}</p>
+            <p>Date: {signedOn}</p>
+            <p>Agreement version: {INTERN_ONBOARDING_POLICY_VERSION}</p>
+          </div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-6">
           <div>
@@ -84,7 +93,8 @@ export default async function InternOnboardingPrintPage() {
         </div>
         <p className="mt-3 text-[9px] font-semibold text-slate-500">
           After signing, upload this page and click Submit. Email confirmation will
-          be sent to your email on file.
+          be sent to your email on file. SitGuru keeps the signed page in
+          SitGuru-controlled storage.
         </p>
       </section>
     </main>

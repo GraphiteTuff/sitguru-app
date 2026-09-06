@@ -6,8 +6,12 @@ import {
   internAllowedConfidentialUpload,
   internNamesMatch,
   internOnboardingComplete,
+  internOnboardingFileHash,
+  internOnboardingPublicState,
   internOnboardingStep,
   internOnboardingStatusLabel,
+  INTERN_CONFIDENTIALITY_NOTICE,
+  INTERN_ONBOARDING_FULLY_EXECUTED,
   INTERN_ONBOARDING_POLICY_VERSION,
   INTERNSHIP_ONBOARDING_PATH,
 } from "./onboarding";
@@ -17,17 +21,32 @@ function ack(overrides: Partial<InternshipOnboarding> = {}): InternshipOnboardin
   return {
     internId: "intern-1",
     policyVersion: INTERN_ONBOARDING_POLICY_VERSION,
+    onboardingStatus: INTERN_ONBOARDING_FULLY_EXECUTED,
     typedLegalName: "Alex Rivera",
+    internNameSnapshot: "Alex Rivera",
+    internUniversitySnapshot: "Test University",
+    internProgramSnapshot: "Marketing",
+    internEmailSnapshot: "alex@test.edu",
     accessRulesAcceptedAt: "2026-09-06T12:00:00.000Z",
+    accessRulesAcceptedIp: "203.0.113.10",
+    accessRulesSessionId: "sess-1",
     electronicSignedAt: "2026-09-06T12:05:00.000Z",
+    electronicSignedIp: "203.0.113.10",
+    electronicSignedSessionId: "sess-1",
     signerEmail: "alex@test.edu",
     wetInkFileName: "signed.pdf",
     wetInkStoragePath: "interns/intern-1/confidentiality/signed.pdf",
+    wetInkFileHash: internOnboardingFileHash(Buffer.from("signed-page")),
     wetInkMimeType: "application/pdf",
     wetInkFileSize: 1200,
     wetInkUploadedAt: "2026-09-06T12:10:00.000Z",
+    wetInkUploadedIp: "203.0.113.10",
+    wetInkUploadedSessionId: "sess-1",
     wetInkSubmittedAt: "2026-09-06T12:12:00.000Z",
+    wetInkSubmittedIp: "203.0.113.10",
+    wetInkSubmittedSessionId: "sess-1",
     wetInkEmailedAt: "2026-09-06T12:12:00.000Z",
+    offboardingCertifiedAt: null,
     ...overrides,
   };
 }
@@ -39,11 +58,18 @@ describe("intern onboarding gate", () => {
     assert.equal(internOnboardingComplete(ack({ wetInkSubmittedAt: null })), false);
     assert.equal(internOnboardingComplete(ack({ electronicSignedAt: null })), false);
     assert.equal(internOnboardingComplete(ack({ accessRulesAcceptedAt: null })), false);
+    assert.equal(internOnboardingComplete(ack({ wetInkFileHash: "" })), false);
+    assert.equal(internOnboardingComplete(ack({ onboardingStatus: "pending" })), false);
     assert.equal(
       internOnboardingComplete(ack({ policyVersion: "old" })),
       false,
     );
     assert.equal(internOnboardingComplete(ack()), true);
+    const state = internOnboardingPublicState(ack({ policyVersion: "old" }));
+    assert.equal(state.onboarded, false);
+    assert.equal(state.requiredPolicyVersion, INTERN_ONBOARDING_POLICY_VERSION);
+    assert.equal(state.step, "access");
+    assert.match(state.notice.sections[3].heading, /Ownership and assignment/);
   });
 
   it("walks access rules, then e-sign, then upload, then submit", () => {
@@ -57,9 +83,23 @@ describe("intern onboarding gate", () => {
       "wetink",
     );
     assert.equal(
-      internOnboardingStep(ack({ wetInkSubmittedAt: null })),
+      internOnboardingStep(ack({ wetInkSubmittedAt: null, onboardingStatus: "pending" })),
       "submit",
     );
+    assert.equal(internOnboardingStep(ack({ policyVersion: "old" })), "access");
+  });
+
+  it("assigns internship work product and bars unapproved AI tools", () => {
+    const ownership = INTERN_CONFIDENTIALITY_NOTICE.sections.find((section) =>
+      section.heading.includes("Ownership and assignment"),
+    );
+    const prohibited = INTERN_CONFIDENTIALITY_NOTICE.sections.find((section) =>
+      section.heading.startsWith("3."),
+    );
+    assert.match(String(ownership?.body || ""), /work made for hire/);
+    assert.match(String(ownership?.body || ""), /hereby assigns/);
+    assert.match(String(prohibited?.body || ""), /generative AI/);
+    assert.match(INTERN_CONFIDENTIALITY_NOTICE.intro, /SitGuru policy/);
   });
 
   it("requires the typed name to match the intern record", () => {

@@ -9,6 +9,8 @@ import {
 } from "@/lib/internship/actions";
 import {
   INTERN_ACCESS_RULES,
+  INTERN_ONBOARDING_FULLY_EXECUTED,
+  INTERN_ONBOARDING_POLICY_VERSION,
   INTERN_ONBOARDING_STEPS,
   INTERNSHIP_ONBOARDING_PRINT_PATH,
   internOnboardingComplete,
@@ -23,18 +25,32 @@ function first(value: string | string[] | undefined) {
 export default function InternOnboardingForm({
   intern,
   onboarding,
+  school,
+  program,
   notice,
 }: {
   intern: InternshipIntern;
   onboarding: InternshipOnboarding | null;
+  school?: string;
+  program?: string;
   notice?: { kind: "ok" | "error"; message: string } | null;
 }) {
   const complete = internOnboardingComplete(onboarding);
   const current = internOnboardingStep(onboarding);
-  const accessDone = Boolean(onboarding?.accessRulesAcceptedAt);
-  const signed = Boolean(onboarding?.electronicSignedAt);
-  const uploaded = Boolean(onboarding?.wetInkUploadedAt && onboarding?.wetInkStoragePath);
-  const submitted = Boolean(onboarding?.wetInkSubmittedAt);
+  const currentPolicy = onboarding?.policyVersion === INTERN_ONBOARDING_POLICY_VERSION;
+  const accessDone = Boolean(onboarding?.accessRulesAcceptedAt && currentPolicy);
+  const signed = Boolean(onboarding?.electronicSignedAt && currentPolicy);
+  const uploaded = Boolean(
+    onboarding?.wetInkUploadedAt &&
+      onboarding?.wetInkStoragePath &&
+      onboarding?.wetInkFileHash &&
+      currentPolicy,
+  );
+  const submitted = Boolean(
+    onboarding?.wetInkSubmittedAt &&
+      onboarding?.onboardingStatus === INTERN_ONBOARDING_FULLY_EXECUTED &&
+      currentPolicy,
+  );
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 px-3 py-5 sm:px-5">
@@ -50,7 +66,15 @@ export default function InternOnboardingForm({
         <p className="mt-3 text-sm font-semibold leading-6 !text-white/90">
           SitGuru unlocks the intern portal after you accept the access rules, sign,
           print and upload the signed page, then submit. Email confirmation will be
-          sent to your email on file.
+          sent to your email on file. The printed wet-ink copy is SitGuru policy, as
+          an extra record — not because the law requires a wet signature.
+        </p>
+        <p className="mt-3 text-xs font-semibold !text-white/80">
+          {intern.fullName}
+          {school ? ` · ${school}` : ""}
+          {program ? ` · ${program}` : ""}
+          {" · Agreement "}
+          {INTERN_ONBOARDING_POLICY_VERSION}
         </p>
       </section>
 
@@ -108,7 +132,7 @@ export default function InternOnboardingForm({
           </p>
           <Link
             href="/intern"
-            className="mt-4 inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
+            className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white sm:w-auto"
           >
             Open intern portal
           </Link>
@@ -133,7 +157,7 @@ export default function InternOnboardingForm({
               <input type="checkbox" name="agreeAccess" required className="mt-1" />
               I understand these access rules and will follow them.
             </label>
-            <button className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white">
+            <button className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white sm:w-auto">
               Accept access rules
             </button>
           </form>
@@ -158,8 +182,14 @@ export default function InternOnboardingForm({
             </label>
             <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
               <input type="checkbox" name="agreeOwnership" required className="mt-1" />
-              I understand internship work product belongs to SitGuru, with a sanitized
-              portfolio report after supervisor review.
+              I assign internship work product to Graff Enterprises LLC d/b/a SitGuru as
+              set out in Section 4, and I will not publish a portfolio version until
+              SitGuru approves it in writing.
+            </label>
+            <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
+              <input type="checkbox" name="agreeTools" required className="mt-1" />
+              I will not put SitGuru confidential information into unapproved AI or
+              other third-party tools, and I will not share credentials.
             </label>
             <label className="block">
               <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
@@ -174,11 +204,12 @@ export default function InternOnboardingForm({
             </label>
             <p className="text-xs font-semibold text-slate-500">
               Use the name on your intern record: {intern.fullName}. This is an electronic
-              signature for onboarding, not a substitute for the printed wet-ink copy.
+              signature. SitGuru policy also requires a printed wet-ink copy as an extra
+              record.
             </p>
             <button
               disabled={!accessDone}
-              className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white disabled:opacity-50"
+              className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white disabled:opacity-50 sm:w-auto"
             >
               Sign electronically
             </button>
@@ -189,14 +220,16 @@ export default function InternOnboardingForm({
       <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5">
         <h2 className="font-black text-slate-950">3. Print, sign, and upload</h2>
         <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-          Print the signature page, sign it, then upload a PDF or photo.
+          Print the acknowledgment from a computer if you can, or photograph a signed
+          printout. Then upload the PDF or photo. SitGuru keeps the signed page in
+          SitGuru-controlled storage.
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <Link
             href={INTERNSHIP_ONBOARDING_PRINT_PATH}
-            className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
+            className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white sm:w-auto"
           >
-            Print
+            Open acknowledgment
           </Link>
         </div>
         {uploaded ? (
@@ -221,7 +254,7 @@ export default function InternOnboardingForm({
             <input type="hidden" name="internId" value={intern.id} />
             <button
               disabled={!uploaded}
-              className="inline-flex min-h-12 items-center rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black !text-white disabled:opacity-50"
+              className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black !text-white disabled:opacity-50 sm:w-auto"
             >
               Submit signed page
             </button>

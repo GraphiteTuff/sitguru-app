@@ -104,13 +104,31 @@ export default async function InternshipInternDetailPage({
       <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5">
         <h2 className="font-black text-slate-950">Onboarding & confidentiality</h2>
         <p className="mt-1 text-sm font-semibold text-slate-500">
-          Portal tools stay locked until the intern electronically signs, uploads the
-          one-page signed sheet, and submits it. intern@sitguru.com receives the file
-          and the intern gets a confirmation email.
+          Portal tools stay locked until onboarding status is fully executed: access
+          rules, electronic signature, signed-page upload with file hash, submit, and
+          the current agreement version. intern@sitguru.com receives the signed page.
+          The intern gets a confirmation email only — not a copy of the signed file.
         </p>
         <p className="mt-3 text-sm font-black text-slate-950">
           Status: {internOnboardingStatusLabel(workspace.onboarding)}
+          {workspace.onboarding?.onboardingStatus
+            ? ` · ${workspace.onboarding.onboardingStatus}`
+            : ""}
         </p>
+        {workspace.onboarding?.policyVersion ? (
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Agreement {workspace.onboarding.policyVersion}
+            {workspace.onboarding.internNameSnapshot
+              ? ` · ${workspace.onboarding.internNameSnapshot}`
+              : ""}
+            {workspace.onboarding.internUniversitySnapshot
+              ? ` · ${workspace.onboarding.internUniversitySnapshot}`
+              : ""}
+            {workspace.onboarding.internProgramSnapshot
+              ? ` · ${workspace.onboarding.internProgramSnapshot}`
+              : ""}
+          </p>
+        ) : null}
         {workspace.onboarding?.electronicSignedAt ? (
           <p className="mt-2 text-sm font-semibold text-slate-600">
             E-signed as {workspace.onboarding.typedLegalName} on{" "}
@@ -125,7 +143,11 @@ export default async function InternshipInternDetailPage({
         {workspace.onboarding?.wetInkUploadedAt ? (
           <p className="mt-2 text-sm font-semibold text-slate-600">
             Signed page uploaded {new Date(workspace.onboarding.wetInkUploadedAt).toLocaleString()}{" "}
-            ({workspace.onboarding.wetInkFileName}).
+            ({workspace.onboarding.wetInkFileName}
+            {workspace.onboarding.wetInkFileHash
+              ? ` · SHA-256 ${workspace.onboarding.wetInkFileHash.slice(0, 12)}…`
+              : ""}
+            ).
           </p>
         ) : (
           <p className="mt-2 text-sm font-semibold text-slate-600">
@@ -136,7 +158,7 @@ export default async function InternshipInternDetailPage({
           <p className="mt-2 text-sm font-semibold text-slate-600">
             Submitted {new Date(workspace.onboarding.wetInkSubmittedAt).toLocaleString()}
             {workspace.onboarding.wetInkEmailedAt
-              ? " · confirmation emailed to the intern and intern@sitguru.com"
+              ? " · intern confirmation emailed; signed page kept in SitGuru storage and emailed to intern@sitguru.com"
               : ""}
             .
           </p>

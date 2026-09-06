@@ -219,17 +219,32 @@ export type InternshipWorkComment = {
 export type InternshipOnboarding = {
   internId: string;
   policyVersion: string;
+  onboardingStatus: string;
   typedLegalName: string;
+  internNameSnapshot: string;
+  internUniversitySnapshot: string;
+  internProgramSnapshot: string;
+  internEmailSnapshot: string;
   accessRulesAcceptedAt: string | null;
+  accessRulesAcceptedIp: string;
+  accessRulesSessionId: string;
   electronicSignedAt: string | null;
+  electronicSignedIp: string;
+  electronicSignedSessionId: string;
   signerEmail: string;
   wetInkFileName: string;
   wetInkStoragePath: string;
+  wetInkFileHash: string;
   wetInkMimeType: string;
   wetInkFileSize: number;
   wetInkUploadedAt: string | null;
+  wetInkUploadedIp: string;
+  wetInkUploadedSessionId: string;
   wetInkSubmittedAt: string | null;
+  wetInkSubmittedIp: string;
+  wetInkSubmittedSessionId: string;
   wetInkEmailedAt: string | null;
+  offboardingCertifiedAt: string | null;
 };
 
 export type InternshipWorkAttachment = {

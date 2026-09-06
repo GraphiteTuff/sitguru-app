@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import InternOnboardingForm, {
   internOnboardingNotice,
 } from "@/components/internship/InternOnboardingForm";
-import { findInternByAccount, getInternOnboarding } from "@/lib/internship/queries";
+import { internSchoolEmphasis } from "@/lib/internship/intern-tools";
+import { findInternByAccount, getInternOnboarding, getInternWorkspace } from "@/lib/internship/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +26,21 @@ export default async function InternOnboardingPage({
   if (!intern) redirect("/intern/login");
 
   const onboarding = await getInternOnboarding(intern.id);
+  const workspace = await getInternWorkspace(intern.id);
+  const school = internSchoolEmphasis({
+    university: workspace?.university,
+    campus: workspace?.campus,
+    intern,
+    cohort: workspace?.cohort,
+  });
   const params = searchParams ? await searchParams : {};
 
   return (
     <InternOnboardingForm
       intern={intern}
       onboarding={onboarding}
+      school={school.school}
+      program={school.program}
       notice={internOnboardingNotice(params)}
     />
   );

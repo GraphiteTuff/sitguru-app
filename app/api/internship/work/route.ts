@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRole } from "@/lib/admin/access";
 import { isHardcodedSuperUserEmail } from "@/lib/admin/super-users";
-import { findInternByAccount } from "@/lib/internship/queries";
+import { internOnboardingComplete } from "@/lib/internship/onboarding";
+import { findInternByAccount, getInternOnboarding } from "@/lib/internship/queries";
 import {
   addInternWorkComment,
   reviewInternWorkRecord,
@@ -53,6 +54,12 @@ export async function POST(req: NextRequest) {
   if (!internId) return json(req, { error: "internId is required." }, 400);
   if (!supervisor && intern?.id !== internId) {
     return json(req, { error: "Not assigned to this internship workspace." }, 403);
+  }
+  if (!supervisor && intern) {
+    const ack = await getInternOnboarding(intern.id);
+    if (!internOnboardingComplete(ack)) {
+      return json(req, { error: "Complete intern onboarding first.", onboardingRequired: true }, 403);
+    }
   }
 
   if (action === "submit") {

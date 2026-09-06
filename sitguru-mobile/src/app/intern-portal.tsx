@@ -21,6 +21,9 @@ import { BrandColors } from '@/constants/theme';
 import { TOUCH_MIN } from '@/constants/mobile-layout';
 import { useAuth } from '@/context/AuthContext';
 import { sitguruApiFetch } from '@/lib/data/api';
+import InternOnboardingFlow, {
+  type InternOnboardingPayload,
+} from '@/components/internship/InternOnboardingFlow';
 
 type Standing = {
   letter?: string;
@@ -40,7 +43,10 @@ type TaskItem = {
 
 type WorkspacePayload = {
   mode?: 'intern' | 'supervisor';
+  onboarded?: boolean;
+  onboardingRequired?: boolean;
   standing?: Standing;
+  intern?: { id: string; fullName: string };
   workspace?: {
     intern?: { id: string; fullName: string };
     tasks?: TaskItem[];
@@ -65,6 +71,7 @@ function letterColor(letter?: string) {
 export default function InternPortalScreen() {
   const { session, loading } = useAuth();
   const [payload, setPayload] = useState<WorkspacePayload | null>(null);
+  const [onboarding, setOnboarding] = useState<InternOnboardingPayload | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [internId, setInternId] = useState('');
@@ -85,6 +92,18 @@ export default function InternPortalScreen() {
     }
     setError('');
     setPayload(result.data);
+    if (result.data.onboardingRequired) {
+      const pack = await sitguruApiFetch<InternOnboardingPayload>(
+        '/api/internship/onboarding',
+      );
+      if (pack.error || !pack.data) {
+        setOnboarding(result.data as InternOnboardingPayload);
+      } else {
+        setOnboarding(pack.data);
+      }
+      return;
+    }
+    setOnboarding(null);
     const firstOpen = result.data.workspace?.tasks?.find(
       (row) => row.status !== 'approved' && row.status !== 'not_accepted',
     );
@@ -144,6 +163,10 @@ export default function InternPortalScreen() {
     );
   }
 
+  if (onboarding && !onboarding.onboarded) {
+    return <InternOnboardingFlow payload={onboarding} onReload={load} />;
+  }
+
   const standing = payload?.standing;
   const TrendIcon =
     standing?.trend?.direction === 'up'
@@ -169,7 +192,7 @@ export default function InternPortalScreen() {
                 style={styles.primaryBtn}
               >
                 <Text style={styles.primaryBtnText}>
-                  {busy ? 'Submitting…' : 'Submit for Jason’s review'}
+                  {busy ? 'Submitting…' : 'Submit for SitGuru review'}
                 </Text>
               </TouchTarget>
             </StickyActionBar>
@@ -259,7 +282,7 @@ export default function InternPortalScreen() {
             <TextInput
               multiline
               onChangeText={setNotes}
-              placeholder="What should Jason review?"
+              placeholder="What should SitGuru review?"
               placeholderTextColor={BrandColors.muted}
               style={[styles.input, styles.notes]}
               value={notes}

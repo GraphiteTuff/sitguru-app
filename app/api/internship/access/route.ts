@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findInternByAccount } from "@/lib/internship/queries";
+import { internOnboardingPublicState } from "@/lib/internship/onboarding";
+import { findInternByAccount, getInternOnboarding } from "@/lib/internship/queries";
 import {
   mobileCorsHeaders,
   optionsWithMobileCors,
@@ -24,6 +25,15 @@ export async function GET(req: NextRequest) {
     userId: resolved.user.id,
     email: resolved.user.email,
   });
-
-  return json(req, { intern: Boolean(intern) });
+  if (!intern) return json(req, { intern: false, onboarded: false });
+  const ack = await getInternOnboarding(intern.id);
+  const state = internOnboardingPublicState(ack);
+  return json(req, {
+    intern: true,
+    onboarded: state.onboarded,
+    requiredPolicyVersion: state.requiredPolicyVersion,
+    policyVersion: state.policyVersion,
+    step: state.step,
+    status: state.status,
+  });
 }

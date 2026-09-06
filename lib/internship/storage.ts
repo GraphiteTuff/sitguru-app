@@ -8,6 +8,7 @@ import {
 import {
   INTERNSHIP_CONFIDENTIAL_BUCKET,
   internAllowedConfidentialUpload,
+  internOnboardingFileHash,
 } from "@/lib/internship/onboarding";
 
 export async function uploadInternshipAsset(input: {
@@ -42,7 +43,7 @@ export async function uploadInternshipConfidential(input: {
   internId: string;
 }) {
   const blocked = internAllowedConfidentialUpload(input.file);
-  if (blocked) return { error: blocked, path: "" };
+  if (blocked) return { error: blocked, path: "", hash: "", bytes: Buffer.alloc(0) };
 
   const ext = internUploadExtension(input.file.name, input.file.type);
   const base = internSafeFileName(input.file.name.replace(/\.[^.]+$/, "") || "signed-page");
@@ -55,8 +56,13 @@ export async function uploadInternshipConfidential(input: {
       upsert: false,
     });
 
-  if (error) return { error: error.message, path: "" };
-  return { error: "", path };
+  if (error) return { error: error.message, path: "", hash: "", bytes: Buffer.alloc(0) };
+  return {
+    error: "",
+    path,
+    hash: internOnboardingFileHash(buffer),
+    bytes: buffer,
+  };
 }
 
 export async function signedInternshipConfidentialUrl(path: string) {

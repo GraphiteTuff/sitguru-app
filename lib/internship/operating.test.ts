@@ -14,6 +14,10 @@ import {
   sumVerifiedRequiredHours,
 } from "./operating";
 import type { InternshipWorkspaceData } from "./types";
+import {
+  INTERN_ONBOARDING_FULLY_EXECUTED,
+  INTERN_ONBOARDING_POLICY_VERSION,
+} from "./onboarding";
 
 function intern(overrides: Partial<InternshipWorkspaceData["intern"]> = {}) {
   return {
@@ -146,18 +150,33 @@ describe("internship operating semantics", () => {
         }),
         onboarding: {
           internId: "intern-1",
-          policyVersion: "2027-spring-v1",
+          policyVersion: INTERN_ONBOARDING_POLICY_VERSION,
+          onboardingStatus: INTERN_ONBOARDING_FULLY_EXECUTED,
           typedLegalName: "Jason Graff-Test Intern",
+          internNameSnapshot: "Jason Graff-Test Intern",
+          internUniversitySnapshot: "Test University",
+          internProgramSnapshot: "Communication",
+          internEmailSnapshot: "student@test.edu",
           accessRulesAcceptedAt: "2026-09-05T12:00:00.000Z",
+          accessRulesAcceptedIp: "203.0.113.10",
+          accessRulesSessionId: "sess-1",
           electronicSignedAt: "2026-09-05T12:01:00.000Z",
-          signerEmail: "jasongraff1978@gmail.com",
+          electronicSignedIp: "203.0.113.10",
+          electronicSignedSessionId: "sess-1",
+          signerEmail: "student@test.edu",
           wetInkFileName: "signed.pdf",
           wetInkStoragePath: "interns/intern-1/confidentiality/signed.pdf",
+          wetInkFileHash: "abc123hash",
           wetInkMimeType: "application/pdf",
           wetInkFileSize: 1200,
           wetInkUploadedAt: "2026-09-05T12:02:00.000Z",
+          wetInkUploadedIp: "203.0.113.10",
+          wetInkUploadedSessionId: "sess-1",
           wetInkSubmittedAt: "2026-09-05T12:03:00.000Z",
+          wetInkSubmittedIp: "203.0.113.10",
+          wetInkSubmittedSessionId: "sess-1",
           wetInkEmailedAt: "2026-09-05T12:03:00.000Z",
+          offboardingCertifiedAt: null,
         },
         smartGoals: [
           {
