@@ -304,8 +304,8 @@ const taxReports: TaxReportCard[] = [
     tone: "green",
     included: [
       "Connect Wave",
-      "Wave business picker",
-      "Read-only account check",
+      "Sync SitGuru totals into Wave",
+      "Stripe Clearing (not NFCU sales)",
       "Tax package CSV",
       "Block Advisors handoff",
       "Keeps QuickBooks",
@@ -979,7 +979,7 @@ function getReadinessItems(
       label: "Wave Accounting",
       status: waveConnected ? "ready" : "needs_review",
       detail: waveConnected
-        ? "Wave is connected for tax-ready bookkeeping. Sync is read-only until ledger writes are verified."
+        ? "Wave is connected. Sync Now posts SitGuru Tax Center totals into Wave for Block Advisors. Reconnect first if the connection is still read-only."
         : "Optional lower-cost books path. Use Connect Wave above, or export the tax package for Block Advisors by hand.",
     },
   ];

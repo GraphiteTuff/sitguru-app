@@ -18,7 +18,14 @@ const PAGE_SIZE = 50;
 type BusinessesPayload = {
   businesses?: {
     pageInfo?: { currentPage?: number; totalPages?: number; totalCount?: number };
-    edges?: Array<{ node?: { id?: string; name?: string; isPersonal?: boolean } }>;
+    edges?: Array<{
+      node?: {
+        id?: string;
+        name?: string;
+        isPersonal?: boolean;
+        isClassicAccounting?: boolean;
+      };
+    }>;
   };
 };
 
@@ -41,7 +48,7 @@ type AccountsPayload = {
   };
 };
 
-async function withFreshTokens() {
+export async function withFreshTokens() {
   const connection = await loadAccountingConnection("wave");
   if (!connection || connection.status === "disconnected") {
     throw new Error("Wave is not connected.");
@@ -91,6 +98,7 @@ export async function listWaveBusinesses(accessToken: string) {
         id,
         name: String(edge.node?.name || "Wave business").trim(),
         isPersonal: Boolean(edge.node?.isPersonal),
+        isClassicAccounting: Boolean(edge.node?.isClassicAccounting),
       });
     }
     page += 1;

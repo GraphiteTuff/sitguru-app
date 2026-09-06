@@ -125,7 +125,7 @@ export function AccountingConnectionsPanel({
     setFailed(false);
     try {
       const payload = await postJson("/api/tax/wave/sync");
-      setMessage(payload?.detail || "Wave read-only check finished.");
+      setMessage(payload?.detail || "SitGuru books posted to Wave.");
       router.refresh();
     } catch (error) {
       setFailed(true);
@@ -308,12 +308,15 @@ export function AccountingConnectionsPanel({
                 : syncBadge("Not connected", "idle")}
           </div>
           <p className={bodyClass}>
-            Affordable bookkeeping and tax-ready financial records. Wave is H&amp;R
-            Block&apos;s self-service books tool — not a tax filing service.
+            Affordable bookkeeping and tax-ready financial records. Click Sync
+            Now to post SitGuru Tax Center totals into Wave for Block Advisors.
+            Navy Federal stays the bank feed — marketplace books land in Stripe
+            Clearing so owner money is not counted as sales.
           </p>
           <p className="mt-2 text-xs font-semibold !text-slate-600">
-            Wave Pro subscription required for direct SitGuru connection. Check
-            Wave for current pricing.
+            Wave Pro is required. After the first write-enabled connect, Sync
+            posts 2026 year-to-date fees, tax collected, payouts, expenses, and
+            refunds. Reconnect if Sync still says the connection is read-only.
           </p>
           {waveConnection ? (
             <p className="mt-3 text-xs font-semibold !text-slate-600">
@@ -321,6 +324,13 @@ export function AccountingConnectionsPanel({
               {waveConnection.lastSyncAt
                 ? ` · Last synchronized ${waveConnection.lastSyncLabel}`
                 : " · Never synchronized"}
+              {waveConnection.canWrite ? " · Write sync enabled" : " · Read-only until you reconnect"}
+            </p>
+          ) : null}
+          {waveConnected && waveConnection && !waveConnection.canWrite ? (
+            <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold !text-amber-950">
+              Reconnect Wave once so Tax Center can post books. Then click Sync Now
+              — SitGuru totals will land in Wave as Stripe Clearing transactions.
             </p>
           ) : null}
 
@@ -355,10 +365,14 @@ export function AccountingConnectionsPanel({
                   className="inline-flex min-h-12 items-center justify-center rounded-2xl px-4 text-sm font-black !text-white disabled:opacity-60"
                   style={{ background: "#0D5C3A" }}
                 >
-                  {busy === "wave-sync" ? "Checking…" : "Sync Now"}
+                  {busy === "wave-sync" ? "Posting to Wave…" : "Sync Now"}
                 </button>
                 <a
-                  href="https://www.waveapps.com/tax-season"
+                  href={
+                    waveConnection?.businessId
+                      ? `https://next.waveapps.com/${waveConnection.businessId}/accounting/transactions`
+                      : "https://next.waveapps.com"
+                  }
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800"

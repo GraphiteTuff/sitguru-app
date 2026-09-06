@@ -8,6 +8,27 @@ export const WAVE_READ_SCOPES = [
   "account:read",
 ].join(" ");
 
+export const WAVE_SYNC_SCOPES = [
+  "user:read",
+  "business:read",
+  "account:read",
+  "account:write",
+  "transaction:read",
+  "transaction:write",
+].join(" ");
+
+export function hasWaveWriteScope(scopes: string) {
+  const parts = String(scopes || "")
+    .split(/[\s,]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return (
+    parts.includes("transaction:write") ||
+    parts.includes("transaction:*") ||
+    parts.includes("transaction:create")
+  );
+}
+
 export function getWaveConfig() {
   const clientId = asTrimmed(process.env.WAVE_CLIENT_ID);
   const clientSecret = asTrimmed(process.env.WAVE_CLIENT_SECRET);
@@ -26,7 +47,7 @@ export function getWaveConfig() {
     authorizeUrl: "https://api.waveapps.com/oauth2/authorize/",
     tokenUrl: "https://api.waveapps.com/oauth2/token/",
     configured: Boolean(clientId && clientSecret),
-    scopes: WAVE_READ_SCOPES,
+    scopes: WAVE_SYNC_SCOPES,
   };
 }
 

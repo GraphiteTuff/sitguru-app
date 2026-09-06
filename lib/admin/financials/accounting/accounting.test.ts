@@ -7,6 +7,7 @@ import {
   resolveAccountingEncryptionKey,
 } from "./encryption";
 import { isValidWaveOAuthStateFormat } from "./wave/oauth";
+import { hasWaveWriteScope } from "./wave/config";
 import { suggestAccountMappings } from "./mapping";
 import {
   buildCanonicalAccountingEvent,
@@ -14,6 +15,7 @@ import {
   salesTaxStaysSeparate,
 } from "./events";
 import { isRecognizedWaveWebhook } from "./wave/webhooks";
+import { buildWavePushItems } from "./wave/push-draft";
 
 describe("accounting token encryption", () => {
   it("round-trips a secret without putting the plaintext in the payload", () => {
@@ -46,12 +48,17 @@ describe("wave account mapping", () => {
       { id: "inc", name: "Sales", type: "INCOME", subtype: "INCOME", archived: false },
       { id: "tax", name: "Sales Tax Payable", type: "LIABILITY", subtype: "SALES_TAX", archived: false },
       { id: "cogs", name: "Contractor Payments", type: "EXPENSE", subtype: "COST_OF_GOODS_SOLD", archived: false },
+      { id: "int", name: "Interest Income", type: "INCOME", subtype: "OTHER_INCOME", archived: false },
     ]);
     const used = mapped.map((row) => row.providerAccountId).filter(Boolean);
     assert.equal(new Set(used).size, used.length);
     assert.equal(
       mapped.find((row) => row.sitguruAccountKey === "sales_tax_payable")?.providerAccountId,
       "tax",
+    );
+    assert.notEqual(
+      mapped.find((row) => row.sitguruAccountKey === "service_revenue")?.providerAccountId,
+      "int",
     );
   });
 });
@@ -75,8 +82,40 @@ describe("canonical accounting events", () => {
   });
 });
 
-describe("wave webhooks stay dormant", () => {
-  it("recognizes known event names without enabling writes", () => {
+describe("wave push draft", () => {
+  it("posts fees, tax, payouts, and expenses and skips zeros", () => {
+    const items = buildWavePushItems({
+      taxYear: 2026,
+      asOf: "2026-09-05",
+      fees: 12.5,
+      tax: 0,
+      payouts: 40,
+      expenses: 5,
+      refunds: 0,
+    });
+    assert.deepEqual(
+      items.map((row) => row.key),
+      ["platform-fees", "guru-payouts", "operating-expenses"],
+    );
+    assert.equal(items[0]?.externalId, "sitguru:ytd:2026:platform-fees");
+    assert.equal(items[0]?.anchorKey, "stripe_clearing");
+    assert.equal(items[0]?.direction, "DEPOSIT");
+    assert.equal(items[1]?.direction, "WITHDRAWAL");
+  });
+});
+
+describe("wave write scopes", () => {
+  it("requires transaction:write before Tax Center can post books", () => {
+    assert.equal(hasWaveWriteScope("user:read business:read account:read"), false);
+    assert.equal(
+      hasWaveWriteScope("user:read business:read account:read transaction:write"),
+      true,
+    );
+  });
+});
+
+describe("wave webhooks", () => {
+  it("recognizes known event names", () => {
     assert.equal(isRecognizedWaveWebhook("transaction.changed"), true);
     assert.equal(isRecognizedWaveWebhook("invoice.send"), false);
   });

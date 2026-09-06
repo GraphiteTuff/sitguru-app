@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { decryptSecret, encryptSecret } from "./encryption";
+import { hasWaveWriteScope } from "./wave/config";
 import {
   SITGURU_ACCOUNTING_ORG_ID,
   type AccountingConnectionRecord,
@@ -60,6 +61,7 @@ export function toSafeConnection(
     lastSyncStatus: row.lastSyncStatus,
     lastSyncError: row.lastSyncError,
     lastSyncLabel: formatLastSyncLabel(row.lastSyncAt),
+    canWrite: row.provider === "wave" ? hasWaveWriteScope(row.scopes) : true,
   };
 }
 

@@ -5,7 +5,7 @@ import {
   loadAccountingConnection,
   toSafeConnection,
 } from "@/lib/admin/financials/accounting/connections";
-import { createWaveProvider } from "@/lib/admin/financials/accounting/wave/provider";
+import { syncSitGuruBooksToWave } from "@/lib/admin/financials/accounting/wave/sync";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,21 +26,42 @@ export async function POST() {
     actorRole: financeCheck.identity.role,
   });
 
-  const result = await createWaveProvider().healthCheck();
-  await writeAccountingAudit({
-    action: result.ok
-      ? "accounting.wave.sync_completed"
-      : "accounting.wave.sync_failed",
-    actorId: financeCheck.identity.id,
-    actorEmail: financeCheck.identity.email,
-    actorRole: financeCheck.identity.role,
-    metadata: { detail: result.detail, readonly: true },
-  });
-
-  return NextResponse.json({
-    ok: result.ok,
-    readonly: true,
-    detail: result.detail,
-    connection: toSafeConnection(await loadAccountingConnection("wave")),
-  });
+  try {
+    const result = await syncSitGuruBooksToWave();
+    await writeAccountingAudit({
+      action: "accounting.wave.sync_completed",
+      actorId: financeCheck.identity.id,
+      actorEmail: financeCheck.identity.email,
+      actorRole: financeCheck.identity.role,
+      metadata: {
+        postedCount: result.postedCount,
+        postedTotal: result.postedTotal,
+        readonly: false,
+      },
+    });
+    return NextResponse.json({
+      ...result,
+      connection: toSafeConnection(await loadAccountingConnection("wave")),
+    });
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "Wave sync failed.";
+    const reconnect = /reconnect/i.test(message) || (caught as { code?: string }).code === "WAVE_RECONNECT_REQUIRED";
+    await writeAccountingAudit({
+      action: "accounting.wave.sync_failed",
+      actorId: financeCheck.identity.id,
+      actorEmail: financeCheck.identity.email,
+      actorRole: financeCheck.identity.role,
+      metadata: { detail: message, reconnect },
+    });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: message,
+        detail: message,
+        reconnect,
+        connection: toSafeConnection(await loadAccountingConnection("wave")),
+      },
+      { status: reconnect ? 409 : 400 },
+    );
+  }
 }

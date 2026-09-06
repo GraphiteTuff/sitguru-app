@@ -72,7 +72,7 @@ export const WAVE_BUSINESSES_QUERY = `
   query SitGuruWaveBusinesses($page: Int!, $pageSize: Int!) {
     businesses(page: $page, pageSize: $pageSize) {
       pageInfo { currentPage totalPages totalCount }
-      edges { node { id name isPersonal } }
+      edges { node { id name isPersonal isClassicAccounting } }
     }
   }
 `;
@@ -98,3 +98,24 @@ export const WAVE_ACCOUNTS_QUERY = `
     }
   }
 `;
+
+export const WAVE_ACCOUNT_CREATE_MUTATION = `
+  mutation SitGuruWaveAccountCreate($input: AccountCreateInput!) {
+    accountCreate(input: $input) {
+      didSucceed
+      inputErrors { path message code }
+      account { id name type { value } subtype { value } }
+    }
+  }
+`;
+
+export const WAVE_MONEY_TRANSACTION_CREATE_MUTATION = `
+  mutation SitGuruWaveMoneyTransactionCreate($input: MoneyTransactionCreateInput!) {
+    moneyTransactionCreate(input: $input) {
+      didSucceed
+      inputErrors { path message code }
+      transaction { id }
+    }
+  }
+`;
+

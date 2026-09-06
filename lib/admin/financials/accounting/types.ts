@@ -20,6 +20,7 @@ export const ACCOUNTING_SYNC_STATUSES = [
   "action_required",
   "error",
   "verified_readonly",
+  "synced",
 ] as const;
 
 export type AccountingSyncStatus = (typeof ACCOUNTING_SYNC_STATUSES)[number];
@@ -114,12 +115,14 @@ export type SafeAccountingConnection = {
   lastSyncStatus: AccountingSyncStatus | null;
   lastSyncError: string | null;
   lastSyncLabel: string;
+  canWrite: boolean;
 };
 
 export type AccountingBusiness = {
   id: string;
   name: string;
   isPersonal?: boolean;
+  isClassicAccounting?: boolean;
 };
 
 export type AccountingAccount = {

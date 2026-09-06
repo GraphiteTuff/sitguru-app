@@ -11,9 +11,9 @@ type MappingHint = {
 const HINTS: MappingHint[] = [
   {
     key: "service_revenue",
-    names: ["sales", "service", "income", "revenue"],
+    names: ["sitguru", "service revenue", "sales"],
     types: ["INCOME"],
-    subtypes: ["INCOME", "OTHER_INCOME"],
+    subtypes: ["INCOME"],
   },
   {
     key: "sales_tax_payable",
@@ -68,6 +68,7 @@ const HINTS: MappingHint[] = [
 function scoreAccount(hint: MappingHint, account: AccountingAccount) {
   if (account.archived) return -1;
   const haystack = `${account.name} ${account.type} ${account.subtype}`.toLowerCase();
+  if (haystack.includes("interest") || haystack.includes("dividend")) return -1;
   let score = 0;
   if (hint.types.includes(account.type.toUpperCase())) score += 4;
   if (hint.subtypes.includes(account.subtype.toUpperCase())) score += 6;
