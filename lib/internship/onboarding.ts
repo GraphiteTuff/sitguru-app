@@ -105,8 +105,8 @@ const WET_INK_MIME = new Set([
 ]);
 
 export function internOnboardingFileHash(bytes: Buffer | Uint8Array | ArrayBuffer) {
-  const data = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
-  return createHash("sha256").update(data).digest("hex");
+  const view = bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes;
+  return createHash("sha256").update(view).digest("hex");
 }
 
 export function internOnboardingComplete(
