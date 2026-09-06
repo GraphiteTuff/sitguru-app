@@ -159,6 +159,7 @@ describe("SitGuru Market Growth Project capstone", () => {
           action: "Posted without tracking",
           result: "Claimed 40 signups",
           lesson: "This should not appear until Jason approves it",
+          nextStep: "",
           internReportedResult: "40 signups",
           verifiedResult: "",
           includedInFinal: false,

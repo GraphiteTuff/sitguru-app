@@ -244,7 +244,7 @@ export function recruitingAttention(universities: RecruitingUniversity[]): Atten
     });
   }
   const awaiting = universities.filter((row) =>
-    ["contacted", "awaiting_response"].includes(row.recruitingStatus),
+    ["contacted", "awaiting_response"].includes(row.recruitingStatus || ""),
   );
   if (awaiting.length) {
     items.push({

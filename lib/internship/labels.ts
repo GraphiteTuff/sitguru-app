@@ -33,11 +33,13 @@ export function institutionRelationshipHint(isUniversityPartner: boolean) {
 export function universityStatusLabel(status: string) {
   const labels: Record<(typeof UNIVERSITY_STATUSES)[number], string> = {
     research_needed: "Research Needed",
+    potential: "Potential",
     potential_partner: "Potential Partner",
     contacted: "Contacted",
     requirements_identified: "Requirements Identified",
     internship_eligible: "Internship Eligible",
     academic_credit_confirmed: "Academic Credit Confirmed",
+    formal_partner: "Formal Partner",
     active_partner: "Active Partner",
     inactive: "Inactive",
   };
@@ -69,10 +71,19 @@ export function eligibilityLabel(status: string) {
 
 export function fundingStatusLabel(status: string) {
   const labels: Record<(typeof FUNDING_DIRECTORY_STATUSES)[number], string> = {
+    unknown: "Unknown",
+    research_needed: "Research Needed",
+    not_yet_open: "Not Yet Open",
+    open: "Open",
+    student_eligible: "Student Eligible",
+    student_applying: "Student Applying",
+    submitted: "Submitted",
+    approved: "Approved",
+    declined: "Declined",
+    closed: "Closed",
     available: "Available",
     possible: "Possible",
     none_found: "None Found",
-    unknown: "Unknown",
   };
   return labels[status as (typeof FUNDING_DIRECTORY_STATUSES)[number]] || status;
 }
