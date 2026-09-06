@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { GraduationCap, Megaphone, ShieldCheck } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
 import { INTERN_GROWTH_WORKPLACE } from "@/lib/internship/intern-tools";
+import { internGhostBtnClass, internPrimaryBtnClass } from "@/lib/internship/intern-ui";
 import { INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/onboarding";
 
 export default function InternPortalHeader({
@@ -33,10 +34,10 @@ export default function InternPortalHeader({
           {assigned && !onboarded ? (
             <Link
               href={INTERNSHIP_ONBOARDING_PATH}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-2xl bg-[#0D5C3A] px-3 text-xs font-black !text-white sm:px-4"
+              className={`${internPrimaryBtnClass} min-h-11 px-3 text-xs sm:px-4`}
             >
               <ShieldCheck size={14} />
-              <span className="hidden sm:inline">Onboarding</span>
+              <span className="hidden sm:inline">Finish onboarding</span>
               <span className="sm:hidden">Start</span>
             </Link>
           ) : null}
@@ -44,7 +45,7 @@ export default function InternPortalHeader({
             <>
               <Link
                 href={INTERN_GROWTH_WORKPLACE.href}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-2xl bg-[#0D5C3A] px-3 text-xs font-black !text-white sm:px-4"
+                className={`${internPrimaryBtnClass} min-h-11 px-3 text-xs sm:px-4`}
               >
                 <Megaphone size={14} />
                 <span className="hidden sm:inline">{INTERN_GROWTH_WORKPLACE.label}</span>
@@ -52,9 +53,9 @@ export default function InternPortalHeader({
               </Link>
               <Link
                 href="/intern#profile"
-                className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-white px-3 text-xs font-black text-emerald-900"
+                className={`${internGhostBtnClass} min-h-11 px-3 text-xs`}
               >
-                Profile
+                Your page
               </Link>
             </>
           ) : null}

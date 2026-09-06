@@ -5,6 +5,7 @@ import { Radio } from "lucide-react";
 import type { InternKpiCard } from "@/lib/internship/intern-kpis";
 import { INTERN_GROWTH_KPIS } from "@/lib/internship/intern-kpis";
 import { snapshotInternKpiBaseline } from "@/lib/internship/actions";
+import { internPrimaryBtnClass } from "@/lib/internship/intern-ui";
 
 const TONE: Record<InternKpiCard["tone"], string> = {
   emerald: "border-emerald-200 bg-emerald-50",
@@ -22,7 +23,7 @@ function impactClass(impact: number | null) {
 }
 
 function impactLabel(impact: number | null) {
-  if (impact == null) return "Set baseline";
+  if (impact == null) return "Starting number not set yet";
   if (impact > 0) return `+${impact.toLocaleString()}`;
   return impact.toLocaleString();
 }
@@ -83,14 +84,14 @@ export default function InternKpiBoard({
         };
         if (cancelled) return;
         if (!response.ok) {
-          setError(payload.error || "Could not load live KPIs.");
+          setError(payload.error || "Could not load live numbers.");
           return;
         }
         setError("");
         setBoard(payload.board || []);
         setLiveAt(payload.liveAt || new Date().toISOString());
       } catch {
-        if (!cancelled) setError("Live KPIs paused. Retrying…");
+        if (!cancelled) setError("Live numbers paused. Trying again…");
       }
     }
 
@@ -134,9 +135,9 @@ export default function InternKpiBoard({
           <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
             Live SitGuru results
           </p>
-          <h2 className="mt-1 text-xl font-black text-slate-950">Growth vs baseline</h2>
+          <h2 className="mt-1 text-xl font-black text-slate-950">Growth vs starting numbers</h2>
           <p className="mt-1 text-sm font-semibold text-slate-500">
-            People counts and per-site tracking. Totals only — no customer names.
+            Live totals for people and social. No customer names.
           </p>
         </div>
         <p className="inline-flex min-h-10 items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 text-xs font-black text-emerald-800">
@@ -155,10 +156,10 @@ export default function InternKpiBoard({
           className="rounded-[1.4rem] border border-emerald-100 bg-white p-4"
         >
           <input type="hidden" name="internId" value={internId} />
-          <h3 className="font-black text-slate-950">Set intern baseline</h3>
+          <h3 className="font-black text-slate-950">Set starting numbers</h3>
           <p className="mt-1 text-sm font-semibold text-slate-500">
-            Captures today’s live SitGuru counts as the intern’s starting line. Leave
-            overrides blank to use live numbers.
+            Saves today’s live SitGuru counts as the intern’s starting line. Leave
+            boxes blank to use live numbers.
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             {INTERN_GROWTH_KPIS.map((kpi) => {
@@ -178,8 +179,8 @@ export default function InternKpiBoard({
               );
             })}
           </div>
-          <button className="mt-3 flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white sm:w-auto sm:px-6">
-            Capture live baseline
+          <button className={`${internPrimaryBtnClass} mt-3 w-full sm:w-auto sm:px-6`}>
+            Save starting numbers
           </button>
         </form>
       ) : null}
@@ -192,7 +193,7 @@ export default function InternKpiBoard({
         </div>
       </div>
       <div>
-        <h3 className="mb-2 text-sm font-black text-slate-950">Social tracking</h3>
+        <h3 className="mb-2 text-sm font-black text-slate-950">Social</h3>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {social.map((card) => (
             <KpiCard key={card.key} card={card} />

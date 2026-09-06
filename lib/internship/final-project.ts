@@ -563,7 +563,7 @@ export function assembleFinalProjectWorkspace(input: {
       chapter: metric.isVerified ? "verified_impact" : section.chapter,
       output: "report",
       title: metric.label,
-      summary: metric.selfReported ? "Intern-reported; awaiting verification." : "SitGuru-controlled source.",
+      summary: metric.selfReported ? "You sent this. SitGuru still needs to check it." : "From SitGuru’s own data.",
       weekNumber: null,
       campaignName: "",
       smartGoal: "",

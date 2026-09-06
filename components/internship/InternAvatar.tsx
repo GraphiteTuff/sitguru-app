@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { fallbackInitials } from "@/lib/sitguru/display";
+import { internPressClass } from "@/lib/internship/intern-ui";
 
 const SIZE_CLASS = {
   sm: "h-11 w-11 text-xs",
@@ -52,7 +53,7 @@ export default function InternAvatar({
         type="button"
         onClick={onClick}
         aria-label={label || `Edit intern page for ${name || "intern"}`}
-        className={classes}
+        className={`${classes} cursor-pointer hover:ring-2 hover:ring-[#0D5C3A] ${internPressClass}`}
       >
         {inner}
       </button>

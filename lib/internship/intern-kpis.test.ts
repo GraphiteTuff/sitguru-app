@@ -70,7 +70,7 @@ describe("intern KPI growth board", () => {
     assert.equal(parents?.baseline, 25);
     assert.equal(parents?.impact, 5);
     assert.equal(gurus?.impact, 0);
-    assert.equal(gurus?.helper, "56 bookable");
+    assert.equal(gurus?.helper, "56 can take bookings");
     assert.equal(facebook?.current, 12);
     assert.equal(facebook?.impact, 7);
     assert.match(facebook?.helper || "", /your tracking links/);

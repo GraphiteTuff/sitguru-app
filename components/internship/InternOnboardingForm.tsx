@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import InternConfidentialityNotice from "@/components/internship/InternConfidentialityNotice";
 import InternSignedPageUpload from "@/components/internship/InternSignedPageUpload";
+import { internPrimaryBtnClass } from "@/lib/internship/intern-ui";
 import {
   acceptInternAccessRules,
   signInternConfidentiality,
@@ -132,7 +133,7 @@ export default function InternOnboardingForm({
           </p>
           <Link
             href="/intern"
-            className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white sm:w-auto"
+            className={`mt-4 ${internPrimaryBtnClass} w-full sm:w-auto`}
           >
             Open intern portal
           </Link>
@@ -157,7 +158,7 @@ export default function InternOnboardingForm({
               <input type="checkbox" name="agreeAccess" required className="mt-1" />
               I understand these access rules and will follow them.
             </label>
-            <button className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white sm:w-auto">
+            <button className={`${internPrimaryBtnClass} w-full sm:w-auto`}>
               Accept access rules
             </button>
           </form>
@@ -209,7 +210,7 @@ export default function InternOnboardingForm({
             </p>
             <button
               disabled={!accessDone}
-              className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white disabled:opacity-50 sm:w-auto"
+              className={`${internPrimaryBtnClass} w-full disabled:opacity-50 sm:w-auto`}
             >
               Sign electronically
             </button>
@@ -227,7 +228,7 @@ export default function InternOnboardingForm({
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <Link
             href={INTERNSHIP_ONBOARDING_PRINT_PATH}
-            className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white sm:w-auto"
+            className={`${internPrimaryBtnClass} w-full sm:w-auto`}
           >
             Open acknowledgment
           </Link>
@@ -254,7 +255,7 @@ export default function InternOnboardingForm({
             <input type="hidden" name="internId" value={intern.id} />
             <button
               disabled={!uploaded}
-              className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black !text-white disabled:opacity-50 sm:w-auto"
+              className={`${internPrimaryBtnClass} w-full disabled:opacity-50 sm:w-auto`}
             >
               Submit signed page
             </button>

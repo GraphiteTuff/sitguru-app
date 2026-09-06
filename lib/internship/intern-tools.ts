@@ -15,7 +15,7 @@ export const INTERN_HOME_TOOLS = [
   {
     id: "tracking",
     label: "Tracking links",
-    blurb: "UTM + referral codes",
+    blurb: "Copy the link, then post",
     tone: "sky",
     bar: "bg-sky-600",
     tile: "border-sky-200 bg-sky-50",
@@ -24,7 +24,7 @@ export const INTERN_HOME_TOOLS = [
   {
     id: "snapshot",
     label: "Market snapshot",
-    blurb: "Your market, aggregated",
+    blurb: "Your market totals, no names",
     tone: "violet",
     bar: "bg-violet-600",
     tile: "border-violet-200 bg-violet-50",
@@ -32,7 +32,7 @@ export const INTERN_HOME_TOOLS = [
   },
   {
     id: "events",
-    label: "Events to promote",
+    label: "Events to share",
     blurb: "Public pet events",
     tone: "amber",
     bar: "bg-amber-500",
@@ -42,7 +42,7 @@ export const INTERN_HOME_TOOLS = [
   {
     id: "social",
     label: "Social media",
-    blurb: "Official accounts + posts",
+    blurb: "Accounts and your posts",
     tone: "rose",
     bar: "bg-rose-600",
     tile: "border-rose-200 bg-rose-50",
@@ -56,7 +56,7 @@ export type InternHomeToolId = (typeof INTERN_HOME_TOOLS)[number]["id"];
 export const INTERN_GROWTH_WORKPLACE = {
   href: INTERNSHIP_GROWTH_PATH,
   label: "Growth workplace",
-  blurb: "Create posts, tracking links, and campaigns for the Market Growth Project.",
+  blurb: "Write posts, tracking links, and campaigns here. SitGuru approves drafts before they go live.",
 } as const;
 
 export const INTERN_SOCIAL_PLATFORMS = [

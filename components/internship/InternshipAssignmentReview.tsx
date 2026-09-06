@@ -15,6 +15,7 @@ import {
 import { taskStatusLabel } from "@/lib/internship/labels";
 import type { InternshipWorkAttachment, InternshipWorkComment } from "@/lib/internship/types";
 import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
+import { internGhostBtnClass, internPrimaryBtnClass } from "@/lib/internship/intern-ui";
 
 const TIER_LABELS: Record<string, string> = {
   tier_1: "Tier 1 — Business outcome",
@@ -150,10 +151,10 @@ export default function InternshipAssignmentReview({
           <input
             name="body"
             required
-            placeholder="Instructor-style comment"
+            placeholder={mode === "intern" ? "Ask a question or add a note" : "Instructor-style comment"}
             className="min-h-12 w-full flex-1 rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
           />
-          <button className="min-h-12 rounded-xl bg-white px-4 text-sm font-black text-emerald-900 ring-1 ring-emerald-200">
+          <button className={internGhostBtnClass}>
             Comment
           </button>
         </form>
@@ -221,8 +222,8 @@ export default function InternshipAssignmentReview({
               className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
             />
           </label>
-          <button className="min-h-12 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
-            {awaiting ? "Resubmit for review" : "Submit for SitGuru review"}
+          <button className={`${internPrimaryBtnClass} w-full`}>
+            {awaiting ? "Send it back for review" : "Send to SitGuru for review"}
           </button>
         </form>
       ) : null}

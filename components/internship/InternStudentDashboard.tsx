@@ -60,6 +60,12 @@ import {
   internPortalFirstName,
   internPortalHeroClass,
 } from "@/lib/internship/portal";
+import {
+  internGhostBtnClass,
+  internPillBtnClass,
+  internPressClass,
+  internPrimaryBtnClass,
+} from "@/lib/internship/intern-ui";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
 
 const TABS = [
@@ -284,7 +290,7 @@ export default function InternStudentDashboard({
         <div className="grid gap-4 p-5 sm:grid-cols-[1.2fr_0.8fr] sm:p-6">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-800">
-              Student institution
+              Your school
             </p>
             <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
               {school.school}
@@ -319,15 +325,15 @@ export default function InternStudentDashboard({
           <div className="rounded-[1.4rem] border border-indigo-100 bg-[#FAF6EE] p-4">
             <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-800">
               <GraduationCap size={14} />
-              Academic window
+              Hours & credits
             </p>
             <p className="mt-2 text-lg font-black text-slate-950">
               {school.hours ? `${school.hours} hours` : "Hours pending"}
               {school.credits != null ? ` · ${school.credits} credits` : ""}
             </p>
             <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
-              SitGuru owns the internship experience. Your school wraps the
-              academics. {school.partner ? "University Partner." : "Student institution — not a SitGuru partnership by default."}
+              SitGuru runs this internship. Your school counts the credits and hours.
+              {school.partner ? " This school is a SitGuru university partner." : ""}
             </p>
           </div>
         </div>
@@ -342,7 +348,7 @@ export default function InternStudentDashboard({
                 SitGuru Intern Portal
               </span>
               <span className="rounded-full bg-emerald-700 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] !text-white">
-                Your intern working area
+                Your work area
               </span>
               <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-700 shadow-sm">
                 {internStatusLabel(data.intern.status)}
@@ -368,14 +374,13 @@ export default function InternStudentDashboard({
               </div>
             </div>
             <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-slate-800">
-              This is your intern workspace for weekly check-ins, assignments, and
-              the Market Growth Project.
+              Do your weekly check-in, finish tasks, and grow SitGuru this week.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <InternPageTrigger onOpen={() => setProfileOpen(true)} />
               <Link
                 href={INTERN_GROWTH_WORKPLACE.href}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[#0D5C3A] px-4 text-sm font-black !text-white shadow-sm"
+                className={`${internPrimaryBtnClass} rounded-full min-h-11 px-4`}
               >
                 <Megaphone size={14} />
                 {INTERN_GROWTH_WORKPLACE.label}
@@ -383,23 +388,23 @@ export default function InternStudentDashboard({
               <button
                 type="button"
                 onClick={() => openTool("social")}
-                className="inline-flex min-h-11 items-center rounded-full bg-rose-600 px-4 text-sm font-black !text-white shadow-sm"
+                className={`${internPillBtnClass} bg-rose-600 !text-white shadow-sm hover:bg-rose-700`}
               >
-                Social
+                Post
               </button>
               <button
                 type="button"
                 onClick={() => openTool("tracking")}
-                className="inline-flex min-h-11 items-center rounded-full bg-white px-4 text-sm font-black text-sky-800 shadow-sm ring-1 ring-sky-200"
+                className={`${internPillBtnClass} bg-white text-sky-800 shadow-sm ring-1 ring-sky-200 hover:bg-sky-50`}
               >
-                Tracking
+                Tracking links
               </button>
               <button
                 type="button"
                 onClick={() => openTab("work")}
-                className="inline-flex min-h-11 items-center rounded-full bg-white px-4 text-sm font-black text-violet-800 shadow-sm ring-1 ring-violet-200"
+                className={`${internPillBtnClass} bg-white text-violet-800 shadow-sm ring-1 ring-violet-200 hover:bg-violet-50`}
               >
-                Open work
+                Do your work
               </button>
             </div>
           </div>
@@ -416,11 +421,11 @@ export default function InternStudentDashboard({
             <div className="mt-4 grid gap-2 text-sm font-bold text-slate-700">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-                {process.weeklyThisWeek ? "Weekly check-in is in" : "Weekly check-in due"}
+                {process.weeklyThisWeek ? "Check-in is done" : "Do your weekly check-in"}
               </div>
               <div className="flex items-center gap-2">
                 <ClipboardList className="h-4 w-4 text-violet-700" />
-                {openWork.length} open tasks
+                {openWork.length} tasks still open
               </div>
               <div className="flex items-center gap-2">
                 <Share2 className="h-4 w-4 text-rose-700" />
@@ -428,16 +433,16 @@ export default function InternStudentDashboard({
               </div>
             </div>
             <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-3 text-xs font-bold leading-5 text-emerald-900">
-              Business Growth Report · {growthReport.percent}% assembled ·{" "}
-              {growthReport.outcomes.length} verified outcomes ·{" "}
+              Your report is {growthReport.percent}% done ·{" "}
+              {growthReport.outcomes.length} checked results ·{" "}
               {growthReport.lessons.length} lessons
             </p>
             <button
               type="button"
               onClick={() => openTab("project")}
-              className="mt-3 text-left text-xs font-black text-emerald-800 underline"
+              className={`mt-3 text-left text-xs font-black text-emerald-800 underline hover:text-emerald-950 ${internPressClass} shadow-none hover:shadow-none`}
             >
-              Open Business Growth Report
+              Open your report
             </button>
           </div>
         </div>
@@ -450,10 +455,10 @@ export default function InternStudentDashboard({
             key={item.id}
             type="button"
             onClick={() => openTab(item.id)}
-            className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-black ${
+            className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-black ${internPressClass} ${
               tab === item.id
                 ? item.active
-                : "border border-slate-200 bg-white text-slate-700"
+                : "border border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-900"
             }`}
           >
             <item.icon size={16} />
@@ -475,34 +480,66 @@ export default function InternStudentDashboard({
       {tab === "home" && !tool ? (
         <div className="space-y-4">
           <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <ThemeStatCard
-              label="This week"
-              value={process.weeklyThisWeek ? "Logged" : "Due"}
-              helper="Weekly check-in"
-              tone="emerald"
-              icon={<CheckCircle2 size={18} />}
-            />
-            <ThemeStatCard
-              label="Open work"
-              value={openWork.length}
-              helper="Tasks to finish"
-              tone="violet"
-              icon={<ClipboardList size={18} />}
-            />
-            <ThemeStatCard
-              label="Metrics"
-              value={verifiedMetrics.length}
-              helper="Verified KPIs"
-              tone="amber"
-              icon={<BarChart3 size={18} />}
-            />
-            <ThemeStatCard
-              label="Social"
-              value={data.content.length}
-              helper="Posts logged"
-              tone="rose"
-              icon={<Share2 size={18} />}
-            />
+            <button
+              type="button"
+              onClick={() => openTab("home")}
+              className={`w-full border-0 bg-transparent p-0 text-left ${internPressClass}`}
+              aria-label="Open this week’s check-in"
+            >
+              <ThemeStatCard
+                label="This week"
+                value={process.weeklyThisWeek ? "Done" : "Due"}
+                helper={process.weeklyThisWeek ? "Check-in is in" : "Do your weekly check-in"}
+                tone="emerald"
+                icon={<CheckCircle2 size={18} />}
+                className="h-full"
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => openTab("work")}
+              className={`w-full border-0 bg-transparent p-0 text-left ${internPressClass}`}
+              aria-label="Open your work"
+            >
+              <ThemeStatCard
+                label="Open work"
+                value={openWork.length}
+                helper="Tasks to do"
+                tone="violet"
+                icon={<ClipboardList size={18} />}
+                className="h-full"
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => openTab("metrics")}
+              className={`w-full border-0 bg-transparent p-0 text-left ${internPressClass}`}
+              aria-label="Open metrics"
+            >
+              <ThemeStatCard
+                label="Metrics"
+                value={verifiedMetrics.length}
+                helper="Numbers SitGuru checked"
+                tone="amber"
+                icon={<BarChart3 size={18} />}
+                className="h-full"
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => openTool("social")}
+              className={`w-full border-0 bg-transparent p-0 text-left ${internPressClass}`}
+              aria-label="Open social posts"
+            >
+              <ThemeStatCard
+                label="Social"
+                value={data.content.length}
+                helper="Posts you’ve logged"
+                tone="rose"
+                icon={<Share2 size={18} />}
+                className="h-full"
+              />
+            </button>
           </section>
 
           <InternKpiBoard internId={data.intern.id} />
@@ -512,18 +549,18 @@ export default function InternStudentDashboard({
             <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
-                  On-the-project training
+                  Your campaign workspace
                 </p>
                 <h2 className="mt-1 font-black text-slate-950">
                   {INTERN_GROWTH_WORKPLACE.label}
                 </h2>
                 <p className="mt-1 max-w-xl text-sm font-semibold text-slate-600">
-                  {INTERN_GROWTH_WORKPLACE.blurb} Drafts wait for SitGuru approval.
+                  {INTERN_GROWTH_WORKPLACE.blurb}
                 </p>
               </div>
               <Link
                 href={INTERN_GROWTH_WORKPLACE.href}
-                className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black !text-white"
+                className={`${internPrimaryBtnClass} shrink-0`}
               >
                 Open workplace
               </Link>
@@ -534,11 +571,11 @@ export default function InternStudentDashboard({
             <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
-                  Course tools
+                  Quick tools
                 </p>
                 <h2 className="mt-1 font-black text-slate-950">Intern toolkit</h2>
               </div>
-              <p className="text-xs font-semibold text-slate-500">Intern tools</p>
+              <p className="text-xs font-semibold text-slate-500">Tap a card to open it</p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {INTERN_HOME_TOOLS.map((item) => {
@@ -548,7 +585,7 @@ export default function InternStudentDashboard({
                     key={item.id}
                     type="button"
                     onClick={() => setTool(item.id)}
-                    className={`overflow-hidden rounded-[1.4rem] border text-left shadow-sm ${item.tile}`}
+                    className={`overflow-hidden rounded-[1.4rem] border text-left shadow-sm ${item.tile} ${internPressClass}`}
                   >
                     <span className={`block h-2.5 w-full ${item.bar}`} />
                     <span className="flex min-h-[5.25rem] flex-col items-start justify-center gap-2 px-3 py-3">
@@ -581,8 +618,8 @@ export default function InternStudentDashboard({
                 {pacing.requiredHours} hours · {pacing.requiredWeeklyPace}/week
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-500">
-                {pacing.weeksRemaining} weeks left in your approved internship window.
-                Pace uses your start and end dates, not a generic semester length.
+                You have {pacing.weeksRemaining} weeks left. Hit this weekly number so
+                you finish your hours on time.
               </p>
             </section>
           ) : null}
@@ -593,7 +630,7 @@ export default function InternStudentDashboard({
               <button
                 type="button"
                 onClick={() => openTab("calendar")}
-                className="text-xs font-black text-emerald-800"
+                className={`${internGhostBtnClass} min-h-10 px-3 text-xs`}
               >
                 Open calendar
               </button>
@@ -601,30 +638,36 @@ export default function InternStudentDashboard({
             {upcoming.length ? (
               <ul className="mt-3 space-y-2">
                 {upcoming.map((event) => (
-                  <li
-                    key={event.id}
-                    className="flex min-h-12 items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-slate-950">
-                        {event.title}
-                      </p>
-                      <p className="text-xs font-semibold text-slate-500">
-                        {kindLabel(event.kind)} · {event.date}
-                      </p>
-                    </div>
-                    {event.status ? (
-                      <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-emerald-800">
-                        {event.status.replaceAll("_", " ")}
-                      </span>
-                    ) : null}
+                  <li key={event.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openTab("calendar");
+                        setSelectedDate(event.date);
+                        setCalendarMonth(new Date(`${event.date}T12:00:00`));
+                      }}
+                      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-3 py-2 text-left hover:bg-emerald-100 ${internPressClass}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-slate-950">
+                          {event.title}
+                        </p>
+                        <p className="text-xs font-semibold text-slate-500">
+                          {kindLabel(event.kind)} · {event.date}
+                        </p>
+                      </div>
+                      {event.status ? (
+                        <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-black uppercase text-emerald-800">
+                          {event.status.replaceAll("_", " ")}
+                        </span>
+                      ) : null}
+                    </button>
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="mt-3 text-sm font-semibold text-slate-500">
-                Nothing dated yet. When tasks get due dates, they show up here and on
-                the calendar.
+                No due dates yet. When SitGuru assigns dates, they show up here.
               </p>
             )}
           </section>
@@ -636,8 +679,8 @@ export default function InternStudentDashboard({
             >
               <h2 className="font-black text-slate-950">This week’s check-in</h2>
               <p className="text-sm font-semibold text-slate-500">
-                This update builds the Business Growth Report: measurable outcomes
-                and lessons learned. Choose which Report section it advanced.
+                Tell SitGuru what you finished this week. Be specific — this goes in
+                your report.
               </p>
               <input type="hidden" name="internId" value={data.intern.id} />
               <input type="hidden" name="mode" value="intern" />
@@ -651,14 +694,14 @@ export default function InternStudentDashboard({
                   name="contributionAdded"
                   required
                   rows={3}
-                  placeholder="This becomes a section of the Business Growth Report — outcomes, methods, or lessons."
+                  placeholder="What you shipped, who it reached, and what you learned."
                   className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-sm font-semibold text-slate-950"
                 />
               </label>
               {[
                 ["accomplished", "What did you finish?"],
                 ["dataShowed", "What did the numbers show?"],
-                ["didntWork", "What didn’t work? (lessons learned)"],
+                ["didntWork", "What didn’t work?"],
                 ["changingNextWeek", "What’s next?"],
               ].map(([name, label]) => (
                 <label key={name} className="block">
@@ -674,24 +717,24 @@ export default function InternStudentDashboard({
               ))}
               <label className="block">
                 <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  Intern-reported KPI
+                  Your number (SitGuru will check it)
                 </span>
                 <input
                   name="internReportedKpi"
-                  placeholder="27 Pet Parent registrations — waits for SitGuru verification"
+                  placeholder="Example: 27 Pet Parent signups"
                   className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold text-slate-950"
                 />
               </label>
-              <button className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+              <button className={`${internPrimaryBtnClass} w-full`}>
                 <CheckCircle2 size={16} />
-                Save check-in
+                Send this week to SitGuru
               </button>
             </form>
           ) : process.weeklyThisWeek ? (
             <div className="space-y-3">
               <p className="flex min-h-12 items-center gap-2 rounded-[1.4rem] border border-emerald-100 bg-emerald-50 px-4 text-sm font-black text-emerald-900">
                 <CheckCircle2 size={16} />
-                This week’s check-in is in.
+                This week’s check-in is done.
               </p>
               <article className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
                 <InternWorkAttachments
@@ -731,7 +774,7 @@ export default function InternStudentDashboard({
                     new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1),
                   )
                 }
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200"
+                className={`flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50 ${internPressClass}`}
               >
                 <ChevronLeft size={18} />
               </button>
@@ -742,7 +785,7 @@ export default function InternStudentDashboard({
                   setCalendarMonth(now);
                   setSelectedDate(toDateKey(now));
                 }}
-                className="min-h-11 rounded-full border border-slate-200 px-3 text-xs font-black"
+                className={`${internGhostBtnClass} min-h-11 rounded-full px-3 text-xs`}
               >
                 Today
               </button>
@@ -754,7 +797,7 @@ export default function InternStudentDashboard({
                     new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1),
                   )
                 }
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200"
+                className={`flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50 ${internPressClass}`}
               >
                 <ChevronRight size={18} />
               </button>
@@ -778,14 +821,14 @@ export default function InternStudentDashboard({
                   key={day.key}
                   type="button"
                   onClick={() => setSelectedDate(day.key)}
-                  className={`flex min-h-12 flex-col items-center justify-center rounded-2xl text-xs font-black ${
+                  className={`flex min-h-12 flex-col items-center justify-center rounded-2xl text-xs font-black ${internPressClass} ${
                     selected
                       ? "bg-[#0D5C3A] !text-white"
                       : today
-                        ? "bg-emerald-50 text-emerald-900"
+                        ? "bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
                         : day.inMonth
-                          ? "text-slate-800"
-                          : "text-slate-300"
+                          ? "text-slate-800 hover:bg-emerald-50"
+                          : "text-slate-300 hover:bg-slate-50"
                   }`}
                 >
                   {day.date.getDate()}
@@ -838,7 +881,7 @@ export default function InternStudentDashboard({
       {tab === "work" ? (
         <section className="space-y-3">
           <p className="px-1 text-sm font-semibold text-slate-600">
-            Tasks, social posts, and campaigns live here. SitGuru reviews what you submit.
+            Open a task, add proof, then send it to SitGuru.
           </p>
           <div className="flex flex-wrap gap-2">
             {(
@@ -853,8 +896,8 @@ export default function InternStudentDashboard({
                 key={id}
                 type="button"
                 onClick={() => setWorkFilter(id)}
-                className={`inline-flex min-h-11 items-center rounded-2xl px-4 text-xs font-black ${
-                  workFilter === id ? on : `border bg-white ${off}`
+                className={`inline-flex min-h-11 items-center rounded-2xl px-4 text-xs font-black ${internPressClass} ${
+                  workFilter === id ? on : `border bg-white ${off} hover:bg-emerald-50`
                 }`}
               >
                 {label}
@@ -947,7 +990,7 @@ export default function InternStudentDashboard({
                   <Field name="draftUrl" label="Draft link" />
                   <Field name="publishedUrl" label="Published link" />
                   <FinalSectionSelect defaultValue="content_system" />
-                  <button className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+                  <button className={`${internPrimaryBtnClass} w-full`}>
                     Save social post
                   </button>
                 </form>
@@ -1010,7 +1053,7 @@ export default function InternStudentDashboard({
                   <p className="text-xs font-semibold leading-5 text-slate-500">
                     {ATTRIBUTION_RULE}
                   </p>
-                  <button className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+                  <button className={`${internPrimaryBtnClass} w-full`}>
                     Save campaign
                   </button>
                 </form>
@@ -1039,8 +1082,7 @@ export default function InternStudentDashboard({
         <section className="space-y-4">
           <InternKpiBoard internId={data.intern.id} />
           <p className="px-1 text-sm font-semibold text-slate-600">
-            Letters come from verified KPI output vs your SMART targets — not from
-            posting more. Self-reported numbers wait for SitGuru.
+            SitGuru checks these numbers. Your own counts stay pending until they confirm them.
           </p>
           <InternshipKpiLetterBoard data={data} />
           {data.metrics.length ? (
@@ -1059,7 +1101,7 @@ export default function InternStudentDashboard({
                           : "bg-amber-50 text-amber-800"
                       }`}
                     >
-                      {metric.isVerified ? "Verified" : "Unverified"}
+                      {metric.isVerified ? "SitGuru checked" : "Waiting"}
                     </span>
                   </div>
                   <p className="mt-2 text-2xl font-black text-slate-950">
@@ -1067,7 +1109,7 @@ export default function InternStudentDashboard({
                   </p>
                   <p className="text-xs font-semibold text-slate-500">
                     Source: {metricSourceLabel(metric.sourceSystem)}
-                    {metric.selfReported ? " · intern-submitted" : ""}
+                    {metric.selfReported ? " · you sent this" : ""}
                   </p>
                   <InternWorkAttachments
                     internId={data.intern.id}
@@ -1082,7 +1124,7 @@ export default function InternStudentDashboard({
             </ul>
           ) : (
             <p className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white p-5 text-sm font-semibold text-slate-500">
-              No metrics yet. Submit a number from an approved source.
+              No numbers yet. Send one from an approved SitGuru source.
             </p>
           )}
           {preview ? (
@@ -1094,7 +1136,7 @@ export default function InternStudentDashboard({
               action={saveInternMetric}
               className="space-y-3 rounded-[1.4rem] border border-emerald-100 bg-white p-4"
             >
-              <h3 className="font-black text-slate-950">Submit metric for verification</h3>
+              <h3 className="font-black text-slate-950">Send a number for SitGuru to check</h3>
               <input type="hidden" name="internId" value={data.intern.id} />
               <input type="hidden" name="mode" value="intern" />
               <Field
@@ -1124,11 +1166,11 @@ export default function InternStudentDashboard({
               <Field name="sourceNote" label="Source note / report link" />
               <FinalSectionSelect defaultValue="analytics_attribution" />
               <p className="text-xs font-semibold text-amber-800">
-                Self-reported until SitGuru verifies it from a SitGuru-controlled source.
+                SitGuru will check this against their own data before it counts.
               </p>
               <p className="text-xs font-semibold leading-5 text-slate-500">{ATTRIBUTION_RULE}</p>
-              <button className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
-                Submit metric
+              <button className={`${internPrimaryBtnClass} w-full`}>
+                Send number
               </button>
             </form>
           )}
@@ -1149,8 +1191,8 @@ export default function InternStudentDashboard({
               key={item.id}
               type="button"
               onClick={() => openTab(item.id)}
-              className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-black ${
-                tab === item.id ? item.chip : "text-slate-500"
+              className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-black ${internPressClass} ${
+                tab === item.id ? item.chip : "text-slate-500 hover:bg-emerald-50 hover:text-emerald-900"
               }`}
             >
               <item.icon size={18} />

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Camera, Upload } from "lucide-react";
 import { uploadInternConfidentialityScan } from "@/lib/internship/actions";
+import { internGhostBtnClass, internPrimaryBtnClass } from "@/lib/internship/intern-ui";
 
 export default function InternSignedPageUpload({
   internId,
@@ -67,7 +68,7 @@ export default function InternSignedPageUpload({
           type="button"
           disabled={disabled || busy}
           onClick={() => inputRef.current?.click()}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 text-sm font-black !text-white disabled:opacity-50 sm:w-auto"
+          className={`${internPrimaryBtnClass} w-full disabled:opacity-50 sm:w-auto`}
         >
           <Upload size={16} />
           {busy ? "Uploading…" : "Upload PDF or photo"}
@@ -76,7 +77,7 @@ export default function InternSignedPageUpload({
           type="button"
           disabled={disabled || busy}
           onClick={() => cameraRef.current?.click()}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 text-sm font-black text-emerald-900 disabled:opacity-50 sm:w-auto"
+          className={`${internGhostBtnClass} w-full disabled:opacity-50 sm:w-auto`}
         >
           <Camera size={16} />
           Take photo

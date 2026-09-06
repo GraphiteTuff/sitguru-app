@@ -739,14 +739,14 @@ export async function saveWeeklyReview(formData: FormData) {
     bounce(
       workspacePath(internId, mode),
       "error",
-      "Choose which Business Growth Report section this week advanced.",
+      "Choose which part of your report this helped.",
     );
   }
   if (!contributionAdded) {
     bounce(
       workspacePath(internId, mode),
       "error",
-      "Describe what you added or improved on the Business Growth Report this week.",
+      "Tell SitGuru what you finished this week.",
     );
   }
 
@@ -796,8 +796,8 @@ export async function saveWeeklyReview(formData: FormData) {
     workspacePath(internId, mode),
     "ok",
     mode === "supervisor"
-      ? "Weekly work reviewed for the Business Growth Report."
-      : "Weekly check-in saved to the Business Growth Report.",
+      ? "Weekly work marked for the report."
+      : "Check-in sent. SitGuru will review it.",
   );
 }
 

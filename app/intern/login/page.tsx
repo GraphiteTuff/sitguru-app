@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
 import { internPortalDestination, internSafeNext } from "@/lib/internship/intern-growth";
+import { internPrimaryBtnClass } from "@/lib/internship/intern-ui";
 import { internOnboardingComplete } from "@/lib/internship/onboarding";
 import { findInternByAccount, getInternOnboarding } from "@/lib/internship/queries";
 
@@ -50,11 +51,11 @@ export default async function InternLoginPage({
           </h1>
           <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
             {error ||
-              "This SitGuru account is not assigned as an intern. SitGuru assigns intern portal access from the Internship Program."}
+              "This SitGuru account is not assigned as an intern. SitGuru has to add you to the internship program first."}
           </p>
           <Link
             href="/customer/dashboard"
-            className="mt-6 inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
+            className={`mt-6 ${internPrimaryBtnClass}`}
           >
             Back to SitGuru
           </Link>

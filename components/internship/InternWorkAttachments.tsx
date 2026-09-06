@@ -6,6 +6,7 @@ import {
   uploadInternAttachment,
 } from "@/lib/internship/actions";
 import { attachmentsForItem } from "@/lib/internship/portal";
+import { internPrimaryBtnClass } from "@/lib/internship/intern-ui";
 import type { InternshipWorkAttachment } from "@/lib/internship/types";
 
 export default function InternWorkAttachments({
@@ -54,7 +55,9 @@ export default function InternWorkAttachments({
                   <input type="hidden" name="internId" value={internId} />
                   <input type="hidden" name="mode" value={mode} />
                   <input type="hidden" name="attachmentId" value={file.id} />
-                  <button className="text-xs font-black text-rose-700">Remove</button>
+                  <button className="text-xs font-black text-rose-700 hover:text-rose-900 hover:underline">
+                    Remove
+                  </button>
                 </form>
               ) : null}
             </li>
@@ -62,8 +65,7 @@ export default function InternWorkAttachments({
         </ul>
       ) : (
         <p className="mt-2 text-xs font-semibold text-slate-500">
-          Attach PDFs, slides, screenshots, or drafts that support this work and the
-          Business Growth Report.
+          Attach PDFs, slides, screenshots, or drafts that prove this work.
         </p>
       )}
       {!readOnly ? (
@@ -82,7 +84,7 @@ export default function InternWorkAttachments({
             required
             className="min-h-11 w-full rounded-xl border border-emerald-100 bg-white px-3 py-2 text-sm font-semibold"
           />
-          <button className="min-h-11 rounded-2xl bg-[#0D5C3A] px-4 text-xs font-black !text-white">
+          <button className={`${internPrimaryBtnClass} min-h-11 px-4 text-xs`}>
             Attach
           </button>
         </form>

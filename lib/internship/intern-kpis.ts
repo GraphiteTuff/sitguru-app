@@ -187,11 +187,11 @@ export function buildInternKpiBoard(input: {
     const attributed = internAttributedForKey(input.snapshot, kpi.key);
     const helper =
       kpi.key === "people.gurus"
-        ? `${input.snapshot.people.bookableGurus.toLocaleString()} bookable`
+        ? `${input.snapshot.people.bookableGurus.toLocaleString()} can take bookings`
         : kpi.group === "social"
           ? attributed
             ? `${attributed.toLocaleString()} from your tracking links`
-            : "SitGuru tracked visits + QR scans"
+            : "SitGuru visits and QR scans"
           : input.snapshot.marketLabel;
 
     return {

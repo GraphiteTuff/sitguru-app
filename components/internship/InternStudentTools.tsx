@@ -19,6 +19,11 @@ import {
   type InternPromoteEvent,
 } from "@/lib/internship/intern-tools";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
+import {
+  internGhostBtnClass,
+  internPressClass,
+  internPrimaryBtnClass,
+} from "@/lib/internship/intern-ui";
 
 function Field({
   name,
@@ -63,7 +68,7 @@ function CopyButton({ value }: { value: string }) {
           setCopied(false);
         }
       }}
-      className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-900"
+      className={`${internGhostBtnClass} min-h-11 shrink-0 px-3 text-xs`}
     >
       <Copy size={14} />
       {copied ? "Copied" : "Copy"}
@@ -90,7 +95,7 @@ function ToolShell({
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex min-h-11 items-center gap-2 text-sm font-black text-emerald-800"
+        className={`inline-flex min-h-11 items-center gap-2 text-sm font-black text-emerald-800 hover:text-emerald-950 ${internPressClass} shadow-none hover:shadow-none`}
       >
         <ArrowLeft size={16} />
         Home
@@ -130,7 +135,7 @@ export default function InternStudentTools({
     return (
       <ToolShell
         title="Brand kit"
-        blurb="Use SitGuru branding only. Do not use university marks unless that school authorizes them."
+        blurb="Use SitGuru’s logo, green, and @SitGuruOfficial. Don’t use school logos unless the school says yes."
         tool={tool}
         onBack={onBack}
       >
@@ -168,14 +173,14 @@ export default function InternStudentTools({
           </p>
           <p className="mt-1 text-lg font-black text-slate-950">{SITGURU_OFFICIAL_HANDLE}</p>
           <p className="mt-2 text-sm font-semibold text-slate-500">
-            Instagram, Facebook, TikTok, X, and YouTube. Rogue is the mascot. Booking
-            stays on SitGuru.
+            Instagram, Facebook, TikTok, X, and YouTube. Rogue is the mascot. Bookings
+            stay on SitGuru.
           </p>
         </article>
         <ul className="space-y-2 text-sm font-semibold text-slate-600">
           <li>White type on brand green. Never dark text on #0D5C3A.</li>
-          <li>Do not imply a university endorses SitGuru.</li>
-          <li>Tag {SITGURU_OFFICIAL_HANDLE} when you post about the brand.</li>
+          <li>Don’t say a university endorses SitGuru.</li>
+          <li>Tag {SITGURU_OFFICIAL_HANDLE} when you post about SitGuru.</li>
         </ul>
       </ToolShell>
     );
@@ -185,7 +190,7 @@ export default function InternStudentTools({
     return (
       <ToolShell
         title="Tracking links"
-        blurb="No growth result counts without a unique UTM or referral code."
+        blurb="Copy your unique link before you post. SitGuru only counts growth from that link."
         tool={tool}
         onBack={onBack}
       >
@@ -241,7 +246,7 @@ export default function InternStudentTools({
             <Field name="referralCode" label="Referral code" />
             <Field name="objective" label="Business objective" />
             <p className="text-xs font-semibold leading-5 text-slate-500">{ATTRIBUTION_RULE}</p>
-            <button className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+            <button className={`${internPrimaryBtnClass} w-full`}>
               Save tracking link
             </button>
           </form>
@@ -254,7 +259,7 @@ export default function InternStudentTools({
     return (
       <ToolShell
         title="Market snapshot"
-        blurb="Aggregated numbers for your assigned market. No Pet Parent or Guru names, emails, or payouts."
+        blurb="Your market totals. No names, emails, or payouts."
         tool={tool}
         onBack={onBack}
       >
@@ -267,7 +272,7 @@ export default function InternStudentTools({
           </div>
           <div className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-              Verified KPIs
+              Numbers SitGuru checked
             </p>
             <p className="mt-1 text-2xl font-black text-slate-950">{snapshot.verifiedCount}</p>
             <p className="text-xs font-semibold text-slate-500">
@@ -304,7 +309,7 @@ export default function InternStudentTools({
           </ul>
         ) : (
           <p className="rounded-[1.4rem] border border-dashed border-slate-200 bg-white p-4 text-sm font-semibold text-slate-500">
-            Verified KPIs show here after SitGuru confirms them from SitGuru sources.
+            SitGuru-checked numbers show here after they confirm them.
           </p>
         )}
         {snapshot.goals.length ? (
@@ -323,7 +328,7 @@ export default function InternStudentTools({
             <Link
               key={link.href}
               href={link.href}
-              className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black text-emerald-900"
+              className={`${internGhostBtnClass}`}
             >
               {link.label}
             </Link>
@@ -336,8 +341,8 @@ export default function InternStudentTools({
   if (tool === "events") {
     return (
       <ToolShell
-        title="Events to promote"
-        blurb="Public SitGuru pet events. Share with a tracking link. This is not Events admin."
+        title="Events to share"
+        blurb="Public SitGuru pet events you can share. Always use a tracking link."
         tool={tool}
         onBack={onBack}
       >
@@ -357,7 +362,7 @@ export default function InternStudentTools({
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Link
                       href={event.href}
-                      className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-xs font-black !text-white"
+                      className={`${internPrimaryBtnClass} min-h-11 px-4 text-xs`}
                     >
                       Open event
                     </Link>
@@ -374,7 +379,7 @@ export default function InternStudentTools({
         )}
         <Link
           href="/events"
-          className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-900"
+          className={`${internGhostBtnClass} min-h-12 px-4`}
         >
           Browse all public events
         </Link>
@@ -385,7 +390,7 @@ export default function InternStudentTools({
   return (
     <ToolShell
       title="Social media"
-      blurb="Promote @SitGuruOfficial. Draft posts here — SitGuru publishes from official accounts unless SitGuru grants a channel."
+      blurb="Draft posts here. Tag @SitGuruOfficial. SitGuru posts from official accounts unless they give you a channel."
       tool={tool}
       onBack={onBack}
     >
@@ -396,14 +401,14 @@ export default function InternStudentTools({
             href={link.href}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-100 bg-white px-3 text-sm font-black text-emerald-900"
+            className={`${internGhostBtnClass} min-h-12 px-3`}
           >
             {link.label}
           </a>
         ))}
       </div>
       <p className="text-sm font-semibold text-slate-500">
-        Handle: {SITGURU_OFFICIAL_HANDLE}. Tag it. Use brand green. Booking stays on
+        Handle: {SITGURU_OFFICIAL_HANDLE}. Tag it. Use brand green. Bookings stay on
         SitGuru. Never put customer names or emails in a caption.
       </p>
       {platforms.length ? (
@@ -474,7 +479,7 @@ export default function InternStudentTools({
           <Field name="draftUrl" label="Draft link" />
           <Field name="publishedUrl" label="Published link" />
           <Field name="studentNotes" label="Caption / notes" />
-          <button className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
+          <button className={`${internPrimaryBtnClass} w-full`}>
             Save social post
           </button>
         </form>

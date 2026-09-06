@@ -9,9 +9,9 @@ import {
   defaultFinalSectionForWeek,
   type FinalContributionSectionId,
 } from "@/lib/internship/final-project";
-import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
 import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
+import { internPrimaryBtnClass } from "@/lib/internship/intern-ui";
 
 export function FinalSectionSelect({
   name = "finalSection",
@@ -25,7 +25,7 @@ export function FinalSectionSelect({
   return (
     <label className="block">
       <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-        Contribution to Business Growth Report
+        Contribution to your report
       </span>
       <select
         name={name}
@@ -33,7 +33,7 @@ export function FinalSectionSelect({
         defaultValue={defaultValue || ""}
         className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold text-slate-950"
       >
-        <option value="">Which Report section did this advance?</option>
+        <option value="">Which part of your report did this help?</option>
         {FINAL_CONTRIBUTION_SECTIONS.map((section) => (
           <option key={section.id} value={section.id}>
             {section.label}
@@ -73,16 +73,14 @@ export default function InternshipFinalProjectBoard({
     <section className="space-y-4">
       <article className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
-          Semester destination
+          Your final report
         </p>
         <h2 className="mt-1 text-2xl font-black text-slate-950">
           Business Growth Report
         </h2>
         <p className="mt-2 text-sm font-semibold text-slate-600">
-          All {MARKET_GROWTH_PROJECT_NAME} work builds this document: measurable
-          outcomes and lessons learned. The Playbook and portfolio are supporting
-          outputs assembled from the same approved record. Week {thisWeek.week}{" "}
-          feeds {thisWeek.buildsToward}.
+          Every task, post, and campaign you finish goes into this report. Week{" "}
+          {thisWeek.week} feeds {thisWeek.buildsToward}.
         </p>
         <p className="mt-3 text-sm font-black text-emerald-900">
           Report assembled: {report.percent}%
@@ -109,7 +107,7 @@ export default function InternshipFinalProjectBoard({
               {report.outcomes.length}
             </p>
             <p className="mt-1 text-xs font-semibold text-slate-600">
-              SitGuru-verified results only. Self-reported numbers wait for approval.
+              SitGuru-checked results only. Your own numbers wait until SitGuru confirms them.
             </p>
           </div>
           <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
@@ -120,7 +118,7 @@ export default function InternshipFinalProjectBoard({
               {report.lessons.length}
             </p>
             <p className="mt-1 text-xs font-semibold text-slate-600">
-              Failed tests and strategy changes stay in the report. They are evidence, not waste.
+              What didn’t work is still useful. Put it in the report.
             </p>
           </div>
         </div>
@@ -129,8 +127,7 @@ export default function InternshipFinalProjectBoard({
       <article className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
         <h3 className="font-black text-slate-950">Business Growth Report draft</h3>
         <p className="mt-1 text-sm font-semibold text-slate-500">
-          By week 15 this should already be mostly written. The last week is
-          synthesis and defense — not reconstructing the semester.
+          Keep filling this as you go. Don’t wait until week 15 to write it.
         </p>
         <div className="mt-4 space-y-2">
           {report.sections.map((section) => (
@@ -194,7 +191,7 @@ export default function InternshipFinalProjectBoard({
                 name="contributionAdded"
                 required
                 rows={3}
-                placeholder="This becomes a section of the Business Growth Report — outcomes, methods, or lessons."
+                placeholder="What you shipped, who it reached, and what you learned."
                 className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-sm font-semibold text-slate-950"
               />
             </label>
@@ -220,12 +217,12 @@ export default function InternshipFinalProjectBoard({
             </label>
             <label className="block">
               <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                What didn’t work? (lessons learned)
+                What didn’t work?
               </span>
               <textarea
                 name="didntWork"
                 rows={2}
-                placeholder="Failed tests stay in the Report. They are evidence, not waste."
+                placeholder="If a test flopped, write it here. That still counts."
                 className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-sm font-semibold"
               />
             </label>
@@ -252,11 +249,11 @@ export default function InternshipFinalProjectBoard({
             </label>
             <label className="block">
               <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                Intern-reported KPI
+                Your number (SitGuru will check it)
               </span>
               <input
                 name="internReportedKpi"
-                placeholder="27 Pet Parent registrations"
+                placeholder="Example: 27 Pet Parent signups"
                 className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
               />
             </label>
@@ -290,8 +287,8 @@ export default function InternshipFinalProjectBoard({
                 </label>
               </div>
             ) : null}
-            <button className="min-h-12 w-full rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white">
-              {supervisor ? "Approve into Business Growth Report" : "Save to Business Growth Report"}
+            <button className={`${internPrimaryBtnClass} w-full`}>
+              {supervisor ? "Approve into Business Growth Report" : "Save to your report"}
             </button>
           </form>
         ) : (
@@ -303,11 +300,10 @@ export default function InternshipFinalProjectBoard({
 
       <article className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
         <h3 className="font-black text-slate-950">
-          Included in the Business Growth Report
+          Work SitGuru approved for your report
         </h3>
         <p className="mt-1 text-sm font-semibold text-slate-500">
-          Internship → Growth Project → Business Growth Report → Weekly Task →
-          Campaign/Experiment → KPI → Evidence → Supervisor Approval
+          Finish work → attach proof → SitGuru checks it → it lands in your report.
         </p>
         {included.length ? (
           <div className="mt-4 space-y-3">
@@ -337,9 +333,7 @@ export default function InternshipFinalProjectBoard({
           </div>
         ) : (
           <p className="mt-3 rounded-2xl border border-dashed border-slate-200 p-4 text-sm font-semibold text-slate-500">
-            Approved weekly contributions, verified KPIs, and lessons will appear
-            here automatically. The intern should not reconstruct the Report at the
-            end of the semester.
+            Approved work shows up here. Don’t try to rewrite the whole report at the end.
           </p>
         )}
       </article>

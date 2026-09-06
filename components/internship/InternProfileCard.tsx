@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Camera, Pencil, Upload, X } from "lucide-react";
 import InternAvatar from "@/components/internship/InternAvatar";
 import { saveInternProfile } from "@/lib/internship/actions";
+import { internGhostBtnClass, internPressClass, internPrimaryBtnClass } from "@/lib/internship/intern-ui";
 import { INTERN_PORTAL_THEMES } from "@/lib/internship/portal";
 import type { InternshipIntern } from "@/lib/internship/types";
 
@@ -14,9 +15,9 @@ function SaveInternPageButton() {
     <button
       type="submit"
       disabled={pending}
-      className="min-h-12 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white disabled:opacity-60 sm:col-span-2"
+      className={`${internPrimaryBtnClass} disabled:opacity-60 sm:col-span-2`}
     >
-      {pending ? "Saving…" : "Save intern page"}
+      {pending ? "Saving…" : "Save your page"}
     </button>
   );
 }
@@ -87,7 +88,7 @@ function InternPhotoPicker({ currentUrl }: { currentUrl?: string }) {
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-4 text-xs font-black !text-white"
+              className={`${internPrimaryBtnClass} min-h-11 px-4 text-xs`}
             >
               <Upload size={14} />
               Choose photo
@@ -95,7 +96,7 @@ function InternPhotoPicker({ currentUrl }: { currentUrl?: string }) {
             <button
               type="button"
               onClick={() => cameraRef.current?.click()}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 text-xs font-black text-emerald-900"
+              className={`${internGhostBtnClass} min-h-11 px-4 text-xs`}
             >
               <Camera size={14} />
               Take photo
@@ -103,8 +104,8 @@ function InternPhotoPicker({ currentUrl }: { currentUrl?: string }) {
           </div>
           <p className="text-xs font-semibold text-slate-500">
             {fileName
-              ? `${fileName} is ready. Save intern page to apply it.`
-              : "JPG, PNG, or phone photo. Save intern page after you choose a file."}
+              ? `${fileName} is ready. Tap Save your page to apply it.`
+              : "JPG, PNG, or a phone photo. Tap Save your page after you pick a file."}
           </p>
         </div>
       </div>
@@ -177,7 +178,7 @@ export default function InternProfileCard({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-700"
+              className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 ${internPressClass}`}
               aria-label="Close"
             >
               <X size={18} />
@@ -322,10 +323,10 @@ export function InternPageTrigger({
     <button
       type="button"
       onClick={onOpen}
-      className={`inline-flex min-h-11 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-black text-emerald-900 shadow-sm ring-1 ring-emerald-200 ${className}`}
+      className={`${internGhostBtnClass} rounded-full px-4 ${className}`}
     >
       <Pencil size={14} />
-      Edit intern page
+      Edit your page
     </button>
   );
 }
