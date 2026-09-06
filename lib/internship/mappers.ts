@@ -11,6 +11,8 @@ import type {
   InternshipTask,
   InternshipUniversity,
   InternshipWeeklyReview,
+  InternshipOnboarding,
+  InternshipWorkAttachment,
 } from "@/lib/internship/types";
 import type {
   AcademicCreditStatus,
@@ -68,6 +70,12 @@ export function mapUniversity(row: Record<string, unknown>): InternshipUniversit
     nextAction: text(row.next_action),
     institutionContactStatus: text(row.institution_contact_status),
     isTest: bool(row.is_test),
+    headerTitle: text(row.header_title),
+    headerProgram: text(row.header_program),
+    logoUrl: text(row.logo_url),
+    logoStoragePath: text(row.logo_storage_path),
+    logoPermissionGranted: bool(row.logo_permission_granted),
+    logoPermissionNotes: text(row.logo_permission_notes),
   };
 }
 
@@ -176,6 +184,12 @@ export function mapIntern(row: Record<string, unknown>): InternshipIntern {
     academicSnapshot: snapshot,
     notes: text(row.notes),
     avatarUrl: text(row.avatar_url),
+    preferredName: text(row.preferred_name),
+    headline: text(row.headline),
+    bio: text(row.bio),
+    linkedinUrl: text(row.linkedin_url),
+    portalTheme: text(row.portal_theme) || "emerald",
+    avatarStoragePath: text(row.avatar_storage_path),
     isTest: bool(row.is_test),
     baselineLockedAt: text(row.baseline_locked_at) || null,
     baselineLockReason: text(row.baseline_lock_reason),
@@ -305,5 +319,40 @@ export function mapWeeklyReview(row: Record<string, unknown>): InternshipWeeklyR
     contributionApproved: bool(row.contribution_approved),
     internReportedKpi: text(row.intern_reported_kpi),
     verifiedKpi: text(row.verified_kpi),
+  };
+}
+
+export function mapOnboarding(row: Record<string, unknown>): InternshipOnboarding {
+  return {
+    internId: text(row.intern_id),
+    policyVersion: text(row.policy_version),
+    typedLegalName: text(row.typed_legal_name),
+    accessRulesAcceptedAt: text(row.access_rules_accepted_at) || null,
+    electronicSignedAt: text(row.electronic_signed_at) || null,
+    signerEmail: text(row.signer_email),
+    wetInkFileName: text(row.wet_ink_file_name),
+    wetInkStoragePath: text(row.wet_ink_storage_path),
+    wetInkMimeType: text(row.wet_ink_mime_type),
+    wetInkFileSize: Number(row.wet_ink_file_size) || 0,
+    wetInkUploadedAt: text(row.wet_ink_uploaded_at) || null,
+  };
+}
+
+export function mapWorkAttachment(row: Record<string, unknown>): InternshipWorkAttachment {
+  return {
+    id: text(row.id),
+    internId: text(row.intern_id),
+    itemType: text(row.item_type),
+    itemId: text(row.item_id),
+    fileName: text(row.file_name),
+    fileUrl: text(row.file_url),
+    storageBucket: text(row.storage_bucket) || "internship-assets",
+    storagePath: text(row.storage_path),
+    mimeType: text(row.mime_type),
+    fileSize: Number(row.file_size) || 0,
+    caption: text(row.caption),
+    contributesToFinal: row.contributes_to_final !== false,
+    uploadedByRole: text(row.uploaded_by_role) === "supervisor" ? "supervisor" : "intern",
+    createdAt: text(row.created_at),
   };
 }

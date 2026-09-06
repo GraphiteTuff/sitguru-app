@@ -15,12 +15,15 @@ import {
   mapTask,
   mapUniversity,
   mapWeeklyReview,
+  mapWorkAttachment,
+  mapOnboarding,
 } from "@/lib/internship/mappers";
 import type {
   AcademicRequirement,
   CohortDashboardStats,
   FrozenAcademicProfile,
   InternshipIntern,
+  InternshipOnboarding,
   InternshipUniversity,
   InternshipWorkspaceData,
 } from "@/lib/internship/types";
@@ -411,6 +414,8 @@ export async function getInternWorkspace(
     accessGrants,
     milestones,
     commentRows,
+    attachmentRows,
+    onboardingRow,
   ] = await Promise.all([
     getUniversity(intern.universityId),
     intern.campusId
@@ -480,6 +485,16 @@ export async function getInternWorkspace(
       .select("*")
       .eq("intern_id", internId)
       .order("created_at", { ascending: true }),
+    supabaseAdmin
+      .from("internship_work_attachments")
+      .select("*")
+      .eq("intern_id", internId)
+      .order("created_at", { ascending: false }),
+    supabaseAdmin
+      .from("internship_onboarding_acknowledgments")
+      .select("*")
+      .eq("intern_id", internId)
+      .maybeSingle(),
   ]);
 
   return {
@@ -548,7 +563,21 @@ export async function getInternWorkspace(
       body: String(row.body || ""),
       createdAt: String(row.created_at || ""),
     })),
+    attachments: rows(attachmentRows.data).map(mapWorkAttachment),
+    onboarding: onboardingRow.data
+      ? mapOnboarding(onboardingRow.data as Record<string, unknown>)
+      : null,
   };
+}
+
+export async function getInternOnboarding(internId: string): Promise<InternshipOnboarding | null> {
+  const { data, error } = await supabaseAdmin
+    .from("internship_onboarding_acknowledgments")
+    .select("*")
+    .eq("intern_id", internId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return mapOnboarding(data as Record<string, unknown>);
 }
 
 export async function linkInternUserId(internId: string, userId: string) {

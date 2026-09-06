@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
-import { internSafeNext } from "@/lib/internship/intern-growth";
-import { findInternByAccount } from "@/lib/internship/queries";
+import { internPortalDestination, internSafeNext } from "@/lib/internship/intern-growth";
+import { internOnboardingComplete } from "@/lib/internship/onboarding";
+import { findInternByAccount, getInternOnboarding } from "@/lib/internship/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,10 @@ export default async function InternLoginPage({
       userId: user.id,
       email: user.email,
     });
-    if (intern) redirect(nextPath);
+    if (intern) {
+      const ack = await getInternOnboarding(intern.id);
+      redirect(internPortalDestination(nextPath, internOnboardingComplete(ack)));
+    }
     const admin = await getAdminIdentity();
     if (admin?.canAccessAdmin) redirect("/admin/internship/portal");
     if (isFounderPersonalMarketplaceEmail(user.email)) redirect("/intern");

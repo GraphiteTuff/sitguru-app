@@ -11,9 +11,11 @@ import {
   matchRequirementForProgram,
   packetDocumentsForRequirement,
 } from "@/lib/internship/queries";
+import { saveInternAssignment } from "@/lib/internship/actions";
 import { INTERNSHIP_PROGRAM_NAME, internPortalPreviewPath } from "@/lib/internship/constants";
 import { academicLevelLabel } from "@/lib/internship/labels";
 import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
+import { internOnboardingStatusLabel } from "@/lib/internship/onboarding";
 import { buildInternshipProcess } from "@/lib/internship/process";
 
 export const dynamic = "force-dynamic";
@@ -99,6 +101,46 @@ export default async function InternshipInternDetailPage({
         </div>
       </div>
 
+      <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5">
+        <h2 className="font-black text-slate-950">Onboarding & confidentiality</h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          Portal tools stay locked until the intern electronically signs and uploads a
+          privately stored wet-ink copy of the confidentiality page.
+        </p>
+        <p className="mt-3 text-sm font-black text-slate-950">
+          Status: {internOnboardingStatusLabel(workspace.onboarding)}
+        </p>
+        {workspace.onboarding?.electronicSignedAt ? (
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            E-signed as {workspace.onboarding.typedLegalName} on{" "}
+            {new Date(workspace.onboarding.electronicSignedAt).toLocaleString()} by{" "}
+            {workspace.onboarding.signerEmail || "intern login"}.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Electronic signature has not been recorded.
+          </p>
+        )}
+        {workspace.onboarding?.wetInkUploadedAt ? (
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Signed page uploaded {new Date(workspace.onboarding.wetInkUploadedAt).toLocaleString()}{" "}
+            ({workspace.onboarding.wetInkFileName}).
+          </p>
+        ) : (
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            No wet-ink scan has been uploaded.
+          </p>
+        )}
+        {workspace.onboarding?.wetInkStoragePath ? (
+          <a
+            href={`/api/internship/onboarding/file?internId=${encodeURIComponent(workspace.intern.id)}`}
+            className="mt-4 inline-flex min-h-11 items-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-black text-emerald-900"
+          >
+            Open signed page
+          </a>
+        ) : null}
+      </section>
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ["Pending approvals", String(process.pendingApprovals)],
@@ -116,6 +158,58 @@ export default async function InternshipInternDetailPage({
       </section>
 
       <InternKpiBoard internId={workspace.intern.id} capture />
+
+      <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5">
+        <h2 className="font-black text-slate-950">School header for this intern</h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          Program and course on the intern Canvas card. School logo and title are set on the
+          university record after permission is granted.
+        </p>
+        <form action={saveInternAssignment} className="mt-4 grid gap-3 sm:grid-cols-2">
+          <input type="hidden" name="internId" value={workspace.intern.id} />
+          <input
+            name="academicProgram"
+            defaultValue={workspace.intern.academicProgram}
+            placeholder="Program"
+            className="min-h-11 rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
+          />
+          <input
+            name="courseCode"
+            defaultValue={workspace.intern.courseCode}
+            placeholder="Course code"
+            className="min-h-11 rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
+          />
+          <input
+            name="semester"
+            defaultValue={workspace.intern.semester}
+            placeholder="Semester"
+            className="min-h-11 rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
+          />
+          <input
+            name="academicLevel"
+            defaultValue={workspace.intern.academicLevel}
+            placeholder="Academic level"
+            className="min-h-11 rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
+          />
+          <input
+            name="credits"
+            type="number"
+            defaultValue={workspace.intern.credits ?? ""}
+            placeholder="Credits"
+            className="min-h-11 rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
+          />
+          <input
+            name="requiredHours"
+            type="number"
+            defaultValue={workspace.intern.requiredHours ?? ""}
+            placeholder="Required hours"
+            className="min-h-11 rounded-xl border border-emerald-100 px-3 text-sm font-semibold"
+          />
+          <button className="min-h-11 rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white sm:col-span-2">
+            Save school header program
+          </button>
+        </form>
+      </section>
 
       <InternshipKpiLetterBoard data={workspace} />
 

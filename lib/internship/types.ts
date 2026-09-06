@@ -51,6 +51,12 @@ export type InternshipUniversity = {
   nextAction?: string;
   institutionContactStatus?: string;
   isTest?: boolean;
+  headerTitle?: string;
+  headerProgram?: string;
+  logoUrl?: string;
+  logoStoragePath?: string;
+  logoPermissionGranted?: boolean;
+  logoPermissionNotes?: string;
 };
 
 export type InternshipCampus = {
@@ -145,6 +151,12 @@ export type InternshipIntern = {
   academicSnapshot: Record<string, unknown>;
   notes: string;
   avatarUrl: string;
+  preferredName?: string;
+  headline?: string;
+  bio?: string;
+  linkedinUrl?: string;
+  portalTheme?: string;
+  avatarStoragePath?: string;
   isTest?: boolean;
   baselineLockedAt?: string | null;
   baselineLockReason?: string;
@@ -201,6 +213,37 @@ export type InternshipWorkComment = {
   itemId: string;
   authorRole: "intern" | "supervisor";
   body: string;
+  createdAt: string;
+};
+
+export type InternshipOnboarding = {
+  internId: string;
+  policyVersion: string;
+  typedLegalName: string;
+  accessRulesAcceptedAt: string | null;
+  electronicSignedAt: string | null;
+  signerEmail: string;
+  wetInkFileName: string;
+  wetInkStoragePath: string;
+  wetInkMimeType: string;
+  wetInkFileSize: number;
+  wetInkUploadedAt: string | null;
+};
+
+export type InternshipWorkAttachment = {
+  id: string;
+  internId: string;
+  itemType: string;
+  itemId: string;
+  fileName: string;
+  fileUrl: string;
+  storageBucket: string;
+  storagePath: string;
+  mimeType: string;
+  fileSize: number;
+  caption: string;
+  contributesToFinal: boolean;
+  uploadedByRole: "intern" | "supervisor";
   createdAt: string;
 };
 
@@ -379,4 +422,6 @@ export type InternshipWorkspaceData = {
   accessGrants: InternshipAccessGrant[];
   milestones: InternshipMilestone[];
   comments: InternshipWorkComment[];
+  attachments: InternshipWorkAttachment[];
+  onboarding: InternshipOnboarding | null;
 };

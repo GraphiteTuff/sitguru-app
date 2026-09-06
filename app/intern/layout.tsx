@@ -1,13 +1,19 @@
 import InternPortalHeader from "@/components/internship/InternPortalHeader";
+import { internOnboardingComplete } from "@/lib/internship/onboarding";
+import { currentAssignedIntern } from "@/lib/admin/growth/workplace";
+import { getInternOnboarding } from "@/lib/internship/queries";
 
-export default function InternLayout({
+export default async function InternLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const intern = await currentAssignedIntern();
+  const ack = intern ? await getInternOnboarding(intern.id) : null;
+
   return (
     <div className="min-h-dvh overflow-x-hidden bg-[#FAF6EE]">
-      <InternPortalHeader />
+      <InternPortalHeader assigned={Boolean(intern)} onboarded={internOnboardingComplete(ack)} />
       {children}
     </div>
   );

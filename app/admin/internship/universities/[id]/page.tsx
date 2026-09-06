@@ -88,12 +88,14 @@ export default async function InternshipUniversityDetailPage({
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <form action={saveUniversity} className="space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-5">
+        <form action={saveUniversity} encType="multipart/form-data" className="space-y-3 rounded-[1.5rem] border border-emerald-100 bg-white p-5">
           <h2 className="font-black text-slate-950">Institution record</h2>
           <input type="hidden" name="id" value={university.id} />
           <input type="hidden" name="slug" value={university.slug} />
           <input name="name" defaultValue={university.name} className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
           <input name="displayName" defaultValue={university.displayName} className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
+          <input name="headerTitle" defaultValue={university.headerTitle || university.displayName} placeholder="School title on intern header" className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
+          <input name="headerProgram" defaultValue={university.headerProgram || ""} placeholder="Program shown in intern header" className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
           <div className="grid grid-cols-2 gap-2">
             <input name="city" defaultValue={university.city} className="min-h-11 rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
             <input name="state" defaultValue={university.state} className="min-h-11 rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />
@@ -121,6 +123,23 @@ export default async function InternshipUniversityDetailPage({
           <label className="flex items-center gap-2 text-sm font-semibold">
             <input type="checkbox" name="isUniversityPartner" value="true" defaultChecked={university.isUniversityPartner} />
             University Partner
+          </label>
+          <label className="flex items-start gap-2 text-sm font-semibold">
+            <input type="checkbox" name="logoPermissionGranted" value="true" defaultChecked={university.logoPermissionGranted} className="mt-1" />
+            <span>
+              University authorized SitGuru to use this school logo on intern pages.
+              Do not display a logo until permission is documented.
+            </span>
+          </label>
+          <textarea name="logoPermissionNotes" defaultValue={university.logoPermissionNotes || ""} placeholder="Permission source: email, agreement, or faculty authorization" className="w-full rounded-xl border border-emerald-100 px-3 py-2 text-sm font-semibold" />
+          {university.logoUrl ? (
+            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-emerald-100">
+              <img src={university.logoUrl} alt="" className="h-full w-full object-contain p-1 mix-blend-multiply" />
+            </div>
+          ) : null}
+          <label className="block text-sm font-semibold">
+            School logo
+            <input name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="mt-1 w-full text-sm" />
           </label>
           <textarea name="partnerNotes" defaultValue={university.partnerNotes} placeholder="Agreement, faculty relationship, or recruiting pipeline notes" className="w-full rounded-xl border border-emerald-100 px-3 py-2 text-sm font-semibold" />
           <input name="sourceUrl" defaultValue={university.sourceUrl} placeholder="Source URL" className="min-h-11 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold" />

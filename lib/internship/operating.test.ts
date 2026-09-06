@@ -74,6 +74,8 @@ function workspace(
     accessGrants: [],
     milestones: [],
     comments: [],
+    attachments: [],
+    onboarding: null,
     ...overrides,
   };
 }
@@ -131,6 +133,7 @@ describe("internship operating semantics", () => {
     assert.match(texts.join(" | "), /Baseline not locked/);
     assert.match(texts.join(" | "), /Weekly update due/);
     assert.match(texts.join(" | "), /No KPI verification source connected/);
+    assert.match(texts.join(" | "), /Onboarding e-sign and signed-page upload pending/);
   });
 
   it("does not invent intern attention when the record is complete", () => {
@@ -141,6 +144,19 @@ describe("internship operating semantics", () => {
           requiredHours: 135,
           baselineLockedAt: "2026-09-05T12:00:00.000Z",
         }),
+        onboarding: {
+          internId: "intern-1",
+          policyVersion: "2027-spring-v1",
+          typedLegalName: "Jason Graff-Test Intern",
+          accessRulesAcceptedAt: "2026-09-05T12:00:00.000Z",
+          electronicSignedAt: "2026-09-05T12:01:00.000Z",
+          signerEmail: "jasongraff1978@gmail.com",
+          wetInkFileName: "signed.pdf",
+          wetInkStoragePath: "interns/intern-1/confidentiality/signed.pdf",
+          wetInkMimeType: "application/pdf",
+          wetInkFileSize: 1200,
+          wetInkUploadedAt: "2026-09-05T12:02:00.000Z",
+        },
         smartGoals: [
           {
             id: "g1",

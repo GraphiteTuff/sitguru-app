@@ -22,7 +22,8 @@ import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipAssignmentReview from "@/components/internship/InternshipAssignmentReview";
 import InternshipKpiLetterBoard from "@/components/internship/InternshipKpiLetterBoard";
 import InternStudentTools from "@/components/internship/InternStudentTools";
-import InternKpiBoard from "@/components/internship/InternKpiBoard";
+import InternProfileCard from "@/components/internship/InternProfileCard";
+import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
 import InternshipFinalProjectBoard, {
   FinalSectionSelect,
 } from "@/components/internship/InternshipFinalProjectBoard";
@@ -50,9 +51,12 @@ import {
 import { buildInternshipProcess } from "@/lib/internship/process";
 import {
   internCalendarEvents,
-  internFirstName,
   internHourPacing,
 } from "@/lib/internship/student-dashboard";
+import {
+  internPortalFirstName,
+  internPortalHeroClass,
+} from "@/lib/internship/portal";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
 
 const TABS = [
@@ -137,7 +141,7 @@ export default function InternStudentDashboard({
 }) {
   const process = useMemo(() => buildInternshipProcess(data), [data]);
   const calendarEvents = useMemo(() => internCalendarEvents(data), [data]);
-  const firstName = internFirstName(data.intern.fullName);
+  const firstName = internPortalFirstName(data.intern);
   const todayKey = toDateKey(new Date());
   const [tab, setTab] = useState<TabId>("home");
   const [tool, setTool] = useState<InternHomeToolId | null>(null);
@@ -175,6 +179,7 @@ export default function InternStudentDashboard({
   const showTasks = workFilter === "all" || workFilter === "tasks";
   const showContent = workFilter === "all" || workFilter === "content";
   const showCampaigns = workFilter === "all" || workFilter === "campaigns";
+  const thisWeekReview = data.weeklyReviews.find((row) => row.weekOf >= weekOf);
   const school = internSchoolEmphasis({
     university: data.university,
     campus: data.campus,
@@ -220,12 +225,22 @@ export default function InternStudentDashboard({
 
       <article className="overflow-hidden rounded-[2rem] border border-indigo-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
         <div
-          className="flex min-h-[5.5rem] items-end px-5 pb-3 sm:px-6"
+          className="flex min-h-[5.5rem] items-end gap-4 px-5 pb-3 sm:px-6"
+          data-brand-green
           style={{
             background:
               "linear-gradient(120deg,#1e3a5f 0%,#334e68 42%,#0D5C3A 100%)",
           }}
         >
+          {school.logoUrl ? (
+            <span className="mb-1 flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white">
+              <img
+                src={school.logoUrl}
+                alt={`${school.school} logo`}
+                className="h-full w-full object-contain p-1 mix-blend-multiply"
+              />
+            </span>
+          ) : null}
           <p className="text-[10px] font-black uppercase tracking-[0.18em] !text-white/85">
             Your school
           </p>
@@ -284,7 +299,7 @@ export default function InternStudentDashboard({
 
       {tab === "home" && !tool ? (
       <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-        <div className="grid gap-6 bg-[radial-gradient(circle_at_86%_18%,rgba(255,255,255,0.96),transparent_20%),linear-gradient(120deg,#bbf7e1_0%,#dff9f0_46%,#ccefff_100%)] px-5 py-6 sm:px-6 sm:py-7 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+        <div className={`grid gap-6 px-5 py-6 sm:px-6 sm:py-7 lg:grid-cols-[1.25fr_0.75fr] lg:items-center ${internPortalHeroClass(data.intern.portalTheme)}`}>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800 shadow-sm">
@@ -452,6 +467,8 @@ export default function InternStudentDashboard({
           </section>
 
           <InternKpiBoard internId={data.intern.id} />
+
+          <InternProfileCard intern={data.intern} preview={preview} />
 
           <section className="overflow-hidden rounded-[1.8rem] border border-emerald-200 bg-white shadow-sm">
             <span className="block h-2.5 w-full bg-[#0D5C3A]" />
@@ -635,10 +652,22 @@ export default function InternStudentDashboard({
               </button>
             </form>
           ) : process.weeklyThisWeek ? (
-            <p className="flex min-h-12 items-center gap-2 rounded-[1.4rem] border border-emerald-100 bg-emerald-50 px-4 text-sm font-black text-emerald-900">
-              <CheckCircle2 size={16} />
-              This week’s check-in is in.
-            </p>
+            <div className="space-y-3">
+              <p className="flex min-h-12 items-center gap-2 rounded-[1.4rem] border border-emerald-100 bg-emerald-50 px-4 text-sm font-black text-emerald-900">
+                <CheckCircle2 size={16} />
+                This week’s check-in is in.
+              </p>
+              <article className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
+                <InternWorkAttachments
+                  internId={data.intern.id}
+                  itemType="weekly"
+                  itemId={thisWeekReview?.id || weekOf}
+                  attachments={data.attachments || []}
+                  preview={preview}
+                  label="This week’s evidence"
+                />
+              </article>
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -815,6 +844,7 @@ export default function InternStudentDashboard({
                   employerLetter={task.employerLetter}
                   kpiTier={task.kpiTier}
                   comments={data.comments || []}
+                  attachments={data.attachments || []}
                   preview={preview}
                 />
               ))
@@ -844,6 +874,7 @@ export default function InternStudentDashboard({
                     employerLetter={item.employerLetter}
                     kpiTier={item.kpiTier}
                     comments={data.comments || []}
+                    attachments={data.attachments || []}
                     preview={preview}
                   />
                 ))
@@ -913,6 +944,13 @@ export default function InternStudentDashboard({
                         {campaign.objective}
                       </p>
                     ) : null}
+                    <InternWorkAttachments
+                      internId={data.intern.id}
+                      itemType="campaign"
+                      itemId={campaign.id}
+                      attachments={data.attachments || []}
+                      preview={preview}
+                    />
                   </article>
                 ))
               ) : workFilter === "campaigns" ? (
@@ -996,6 +1034,14 @@ export default function InternStudentDashboard({
                     Source: {metricSourceLabel(metric.sourceSystem)}
                     {metric.selfReported ? " · intern-submitted" : ""}
                   </p>
+                  <InternWorkAttachments
+                    internId={data.intern.id}
+                    itemType="metric"
+                    itemId={metric.id}
+                    attachments={data.attachments || []}
+                    preview={preview}
+                    label="Source files"
+                  />
                 </li>
               ))}
             </ul>

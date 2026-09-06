@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { INTERNSHIP_PORTAL_PATH } from "./constants";
-import { internSafeNext, INTERNSHIP_GROWTH_PATH } from "./intern-growth";
+import { internSafeNext, internPortalDestination, INTERNSHIP_GROWTH_PATH } from "./intern-growth";
+import { INTERNSHIP_ONBOARDING_PATH } from "./onboarding";
 
 describe("intern growth workplace path", () => {
   it("lives on the intern portal, not Admin HQ", () => {
@@ -15,5 +16,10 @@ describe("intern growth workplace path", () => {
     assert.equal(internSafeNext("/admin/growth"), INTERNSHIP_PORTAL_PATH);
     assert.equal(internSafeNext("https://evil.example/intern"), INTERNSHIP_PORTAL_PATH);
     assert.equal(internSafeNext("//intern/growth"), INTERNSHIP_PORTAL_PATH);
+    assert.equal(
+      internPortalDestination("/intern/growth/create", false),
+      INTERNSHIP_ONBOARDING_PATH,
+    );
+    assert.equal(internPortalDestination("/intern/growth/create", true), "/intern/growth/create");
   });
 });

@@ -11,6 +11,7 @@ import {
 } from "@/lib/internship/final-project";
 import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
+import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
 
 export function FinalSectionSelect({
   name = "finalSection",
@@ -90,6 +91,15 @@ export default function InternshipFinalProjectBoard({
           Supporting: Playbook {workspace.outputs.find((row) => row.id === "playbook")?.percent || 0}% ·
           Portfolio {workspace.outputs.find((row) => row.id === "portfolio")?.percent || 0}%
         </p>
+        <InternWorkAttachments
+          internId={data.intern.id}
+          itemType="report"
+          itemId={data.intern.id}
+          attachments={data.attachments || []}
+          mode={mode}
+          preview={preview}
+          label="Final report files"
+        />
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-800">

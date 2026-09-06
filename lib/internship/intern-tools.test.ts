@@ -53,6 +53,37 @@ describe("intern school emphasis", () => {
     assert.equal(school.semester, "Spring 2027");
     assert.equal(school.partner, false);
     assert.match(school.place, /Abington/);
+    assert.equal(school.logoUrl, "");
+  });
+
+  it("shows an authorized school logo and header title, never an unauthorized mark", () => {
+    const hidden = internSchoolEmphasis({
+      university: {
+        displayName: "Penn State Abington",
+        name: "Pennsylvania State University",
+        headerTitle: "Penn State Abington Internship",
+        headerProgram: "Corporate Communication",
+        logoUrl: "https://cdn.example/psu.png",
+        logoPermissionGranted: false,
+      },
+      intern: { academicProgram: "" },
+    });
+    assert.equal(hidden.school, "Penn State Abington Internship");
+    assert.equal(hidden.program, "Corporate Communication");
+    assert.equal(hidden.logoUrl, "");
+    assert.equal(hidden.logoPermission, false);
+
+    const shown = internSchoolEmphasis({
+      university: {
+        displayName: "Penn State Abington",
+        name: "Pennsylvania State University",
+        logoUrl: "https://cdn.example/psu.png",
+        logoPermissionGranted: true,
+      },
+      intern: { academicProgram: "CAS" },
+    });
+    assert.equal(shown.logoUrl, "https://cdn.example/psu.png");
+    assert.equal(shown.program, "CAS");
   });
 });
 

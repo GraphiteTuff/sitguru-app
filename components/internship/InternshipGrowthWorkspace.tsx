@@ -36,6 +36,7 @@ import InternshipFinalProjectBoard, {
   FinalSectionSelect,
 } from "@/components/internship/InternshipFinalProjectBoard";
 import InternshipAssignmentReview from "@/components/internship/InternshipAssignmentReview";
+import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
 import InternAvatar from "@/components/internship/InternAvatar";
 
 const TABS = [
@@ -357,6 +358,7 @@ export default function InternshipGrowthWorkspace({
                   employerLetter={task.employerLetter}
                   kpiTier={task.kpiTier}
                   comments={data.comments || []}
+                  attachments={data.attachments || []}
                   preview={preview}
                 />
               ))
@@ -428,6 +430,7 @@ export default function InternshipGrowthWorkspace({
                   employerLetter={item.employerLetter}
                   kpiTier={item.kpiTier}
                   comments={data.comments || []}
+                  attachments={data.attachments || []}
                   preview={preview}
                 />
               ))}
@@ -482,6 +485,14 @@ export default function InternshipGrowthWorkspace({
                     ? contributionLabel("primary")
                     : contributionLabel("supporting")}
                 </p>
+                <InternWorkAttachments
+                  internId={data.intern.id}
+                  itemType="campaign"
+                  itemId={campaign.id}
+                  attachments={data.attachments || []}
+                  mode={mode}
+                  preview={preview}
+                />
               </article>
             ))}
           </div>
@@ -688,6 +699,7 @@ export default function InternshipGrowthWorkspace({
                       employerLetter={task.employerLetter}
                       kpiTier={task.kpiTier}
                       comments={data.comments || []}
+                      attachments={data.attachments || []}
                       preview={preview}
                     />
                   ))}
@@ -709,6 +721,7 @@ export default function InternshipGrowthWorkspace({
                       employerLetter={item.employerLetter}
                       kpiTier={item.kpiTier}
                       comments={data.comments || []}
+                      attachments={data.attachments || []}
                       preview={preview}
                     />
                   ))}

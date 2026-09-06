@@ -194,6 +194,10 @@ export function internSchoolEmphasis(input: {
     city?: string | null;
     state?: string | null;
     isUniversityPartner?: boolean;
+    headerTitle?: string | null;
+    headerProgram?: string | null;
+    logoUrl?: string | null;
+    logoPermissionGranted?: boolean;
   } | null;
   campus?: {
     displayName?: string | null;
@@ -211,12 +215,14 @@ export function internSchoolEmphasis(input: {
   };
   cohort?: { name?: string | null; season?: string | null; year?: number | null } | null;
 }) {
-  const school = formatInstitutionLine({
-    universityName: input.university?.name || "",
-    campusName: input.campus?.displayName || input.campus?.name,
-    displayName:
-      input.university?.displayName || input.university?.shortName || "",
-  });
+  const school =
+    String(input.university?.headerTitle || "").trim() ||
+    formatInstitutionLine({
+      universityName: input.university?.name || "",
+      campusName: input.campus?.displayName || input.campus?.name,
+      displayName:
+        input.university?.displayName || input.university?.shortName || "",
+    });
   const campus =
     String(input.campus?.displayName || input.campus?.name || "").trim();
   const place = [
@@ -228,18 +234,26 @@ export function internSchoolEmphasis(input: {
     .join(", ");
   const term = formatCohortHeadline(input.cohort || {});
   const semester = String(input.intern.semester || "").trim() || term;
+  const logoPermission = Boolean(input.university?.logoPermissionGranted);
+  const logoUrl = logoPermission
+    ? String(input.university?.logoUrl || "").trim()
+    : "";
 
   return {
     school,
     campus:
       campus && !school.toLowerCase().includes(campus.toLowerCase()) ? campus : "",
     place,
-    program: String(input.intern.academicProgram || "").trim(),
+    program:
+      String(input.intern.academicProgram || "").trim() ||
+      String(input.university?.headerProgram || "").trim(),
     courseCode: String(input.intern.courseCode || "").trim(),
     semester,
     credits: input.intern.credits,
     hours: input.intern.requiredHours,
     level: String(input.intern.academicLevel || "").trim(),
     partner: Boolean(input.university?.isUniversityPartner),
+    logoUrl,
+    logoPermission,
   };
 }

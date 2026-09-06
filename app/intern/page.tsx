@@ -6,9 +6,11 @@ import InternStudentDashboard from "@/components/internship/InternStudentDashboa
 import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipBackToProgram from "@/components/internship/InternshipBackToProgram";
 import { INTERNSHIP_ADMIN_PATH } from "@/lib/internship/constants";
+import { internOnboardingComplete, INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/onboarding";
 import {
   findInternByAccount,
   findInternById,
+  getInternOnboarding,
   getInternWorkspace,
   linkInternUserId,
 } from "@/lib/internship/queries";
@@ -112,6 +114,11 @@ export default async function InternPortalPage({
 
   if (!preview && !intern.userId) {
     await linkInternUserId(intern.id, user.id);
+  }
+
+  if (!preview) {
+    const ack = await getInternOnboarding(intern.id);
+    if (!internOnboardingComplete(ack)) redirect(INTERNSHIP_ONBOARDING_PATH);
   }
 
   const workspace = await getInternWorkspace(intern.id);

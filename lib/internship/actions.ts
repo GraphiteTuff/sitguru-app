@@ -9,6 +9,7 @@ import {
   findInternByAccount,
   findOrCreateStudentInstitution,
   freezeAcademicProfile,
+  getInternOnboarding,
   getInternWorkspace,
   getUniversity,
   listCampuses,
@@ -22,11 +23,15 @@ import {
   INTERN_KPI_BASELINE_NOTE,
 } from "@/lib/internship/intern-kpis";
 import { internSnapshotValues, loadInternSafeKpiSnapshot } from "@/lib/internship/intern-kpi-snapshot";
+import { internPortalTheme, internSafeLinkedInUrl, internWorkItemType } from "@/lib/internship/portal";
 import {
-  addInternWorkComment,
-  reviewInternWorkRecord,
-  submitInternWorkRecord,
-} from "@/lib/internship/work";
+  internAllowedConfidentialUpload,
+  internNamesMatch,
+  internOnboardingComplete,
+  INTERNSHIP_ONBOARDING_PATH,
+  INTERN_ONBOARDING_POLICY_VERSION,
+} from "@/lib/internship/onboarding";
+import { uploadInternshipAsset, uploadInternshipConfidential } from "@/lib/internship/storage";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -37,6 +42,14 @@ function optionalNumber(formData: FormData, key: string) {
   if (!raw) return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
+}
+
+function formFile(formData: FormData, key: string) {
+  const value = formData.get(key);
+  if (!value || typeof value === "string") return null;
+  if (typeof (value as File).arrayBuffer !== "function") return null;
+  if (!("size" in value) || Number((value as File).size) <= 0) return null;
+  return value as File;
 }
 
 function bounce(path: string, kind: "ok" | "error", message: string): never {
@@ -79,6 +92,7 @@ function refreshInternship(extra?: string) {
   revalidatePath("/admin/internship/playbook");
   revalidatePath("/admin/hr");
   revalidatePath("/intern", "layout");
+  revalidatePath(INTERNSHIP_ONBOARDING_PATH);
   if (extra) revalidatePath(extra);
 }
 
@@ -114,6 +128,12 @@ export async function saveUniversity(formData: FormData) {
     funding_status: text(formData, "fundingStatus") || "unknown",
     source_url: text(formData, "sourceUrl"),
     notes: text(formData, "notes"),
+    header_title: text(formData, "headerTitle"),
+    header_program: text(formData, "headerProgram"),
+    logo_permission_granted:
+      formData.get("logoPermissionGranted") === "true" ||
+      formData.get("logoPermissionGranted") === "on",
+    logo_permission_notes: text(formData, "logoPermissionNotes"),
     updated_at: new Date().toISOString(),
   };
 
@@ -125,8 +145,26 @@ export async function saveUniversity(formData: FormData) {
   if (error) {
     bounce("/admin/internship/universities", "error", error.message);
   }
-  refreshInternship();
   const nextId = id || String((data as { id?: string } | null)?.id || "");
+  const logo = formFile(formData, "logo");
+  if (nextId && logo) {
+    const uploaded = await uploadInternshipAsset({
+      file: logo,
+      pathPrefix: `universities/${nextId}/logo`,
+    });
+    if (uploaded.error) {
+      bounce(`/admin/internship/universities/${nextId}`, "error", uploaded.error);
+    }
+    await supabaseAdmin
+      .from("internship_universities")
+      .update({
+        logo_url: uploaded.url,
+        logo_storage_path: uploaded.path,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", nextId);
+  }
+  refreshInternship();
   bounce(
     nextId ? `/admin/internship/universities/${nextId}` : "/admin/internship/universities",
     "ok",
@@ -844,4 +882,239 @@ function workspacePath(internId: string, mode: string) {
   return mode === "supervisor"
     ? `/admin/internship/interns/${internId}`
     : "/intern";
+}
+
+export async function saveInternProfile(formData: FormData) {
+  const internId = text(formData, "internId");
+  await assertWorkspaceActor(internId, "intern");
+  const payload: Record<string, unknown> = {
+    preferred_name: text(formData, "preferredName"),
+    full_name: text(formData, "fullName"),
+    phone: text(formData, "phone"),
+    student_id: text(formData, "studentId"),
+    student_email: text(formData, "studentEmail").toLowerCase(),
+    headline: text(formData, "headline"),
+    bio: text(formData, "bio"),
+    linkedin_url: internSafeLinkedInUrl(text(formData, "linkedinUrl")),
+    portal_theme: internPortalTheme(text(formData, "portalTheme")),
+    updated_at: new Date().toISOString(),
+  };
+  if (!String(payload.full_name || "").trim()) {
+    bounce("/intern", "error", "Add the name that should appear on your intern page.");
+  }
+
+  const photo = formFile(formData, "avatar");
+  if (photo) {
+    const uploaded = await uploadInternshipAsset({
+      file: photo,
+      pathPrefix: `interns/${internId}/avatar`,
+    });
+    if (uploaded.error) bounce("/intern", "error", uploaded.error);
+    payload.avatar_url = uploaded.url;
+    payload.avatar_storage_path = uploaded.path;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("internship_interns")
+    .update(payload)
+    .eq("id", internId);
+  if (error) bounce("/intern", "error", error.message);
+  refreshInternship();
+  bounce("/intern", "ok", "Your intern page was updated.");
+}
+
+export async function saveInternAssignment(formData: FormData) {
+  await requireInternshipAdmin();
+  const internId = text(formData, "internId");
+  if (!internId) bounce("/admin/internship/interns", "error", "Intern is required.");
+  const { error } = await supabaseAdmin
+    .from("internship_interns")
+    .update({
+      academic_program: text(formData, "academicProgram"),
+      course_code: text(formData, "courseCode"),
+      semester: text(formData, "semester"),
+      academic_level: text(formData, "academicLevel"),
+      credits: optionalNumber(formData, "credits"),
+      required_hours: optionalNumber(formData, "requiredHours"),
+      academic_start_date: text(formData, "academicStartDate") || null,
+      academic_end_date: text(formData, "academicEndDate") || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", internId);
+  if (error) bounce(`/admin/internship/interns/${internId}`, "error", error.message);
+  refreshInternship(`/admin/internship/interns/${internId}`);
+  bounce(
+    `/admin/internship/interns/${internId}`,
+    "ok",
+    "School header program and academic assignment updated.",
+  );
+}
+
+export async function uploadInternAttachment(formData: FormData) {
+  const internId = text(formData, "internId");
+  const mode = text(formData, "mode") || "intern";
+  const itemType = internWorkItemType(text(formData, "itemType"));
+  const itemId = text(formData, "itemId");
+  await assertWorkspaceActor(internId, mode);
+  if (!itemType || !itemId) {
+    bounce(workspacePath(internId, mode), "error", "Choose a work item for this file.");
+  }
+  const file = formFile(formData, "file");
+  if (!file) bounce(workspacePath(internId, mode), "error", "Choose a file to attach.");
+  const uploaded = await uploadInternshipAsset({
+    file,
+    pathPrefix: `interns/${internId}/${itemType}/${itemId}`,
+  });
+  if (uploaded.error) bounce(workspacePath(internId, mode), "error", uploaded.error);
+  const { error } = await supabaseAdmin.from("internship_work_attachments").insert({
+    intern_id: internId,
+    item_type: itemType,
+    item_id: itemId,
+    file_name: file.name,
+    file_url: uploaded.url,
+    storage_bucket: "internship-assets",
+    storage_path: uploaded.path,
+    mime_type: file.type || "",
+    file_size: file.size,
+    caption: text(formData, "caption"),
+    contributes_to_final: formData.get("contributesToFinal") !== "false",
+    uploaded_by_role: mode === "supervisor" ? "supervisor" : "intern",
+  });
+  if (error) bounce(workspacePath(internId, mode), "error", error.message);
+  refreshInternship(workspacePath(internId, mode));
+  bounce(workspacePath(internId, mode), "ok", "File attached to this work area.");
+}
+
+export async function deleteInternAttachment(formData: FormData) {
+  const internId = text(formData, "internId");
+  const mode = text(formData, "mode") || "intern";
+  const attachmentId = text(formData, "attachmentId");
+  await assertWorkspaceActor(internId, mode);
+  const { error } = await supabaseAdmin
+    .from("internship_work_attachments")
+    .delete()
+    .eq("id", attachmentId)
+    .eq("intern_id", internId);
+  if (error) bounce(workspacePath(internId, mode), "error", error.message);
+  refreshInternship(workspacePath(internId, mode));
+  bounce(workspacePath(internId, mode), "ok", "Attachment removed.");
+}
+
+async function upsertOnboarding(internId: string, patch: Record<string, unknown>) {
+  const now = new Date().toISOString();
+  const { data } = await supabaseAdmin
+    .from("internship_onboarding_acknowledgments")
+    .select("id")
+    .eq("intern_id", internId)
+    .maybeSingle();
+  if (data?.id) {
+    return supabaseAdmin
+      .from("internship_onboarding_acknowledgments")
+      .update({ ...patch, updated_at: now })
+      .eq("intern_id", internId);
+  }
+  return supabaseAdmin.from("internship_onboarding_acknowledgments").insert({
+    intern_id: internId,
+    policy_version: INTERN_ONBOARDING_POLICY_VERSION,
+    ...patch,
+    updated_at: now,
+  });
+}
+
+export async function acceptInternAccessRules(formData: FormData) {
+  const internId = text(formData, "internId");
+  await assertWorkspaceActor(internId, "intern");
+  if (formData.get("agreeAccess") !== "on") {
+    bounce(INTERNSHIP_ONBOARDING_PATH, "error", "Confirm the intern access rules to continue.");
+  }
+  const { error } = await upsertOnboarding(internId, {
+    policy_version: INTERN_ONBOARDING_POLICY_VERSION,
+    access_rules_accepted_at: new Date().toISOString(),
+  });
+  if (error) bounce(INTERNSHIP_ONBOARDING_PATH, "error", error.message);
+  refreshInternship(INTERNSHIP_ONBOARDING_PATH);
+  bounce(INTERNSHIP_ONBOARDING_PATH, "ok", "Access rules accepted. Sign the confidentiality notice next.");
+}
+
+export async function signInternConfidentiality(formData: FormData) {
+  const internId = text(formData, "internId");
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/intern/login");
+  await assertWorkspaceActor(internId, "intern");
+  const intern = await findInternByAccount({
+    userId: user.id,
+    email: user.email,
+  });
+  if (!intern) redirect("/intern/login");
+
+  const ack = await getInternOnboarding(internId);
+  if (!ack?.accessRulesAcceptedAt) {
+    bounce(INTERNSHIP_ONBOARDING_PATH, "error", "Accept the intern access rules first.");
+  }
+  if (formData.get("agreeConfidential") !== "on" || formData.get("agreeOwnership") !== "on") {
+    bounce(
+      INTERNSHIP_ONBOARDING_PATH,
+      "error",
+      "Check both acknowledgment boxes before signing.",
+    );
+  }
+  const typedName = text(formData, "typedLegalName");
+  if (!internNamesMatch(typedName, intern.fullName)) {
+    bounce(
+      INTERNSHIP_ONBOARDING_PATH,
+      "error",
+      `Type your legal name as it appears on your intern record (${intern.fullName}).`,
+    );
+  }
+  const { error } = await upsertOnboarding(internId, {
+    policy_version: INTERN_ONBOARDING_POLICY_VERSION,
+    typed_legal_name: typedName,
+    electronic_signed_at: new Date().toISOString(),
+    signer_user_id: user.id,
+    signer_email: String(user.email || intern.email || "").toLowerCase(),
+  });
+  if (error) bounce(INTERNSHIP_ONBOARDING_PATH, "error", error.message);
+  refreshInternship(INTERNSHIP_ONBOARDING_PATH);
+  bounce(
+    INTERNSHIP_ONBOARDING_PATH,
+    "ok",
+    "Electronic signature saved. Print, sign in ink, and upload that page.",
+  );
+}
+
+export async function uploadInternConfidentialityScan(formData: FormData) {
+  const internId = text(formData, "internId");
+  await assertWorkspaceActor(internId, "intern");
+  const ack = await getInternOnboarding(internId);
+  if (!ack?.electronicSignedAt) {
+    bounce(
+      INTERNSHIP_ONBOARDING_PATH,
+      "error",
+      "Sign electronically before uploading the printed page.",
+    );
+  }
+  const file = formFile(formData, "file");
+  if (!file) bounce(INTERNSHIP_ONBOARDING_PATH, "error", "Choose the signed PDF or photo.");
+  const blocked = internAllowedConfidentialUpload(file);
+  if (blocked) bounce(INTERNSHIP_ONBOARDING_PATH, "error", blocked);
+  const uploaded = await uploadInternshipConfidential({ file, internId });
+  if (uploaded.error) bounce(INTERNSHIP_ONBOARDING_PATH, "error", uploaded.error);
+  const { error } = await upsertOnboarding(internId, {
+    policy_version: INTERN_ONBOARDING_POLICY_VERSION,
+    wet_ink_file_name: file.name,
+    wet_ink_storage_path: uploaded.path,
+    wet_ink_mime_type: file.type || "",
+    wet_ink_file_size: file.size,
+    wet_ink_uploaded_at: new Date().toISOString(),
+  });
+  if (error) bounce(INTERNSHIP_ONBOARDING_PATH, "error", error.message);
+  refreshInternship("/intern");
+  const next = await getInternOnboarding(internId);
+  if (internOnboardingComplete(next)) {
+    bounce("/intern", "ok", "Onboarding complete. The intern portal is open.");
+  }
+  bounce(INTERNSHIP_ONBOARDING_PATH, "ok", "Signed page uploaded privately.");
 }

@@ -6,6 +6,7 @@ import {
   UNIVERSITY_STATUSES,
 } from "@/lib/internship/constants";
 import { internStatusLabel } from "@/lib/internship/labels";
+import { internOnboardingComplete } from "@/lib/internship/onboarding";
 import { INTERN_KPI_BASELINE_NOTE } from "@/lib/internship/intern-kpis";
 import type {
   InternshipAccessGrant,
@@ -150,6 +151,13 @@ export function internSupervisorAttention(
       href,
     });
   }
+  if (!internOnboardingComplete(data.onboarding)) {
+    items.push({
+      id: `${intern.id}-onboarding`,
+      text: `${intern.fullName}: intern onboarding (e-sign + signed page) is incomplete.`,
+      href,
+    });
+  }
   if (!approvedGoal) {
     items.push({
       id: `${intern.id}-smart`,
@@ -206,6 +214,12 @@ export function internReviewAttention(data: InternshipWorkspaceData): AttentionI
   }
   if (!academicFieldsVerified(intern) || intern.requiredHours == null) {
     items.push({ id: "hours", text: "Required hours pending" });
+  }
+  if (!internOnboardingComplete(data.onboarding)) {
+    items.push({
+      id: "onboarding",
+      text: "Onboarding e-sign and signed-page upload pending",
+    });
   }
   if (!(data.smartGoals || []).some(isGradingSmartGoal)) {
     items.push({ id: "smart", text: "SMART goal not established" });

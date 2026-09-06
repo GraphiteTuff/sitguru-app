@@ -1,8 +1,10 @@
 import { createElement, type ReactNode } from "react";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity, type AdminIdentity } from "@/lib/admin/access";
-import { findInternByAccount } from "@/lib/internship/queries";
+import { findInternByAccount, getInternOnboarding } from "@/lib/internship/queries";
 import { INTERNSHIP_GROWTH_PATH } from "@/lib/internship/intern-growth";
+import { internOnboardingComplete, INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/onboarding";
 import { canUseGrowthPortal, requireGrowthPortal } from "@/lib/admin/growth/access";
 import type { InternshipIntern } from "@/lib/internship/types";
 
@@ -109,6 +111,8 @@ export async function requireGrowthWorkplace(
   if (kind === "intern") {
     const intern = await currentAssignedIntern();
     if (intern) {
+      const ack = await getInternOnboarding(intern.id);
+      if (!internOnboardingComplete(ack)) redirect(INTERNSHIP_ONBOARDING_PATH);
       return {
         ok: true,
         kind,
@@ -148,7 +152,13 @@ export async function requireGrowthActor(): Promise<
   { ok: true; actor: GrowthWorkplaceActor } | { ok: false; error: string }
 > {
   const intern = await currentAssignedIntern();
-  if (intern) return { ok: true, actor: internToActor(intern) };
+  if (intern) {
+    const ack = await getInternOnboarding(intern.id);
+    if (!internOnboardingComplete(ack)) {
+      return { ok: false, error: "Complete intern onboarding first." };
+    }
+    return { ok: true, actor: internToActor(intern) };
+  }
 
   const actor = await getAdminIdentity();
   if (!canUseGrowthPortal(actor) || !actor) {

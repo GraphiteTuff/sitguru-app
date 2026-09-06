@@ -13,7 +13,8 @@ import {
   employerLetterTone,
 } from "@/lib/internship/grading";
 import { taskStatusLabel } from "@/lib/internship/labels";
-import type { InternshipWorkComment } from "@/lib/internship/types";
+import type { InternshipWorkAttachment, InternshipWorkComment } from "@/lib/internship/types";
+import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
 
 const TIER_LABELS: Record<string, string> = {
   tier_1: "Tier 1 — Business outcome",
@@ -45,6 +46,7 @@ export default function InternshipAssignmentReview({
   employerLetter,
   kpiTier,
   comments,
+  attachments = [],
   preview = false,
 }: {
   internId: string;
@@ -61,6 +63,7 @@ export default function InternshipAssignmentReview({
   employerLetter?: string;
   kpiTier?: string;
   comments: InternshipWorkComment[];
+  attachments?: InternshipWorkAttachment[];
   preview?: boolean;
 }) {
   const supervisor = mode === "supervisor";
@@ -128,6 +131,15 @@ export default function InternshipAssignmentReview({
           ))}
         </div>
       ) : null}
+
+      <InternWorkAttachments
+        internId={internId}
+        itemType={itemType}
+        itemId={id}
+        attachments={attachments}
+        mode={mode}
+        preview={preview}
+      />
 
       {!closed && !preview ? (
         <form action={commentInternWork} className="mt-3 flex flex-col gap-2 sm:flex-row">
