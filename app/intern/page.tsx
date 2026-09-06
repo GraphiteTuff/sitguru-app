@@ -3,9 +3,18 @@ import { createClient } from "@/lib/supabase/server";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { isFounderPersonalMarketplaceEmail } from "@/lib/admin/super-users";
 import InternStudentDashboard from "@/components/internship/InternStudentDashboard";
+import InternshipGrowthWorkspace from "@/components/internship/InternshipGrowthWorkspace";
 import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipBackToProgram from "@/components/internship/InternshipBackToProgram";
 import { INTERNSHIP_ADMIN_PATH } from "@/lib/internship/constants";
+import {
+  documentationInternWorkspace,
+  documentationPromoteEvents,
+} from "@/lib/internship/documentation-fixture";
+import {
+  internDocumentationModeEnabled,
+  internDocumentationScene,
+} from "@/lib/internship/documentation-mode";
 import { internOnboardingComplete, INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/onboarding";
 import {
   findInternByAccount,
@@ -37,6 +46,35 @@ export default async function InternPortalPage({
   const viewId = first(params.view);
   const ok = first(params.ok);
   const error = first(params.error);
+
+  if (internDocumentationModeEnabled()) {
+    const workspace = documentationInternWorkspace(
+      internDocumentationScene(first(params.doc)),
+    );
+    const panel = first(params.panel);
+    return (
+      <main className="mx-auto w-full max-w-[1500px] space-y-4 px-3 py-4 sm:px-5 lg:px-6">
+        {panel === "workspace" ? (
+          <InternshipGrowthWorkspace
+            data={workspace}
+            mode="intern"
+            preview={false}
+            initialTab={first(params.workspaceTab) || "campaigns"}
+          />
+        ) : (
+          <InternStudentDashboard
+            data={workspace}
+            events={documentationPromoteEvents()}
+            preview={false}
+            initialTab={first(params.tab)}
+            initialTool={first(params.tool) || null}
+            initialWorkFilter={first(params.work)}
+            initialDate={first(params.date)}
+          />
+        )}
+      </main>
+    );
+  }
 
   if (!user) redirect("/intern/login");
 

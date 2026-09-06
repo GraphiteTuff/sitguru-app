@@ -19,6 +19,12 @@ import {
   listGrowthContent,
 } from "@/lib/admin/growth/data";
 import {
+  documentationGrowthCampaigns,
+  documentationGrowthContent,
+  documentationGrowthHomeStats,
+} from "@/lib/internship/documentation-fixture";
+import { internDocumentationModeEnabled } from "@/lib/internship/documentation-mode";
+import {
   growthHref,
   type GrowthWorkplaceAccess,
 } from "@/lib/admin/growth/workplace";
@@ -51,13 +57,21 @@ export async function GrowthWorkplaceHome({
 }) {
   const intern = workplace.kind === "intern";
   const base = workplace.basePath;
+  const documentation = internDocumentationModeEnabled();
 
-  const [stats, campaigns, content, parents] = await Promise.all([
-    getGrowthHomeStats(),
-    listGrowthCampaigns(),
-    listGrowthContent(),
-    intern ? Promise.resolve(null) : getPetParentSummary(),
-  ]);
+  const [stats, campaigns, content, parents] = documentation
+    ? [
+        documentationGrowthHomeStats(),
+        documentationGrowthCampaigns(),
+        documentationGrowthContent(),
+        null,
+      ]
+    : await Promise.all([
+        getGrowthHomeStats(),
+        listGrowthCampaigns(),
+        listGrowthContent(),
+        intern ? Promise.resolve(null) : getPetParentSummary(),
+      ]);
 
   const weekStart = startOfWeek();
   const days = Array.from({ length: 7 }, (_, index) => {

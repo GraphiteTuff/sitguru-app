@@ -6,6 +6,8 @@ import { findInternByAccount, getInternOnboarding } from "@/lib/internship/queri
 import { INTERNSHIP_GROWTH_PATH } from "@/lib/internship/intern-growth";
 import { internOnboardingComplete, INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/onboarding";
 import { canUseGrowthPortal, requireGrowthPortal } from "@/lib/admin/growth/access";
+import { DOCUMENTATION_INTERN_ID } from "@/lib/internship/documentation-fixture";
+import { internDocumentationModeEnabled } from "@/lib/internship/documentation-mode";
 import type { InternshipIntern } from "@/lib/internship/types";
 
 export const GROWTH_ADMIN_BASE = "/admin/growth";
@@ -108,6 +110,21 @@ export async function currentAssignedIntern() {
 export async function requireGrowthWorkplace(
   kind: GrowthWorkplaceKind,
 ): Promise<GrowthWorkplaceAccess | { ok: false; ui: ReactNode }> {
+  if (kind === "intern" && internDocumentationModeEnabled()) {
+    return {
+      ok: true,
+      kind,
+      basePath: GROWTH_INTERN_BASE,
+      actor: {
+        id: DOCUMENTATION_INTERN_ID,
+        email: "taylor.morgan@example.edu",
+        isSuperUser: false,
+        kind: "intern",
+      },
+      canApprove: false,
+    };
+  }
+
   if (kind === "intern") {
     const intern = await currentAssignedIntern();
     if (intern) {

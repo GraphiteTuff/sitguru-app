@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminIdentity } from "@/lib/admin/access";
 import { buildInternKpiBoard } from "@/lib/internship/intern-kpis";
+import {
+  documentationInternWorkspace,
+  documentationKpiSnapshot,
+} from "@/lib/internship/documentation-fixture";
+import { internDocumentationModeEnabled } from "@/lib/internship/documentation-mode";
 import { loadInternSafeKpiSnapshot } from "@/lib/internship/intern-kpi-snapshot";
 import { internOnboardingComplete } from "@/lib/internship/onboarding";
 import {
@@ -25,6 +30,20 @@ export function OPTIONS(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  if (internDocumentationModeEnabled()) {
+    const workspace = documentationInternWorkspace();
+    const snapshot = documentationKpiSnapshot();
+    return json(req, {
+      internId: workspace.intern.id,
+      liveAt: snapshot.capturedAt,
+      snapshot,
+      board: buildInternKpiBoard({
+        metrics: workspace.metrics,
+        snapshot,
+      }),
+    });
+  }
+
   const resolved = await resolveRequestUser(req);
   if (!resolved) return json(req, { error: "Sign in required." }, 401);
 

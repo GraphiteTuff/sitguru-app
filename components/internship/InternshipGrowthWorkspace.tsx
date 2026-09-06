@@ -86,18 +86,21 @@ export default function InternshipGrowthWorkspace({
   mode,
   notice,
   preview = false,
+  initialTab,
 }: {
   data: InternshipWorkspaceData;
   mode: "intern" | "supervisor";
   notice?: { kind: "ok" | "error"; message: string } | null;
   preview?: boolean;
+  initialTab?: string;
 }) {
   const supervisor = mode === "supervisor";
   const readOnly = preview;
   const process = useMemo(() => buildInternshipProcess(data), [data]);
   const pendingApproval = process.pendingApprovals;
+  const requestedTab = TABS.find((item) => item.id === initialTab)?.id;
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>(
-    supervisor && pendingApproval > 0 ? "review" : "plan",
+    requestedTab || (supervisor && pendingApproval > 0 ? "review" : "plan"),
   );
 
   return (

@@ -131,27 +131,59 @@ function Field({
   );
 }
 
+function isTabId(value: string | null | undefined): value is TabId {
+  return TABS.some((tab) => tab.id === value);
+}
+
+function isWorkFilter(value: string | null | undefined): value is WorkFilter {
+  return value === "all" || value === "tasks" || value === "content" || value === "campaigns";
+}
+
+function isHomeTool(value: string | null | undefined): value is InternHomeToolId {
+  return INTERN_HOME_TOOLS.some((tool) => tool.id === value);
+}
+
+function dateFromKey(value: string | null | undefined) {
+  const key = String(value || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  const parsed = new Date(`${key}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export default function InternStudentDashboard({
   data,
   events = [],
   notice,
   preview = false,
+  initialTab,
+  initialTool,
+  initialWorkFilter,
+  initialDate,
 }: {
   data: InternshipWorkspaceData;
   events?: InternPromoteEvent[];
   notice?: { kind: "ok" | "error"; message: string } | null;
   preview?: boolean;
+  initialTab?: string;
+  initialTool?: string | null;
+  initialWorkFilter?: string;
+  initialDate?: string;
 }) {
   const process = useMemo(() => buildInternshipProcess(data), [data]);
   const calendarEvents = useMemo(() => internCalendarEvents(data), [data]);
   const firstName = internPortalFirstName(data.intern);
   const todayKey = toDateKey(new Date());
-  const [tab, setTab] = useState<TabId>("home");
+  const startDate = dateFromKey(initialDate);
+  const [tab, setTab] = useState<TabId>(isTabId(initialTab) ? initialTab : "home");
   const [profileOpen, setProfileOpen] = useState(false);
-  const [tool, setTool] = useState<InternHomeToolId | null>(null);
-  const [workFilter, setWorkFilter] = useState<WorkFilter>("all");
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
-  const [selectedDate, setSelectedDate] = useState(todayKey);
+  const [tool, setTool] = useState<InternHomeToolId | null>(
+    isHomeTool(initialTool) ? initialTool : null,
+  );
+  const [workFilter, setWorkFilter] = useState<WorkFilter>(
+    isWorkFilter(initialWorkFilter) ? initialWorkFilter : "all",
+  );
+  const [calendarMonth, setCalendarMonth] = useState(() => startDate || new Date());
+  const [selectedDate, setSelectedDate] = useState(startDate ? toDateKey(startDate) : todayKey);
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, typeof calendarEvents>();
