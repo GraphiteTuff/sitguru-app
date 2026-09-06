@@ -31,6 +31,18 @@ async function safeCount(table: string, filters: CountFilter[] = []) {
   }
 }
 
+async function safeReferralClicks() {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("referral_clicks")
+      .select("utm_source, utm_medium, utm_campaign, landing_page");
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
+}
+
 function isAssignedMarket(input: {
   state?: string | null;
   city?: string | null;
@@ -56,11 +68,7 @@ export async function loadInternSafeKpiSnapshot(input?: {
     safeCount("gurus", [{ column: "is_public", operator: "eq", value: true }]),
     safeCount("ambassadors", [{ column: "status", operator: "eq", value: "active" }]),
     includeMarket ? loadMarketDensity().catch(() => null) : Promise.resolve(null),
-    supabaseAdmin
-      .from("referral_clicks")
-      .select("utm_source, utm_medium, utm_campaign, landing_page")
-      .then((result) => (result.error ? [] : result.data || []))
-      .catch(() => []),
+    safeReferralClicks(),
   ]);
 
   const social = emptyInternSocialCounts();
