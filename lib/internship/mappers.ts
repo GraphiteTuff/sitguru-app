@@ -335,6 +335,8 @@ export function mapOnboarding(row: Record<string, unknown>): InternshipOnboardin
     wetInkMimeType: text(row.wet_ink_mime_type),
     wetInkFileSize: Number(row.wet_ink_file_size) || 0,
     wetInkUploadedAt: text(row.wet_ink_uploaded_at) || null,
+    wetInkSubmittedAt: text(row.wet_ink_submitted_at) || null,
+    wetInkEmailedAt: text(row.wet_ink_emailed_at) || null,
   };
 }
 

@@ -228,6 +228,8 @@ export type InternshipOnboarding = {
   wetInkMimeType: string;
   wetInkFileSize: number;
   wetInkUploadedAt: string | null;
+  wetInkSubmittedAt: string | null;
+  wetInkEmailedAt: string | null;
 };
 
 export type InternshipWorkAttachment = {

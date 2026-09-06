@@ -67,3 +67,15 @@ export async function signedInternshipConfidentialUrl(path: string) {
   if (error) return "";
   return data.signedUrl;
 }
+
+export async function downloadInternshipConfidential(path: string) {
+  if (!path) return { error: "Missing signed page.", bytes: null as Buffer | null, contentType: "" };
+  const { data, error } = await supabaseAdmin.storage
+    .from(INTERNSHIP_CONFIDENTIAL_BUCKET)
+    .download(path);
+  if (error || !data) {
+    return { error: error?.message || "Could not open the signed page.", bytes: null, contentType: "" };
+  }
+  const bytes = Buffer.from(await data.arrayBuffer());
+  return { error: "", bytes, contentType: data.type || "" };
+}

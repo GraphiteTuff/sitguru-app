@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   findInternByAccount,
+  findInternById,
   findOrCreateStudentInstitution,
   freezeAcademicProfile,
   getInternOnboarding,
@@ -27,11 +28,15 @@ import { internPortalTheme, internSafeLinkedInUrl, internWorkItemType } from "@/
 import {
   internAllowedConfidentialUpload,
   internNamesMatch,
-  internOnboardingComplete,
   INTERNSHIP_ONBOARDING_PATH,
   INTERN_ONBOARDING_POLICY_VERSION,
 } from "@/lib/internship/onboarding";
-import { uploadInternshipAsset, uploadInternshipConfidential } from "@/lib/internship/storage";
+import { sendInternConfidentialityReceipts } from "@/lib/internship/onboarding-mail";
+import {
+  downloadInternshipConfidential,
+  uploadInternshipAsset,
+  uploadInternshipConfidential,
+} from "@/lib/internship/storage";
 import {
   addInternWorkComment,
   reviewInternWorkRecord,
@@ -1116,10 +1121,57 @@ export async function uploadInternConfidentialityScan(formData: FormData) {
     wet_ink_uploaded_at: new Date().toISOString(),
   });
   if (error) bounce(INTERNSHIP_ONBOARDING_PATH, "error", error.message);
-  refreshInternship("/intern");
-  const next = await getInternOnboarding(internId);
-  if (internOnboardingComplete(next)) {
-    bounce("/intern", "ok", "Onboarding complete. The intern portal is open.");
+  refreshInternship(INTERNSHIP_ONBOARDING_PATH);
+  bounce(
+    INTERNSHIP_ONBOARDING_PATH,
+    "ok",
+    "Signed page uploaded. Submit it to intern@sitguru.com to finish onboarding.",
+  );
+}
+
+export async function submitInternConfidentialityScan(formData: FormData) {
+  const internId = text(formData, "internId");
+  await assertWorkspaceActor(internId, "intern");
+  const intern = await findInternById(internId);
+  const ack = await getInternOnboarding(internId);
+  if (!intern || !ack?.electronicSignedAt) {
+    bounce(INTERNSHIP_ONBOARDING_PATH, "error", "Sign electronically before submitting.");
   }
-  bounce(INTERNSHIP_ONBOARDING_PATH, "ok", "Signed page uploaded privately.");
+  if (!ack.wetInkStoragePath || !ack.wetInkUploadedAt) {
+    bounce(INTERNSHIP_ONBOARDING_PATH, "error", "Upload the signed page before submitting.");
+  }
+  const downloaded = await downloadInternshipConfidential(ack.wetInkStoragePath);
+  if (downloaded.error || !downloaded.bytes) {
+    bounce(INTERNSHIP_ONBOARDING_PATH, "error", downloaded.error || "Could not open the signed page.");
+  }
+  try {
+    await sendInternConfidentialityReceipts({
+      intern,
+      onboarding: ack,
+      fileName: ack.wetInkFileName,
+      fileBytes: downloaded.bytes,
+      contentType: ack.wetInkMimeType || downloaded.contentType,
+    });
+  } catch (error) {
+    bounce(
+      INTERNSHIP_ONBOARDING_PATH,
+      "error",
+      error instanceof Error
+        ? error.message
+        : "The signed page is uploaded, but email could not be sent. Try Submit again.",
+    );
+  }
+  const now = new Date().toISOString();
+  const { error } = await upsertOnboarding(internId, {
+    policy_version: INTERN_ONBOARDING_POLICY_VERSION,
+    wet_ink_submitted_at: now,
+    wet_ink_emailed_at: now,
+  });
+  if (error) bounce(INTERNSHIP_ONBOARDING_PATH, "error", error.message);
+  refreshInternship("/intern");
+  bounce(
+    "/intern",
+    "ok",
+    "Submitted. intern@sitguru.com has the signed page, and a confirmation was sent to your email.",
+  );
 }

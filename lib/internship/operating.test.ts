@@ -156,6 +156,8 @@ describe("internship operating semantics", () => {
           wetInkMimeType: "application/pdf",
           wetInkFileSize: 1200,
           wetInkUploadedAt: "2026-09-05T12:02:00.000Z",
+          wetInkSubmittedAt: "2026-09-05T12:03:00.000Z",
+          wetInkEmailedAt: "2026-09-05T12:03:00.000Z",
         },
         smartGoals: [
           {

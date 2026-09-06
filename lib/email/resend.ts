@@ -1,12 +1,17 @@
 import { mergeAdminBcc } from "@/lib/email/admin-bcc";
 
 type SendEmailParams = {
-  to: string;
+  to: string | string[];
   subject: string;
   html: string;
   text?: string;
   replyTo?: string;
   bcc?: string | string[];
+  attachments?: Array<{
+    filename: string;
+    content: string;
+    contentType?: string;
+  }>;
 };
 
 type ResendSendResponse = {
@@ -34,6 +39,7 @@ export async function sendSitGuruEmail({
   text,
   replyTo,
   bcc,
+  attachments,
 }: SendEmailParams) {
   const apiKey = getRequiredEnv("RESEND_API_KEY");
   const from = getRequiredEnv("RESEND_FROM_EMAIL");
@@ -54,6 +60,15 @@ export async function sendSitGuruEmail({
       text,
       reply_to: resolvedReplyTo,
       ...(resolvedBcc.length > 0 ? { bcc: resolvedBcc } : {}),
+      ...(attachments?.length
+        ? {
+            attachments: attachments.map((file) => ({
+              filename: file.filename,
+              content: file.content,
+              content_type: file.contentType,
+            })),
+          }
+        : {}),
     }),
   });
 

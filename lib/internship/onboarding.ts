@@ -6,6 +6,8 @@ export const INTERNSHIP_ONBOARDING_PRINT_PATH = `${INTERNSHIP_ONBOARDING_PATH}/p
 export const INTERN_ONBOARDING_POLICY_VERSION = "2027-spring-v1";
 export const INTERNSHIP_CONFIDENTIAL_BUCKET = "internship-confidential";
 
+export const INTERN_ONBOARDING_INBOX = "intern@sitguru.com";
+
 export const INTERN_ONBOARDING_STEPS = [
   {
     id: "access",
@@ -20,7 +22,12 @@ export const INTERN_ONBOARDING_STEPS = [
   {
     id: "wetink",
     title: "Print, sign, upload",
-    blurb: "Print the same page, sign in ink, and upload it privately.",
+    blurb: "Print the one-page signature sheet, sign in ink, and upload it.",
+  },
+  {
+    id: "submit",
+    title: "Submit",
+    blurb: "Send the signed page to intern@sitguru.com and unlock the portal.",
   },
 ] as const;
 
@@ -98,6 +105,7 @@ export function internOnboardingComplete(
     | "electronicSignedAt"
     | "wetInkUploadedAt"
     | "wetInkStoragePath"
+    | "wetInkSubmittedAt"
   > | null | undefined,
 ) {
   return Boolean(
@@ -107,7 +115,8 @@ export function internOnboardingComplete(
       ack.electronicSignedAt &&
       String(ack.typedLegalName || "").trim() &&
       ack.wetInkUploadedAt &&
-      String(ack.wetInkStoragePath || "").trim(),
+      String(ack.wetInkStoragePath || "").trim() &&
+      ack.wetInkSubmittedAt,
   );
 }
 
@@ -119,7 +128,8 @@ export function internOnboardingStep(
   if (!ack.wetInkUploadedAt || !String(ack.wetInkStoragePath || "").trim()) {
     return "wetink";
   }
-  return "wetink";
+  if (!ack.wetInkSubmittedAt) return "submit";
+  return "submit";
 }
 
 export function internNamesMatch(typed: string, legalName: string) {
@@ -165,5 +175,6 @@ export function internOnboardingStatusLabel(ack: InternshipOnboarding | null | u
   const step = internOnboardingStep(ack);
   if (step === "access") return "Access rules pending";
   if (step === "esign") return "Electronic signature pending";
-  return "Signed page upload pending";
+  if (step === "wetink") return "Signed page upload pending";
+  return "Submit to intern@sitguru.com pending";
 }

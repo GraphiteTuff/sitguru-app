@@ -104,8 +104,9 @@ export default async function InternshipInternDetailPage({
       <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-5">
         <h2 className="font-black text-slate-950">Onboarding & confidentiality</h2>
         <p className="mt-1 text-sm font-semibold text-slate-500">
-          Portal tools stay locked until the intern electronically signs and uploads a
-          privately stored wet-ink copy of the confidentiality page.
+          Portal tools stay locked until the intern electronically signs, uploads the
+          one-page signed sheet, and submits it. intern@sitguru.com receives the file
+          and the intern gets a confirmation email.
         </p>
         <p className="mt-3 text-sm font-black text-slate-950">
           Status: {internOnboardingStatusLabel(workspace.onboarding)}
@@ -129,6 +130,19 @@ export default async function InternshipInternDetailPage({
         ) : (
           <p className="mt-2 text-sm font-semibold text-slate-600">
             No wet-ink scan has been uploaded.
+          </p>
+        )}
+        {workspace.onboarding?.wetInkSubmittedAt ? (
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Submitted {new Date(workspace.onboarding.wetInkSubmittedAt).toLocaleString()}
+            {workspace.onboarding.wetInkEmailedAt
+              ? " · confirmation emailed to the intern and intern@sitguru.com"
+              : ""}
+            .
+          </p>
+        ) : (
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            Signed page has not been submitted yet.
           </p>
         )}
         {workspace.onboarding?.wetInkStoragePath ? (

@@ -2,8 +2,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import InternConfidentialityNotice from "@/components/internship/InternConfidentialityNotice";
 import InternPrintButton from "@/components/internship/InternPrintButton";
+import SiteLogo from "@/components/SiteLogo";
 import { internSchoolEmphasis } from "@/lib/internship/intern-tools";
-import { INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/onboarding";
+import {
+  INTERN_ONBOARDING_INBOX,
+  INTERNSHIP_ONBOARDING_PATH,
+} from "@/lib/internship/onboarding";
 import { findInternByAccount, getInternWorkspace } from "@/lib/internship/queries";
 
 export const dynamic = "force-dynamic";
@@ -34,50 +38,53 @@ export default async function InternOnboardingPrintPage() {
   });
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6 print:max-w-none print:px-0 print:py-0">
+    <main className="intern-signature-sheet mx-auto max-w-[8.5in] bg-white px-4 py-6 print:max-w-none print:p-0">
+      <style>{`
+        @media print {
+          @page { size: letter portrait; margin: 0.4in; }
+          html, body { background: #fff !important; }
+          header, footer, .print\\:hidden, #crisp-chatbox { display: none !important; }
+        }
+      `}</style>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <a
-          href={INTERNSHIP_ONBOARDING_PATH}
-          className="text-sm font-black text-emerald-800"
-        >
+        <a href={INTERNSHIP_ONBOARDING_PATH} className="text-sm font-black text-emerald-800">
           Back to onboarding
         </a>
-        <InternPrintButton />
+        <InternPrintButton label="Print this one-page signature sheet" />
       </div>
-      <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-6 print:rounded-none print:border-0 print:p-0">
-        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
-          SitGuru Internship · print, sign, and return
-        </p>
-        <InternConfidentialityNotice />
-        <div className="mt-8 grid gap-6 border-t border-slate-200 pt-6 sm:grid-cols-2">
-          <p className="text-sm font-semibold text-slate-700">
-            Intern legal name: {intern.fullName}
+      <section className="border border-emerald-100 bg-white p-4 print:border-0 print:p-0">
+        <div className="flex items-start justify-between gap-3 border-b border-emerald-100 pb-2">
+          <SiteLogo href="" wrapperClassName="w-[140px]" imageClassName="h-10 w-auto" />
+          <p className="text-right text-[9px] font-black uppercase tracking-[0.14em] text-emerald-800">
+            One-page signature sheet
+            <br />
+            Return to {INTERN_ONBOARDING_INBOX}
           </p>
-          <p className="text-sm font-semibold text-slate-700">
-            School: {school.school || "SitGuru intern"}
-          </p>
-          <p className="text-sm font-semibold text-slate-700">
-            Program: {school.program || intern.academicProgram || "—"}
-          </p>
-          <p className="text-sm font-semibold text-slate-700">Date: {signedOn}</p>
         </div>
-        <div className="mt-8 grid gap-8 sm:grid-cols-2">
+        <InternConfidentialityNotice printSheet />
+        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3 text-[10px] font-semibold text-slate-700">
+          <p>Intern legal name: {intern.fullName}</p>
+          <p>School: {school.school || "SitGuru intern"}</p>
+          <p>Program: {school.program || intern.academicProgram || "—"}</p>
+          <p>Date: {signedOn}</p>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-6">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-800">
               Wet-ink signature
             </p>
-            <div className="mt-8 border-b border-slate-400" />
+            <div className="mt-6 border-b border-slate-400" />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-800">
               Printed name
             </p>
-            <div className="mt-8 border-b border-slate-400" />
+            <div className="mt-6 border-b border-slate-400" />
           </div>
         </div>
-        <p className="mt-6 text-xs font-semibold text-slate-500">
-          After signing, scan or photograph this page and upload it on intern onboarding.
-          SitGuru stores that file privately.
+        <p className="mt-3 text-[9px] font-semibold text-slate-500">
+          After signing, upload this one page at sitguru.com/intern/onboarding and click
+          Submit. SitGuru emails {INTERN_ONBOARDING_INBOX} and sends you a confirmation.
         </p>
       </section>
     </main>

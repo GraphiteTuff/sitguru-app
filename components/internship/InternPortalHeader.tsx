@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { GraduationCap, Megaphone, ShieldCheck } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
 import { INTERN_GROWTH_WORKPLACE } from "@/lib/internship/intern-tools";
@@ -13,6 +14,9 @@ export default function InternPortalHeader({
   assigned?: boolean;
   onboarded?: boolean;
 }) {
+  const pathname = usePathname();
+  if (pathname === "/intern/onboarding/print") return null;
+
   return (
     <header className="sticky top-0 z-50 border-b border-amber-200/80 bg-[#FAF6EE]/95 shadow-sm backdrop-blur print:hidden">
       <div className="mx-auto flex min-h-16 max-w-[1500px] items-center justify-between gap-4 px-3 py-2 sm:px-5 lg:px-6">

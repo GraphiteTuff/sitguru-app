@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { internPortalDestination, internSafeNext } from "./intern-growth";
+import { internConfirmationEmails } from "./onboarding-mail";
 import {
   internAllowedConfidentialUpload,
   internNamesMatch,
@@ -25,14 +26,17 @@ function ack(overrides: Partial<InternshipOnboarding> = {}): InternshipOnboardin
     wetInkMimeType: "application/pdf",
     wetInkFileSize: 1200,
     wetInkUploadedAt: "2026-09-06T12:10:00.000Z",
+    wetInkSubmittedAt: "2026-09-06T12:12:00.000Z",
+    wetInkEmailedAt: "2026-09-06T12:12:00.000Z",
     ...overrides,
   };
 }
 
 describe("intern onboarding gate", () => {
-  it("keeps the portal locked until access rules, e-sign, and wet-ink upload are done", () => {
+  it("keeps the portal locked until access rules, e-sign, upload, and submit are done", () => {
     assert.equal(internOnboardingComplete(null), false);
     assert.equal(internOnboardingComplete(ack({ wetInkUploadedAt: null })), false);
+    assert.equal(internOnboardingComplete(ack({ wetInkSubmittedAt: null })), false);
     assert.equal(internOnboardingComplete(ack({ electronicSignedAt: null })), false);
     assert.equal(internOnboardingComplete(ack({ accessRulesAcceptedAt: null })), false);
     assert.equal(
@@ -42,15 +46,19 @@ describe("intern onboarding gate", () => {
     assert.equal(internOnboardingComplete(ack()), true);
   });
 
-  it("walks access rules, then e-sign, then upload", () => {
+  it("walks access rules, then e-sign, then upload, then submit", () => {
     assert.equal(internOnboardingStep(null), "access");
     assert.equal(
-      internOnboardingStep(ack({ electronicSignedAt: null, wetInkUploadedAt: null })),
+      internOnboardingStep(ack({ electronicSignedAt: null, wetInkUploadedAt: null, wetInkSubmittedAt: null })),
       "esign",
     );
     assert.equal(
-      internOnboardingStep(ack({ wetInkUploadedAt: null, wetInkStoragePath: "" })),
+      internOnboardingStep(ack({ wetInkUploadedAt: null, wetInkStoragePath: "", wetInkSubmittedAt: null })),
       "wetink",
+    );
+    assert.equal(
+      internOnboardingStep(ack({ wetInkSubmittedAt: null })),
+      "submit",
     );
   });
 
@@ -93,6 +101,27 @@ describe("intern onboarding gate", () => {
     );
     assert.equal(internSafeNext("/intern/onboarding"), "/intern/onboarding");
     assert.equal(internOnboardingStatusLabel(null), "Access rules pending");
+    assert.equal(
+      internOnboardingStatusLabel(ack({ wetInkSubmittedAt: null })),
+      "Submit to intern@sitguru.com pending",
+    );
     assert.equal(internOnboardingStatusLabel(ack()), "Complete");
+  });
+
+  it("confirms to the intern email and student email, without duplicates", () => {
+    assert.deepEqual(
+      internConfirmationEmails({
+        email: "alex@sitguru.com",
+        studentEmail: "alex@test.edu",
+      }),
+      ["alex@sitguru.com", "alex@test.edu"],
+    );
+    assert.deepEqual(
+      internConfirmationEmails({
+        email: "alex@test.edu",
+        studentEmail: "alex@test.edu",
+      }),
+      ["alex@test.edu"],
+    );
   });
 });

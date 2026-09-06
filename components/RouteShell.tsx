@@ -64,6 +64,8 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     isPublicGuruProfilePage ||
     isPublicShortGuruProfilePage;
 
+  const isInternPrintPage = pathname === "/intern/onboarding/print";
+
   const isInternPrivatePage =
     pathname === "/intern" || pathname.startsWith("/intern/");
 
@@ -189,7 +191,7 @@ export default function RouteShell({ children }: { children: ReactNode }) {
     return (
       <>
         <div className="site-main min-h-screen bg-white">{children}</div>
-        <Footer />
+        {isInternPrintPage ? null : <Footer />}
         {shouldShowGlobalMessageNotifier ? <GlobalMessageNotifier /> : null}
         {floatingControls}
       </>
