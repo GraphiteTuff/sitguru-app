@@ -8,19 +8,29 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  GraduationCap,
   Home,
+  Link2,
+  MapPinned,
+  Palette,
   Share2,
 } from "lucide-react";
 import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipAssignmentReview from "@/components/internship/InternshipAssignmentReview";
 import InternshipKpiLetterBoard from "@/components/internship/InternshipKpiLetterBoard";
 import InternStudentTools from "@/components/internship/InternStudentTools";
+import { ThemeStatCard } from "@/components/sitguru/ThemeStatCard";
 import { saveInternCampaign, saveInternContent, saveInternMetric, saveWeeklyReview } from "@/lib/internship/actions";
 import { ATTRIBUTION_RULE, METRIC_SOURCE_SYSTEMS } from "@/lib/internship/constants";
-import { internStatusLabel, metricSourceLabel } from "@/lib/internship/labels";
+import {
+  academicLevelLabel,
+  internStatusLabel,
+  metricSourceLabel,
+} from "@/lib/internship/labels";
 import {
   INTERN_HOME_TOOLS,
   INTERN_SOCIAL_PLATFORMS,
+  internSchoolEmphasis,
   type InternHomeToolId,
   type InternPromoteEvent,
 } from "@/lib/internship/intern-tools";
@@ -34,10 +44,10 @@ import {
 import type { InternshipWorkspaceData } from "@/lib/internship/types";
 
 const TABS = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "calendar", label: "Calendar", icon: CalendarDays },
-  { id: "work", label: "Work", icon: ClipboardList },
-  { id: "metrics", label: "Metrics", icon: BarChart3 },
+  { id: "home", label: "Home", icon: Home, active: "bg-emerald-700 !text-white", chip: "bg-emerald-50 text-emerald-900" },
+  { id: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-sky-600 !text-white", chip: "bg-sky-50 text-sky-900" },
+  { id: "work", label: "Work", icon: ClipboardList, active: "bg-violet-600 !text-white", chip: "bg-violet-50 text-violet-900" },
+  { id: "metrics", label: "Metrics", icon: BarChart3, active: "bg-amber-500 !text-white", chip: "bg-amber-50 text-amber-900" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -152,10 +162,28 @@ export default function InternStudentDashboard({
   const showTasks = workFilter === "all" || workFilter === "tasks";
   const showContent = workFilter === "all" || workFilter === "content";
   const showCampaigns = workFilter === "all" || workFilter === "campaigns";
+  const school = internSchoolEmphasis({
+    university: data.university,
+    campus: data.campus,
+    intern: data.intern,
+    cohort: data.cohort,
+  });
+  const toolIcons = {
+    brand: Palette,
+    tracking: Link2,
+    snapshot: MapPinned,
+    events: CalendarDays,
+    social: Share2,
+  } as const;
 
   function openTab(next: TabId) {
     setTab(next);
     setTool(null);
+  }
+
+  function openTool(id: InternHomeToolId) {
+    setTab("home");
+    setTool(id);
   }
 
   return (
@@ -172,47 +200,161 @@ export default function InternStudentDashboard({
         </p>
       ) : null}
 
-      <section
-        className="public-dark-section overflow-hidden rounded-[1.75rem] p-5 sm:p-6"
-        data-brand-green
-        style={{ background: "#0D5C3A" }}
-      >
-        <div className="flex items-center gap-4">
-          <InternAvatar
-            name={data.intern.fullName}
-            email={data.intern.email}
-            src={data.intern.avatarUrl}
-            size="lg"
-            className="ring-white/30"
-          />
+      <article className="overflow-hidden rounded-[2rem] border border-indigo-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div
+          className="flex min-h-[5.5rem] items-end px-5 pb-3 sm:px-6"
+          style={{
+            background:
+              "linear-gradient(120deg,#1e3a5f 0%,#334e68 42%,#0D5C3A 100%)",
+          }}
+        >
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] !text-white/85">
+            Your school
+          </p>
+        </div>
+        <div className="grid gap-4 p-5 sm:grid-cols-[1.2fr_0.8fr] sm:p-6">
           <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-[0.2em] !text-white/80">
-              Intern portal
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-800">
+              Student institution
             </p>
-            <h1 className="mt-1 truncate text-2xl font-black !text-white sm:text-3xl">
-              Hey, {firstName}
-            </h1>
-            <p className="mt-1 text-sm font-semibold !text-white/90">
-              Week {process.weekNumber} · {process.deliverable.title}
+            <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+              {school.school}
+            </h2>
+            <p className="mt-2 text-sm font-semibold text-slate-600">
+              {[school.campus, school.place].filter(Boolean).join(" · ") ||
+                "School on your intern assignment"}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {school.program ? (
+                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-900">
+                  {school.program}
+                </span>
+              ) : null}
+              {school.courseCode ? (
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-900">
+                  {school.courseCode}
+                </span>
+              ) : null}
+              {school.semester ? (
+                <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-900">
+                  {school.semester}
+                </span>
+              ) : null}
+              {school.level ? (
+                <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-900">
+                  {academicLevelLabel(school.level)}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div className="rounded-[1.4rem] border border-indigo-100 bg-[#FAF6EE] p-4">
+            <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-800">
+              <GraduationCap size={14} />
+              Academic window
+            </p>
+            <p className="mt-2 text-lg font-black text-slate-950">
+              {school.hours ? `${school.hours} hours` : "Hours pending"}
+              {school.credits != null ? ` · ${school.credits} credits` : ""}
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+              SitGuru owns the internship experience. Your school wraps the
+              academics. {school.partner ? "University Partner." : "Student institution — not a SitGuru partnership by default."}
             </p>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-black !text-white">
-            {internStatusLabel(data.intern.status)}
-          </span>
-          {data.intern.academicProgram ? (
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-black !text-white">
-              {data.intern.academicProgram}
-            </span>
-          ) : null}
-          {data.university?.shortName || data.university?.displayName ? (
-            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-black !text-white">
-              {data.university.shortName || data.university.displayName}
-            </span>
-          ) : null}
+      </article>
+
+      {tab === "home" && !tool ? (
+      <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div className="grid gap-6 bg-[radial-gradient(circle_at_86%_18%,rgba(255,255,255,0.96),transparent_20%),linear-gradient(120deg,#bbf7e1_0%,#dff9f0_46%,#ccefff_100%)] px-5 py-6 sm:px-6 sm:py-7 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800 shadow-sm">
+                SitGuru Intern Portal
+              </span>
+              <span className="rounded-full bg-emerald-700 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] !text-white">
+                Your intern working area
+              </span>
+              <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-700 shadow-sm">
+                {internStatusLabel(data.intern.status)}
+              </span>
+            </div>
+            <div className="mt-4 flex items-center gap-4">
+              <InternAvatar
+                name={data.intern.fullName}
+                email={data.intern.email}
+                src={data.intern.avatarUrl}
+                size="lg"
+                className="ring-white/70"
+              />
+              <div className="min-w-0">
+                <h1 className="truncate text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl">
+                  Welcome, {firstName}.
+                </h1>
+                <p className="mt-1 text-sm font-semibold text-slate-700">
+                  Week {process.weekNumber} · {process.deliverable.title}
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-slate-800">
+              Color-coded like Ambassador Social and Referrals. School stays on
+              the Canvas card. SitGuru tools stay intern-only — no Admin login.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => openTool("social")}
+                className="inline-flex min-h-11 items-center rounded-full bg-rose-600 px-4 text-sm font-black !text-white shadow-sm"
+              >
+                Social
+              </button>
+              <button
+                type="button"
+                onClick={() => openTool("tracking")}
+                className="inline-flex min-h-11 items-center rounded-full bg-white px-4 text-sm font-black text-sky-800 shadow-sm ring-1 ring-sky-200"
+              >
+                Tracking
+              </button>
+              <button
+                type="button"
+                onClick={() => openTab("work")}
+                className="inline-flex min-h-11 items-center rounded-full bg-white px-4 text-sm font-black text-violet-800 shadow-sm ring-1 ring-violet-200"
+              >
+                Open work
+              </button>
+            </div>
+          </div>
+          <div className="rounded-[1.6rem] border border-white/80 bg-white/95 p-5 shadow-xl">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+              Today’s focus
+            </p>
+            <h2 className="mt-2 text-xl font-black text-slate-950">
+              {process.deliverable.title}
+            </h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              {process.deliverable.demonstrates}
+            </p>
+            <div className="mt-4 grid gap-2 text-sm font-bold text-slate-700">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+                {process.weeklyThisWeek ? "Weekly check-in is in" : "Weekly check-in due"}
+              </div>
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-violet-700" />
+                {openWork.length} open tasks
+              </div>
+              <div className="flex items-center gap-2">
+                <Share2 className="h-4 w-4 text-rose-700" />
+                {data.content.length} social posts logged
+              </div>
+            </div>
+            <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-3 text-xs font-bold leading-5 text-emerald-900">
+              {MARKET_GROWTH_PROJECT_NAME}
+            </p>
+          </div>
         </div>
       </section>
+      ) : null}
 
       <div className="hidden gap-2 sm:flex">
         {TABS.map((item) => (
@@ -222,8 +364,8 @@ export default function InternStudentDashboard({
             onClick={() => openTab(item.id)}
             className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-black ${
               tab === item.id
-                ? "bg-[#0D5C3A] !text-white"
-                : "border border-emerald-100 bg-white text-emerald-900"
+                ? item.active
+                : "border border-slate-200 bg-white text-slate-700"
             }`}
           >
             <item.icon size={16} />
@@ -244,61 +386,76 @@ export default function InternStudentDashboard({
 
       {tab === "home" && !tool ? (
         <div className="space-y-4">
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                This week
-              </p>
-              <p className="mt-1 text-2xl font-black text-slate-950">
-                {process.weeklyThisWeek ? "Logged" : "Due"}
-              </p>
-              <p className="mt-1 text-xs font-semibold text-slate-500">Weekly check-in</p>
-            </div>
-            <div className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                Open work
-              </p>
-              <p className="mt-1 text-2xl font-black text-slate-950">{openWork.length}</p>
-              <p className="mt-1 text-xs font-semibold text-slate-500">Tasks to finish</p>
-            </div>
-            <div className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                Metrics
-              </p>
-              <p className="mt-1 text-2xl font-black text-slate-950">{verifiedMetrics.length}</p>
-              <p className="mt-1 text-xs font-semibold text-slate-500">Verified KPIs</p>
-            </div>
-            <div className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                Social
-              </p>
-              <p className="mt-1 text-2xl font-black text-slate-950">{data.content.length}</p>
-              <p className="mt-1 text-xs font-semibold text-slate-500">Posts logged</p>
-            </div>
+          <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <ThemeStatCard
+              label="This week"
+              value={process.weeklyThisWeek ? "Logged" : "Due"}
+              helper="Weekly check-in"
+              tone="emerald"
+              icon={<CheckCircle2 size={18} />}
+            />
+            <ThemeStatCard
+              label="Open work"
+              value={openWork.length}
+              helper="Tasks to finish"
+              tone="violet"
+              icon={<ClipboardList size={18} />}
+            />
+            <ThemeStatCard
+              label="Metrics"
+              value={verifiedMetrics.length}
+              helper="Verified KPIs"
+              tone="amber"
+              icon={<BarChart3 size={18} />}
+            />
+            <ThemeStatCard
+              label="Social"
+              value={data.content.length}
+              helper="Posts logged"
+              tone="rose"
+              icon={<Share2 size={18} />}
+            />
           </section>
 
-          <section className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
+          <section className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="font-black text-slate-950">Tools</h2>
-              <Share2 size={16} className="text-emerald-800" />
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
+                  Course tools
+                </p>
+                <h2 className="mt-1 font-black text-slate-950">Intern toolkit</h2>
+              </div>
+              <p className="text-xs font-semibold text-slate-500">No Admin login</p>
             </div>
-            <p className="mt-1 text-sm font-semibold text-slate-500">
-              Intern-only. No Admin login.
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {INTERN_HOME_TOOLS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setTool(item.id)}
-                  className="flex min-h-[4.75rem] flex-col items-start justify-center rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-left"
-                >
-                  <span className="text-sm font-black text-slate-950">{item.label}</span>
-                  <span className="mt-0.5 text-[11px] font-semibold text-slate-500">
-                    {item.blurb}
-                  </span>
-                </button>
-              ))}
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {INTERN_HOME_TOOLS.map((item) => {
+                const Icon = toolIcons[item.id];
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setTool(item.id)}
+                    className={`overflow-hidden rounded-[1.4rem] border text-left shadow-sm ${item.tile}`}
+                  >
+                    <span className={`block h-2.5 w-full ${item.bar}`} />
+                    <span className="flex min-h-[5.25rem] flex-col items-start justify-center gap-2 px-3 py-3">
+                      <span
+                        className={`flex h-9 w-9 items-center justify-center rounded-xl !text-white ${item.bar}`}
+                      >
+                        <Icon size={16} />
+                      </span>
+                      <span>
+                        <span className="block text-sm font-black text-slate-950">
+                          {item.label}
+                        </span>
+                        <span className={`mt-0.5 block text-[11px] font-semibold ${item.ink}`}>
+                          {item.blurb}
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </section>
 
@@ -317,22 +474,7 @@ export default function InternStudentDashboard({
             </section>
           ) : null}
 
-          <section className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-              Focus
-            </p>
-            <h2 className="mt-1 text-lg font-black text-slate-950">
-              {process.deliverable.title}
-            </h2>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-              {process.deliverable.demonstrates}
-            </p>
-            <p className="mt-3 text-xs font-semibold text-slate-500">
-              {MARKET_GROWTH_PROJECT_NAME}
-            </p>
-          </section>
-
-          <section className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
+          <section className="rounded-[1.4rem] border border-sky-200 bg-white p-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-black text-slate-950">Up next</h2>
               <button
@@ -553,20 +695,18 @@ export default function InternStudentDashboard({
           <div className="flex flex-wrap gap-2">
             {(
               [
-                ["all", "All"],
-                ["tasks", "Tasks"],
-                ["content", "Social"],
-                ["campaigns", "Campaigns"],
+                ["all", "All", "bg-emerald-700 !text-white", "border-emerald-200 text-emerald-900"],
+                ["tasks", "Tasks", "bg-violet-600 !text-white", "border-violet-200 text-violet-900"],
+                ["content", "Social", "bg-rose-600 !text-white", "border-rose-200 text-rose-900"],
+                ["campaigns", "Campaigns", "bg-sky-600 !text-white", "border-sky-200 text-sky-900"],
               ] as const
-            ).map(([id, label]) => (
+            ).map(([id, label, on, off]) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => setWorkFilter(id)}
                 className={`inline-flex min-h-11 items-center rounded-2xl px-4 text-xs font-black ${
-                  workFilter === id
-                    ? "bg-[#0D5C3A] !text-white"
-                    : "border border-emerald-100 bg-white text-emerald-900"
+                  workFilter === id ? on : `border bg-white ${off}`
                 }`}
               >
                 {label}
@@ -825,7 +965,7 @@ export default function InternStudentDashboard({
               type="button"
               onClick={() => openTab(item.id)}
               className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-black ${
-                tab === item.id ? "bg-emerald-50 text-emerald-900" : "text-slate-500"
+                tab === item.id ? item.chip : "text-slate-500"
               }`}
             >
               <item.icon size={18} />

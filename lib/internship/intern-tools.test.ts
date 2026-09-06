@@ -4,6 +4,7 @@ import {
   INTERN_HOME_TOOLS,
   internContentByPlatform,
   internMarketSnapshot,
+  internSchoolEmphasis,
   toInternPromoteEvent,
 } from "./intern-tools";
 
@@ -11,6 +12,41 @@ describe("intern home tools", () => {
   it("stays intern-scoped, including social", () => {
     const ids = INTERN_HOME_TOOLS.map((tool) => tool.id);
     assert.deepEqual(ids, ["brand", "tracking", "snapshot", "events", "social"]);
+  });
+
+  it("color-codes each tool like Ambassador social/referrals", () => {
+    const tones = INTERN_HOME_TOOLS.map((tool) => tool.tone);
+    assert.deepEqual(tones, ["emerald", "sky", "violet", "amber", "rose"]);
+  });
+});
+
+describe("intern school emphasis", () => {
+  it("puts the campus school first, without inventing a university partnership", () => {
+    const school = internSchoolEmphasis({
+      university: {
+        name: "Pennsylvania State University",
+        displayName: "Penn State Abington",
+        city: "Abington",
+        state: "PA",
+        isUniversityPartner: false,
+      },
+      campus: { displayName: "Abington", city: "Abington", state: "PA" },
+      intern: {
+        academicProgram: "Corporate Communication",
+        courseCode: "CAS 495",
+        credits: 3,
+        requiredHours: 135,
+        semester: "Spring 2027",
+        academicLevel: "junior",
+      },
+      cohort: { season: "spring", year: 2027 },
+    });
+    assert.equal(school.school, "Penn State Abington");
+    assert.equal(school.program, "Corporate Communication");
+    assert.equal(school.courseCode, "CAS 495");
+    assert.equal(school.semester, "Spring 2027");
+    assert.equal(school.partner, false);
+    assert.match(school.place, /Abington/);
   });
 });
 

@@ -63,7 +63,7 @@ export default async function InternPortalPage({
           .trim()
           .split(/\s+/)[0] || "there";
       return (
-        <main className="mx-auto w-full max-w-lg space-y-5 px-4 py-6 sm:px-6">
+        <main className="mx-auto max-w-lg px-4 py-10">
           <section
             className="public-dark-section rounded-[1.75rem] p-5 sm:p-6"
             data-brand-green
@@ -120,7 +120,7 @@ export default async function InternPortalPage({
   const promoteEvents = await listInternPromoteEvents();
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 sm:max-w-5xl sm:px-6 sm:py-6">
+    <main className="mx-auto w-full max-w-[1500px] space-y-4 px-3 py-4 sm:px-5 lg:px-6">
       {preview ? (
         <section className="space-y-3">
           <InternshipBackToProgram />

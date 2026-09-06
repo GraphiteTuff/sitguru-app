@@ -1,0 +1,24 @@
+"use client";
+
+import Link from "next/link";
+import { GraduationCap } from "lucide-react";
+import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
+
+export default function InternPortalHeader() {
+  return (
+    <header className="sticky top-0 z-50 border-b border-amber-200/80 bg-[#FAF6EE]/95 shadow-sm backdrop-blur">
+      <div className="mx-auto flex min-h-16 max-w-[1500px] items-center justify-between gap-4 px-3 py-2 sm:px-5 lg:px-6">
+        <Link href="/intern" className="min-w-0" aria-label="Open Intern Portal">
+          <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-amber-800">
+            SitGuru Internship
+          </p>
+          <p className="flex items-center gap-1.5 truncate text-base font-black tracking-tight text-slate-950">
+            <GraduationCap size={16} className="shrink-0 text-emerald-800" />
+            Student Portal
+          </p>
+        </Link>
+        <SiteAccountMenu compact />
+      </div>
+    </header>
+  );
+}

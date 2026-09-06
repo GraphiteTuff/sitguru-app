@@ -1,3 +1,4 @@
+import { formatCohortHeadline, formatInstitutionLine } from "@/lib/internship/labels";
 import { MARKET_GROWTH_PROJECT_NAME } from "@/lib/internship/playbook";
 
 export const INTERN_HOME_TOOLS = [
@@ -5,26 +6,46 @@ export const INTERN_HOME_TOOLS = [
     id: "brand",
     label: "Brand kit",
     blurb: "Logo, green, @SitGuruOfficial",
+    tone: "emerald",
+    bar: "bg-emerald-700",
+    tile: "border-emerald-200 bg-emerald-50",
+    ink: "text-emerald-800",
   },
   {
     id: "tracking",
     label: "Tracking links",
     blurb: "UTM + referral codes",
+    tone: "sky",
+    bar: "bg-sky-600",
+    tile: "border-sky-200 bg-sky-50",
+    ink: "text-sky-800",
   },
   {
     id: "snapshot",
     label: "Market snapshot",
     blurb: "Your market, aggregated",
+    tone: "violet",
+    bar: "bg-violet-600",
+    tile: "border-violet-200 bg-violet-50",
+    ink: "text-violet-800",
   },
   {
     id: "events",
     label: "Events to promote",
     blurb: "Public pet events",
+    tone: "amber",
+    bar: "bg-amber-500",
+    tile: "border-amber-200 bg-amber-50",
+    ink: "text-amber-800",
   },
   {
     id: "social",
     label: "Social media",
     blurb: "Official accounts + posts",
+    tone: "rose",
+    bar: "bg-rose-600",
+    tile: "border-rose-200 bg-rose-50",
+    ink: "text-rose-800",
   },
 ] as const;
 
@@ -154,5 +175,63 @@ export function internMarketSnapshot(input: {
       { href: "/events", label: "Pet Events" },
       { href: "/ambassadors", label: "Ambassadors" },
     ],
+  };
+}
+
+export function internSchoolEmphasis(input: {
+  university?: {
+    displayName?: string | null;
+    shortName?: string | null;
+    name?: string | null;
+    city?: string | null;
+    state?: string | null;
+    isUniversityPartner?: boolean;
+  } | null;
+  campus?: {
+    displayName?: string | null;
+    name?: string | null;
+    city?: string | null;
+    state?: string | null;
+  } | null;
+  intern: {
+    academicProgram?: string | null;
+    courseCode?: string | null;
+    credits?: number | null;
+    requiredHours?: number | null;
+    semester?: string | null;
+    academicLevel?: string | null;
+  };
+  cohort?: { name?: string | null; season?: string | null; year?: number | null } | null;
+}) {
+  const school = formatInstitutionLine({
+    universityName: input.university?.name || "",
+    campusName: input.campus?.displayName || input.campus?.name,
+    displayName:
+      input.university?.displayName || input.university?.shortName || "",
+  });
+  const campus =
+    String(input.campus?.displayName || input.campus?.name || "").trim();
+  const place = [
+    input.campus?.city || input.university?.city,
+    input.campus?.state || input.university?.state,
+  ]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(", ");
+  const term = formatCohortHeadline(input.cohort || {});
+  const semester = String(input.intern.semester || "").trim() || term;
+
+  return {
+    school,
+    campus:
+      campus && !school.toLowerCase().includes(campus.toLowerCase()) ? campus : "",
+    place,
+    program: String(input.intern.academicProgram || "").trim(),
+    courseCode: String(input.intern.courseCode || "").trim(),
+    semester,
+    credits: input.intern.credits,
+    hours: input.intern.requiredHours,
+    level: String(input.intern.academicLevel || "").trim(),
+    partner: Boolean(input.university?.isUniversityPartner),
   };
 }

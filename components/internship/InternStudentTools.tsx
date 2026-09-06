@@ -11,6 +11,7 @@ import {
 import { saveInternCampaign, saveInternContent } from "@/lib/internship/actions";
 import { ATTRIBUTION_RULE } from "@/lib/internship/constants";
 import {
+  INTERN_HOME_TOOLS,
   INTERN_SOCIAL_PLATFORMS,
   internContentByPlatform,
   internMarketSnapshot,
@@ -73,14 +74,17 @@ function CopyButton({ value }: { value: string }) {
 function ToolShell({
   title,
   blurb,
+  tool,
   onBack,
   children,
 }: {
   title: string;
   blurb: string;
+  tool: InternHomeToolId;
   onBack: () => void;
   children: ReactNode;
 }) {
+  const theme = INTERN_HOME_TOOLS.find((item) => item.id === tool);
   return (
     <section className="space-y-4">
       <button
@@ -91,9 +95,15 @@ function ToolShell({
         <ArrowLeft size={16} />
         Home
       </button>
-      <div>
-        <h2 className="text-xl font-black text-slate-950">{title}</h2>
-        <p className="mt-1 text-sm font-semibold text-slate-500">{blurb}</p>
+      <div className={`overflow-hidden rounded-[1.6rem] border ${theme?.tile || "border-emerald-100 bg-white"}`}>
+        <span className={`block h-2.5 w-full ${theme?.bar || "bg-emerald-700"}`} />
+        <div className="px-4 py-4">
+          <p className={`text-[10px] font-black uppercase tracking-[0.16em] ${theme?.ink || "text-emerald-800"}`}>
+            Intern tool
+          </p>
+          <h2 className="mt-1 text-xl font-black text-slate-950">{title}</h2>
+          <p className="mt-1 text-sm font-semibold text-slate-600">{blurb}</p>
+        </div>
       </div>
       {children}
     </section>
@@ -121,6 +131,7 @@ export default function InternStudentTools({
       <ToolShell
         title="Brand kit"
         blurb="Use SitGuru branding only. Do not use university marks unless that school authorizes them."
+        tool={tool}
         onBack={onBack}
       >
         <div className="grid gap-3 sm:grid-cols-2">
@@ -175,6 +186,7 @@ export default function InternStudentTools({
       <ToolShell
         title="Tracking links"
         blurb="No growth result counts without a unique UTM or referral code."
+        tool={tool}
         onBack={onBack}
       >
         {data.campaigns.length ? (
@@ -243,6 +255,7 @@ export default function InternStudentTools({
       <ToolShell
         title="Market snapshot"
         blurb="Aggregated numbers for your assigned market. No Pet Parent or Guru names, emails, or payouts."
+        tool={tool}
         onBack={onBack}
       >
         <div className="grid grid-cols-2 gap-3">
@@ -325,6 +338,7 @@ export default function InternStudentTools({
       <ToolShell
         title="Events to promote"
         blurb="Public SitGuru pet events. Share with a tracking link. This is not Events admin."
+        tool={tool}
         onBack={onBack}
       >
         {events.length ? (
@@ -372,6 +386,7 @@ export default function InternStudentTools({
     <ToolShell
       title="Social media"
       blurb="Promote @SitGuruOfficial. Draft posts here — SitGuru publishes from official accounts unless Jason grants a channel."
+      tool={tool}
       onBack={onBack}
     >
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
