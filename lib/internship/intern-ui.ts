@@ -7,3 +7,13 @@ export const internPrimaryBtnClass = `inline-flex min-h-12 items-center justify-
 export const internGhostBtnClass = `inline-flex min-h-11 items-center justify-center gap-1.5 rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-black text-emerald-900 hover:border-emerald-400 hover:bg-emerald-50 ${internPressClass}`;
 
 export const internPillBtnClass = `inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-black ${internPressClass}`;
+
+export const INTERN_PAGE_HASH = "#profile";
+export const INTERN_PAGE_QUERY = "edit";
+export const INTERN_PAGE_QUERY_VALUE = "page";
+export const INTERN_OPEN_PAGE_EVENT = "sitguru:intern-open-page";
+export const INTERN_PAGE_HREF = `/intern?${INTERN_PAGE_QUERY}=${INTERN_PAGE_QUERY_VALUE}`;
+
+export function internPageHashActive() {
+  return typeof window !== "undefined" && window.location.hash === INTERN_PAGE_HASH;
+}

@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { GraduationCap, Megaphone, ShieldCheck } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
 import { INTERN_GROWTH_WORKPLACE } from "@/lib/internship/intern-tools";
-import { internGhostBtnClass, internPrimaryBtnClass } from "@/lib/internship/intern-ui";
+import {
+  INTERN_OPEN_PAGE_EVENT,
+  INTERN_PAGE_HREF,
+  internGhostBtnClass,
+  internPrimaryBtnClass,
+} from "@/lib/internship/intern-ui";
 import { INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/onboarding";
 
 export default function InternPortalHeader({
@@ -16,6 +21,7 @@ export default function InternPortalHeader({
   onboarded?: boolean;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   if (pathname === "/intern/onboarding/print") return null;
 
   return (
@@ -51,12 +57,19 @@ export default function InternPortalHeader({
                 <span className="hidden sm:inline">{INTERN_GROWTH_WORKPLACE.label}</span>
                 <span className="sm:hidden">Growth</span>
               </Link>
-              <Link
-                href="/intern#profile"
+              <button
+                type="button"
+                onClick={() => {
+                  if (pathname === "/intern" || pathname === "/intern/") {
+                    window.dispatchEvent(new Event(INTERN_OPEN_PAGE_EVENT));
+                    return;
+                  }
+                  router.push(INTERN_PAGE_HREF);
+                }}
                 className={`${internGhostBtnClass} min-h-11 px-3 text-xs`}
               >
                 Your page
-              </Link>
+              </button>
             </>
           ) : null}
           <SiteAccountMenu compact />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   BarChart3,
@@ -61,7 +61,9 @@ import {
   internPortalHeroClass,
 } from "@/lib/internship/portal";
 import {
+  INTERN_OPEN_PAGE_EVENT,
   internGhostBtnClass,
+  internPageHashActive,
   internPillBtnClass,
   internPressClass,
   internPrimaryBtnClass,
@@ -165,6 +167,7 @@ export default function InternStudentDashboard({
   initialTool,
   initialWorkFilter,
   initialDate,
+  initialProfileOpen = false,
 }: {
   data: InternshipWorkspaceData;
   events?: InternPromoteEvent[];
@@ -174,6 +177,7 @@ export default function InternStudentDashboard({
   initialTool?: string | null;
   initialWorkFilter?: string;
   initialDate?: string;
+  initialProfileOpen?: boolean;
 }) {
   const process = useMemo(() => buildInternshipProcess(data), [data]);
   const calendarEvents = useMemo(() => internCalendarEvents(data), [data]);
@@ -181,7 +185,7 @@ export default function InternStudentDashboard({
   const todayKey = toDateKey(new Date());
   const startDate = dateFromKey(initialDate);
   const [tab, setTab] = useState<TabId>(isTabId(initialTab) ? initialTab : "home");
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(initialProfileOpen);
   const [tool, setTool] = useState<InternHomeToolId | null>(
     isHomeTool(initialTool) ? initialTool : null,
   );
@@ -190,6 +194,29 @@ export default function InternStudentDashboard({
   );
   const [calendarMonth, setCalendarMonth] = useState(() => startDate || new Date());
   const [selectedDate, setSelectedDate] = useState(startDate ? toDateKey(startDate) : todayKey);
+
+  useEffect(() => {
+    function openInternPage() {
+      setTab("home");
+      setTool(null);
+      setProfileOpen(true);
+      if (internPageHashActive()) {
+        window.history.replaceState(null, "", "/intern");
+      }
+    }
+
+    function onHash() {
+      if (internPageHashActive()) openInternPage();
+    }
+
+    onHash();
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener(INTERN_OPEN_PAGE_EVENT, openInternPage);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener(INTERN_OPEN_PAGE_EVENT, openInternPage);
+    };
+  }, []);
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, typeof calendarEvents>();

@@ -70,6 +70,7 @@ export default async function InternPortalPage({
             initialTool={first(params.tool) || null}
             initialWorkFilter={first(params.work)}
             initialDate={first(params.date)}
+            initialProfileOpen={first(params.edit) === "page"}
           />
         )}
       </main>
@@ -193,6 +194,7 @@ export default async function InternPortalPage({
               ? { kind: "error", message: error }
               : null
         }
+        initialProfileOpen={first(params.edit) === "page"}
       />
     </main>
   );
