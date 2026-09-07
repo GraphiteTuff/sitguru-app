@@ -4,11 +4,13 @@ import { INTERNSHIP_ONBOARDING_PATH } from "./onboarding";
 import { internPortalDestination, INTERNSHIP_HELP_PATH } from "./intern-growth";
 import {
   internHelpArticle,
+  internHelpFileAllowed,
   internHelpMediaAllowed,
   internHelpMediaSrc,
   searchInternHelpArticles,
   INTERN_HELP_ARTICLES,
 } from "./intern-help";
+import { INTERN_WATCH_VIDEOS } from "./intern-glossary";
 
 describe("intern help catalog", () => {
   it("keeps every article inside the intern portal, not Admin HQ or public Help Center", () => {
@@ -21,6 +23,10 @@ describe("intern help catalog", () => {
     }
     assert.ok(internHelpArticle("home"));
     assert.equal(internHelpArticle("missing"), null);
+    for (const article of INTERN_HELP_ARTICLES) {
+      assert.ok(article.purpose.length > 40, article.slug);
+      assert.ok(article.contributes.length > 40, article.slug);
+    }
   });
 
   it("finds student wording like check-in, hours, and tracking links", () => {
@@ -32,6 +38,26 @@ describe("intern help catalog", () => {
     assert.ok(tracking.some((article) => article.slug === "toolkit-tracking"));
     const pdf = searchInternHelpArticles("print pdf");
     assert.ok(pdf.some((article) => article.slug === "student-guide"));
+    const checkinField = searchInternHelpArticles("lessons learned");
+    assert.ok(checkinField.some((article) => article.slug === "weekly-checkin"));
+    const metricKey = searchInternHelpArticles("metric key");
+    assert.ok(metricKey.some((article) => article.slug === "metrics"));
+    const reportPart = searchInternHelpArticles("which part of your report");
+    assert.ok(reportPart.some((article) => article.slug === "definitions"));
+    const pawreport = searchInternHelpArticles("pawreport");
+    assert.ok(pawreport.some((article) => article.slug === "sitguru-features"));
+    const events = searchInternHelpArticles("paws at the park");
+    assert.ok(events.some((article) => article.slug === "vendor-events"));
+    const stripe = searchInternHelpArticles("bookings stay on sitguru");
+    assert.ok(stripe.some((article) => article.slug === "payments-on-sitguru"));
+    const localCare = searchInternHelpArticles("trusted local pet care");
+    assert.ok(localCare.some((article) => article.slug === "watch-sitguru"));
+    assert.ok(INTERN_WATCH_VIDEOS.some((video) => video.id === "trusted-local-pet-care"));
+    assert.ok(internHelpArticle("definitions"));
+    assert.ok(internHelpArticle("sitguru-university"));
+    assert.equal(internHelpFileAllowed("best-pa-nj-vendor-events.docx"), true);
+    assert.equal(internHelpFileAllowed("stripe-setup.docx"), true);
+    assert.equal(internHelpFileAllowed("secret.env"), false);
   });
 
   it("serves training screenshots from intern Help media, never Your page", () => {
@@ -45,6 +71,8 @@ describe("intern help catalog", () => {
     );
     assert.equal(internHelpMediaAllowed("screenshots/01-home-welcome.png"), true);
     assert.equal(internHelpMediaAllowed("assets/syllabus-cover.jpg"), true);
+    assert.equal(internHelpMediaAllowed("assets/sitguru-university-guide.jpg"), true);
+    assert.equal(internHelpMediaAllowed("assets/brand/sitguru-logo-horizontal.jpg"), true);
     assert.equal(internHelpMediaAllowed("screenshots/17-your-page.png"), false);
     assert.equal(internHelpMediaAllowed("../.env"), false);
   });

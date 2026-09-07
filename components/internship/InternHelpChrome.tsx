@@ -84,3 +84,58 @@ export function InternHelpShots({ article }: { article: InternHelpArticle }) {
     </div>
   );
 }
+
+export function InternHelpExplain({ article }: { article: InternHelpArticle }) {
+  return (
+    <div className="space-y-6">
+      <section>
+        <h2 className="text-lg font-black text-slate-950">What this is</h2>
+        <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">{article.purpose}</p>
+      </section>
+      <section className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-5 py-4">
+        <h2 className="text-lg font-black text-emerald-950">How this helps you</h2>
+        <p className="mt-2 text-sm font-semibold leading-7 text-emerald-950">{article.contributes}</p>
+      </section>
+      {article.fields.length ? (
+        <section>
+          <h2 className="text-lg font-black text-slate-950">How to fill it out</h2>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+            Each field is intern-facing. SitGuru uses it for review, your internship
+            file, and the Business Growth Report — not as a university grade.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {article.fields.map((field) => (
+              <li
+                key={field.label}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+              >
+                <p className="text-sm font-black text-slate-950">{field.label}</p>
+                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                  {field.meaning}
+                </p>
+                {field.example ? <InternHelpExample example={field.example} /> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function InternHelpExample({ example }: { example: string }) {
+  if (/^https?:\/\//i.test(example) || example.startsWith("mailto:")) {
+    return (
+      <p className="mt-2 text-sm font-semibold leading-6 text-emerald-900">
+        <a href={example} className="underline">
+          {example}
+        </a>
+      </p>
+    );
+  }
+  return (
+    <p className="mt-2 text-sm font-semibold leading-6 text-emerald-900">
+      Example: {example}
+    </p>
+  );
+}

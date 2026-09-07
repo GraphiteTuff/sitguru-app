@@ -43,8 +43,13 @@ describe("intern student user guide downloads", () => {
     assert.match(docx.toString("utf8"), /Intern Portal Student User Guide/);
     assert.match(docx.toString("utf8"), /word\/media\/image1/);
     assert.match(text, /intern agreement/);
+    assert.match(text, /Market Analysis/);
+    assert.match(text, /sitguru\.com\/events/);
+    assert.match(text, /PawReport/);
+    assert.match(text, /Trusted Local Pet Care/);
     assert.doesNotMatch(text, /\bRover\b/i);
     assert.doesNotMatch(text, /\bWag\b/i);
+    assert.doesNotMatch(text, /last 4 digits of your SSN/i);
   });
 
   it("keeps print and Word downloads inside intern Help during onboarding", () => {

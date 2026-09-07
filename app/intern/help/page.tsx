@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import InternHelpSearchBar from "@/components/internship/InternHelpSearchBar";
 import InternGuideDownloads from "@/components/internship/InternGuideDownloads";
+import InternHelpWatchVideos from "@/components/internship/InternHelpWatchVideos";
 import { requireInternHelpAccess } from "@/lib/internship/intern-help-access";
 import {
   INTERN_HELP_ARTICLES,
@@ -30,14 +31,23 @@ export default async function InternHelpHomePage() {
           How can we help?
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm font-semibold text-slate-600 sm:text-base">
-          Search intern articles the same way as SitGuru Help — check-in, hours,
-          tracking links, Growth workplace, and intern-safe rules.
+          Search intern articles the same way as SitGuru Help. Each one explains
+          what the screen is for, how it counts toward your internship, and how
+          to fill the fields — check-in, hours, tracking links, Growth workplace,
+          and intern-safe rules.
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3">
           <InternHelpSearchBar autoFocus />
           <InternGuideDownloads />
         </div>
+      </div>
+
+      <div className="mt-12 w-full">
+        <InternHelpWatchVideos />
+      </div>
+
+      <div className="w-full text-center">
 
         <div className="mt-10 grid gap-3 text-left sm:grid-cols-2">
           {INTERN_HELP_CATEGORIES.map((category) => (
@@ -74,13 +84,13 @@ export default async function InternHelpHomePage() {
                   <li key={article.slug}>
                     <Link
                       href={article.href}
-                      className="flex flex-col rounded-2xl border border-transparent px-3 py-3 transition hover:border-emerald-100 hover:bg-white sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col rounded-2xl border border-transparent px-3 py-3 transition hover:border-emerald-100 hover:bg-white"
                     >
                       <span className="text-sm font-black text-slate-900">
                         {article.title}
                       </span>
-                      <span className="mt-1 shrink-0 text-xs font-bold text-slate-500 sm:mt-0 sm:ml-4">
-                        {article.category}
+                      <span className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                        {article.summary}
                       </span>
                     </Link>
                   </li>

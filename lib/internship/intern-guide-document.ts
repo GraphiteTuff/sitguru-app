@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { internHelpPath } from "@/lib/internship/intern-growth";
+import { internGlossarySectionHtml } from "@/lib/internship/intern-glossary";
 import { internHelpMediaAllowed } from "@/lib/internship/intern-help";
 
 export const INTERN_GUIDE_FILE = "docs/intern-guide/student-user-guide.html";
@@ -117,8 +118,24 @@ export function internGuideRelativeSrc(src: string) {
   return "";
 }
 
+export function internGuideWithDefinitions(html: string) {
+  const section = internGlossarySectionHtml();
+  let next = html;
+  if (!next.includes('href="#definitions"')) {
+    next = next.replace(
+      '<li><a href="#start">How to use this guide</a></li>',
+      '<li><a href="#definitions">Definitions</a></li>\n        <li><a href="#start">How to use this guide</a></li>',
+    );
+  }
+  if (/id="definitions"/.test(next)) {
+    return next.replace(/<section id="definitions"[\s\S]*?<\/section>/, section);
+  }
+  return next.replace("</nav>", `</nav>\n    ${section}`);
+}
+
 export async function internGuideSourceHtml() {
-  return readFile(path.join(process.cwd(), INTERN_GUIDE_FILE), "utf8");
+  const html = await readFile(path.join(process.cwd(), INTERN_GUIDE_FILE), "utf8");
+  return internGuideWithDefinitions(html);
 }
 
 export function internGuideParts(html: string) {
