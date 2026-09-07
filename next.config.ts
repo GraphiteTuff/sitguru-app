@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
     },
   },
 
+  // Videos stay on the CDN. Dynamic public/ reads must not pack them into
+  // serverless traces (the events social function hit 391MB / 250MB).
+  outputFileTracingExcludes: {
+    "/*": ["./public/videos/**/*", "./sitguru-mobile/**/*"],
+  },
+
   turbopack: {
     root: process.cwd(),
   },

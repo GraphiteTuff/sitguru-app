@@ -25,10 +25,17 @@ function isSocialFormat(value: string): value is SocialFormat {
   return value in FORMATS;
 }
 
-async function localPngDataUri(publicPath: string) {
+const APPLE_ICON_PATH = join(process.cwd(), "public", "apple-touch-icon.png");
+const LOGO_MARK_PATH = join(
+  process.cwd(),
+  "public",
+  "images",
+  "sitguru-logo-mark.png",
+);
+
+async function localPngDataUri(filePath: string) {
   try {
-    const file = join(process.cwd(), "public", publicPath);
-    const buf = await readFile(file);
+    const buf = await readFile(filePath);
     return `data:image/png;base64,${buf.toString("base64")}`;
   } catch {
     return null;
@@ -82,8 +89,8 @@ export async function GET(_req: NextRequest, context: RouteContext) {
         null,
     )) || null;
   const logoMark =
-    (await localPngDataUri("apple-touch-icon.png")) ||
-    (await localPngDataUri("images/sitguru-logo-mark.png"));
+    (await localPngDataUri(APPLE_ICON_PATH)) ||
+    (await localPngDataUri(LOGO_MARK_PATH));
 
   const isStory = format === "story";
   const isSquare = format === "square";
