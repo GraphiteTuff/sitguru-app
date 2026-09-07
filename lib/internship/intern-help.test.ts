@@ -8,8 +8,10 @@ import {
   internHelpMediaAllowed,
   internHelpMediaSrc,
   searchInternHelpArticles,
+  INTERN_GUIDE_CONFIDENTIALITY,
   INTERN_HELP_ARTICLES,
 } from "./intern-help";
+import { internGuideSourceHtml, internGuideWordBuffer } from "./intern-guide-document";
 import { INTERN_WATCH_VIDEOS } from "./intern-glossary";
 
 describe("intern help catalog", () => {
@@ -90,6 +92,20 @@ describe("intern help catalog", () => {
     assert.equal(internHelpMediaAllowed("assets/brand/sitguru-logo-horizontal.jpg"), true);
     assert.equal(internHelpMediaAllowed("screenshots/17-your-page.png"), false);
     assert.equal(internHelpMediaAllowed("../.env"), false);
+  });
+
+  it("includes the confidentiality disclaimer in student guide HTML and Word output", async () => {
+    assert.match(INTERN_GUIDE_CONFIDENTIALITY, /Proprietary and confidential/);
+    assert.match(INTERN_GUIDE_CONFIDENTIALITY, /belongs solely to SitGuru/);
+    const html = await internGuideSourceHtml();
+    assert.ok(html.includes(INTERN_GUIDE_CONFIDENTIALITY));
+    assert.match(html, /@bottom-center/);
+    const studentGuide = internHelpArticle("student-guide");
+    assert.ok(studentGuide);
+    const docx = await internGuideWordBuffer();
+    const wordXml = docx.toString("utf8");
+    assert.match(wordXml, /w:footerReference/);
+    assert.match(wordXml, /Proprietary and confidential/);
   });
 
   it("lets unsigned interns open Help during onboarding", () => {

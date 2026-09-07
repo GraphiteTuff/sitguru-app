@@ -2,7 +2,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { internHelpPath } from "@/lib/internship/intern-growth";
 import { internGlossarySectionHtml } from "@/lib/internship/intern-glossary";
-import { internHelpMediaAllowed } from "@/lib/internship/intern-help";
+import {
+  INTERN_GUIDE_CONFIDENTIALITY,
+  internHelpMediaAllowed,
+} from "@/lib/internship/intern-help";
+
+export { INTERN_GUIDE_CONFIDENTIALITY };
 
 export const INTERN_GUIDE_FILE = "docs/intern-guide/student-user-guide.html";
 export const INTERN_GUIDE_DOWNLOAD_NAME = "SitGuru-Intern-Portal-Student-User-Guide-Spring-2027";
@@ -166,9 +171,9 @@ export function internGuideBlocks(bodyHtml: string): GuideBlock[] {
       continue;
     }
     const className = attr(match[2] || "", "class");
-    if (className.includes("print-hint")) continue;
+    if (className.includes("print-hint") || className.includes("guide-confidentiality")) continue;
     const text = stripTags(match[3] || "");
-    if (!text) continue;
+    if (!text || text === INTERN_GUIDE_CONFIDENTIALITY) continue;
     if (tag === "figcaption") blocks.push({ type: "caption", text });
     else if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "p" || tag === "li") {
       blocks.push({ type: tag, text });
@@ -241,11 +246,33 @@ export async function internGuideWordBuffer() {
     bodyXml.push(drawingXml(relId, block.alt || fileName, size.width, size.height, imageCount));
   }
 
+  const footerXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:p>
+    <w:pPr>
+      <w:jc w:val="center"/>
+      <w:spacing w:before="40" w:after="0"/>
+    </w:pPr>
+    <w:r>
+      <w:rPr>
+        <w:sz w:val="16"/>
+        <w:szCs w:val="16"/>
+        <w:color w:val="64748B"/>
+      </w:rPr>
+      <w:t xml:space="preserve">${xmlEscape(INTERN_GUIDE_CONFIDENTIALITY)}</w:t>
+    </w:r>
+  </w:p>
+</w:ftr>`;
+
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
   <w:body>
     ${bodyXml.join("")}
-    <w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></w:sectPr>
+    <w:sectPr>
+      <w:footerReference w:type="default" r:id="rIdFooter"/>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="720" w:right="720" w:bottom="1080" w:left="720" w:header="360" w:footer="720"/>
+    </w:sectPr>
   </w:body>
 </w:document>`;
 
@@ -258,6 +285,7 @@ export async function internGuideWordBuffer() {
   <Default Extension="jpg" ContentType="image/jpeg"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
 </Types>`;
 
   const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -268,6 +296,7 @@ export async function internGuideWordBuffer() {
   const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rIdFooter" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
   ${rels.join("\n  ")}
 </Relationships>`;
 
@@ -285,6 +314,7 @@ export async function internGuideWordBuffer() {
     { name: "word/document.xml", data: Buffer.from(documentXml, "utf8") },
     { name: "word/_rels/document.xml.rels", data: Buffer.from(docRels, "utf8") },
     { name: "word/styles.xml", data: Buffer.from(stylesXml, "utf8") },
+    { name: "word/footer1.xml", data: Buffer.from(footerXml, "utf8") },
     ...mediaFiles,
   ]);
 }

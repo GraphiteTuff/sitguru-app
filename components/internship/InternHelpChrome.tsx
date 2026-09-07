@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import InternHelpSearchBar from "@/components/internship/InternHelpSearchBar";
 import { internGhostBtnClass } from "@/lib/internship/intern-ui";
 import {
+  INTERN_GUIDE_CONFIDENTIALITY,
   INTERN_HELP_INBOX,
   INTERNSHIP_HELP_PATH,
   internHelpMediaSrc,
@@ -60,6 +61,11 @@ export default function InternHelpChrome({
         </a>
         .
       </div>
+      {article?.slug === "student-guide" ? (
+        <p className="mt-6 text-[11px] font-semibold leading-4 text-slate-500">
+          {INTERN_GUIDE_CONFIDENTIALITY}
+        </p>
+      ) : null}
     </article>
   );
 }

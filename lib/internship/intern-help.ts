@@ -15,6 +15,8 @@ export { INTERNSHIP_HELP_PATH };
 
 export const INTERN_GUIDE_PRINT_PATH = internHelpPath("print");
 export const INTERN_GUIDE_WORD_HREF = `${INTERNSHIP_HELP_PATH}/export?format=word`;
+export const INTERN_GUIDE_CONFIDENTIALITY =
+  "© SitGuru. Proprietary and confidential. This user guide belongs solely to SitGuru and may not be copied, reproduced, distributed, shared, or used in whole or in part without prior written permission from SitGuru.";
 
 export const INTERN_HELP_INBOX = "intern@sitguru.com";
 

@@ -7,7 +7,10 @@ import {
   internGuidePortalHtml,
   internGuideSourceHtml,
 } from "@/lib/internship/intern-guide-document";
-import { INTERNSHIP_HELP_PATH } from "@/lib/internship/intern-help";
+import {
+  INTERN_GUIDE_CONFIDENTIALITY,
+  INTERNSHIP_HELP_PATH,
+} from "@/lib/internship/intern-help";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +34,16 @@ export default async function InternGuidePrintPage({
     <main className="intern-guide-print bg-white">
       <style>{`
         ${style}
-        @page { size: letter; margin: 0.5in; }
+        @page {
+          size: letter;
+          margin: 0.55in 0.5in 0.95in 0.5in;
+          @bottom-center {
+            content: ${JSON.stringify(INTERN_GUIDE_CONFIDENTIALITY)};
+            font-family: "Segoe UI", system-ui, sans-serif;
+            font-size: 7.5pt;
+            color: #64748b;
+          }
+        }
         @media print {
           .print-toolbar, #crisp-chatbox { display: none !important; }
           body, .intern-guide-print { background: #fff !important; }

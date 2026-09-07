@@ -25,7 +25,17 @@
     }
     img { max-width: 100%; height: auto; display: block; }
     a { color: var(--green); }
-    .wrap { max-width: 880px; margin: 0 auto; padding: 24px 18px 72px; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 24px 18px 88px; }
+    @page {
+      size: letter;
+      margin: 0.55in 0.5in 0.95in 0.5in;
+      @bottom-center {
+        content: "© SitGuru. Proprietary and confidential. This user guide belongs solely to SitGuru and may not be copied, reproduced, distributed, shared, or used in whole or in part without prior written permission from SitGuru.";
+        font-family: "Segoe UI", system-ui, sans-serif;
+        font-size: 7.5pt;
+        color: #64748b;
+      }
+    }
     .cover {
       background: #fff;
       border-radius: 28px;
@@ -131,12 +141,22 @@
     @media (min-width: 760px) {
       .two { grid-template-columns: 1fr 1fr; }
     }
-    footer {
+    footer, .guide-confidentiality {
       text-align: center;
       color: #64748b;
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 600;
-      padding: 12px;
+      line-height: 1.4;
+      padding: 10px 16px 12px;
+    }
+    footer.guide-confidentiality {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 20;
+      background: #fff;
+      border-top: 1px solid #e2e8f0;
     }
     .print-hint { font-size: 13px; font-weight: 700; color: #a7f3d0; }
     @media print {
@@ -146,6 +166,13 @@
       .print-hint { display: none; }
       a { color: var(--green); text-decoration: none; }
       .print-toolbar { display: none !important; }
+      footer.guide-confidentiality {
+        position: static;
+        border-top: 0;
+        background: transparent;
+        padding: 8px 0 0;
+        font-size: 10px;
+      }
     }
   </style>
 </head>
@@ -509,9 +536,8 @@
       <p>This guide shows the student portal as it works for Spring 2027. It is not the syllabus, not a contract, and not legal advice. Follow the intern agreement you signed in the portal.</p>
     </section>
 
-    <footer>
-      SitGuru™ · Graff Enterprises LLC d/b/a SitGuru · Spring 2027 Intern Portal Student User Guide<br />
-      Trusted Pet Care. Simplified.
+    <footer class="guide-confidentiality">
+      © SitGuru. Proprietary and confidential. This user guide belongs solely to SitGuru and may not be copied, reproduced, distributed, shared, or used in whole or in part without prior written permission from SitGuru.
     </footer>
   </div>
 </body>

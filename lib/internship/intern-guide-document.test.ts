@@ -7,7 +7,11 @@ import {
   internGuideSourceHtml,
   internGuideWordBuffer,
 } from "./intern-guide-document";
-import { INTERN_GUIDE_PRINT_PATH, INTERN_GUIDE_WORD_HREF } from "./intern-help";
+import {
+  INTERN_GUIDE_CONFIDENTIALITY,
+  INTERN_GUIDE_PRINT_PATH,
+  INTERN_GUIDE_WORD_HREF,
+} from "./intern-help";
 import { internPortalDestination } from "./intern-growth";
 import { INTERNSHIP_ONBOARDING_PATH } from "./onboarding";
 
@@ -19,6 +23,27 @@ describe("intern student user guide downloads", () => {
     assert.doesNotMatch(html, /syllabus cover/i);
     assert.match(html, /\/intern\/help\/media\/screenshots\/26-onboarding\.png/);
     assert.doesNotMatch(html, /\bsrc="screenshots\//);
+    assert.match(html, /@bottom-center/);
+    assert.match(html, /Proprietary and confidential/);
+    assert.ok(html.includes(INTERN_GUIDE_CONFIDENTIALITY));
+  });
+
+  it("puts the confidentiality disclaimer in HTML source and the Word page footer", async () => {
+    const html = await internGuideSourceHtml();
+    assert.ok(html.includes(INTERN_GUIDE_CONFIDENTIALITY));
+    assert.match(html, /@bottom-center/);
+    assert.match(html, /class="guide-confidentiality"/);
+    const docx = await internGuideWordBuffer();
+    const wordXml = docx.toString("utf8");
+    assert.match(wordXml, /w:footerReference/);
+    assert.match(wordXml, /word\/footer1\.xml/);
+    assert.match(wordXml, /Proprietary and confidential/);
+    assert.ok(wordXml.includes("belongs solely to SitGuru"));
+    const { body } = internGuideParts(html);
+    const text = internGuideBlocks(body)
+      .map((block) => ("text" in block ? block.text : ""))
+      .join("\n");
+    assert.doesNotMatch(text, /Proprietary and confidential/);
   });
 
   it("parses headings, steps, and screenshots from the illustrated guide", async () => {
