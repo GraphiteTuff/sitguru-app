@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { GraduationCap, Megaphone, ShieldCheck } from "lucide-react";
+import { CircleHelp, GraduationCap, Megaphone, ShieldCheck } from "lucide-react";
 import { SiteAccountMenu } from "@/components/sitguru/SiteAccountMenu";
+import { INTERNSHIP_HELP_PATH } from "@/lib/internship/intern-growth";
 import { INTERN_GROWTH_WORKPLACE } from "@/lib/internship/intern-tools";
 import {
   INTERN_OPEN_PAGE_EVENT,
@@ -71,6 +72,15 @@ export default function InternPortalHeader({
                 Your page
               </button>
             </>
+          ) : null}
+          {assigned ? (
+            <Link
+              href={INTERNSHIP_HELP_PATH}
+              className={`${internGhostBtnClass} min-h-11 px-3 text-xs`}
+            >
+              <CircleHelp size={14} />
+              <span className="hidden sm:inline">Help</span>
+            </Link>
           ) : null}
           <SiteAccountMenu compact />
         </div>

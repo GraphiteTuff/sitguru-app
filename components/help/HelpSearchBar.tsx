@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 import {
   HELP_ARTICLES,
   searchHelpArticles,
-  type HelpArticle,
+  type HelpSearchItem,
 } from "@/lib/help/articles";
 import { HELP_SEARCH_CONFIG } from "@/lib/help/config";
 
@@ -16,8 +16,8 @@ type HelpSearchBarProps = {
   variant?: "hero" | "header";
   placeholder?: string;
   autoFocus?: boolean;
-  /** Optional merged catalog (static + DB published insights) */
-  articles?: HelpArticle[];
+  /** Optional merged catalog (static + DB published insights, or intern Help) */
+  articles?: readonly HelpSearchItem[];
 };
 
 export default function HelpSearchBar({
@@ -124,7 +124,7 @@ export default function HelpSearchBar({
   );
 }
 
-function ResultRow({ article }: { article: HelpArticle }) {
+function ResultRow({ article }: { article: HelpSearchItem }) {
   return (
     <li>
       <Link

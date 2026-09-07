@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SitGuru Intern Portal Student User Guide · Spring 2027</title>
+  <style>
+    :root {
+      --green: #0D5C3A;
+      --green-dark: #09472d;
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #d1fae5;
+      --paper: #f8f5ef;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      line-height: 1.55;
+    }
+    img { max-width: 100%; height: auto; display: block; }
+    a { color: var(--green); }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 24px 18px 72px; }
+    .cover {
+      background: #fff;
+      border-radius: 28px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .cover img { width: 100%; }
+    .hero {
+      background: var(--green);
+      color: #fff;
+      border-radius: 28px;
+      padding: 28px 24px;
+      margin: 20px 0 28px;
+    }
+    .hero h1, .hero h2, .hero p, .hero li { color: #fff !important; }
+    .eyebrow {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin: 0 0 8px;
+    }
+    h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 10px; }
+    h2 {
+      font-size: 1.45rem;
+      margin: 0 0 10px;
+      color: var(--ink);
+      page-break-after: avoid;
+    }
+    h3 { font-size: 1.05rem; margin: 18px 0 8px; }
+    p, li { font-size: 15.5px; color: var(--muted); }
+    .lede { font-size: 17px; font-weight: 600; color: #ecfdf5; }
+    nav.toc {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px 22px;
+      margin-bottom: 28px;
+    }
+    nav.toc ol { margin: 8px 0 0; padding-left: 22px; }
+    nav.toc a { font-weight: 700; text-decoration: none; }
+    nav.toc a:hover { text-decoration: underline; }
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 22px 22px 10px;
+      margin: 0 0 22px;
+      page-break-inside: avoid;
+    }
+    section.break { page-break-before: always; }
+    .steps { margin: 0 0 16px; padding-left: 22px; }
+    .steps li { margin: 0 0 8px; }
+    .callout {
+      background: #ecfdf5;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px 14px;
+      margin: 12px 0 16px;
+      color: var(--green-dark);
+      font-weight: 600;
+    }
+    .warn {
+      background: #fff7ed;
+      border-color: #fed7aa;
+      color: #9a3412;
+    }
+    figure {
+      margin: 8px 0 20px;
+      page-break-inside: avoid;
+    }
+    figure img {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    }
+    figcaption {
+      margin-top: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+    }
+    .two {
+      display: grid;
+      gap: 14px;
+    }
+    @media (min-width: 760px) {
+      .two { grid-template-columns: 1fr 1fr; }
+    }
+    footer {
+      text-align: center;
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 12px;
+    }
+    .print-hint { font-size: 13px; font-weight: 700; color: #a7f3d0; }
+    @media print {
+      body { background: #fff; }
+      .wrap { max-width: none; padding: 0; }
+      .hero, section, .cover, nav.toc { box-shadow: none; }
+      .print-hint { display: none; }
+      a { color: var(--green); text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="cover">
+      <img src="assets/syllabus-cover.jpg" alt="SitGuru Social Media & Community Growth Internship Program, Spring 2027 syllabus cover" />
+    </div>
+
+    <header class="hero">
+      <p class="eyebrow">SitGuru Internship · Student Portal</p>
+      <h1>Intern Portal Student User Guide</h1>
+      <p class="lede">Spring 2027 Social Media &amp; Community Growth Internship. A picture walkthrough of every student area, in the order you will actually use them.</p>
+      <p>Open <strong>https://www.sitguru.com/intern</strong>. SitGuru runs the internship. Your school counts credits and hours.</p>
+      <p class="print-hint">To save a PDF: File → Print → Save as PDF.</p>
+    </header>
+
+    <nav class="toc" aria-label="Contents">
+      <p class="eyebrow" style="color:var(--green)">Contents</p>
+      <ol>
+        <li><a href="#start">How to use this guide</a></li>
+        <li><a href="#login">Log in</a></li>
+        <li><a href="#onboarding">Onboarding (required first)</a></li>
+        <li><a href="#home">Home</a></li>
+        <li><a href="#checkin">Weekly check-in</a></li>
+        <li><a href="#calendar">Calendar</a></li>
+        <li><a href="#work">Work (tasks, social, campaigns)</a></li>
+        <li><a href="#report">Report and hours</a></li>
+        <li><a href="#metrics">Metrics</a></li>
+        <li><a href="#toolkit">Intern toolkit</a></li>
+        <li><a href="#growth">Growth workplace</a></li>
+        <li><a href="#page">Your page</a></li>
+        <li><a href="#rules">Rules that keep you intern-safe</a></li>
+        <li><a href="#help">If you get stuck</a></li>
+      </ol>
+    </nav>
+
+    <section id="start">
+      <h2>1. How to use this guide</h2>
+      <p>This is the student walkthrough for the intern portal. Match the pictures to the screen in front of you, then follow the steps.</p>
+      <div class="callout">The screenshots come from a SitGuru training intern login. You will see a practice name, school, and zeros. Your portal will show <strong>your</strong> name, school, tasks, and numbers.</div>
+      <ul class="steps">
+        <li>Do not invent extra buttons. If a screen does not have a control, it is not part of your job yet.</li>
+        <li>Green buttons do the real work: send, save, submit. Only press them on <em>your</em> account when the work is ready.</li>
+        <li>SitGuru checks growth numbers. Your own count stays pending until they confirm it.</li>
+      </ul>
+    </section>
+
+    <section id="login">
+      <h2>2. Log in</h2>
+      <ol class="steps">
+        <li>Go to <strong>https://www.sitguru.com/intern</strong>.</li>
+        <li>Sign in with the intern login SitGuru gave you. Do not share it. Do not let a roommate or classmate use it.</li>
+        <li>If SitGuru has not added you to the program yet, you will see a message that this account is not assigned as an intern. Email SitGuru and wait. You cannot skip that step.</li>
+      </ol>
+    </section>
+
+    <section id="onboarding" class="break">
+      <h2>3. Onboarding (required first)</h2>
+      <p>SitGuru unlocks Home, Work, Report, Metrics, and Growth workplace after four steps. Email confirmation goes to <strong>your email on file</strong> — SitGuru does not print a personal address on the submit screen.</p>
+      <figure>
+        <img src="screenshots/26-onboarding.png" alt="Intern onboarding with four completed steps: Access rules, Electronic signature, Print sign upload, and Submit" />
+        <figcaption>The four onboarding steps. The portal stays locked until all four are done.</figcaption>
+      </figure>
+      <ol class="steps">
+        <li><strong>Access rules.</strong> Read the intern-safe duties. Confirm you understand them.</li>
+        <li><strong>Electronic signature.</strong> Read the confidentiality notice and sign with your legal name.</li>
+        <li><strong>Print, sign, upload.</strong> Print the page (or photograph a signed printout) and upload the PDF or photo. SitGuru keeps that copy as an extra policy record. The law already allows electronic signatures; the wet-ink page is SitGuru’s extra file, not a legal requirement.</li>
+        <li><strong>Submit.</strong> Confirmation is emailed to the address on your intern record. Then tap <strong>Open intern portal</strong>.</li>
+      </ol>
+      <div class="callout warn">Do not paste SitGuru plans, passwords, customer names, or internal numbers into ChatGPT, school AI tools, or group chats. That is one of the access rules you accept here.</div>
+    </section>
+
+    <section id="home" class="break">
+      <h2>4. Home</h2>
+      <p>Home is your weekly dashboard. The top cards show your school, program, term, and hours. The welcome block shows this week’s focus.</p>
+      <figure>
+        <img src="screenshots/01-home-welcome.png" alt="Intern Home welcome with school card, week focus, and summary tiles" />
+        <figcaption>Home welcome. Your first name, school, and this week’s focus appear here.</figcaption>
+      </figure>
+      <p>The four summary tiles are tappable:</p>
+      <ul class="steps">
+        <li><strong>This week</strong> — do your weekly check-in.</li>
+        <li><strong>Open work</strong> — tasks still to do.</li>
+        <li><strong>Metrics</strong> — numbers SitGuru has checked.</li>
+        <li><strong>Social</strong> — posts you have logged.</li>
+      </ul>
+      <figure>
+        <img src="screenshots/02-home-summary-kpis.png" alt="Home summary tiles and live SitGuru results for people and social" />
+        <figcaption>Summary tiles plus live SitGuru totals. These are market totals — no customer names.</figcaption>
+      </figure>
+      <p>Scroll for Growth workplace, the intern toolkit, and upcoming milestones. Use the green bar: <strong>Home · Calendar · Work · Report · Metrics</strong>.</p>
+      <figure>
+        <img src="screenshots/03-home-workplace-toolkit.png" alt="Growth workplace card and intern toolkit cards on Home" />
+        <figcaption>Growth workplace shortcut and intern toolkit. Tap a toolkit card to open it.</figcaption>
+      </figure>
+    </section>
+
+    <section id="checkin" class="break">
+      <h2>5. Weekly check-in</h2>
+      <p>Every week, tell SitGuru what you finished. Be specific — this writing goes into your Business Growth Report.</p>
+      <figure>
+        <img src="screenshots/04-home-checkin.png" alt="This week’s check-in form on Home" />
+        <figcaption>Weekly check-in on Home. Pick which report section the week helped.</figcaption>
+      </figure>
+      <ol class="steps">
+        <li>Choose <strong>Contribution to your report</strong> (Market Analysis, Audience Strategy, and so on).</li>
+        <li>Fill in what you added, what you finished, what the numbers showed, what did not work, and what’s next.</li>
+        <li>Add <strong>Your number</strong> if you have one SitGuru can check (example: Pet Parent signups from your tracking link).</li>
+        <li>Tap <strong>Send this week to SitGuru</strong>.</li>
+      </ol>
+      <figure>
+        <img src="screenshots/05-home-checkin-submit.png" alt="Send this week to SitGuru button at the bottom of the check-in form" />
+        <figcaption>The send button. Only press it when the week’s story is true and complete.</figcaption>
+      </figure>
+    </section>
+
+    <section id="calendar" class="break">
+      <h2>6. Calendar</h2>
+      <p>Calendar shows tasks, check-ins, and program milestones. Dots on a date mean something is scheduled.</p>
+      <div class="two">
+        <figure>
+          <img src="screenshots/06-calendar.png" alt="September calendar in the intern portal with milestone dots" />
+          <figcaption>Month view. Tap a dotted day to see what is due.</figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/07-calendar-milestone.png" alt="Calendar day open on Program confirmation milestone" />
+          <figcaption>A milestone opened from the calendar (example: Program confirmation).</figcaption>
+        </figure>
+      </div>
+      <p>Use Calendar to plan the week. Do the actual work on <strong>Work</strong>, log hours on <strong>Report</strong>, and send the weekly story from <strong>Home</strong>.</p>
+    </section>
+
+    <section id="work" class="break">
+      <h2>7. Work</h2>
+      <p>Work is your assignment list. Filter <strong>Tasks</strong>, <strong>Social</strong>, or <strong>Campaigns</strong>.</p>
+      <h3>Tasks</h3>
+      <p>Open a task, attach proof, add the link, and send it to SitGuru.</p>
+      <figure>
+        <img src="screenshots/08-work-tasks.png" alt="Work tab showing assigned tasks still marked to do" />
+        <figcaption>Work → Tasks. Status starts as to-do until you send the work.</figcaption>
+      </figure>
+      <ol class="steps">
+        <li>Attach PDFs, slides, screenshots, or drafts that prove the work.</li>
+        <li>Paste a <strong>Link to completed work</strong> if you have one (Google Doc, Canva, published post).</li>
+        <li>Write <strong>What should SitGuru review?</strong></li>
+        <li>Tap <strong>Send to SitGuru for review</strong>.</li>
+      </ol>
+      <figure>
+        <img src="screenshots/09-work-task-submit.png" alt="Task submit form with supporting files and Send to SitGuru for review" />
+        <figcaption>Task submit. Attach proof, then send. Do not send an empty task.</figcaption>
+      </figure>
+
+      <h3>Social posts</h3>
+      <p>Log every SitGuru post you draft or publish. Tag <strong>@SitGuruOfficial</strong>. Bookings stay on SitGuru. Never put a customer name or email in a caption.</p>
+      <figure>
+        <img src="screenshots/10-work-social.png" alt="Work social tab with Log a social post form" />
+        <figcaption>Work → Social. Log the post here even if you designed it in Canva or CapCut.</figcaption>
+      </figure>
+
+      <h3>Campaigns</h3>
+      <p>A campaign is a named push with a tracking link. Create it <em>before</em> you post. SitGuru only counts growth from that link — not from a bare homepage URL.</p>
+      <figure>
+        <img src="screenshots/11-work-campaigns.png" alt="Work campaigns tab with New campaign form" />
+        <figcaption>Work → Campaigns. Name the campaign, then save. Copy the tracking link from the toolkit or Growth workplace after it exists.</figcaption>
+      </figure>
+    </section>
+
+    <section id="report" class="break">
+      <h2>8. Report and hours</h2>
+      <p>Report is your Business Growth Report. It fills in from weekly check-ins, approved work, and hours you log here. Hours are <strong>not</strong> a separate Work screen — log them on Report.</p>
+      <figure>
+        <img src="screenshots/12-report.png" alt="Business Growth Report showing starting point and percent complete" />
+        <figcaption>Report overview. Percent complete rises as SitGuru accepts your weekly work.</figcaption>
+      </figure>
+      <ol class="steps">
+        <li>Enter <strong>Hours this week</strong>.</li>
+        <li>Tap <strong>Save to your report</strong>.</li>
+        <li>Your school still owns credit and hour counting. SitGuru records what you logged for the internship file.</li>
+      </ol>
+      <div class="two">
+        <figure>
+          <img src="screenshots/13-report-hours.png" alt="Hours this week field on the intern report" />
+          <figcaption>Hours field on Report.</figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/14-report-hours-submit.png" alt="Save to your report button for weekly hours" />
+          <figcaption>Save hours into the report.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="metrics" class="break">
+      <h2>9. Metrics</h2>
+      <p>Metrics is where you send a number for SitGuru to check. Live people and social totals also show on Home. A letter (like I) is SitGuru’s current employer snapshot — it is not your university grade.</p>
+      <figure>
+        <img src="screenshots/15-metrics-letters.png" alt="Metrics tab with KPI letter board and live totals" />
+        <figcaption>Metrics letter board and live totals. SitGuru checks these against their own data.</figcaption>
+      </figure>
+      <ol class="steps">
+        <li>Tap <strong>Send a number for SitGuru to check</strong>.</li>
+        <li>Name the metric, enter the value, and pick an approved source (analytics, tracking link, CRM, or another SitGuru-approved source).</li>
+        <li>Send it. Status stays <strong>Waiting</strong> until SitGuru confirms it.</li>
+      </ol>
+      <figure>
+        <img src="screenshots/16-metrics-submit.png" alt="Send a number for SitGuru to check form" />
+        <figcaption>Submit a metric. Guessing does not count. SitGuru has to be able to verify it.</figcaption>
+      </figure>
+      <div class="callout">No growth result is counted as attributable unless SitGuru can reasonably verify it through platform analytics, campaign tracking, referral codes, CRM records, or another approved source.</div>
+    </section>
+
+    <section id="toolkit" class="break">
+      <h2>10. Intern toolkit</h2>
+      <p>On Home, tap a toolkit card. Each tool has a colored bar and a <strong>← Home</strong> back link.</p>
+
+      <h3>Brand kit</h3>
+      <ul class="steps">
+        <li>Logo, brand green <strong>#0D5C3A</strong>, and handle <strong>@SitGuruOfficial</strong>.</li>
+        <li>White type on brand green. Never dark text on that green.</li>
+        <li>Do not put a university logo on SitGuru work unless SitGuru has recorded that the school said yes.</li>
+        <li>Rogue is the mascot. Bookings stay on SitGuru.</li>
+      </ul>
+      <figure>
+        <img src="screenshots/18-tool-brand.png" alt="Brand kit intern tool with SitGuru logo, green swatch, and handle" />
+        <figcaption>Brand kit. Copy the green. Tag the official handle.</figcaption>
+      </figure>
+
+      <h3>Tracking links</h3>
+      <p>Create a unique link before you post. SitGuru only counts growth from that link.</p>
+      <figure>
+        <img src="screenshots/22-tool-tracking.png" alt="Tracking links intern tool with new tracking link form" />
+        <figcaption>Tracking links. Fill campaign name, then save. Copy the link after it appears.</figcaption>
+      </figure>
+
+      <h3>Market snapshot</h3>
+      <p>Market totals only — no names, emails, or payouts.</p>
+      <figure>
+        <img src="screenshots/23-tool-snapshot.png" alt="Market snapshot showing Greater Philadelphia totals" />
+        <figcaption>Market snapshot. Checked numbers appear after SitGuru confirms them.</figcaption>
+      </figure>
+
+      <h3>Events to share</h3>
+      <p>Public pet events you can promote. Always use a tracking link. Open the event or copy the details. Do not add street addresses or partner emails that are not already on the public card.</p>
+      <figure>
+        <img src="screenshots/24-tool-events.png" alt="Events to share list with Open event and Copy buttons" />
+        <figcaption>Events to share. Public listings only.</figcaption>
+      </figure>
+
+      <h3>Social media (toolkit)</h3>
+      <p>Same job as Work → Social, with official account shortcuts. SitGuru posts from official accounts unless they give you a channel.</p>
+      <figure>
+        <img src="screenshots/25-tool-social.png" alt="Social media intern tool with platform buttons and log a post form" />
+        <figcaption>Social toolkit. Draft here, tag @SitGuruOfficial, then log the live link.</figcaption>
+      </figure>
+    </section>
+
+    <section id="growth" class="break">
+      <h2>11. Growth workplace</h2>
+      <p>Growth workplace is on-the-project training for the SitGuru Market Growth Project. Write posts, tracking links, and campaigns here. SitGuru approves drafts before they go live. You do not get Admin HQ, passwords, or Pet Parent personal information.</p>
+      <p>Open it from the green <strong>Growth workplace</strong> button in the header, or from the Home card.</p>
+      <figure>
+        <img src="screenshots/19-growth-home.png" alt="Growth workplace home with weekly KPIs and Create a post shortcuts" />
+        <figcaption>Growth workplace Home. Bottom bar: Home, Campaigns, Create (+), Media, More.</figcaption>
+      </figure>
+
+      <h3>Create a post</h3>
+      <p>Pick a type (Guru Spotlight, Event, Partner, PawPerks, Pet Parent, SitGuru Feature, or General Post). Write the title, channel, market, caption, destination, and date. After save, copy the tracking link, then publish in Canva / CapCut / Meta / TikTok. Do not publish until SitGuru approves.</p>
+      <figure>
+        <img src="screenshots/20-growth-create.png" alt="Growth workplace Create screen with post type cards" />
+        <figcaption>Create. Choose a post type, then fill the form. Public posts wait for SitGuru.</figcaption>
+      </figure>
+
+      <h3>Campaigns</h3>
+      <p>Every real post gets a tracking link. Never send people to a bare SitGuru homepage.</p>
+      <figure>
+        <img src="screenshots/21-growth-campaigns.png" alt="Growth workplace Campaigns empty state with New campaign button" />
+        <figcaption>Campaigns. Create a Guru or Pet Parent post to get a link.</figcaption>
+      </figure>
+
+      <h3>Media</h3>
+      <p>Drop Canva, CapCut, or Drive links here. SitGuru does not publish to Instagram for you — you still post in Meta and TikTok after approval.</p>
+      <figure>
+        <img src="screenshots/27-growth-media.png" alt="Growth workplace Media tab with Save asset form" />
+        <figcaption>Media. Save the asset, then wait for SitGuru review before it is treated as live.</figcaption>
+      </figure>
+    </section>
+
+    <section id="page">
+      <h2>12. Your page</h2>
+      <p>Tap <strong>Your page</strong> in the header (or <strong>Edit your page</strong> on Home). This is your intern profile for SitGuru — not a public SitGuru.com guru listing.</p>
+      <p>You can update:</p>
+      <ul class="steps">
+        <li>Preferred name and full name</li>
+        <li>Phone, student ID, and student email</li>
+        <li>Headline and about</li>
+        <li>LinkedIn</li>
+        <li>Page color</li>
+        <li>Profile photo (choose a file or take a photo)</li>
+      </ul>
+      <p>School, program, and hours stay on the academic card at the top of Home. SitGuru reviews your internship work from this portal.</p>
+      <div class="callout warn">Keep phone numbers and student email in the form only. Do not put other people’s personal information on Your page, in captions, or in screenshots you share with classmates.</div>
+    </section>
+
+    <section id="rules">
+      <h2>13. Rules that keep you intern-safe</h2>
+      <ol class="steps">
+        <li>Use only the intern portal and Growth workplace. Do not try Admin HQ, Pet Parent records, passwords, or payments.</li>
+        <li>Do not share this login. Report a lost device or a leaked password to SitGuru right away.</li>
+        <li>Do not drop SitGuru confidential information into unapproved AI or chatbots.</li>
+        <li>Keep customer and Pet Parent names, emails, and phone numbers out of drafts, class slides, and portfolios. Use totals, not people.</li>
+        <li>Do not count a result as “yours” until SitGuru verifies it.</li>
+        <li>University logos stay off SitGuru work unless SitGuru recorded permission.</li>
+        <li>Drafts wait for SitGuru. Do not publish, boost, or send SitGuru communications until they are approved.</li>
+        <li>A cleaned-up portfolio version of your report needs SitGuru written approval first.</li>
+      </ol>
+    </section>
+
+    <section id="help">
+      <h2>14. If you get stuck</h2>
+      <ul class="steps">
+        <li>Internship questions: <strong>intern@sitguru.com</strong></li>
+        <li>Portal login: start again at <strong>https://www.sitguru.com/intern</strong></li>
+        <li>Official social: <strong>@SitGuruOfficial</strong> on Instagram, Facebook, TikTok, X, and YouTube</li>
+      </ul>
+      <p>This guide shows the student portal as it works for Spring 2027. It is not the syllabus, not a contract, and not legal advice. Follow the onboarding notice you signed in the portal.</p>
+    </section>
+
+    <footer>
+      SitGuru™ · Graff Enterprises LLC d/b/a SitGuru · Spring 2027 Intern Portal Student User Guide<br />
+      Trusted Pet Care. Simplified.
+    </footer>
+  </div>
+</body>
+</html>

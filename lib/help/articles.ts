@@ -27,6 +27,17 @@ export type HelpArticle = {
   keywords: string[];
 };
 
+/** Search bar row — intern Help reuses the same dropdown without joining the public catalog. */
+export type HelpSearchItem = {
+  slug: string;
+  href: string;
+  title: string;
+  summary: string;
+  category: string;
+  tags: readonly string[];
+  keywords: readonly string[];
+};
+
 export const HELP_ARTICLES: HelpArticle[] = [
   /* —— Pet Parent Support —— */
   {

@@ -21,5 +21,6 @@ describe("intern growth workplace path", () => {
       INTERNSHIP_ONBOARDING_PATH,
     );
     assert.equal(internPortalDestination("/intern/growth/create", true), "/intern/growth/create");
+    assert.equal(internPortalDestination("/intern/help", false), "/intern/help");
   });
 });

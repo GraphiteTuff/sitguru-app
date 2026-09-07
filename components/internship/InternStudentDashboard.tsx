@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  CircleHelp,
   ClipboardList,
   GraduationCap,
   Home,
@@ -60,6 +61,7 @@ import {
   internPortalFirstName,
   internPortalHeroClass,
 } from "@/lib/internship/portal";
+import { INTERNSHIP_HELP_PATH } from "@/lib/internship/intern-growth";
 import {
   INTERN_OPEN_PAGE_EVENT,
   internGhostBtnClass,
@@ -634,6 +636,23 @@ export default function InternStudentDashboard({
                 );
               })}
             </div>
+            <Link
+              href={INTERNSHIP_HELP_PATH}
+              className={`mt-3 flex min-h-14 items-center justify-between gap-3 rounded-[1.4rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-left ${internPressClass}`}
+            >
+              <span className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0D5C3A] !text-white">
+                  <CircleHelp size={16} />
+                </span>
+                <span>
+                  <span className="block text-sm font-black text-slate-950">Intern help</span>
+                  <span className="mt-0.5 block text-[11px] font-semibold text-emerald-800">
+                    Search how to check in, log hours, and use tracking links
+                  </span>
+                </span>
+              </span>
+              <span className="shrink-0 text-xs font-black text-emerald-800">Open →</span>
+            </Link>
           </section>
 
           {pacing ? (
