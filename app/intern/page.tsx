@@ -194,6 +194,10 @@ export default async function InternPortalPage({
               ? { kind: "error", message: error }
               : null
         }
+        initialTab={first(params.tab)}
+        initialTool={first(params.tool) || null}
+        initialWorkFilter={first(params.work)}
+        initialDate={first(params.date)}
         initialProfileOpen={first(params.edit) === "page"}
       />
     </main>

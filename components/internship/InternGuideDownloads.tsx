@@ -18,8 +18,26 @@ export default function InternGuideDownloads({
 }) {
   useEffect(() => {
     if (!autoPrint) return;
-    const timer = window.setTimeout(() => window.print(), 400);
-    return () => window.clearTimeout(timer);
+    let cancelled = false;
+    const images = Array.from(document.images);
+    Promise.all(
+      images.map((image) =>
+        image.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              image.addEventListener("load", () => resolve(), { once: true });
+              image.addEventListener("error", () => resolve(), { once: true });
+            }),
+      ),
+    ).then(() => {
+      if (cancelled) return;
+      window.setTimeout(() => {
+        if (!cancelled) window.print();
+      }, 250);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [autoPrint]);
 
   return (

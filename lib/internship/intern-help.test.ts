@@ -58,6 +58,10 @@ describe("intern help catalog", () => {
     assert.equal(internHelpFileAllowed("best-pa-nj-vendor-events.docx"), true);
     assert.equal(internHelpFileAllowed("stripe-setup.docx"), true);
     assert.equal(internHelpFileAllowed("secret.env"), false);
+    const brandGreen = searchInternHelpArticles("#166534");
+    assert.ok(brandGreen.some((article) => article.slug === "toolkit-brand"));
+    const brandUpload = searchInternHelpArticles("your brand files");
+    assert.ok(brandUpload.some((article) => article.slug === "toolkit-brand"));
   });
 
   it("serves training screenshots from intern Help media, never Your page", () => {

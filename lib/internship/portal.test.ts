@@ -50,6 +50,7 @@ describe("intern work attachments", () => {
 
   it("keeps work types intern-scoped", () => {
     assert.equal(internWorkItemType("campaign"), "campaign");
+    assert.equal(internWorkItemType("brand"), "brand");
     assert.equal(internWorkItemType("admin"), null);
   });
 });

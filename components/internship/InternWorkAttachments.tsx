@@ -54,6 +54,7 @@ export default function InternWorkAttachments({
                 <form action={deleteInternAttachment}>
                   <input type="hidden" name="internId" value={internId} />
                   <input type="hidden" name="mode" value={mode} />
+                  <input type="hidden" name="itemType" value={itemType} />
                   <input type="hidden" name="attachmentId" value={file.id} />
                   <button className="text-xs font-black text-rose-700 hover:text-rose-900 hover:underline">
                     Remove
@@ -65,7 +66,9 @@ export default function InternWorkAttachments({
         </ul>
       ) : (
         <p className="mt-2 text-xs font-semibold text-slate-500">
-          Attach PDFs, slides, screenshots, or drafts that prove this work.
+          {itemType === "brand"
+            ? "Upload Canva/CapCut exports, flyers, or logo files SitGuru should review. PDF, Word, PNG, JPG, SVG, or slides under 10MB. No customer names."
+            : "Attach PDFs, slides, screenshots, or drafts that prove this work."}
         </p>
       )}
       {!readOnly ? (

@@ -958,23 +958,29 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
   article("toolkit-brand", {
     title: "Use the brand kit",
     summary:
-      "SitGuru’s visual rules so intern creative looks like SitGuru — logo, brand green #0D5C3A, white type on green, @SitGuruOfficial.",
+      "SitGuru’s visual rules so intern creative looks like SitGuru — logo, SitGuru Green #166534, white type on green, @SitGuruOfficial. Upload your Canva files in Brand kit.",
     purpose:
-      "Pet Parents and Gurus should recognize SitGuru immediately. Dark text on brand green fails (site headings default to slate). University logos imply the school endorses SitGuru unless SitGuru recorded permission. Rogue is the mascot. Bookings stay on SitGuru.",
+      "Pet Parents and Gurus should recognize SitGuru immediately. Dark text on SitGuru Green fails (site headings default to slate). University logos imply the school endorses SitGuru unless SitGuru recorded permission. Rogue is the mascot. Bookings stay on SitGuru. Interns download official logos here and upload their own branded drafts in Home → Brand kit so SitGuru can review them.",
     contributes:
-      "Following the kit keeps your drafts approvable. SitGuru will send brand-breaking work back. That delay is intern time you do not get back.",
+      "Following the kit keeps your drafts approvable. Files you upload in Brand kit become intern evidence SitGuru can check. SitGuru will send brand-breaking work back. That delay is intern time you do not get back.",
     category: "Intern toolkit",
     tags: ["brand", "logo", "green"],
-    keywords: ["#0d5c3a", "rogue", "university logo", "mix-blend", "chopper", "vector prints"],
+    keywords: ["#166534", "sitguru green", "rogue", "university logo", "mix-blend", "chopper", "vector prints", "upload"],
     steps: [
       "On Home, tap Brand kit, or download logos from this Help article.",
-      "Copy brand green #0D5C3A. Use white type on that green — never dark text.",
+      "Copy SitGuru Green #166534 (dark #102417, light #CFE6D5). Use white type on that green — never dark text.",
+      "Upload Canva/CapCut exports into Brand kit so SitGuru can review them. PDF, PNG, JPG, SVG, or slides under 10MB.",
       "Tag @SitGuruOfficial. Do not use a university logo unless SitGuru recorded permission.",
     ],
     fields: [
       {
-        label: "Brand green",
-        meaning: "SitGuru green #0D5C3A. Copy it into Canva. On that green, type is white.",
+        label: "SitGuru Green",
+        meaning: "Primary brand green #166534 (RGB 22, 101, 52). Copy it into Canva. On that green, type is white.",
+        example: "#166534",
+      },
+      {
+        label: "Dark green / Light green",
+        meaning: "Related palette for shadows and tints. Dark #102417. Light #CFE6D5.",
       },
       {
         label: "Handle",
@@ -983,12 +989,19 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       {
         label: "Official logos",
         meaning:
-          "Chopper vector logos and Vector Prints add-ons are on this page. Download SVG/PDF/EPS for print. Use mix-blend-multiply if a white box appears on brand green.",
+          "Chopper vector logos and Vector Prints add-ons are on this Help page. Download SVG/PDF/EPS for print. Use mix-blend-multiply if a white box appears on SitGuru Green.",
+      },
+      {
+        label: "Your brand files",
+        meaning:
+          "Upload in Home → Brand kit: Canva/CapCut exports, flyers, or logo files for SitGuru review. This is intern evidence, not auto-publish. No customer names. Files stay in the internship file.",
+        example: "Campus flyer PNG using #166534 and @SitGuruOfficial.",
       },
     ],
     tips: [
       "If a logo sits on a colored header, avoid a white box around it — white should read as transparent.",
       "Rogue is high-energy and loving. Do not invent a different mascot.",
+      "Uploading to Brand kit does not post to Instagram. SitGuru still approves before anything goes live.",
     ],
     shots: [
       {

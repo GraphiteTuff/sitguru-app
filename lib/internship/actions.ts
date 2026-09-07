@@ -58,8 +58,10 @@ function formFile(formData: FormData, key: string) {
 }
 
 function bounce(path: string, kind: "ok" | "error", message: string): never {
-  const params = new URLSearchParams({ [kind]: message });
-  redirect(`${path}?${params.toString()}`);
+  const [base, existing] = path.split("?");
+  const params = new URLSearchParams(existing || "");
+  params.set(kind, message);
+  redirect(`${base}?${params.toString()}`);
 }
 
 async function requireInternshipAdmin() {
@@ -883,10 +885,10 @@ export async function saveMilestoneStatus(formData: FormData) {
   bounce("/admin/internship/timeline", "ok", "Timeline updated. Intern portal and HQ now share this status.");
 }
 
-function workspacePath(internId: string, mode: string) {
-  return mode === "supervisor"
-    ? `/admin/internship/interns/${internId}`
-    : "/intern";
+function workspacePath(internId: string, mode: string, itemType?: string | null) {
+  if (mode === "supervisor") return `/admin/internship/interns/${internId}`;
+  if (itemType === "brand") return "/intern?tool=brand";
+  return "/intern";
 }
 
 export async function saveInternProfile(formData: FormData) {
@@ -985,24 +987,31 @@ export async function uploadInternAttachment(formData: FormData) {
     contributes_to_final: formData.get("contributesToFinal") !== "false",
     uploaded_by_role: mode === "supervisor" ? "supervisor" : "intern",
   });
-  if (error) bounce(workspacePath(internId, mode), "error", error.message);
-  refreshInternship(workspacePath(internId, mode));
-  bounce(workspacePath(internId, mode), "ok", "File attached to this work area.");
+  if (error) bounce(workspacePath(internId, mode, itemType), "error", error.message);
+  refreshInternship(workspacePath(internId, mode, itemType));
+  bounce(
+    workspacePath(internId, mode, itemType),
+    "ok",
+    itemType === "brand"
+      ? "File saved in Brand kit. SitGuru can review it from your internship file."
+      : "File attached to this work area.",
+  );
 }
 
 export async function deleteInternAttachment(formData: FormData) {
   const internId = text(formData, "internId");
   const mode = text(formData, "mode") || "intern";
   const attachmentId = text(formData, "attachmentId");
+  const itemType = internWorkItemType(text(formData, "itemType"));
   await assertWorkspaceActor(internId, mode);
   const { error } = await supabaseAdmin
     .from("internship_work_attachments")
     .delete()
     .eq("id", attachmentId)
     .eq("intern_id", internId);
-  if (error) bounce(workspacePath(internId, mode), "error", error.message);
-  refreshInternship(workspacePath(internId, mode));
-  bounce(workspacePath(internId, mode), "ok", "Attachment removed.");
+  if (error) bounce(workspacePath(internId, mode, itemType), "error", error.message);
+  refreshInternship(workspacePath(internId, mode, itemType));
+  bounce(workspacePath(internId, mode, itemType), "ok", "Attachment removed.");
 }
 
 export async function acceptInternAccessRules(formData: FormData) {

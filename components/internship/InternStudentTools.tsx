@@ -23,7 +23,11 @@ import {
   internGhostBtnClass,
   internPressClass,
   internPrimaryBtnClass,
+  SITGURU_BRAND_GREEN,
+  SITGURU_BRAND_GREEN_DARK,
+  SITGURU_BRAND_GREEN_LIGHT,
 } from "@/lib/internship/intern-ui";
+import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
 
 function Field({
   name,
@@ -135,7 +139,7 @@ export default function InternStudentTools({
     return (
       <ToolShell
         title="Brand kit"
-        blurb="Use SitGuru’s logo, green, and @SitGuruOfficial. Don’t use school logos unless the school says yes."
+        blurb="Use SitGuru’s logo, green, and @SitGuruOfficial. Upload your Canva or CapCut files here for SitGuru to review. Don’t use school logos unless the school says yes."
         tool={tool}
         onBack={onBack}
       >
@@ -143,7 +147,7 @@ export default function InternStudentTools({
           <div
             className="public-dark-section flex min-h-32 items-center justify-center rounded-[1.4rem] p-5"
             data-brand-green
-            style={{ background: "#0D5C3A" }}
+            style={{ background: SITGURU_BRAND_GREEN }}
           >
             <Image
               src="/images/sitguru-logo-cropped.png"
@@ -155,15 +159,38 @@ export default function InternStudentTools({
           </div>
           <div className="rounded-[1.4rem] border border-emerald-100 bg-white p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-              Brand green
+              SitGuru Green
             </p>
-            <p className="mt-2 text-2xl font-black text-slate-950">#0D5C3A</p>
+            <p className="mt-2 text-2xl font-black text-slate-950">{SITGURU_BRAND_GREEN}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-500">RGB 22, 101, 52</p>
             <div className="mt-3 flex items-center gap-2">
               <span
                 className="h-11 w-11 rounded-xl border border-emerald-100"
-                style={{ background: "#0D5C3A" }}
+                style={{ background: SITGURU_BRAND_GREEN }}
               />
-              <CopyButton value="#0D5C3A" />
+              <CopyButton value={SITGURU_BRAND_GREEN} />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-emerald-100 p-3">
+                <span
+                  className="block h-8 w-full rounded-lg"
+                  style={{ background: SITGURU_BRAND_GREEN_DARK }}
+                />
+                <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                  Dark green
+                </p>
+                <p className="text-xs font-black text-slate-950">{SITGURU_BRAND_GREEN_DARK}</p>
+              </div>
+              <div className="rounded-xl border border-emerald-100 p-3">
+                <span
+                  className="block h-8 w-full rounded-lg border border-emerald-100"
+                  style={{ background: SITGURU_BRAND_GREEN_LIGHT }}
+                />
+                <p className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                  Light green
+                </p>
+                <p className="text-xs font-black text-slate-950">{SITGURU_BRAND_GREEN_LIGHT}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -178,10 +205,18 @@ export default function InternStudentTools({
           </p>
         </article>
         <ul className="space-y-2 text-sm font-semibold text-slate-600">
-          <li>White type on brand green. Never dark text on #0D5C3A.</li>
+          <li>White type on SitGuru Green. Never dark text on {SITGURU_BRAND_GREEN}.</li>
           <li>Don’t say a university endorses SitGuru.</li>
           <li>Tag {SITGURU_OFFICIAL_HANDLE} when you post about SitGuru.</li>
         </ul>
+        <InternWorkAttachments
+          internId={data.intern.id}
+          itemType="brand"
+          itemId={data.intern.id}
+          attachments={data.attachments || []}
+          preview={preview}
+          label="Your brand files"
+        />
       </ToolShell>
     );
   }

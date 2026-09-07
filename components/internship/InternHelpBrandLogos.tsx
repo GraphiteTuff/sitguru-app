@@ -7,7 +7,7 @@ export default function InternHelpBrandLogos() {
       <p className="text-sm font-semibold leading-6 text-slate-600">
         Download these SitGuru files only. Do not put a university logo on SitGuru
         work unless SitGuru recorded that the school said yes. On brand green
-        <span className="font-black"> #0D5C3A</span>, type is white — never dark
+        <span className="font-black"> #166534</span>, type is white — never dark
         text. If a logo shows a white box on green, use mix-blend-multiply.
       </p>
       <ul className="grid gap-4 sm:grid-cols-2">
@@ -19,10 +19,10 @@ export default function InternHelpBrandLogos() {
             <div
               className={
                 logo.onGreen
-                  ? "public-dark-section flex min-h-28 items-center justify-center bg-[#0D5C3A] px-4 py-6"
+                  ? "public-dark-section flex min-h-28 items-center justify-center bg-[#166534] px-4 py-6"
                   : "flex min-h-28 items-center justify-center bg-slate-50 px-4 py-6"
               }
-              {...(logo.onGreen ? { "data-brand-green": true } : {})}
+              {...(logo.onGreen ? { "data-brand-green": "" } : {})}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img

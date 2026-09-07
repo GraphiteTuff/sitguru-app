@@ -6,8 +6,9 @@
   <title>SitGuru Intern Portal Student User Guide · Spring 2027</title>
   <style>
     :root {
-      --green: #0D5C3A;
-      --green-dark: #09472d;
+      --green: #166534;
+      --green-dark: #102417;
+      --green-light: #CFE6D5;
       --ink: #0f172a;
       --muted: #475569;
       --line: #d1fae5;
@@ -76,6 +77,14 @@
       page-break-inside: avoid;
     }
     section.break { page-break-before: always; }
+    @media print {
+      section { page-break-inside: auto; break-inside: auto; }
+      figure { page-break-inside: avoid; break-inside: avoid; }
+      img {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
     .steps { margin: 0 0 16px; padding-left: 22px; }
     .steps li { margin: 0 0 8px; }
     .callout {
@@ -349,8 +358,9 @@
 
       <h3>Brand kit</h3>
       <ul class="steps">
-        <li>Logo, brand green <strong>#0D5C3A</strong>, and handle <strong>@SitGuruOfficial</strong>.</li>
-        <li>White type on brand green. Never dark text on that green.</li>
+        <li>Logo, SitGuru Green <strong>#166534</strong> (dark <strong>#102417</strong>, light <strong>#CFE6D5</strong>), and handle <strong>@SitGuruOfficial</strong>.</li>
+        <li>White type on SitGuru Green. Never dark text on that green.</li>
+        <li>Upload Canva/CapCut exports into Brand kit so SitGuru can review them.</li>
         <li>Do not put a university logo on SitGuru work unless SitGuru has recorded that the school said yes.</li>
         <li>Rogue is the mascot. Bookings stay on SitGuru.</li>
       </ul>

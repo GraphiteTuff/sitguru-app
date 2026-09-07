@@ -33,8 +33,14 @@ export default async function InternGuidePrintPage({
         ${style}
         @page { size: letter; margin: 0.5in; }
         @media print {
-          header, footer, .print-toolbar, #crisp-chatbox { display: none !important; }
+          .print-toolbar, #crisp-chatbox { display: none !important; }
           body, .intern-guide-print { background: #fff !important; }
+          section { page-break-inside: auto !important; break-inside: auto !important; }
+          figure, .cover { page-break-inside: avoid; break-inside: avoid; }
+          img {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
         }
       `}</style>
       <div className="print-toolbar mx-auto flex max-w-[880px] flex-wrap items-center justify-between gap-3 px-4 py-4">

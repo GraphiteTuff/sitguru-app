@@ -203,7 +203,14 @@ export const INTERN_WATCH_VIDEOS: InternWatchVideo[] = [
   },
 ];
 
-export const INTERN_BRAND_LOGOS = [
+export const INTERN_BRAND_LOGOS: Array<{
+  id: string;
+  label: string;
+  src: string;
+  use: string;
+  download?: string;
+  onGreen?: boolean;
+}> = [
   {
     id: "horizontal",
     label: "Horizontal logo",
@@ -242,7 +249,7 @@ export const INTERN_BRAND_LOGOS = [
     src: "/images/brand/intern/sitguru-logo-cropped.png",
     use: "The same logo SitGuru uses on the website header.",
   },
-] as const;
+];
 
 export const INTERN_WATCH_VIDEO_GROUPS = [
   { id: "product" as const, title: "SitGuru product — watch first" },
@@ -457,6 +464,106 @@ export const INTERN_REPORT_SECTION_DEFINITIONS: InternGlossaryTerm[] = [
     label: "Portfolio Case Study",
     meaning:
       "A cleaned-up professional version of your report you may keep only after SitGuru approves it in writing. For you, this is the piece you can show faculty or employers — with no Pet Parent names, passwords, source code, or unpublished SitGuru internals.",
+  },
+];
+
+export const INTERN_REPORT_DRAFT_SECTIONS: InternGlossaryTerm[] = [
+  {
+    label: "Starting Point",
+    meaning:
+      "Chapter 1 of the Business Growth Report: where SitGuru and this market stood when you arrived. Define the market (who needs pet care, where, why now), what intern-safe snapshot totals show, and what public research you found. Use market totals, not customer names. This is research, not a caption dump. Do it in week 1–2 and keep adding citations as you learn.",
+    example:
+      "Greater Philadelphia Pet Parents searching for weekend walking vs Guru coverage on Find Care. Cite Market snapshot + one public source (campus pet policy, public event calendar). No emails.",
+  },
+  {
+    label: "Baseline & SMART Goals",
+    meaning:
+      "The starting numbers and the intern goals SitGuru can actually check. SMART means Specific, Measurable, Achievable, Relevant, Time-bound — tied to tracking links, signups, Guru interest, or event shares, not vanity likes. Copy baseline from Market snapshot and any SitGuru-checked Metrics. Do not invent a baseline. If you do not have a verified number yet, write “baseline pending SitGuru check” and the metric you will submit.",
+    example:
+      "By week 8, grow tracked campus Pet Parent registrations from this intern campaign (utm_campaign=spring27_campus) — target SitGuru can verify in registrations, not Instagram likes.",
+  },
+  {
+    label: "How the work was done",
+    meaning:
+      "Your method so SitGuru (and the next intern) can repeat it: who you wrote for (Pet Parent, Guru, partner/event), which channels, brand kit rules, how drafts get approved, where tracking links go, and the SOP. This is Audience Strategy + Content System + Campaign System + SOP / Handoff in one chapter. Write the process, not a diary.",
+    example:
+      "Pet Parent campus stories: Brand kit → Create SitGuru Feature → tracking link in first comment → wait for SitGuru → post → log in Work → Social.",
+  },
+  {
+    label: "Campaign Experiments",
+    meaning:
+      "Named tests with a hypothesis, one change at a time, and a tracking link. Example: caption vs first-comment link, Event post vs Guru Spotlight, Instagram vs TikTok. A flop still belongs here. Untracked posts are not experiments SitGuru can read. Create the campaign before you post.",
+    example:
+      "Hypothesis: first-comment tracking link lifts sessions vs burying the URL in the caption. Campaign spring27_first_comment. Compare next week’s SitGuru-checked sessions.",
+  },
+  {
+    label: "Measurable Outcomes",
+    meaning:
+      "Only results SitGuru has checked. Your number on check-in/Metrics stays pending until they confirm it. Guessing, screenshot likes, or a roommate’s count do not belong here. If the week had no verified number, say so and point to the pending Metrics row. This protects you: the report will not claim growth SitGuru cannot see.",
+    example:
+      "SitGuru-checked: 27 Pet Parent signups from spring27_growth. Status confirmed. Do not add 40 because the event “felt busy.”",
+  },
+  {
+    label: "Lessons Learned",
+    meaning:
+      "What did not work, what you would change, and what you would keep. Fill “What didn’t work?” every week — empty lessons usually mean you skipped that field. Failed tests are intern work. Hide nothing SitGuru already saw in a check-in. No customer PII in the write-up.",
+    example:
+      "Event share without a tracking link got comments but zero intern-attributed signups. Next week: campaign link before posting.",
+  },
+  {
+    label: "Recommendations",
+    meaning:
+      "What SitGuru should do after you leave: keep, stop, or try next term — with evidence from verified outcomes and lessons. This is not a thank-you note. Be specific enough to hand off: which campaign, which market, which SitGuru Feature, which event type. SitGuru can use this in the playbook. Your school still owns credit.",
+    example:
+      "Keep campus Pet Parent stories with tracking links. Stop bare homepage URLs. Next intern: staff Paws at the Park only if SitGuru assigns the booth; otherwise promote public Events to share.",
+  },
+];
+
+export const INTERN_REPORT_WEEKLY_BUILD_FIELDS: InternGlossaryTerm[] = [
+  {
+    label: "This week’s build",
+    meaning:
+      "The form on Report that files one week into a draft chapter. The green banner (for example “Feeds Final report: Starting Point”) tells you which chapter this week is feeding. Fill it the same week you work — do not wait until week 15. Same story as the Home weekly check-in: completeness beats poetry.",
+  },
+  {
+    label: "Week of",
+    meaning: "The week you are documenting. One week, one build. Do not mash three weeks into one form unless SitGuru asked you to catch up.",
+  },
+  {
+    label: "Contribution to your report",
+    meaning:
+      "Dropdown: which part of the report this week helped (Market Analysis, Audience Strategy, Growth Strategy, Content System, Campaign System, Pet Parent / Guru / Partner Growth, Conversion Optimization, Analytics & Attribution, SOP / Handoff, Business Growth Report, Portfolio Case Study). Pick the closest fit. SitGuru can move it. That pick is how the week lands in Starting Point vs Campaign Experiments vs Outcomes.",
+    example: "Week of market research → Market Analysis (Starting Point). Week of a tracked Instagram test → Campaign System or Campaign Experiments.",
+  },
+  {
+    label: "What did you add or improve this week?",
+    meaning:
+      "What you shipped, who it was for, and what you learned. Name the audience (Pet Parent, Guru, event), the channel, and the tracking campaign if you had one. “Worked on social” is not enough for the draft.",
+    example: "Added a SitGuru Feature draft on PawReport for campus Pet Parents. Tracking campaign spring27_pawreport. Waiting on SitGuru approval.",
+  },
+  {
+    label: "What did you finish?",
+    meaning: "Completed intern work SitGuru can find: sent check-in, logged post, created campaign, submitted a metric, finished a task with proof.",
+  },
+  {
+    label: "What did the numbers show?",
+    meaning:
+      "What the data said this week — including “no verified number yet.” Point to a Metrics submission or tracking-link sessions. Do not paste unpublished Admin HQ exports. Totals only.",
+  },
+  {
+    label: "What didn’t work?",
+    meaning:
+      "Required. If a post flopped, write it. That still counts and becomes Lessons Learned. Skipping this starves the report.",
+    example: "If a tweet flopped, write it here. That still counts.",
+  },
+  {
+    label: "What’s next?",
+    meaning: "The smallest next intern action SitGuru can approve: which campaign, which draft, which metric you will submit.",
+  },
+  {
+    label: "Hours this week / Your number",
+    meaning:
+      "Hours: honest internship time (research, drafts, events, writing the report). Your number: one result SitGuru will try to verify. Both belong in the same week’s story.",
   },
 ];
 

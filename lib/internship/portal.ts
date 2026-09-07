@@ -33,6 +33,7 @@ export const INTERN_WORK_ITEM_TYPES = [
   "weekly",
   "experiment",
   "report",
+  "brand",
 ] as const;
 
 export type InternWorkItemType = (typeof INTERN_WORK_ITEM_TYPES)[number];
