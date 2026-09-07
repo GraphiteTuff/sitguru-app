@@ -136,7 +136,7 @@ export const BASELINE_ATTACHMENT_CATEGORIES = [
     id: "brief",
     label: "Written Brief",
     accept: ".doc,.docx,.pdf",
-    extensions: ["doc", "docx", "pdf"],
+    extensions: ["doc", "docx", "pdf"] as readonly string[],
     meaning:
       "Your 2–5 page written starting point. This is the official narrative SitGuru will lock into the Final Growth Report.",
     why: "A deck alone is not enough. SitGuru needs a readable brief they can quote later.",
@@ -148,7 +148,7 @@ export const BASELINE_ATTACHMENT_CATEGORIES = [
     id: "presentation",
     label: "Presentation",
     accept: ".ppt,.pptx",
-    extensions: ["ppt", "pptx"],
+    extensions: ["ppt", "pptx"] as readonly string[],
     meaning:
       "A 6–10 slide walkthrough of the same brief so SitGuru can review it quickly in a meeting.",
     why: "The deck is the conversation. The written brief is the record. Both are required.",
@@ -160,7 +160,7 @@ export const BASELINE_ATTACHMENT_CATEGORIES = [
     id: "evidence",
     label: "Supporting Evidence",
     accept: ".pdf,.png,.jpg,.jpeg,.webp,.csv,.xlsx,.doc,.docx",
-    extensions: ["pdf", "png", "jpg", "jpeg", "webp", "csv", "xlsx", "doc", "docx"],
+    extensions: ["pdf", "png", "jpg", "jpeg", "webp", "csv", "xlsx", "doc", "docx"] as readonly string[],
     meaning:
       "Screenshots, research notes, charts, and source PDFs that prove the numbers and claims in the brief.",
     why: "SitGuru cannot verify a baseline from memory. Show where the number came from — without customer names.",
