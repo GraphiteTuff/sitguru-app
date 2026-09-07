@@ -135,12 +135,12 @@ export const billingFaqs: HelpFaqItem[] = [
   {
     question: "How do Pet Parents pay for services?",
     answer:
-      "Pet Parents pay through SitGuru checkout only. Depending on what is available, they may use credit/debit card, Apple Pay, Google Pay, Link by Stripe, saved payment methods, ACH/bank when available, PawPerks credits, referral credits, promo codes, gift cards, SitGuru credits, and optional Guru tips. Receipts, booking status, PawReports, messages, and reviews stay connected to the SitGuru dashboard.",
+      "Pet Parents, Gurus, and Ambassadors can use any of these payment methods to pay for SitGuru services: Stripe, PayPal, Apple Pay, Google Pay, Venmo, and Plaid. Pay in SitGuru checkout only. Credits, promo codes, gift cards, and optional Guru tips stay on the same booking. Receipts, PawReports, messages, and reviews stay connected to the SitGuru dashboard.",
   },
   {
     question: "Can I pay or get paid outside SitGuru?",
     answer:
-      "No. SitGuru bookings should be paid through SitGuru only. Do not use cash, Venmo, Zelle, Cash App, PayPal, direct bank transfer, personal card readers, checks, or other outside payment arrangements for SitGuru bookings. This keeps receipts, booking records, support, PawReport history, reviews, credits, tips, and payout tracking connected.",
+      "No. SitGuru bookings should be paid through SitGuru checkout only. Stripe, PayPal, Apple Pay, Google Pay, Venmo, and Plaid are SitGuru’s trusted payment stack inside checkout — not a personal Venmo, PayPal, Zelle, Cash App, cash, or bank transfer to a Guru or Ambassador. Trust & Safety means SitGuru holds the booking.",
   },
   {
     question: "Why do Gurus need to set up Stripe?",
@@ -187,7 +187,7 @@ export const paymentFlows: HelpStepBlock[] = [
       "Choose a Guru from SitGuru search or a Guru profile.",
       "Select the service, dates, pet, care location, notes, and any available pricing options.",
       "Review the SitGuru checkout summary before payment, including service subtotal, SitGuru fees when applicable, sales tax when it applies, credits, promo codes, gift cards, and optional Guru tip.",
-      "Pay through SitGuru checkout only using secure options such as card, Apple Pay, Google Pay, Link by Stripe, saved methods, ACH when available, or credits/promo codes.",
+      "Pay through SitGuru checkout only using Stripe, PayPal, Apple Pay, Google Pay, Venmo, Plaid, or other methods SitGuru shows — plus credits or promo codes when available.",
       "Return to your Pet Parent dashboard for booking status, receipts, messages, live PawReport tracking, instant potty push alerts, and the automated email report when the walk ends.",
     ],
   },
@@ -239,7 +239,7 @@ export const parentPaymentSteps: string[] = [
   "Open SitGuru checkout and review the full summary before paying.",
   "Apply credits, promo codes, or gift cards when available.",
   "Add an optional Guru tip when the checkout flow offers it.",
-  "Pay with a supported method (card, Apple Pay, Google Pay, Link, saved method, or ACH when available).",
+  "Pay with a supported SitGuru checkout method (Stripe, PayPal, Apple Pay, Google Pay, Venmo, or Plaid).",
   "Confirm the receipt in your dashboard — live PawReport tracking, push alerts, and the end-of-walk email stay attached to the same booking.",
 ];
 

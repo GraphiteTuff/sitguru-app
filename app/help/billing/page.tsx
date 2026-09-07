@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import HelpCategoryHub from "@/components/help/HelpCategoryHub";
+import PremiumPaymentsGraphic from "@/components/help/PremiumPaymentsGraphic";
+import {
+  PREMIUM_PAYMENTS_CUSTOMER_SENTENCE,
+  PREMIUM_PAYMENTS_PUBLIC_SRC,
+} from "@/lib/help/premium-payments";
 
 export const metadata: Metadata = {
   title: "Billing & Refunds",
-  description:
-    "SitGuru checkout, Stripe payouts, tips, credits, promo codes, and refund help.",
+  description: PREMIUM_PAYMENTS_CUSTOMER_SENTENCE,
 };
 
 export default function BillingHubPage() {
@@ -12,7 +16,8 @@ export default function BillingHubPage() {
     <HelpCategoryHub
       category="Billing & Refunds"
       title="Billing & Refunds"
-      description="Checkout, Stripe payouts, tips, credits, promo codes, and refund questions."
+      description={`${PREMIUM_PAYMENTS_CUSTOMER_SENTENCE} Checkout, payouts, tips, credits, promo codes, and refund questions stay on SitGuru.`}
+      lead={<PremiumPaymentsGraphic src={PREMIUM_PAYMENTS_PUBLIC_SRC} />}
     />
   );
 }

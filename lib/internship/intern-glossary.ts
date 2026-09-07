@@ -368,7 +368,40 @@ export const INTERN_PAYMENTS_INTERN_SAFE: InternGlossaryTerm[] = [
   {
     label: "Pet Parent payment",
     meaning:
-      "Pet Parents pay on SitGuru through Stripe checkout. Interns explain that bookings and payments stay on SitGuru. Interns never collect card numbers, CVC, or billing addresses.",
+      "Pet Parents, Gurus, and Ambassadors pay for SitGuru services in SitGuru checkout — Stripe, PayPal, Apple Pay, Google Pay, Venmo, or Plaid. Interns never collect card numbers, CVC, or billing addresses.",
+  },
+  {
+    label: "Stripe",
+    meaning:
+      "SitGuru’s card checkout partner. People pay inside SitGuru, not to an intern or a Guru’s personal card reader.",
+  },
+  {
+    label: "PayPal",
+    meaning:
+      "A SitGuru checkout option. Do not send a personal PayPal to a Guru or intern.",
+  },
+  {
+    label: "Apple Pay",
+    meaning: "Wallet checkout inside SitGuru on Apple devices. Still a SitGuru booking.",
+  },
+  {
+    label: "Google Pay",
+    meaning: "Wallet checkout inside SitGuru on Android or Chrome. Still a SitGuru booking.",
+  },
+  {
+    label: "Venmo",
+    meaning:
+      "Available in SitGuru checkout when SitGuru offers it. Never a personal Venmo handle for a booking.",
+  },
+  {
+    label: "Plaid",
+    meaning:
+      "Bank-link checkout inside SitGuru when SitGuru offers it. Interns never ask for a bank login.",
+  },
+  {
+    label: "Trust & Safety",
+    meaning:
+      "SitGuru holds the booking and the payment. A personal Venmo, PayPal, Zelle, or cash to a Guru is not SitGuru. Do not send people to Rover or Wag.",
   },
   {
     label: "Guru payouts",

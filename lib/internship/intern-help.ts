@@ -87,7 +87,7 @@ export const INTERN_HELP_CATEGORIES = [
     id: "getting-started",
     title: "Getting started",
     description:
-      "Student User Guide, definitions (including Brief words), Watch SitGuru videos, then log in, onboard, and use Home.",
+      "Student User Guide, definitions (including Brief words), Watch SitGuru videos, payments stay on SitGuru, then log in, onboard, and use Home.",
     category: "Getting started" as InternHelpCategory,
   },
   {
@@ -1334,25 +1334,47 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
   article("payments-on-sitguru", {
     title: "Payments stay on SitGuru",
     summary:
-      "Pet Parents pay on SitGuru through Stripe. Gurus and Ambassadors complete payout setup on their own dashboards. Interns never enter bank or card details.",
+      "Pet Parents, Gurus, and Ambassadors pay for SitGuru services in checkout with Stripe, PayPal, Apple Pay, Google Pay, Venmo, or Plaid. Interns never collect money off-platform.",
     purpose:
-      "Interns need the trust story: bookings and payments stay on SitGuru. Stripe processes the charge. SitGuru applies the marketplace fee. Gurus receive Earnings after they finish Stripe. Interns explain that story in SitGuru Feature posts. Interns do not complete Stripe, enter SSN, or log into a bank.",
+      "Interns need the trust story: bookings and payments stay on SitGuru. Pet Parents, Gurus, and Ambassadors can use Stripe, PayPal, Apple Pay, Google Pay, Venmo, and Plaid inside SitGuru checkout. Trust & Safety means SitGuru holds the booking — not a personal Venmo to a Guru. Interns do not collect money off-platform, do not take SSN or bank as homework, and do not send people to Rover or Wag.",
     contributes:
-      "Accurate payment copy supports Conversion Optimization and SitGuru Feature posts. Helping someone enter bank credentials is not intern work and can revoke access.",
+      "Accurate payment copy supports Conversion Optimization and SitGuru Feature posts. Say: pay in SitGuru checkout with any of these methods. Helping someone enter bank credentials is not intern work and can revoke access.",
     category: "Getting started",
     tags: ["stripe", "payments", "trust"],
-    keywords: ["stripe", "payout", "earnings", "payment", "bookings stay on sitguru", "checkout"],
+    keywords: [
+      "stripe",
+      "paypal",
+      "apple pay",
+      "google pay",
+      "venmo",
+      "plaid",
+      "premium payments",
+      "trust & safety",
+      "payout",
+      "earnings",
+      "payment",
+      "bookings stay on sitguru",
+      "checkout",
+    ],
     fields: INTERN_PAYMENTS_INTERN_SAFE,
     steps: [
-      "Use this language: Bookings stay on SitGuru. Payments are secure through Stripe.",
-      "Send Gurus to Become a Guru with a tracking link. They complete payout on their Guru dashboard.",
-      "If someone asks you to enter bank, SSN, or card details, stop and email intern@sitguru.com. Product payout help is support@sitguru.com.",
+      "Use this language: Pet Parents, Gurus, and Ambassadors pay in SitGuru checkout with Stripe, PayPal, Apple Pay, Google Pay, Venmo, or Plaid. Bookings stay on SitGuru.",
+      "Show the Premium payments graphic. Trust & Safety means SitGuru holds the booking — not a personal Venmo to a Guru.",
+      "Send Gurus to Become a Guru with a tracking link. They complete payout on their Guru dashboard. Interns do not enter SSN or bank details.",
+      "If someone asks you to collect money off-platform, take SSN or bank homework, or send them to Rover or Wag, stop and email intern@sitguru.com. Product payout help is support@sitguru.com.",
     ],
     tips: [
       "The Stripe setup Word file is a SitGuru product packet for awareness — not intern homework to complete.",
       "Interns do not open Guru Earnings, Ambassador commissions, or Pet Parent checkout.",
+      "Venmo and PayPal on SitGuru are checkout options. A personal Venmo handle is not SitGuru.",
     ],
     shots: [
+      {
+        file: "assets/premium-payments.png",
+        alt: "SitGuru premium payments: Stripe, PayPal, Apple Pay, Google Pay, Venmo, and Plaid, with Trust & Safety built into every booking",
+        caption:
+          "Pet Parents, Gurus, and Ambassadors can use any of these payment methods to pay for SitGuru services. Pay in SitGuru checkout.",
+      },
       {
         file: "assets/pet-parent-payment-guide.jpg",
         alt: "SitGuru Pet Parent payment guide showing Stripe checkout",
@@ -1369,7 +1391,7 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
         caption: "Ambassador payouts are not intern internship pay.",
       },
     ],
-    note: "Do not paste Stripe, bank, or SSN details into ChatGPT or intern drafts.",
+    note: "Do not paste Stripe, bank, or SSN details into ChatGPT or intern drafts. Do not send people to Rover or Wag.",
   }),
   article("toolkit-social", {
     title: "Draft social from the toolkit",

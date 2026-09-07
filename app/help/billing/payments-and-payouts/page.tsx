@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 import HelpArticleChrome from "@/components/help/HelpArticleChrome";
+import PremiumPaymentsGraphic from "@/components/help/PremiumPaymentsGraphic";
 import { HelpFaqList, HelpStepBlocks } from "@/components/help/HelpFaqList";
 import { billingFaqs, paymentFlows } from "@/lib/help/content";
+import {
+  PREMIUM_PAYMENTS_CUSTOMER_SENTENCE,
+  PREMIUM_PAYMENTS_PUBLIC_SRC,
+  PREMIUM_PAYMENTS_TRUST_SENTENCE,
+} from "@/lib/help/premium-payments";
 
 export const metadata: Metadata = {
   title: "Payments, Payouts, Tips & Credits",
-  description:
-    "SitGuru-only checkout, Stripe payouts, tips, promo codes, and refund help.",
+  description: PREMIUM_PAYMENTS_CUSTOMER_SENTENCE,
 };
 
 export default function PaymentsAndPayoutsPage() {
@@ -14,7 +19,7 @@ export default function PaymentsAndPayoutsPage() {
     <HelpArticleChrome
       eyebrow="Billing & Refunds"
       title="Payments, payouts, tips & credits"
-      summary="Everything stays on SitGuru checkout and Stripe — receipts, tips, PawReports, and refund reviews stay connected to the booking."
+      summary={`${PREMIUM_PAYMENTS_CUSTOMER_SENTENCE} Receipts, tips, PawReports, and refund reviews stay connected to the SitGuru booking.`}
       backHref="/help/billing"
       backLabel="Back to Billing & Refunds"
       jumps={[
@@ -22,14 +27,18 @@ export default function PaymentsAndPayoutsPage() {
         { href: "#faq", label: "FAQ" },
       ]}
     >
+      <PremiumPaymentsGraphic src={PREMIUM_PAYMENTS_PUBLIC_SRC} />
+      <p className="text-sm font-semibold leading-6 text-slate-600">
+        {PREMIUM_PAYMENTS_TRUST_SENTENCE}
+      </p>
       <section id="flows" className="scroll-mt-28">
         <h2 className="text-xl font-black tracking-[-0.03em] text-slate-950">
           Role-by-role payment flows
         </h2>
         <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-          Pet Parents pay in checkout. Gurus and Ambassadors receive eligible
-          earnings through Stripe. Off-platform payments are not allowed for
-          SitGuru bookings.
+          Pay in SitGuru checkout with Stripe, PayPal, Apple Pay, Google Pay,
+          Venmo, or Plaid. Gurus and Ambassadors receive eligible earnings on
+          SitGuru. Off-platform personal payments are not allowed.
         </p>
         <div className="mt-4">
           <HelpStepBlocks blocks={paymentFlows} />

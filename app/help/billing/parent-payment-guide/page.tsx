@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 import HelpArticleChrome from "@/components/help/HelpArticleChrome";
+import PremiumPaymentsGraphic from "@/components/help/PremiumPaymentsGraphic";
 import { HelpNumberedSteps } from "@/components/help/HelpFaqList";
 import { parentPaymentSteps } from "@/lib/help/content";
+import {
+  PREMIUM_PAYMENTS_CUSTOMER_SENTENCE,
+  PREMIUM_PAYMENTS_PUBLIC_SRC,
+  PREMIUM_PAYMENTS_TRUST_SENTENCE,
+} from "@/lib/help/premium-payments";
 
 export const metadata: Metadata = {
   title: "Pet Parent Payment Guide",
-  description:
-    "Pay securely through SitGuru checkout with cards, wallets, credits, and tips.",
+  description: PREMIUM_PAYMENTS_CUSTOMER_SENTENCE,
 };
 
 export default function ParentPaymentGuidePage() {
@@ -14,10 +19,14 @@ export default function ParentPaymentGuidePage() {
     <HelpArticleChrome
       eyebrow="Billing & Refunds"
       title="Pet Parent payment guide"
-      summary="Use SitGuru checkout only — then track receipts, live PawReports, push alerts, and the automated end-of-walk email from your dashboard."
+      summary={`${PREMIUM_PAYMENTS_CUSTOMER_SENTENCE} Use SitGuru checkout only — then track receipts, live PawReports, push alerts, and the automated end-of-walk email from your dashboard.`}
       backHref="/help/billing"
       backLabel="Back to Billing & Refunds"
     >
+      <PremiumPaymentsGraphic src={PREMIUM_PAYMENTS_PUBLIC_SRC} />
+      <p className="text-sm font-semibold leading-6 text-slate-600">
+        {PREMIUM_PAYMENTS_TRUST_SENTENCE}
+      </p>
       <section>
         <h2 className="text-xl font-black tracking-[-0.03em] text-slate-950">
           Checkout steps

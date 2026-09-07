@@ -1,5 +1,6 @@
 // components/help/HelpCategoryHub.tsx
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   articlesByCategory,
   type HelpCategory,
@@ -9,12 +10,14 @@ type HelpCategoryHubProps = {
   category: HelpCategory;
   title: string;
   description: string;
+  lead?: ReactNode;
 };
 
 export default function HelpCategoryHub({
   category,
   title,
   description,
+  lead,
 }: HelpCategoryHubProps) {
   const articles = articlesByCategory(category);
 
@@ -30,6 +33,7 @@ export default function HelpCategoryHub({
         {title}
       </h1>
       <p className="mt-2 text-sm font-semibold text-slate-600">{description}</p>
+      {lead ? <div className="mt-6">{lead}</div> : null}
       <ul className="mt-6 space-y-3">
         {articles.map((article) => (
           <li key={article.slug}>
