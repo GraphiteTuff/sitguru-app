@@ -1,3 +1,9 @@
+import {
+  isBaselineGrowthBriefTask,
+  mapApprovedBriefToReportSections,
+  parseBaselineBriefPayload,
+} from "@/lib/internship/baseline-brief";
+
 /**
  * SitGuru Market Growth Project — one semester capstone.
  * Every approved task, campaign, KPI, experiment, and reflection builds
@@ -172,25 +178,39 @@ export const FINAL_WORKSPACE_CHAPTERS = [
 export type FinalWorkspaceChapterId =
   (typeof FINAL_WORKSPACE_CHAPTERS)[number]["id"];
 
+export const FINAL_GROWTH_REPORT_TABS = [
+  { id: "overview", label: "Overview", chapters: ["market_analysis", "baseline_goals"] },
+  { id: "baseline", label: "Baseline", chapters: ["baseline_goals"] },
+  { id: "strategy", label: "Strategy", chapters: ["audience_strategy"] },
+  { id: "campaigns", label: "Campaigns", chapters: ["campaign_system"] },
+  { id: "experiments", label: "Experiments", chapters: ["experiments_results"] },
+  { id: "results", label: "Results", chapters: ["verified_impact"] },
+  { id: "learnings", label: "Learnings", chapters: [] as string[] },
+  { id: "playbook", label: "Playbook", chapters: ["sops_handoff"] },
+  { id: "recommendations", label: "Recommendations", chapters: ["recommendations"] },
+  { id: "portfolio", label: "Portfolio", chapters: ["portfolio"] },
+  { id: "presentation", label: "Presentation", chapters: ["recommendations"] },
+] as const;
+
 export const BUSINESS_GROWTH_REPORT_SECTIONS = [
   {
     id: "starting_point",
-    label: "Starting Point",
+    label: "Executive Summary / Project Scope",
     chapters: ["market_analysis"],
   },
   {
     id: "baseline_goals",
-    label: "Baseline & SMART Goals",
+    label: "Starting Position / Baseline & SMART Goals",
     chapters: ["baseline_goals"],
   },
   {
     id: "methods",
-    label: "How the work was done",
+    label: "Audience & Market / Strategy",
     chapters: ["audience_strategy", "campaign_system", "sops_handoff"],
   },
   {
     id: "experiments",
-    label: "Campaign Experiments",
+    label: "Initial Testing Plan / Campaign Experiments",
     chapters: ["experiments_results"],
   },
   {
@@ -396,6 +416,7 @@ export function assembleFinalProjectWorkspace(input: {
     internReportedKpi?: string;
     verifiedKpi?: string;
   }>;
+  intern?: { baselineLockedAt?: string | null };
   tasks?: Array<{
     id: string;
     title: string;
@@ -407,6 +428,7 @@ export function assembleFinalProjectWorkspace(input: {
     weekNumber?: number | null;
     internReportedValue?: string;
     verifiedValue?: string;
+    briefPayload?: Record<string, unknown>;
   }>;
   campaigns?: Array<{
     id: string;
@@ -444,8 +466,29 @@ export function assembleFinalProjectWorkspace(input: {
     baselineValue: string;
     status: string;
   }>;
+  briefBlocks?: Array<{
+    id: string;
+    reportSection: string;
+    title: string;
+    summary: string;
+    official: boolean;
+  }>;
 }): FinalProjectWorkspace {
   const blocks: FinalProjectBlock[] = [];
+  const briefTask = (input.tasks || []).find((row) => isBaselineGrowthBriefTask(row));
+  const derivedBriefBlocks =
+    input.briefBlocks ||
+    (briefTask
+      ? mapApprovedBriefToReportSections({
+          payload: parseBaselineBriefPayload(briefTask.briefPayload),
+          approved:
+            briefTask.supervisorApproved === true ||
+            briefTask.status === "approved" ||
+            Boolean(input.intern?.baselineLockedAt),
+          smartGoals: input.smartGoals,
+          experiments: input.experiments,
+        })
+      : []);
 
   for (const review of input.weeklyReviews || []) {
     const section = sectionMeta(review.finalSection);
@@ -571,6 +614,34 @@ export function assembleFinalProjectWorkspace(input: {
       verified: metric.isVerified && metric.valueNumeric != null ? String(metric.valueNumeric) : "",
       learning: "",
       included: metric.isVerified,
+      hoursApproved: null,
+    });
+  }
+
+  for (const brief of derivedBriefBlocks) {
+    const section =
+      brief.reportSection === "baseline_goals"
+        ? sectionMeta("growth_strategy")
+        : brief.reportSection === "methods"
+          ? sectionMeta("audience_strategy")
+          : brief.reportSection === "experiments"
+            ? sectionMeta("pet_parent_growth")
+            : sectionMeta("market_analysis");
+    blocks.push({
+      id: brief.id,
+      kind: "task",
+      section: section.id,
+      chapter: section.chapter,
+      output: "report",
+      title: brief.title,
+      summary: brief.summary,
+      weekNumber: 2,
+      campaignName: "",
+      smartGoal: "",
+      internReported: "",
+      verified: "",
+      learning: "",
+      included: brief.official,
       hoursApproved: null,
     });
   }

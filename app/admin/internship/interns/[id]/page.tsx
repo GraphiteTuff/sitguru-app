@@ -5,6 +5,8 @@ import InternshipGrowthWorkspace from "@/components/internship/InternshipGrowthW
 import InternAvatar from "@/components/internship/InternAvatar";
 import InternshipKpiLetterBoard from "@/components/internship/InternshipKpiLetterBoard";
 import InternKpiBoard from "@/components/internship/InternKpiBoard";
+import InternshipAssignmentReview from "@/components/internship/InternshipAssignmentReview";
+import { findBaselineGrowthBriefTask } from "@/lib/internship/baseline-brief";
 import {
   getInternWorkspace,
   listRequirements,
@@ -192,6 +194,43 @@ export default async function InternshipInternDetailPage({
           </div>
         ))}
       </section>
+
+      {findBaselineGrowthBriefTask(workspace.tasks) ? (
+        <section className="space-y-3">
+          <div className="rounded-[1.5rem] border border-emerald-100 bg-white p-5">
+            <h2 className="font-black text-slate-950">Baseline & Growth Brief review</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Files and structured sections live here so you do not hunt tabs. Hours approval stays
+              separate from this deliverable and from KPI verification.
+            </p>
+          </div>
+          {workspace.tasks
+            .filter((task) => findBaselineGrowthBriefTask([task]))
+            .map((task) => (
+              <InternshipAssignmentReview
+                key={`brief-${task.id}`}
+                internId={workspace.intern.id}
+                mode="supervisor"
+                itemType="task"
+                id={task.id}
+                title={task.title}
+                status={task.status}
+                workUrl={task.workUrl}
+                studentNotes={task.studentNotes}
+                supervisorNotes={task.supervisorNotes}
+                employerLetter={task.employerLetter}
+                kpiTier={task.kpiTier}
+                comments={workspace.comments || []}
+                attachments={workspace.attachments || []}
+                intern={workspace.intern}
+                task={task}
+                metrics={workspace.metrics || []}
+                smartGoals={workspace.smartGoals || []}
+                experiments={workspace.experiments || []}
+              />
+            ))}
+        </section>
+      ) : null}
 
       <InternKpiBoard internId={workspace.intern.id} capture />
 

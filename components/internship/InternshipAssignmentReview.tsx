@@ -14,8 +14,17 @@ import {
 } from "@/lib/internship/grading";
 import { taskStatusLabel } from "@/lib/internship/labels";
 import type { InternshipWorkAttachment, InternshipWorkComment } from "@/lib/internship/types";
+import InternBaselineBriefPanel from "@/components/internship/InternBaselineBriefPanel";
 import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
+import { isBaselineGrowthBriefTask } from "@/lib/internship/baseline-brief";
 import { internGhostBtnClass, internPrimaryBtnClass } from "@/lib/internship/intern-ui";
+import type {
+  InternshipExperiment,
+  InternshipIntern,
+  InternshipMetric,
+  InternshipSmartGoal,
+  InternshipTask,
+} from "@/lib/internship/types";
 
 const TIER_LABELS: Record<string, string> = {
   tier_1: "Tier 1 — Business outcome",
@@ -49,6 +58,11 @@ export default function InternshipAssignmentReview({
   comments,
   attachments = [],
   preview = false,
+  intern,
+  task,
+  metrics = [],
+  smartGoals = [],
+  experiments = [],
 }: {
   internId: string;
   mode: "intern" | "supervisor";
@@ -66,12 +80,22 @@ export default function InternshipAssignmentReview({
   comments: InternshipWorkComment[];
   attachments?: InternshipWorkAttachment[];
   preview?: boolean;
+  intern?: InternshipIntern;
+  task?: InternshipTask;
+  metrics?: InternshipMetric[];
+  smartGoals?: InternshipSmartGoal[];
+  experiments?: InternshipExperiment[];
 }) {
   const supervisor = mode === "supervisor";
   const closed = status === "approved" || status === "not_accepted";
   const awaiting = status === "submitted";
   const needsRevision = status === "revision_requested";
   const itemComments = comments.filter((row) => row.itemId === id);
+  const baselineBrief =
+    itemType === "task" &&
+    isBaselineGrowthBriefTask({ title, studentNotes }) &&
+    intern &&
+    (task || intern);
 
   return (
     <article className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
@@ -116,8 +140,41 @@ export default function InternshipAssignmentReview({
         </div>
       ) : null}
 
-      {studentNotes ? (
+      {studentNotes && !baselineBrief ? (
         <p className="mt-2 text-sm font-semibold text-slate-600">{studentNotes}</p>
+      ) : null}
+
+      {baselineBrief && intern ? (
+        <InternBaselineBriefPanel
+          intern={intern}
+          task={
+            task || {
+              id,
+              internId,
+              projectId: null,
+              title,
+              dueOn: null,
+              status: status as InternshipTask["status"],
+              workUrl: workUrl || "",
+              businessObjective: "",
+              metricAffected: "",
+              studentNotes: studentNotes || "",
+              supervisorNotes: supervisorNotes || "",
+              supervisorApproved: false,
+              approvedAt: null,
+              submittedAt: null,
+              employerLetter: employerLetter || "",
+              kpiTier: kpiTier || "",
+              outputVsTarget: null,
+            }
+          }
+          attachments={attachments}
+          metrics={metrics}
+          smartGoals={smartGoals}
+          experiments={experiments}
+          mode={mode}
+          preview={preview}
+        />
       ) : null}
 
       {itemComments.length ? (
@@ -133,14 +190,16 @@ export default function InternshipAssignmentReview({
         </div>
       ) : null}
 
-      <InternWorkAttachments
-        internId={internId}
-        itemType={itemType}
-        itemId={id}
-        attachments={attachments}
-        mode={mode}
-        preview={preview}
-      />
+      {!baselineBrief ? (
+        <InternWorkAttachments
+          internId={internId}
+          itemType={itemType}
+          itemId={id}
+          attachments={attachments}
+          mode={mode}
+          preview={preview}
+        />
+      ) : null}
 
       {!closed && !preview ? (
         <form action={commentInternWork} className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -160,7 +219,7 @@ export default function InternshipAssignmentReview({
         </form>
       ) : null}
 
-      {!supervisor && !preview && !closed ? (
+      {!baselineBrief && !supervisor && !preview && !closed ? (
         <form action={submitInternWork} className="mt-4 grid gap-3">
           <input type="hidden" name="internId" value={internId} />
           <input type="hidden" name="mode" value={mode} />

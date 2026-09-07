@@ -305,8 +305,12 @@ export function smartGoalStatusLabel(status: string) {
   const labels: Record<(typeof SMART_GOAL_STATUSES)[number], string> = {
     draft: "Draft",
     submitted: "Submitted",
+    supervisor_review: "Supervisor Review",
     approved: "Supervisor Approved",
     locked: "Locked",
+    completed: "Completed",
+    adjusted: "Adjusted",
+    closed: "Closed",
   };
   return labels[status as (typeof SMART_GOAL_STATUSES)[number]] || status;
 }

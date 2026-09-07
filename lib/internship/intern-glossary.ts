@@ -2,6 +2,7 @@ import {
   SITGURU_OFFICIAL_HANDLE,
   SITGURU_OFFICIAL_SOCIAL_LINKS,
 } from "@/lib/chat/sitguru-social";
+import { BASELINE_WORD_DEFINITIONS } from "@/lib/internship/baseline-brief";
 
 export { SITGURU_OFFICIAL_HANDLE, SITGURU_OFFICIAL_SOCIAL_LINKS };
 
@@ -630,6 +631,7 @@ export const INTERN_GLOSSARY: InternGlossaryTerm[] = [
   ...INTERN_REPORT_WEEKLY_BUILD_FIELDS,
   ...INTERN_PORTAL_WORD_DEFINITIONS,
   ...INTERN_VENDOR_EVENTS,
+  ...BASELINE_WORD_DEFINITIONS,
 ];
 
 function escapeHtml(value: string) {
@@ -694,5 +696,6 @@ export function internGlossarySectionHtml() {
       ${groupHtml("Business Growth Report draft chapters", INTERN_REPORT_DRAFT_SECTIONS)}
       ${groupHtml("Weekly report build", INTERN_REPORT_WEEKLY_BUILD_FIELDS)}
       ${groupHtml("Intern portal words", words)}
+      ${groupHtml("Baseline & Growth Brief", BASELINE_WORD_DEFINITIONS)}
     </section>`;
 }

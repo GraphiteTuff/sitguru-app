@@ -1,5 +1,10 @@
 import { internHelpPath, INTERNSHIP_HELP_PATH } from "@/lib/internship/intern-growth";
 import {
+  allBaselineBriefDefinitions,
+  BASELINE_GROWTH_BRIEF_COMPLETION,
+  BASELINE_GROWTH_BRIEF_PURPOSE,
+} from "@/lib/internship/baseline-brief";
+import {
   INTERN_AI_COMPANIONS,
   INTERN_GLOSSARY,
   INTERN_PAYMENTS_INTERN_SAFE,
@@ -225,6 +230,11 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       "campaign",
       "tracking link",
       "which part of your report",
+      "baseline",
+      "locked baseline",
+      "smart goal",
+      "tier 1",
+      "intern-reported",
       "market analysis",
       "pawreport",
       "pawperks",
@@ -651,12 +661,56 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       },
     ],
   }),
+  article("baseline-brief", {
+    title: "Baseline & Growth Brief",
+    summary:
+      "Weeks 1–2 required starting point for the Final Business Growth Report. Not just a file upload.",
+    purpose: BASELINE_GROWTH_BRIEF_PURPOSE,
+    contributes:
+      `${BASELINE_GROWTH_BRIEF_COMPLETION} Approved sections carry into Executive Summary, Starting Position, Audience, Challenges, Opportunities, SMART goals, and the Initial Testing Plan. Draft work stays labeled Draft / Not Yet Approved.`,
+    category: "Report & metrics",
+    tags: ["baseline", "brief", "report", "smart"],
+    keywords: [
+      "baseline & growth brief",
+      "baseline",
+      "locked baseline",
+      "written brief",
+      "presentation",
+      "supporting evidence",
+      "smart goal",
+      "tier 1",
+      "intern-reported",
+      "ready to submit",
+      "supervisor review requested",
+    ],
+    fields: allBaselineBriefDefinitions(),
+    steps: [
+      "Open Work → Tasks → Baseline & Growth Brief.",
+      "Read each section’s “what this means” and fill the fields. Vague “pet owners / Instagram” will be sent back.",
+      "Upload three things: Written Brief (DOC/DOCX/PDF), Presentation (PPT/PPTX), and Supporting Evidence.",
+      "Propose SMART goals and 1–3 experiments. Write Supervisor review requested, then Send to SitGuru for review.",
+    ],
+    tips: [
+      "Follower count, views, and reach alone are not enough. Prefer a Tier 1 business outcome SitGuru can check.",
+      "Intern-reported numbers never auto-verify. The Final Report shows both your number and SitGuru’s verified number.",
+      "Once the baseline is locked you cannot edit it. Corrections need a reason and SitGuru approval.",
+      "Do not put customer names, emails, or payment details in files. Bookings stay on SitGuru.",
+    ],
+    shots: [
+      {
+        file: "09-work-task-submit.png",
+        alt: "Baseline & Growth Brief task on Work → Tasks",
+        caption: "Required sections plus written brief and deck — not a single file.",
+      },
+    ],
+    note: "Hours approval is separate from brief approval and KPI verification. Questions go to intern@sitguru.com.",
+  }),
   article("work-tasks", {
     title: "Finish and send a task",
     summary:
       "A task is assigned internship work. Sending it asks SitGuru to review proof — not to guess that you finished.",
     purpose:
-      "Tasks start as to-do. Attachments, a work link, and “What should SitGuru review?” are the evidence packet. SitGuru comments, asks for revision, or accepts the work. Accepted work can feed your report. Empty send = nothing to review.",
+      "Tasks start as to-do. Most tasks need proof plus what SitGuru should review. The Baseline & Growth Brief is different: it needs required sections, a written brief, a presentation, and supervisor approval. Empty send = nothing to review.",
     contributes:
       "This is how you prove you completed an assignment. The note tells SitGuru where to look. Status Waiting / revision requested is normal. A KPI letter on a task is SitGuru’s employer snapshot, not your university grade.",
     category: "Weekly work",
@@ -669,14 +723,23 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
     ],
     steps: [
       "Open Work → Tasks and tap the assignment.",
-      "Attach PDFs, slides, screenshots, or drafts that prove the work.",
+      "If it is Baseline & Growth Brief, fill the sections and use the three upload boxes (Written Brief, Presentation, Evidence). Other tasks still use one proof box.",
       "Paste a Link to completed work if you have one.",
-      "Write what SitGuru should review, then tap Send to SitGuru for review.",
+      "Write Supervisor review requested (or what SitGuru should review), then tap Send to SitGuru for review.",
     ],
     fields: [
       {
+        label: "Written Brief",
+        meaning: "On the Baseline & Growth Brief only: the required 2–5 page DOC/DOCX/PDF. A single screenshot is not the brief.",
+        example: "A Word brief covering market, baseline table, audience, risks, opportunities, SMART goals, and first tests.",
+      },
+      {
+        label: "Presentation",
+        meaning: "On the Baseline & Growth Brief only: the required PPT/PPTX (6–10 slides). A PDF export goes under Supporting Evidence.",
+      },
+      {
         label: "Supporting files",
-        meaning: "PDFs, slides, screenshots, or drafts that prove the work. No Pet Parent names, emails, or passwords in the file.",
+        meaning: "For other tasks: PDFs, slides, screenshots, or drafts that prove the work. No Pet Parent names, emails, or passwords in the file.",
         example: "Canva PDF of three approved-style post drafts, or a screenshot of the tracking link in the caption.",
       },
       {
@@ -685,10 +748,10 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
         example: "https://www.canva.com/design/…",
       },
       {
-        label: "What should SitGuru review?",
+        label: "Supervisor review requested",
         meaning:
-          "A short brief: what you did, what you want them to check, and anything that is still draft. This is not the weekly check-in — it is about this task only.",
-        example: "Please review caption tone and whether the tracking link is in the first comment. Draft is not posted yet.",
+          "On the Baseline & Growth Brief, this replaces “What should SitGuru review?” Tell them what to verify, approve, or correct. Other tasks still use a short review note.",
+        example: "Please verify the Pet Parent registration baseline and check that my SMART target is Tier 1.",
       },
       {
         label: "Note to supervisor",
@@ -896,7 +959,7 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
     summary:
       "Draft chapters and weekly build fields on Report. Research a little every week and compile — do not wait until week 15.",
     purpose:
-      "The Business Growth Report is the semester destination SitGuru assembles from weekly check-ins, accepted tasks, campaigns, and verified numbers. Report tab draft chapters (Starting Point through Recommendations) and This week’s build are how you file work while it is still fresh. Waiting until week 15 leaves a thin report and no time for SitGuru to verify numbers.",
+      "The Business Growth Report is the semester destination SitGuru assembles from the approved Baseline & Growth Brief, weekly check-ins, accepted tasks, campaigns, and verified numbers. Weeks 1–2 lock the starting point so week 15 is synthesis — not a blank page. Report tab draft chapters and This week’s build keep filing work while it is fresh.",
     contributes:
       "Each weekly build lands in a draft chapter. SitGuru-checked totals become Measurable Outcomes. Lessons and recommendations become the handoff. Your school still owns credit. SitGuru letters are not a university grade. Use intern-safe totals, never Pet Parent names or emails.",
     category: "Report & metrics",
@@ -914,6 +977,7 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
     ],
     fields: [...INTERN_REPORT_DRAFT_SECTIONS, ...INTERN_REPORT_WEEKLY_BUILD_FIELDS],
     steps: [
+      "Finish and get the Baseline & Growth Brief approved in weeks 1–2. That fills Executive Summary, Starting Position, Audience, Challenges, Opportunities, SMART goals, and the Initial Testing Plan.",
       "Open Report the same week you work. The green banner (for example “Feeds Final report: Starting Point”) tells you which chapter this week is feeding.",
       "Do a little self-research every week — market totals, public sources, tracking-link results — and write it into This week’s build. Do not wait until week 15.",
       "Pick Contribution to your report. Fill what you added, finished, what the numbers showed, what did not work, and what’s next.",

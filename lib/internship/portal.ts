@@ -54,6 +54,7 @@ const ALLOWED_UPLOAD_EXT = new Set([
   "docx",
   "xlsx",
   "pptx",
+  "ppt",
   "txt",
   "csv",
 ]);
@@ -70,6 +71,7 @@ const ALLOWED_UPLOAD_MIME = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.ms-powerpoint",
   "text/plain",
   "text/csv",
 ]);
@@ -118,6 +120,7 @@ export function internUploadExtension(fileName: string, mimeType = "") {
   if (mimeType.includes("wordprocessingml")) return "docx";
   if (mimeType.includes("spreadsheetml")) return "xlsx";
   if (mimeType.includes("presentationml")) return "pptx";
+  if (mimeType.includes("ms-powerpoint") || mimeType === "application/vnd.ms-powerpoint") return "ppt";
   if (mimeType === "text/csv") return "csv";
   if (mimeType.startsWith("image/")) return "jpg";
   return "bin";

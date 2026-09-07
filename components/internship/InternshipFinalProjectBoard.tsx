@@ -6,6 +6,7 @@ import {
   assembleFinalProjectWorkspace,
   CAPSTONE_WEEK_PLAN,
   FINAL_CONTRIBUTION_SECTIONS,
+  FINAL_GROWTH_REPORT_TABS,
   defaultFinalSectionForWeek,
   type FinalContributionSectionId,
 } from "@/lib/internship/final-project";
@@ -25,7 +26,7 @@ export function FinalSectionSelect({
   return (
     <label className="block">
       <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-        Contribution to your report
+        What part of the Final Growth Report did your work advance this week?
       </span>
       <select
         name={name}
@@ -33,7 +34,7 @@ export function FinalSectionSelect({
         defaultValue={defaultValue || ""}
         className="mt-1 min-h-12 w-full rounded-xl border border-emerald-100 px-3 text-sm font-semibold text-slate-950"
       >
-        <option value="">Which part of your report did this help?</option>
+        <option value="">Which Final Growth Report chapter did this advance?</option>
         {FINAL_CONTRIBUTION_SECTIONS.map((section) => (
           <option key={section.id} value={section.id}>
             {section.label}
@@ -127,8 +128,27 @@ export default function InternshipFinalProjectBoard({
       <article className="rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm">
         <h3 className="font-black text-slate-950">Business Growth Report draft</h3>
         <p className="mt-1 text-sm font-semibold text-slate-500">
-          Keep filling this as you go. Don’t wait until week 15 to write it.
+          Keep filling this as you go. Don’t wait until week 15 to write it. Only SitGuru-approved
+          content is official. Everything else is Draft / Not Yet Approved.
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {FINAL_GROWTH_REPORT_TABS.map((tab) => {
+            const related = workspace.chapters.filter((row) =>
+              (tab.chapters as readonly string[]).includes(row.id),
+            );
+            const percent = related.length
+              ? Math.round(related.reduce((sum, row) => sum + row.percent, 0) / related.length)
+              : report.percent;
+            return (
+              <span
+                key={tab.id}
+                className="inline-flex min-h-11 items-center rounded-2xl border border-emerald-100 bg-emerald-50 px-3 text-xs font-black text-emerald-900"
+              >
+                {tab.label} {percent}%
+              </span>
+            );
+          })}
+        </div>
         <div className="mt-4 space-y-2">
           {report.sections.map((section) => (
             <div
@@ -145,8 +165,9 @@ export default function InternshipFinalProjectBoard({
                 <ul className="mt-2 space-y-1 text-sm font-semibold">
                   {section.entries.slice(0, 4).map((entry) => (
                     <li key={entry.id}>
-                      {section.id === "outcomes" && entry.verified
-                        ? `${entry.title}: ${entry.verified}`
+                      {entry.included ? "Approved · " : "Draft / Not Yet Approved · "}
+                      {section.id === "outcomes" && (entry.verified || entry.internReported)
+                        ? `${entry.title}: intern-reported ${entry.internReported || "—"} / verified ${entry.verified || "pending"}`
                         : section.id === "lessons" && entry.learning
                           ? entry.learning
                           : entry.title}
@@ -185,7 +206,7 @@ export default function InternshipFinalProjectBoard({
             <FinalSectionSelect defaultValue={defaultSection} />
             <label className="block">
               <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                What did you add or improve this week?
+                What did you add, test, learn, or improve?
               </span>
               <textarea
                 name="contributionAdded"

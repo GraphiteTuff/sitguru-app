@@ -53,4 +53,9 @@ describe("intern work attachments", () => {
     assert.equal(internWorkItemType("brand"), "brand");
     assert.equal(internWorkItemType("admin"), null);
   });
+
+  it("accepts PowerPoint uploads for the Baseline presentation box", () => {
+    assert.equal(internAllowedUpload({ name: "deck.pptx", type: "application/vnd.openxmlformats-officedocument.presentationml.presentation", size: 12 }), "");
+    assert.equal(internAllowedUpload({ name: "deck.ppt", type: "application/vnd.ms-powerpoint", size: 12 }), "");
+  });
 });

@@ -220,6 +220,10 @@ export function mapTask(row: Record<string, unknown>): InternshipTask {
     campaignId: text(row.campaign_id) || null,
     internReportedValue: text(row.intern_reported_value),
     verifiedValue: text(row.verified_value),
+    briefPayload:
+      row.brief_payload && typeof row.brief_payload === "object"
+        ? (row.brief_payload as Record<string, unknown>)
+        : {},
   };
 }
 
@@ -368,6 +372,7 @@ export function mapWorkAttachment(row: Record<string, unknown>): InternshipWorkA
     mimeType: text(row.mime_type),
     fileSize: Number(row.file_size) || 0,
     caption: text(row.caption),
+    category: text(row.category) || text(row.caption),
     contributesToFinal: row.contributes_to_final !== false,
     uploadedByRole: text(row.uploaded_by_role) === "supervisor" ? "supervisor" : "intern",
     createdAt: text(row.created_at),

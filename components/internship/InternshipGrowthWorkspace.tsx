@@ -363,6 +363,11 @@ export default function InternshipGrowthWorkspace({
                   comments={data.comments || []}
                   attachments={data.attachments || []}
                   preview={preview}
+                  intern={data.intern}
+                  task={task}
+                  metrics={data.metrics || []}
+                  smartGoals={data.smartGoals || []}
+                  experiments={data.experiments || []}
                 />
               ))
             ) : (
@@ -704,6 +709,11 @@ export default function InternshipGrowthWorkspace({
                       comments={data.comments || []}
                       attachments={data.attachments || []}
                       preview={preview}
+                      intern={data.intern}
+                      task={task}
+                      metrics={data.metrics || []}
+                      smartGoals={data.smartGoals || []}
+                      experiments={data.experiments || []}
                     />
                   ))}
                 {data.content

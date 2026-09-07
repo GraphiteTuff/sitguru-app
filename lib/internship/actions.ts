@@ -23,6 +23,15 @@ import {
   INTERN_KPI_BASELINE_NOTE,
 } from "@/lib/internship/intern-kpis";
 import { internSnapshotValues, loadInternSafeKpiSnapshot } from "@/lib/internship/intern-kpi-snapshot";
+import {
+  BASELINE_GROWTH_BRIEF_TITLE,
+  baselineBriefChecklist,
+  baselineBriefReadyToSubmit,
+  baselineBriefSubmitBlockers,
+  internCanEditBrief,
+  isBaselineGrowthBriefTask,
+  parseBaselineBriefPayload,
+} from "@/lib/internship/baseline-brief";
 import { internPortalTheme, internSafeLinkedInUrl, internWorkItemType } from "@/lib/internship/portal";
 import { INTERNSHIP_ONBOARDING_PATH } from "@/lib/internship/onboarding";
 import {
@@ -379,8 +388,18 @@ export async function saveIntern(formData: FormData) {
         grant_status: granted ? "active" : "not_granted",
       })),
     );
-    await supabaseAdmin.from("internship_tasks").insert(
-      CAPSTONE_WEEK_PLAN.map((week) => ({
+    await supabaseAdmin.from("internship_tasks").insert([
+      {
+        intern_id: internId,
+        title: BASELINE_GROWTH_BRIEF_TITLE,
+        status: "todo",
+        business_objective: "Official starting point for the Final Business Growth Report",
+        metric_affected: "SitGuru Market Growth Project",
+        student_notes: "Weeks 1–2 · Required semester deliverable · Supervisor approval required",
+        final_section: "growth_strategy",
+        week_number: 2,
+      },
+      ...CAPSTONE_WEEK_PLAN.map((week) => ({
         intern_id: internId,
         title: `Week ${week.week}: ${week.work}`,
         status: "todo",
@@ -390,7 +409,7 @@ export async function saveIntern(formData: FormData) {
         final_section: week.section,
         week_number: week.week,
       })),
-    );
+    ]);
   }
   refreshInternship();
   bounce(
@@ -476,14 +495,148 @@ export async function approveInternWork(formData: FormData) {
   bounce(`/admin/internship/interns/${internId}`, "ok", "SitGuru approval recorded.");
 }
 
+export async function saveBaselineBrief(formData: FormData) {
+  const internId = text(formData, "internId");
+  const mode = text(formData, "mode") || "intern";
+  await assertWorkspaceActor(internId, mode);
+  const taskId = text(formData, "id");
+  const workspace = await getInternWorkspace(internId);
+  const task = workspace?.tasks.find((row) => row.id === taskId);
+  if (!task || !isBaselineGrowthBriefTask(task)) {
+    bounce(workspacePath(internId, mode, "task"), "error", "Open the Baseline & Growth Brief task.");
+  }
+  if (mode !== "supervisor" && !internCanEditBrief({ intern: workspace?.intern, taskStatus: task.status })) {
+    bounce(
+      workspacePath(internId, mode, "task"),
+      "error",
+      "This baseline is locked or approved. Ask SitGuru if a correction is needed.",
+    );
+  }
+  const payload = parseBaselineBriefPayload(text(formData, "briefPayload") || "{}");
+  payload.supervisorReviewRequested =
+    text(formData, "supervisorReviewRequested") || payload.supervisorReviewRequested;
+  payload.overallStatus = task.status === "todo" ? "in_progress" : payload.overallStatus || "in_progress";
+  const { error } = await supabaseAdmin
+    .from("internship_tasks")
+    .update({
+      brief_payload: payload,
+      work_url: text(formData, "workUrl") || task.workUrl,
+      student_notes: payload.supervisorReviewRequested || task.studentNotes,
+      status: task.status === "todo" ? "in_progress" : task.status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", taskId)
+    .eq("intern_id", internId);
+  if (error) bounce(workspacePath(internId, mode, "task"), "error", error.message);
+  refreshInternship(workspacePath(internId, mode, "task"));
+  bounce(workspacePath(internId, mode, "task"), "ok", "Baseline & Growth Brief draft saved.");
+}
+
+export async function reviewBaselineBrief(formData: FormData) {
+  const actor = await requireInternshipAdmin();
+  const internId = text(formData, "internId");
+  const taskId = text(formData, "id");
+  const workspace = await getInternWorkspace(internId);
+  const task = workspace?.tasks.find((row) => row.id === taskId);
+  if (!task || !isBaselineGrowthBriefTask(task)) {
+    bounce(`/admin/internship/interns/${internId}`, "error", "Baseline & Growth Brief not found.");
+  }
+  const payload = parseBaselineBriefPayload(task.briefPayload);
+  const decision = text(formData, "decision");
+  const comments = text(formData, "comments");
+  if (decision === "lock") {
+    payload.overallStatus = "locked";
+    await supabaseAdmin
+      .from("internship_interns")
+      .update({
+        baseline_locked_at: new Date().toISOString(),
+        baseline_lock_reason: comments || "Baseline & Growth Brief approved and locked.",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", internId);
+  } else if (decision === "approved") {
+    payload.overallStatus = "approved";
+  } else if (decision === "revision_requested") {
+    payload.overallStatus = "changes_requested";
+  }
+  const { error } = await supabaseAdmin
+    .from("internship_tasks")
+    .update({
+      brief_payload: payload,
+      status:
+        decision === "lock" || decision === "approved"
+          ? "approved"
+          : decision === "revision_requested"
+            ? "revision_requested"
+            : task.status,
+      supervisor_approved: decision === "approved" || decision === "lock",
+      supervisor_notes: comments,
+      approved_at: decision === "approved" || decision === "lock" ? new Date().toISOString() : null,
+      approved_by: decision === "approved" || decision === "lock" ? actor.id : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", taskId)
+    .eq("intern_id", internId);
+  if (error) bounce(`/admin/internship/interns/${internId}`, "error", error.message);
+  if (comments) {
+    await addInternWorkComment({
+      internId,
+      itemType: "task",
+      itemId: taskId,
+      authorRole: "supervisor",
+      body: comments,
+    });
+  }
+  refreshInternship(`/admin/internship/interns/${internId}`);
+  bounce(
+    `/admin/internship/interns/${internId}`,
+    "ok",
+    decision === "lock"
+      ? "Baseline locked. This is the official starting point for the Final Growth Report."
+      : "Baseline & Growth Brief review saved.",
+  );
+}
+
 export async function submitInternWork(formData: FormData) {
   const internId = text(formData, "internId");
   const mode = text(formData, "mode") || "intern";
   await assertWorkspaceActor(internId, mode);
   const itemType = text(formData, "itemType") === "content" ? "content" : "task";
   const workUrl = text(formData, "workUrl");
-  const studentNotes = text(formData, "studentNotes");
-  if (!workUrl && !studentNotes && !text(formData, "draftUrl") && !text(formData, "publishedUrl")) {
+  const studentNotes =
+    text(formData, "supervisorReviewRequested") || text(formData, "studentNotes");
+  const workspace = itemType === "task" ? await getInternWorkspace(internId) : null;
+  const task = workspace?.tasks.find((row) => row.id === text(formData, "id"));
+  if (task && isBaselineGrowthBriefTask(task)) {
+    const payload = parseBaselineBriefPayload(text(formData, "briefPayload") || task.briefPayload);
+    payload.supervisorReviewRequested = studentNotes || payload.supervisorReviewRequested;
+    const checklist = baselineBriefChecklist({
+      payload,
+      attachments: workspace?.attachments || [],
+      taskId: task.id,
+      smartGoals: workspace?.smartGoals || [],
+      experiments: workspace?.experiments || [],
+      metrics: workspace?.metrics || [],
+    });
+    if (!baselineBriefReadyToSubmit(checklist)) {
+      bounce(
+        workspacePath(internId, mode, "task"),
+        "error",
+        baselineBriefSubmitBlockers(checklist)[0] ||
+          "Finish the required brief sections, written brief, and presentation before sending.",
+      );
+    }
+    payload.overallStatus = task.status === "revision_requested" ? "resubmitted" : "submitted";
+    const { error } = await supabaseAdmin
+      .from("internship_tasks")
+      .update({
+        brief_payload: payload,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", task.id)
+      .eq("intern_id", internId);
+    if (error) bounce(workspacePath(internId, mode, "task"), "error", error.message);
+  } else if (!workUrl && !studentNotes && !text(formData, "draftUrl") && !text(formData, "publishedUrl")) {
     bounce(workspacePath(internId, mode), "error", "Add a work link or notes before submitting for review.");
   }
   const result = await submitInternWorkRecord({
@@ -888,6 +1041,7 @@ export async function saveMilestoneStatus(formData: FormData) {
 function workspacePath(internId: string, mode: string, itemType?: string | null) {
   if (mode === "supervisor") return `/admin/internship/interns/${internId}`;
   if (itemType === "brand") return "/intern?tool=brand";
+  if (itemType === "task") return "/intern?tab=work&work=tasks";
   return "/intern";
 }
 
@@ -983,7 +1137,8 @@ export async function uploadInternAttachment(formData: FormData) {
     storage_path: uploaded.path,
     mime_type: file.type || "",
     file_size: file.size,
-    caption: text(formData, "caption"),
+    caption: text(formData, "caption") || text(formData, "category"),
+    category: text(formData, "category") || text(formData, "caption"),
     contributes_to_final: formData.get("contributesToFinal") !== "false",
     uploaded_by_role: mode === "supervisor" ? "supervisor" : "intern",
   });

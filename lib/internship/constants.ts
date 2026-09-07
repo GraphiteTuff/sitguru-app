@@ -71,8 +71,12 @@ export const ACCESS_GRANT_STATUSES = [
 export const SMART_GOAL_STATUSES = [
   "draft",
   "submitted",
+  "supervisor_review",
   "approved",
   "locked",
+  "completed",
+  "adjusted",
+  "closed",
 ] as const;
 
 export const PROJECT_RECORD_KINDS = ["track", "intern_project"] as const;

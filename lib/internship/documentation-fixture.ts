@@ -57,10 +57,28 @@ function task(
     campaignId: extra.campaignId || DOCUMENTATION_CAMPAIGN_ID,
     internReportedValue: extra.internReportedValue || "",
     verifiedValue: extra.verifiedValue || "",
+    briefPayload: extra.briefPayload,
   };
 }
 
 const TASKS: InternshipTask[] = [
+  task("doc-task-brief", "Baseline & Growth Brief", "todo", {
+    dueOn: "2026-08-22",
+    weekNumber: 2,
+    finalSection: "growth_strategy",
+    studentNotes: "Weeks 1–2 · Required semester deliverable · Supervisor approval required",
+    businessObjective: "Official starting point for the Final Business Growth Report",
+    briefPayload: {
+      project: {
+        name: "Greater Philadelphia campus Pet Parent growth",
+        growthTrack: "pet_parent_growth",
+        assignedMarket: "Example University / Greater Philadelphia",
+        businessObjective: "Help nearby Pet Parents find a trusted local Guru on SitGuru.",
+      },
+      supervisorReviewRequested: "",
+      overallStatus: "todo",
+    },
+  }),
   task("doc-task-01", "Map Greater Philadelphia Pet Parent demand", "approved", {
     dueOn: "2026-08-16",
     weekNumber: 1,

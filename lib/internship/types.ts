@@ -185,6 +185,7 @@ export type InternshipTask = {
   campaignId?: string | null;
   internReportedValue?: string;
   verifiedValue?: string;
+  briefPayload?: Record<string, unknown>;
 };
 
 export type InternshipContentItem = {
@@ -259,6 +260,7 @@ export type InternshipWorkAttachment = {
   mimeType: string;
   fileSize: number;
   caption: string;
+  category?: string;
   contributesToFinal: boolean;
   uploadedByRole: "intern" | "supervisor";
   createdAt: string;

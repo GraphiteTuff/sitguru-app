@@ -732,15 +732,23 @@ export default function InternStudentDashboard({
               <input type="hidden" name="mode" value="intern" />
               <input type="hidden" name="weekOf" value={weekOf} />
               <FinalSectionSelect defaultValue={defaultFinalSectionForWeek(process.weekNumber)} />
+              <p className="text-xs font-semibold leading-5 text-slate-500">
+                What part of the Final Growth Report did your work advance this week? Pick the closest chapter. SitGuru
+                can move it later. Approved weeks become official report material; unapproved weeks stay Draft / Not Yet
+                Approved.
+              </p>
               <label className="block">
                 <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">
-                  What did you add or improve this week?
+                  What did you add, test, learn, or improve?
                 </span>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                  Be specific. This is how the weekly story lands in the Final Growth Report instead of a loose note.
+                </p>
                 <textarea
                   name="contributionAdded"
                   required
                   rows={3}
-                  placeholder="What you shipped, who it reached, and what you learned."
+                  placeholder="What you added, tested, learned, or improved — and who it reached."
                   className="mt-1 w-full rounded-xl border border-emerald-100 px-3 py-3 text-sm font-semibold text-slate-950"
                 />
               </label>
@@ -970,6 +978,11 @@ export default function InternStudentDashboard({
                   comments={data.comments || []}
                   attachments={data.attachments || []}
                   preview={preview}
+                  intern={data.intern}
+                  task={task}
+                  metrics={data.metrics || []}
+                  smartGoals={data.smartGoals || []}
+                  experiments={data.experiments || []}
                 />
               ))
             ) : workFilter === "tasks" ? (

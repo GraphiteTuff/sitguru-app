@@ -69,6 +69,17 @@ describe("intern help catalog", () => {
     const weekFifteen = searchInternHelpArticles("week 15");
     assert.ok(weekFifteen.some((article) => article.slug === "business-growth-report"));
     assert.ok(internHelpArticle("business-growth-report"));
+    const baseline = searchInternHelpArticles("baseline & growth brief");
+    assert.ok(baseline.some((article) => article.slug === "baseline-brief"));
+    const locked = searchInternHelpArticles("locked baseline");
+    assert.ok(locked.some((article) => article.slug === "baseline-brief" || article.slug === "definitions"));
+    const tier = searchInternHelpArticles("tier 1");
+    assert.ok(tier.some((article) => article.slug === "baseline-brief" || article.slug === "definitions"));
+    assert.ok(internHelpArticle("baseline-brief"));
+    const briefArticle = internHelpArticle("baseline-brief");
+    assert.doesNotMatch(JSON.stringify(briefArticle), /jasongraff1978@gmail\.com/i);
+    assert.doesNotMatch(briefArticle?.purpose || "", /\bJason\b/);
+    assert.doesNotMatch(briefArticle?.purpose || "", /Proprietary and confidential/i);
   });
 
   it("serves training screenshots from intern Help media, never Your page", () => {
