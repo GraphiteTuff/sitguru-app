@@ -6,6 +6,7 @@ import {
   INTERN_GUIDE_CONFIDENTIALITY,
   INTERN_HELP_INBOX,
   INTERNSHIP_HELP_PATH,
+  internHelpFeatured,
   internHelpMediaSrc,
   type InternHelpArticle,
 } from "@/lib/internship/intern-help";
@@ -34,6 +35,17 @@ export default function InternHelpChrome({
       <div className="mt-4 w-full sm:max-w-md">
         <InternHelpSearchBar variant="header" />
       </div>
+      <p className="mt-3 text-xs font-semibold leading-5 text-slate-500">
+        What’s new:{" "}
+        {internHelpFeatured().map((item, index) => (
+          <span key={item.slug}>
+            {index > 0 ? " · " : null}
+            <Link href={item.href} className="font-black text-emerald-800 hover:underline">
+              {item.title}
+            </Link>
+          </span>
+        ))}
+      </p>
 
       {article ? (
         <>

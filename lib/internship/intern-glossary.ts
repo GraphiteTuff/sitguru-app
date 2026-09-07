@@ -597,7 +597,17 @@ export const INTERN_PORTAL_WORD_DEFINITIONS: InternGlossaryTerm[] = [
   {
     label: "Weekly check-in",
     meaning:
-      "The week’s story SitGuru files into your report: what you added, finished, what the numbers showed, what did not work, what’s next, hours, and Your number.",
+      "The week’s story SitGuru files into your Final Growth Report: which chapter it helped, what you added, tested, or learned, what did not work, what’s next, hours, and Your number.",
+  },
+  {
+    label: "Brand kit",
+    meaning:
+      "Home → Brand kit. Download official SitGuru logos and upload your Canva or CapCut files. SitGuru Green is #166534 (dark #102417, light #CFE6D5). Use white type on that green.",
+  },
+  {
+    label: "Student User Guide",
+    meaning:
+      "The Spring 2027 Internship User Guide (not a syllabus). Print PDF or Word from intern Help. Every SitGuru guide page has the confidentiality footer. That footer is for SitGuru’s template — not intern-created portfolio work.",
   },
   {
     label: "Your number",

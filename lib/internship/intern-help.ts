@@ -87,26 +87,28 @@ export const INTERN_HELP_CATEGORIES = [
     id: "getting-started",
     title: "Getting started",
     description:
-      "Watch SitGuru videos, learn definitions, then log in, onboard, and use Home and Your page.",
+      "Student User Guide, definitions (including Brief words), Watch SitGuru videos, then log in, onboard, and use Home.",
     category: "Getting started" as InternHelpCategory,
   },
   {
     id: "weekly-work",
     title: "Weekly work",
-    description: "How weekly check-in, Calendar, tasks, social, and campaigns feed your report.",
+    description:
+      "Weekly check-in (which Final Growth Report chapter + what you added, tested, or learned), Calendar, tasks, social, and campaigns.",
     category: "Weekly work" as InternHelpCategory,
   },
   {
     id: "report-metrics",
     title: "Report & metrics",
-    description: "Hours, the Business Growth Report, and numbers SitGuru can actually verify.",
+    description:
+      "Baseline & Growth Brief (Weeks 1–2), Business Growth Report chapters on the Report tab, hours, and verified numbers.",
     category: "Report & metrics" as InternHelpCategory,
   },
   {
     id: "toolkit",
     title: "Intern toolkit",
     description:
-      "Brand, tracking links, market totals, public events, PA/NJ vendor research, and social.",
+      "Brand kit (download logos and upload Canva/CapCut), tracking links, market totals, public events, and social.",
     category: "Intern toolkit" as InternHelpCategory,
   },
   {
@@ -114,6 +116,44 @@ export const INTERN_HELP_CATEGORIES = [
     title: "Growth workplace",
     description: "Create posts, campaigns, and media, then wait for SitGuru before anything goes live.",
     category: "Growth workplace" as InternHelpCategory,
+  },
+] as const;
+
+export const INTERN_HELP_FEATURED = [
+  {
+    slug: "baseline-brief",
+    eyebrow: "What’s new · Weeks 1–2",
+    blurb:
+      "Phase 1 of the Final Business Growth Report. Fill the sections, upload the written brief and presentation, then wait for SitGuru approval. A file alone does not finish it.",
+    highlight: true,
+  },
+  {
+    slug: "toolkit-brand",
+    eyebrow: "Home → Brand kit",
+    blurb:
+      "Download official logos and upload your Canva or CapCut files. SitGuru Green is #166534. Use white type on that green.",
+    highlight: false,
+  },
+  {
+    slug: "student-guide",
+    eyebrow: "Spring 2027",
+    blurb:
+      "Internship User Guide — not a syllabus. Print PDF or Word. The confidentiality footer is on every SitGuru guide page.",
+    highlight: false,
+  },
+  {
+    slug: "business-growth-report",
+    eyebrow: "Report tab",
+    blurb:
+      "Draft chapters and This week’s build. Compile a little every week. Do not wait until week 15.",
+    highlight: false,
+  },
+  {
+    slug: "definitions",
+    eyebrow: "Words to know",
+    blurb:
+      "Baseline, locked, SMART, Tier 1, intern-reported, written brief, presentation, and the rest of the intern glossary.",
+    highlight: false,
   },
 ] as const;
 
@@ -135,9 +175,9 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
   article("student-guide", {
     title: "Intern Portal student user guide",
     summary:
-      "The full picture walkthrough of every student area. Use Help when you need the meaning of a field; print PDF or Word when your school wants a copy.",
+      "Spring 2027 Internship User Guide — not a syllabus. Use Help for field meanings. Print PDF or Word when your school wants a SitGuru copy.",
     purpose:
-      "This internship is the SitGuru Market Growth Project. The portal is where you do the work, SitGuru reviews it, and your Business Growth Report is assembled. Help articles explain what each screen is for — not only which button to tap.",
+      "This internship is the SitGuru Market Growth Project. The portal is where you do the work, SitGuru reviews it, and your Business Growth Report is assembled. The cover says Internship User Guide. Help articles explain what each screen is for — not only which button to tap.",
     contributes:
       "Your weekly check-ins, tasks, posts, campaigns, hours, and verified numbers become the report, a reusable playbook for SitGuru, and (if SitGuru approves a sanitized version) a portfolio case study. Your school still owns credit and hour counting. SitGuru letters are an employer snapshot, not a university grade.",
     category: "Getting started",
@@ -145,6 +185,8 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
     keywords: [
       "user guide",
       "student guide",
+      "student user guide",
+      "internship user guide",
       "how to",
       "intern portal",
       "syllabus",
@@ -152,12 +194,14 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       "print pdf",
       "word",
       "download",
+      "confidentiality footer",
     ],
     steps: [
       "Search this Help hub for the screen you are on.",
       "Open the matching article and follow the steps next to the screenshot.",
       "Watch the SitGuru videos on intern Help before you write SitGuru Feature posts.",
       "Print PDF for the illustrated guide, or download Word if your school wants a document copy.",
+      "The confidentiality footer is on every SitGuru User Guide page (online Help for this guide, Print PDF, and Word). It is for SitGuru’s template — not a stamp on intern-created portfolio work.",
       "Green buttons send, save, or submit. Only press them on your account when the work is ready.",
     ],
     tips: [
@@ -218,9 +262,9 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
   article("definitions", {
     title: "Definitions",
     summary:
-      "Intern-portal words, SitGuru Features, report dropdown sections, official socials, Events, PawPerks, and SitGuru AI.",
+      "Intern-portal words, Baseline & Growth Brief terms (baseline, locked, SMART, Tier 1, intern-reported, written brief, presentation), SitGuru Features, report chapters, and official socials.",
     purpose:
-      "After Contents in the student guide comes Definitions. This article is the same glossary: what the word means, how it helps your internship, and how to fill the matching field.",
+      "After Contents in the student guide comes Definitions. This article is the same glossary: what the word means, how it helps your internship, and how to fill the matching field. New Brief words live here too.",
     contributes:
       "Using the same words as SitGuru (Campaign, tracking link, Market Analysis, SitGuru Feature) is how your week files into the Business Growth Report instead of a loose note.",
     category: "Getting started",
@@ -232,6 +276,9 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       "which part of your report",
       "baseline",
       "locked baseline",
+      "baseline brief",
+      "written brief",
+      "presentation",
       "smart goal",
       "tier 1",
       "intern-reported",
@@ -419,17 +466,18 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
   article("home", {
     title: "Use Home each week",
     summary:
-      "Home is the weekly dashboard: school card, this week’s focus, jump tiles, live market totals, toolkit, and Growth workplace.",
+      "Home is the weekly dashboard: school card, this week’s focus, jump tiles, Brand kit, live market totals, toolkit, and Growth workplace.",
     purpose:
-      "Home answers “what should I do this week?” without dumping Admin analytics. The academic card is your school, program, term, and hours. Live totals are SitGuru market numbers with no customer names. Toolkit cards are shortcuts, not extra jobs.",
+      "Home answers “what should I do this week?” without dumping Admin analytics. The academic card is your school, program, term, and hours. Live totals are SitGuru market numbers with no customer names. Toolkit cards are shortcuts, not extra jobs. Brand kit is where you download logos and upload Canva files.",
     contributes:
-      "This is where you start the weekly check-in that writes your report, jump to open tasks, and open Growth workplace. If you skip Home, you still have Calendar / Work / Report / Metrics — but Home is the intern-facing summary of all of them.",
+      "This is where you start the weekly check-in that writes your report, jump to open tasks, open Brand kit, and open Growth workplace. If you skip Home, you still have Calendar / Work / Report / Metrics — but Home is the intern-facing summary of all of them.",
     category: "Getting started",
     tags: ["home", "dashboard", "week"],
-    keywords: ["welcome", "tasks to do", "this week", "live totals", "summary tiles"],
+    keywords: ["welcome", "tasks to do", "this week", "live totals", "summary tiles", "brand kit"],
     steps: [
       "Read this week’s focus at the top of Home.",
       "Tap This week, Open work, Metrics, or Social to jump to that work.",
+      "Open Brand kit to download official logos or upload Canva / CapCut files.",
       "Use the green bar: Home, Calendar, Work, Report, Metrics.",
     ],
     fields: [
@@ -448,6 +496,12 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
         label: "Live totals",
         meaning:
           "SitGuru market counts (people and social). They are not your personal grade and they never include Pet Parent names.",
+      },
+      {
+        label: "Brand kit",
+        meaning:
+          "Download official SitGuru logos and upload your Canva or CapCut files. SitGuru Green is #166534. White type on that green.",
+        example: "Campus flyer PNG using #166534, then upload it in Home → Brand kit.",
       },
     ],
     tips: [
@@ -532,11 +586,11 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
   article("weekly-checkin", {
     title: "Send your weekly check-in",
     summary:
-      "This is the writing that becomes your Business Growth Report. SitGuru reads it as your week’s story — what you shipped, what the numbers showed, and what you will change.",
+      "This is the writing that becomes your Business Growth Report. Pick which Final Growth Report chapter this week helped, then write what you added, tested, or learned.",
     purpose:
-      "The check-in is not a timesheet and not a chat. Each answer is stored as a contribution to a report section (Market Analysis, Audience Strategy, Pet Parent Growth, and so on). SitGuru uses it in supervisor review and to assemble the report you will finish by the end of the term. “What didn’t work” still counts — failed tests belong in Lessons learned.",
+      "The check-in is not a timesheet and not a chat. Each answer is stored as a contribution to a Final Growth Report chapter (Market Analysis, Audience Strategy, Pet Parent Growth, and so on). SitGuru uses it in supervisor review and to assemble the report you will finish by the end of the term. “What didn’t work” still counts — failed tests belong in Lessons learned.",
     contributes:
-      "Sending a complete week is how your report percent complete rises. Vague lines like “worked on social” do not give SitGuru anything to verify. Specifics (who you reached, which tracking link, what you would do differently) become Measurable outcomes once SitGuru checks the number, or Lessons learned if the test missed.",
+      "Sending a complete week is how your report percent complete rises. Vague lines like “worked on social” do not give SitGuru anything to verify. Specifics (which chapter, who you reached, which tracking link, what you tested, what you learned) become Measurable outcomes once SitGuru checks the number, or Lessons learned if the test missed.",
     category: "Weekly work",
     tags: ["check-in", "weekly", "report"],
     keywords: [
@@ -545,11 +599,16 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       "market analysis",
       "what didn’t work",
       "your number",
+      "final growth report",
+      "final growth report chapter",
+      "added",
+      "tested",
+      "learned",
     ],
     steps: [
       "On Home, open This week’s check-in.",
-      "Choose which part of your report this week helped.",
-      "Write what you added, finished, learned from the numbers, what did not work, and what’s next.",
+      "Choose which Final Growth Report chapter this week helped.",
+      "Write what you added, tested, or learned — plus what you finished, what the numbers showed, what did not work, and what’s next.",
       "Add Your number if SitGuru can check it, then tap Send this week to SitGuru.",
     ],
     fields: [
@@ -560,12 +619,12 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       {
         label: "Contribution to your report",
         meaning:
-          "Which chapter this week belongs in. Pick the closest fit. SitGuru can move it later. Market Analysis is research; Pet Parent / Guru Growth is people results; Content / Campaign System is how you posted; Analytics & Attribution is tracking-link proof; Business Growth Report is synthesis near the end.",
+          "Which Final Growth Report chapter this week belongs in. Pick the closest fit. SitGuru can move it later. Market Analysis is research; Pet Parent / Guru Growth is people results; Content / Campaign System is how you posted; Analytics & Attribution is tracking-link proof; Business Growth Report is synthesis near the end.",
         example: "A week spent building Instagram posts with a tracking link → Content System or Campaign System.",
       },
       {
         label: "What did you add or improve this week?",
-        meaning: "The new work — not a list of meetings. Who it reached and what you learned.",
+        meaning: "The new work — not a list of meetings. What you added, tested, or learned, who it reached, and what changed.",
         example: "Wrote and scheduled 3 Guru Spotlight drafts for Greater Philadelphia; SitGuru has not approved them yet.",
       },
       {
@@ -664,19 +723,22 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
   article("baseline-brief", {
     title: "Baseline & Growth Brief",
     summary:
-      "Weeks 1–2 required starting point for the Final Business Growth Report. Not just a file upload.",
-    purpose: BASELINE_GROWTH_BRIEF_PURPOSE,
+      "Weeks 1–2 Phase 1 of the Final Business Growth Report. Work → Tasks is no longer “attach a file.” You fill sections, upload three files, and wait for SitGuru approval.",
+    purpose: `${BASELINE_GROWTH_BRIEF_PURPOSE} This is not a generic task upload. You write the project and market, baseline metrics (Tier 1 / 2 / 3), audience, current situation (evidence, observation, or interpretation), three risks, three opportunities, SMART goals, and first experiments. Then you upload a Written Brief (DOC/DOCX/PDF, 2–5 pages), a Presentation (PPT/PPTX, 6–10 slides), and Supporting Evidence.`,
     contributes:
       `${BASELINE_GROWTH_BRIEF_COMPLETION} Approved sections carry into Executive Summary, Starting Position, Audience, Challenges, Opportunities, SMART goals, and the Initial Testing Plan. Draft work stays labeled Draft / Not Yet Approved.`,
     category: "Report & metrics",
     tags: ["baseline", "brief", "report", "smart"],
     keywords: [
       "baseline & growth brief",
+      "baseline brief",
       "baseline",
+      "locked",
       "locked baseline",
       "written brief",
       "presentation",
       "supporting evidence",
+      "smart",
       "smart goal",
       "tier 1",
       "intern-reported",
@@ -1076,7 +1138,20 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       "Following the kit keeps your drafts approvable. Files you upload in Brand kit become intern evidence SitGuru can check. SitGuru will send brand-breaking work back. That delay is intern time you do not get back.",
     category: "Intern toolkit",
     tags: ["brand", "logo", "green"],
-    keywords: ["#166534", "sitguru green", "rogue", "university logo", "mix-blend", "chopper", "vector prints", "upload"],
+    keywords: [
+      "#166534",
+      "sitguru green",
+      "brand kit",
+      "canva",
+      "capcut",
+      "rogue",
+      "university logo",
+      "mix-blend",
+      "chopper",
+      "vector prints",
+      "upload",
+      "download",
+    ],
     steps: [
       "On Home, tap Brand kit, or download logos from this Help article.",
       "Copy SitGuru Green #166534 (dark #102417, light #CFE6D5). Use white type on that green — never dark text.",
@@ -1519,6 +1594,21 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
 export function internHelpArticle(slug: string | null | undefined) {
   const id = String(slug || "").trim();
   return INTERN_HELP_ARTICLES.find((article) => article.slug === id) || null;
+}
+
+export function internHelpFeatured() {
+  return INTERN_HELP_FEATURED.flatMap((item) => {
+    const article = internHelpArticle(item.slug);
+    return article
+      ? [
+          {
+            ...item,
+            href: article.href,
+            title: article.title,
+          },
+        ]
+      : [];
+  });
 }
 
 export function internHelpByCategory(category: InternHelpCategory) {

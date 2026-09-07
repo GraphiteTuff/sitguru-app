@@ -4,12 +4,14 @@ import { INTERNSHIP_ONBOARDING_PATH } from "./onboarding";
 import { internPortalDestination, INTERNSHIP_HELP_PATH } from "./intern-growth";
 import {
   internHelpArticle,
+  internHelpFeatured,
   internHelpFileAllowed,
   internHelpMediaAllowed,
   internHelpMediaSrc,
   searchInternHelpArticles,
   INTERN_GUIDE_CONFIDENTIALITY,
   INTERN_HELP_ARTICLES,
+  INTERN_HELP_FEATURED,
 } from "./intern-help";
 import { internGuideSourceHtml, internGuideWordBuffer } from "./intern-guide-document";
 import { INTERN_WATCH_VIDEOS } from "./intern-glossary";
@@ -71,6 +73,22 @@ describe("intern help catalog", () => {
     assert.ok(internHelpArticle("business-growth-report"));
     const baseline = searchInternHelpArticles("baseline & growth brief");
     assert.ok(baseline.some((article) => article.slug === "baseline-brief"));
+    const baselineBrief = searchInternHelpArticles("baseline brief");
+    assert.ok(baselineBrief.some((article) => article.slug === "baseline-brief"));
+    const writtenBrief = searchInternHelpArticles("written brief");
+    assert.ok(writtenBrief.some((article) => article.slug === "baseline-brief"));
+    const presentation = searchInternHelpArticles("presentation");
+    assert.ok(presentation.some((article) => article.slug === "baseline-brief"));
+    const userGuide = searchInternHelpArticles("user guide");
+    assert.ok(userGuide.some((article) => article.slug === "student-guide"));
+    const internReported = searchInternHelpArticles("intern-reported");
+    assert.ok(
+      internReported.some(
+        (article) => article.slug === "baseline-brief" || article.slug === "definitions",
+      ),
+    );
+    const smart = searchInternHelpArticles("SMART");
+    assert.ok(smart.some((article) => article.slug === "baseline-brief" || article.slug === "definitions"));
     const locked = searchInternHelpArticles("locked baseline");
     assert.ok(locked.some((article) => article.slug === "baseline-brief" || article.slug === "definitions"));
     const tier = searchInternHelpArticles("tier 1");
@@ -80,6 +98,12 @@ describe("intern help catalog", () => {
     assert.doesNotMatch(JSON.stringify(briefArticle), /jasongraff1978@gmail\.com/i);
     assert.doesNotMatch(briefArticle?.purpose || "", /\bJason\b/);
     assert.doesNotMatch(briefArticle?.purpose || "", /Proprietary and confidential/i);
+    assert.deepEqual(
+      INTERN_HELP_FEATURED.map((item) => item.slug),
+      ["baseline-brief", "toolkit-brand", "student-guide", "business-growth-report", "definitions"],
+    );
+    assert.equal(internHelpFeatured().length, INTERN_HELP_FEATURED.length);
+    assert.ok(internHelpFeatured().every((item) => item.href.startsWith("/intern/help/")));
   });
 
   it("serves training screenshots from intern Help media, never Your page", () => {

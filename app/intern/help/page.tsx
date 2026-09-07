@@ -8,6 +8,7 @@ import {
   INTERN_HELP_ARTICLES,
   INTERN_HELP_CATEGORIES,
   internHelpByCategory,
+  internHelpFeatured,
 } from "@/lib/internship/intern-help";
 
 export const metadata: Metadata = {
@@ -31,10 +32,10 @@ export default async function InternHelpHomePage() {
           How can we help?
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm font-semibold text-slate-600 sm:text-base">
-          Search intern articles the same way as SitGuru Help. Each one explains
-          what the screen is for, how it counts toward your internship, and how
-          to fill the fields — check-in, hours, tracking links, Growth workplace,
-          and intern-safe rules.
+          Search intern articles the same way as SitGuru Help. Start with the
+          Baseline &amp; Growth Brief, Brand kit, Student User Guide, Business
+          Growth Report, and Definitions. Each article explains what the screen
+          is for, why it matters for the report, and how to fill the fields.
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3">
@@ -42,6 +43,57 @@ export default async function InternHelpHomePage() {
           <InternGuideDownloads />
         </div>
       </div>
+
+      <section className="mt-10 w-full text-left">
+        <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-400">
+          What’s new
+        </h2>
+        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+          Start here if you just opened the portal this term. These cards match
+          the Work, Home, and Report screens that just shipped.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {internHelpFeatured().map((item) =>
+            item.highlight ? (
+              <Link
+                key={item.slug}
+                href={item.href}
+                className="public-dark-section rounded-3xl p-5 shadow-sm transition hover:shadow-md sm:col-span-2"
+                data-brand-green
+                style={{ backgroundColor: "#166534" }}
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] !text-white">
+                  {item.eyebrow}
+                </p>
+                <h3 className="mt-2 text-lg font-black tracking-[-0.03em] !text-white">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm font-semibold leading-6 !text-white">
+                  {item.blurb}
+                </p>
+                <p className="mt-3 text-sm font-black !text-white">Open article →</p>
+              </Link>
+            ) : (
+              <Link
+                key={item.slug}
+                href={item.href}
+                className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md"
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                  {item.eyebrow}
+                </p>
+                <h3 className="mt-2 text-lg font-black tracking-[-0.03em] text-slate-950">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  {item.blurb}
+                </p>
+                <p className="mt-3 text-sm font-black text-emerald-800">Open article →</p>
+              </Link>
+            ),
+          )}
+        </div>
+      </section>
 
       <div className="mt-12 w-full">
         <InternHelpWatchVideos />
