@@ -166,7 +166,11 @@ export default function InternOnboardingForm({
       </section>
 
       <section className="rounded-[1.75rem] border border-emerald-100 bg-white p-5">
-        <h2 className="font-black text-slate-950">2. Confidentiality notice</h2>
+        <h2 className="font-black text-slate-950">2. Intern agreement</h2>
+        <p className="mt-2 text-sm font-semibold text-slate-600">
+          This is the SitGuru Intern Confidentiality, Intellectual Property &amp; Professional
+          Conduct Agreement. It is separate from the internship syllabus.
+        </p>
         <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <InternConfidentialityNotice compact />
         </div>
@@ -179,7 +183,7 @@ export default function InternOnboardingForm({
             <input type="hidden" name="internId" value={intern.id} />
             <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
               <input type="checkbox" name="agreeConfidential" required className="mt-1" />
-              I have read the notice and agree to protect SitGuru confidential information.
+              I have read this agreement and agree to protect SitGuru confidential information.
             </label>
             <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
               <input type="checkbox" name="agreeOwnership" required className="mt-1" />
@@ -191,6 +195,13 @@ export default function InternOnboardingForm({
               <input type="checkbox" name="agreeTools" required className="mt-1" />
               I will not put SitGuru confidential information into unapproved AI or
               other third-party tools, and I will not share credentials.
+            </label>
+            <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
+              <input type="checkbox" name="agreeLimitedProtection" required className="mt-1" />
+              I will not use SitGuru confidential information to establish, operate, or
+              materially assist a directly competing pet care marketplace during the
+              internship and for twelve months after it ends. This is not a ban on working
+              for another pet care company or elsewhere in the pet industry.
             </label>
             <label className="block">
               <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-800">

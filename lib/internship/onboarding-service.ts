@@ -101,7 +101,7 @@ export async function recordInternAccessRules(internId: string): Promise<InternO
     ...internOnboardingIdentitySnapshot(intern, workspace),
   });
   if (error) return { ok: false, error: error.message };
-  return { ok: true, message: "Access rules accepted. Sign the confidentiality notice next." };
+  return { ok: true, message: "Access rules accepted. Sign the intern agreement next." };
 }
 
 export async function recordInternElectronicSignature(input: {
@@ -112,6 +112,7 @@ export async function recordInternElectronicSignature(input: {
   agreeConfidential: boolean;
   agreeOwnership: boolean;
   agreeTools: boolean;
+  agreeLimitedProtection: boolean;
 }): Promise<InternOnboardingResult> {
   const intern = await findInternById(input.internId);
   if (!intern) return { ok: false, error: "Intern record not found." };
@@ -119,7 +120,12 @@ export async function recordInternElectronicSignature(input: {
   if (!ack?.accessRulesAcceptedAt || ack.policyVersion !== INTERN_ONBOARDING_POLICY_VERSION) {
     return { ok: false, error: "Accept the intern access rules first." };
   }
-  if (!input.agreeConfidential || !input.agreeOwnership || !input.agreeTools) {
+  if (
+    !input.agreeConfidential ||
+    !input.agreeOwnership ||
+    !input.agreeTools ||
+    !input.agreeLimitedProtection
+  ) {
     return { ok: false, error: "Check all acknowledgment boxes before signing." };
   }
   if (!internNamesMatch(input.typedLegalName, intern.fullName)) {

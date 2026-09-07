@@ -2,6 +2,9 @@ import { internHelpPath, INTERNSHIP_HELP_PATH } from "@/lib/internship/intern-gr
 
 export { INTERNSHIP_HELP_PATH };
 
+export const INTERN_GUIDE_PRINT_PATH = internHelpPath("print");
+export const INTERN_GUIDE_WORD_HREF = `${INTERNSHIP_HELP_PATH}/export?format=word`;
+
 export const INTERN_HELP_INBOX = "intern@sitguru.com";
 
 export type InternHelpCategory =
@@ -76,7 +79,7 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
     summary:
       "Picture walkthrough of every student area, in the order you use them. Match the screenshots to your portal.",
     category: "Getting started",
-    tags: ["guide", "walkthrough", "screenshots", "help"],
+    tags: ["guide", "walkthrough", "screenshots", "help", "pdf", "word"],
     keywords: [
       "user guide",
       "student guide",
@@ -84,10 +87,14 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       "intern portal",
       "syllabus",
       "spring 2027",
+      "print pdf",
+      "word",
+      "download",
     ],
     steps: [
       "Search this Help hub for the screen you are on.",
       "Open the matching article and follow the steps next to the screenshot.",
+      "Print PDF for the illustrated guide, or download Word if your school wants a document copy.",
       "Green buttons send, save, or submit. Only press them on your account when the work is ready.",
     ],
     shots: [
@@ -97,7 +104,7 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
         caption: "Spring 2027 internship. SitGuru runs the program. Your school counts credits and hours.",
       },
     ],
-    note: "Screenshots in Help come from a SitGuru training intern login. Your name, school, and numbers will be yours.",
+    note: "Screenshots in Help come from a SitGuru training intern login. Your name, school, and numbers will be yours. Print PDF saves the illustrated walkthrough. Download Word for a .docx copy with the same screenshots.",
   }),
   article("login", {
     title: "Log in to the intern portal",
@@ -125,10 +132,11 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       "upload",
       "email on file",
       "confidentiality",
+      "intern agreement",
     ],
     steps: [
       "Read the intern-safe access rules and confirm them.",
-      "Read the confidentiality notice and sign electronically with your legal name.",
+      "Read the intern agreement and sign electronically with your legal name.",
       "Print the page or photograph a signed printout, then upload the PDF or photo.",
       "Submit. Confirmation is emailed to your email on file. Then open the intern portal.",
     ],
@@ -566,6 +574,8 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       "pii",
       "portfolio",
       "university logo",
+      "credentials",
+      "competing marketplace",
     ],
     steps: [
       "Use only the intern portal and Growth workplace.",
@@ -574,6 +584,8 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       "Keep customer names and emails out of drafts, class slides, and portfolios.",
       "Do not count a result as yours until SitGuru verifies it.",
       "Drafts wait for SitGuru. A cleaned-up portfolio version needs written approval.",
+      "Do not use SitGuru confidential information to build or help a competing pet care marketplace. Working in pet care is still allowed.",
+      "When the internship ends, return or delete SitGuru credentials and internal data.",
     ],
     shots: [],
   }),

@@ -1033,6 +1033,7 @@ export async function signInternConfidentiality(formData: FormData) {
     agreeConfidential: formData.get("agreeConfidential") === "on",
     agreeOwnership: formData.get("agreeOwnership") === "on",
     agreeTools: formData.get("agreeTools") === "on",
+    agreeLimitedProtection: formData.get("agreeLimitedProtection") === "on",
   });
   if (!result.ok) bounce(INTERNSHIP_ONBOARDING_PATH, "error", result.error);
   refreshInternship(INTERNSHIP_ONBOARDING_PATH);

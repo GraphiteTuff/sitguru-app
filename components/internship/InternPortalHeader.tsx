@@ -23,7 +23,7 @@ export default function InternPortalHeader({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  if (pathname === "/intern/onboarding/print") return null;
+  if (pathname === "/intern/onboarding/print" || pathname === "/intern/help/print") return null;
 
   return (
     <header className="sticky top-0 z-50 border-b border-amber-200/80 bg-[#FAF6EE]/95 shadow-sm backdrop-blur print:hidden">

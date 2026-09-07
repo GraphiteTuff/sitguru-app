@@ -69,7 +69,10 @@ describe("intern onboarding gate", () => {
     assert.equal(state.onboarded, false);
     assert.equal(state.requiredPolicyVersion, INTERN_ONBOARDING_POLICY_VERSION);
     assert.equal(state.step, "access");
-    assert.match(state.notice.sections[3].heading, /Ownership and assignment/);
+    const ownership = state.notice.sections.find((section) =>
+      section.heading.includes("Ownership and assignment"),
+    );
+    assert.ok(ownership);
   });
 
   it("walks access rules, then e-sign, then upload, then submit", () => {
@@ -100,6 +103,23 @@ describe("intern onboarding gate", () => {
     assert.match(String(ownership?.body || ""), /hereby assigns/);
     assert.match(String(prohibited?.body || ""), /generative AI/);
     assert.match(INTERN_CONFIDENTIALITY_NOTICE.intro, /SitGuru policy/);
+  });
+
+  it("uses a limited information-use clause, not a named-company job ban", () => {
+    const limited = INTERN_CONFIDENTIALITY_NOTICE.sections.find((section) =>
+      section.heading.includes("Limited protection"),
+    );
+    const text = [
+      INTERN_CONFIDENTIALITY_NOTICE.title,
+      INTERN_CONFIDENTIALITY_NOTICE.intro,
+      ...INTERN_CONFIDENTIALITY_NOTICE.sections.map((section) => `${section.heading} ${section.body}`),
+    ].join("\n");
+    assert.match(String(limited?.body || ""), /directly competing pet care marketplace/);
+    assert.match(String(limited?.body || ""), /does not prohibit the intern from working for another pet care company/);
+    assert.match(INTERN_CONFIDENTIALITY_NOTICE.intro, /not a traditional non-compete/);
+    assert.match(INTERN_CONFIDENTIALITY_NOTICE.subtitle, /separate from the syllabus/);
+    assert.doesNotMatch(text, /\bRover\b/i);
+    assert.doesNotMatch(text, /\bWag\b/i);
   });
 
   it("requires the typed name to match the intern record", () => {

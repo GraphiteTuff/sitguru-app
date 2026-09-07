@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import InternHelpSearchBar from "@/components/internship/InternHelpSearchBar";
+import InternGuideDownloads from "@/components/internship/InternGuideDownloads";
 import { requireInternHelpAccess } from "@/lib/internship/intern-help-access";
 import {
   INTERN_HELP_ARTICLES,
@@ -33,8 +34,9 @@ export default async function InternHelpHomePage() {
           tracking links, Growth workplace, and intern-safe rules.
         </p>
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex flex-col items-center gap-3">
           <InternHelpSearchBar autoFocus />
+          <InternGuideDownloads />
         </div>
 
         <div className="mt-10 grid gap-3 text-left sm:grid-cols-2">

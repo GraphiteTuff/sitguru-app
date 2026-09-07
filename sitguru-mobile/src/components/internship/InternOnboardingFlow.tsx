@@ -47,6 +47,7 @@ export default function InternOnboardingFlow({ payload, onReload }: Props) {
   const [agreeConfidential, setAgreeConfidential] = useState(false);
   const [agreeOwnership, setAgreeOwnership] = useState(false);
   const [agreeTools, setAgreeTools] = useState(false);
+  const [agreeLimitedProtection, setAgreeLimitedProtection] = useState(false);
   const [typedName, setTypedName] = useState(payload.intern?.fullName || '');
 
   const step = payload.step || 'access';
@@ -134,6 +135,7 @@ export default function InternOnboardingFlow({ payload, onReload }: Props) {
         agreeConfidential,
         agreeOwnership,
         agreeTools,
+        agreeLimitedProtection,
       });
       return;
     }
@@ -209,7 +211,7 @@ export default function InternOnboardingFlow({ payload, onReload }: Props) {
 
       {payload.accessDone && (step === 'esign' || !payload.signed) ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{payload.notice?.title || 'Confidentiality notice'}</Text>
+          <Text style={styles.cardTitle}>{payload.notice?.title || 'Intern agreement'}</Text>
           <Text style={styles.caption}>{payload.notice?.employer}</Text>
           <Text style={styles.body}>{payload.notice?.intro}</Text>
           {(payload.notice?.sections || []).map((section) => (
@@ -221,7 +223,7 @@ export default function InternOnboardingFlow({ payload, onReload }: Props) {
           <TouchTarget onPress={() => setAgreeConfidential((value) => !value)} style={styles.checkRow}>
             <Text style={styles.check}>{agreeConfidential ? '☑' : '☐'}</Text>
             <Text style={styles.checkLabel}>
-              I have read the notice and agree to protect SitGuru confidential information.
+              I have read this agreement and agree to protect SitGuru confidential information.
             </Text>
           </TouchTarget>
           <TouchTarget onPress={() => setAgreeOwnership((value) => !value)} style={styles.checkRow}>
@@ -234,6 +236,12 @@ export default function InternOnboardingFlow({ payload, onReload }: Props) {
             <Text style={styles.check}>{agreeTools ? '☑' : '☐'}</Text>
             <Text style={styles.checkLabel}>
               I will not put SitGuru confidential information into unapproved AI or other third-party tools, and I will not share credentials.
+            </Text>
+          </TouchTarget>
+          <TouchTarget onPress={() => setAgreeLimitedProtection((value) => !value)} style={styles.checkRow}>
+            <Text style={styles.check}>{agreeLimitedProtection ? '☑' : '☐'}</Text>
+            <Text style={styles.checkLabel}>
+              I will not use SitGuru confidential information to establish, operate, or materially assist a directly competing pet care marketplace during the internship and for twelve months after it ends. This is not a ban on working for another pet care company or elsewhere in the pet industry.
             </Text>
           </TouchTarget>
           <TextInput

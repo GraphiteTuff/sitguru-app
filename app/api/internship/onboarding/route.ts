@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
   let agreeConfidential = false;
   let agreeOwnership = false;
   let agreeTools = false;
+  let agreeLimitedProtection = false;
   let file: File | null = null;
 
   if (contentType.includes("multipart/form-data")) {
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
     agreeConfidential = agreed(form.get("agreeConfidential"));
     agreeOwnership = agreed(form.get("agreeOwnership"));
     agreeTools = agreed(form.get("agreeTools"));
+    agreeLimitedProtection = agreed(form.get("agreeLimitedProtection"));
     const value = form.get("file");
     if (value && typeof value !== "string") file = value as File;
   } else {
@@ -89,6 +91,7 @@ export async function POST(req: NextRequest) {
     agreeConfidential = agreed(body.agreeConfidential);
     agreeOwnership = agreed(body.agreeOwnership);
     agreeTools = agreed(body.agreeTools);
+    agreeLimitedProtection = agreed(body.agreeLimitedProtection);
   }
 
   let result;
@@ -106,6 +109,7 @@ export async function POST(req: NextRequest) {
       agreeConfidential,
       agreeOwnership,
       agreeTools,
+      agreeLimitedProtection,
     });
   } else if (action === "upload") {
     if (!file) return json(req, { error: "Choose the signed PDF or photo." }, 400);

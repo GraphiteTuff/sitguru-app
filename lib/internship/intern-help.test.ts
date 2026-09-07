@@ -30,6 +30,8 @@ describe("intern help catalog", () => {
     assert.ok(hours.some((article) => article.slug === "report-hours"));
     const tracking = searchInternHelpArticles("tracking link");
     assert.ok(tracking.some((article) => article.slug === "toolkit-tracking"));
+    const pdf = searchInternHelpArticles("print pdf");
+    assert.ok(pdf.some((article) => article.slug === "student-guide"));
   });
 
   it("serves training screenshots from intern Help media, never Your page", () => {
@@ -53,6 +55,7 @@ describe("intern help catalog", () => {
       internPortalDestination("/intern/help/onboarding", false),
       "/intern/help/onboarding",
     );
+    assert.equal(internPortalDestination("/intern/help/print", false), "/intern/help/print");
     assert.equal(
       internPortalDestination("/intern/growth", false),
       INTERNSHIP_ONBOARDING_PATH,

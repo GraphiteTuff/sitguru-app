@@ -64,9 +64,11 @@ export default async function InternOnboardingPrintPage() {
         <InternConfidentialityNotice printSheet />
         <div className="mt-3 border-t border-slate-200 pt-3 text-[10px] font-semibold text-slate-700">
           <p>
-            I have read this notice and agree to its confidentiality, data-security, and
-            ownership and assignment terms. SitGuru policy also requires this printed
-            wet-ink copy as an extra record.
+            I have read this Intern Confidentiality, Intellectual Property &amp; Professional
+            Conduct Agreement and agree to its confidentiality, intellectual-property, data
+            protection, credential, limited non-solicitation, and limited information-use
+            terms. This agreement is separate from the internship syllabus. SitGuru policy
+            also requires this printed wet-ink copy as an extra record.
           </p>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <p>Printed name: {intern.fullName}</p>
