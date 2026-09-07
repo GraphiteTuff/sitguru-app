@@ -161,8 +161,8 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
     shots: [
       {
         file: "assets/syllabus-cover.jpg",
-        alt: "SitGuru Spring 2027 Social Media & Community Growth Internship student user guide cover",
-        caption: "Spring 2027 student user guide. SitGuru runs the program. Your school counts credits and hours.",
+        alt: "SitGuru Spring 2027 Internship User Guide cover for the Social Media & Community Growth Internship Program",
+        caption: "Spring 2027 Internship User Guide. SitGuru runs the program. Your school counts credits and hours.",
       },
     ],
     note: "Screenshots in Help come from a SitGuru training intern login. Your name, school, and numbers will be yours. Print PDF saves the illustrated walkthrough. Download Word for a .docx copy with the same screenshots.",

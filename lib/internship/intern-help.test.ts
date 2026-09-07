@@ -80,6 +80,12 @@ describe("intern help catalog", () => {
     );
     assert.equal(internHelpMediaAllowed("screenshots/01-home-welcome.png"), true);
     assert.equal(internHelpMediaAllowed("assets/syllabus-cover.jpg"), true);
+    const studentGuide = internHelpArticle("student-guide");
+    assert.equal(studentGuide?.shots[0]?.file, "assets/syllabus-cover.jpg");
+    assert.match(studentGuide?.shots[0]?.alt || "", /Spring 2027 Internship User Guide/);
+    assert.match(studentGuide?.shots[0]?.caption || "", /Spring 2027 Internship User Guide/);
+    assert.doesNotMatch(studentGuide?.shots[0]?.alt || "", /Syllabus/);
+    assert.doesNotMatch(studentGuide?.shots[0]?.caption || "", /Syllabus/);
     assert.equal(internHelpMediaAllowed("assets/sitguru-university-guide.jpg"), true);
     assert.equal(internHelpMediaAllowed("assets/brand/sitguru-logo-horizontal.jpg"), true);
     assert.equal(internHelpMediaAllowed("screenshots/17-your-page.png"), false);

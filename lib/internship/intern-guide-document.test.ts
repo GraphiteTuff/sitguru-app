@@ -15,6 +15,8 @@ describe("intern student user guide downloads", () => {
   it("rewrites screenshot paths to intern Help media", async () => {
     const html = internGuidePortalHtml(await internGuideSourceHtml());
     assert.match(html, /\/intern\/help\/media\/assets\/syllabus-cover\.jpg/);
+    assert.match(html, /Spring 2027 Internship User Guide cover/);
+    assert.doesNotMatch(html, /syllabus cover/i);
     assert.match(html, /\/intern\/help\/media\/screenshots\/26-onboarding\.png/);
     assert.doesNotMatch(html, /\bsrc="screenshots\//);
   });
