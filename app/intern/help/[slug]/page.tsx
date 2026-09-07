@@ -57,7 +57,15 @@ export default async function InternHelpArticlePage({
   return (
     <div className="mx-auto w-full max-w-[1500px] px-3 py-4 sm:px-5">
     <InternHelpChrome article={article}>
-      {article.slug === "student-guide" ? <InternGuideDownloads /> : null}
+      {article.slug === "student-guide" ? (
+        <>
+          <InternGuideDownloads />
+          <InternHelpFileDownloads ids={["onboarding-inprocessing"]} />
+        </>
+      ) : null}
+      {article.slug === "onboarding" ? (
+        <InternHelpFileDownloads ids={["onboarding-inprocessing"]} />
+      ) : null}
       {article.slug === "watch-sitguru" ? <InternHelpWatchVideos /> : null}
       {article.slug === "toolkit-brand" ? (
         <InternHelpBrandLogos internId={brandInternId} attachments={brandAttachments} />

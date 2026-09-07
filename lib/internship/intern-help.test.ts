@@ -6,6 +6,7 @@ import {
   internHelpArticle,
   internHelpFeatured,
   internHelpFileAllowed,
+  internHelpFileContentType,
   internHelpMediaAllowed,
   internHelpMediaSrc,
   searchInternHelpArticles,
@@ -76,7 +77,29 @@ describe("intern help catalog", () => {
     assert.ok(internHelpArticle("sitguru-university"));
     assert.equal(internHelpFileAllowed("best-pa-nj-vendor-events.docx"), true);
     assert.equal(internHelpFileAllowed("stripe-setup.docx"), true);
+    assert.equal(
+      internHelpFileAllowed("sitguru-internship-onboarding-inprocessing-spring-2027.pptx"),
+      true,
+    );
     assert.equal(internHelpFileAllowed("secret.env"), false);
+    assert.equal(
+      internHelpFileContentType("sitguru-internship-onboarding-inprocessing-spring-2027.pptx"),
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    );
+    assert.equal(
+      internHelpFileContentType("stripe-setup.docx"),
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    const onboardingDeck = searchInternHelpArticles("onboarding deck");
+    assert.ok(
+      onboardingDeck.some((article) => article.slug === "onboarding" || article.slug === "student-guide"),
+    );
+    const inprocessing = searchInternHelpArticles("inprocessing");
+    assert.ok(inprocessing.some((article) => article.slug === "onboarding"));
+    const onboardingArticle = internHelpArticle("onboarding");
+    assert.doesNotMatch(JSON.stringify(onboardingArticle), /jasongraff1978@gmail\.com/i);
+    assert.doesNotMatch(onboardingArticle?.purpose || "", /\bJason\b/);
+    assert.match(onboardingArticle?.purpose || "", /Onboarding & Inprocessing PowerPoint/);
     const brandGreen = searchInternHelpArticles("#166534");
     assert.ok(brandGreen.some((article) => article.slug === "toolkit-brand"));
     const brandUpload = searchInternHelpArticles("your brand files");

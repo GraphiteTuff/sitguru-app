@@ -27,6 +27,11 @@ export const INTERN_HELP_INBOX = "intern@sitguru.com";
 
 export const INTERN_HELP_FILES = [
   {
+    id: "onboarding-inprocessing" as const,
+    filename: "sitguru-internship-onboarding-inprocessing-spring-2027.pptx",
+    title: "Onboarding & inprocessing deck",
+  },
+  {
     id: "best-pa-nj-vendor-events" as const,
     filename: "best-pa-nj-vendor-events.docx",
     title: "PA & NJ vendor events",
@@ -44,6 +49,17 @@ export function internHelpFileHref(filename: string) {
 
 export function internHelpFileAllowed(filename: string) {
   return INTERN_HELP_FILES.some((file) => file.filename === filename);
+}
+
+export function internHelpFileContentType(filename: string) {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".pptx")) {
+    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  }
+  if (lower.endsWith(".docx")) {
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  }
+  return "application/octet-stream";
 }
 
 export type InternHelpCategory =
@@ -175,9 +191,9 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
   article("student-guide", {
     title: "Intern Portal student user guide",
     summary:
-      "Spring 2027 Internship User Guide — not a syllabus. Use Help for field meanings. Print PDF or Word when your school wants a SitGuru copy.",
+      "Spring 2027 Internship User Guide — not a syllabus. Use Help for field meanings. Print PDF or Word when your school wants a SitGuru copy. Download the Onboarding & Inprocessing deck for first-week training.",
     purpose:
-      "This internship is the SitGuru Market Growth Project. The portal is where you do the work, SitGuru reviews it, and your Business Growth Report is assembled. The cover says Internship User Guide. Help articles explain what each screen is for — not only which button to tap.",
+      "This internship is the SitGuru Market Growth Project. The portal is where you do the work, SitGuru reviews it, and your Business Growth Report is assembled. The cover says Internship User Guide. Help articles explain what each screen is for — not only which button to tap. The Onboarding & Inprocessing PowerPoint is SitGuru’s official first-week training deck.",
     contributes:
       "Your weekly check-ins, tasks, posts, campaigns, hours, and verified numbers become the report, a reusable playbook for SitGuru, and (if SitGuru approves a sanitized version) a portfolio case study. Your school still owns credit and hour counting. SitGuru letters are an employer snapshot, not a university grade.",
     category: "Getting started",
@@ -195,13 +211,19 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       "word",
       "download",
       "confidentiality footer",
+      "onboarding deck",
+      "inprocessing",
+      "powerpoint",
+      "pptx",
+      "training slides",
     ],
     steps: [
       "Search this Help hub for the screen you are on.",
       "Open the matching article and follow the steps next to the screenshot.",
       "Watch the SitGuru videos on intern Help before you write SitGuru Feature posts.",
       "Print PDF for the illustrated guide, or download Word if your school wants a document copy.",
-      "The confidentiality footer is on every SitGuru User Guide page (online Help for this guide, Print PDF, and Word). It is for SitGuru’s template — not a stamp on intern-created portfolio work.",
+      "Download the Onboarding & Inprocessing PowerPoint for official first-week training (agreement, hours, portal, Help, Brand kit, tracking links, Baseline & Growth Brief).",
+      "The confidentiality footer is on every SitGuru User Guide page and on SitGuru’s own training deck. It is for SitGuru’s template — not a stamp on intern-created portfolio work.",
       "Green buttons send, save, or submit. Only press them on your account when the work is ready.",
     ],
     tips: [
@@ -216,7 +238,7 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
         caption: "Spring 2027 Internship User Guide. SitGuru runs the program. Your school counts credits and hours.",
       },
     ],
-    note: "Screenshots in Help come from a SitGuru training intern login. Your name, school, and numbers will be yours. Print PDF saves the illustrated walkthrough. Download Word for a .docx copy with the same screenshots.",
+    note: "Screenshots in Help come from a SitGuru training intern login. Your name, school, and numbers will be yours. Print PDF saves the illustrated walkthrough. Download Word for a .docx copy with the same screenshots. The Onboarding & Inprocessing deck is SitGuru’s official first-week training — its confidentiality footer is SitGuru’s template, not a stamp for intern portfolio slides.",
   }),
   article("watch-sitguru", {
     title: "Watch SitGuru videos",
@@ -408,13 +430,13 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
   article("onboarding", {
     title: "Complete intern onboarding",
     summary:
-      "Four steps unlock Home, Work, Report, Metrics, and Growth workplace: access rules, intern agreement, print-sign-upload, then submit.",
+      "Four steps unlock Home, Work, Report, Metrics, and Growth workplace: access rules, intern agreement, print-sign-upload, then submit. Download the official Onboarding & Inprocessing deck for the first-week walkthrough.",
     purpose:
-      "Onboarding is the intern agreement and access rules — separate from the syllabus your school receives. The syllabus explains the educational program. The agreement covers confidentiality, internship work product, credentials, and limited post-internship duties. SitGuru policy also keeps a printed wet-ink copy as an extra record.",
+      "Onboarding is the intern agreement and access rules — separate from the syllabus your school receives. The syllabus explains the educational program. The agreement covers confidentiality, internship work product, credentials, and limited post-internship duties. SitGuru policy also keeps a printed wet-ink copy as an extra record. The Onboarding & Inprocessing PowerPoint is SitGuru’s official training deck for those steps plus hours, Help, Brand kit, tracking links, and the Baseline & Growth Brief.",
     contributes:
       "Until onboarding is fully executed, the portal stays locked so you cannot see intern tools or Growth workplace. Completing it is how you get to the work that fills your Business Growth Report. Confirmation goes to your email on file, not a personal SitGuru HQ address on the submit screen.",
     category: "Getting started",
-    tags: ["onboarding", "signature", "confidential"],
+    tags: ["onboarding", "signature", "confidential", "inprocessing"],
     keywords: [
       "access rules",
       "wet ink",
@@ -423,8 +445,14 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
       "email on file",
       "confidentiality",
       "intern agreement",
+      "onboarding deck",
+      "inprocessing",
+      "powerpoint",
+      "pptx",
+      "training slides",
     ],
     steps: [
+      "Download the Onboarding & Inprocessing PowerPoint from this page and read it before you start public campaign work.",
       "Read the intern-safe access rules and confirm them.",
       "Read the intern agreement and sign electronically with your legal name.",
       "Print the page or photograph a signed printout, then upload the PDF or photo.",
@@ -452,7 +480,8 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
     ],
     tips: [
       "If the typed name does not match your intern record, the electronic signature will not save.",
-      "Email confirmation goes to the intern email and student email on file.",
+      "Email confirmation goes to the intern email and student email on file. Questions: intern@sitguru.com.",
+      "The confidentiality footer on the Onboarding & Inprocessing deck is SitGuru’s template notice — do not stamp it on intern-created portfolio slides.",
     ],
     shots: [
       {
