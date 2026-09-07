@@ -814,11 +814,9 @@ export function baselineAttachmentCategory(value: string | null | undefined): Ba
     : null;
 }
 
-export function attachmentsForBriefCategory(
-  attachments: Array<{ itemType: string; itemId: string; caption?: string; category?: string }> | null | undefined,
-  itemId: string,
-  category: BaselineAttachmentCategory,
-) {
+export function attachmentsForBriefCategory<
+  T extends { itemType: string; itemId: string; caption?: string; category?: string },
+>(attachments: T[] | null | undefined, itemId: string, category: BaselineAttachmentCategory) {
   return (attachments || []).filter((row) => {
     if (row.itemId !== itemId) return false;
     if (row.itemType !== "task" && row.itemType !== "brief" && row.itemType !== "presentation" && row.itemType !== "evidence") {
@@ -1022,12 +1020,21 @@ export type BaselineBriefChecklist = {
   supervisorReview: boolean;
 };
 
+export type BaselineBriefSmartGoalInput = Pick<
+  InternshipSmartGoal,
+  "id" | "specific" | "targetValue" | "baselineValue" | "status"
+> &
+  Partial<InternshipSmartGoal>;
+
+export type BaselineBriefExperimentInput = Pick<InternshipExperiment, "id" | "hypothesis" | "action"> &
+  Partial<InternshipExperiment>;
+
 export function baselineBriefChecklist(input: {
   payload: BaselineBriefPayload;
   attachments?: InternshipWorkAttachment[];
   taskId: string;
-  smartGoals?: InternshipSmartGoal[];
-  experiments?: InternshipExperiment[];
+  smartGoals?: BaselineBriefSmartGoalInput[];
+  experiments?: BaselineBriefExperimentInput[];
   metrics?: InternshipMetric[];
 }): BaselineBriefChecklist {
   const { payload, taskId } = input;
@@ -1171,8 +1178,8 @@ export type BaselineReportBlock = {
 export function mapApprovedBriefToReportSections(input: {
   payload: BaselineBriefPayload;
   approved: boolean;
-  smartGoals?: InternshipSmartGoal[];
-  experiments?: InternshipExperiment[];
+  smartGoals?: BaselineBriefSmartGoalInput[];
+  experiments?: BaselineBriefExperimentInput[];
 }): BaselineReportBlock[] {
   if (!input.approved) return [];
   const { payload } = input;
