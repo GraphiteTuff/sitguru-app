@@ -88,7 +88,7 @@ export default function InternWorkAttachments({
             className="min-h-11 w-full rounded-xl border border-emerald-100 bg-white px-3 py-2 text-sm font-semibold"
           />
           <button className={`${internPrimaryBtnClass} min-h-11 px-4 text-xs`}>
-            Attach
+            {itemType === "brand" ? "Upload" : "Attach"}
           </button>
         </form>
       ) : null}

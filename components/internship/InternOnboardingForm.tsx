@@ -58,7 +58,7 @@ export default function InternOnboardingForm({
       <section
         className="public-dark-section rounded-[1.75rem] p-5 sm:p-6"
         data-brand-green
-        style={{ background: "#0D5C3A" }}
+        style={{ background: "#166534" }}
       >
         <p className="text-[11px] font-black uppercase tracking-[0.2em] !text-white/80">
           Required before portal access

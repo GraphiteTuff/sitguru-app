@@ -62,6 +62,11 @@ describe("intern help catalog", () => {
     assert.ok(brandGreen.some((article) => article.slug === "toolkit-brand"));
     const brandUpload = searchInternHelpArticles("your brand files");
     assert.ok(brandUpload.some((article) => article.slug === "toolkit-brand"));
+    const reportDraft = searchInternHelpArticles("starting point");
+    assert.ok(reportDraft.some((article) => article.slug === "business-growth-report"));
+    const weekFifteen = searchInternHelpArticles("week 15");
+    assert.ok(weekFifteen.some((article) => article.slug === "business-growth-report"));
+    assert.ok(internHelpArticle("business-growth-report"));
   });
 
   it("serves training screenshots from intern Help media, never Your page", () => {

@@ -14,6 +14,8 @@ import {
   internHelpArticle,
   INTERN_HELP_ARTICLES,
 } from "@/lib/internship/intern-help";
+import { getInternWorkspace } from "@/lib/internship/queries";
+import type { InternshipWorkAttachment } from "@/lib/internship/types";
 
 export const dynamic = "force-dynamic";
 
@@ -39,16 +41,27 @@ export default async function InternHelpArticlePage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  await requireInternHelpAccess();
+  const access = await requireInternHelpAccess();
   const article = internHelpArticle((await params).slug);
   if (!article) notFound();
+
+  let brandInternId = "";
+  let brandAttachments: InternshipWorkAttachment[] = [];
+  const intern = "intern" in access ? access.intern : null;
+  if (article.slug === "toolkit-brand" && intern?.id) {
+    const workspace = await getInternWorkspace(intern.id);
+    brandInternId = intern.id;
+    brandAttachments = workspace?.attachments || [];
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1500px] px-3 py-4 sm:px-5">
     <InternHelpChrome article={article}>
       {article.slug === "student-guide" ? <InternGuideDownloads /> : null}
       {article.slug === "watch-sitguru" ? <InternHelpWatchVideos /> : null}
-      {article.slug === "toolkit-brand" ? <InternHelpBrandLogos /> : null}
+      {article.slug === "toolkit-brand" ? (
+        <InternHelpBrandLogos internId={brandInternId} attachments={brandAttachments} />
+      ) : null}
       {article.slug === "vendor-events" ? (
         <InternHelpFileDownloads ids={["best-pa-nj-vendor-events"]} />
       ) : null}

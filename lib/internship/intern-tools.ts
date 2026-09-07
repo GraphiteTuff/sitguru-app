@@ -6,7 +6,7 @@ export const INTERN_HOME_TOOLS = [
   {
     id: "brand",
     label: "Brand kit",
-    blurb: "Logo, green, @SitGuruOfficial",
+    blurb: "Logo, green, upload drafts",
     tone: "emerald",
     bar: "bg-emerald-700",
     tile: "border-emerald-200 bg-emerald-50",

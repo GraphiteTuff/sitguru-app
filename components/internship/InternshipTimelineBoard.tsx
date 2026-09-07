@@ -103,7 +103,7 @@ function MilestoneGroup({
                     <option value="done">Done</option>
                     <option value="blocked">Blocked</option>
                   </select>
-                  <button className="min-h-10 rounded-xl bg-[#0D5C3A] px-3 text-xs font-black !text-white">
+                  <button className="min-h-10 rounded-xl bg-[#166534] px-3 text-xs font-black !text-white">
                     Update
                   </button>
                 </form>

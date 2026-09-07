@@ -154,7 +154,7 @@ export default function InternProfileCard({
         aria-labelledby="intern-page-title"
         className="relative z-[1] max-h-[min(92vh,920px)] w-full max-w-2xl overflow-y-auto rounded-t-[1.8rem] border border-emerald-200 bg-white shadow-2xl sm:rounded-[1.8rem]"
       >
-        <span className="block h-2.5 w-full bg-[#0D5C3A]" />
+        <span className="block h-2.5 w-full bg-[#166534]" />
         <div className="p-4 sm:p-5">
           <div className="flex items-start gap-4">
             <InternAvatar

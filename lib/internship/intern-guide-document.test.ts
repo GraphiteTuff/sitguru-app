@@ -47,6 +47,9 @@ describe("intern student user guide downloads", () => {
     assert.match(text, /sitguru\.com\/events/);
     assert.match(text, /PawReport/);
     assert.match(text, /Trusted Local Pet Care/);
+    assert.match(text, /Starting Point/);
+    assert.match(text, /week 15/);
+    assert.match(text, /student user guide/i);
     assert.doesNotMatch(text, /\bRover\b/i);
     assert.doesNotMatch(text, /\bWag\b/i);
     assert.doesNotMatch(text, /last 4 digits of your SSN/i);

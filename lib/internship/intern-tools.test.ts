@@ -13,6 +13,8 @@ describe("intern home tools", () => {
   it("stays intern-scoped, including social", () => {
     const ids = INTERN_HOME_TOOLS.map((tool) => tool.id);
     assert.deepEqual(ids, ["brand", "tracking", "snapshot", "events", "social"]);
+    const brand = INTERN_HOME_TOOLS.find((tool) => tool.id === "brand");
+    assert.match(brand?.blurb || "", /upload/i);
   });
 
   it("opens the live growth workplace inside the intern portal", () => {

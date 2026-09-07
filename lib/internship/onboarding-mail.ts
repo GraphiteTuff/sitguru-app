@@ -74,7 +74,7 @@ export async function sendInternConfidentialityReceipts(input: {
       "",
       "SitGuru Internship Program",
     ].join("\n"),
-    html: `<div style="font-family:Arial,sans-serif;color:#0f172a"><p>Hi ${escapeHtml(name)},</p><p>Your signed SitGuru internship confidentiality page is <strong>on file</strong>.</p><p>SitGuru keeps the signed page in SitGuru-controlled storage. Your intern portal is now open.</p><p><a href="${portalUrl}" style="color:#0D5C3A;font-weight:700">Open the intern portal</a></p><p style="color:#64748b">SitGuru Internship Program</p></div>`,
+    html: `<div style="font-family:Arial,sans-serif;color:#0f172a"><p>Hi ${escapeHtml(name)},</p><p>Your signed SitGuru internship confidentiality page is <strong>on file</strong>.</p><p>SitGuru keeps the signed page in SitGuru-controlled storage. Your intern portal is now open.</p><p><a href="${portalUrl}" style="color:#166534;font-weight:700">Open the intern portal</a></p><p style="color:#64748b">SitGuru Internship Program</p></div>`,
   });
 
   return { internEmailed: true };

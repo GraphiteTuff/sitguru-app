@@ -108,7 +108,7 @@ export default async function InternPortalPage({
           <section
             className="public-dark-section rounded-[1.75rem] p-5 sm:p-6"
             data-brand-green
-            style={{ background: "#0D5C3A" }}
+            style={{ background: "#166534" }}
           >
             <div className="flex items-center gap-4">
               <InternAvatar
@@ -133,7 +133,7 @@ export default async function InternPortalPage({
             <div className="flex flex-col gap-2">
               <Link
                 href="/customer/dashboard"
-                className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-black !text-white"
+                className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#166534] px-4 text-sm font-black !text-white"
               >
                 Pet Parent dashboard
               </Link>
@@ -176,7 +176,7 @@ export default async function InternPortalPage({
             </p>
             <Link
               href={`${INTERNSHIP_ADMIN_PATH}/interns/${intern.id}`}
-              className="inline-flex min-h-11 items-center rounded-2xl bg-[#0D5C3A] px-4 text-xs font-black !text-white"
+              className="inline-flex min-h-11 items-center rounded-2xl bg-[#166534] px-4 text-xs font-black !text-white"
             >
               Employer review
             </Link>

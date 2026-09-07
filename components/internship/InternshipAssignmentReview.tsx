@@ -300,7 +300,7 @@ export default function InternshipAssignmentReview({
             <button
               name="decision"
               value="approved"
-              className="min-h-12 rounded-2xl bg-[#0D5C3A] text-sm font-black !text-white"
+              className="min-h-12 rounded-2xl bg-[#166534] text-sm font-black !text-white"
             >
               Approve
             </button>

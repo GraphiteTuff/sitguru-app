@@ -1,12 +1,24 @@
 import { INTERN_BRAND_LOGOS } from "@/lib/internship/intern-glossary";
+import InternWorkAttachments from "@/components/internship/InternWorkAttachments";
+import type { InternshipWorkAttachment } from "@/lib/internship/types";
 
-export default function InternHelpBrandLogos() {
+export default function InternHelpBrandLogos({
+  internId,
+  attachments,
+}: {
+  internId?: string;
+  attachments?: InternshipWorkAttachment[];
+}) {
+  const canUpload = Boolean(internId);
+
   return (
     <section className="space-y-4">
       <h2 className="text-lg font-black text-slate-950">Official logos for Canva and CapCut</h2>
       <p className="text-sm font-semibold leading-6 text-slate-600">
-        Download these SitGuru files only. Do not put a university logo on SitGuru
-        work unless SitGuru recorded that the school said yes. On brand green
+        Download these SitGuru files only. Upload your own Canva or CapCut drafts in{" "}
+        <strong>Home → Brand kit</strong>
+        {canUpload ? ", or use the form below" : ""}. Do not put a university logo on
+        SitGuru work unless SitGuru recorded that the school said yes. On brand green
         <span className="font-black"> #166534</span>, type is white — never dark
         text. If a logo shows a white box on green, use mix-blend-multiply.
       </p>
@@ -68,6 +80,20 @@ export default function InternHelpBrandLogos() {
         </a>
         .
       </p>
+      {canUpload && internId ? (
+        <InternWorkAttachments
+          internId={internId}
+          itemType="brand"
+          itemId={internId}
+          attachments={attachments || []}
+          label="Your brand files"
+        />
+      ) : (
+        <p className="text-sm font-semibold text-slate-600">
+          Upload Canva/CapCut exports in Home → Brand kit so SitGuru can review them.
+          Uploading does not post to Instagram.
+        </p>
+      )}
     </section>
   );
 }

@@ -58,7 +58,7 @@ export default function InternGrowthChrome({
               href={item.href}
               className={
                 active
-                  ? "inline-flex min-h-10 items-center gap-1.5 rounded-full bg-[#0D5C3A] px-3 text-xs font-black !text-white"
+                  ? "inline-flex min-h-10 items-center gap-1.5 rounded-full bg-[#166534] px-3 text-xs font-black !text-white"
                   : "inline-flex min-h-10 items-center gap-1.5 rounded-full border border-emerald-100 bg-white px-3 text-xs font-black text-emerald-900"
               }
             >

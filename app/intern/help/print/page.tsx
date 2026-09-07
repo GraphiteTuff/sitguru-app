@@ -35,12 +35,18 @@ export default async function InternGuidePrintPage({
         @media print {
           .print-toolbar, #crisp-chatbox { display: none !important; }
           body, .intern-guide-print { background: #fff !important; }
-          section { page-break-inside: auto !important; break-inside: auto !important; }
-          figure, .cover { page-break-inside: avoid; break-inside: avoid; }
+          section { page-break-inside: auto !important; break-inside: auto !important; overflow: visible; }
+          figure, .cover { page-break-inside: avoid; break-inside: avoid; overflow: visible; }
           img {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            max-height: 8.2in;
+            width: auto;
+            max-width: 100%;
+            object-fit: contain;
           }
+          .cover img { max-height: 9in; margin: 0 auto; }
+          .two { display: block !important; }
         }
       `}</style>
       <div className="print-toolbar mx-auto flex max-w-[880px] flex-wrap items-center justify-between gap-3 px-4 py-4">

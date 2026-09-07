@@ -76,7 +76,7 @@ const TABS = [
   { id: "home", label: "Home", icon: Home, active: "bg-emerald-700 !text-white", chip: "bg-emerald-50 text-emerald-900" },
   { id: "calendar", label: "Calendar", icon: CalendarDays, active: "bg-sky-600 !text-white", chip: "bg-sky-50 text-sky-900" },
   { id: "work", label: "Work", icon: ClipboardList, active: "bg-violet-600 !text-white", chip: "bg-violet-50 text-violet-900" },
-  { id: "project", label: "Report", icon: BookOpen, active: "bg-[#0D5C3A] !text-white", chip: "bg-emerald-50 text-emerald-900" },
+  { id: "project", label: "Report", icon: BookOpen, active: "bg-[#166534] !text-white", chip: "bg-emerald-50 text-emerald-900" },
   { id: "metrics", label: "Metrics", icon: BarChart3, active: "bg-amber-500 !text-white", chip: "bg-amber-50 text-amber-900" },
 ] as const;
 
@@ -300,7 +300,7 @@ export default function InternStudentDashboard({
           data-brand-green
           style={{
             background:
-              "linear-gradient(120deg,#1e3a5f 0%,#334e68 42%,#0D5C3A 100%)",
+              "linear-gradient(120deg,#1e3a5f 0%,#334e68 42%,#166534 100%)",
           }}
         >
           {school.logoUrl ? (
@@ -574,7 +574,7 @@ export default function InternStudentDashboard({
           <InternKpiBoard internId={data.intern.id} />
 
           <section className="overflow-hidden rounded-[1.8rem] border border-emerald-200 bg-white shadow-sm">
-            <span className="block h-2.5 w-full bg-[#0D5C3A]" />
+            <span className="block h-2.5 w-full bg-[#166534]" />
             <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">
@@ -641,7 +641,7 @@ export default function InternStudentDashboard({
               className={`mt-3 flex min-h-14 items-center justify-between gap-3 rounded-[1.4rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-left ${internPressClass}`}
             >
               <span className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0D5C3A] !text-white">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#166534] !text-white">
                   <CircleHelp size={16} />
                 </span>
                 <span>
@@ -869,7 +869,7 @@ export default function InternStudentDashboard({
                   onClick={() => setSelectedDate(day.key)}
                   className={`flex min-h-12 flex-col items-center justify-center rounded-2xl text-xs font-black ${internPressClass} ${
                     selected
-                      ? "bg-[#0D5C3A] !text-white"
+                      ? "bg-[#166534] !text-white"
                       : today
                         ? "bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
                         : day.inMonth

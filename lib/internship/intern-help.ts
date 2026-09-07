@@ -5,6 +5,8 @@ import {
   INTERN_PAYMENTS_INTERN_SAFE,
   INTERN_SITGURU_FEATURES,
   INTERN_UNIVERSITY_PATHS,
+  INTERN_REPORT_DRAFT_SECTIONS,
+  INTERN_REPORT_WEEKLY_BUILD_FIELDS,
   INTERN_VENDOR_EVENTS,
   INTERN_WATCH_VIDEOS,
 } from "@/lib/internship/intern-glossary";
@@ -159,8 +161,8 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
     shots: [
       {
         file: "assets/syllabus-cover.jpg",
-        alt: "SitGuru Spring 2027 Social Media & Community Growth Internship syllabus cover",
-        caption: "Spring 2027 internship. SitGuru runs the program. Your school counts credits and hours.",
+        alt: "SitGuru Spring 2027 Social Media & Community Growth Internship student user guide cover",
+        caption: "Spring 2027 student user guide. SitGuru runs the program. Your school counts credits and hours.",
       },
     ],
     note: "Screenshots in Help come from a SitGuru training intern login. Your name, school, and numbers will be yours. Print PDF saves the illustrated walkthrough. Download Word for a .docx copy with the same screenshots.",
@@ -886,6 +888,49 @@ export const INTERN_HELP_ARTICLES: InternHelpArticle[] = [
         caption: "Save hours into the report.",
       },
     ],
+  }),
+  article("business-growth-report", {
+    title: "Build the Business Growth Report as you go",
+    summary:
+      "Draft chapters and weekly build fields on Report. Research a little every week and compile — do not wait until week 15.",
+    purpose:
+      "The Business Growth Report is the semester destination SitGuru assembles from weekly check-ins, accepted tasks, campaigns, and verified numbers. Report tab draft chapters (Starting Point through Recommendations) and This week’s build are how you file work while it is still fresh. Waiting until week 15 leaves a thin report and no time for SitGuru to verify numbers.",
+    contributes:
+      "Each weekly build lands in a draft chapter. SitGuru-checked totals become Measurable Outcomes. Lessons and recommendations become the handoff. Your school still owns credit. SitGuru letters are not a university grade. Use intern-safe totals, never Pet Parent names or emails.",
+    category: "Report & metrics",
+    tags: ["report", "draft", "chapters"],
+    keywords: [
+      "business growth report",
+      "starting point",
+      "this week's build",
+      "week 15",
+      "compile as you go",
+      "measurable outcomes",
+      "lessons learned",
+      "recommendations",
+      "weekly self-research",
+    ],
+    fields: [...INTERN_REPORT_DRAFT_SECTIONS, ...INTERN_REPORT_WEEKLY_BUILD_FIELDS],
+    steps: [
+      "Open Report the same week you work. The green banner (for example “Feeds Final report: Starting Point”) tells you which chapter this week is feeding.",
+      "Do a little self-research every week — market totals, public sources, tracking-link results — and write it into This week’s build. Do not wait until week 15.",
+      "Pick Contribution to your report. Fill what you added, finished, what the numbers showed, what did not work, and what’s next.",
+      "Submit Hours this week and Your number. SitGuru verifies numbers. Guessing and screenshot likes do not belong in Measurable Outcomes.",
+      "Use intern-safe totals only. No Pet Parent names, emails, or unpublished Admin HQ exports. Bookings stay on SitGuru.",
+    ],
+    tips: [
+      "Empty “What didn’t work?” starves Lessons Learned. A flop still counts.",
+      "If you do not have a SitGuru-checked number yet, write “baseline pending SitGuru check” — do not invent a baseline.",
+      "Your school owns credit and hour counting. SitGuru letters are an employer snapshot, not a university grade.",
+    ],
+    shots: [
+      {
+        file: "12-report.png",
+        alt: "Business Growth Report showing starting point and percent complete",
+        caption: "Compile weekly. Percent complete rises when SitGuru accepts the work.",
+      },
+    ],
+    note: "SitGuru verifies numbers before they appear as outcomes. Bookings stay on SitGuru. School credit is the school’s decision.",
   }),
   article("metrics", {
     title: "Send a number for SitGuru to check",

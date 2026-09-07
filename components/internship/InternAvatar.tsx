@@ -53,7 +53,7 @@ export default function InternAvatar({
         type="button"
         onClick={onClick}
         aria-label={label || `Edit intern page for ${name || "intern"}`}
-        className={`${classes} cursor-pointer hover:ring-2 hover:ring-[#0D5C3A] ${internPressClass}`}
+        className={`${classes} cursor-pointer hover:ring-2 hover:ring-[#166534] ${internPressClass}`}
       >
         {inner}
       </button>

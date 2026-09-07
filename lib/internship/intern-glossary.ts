@@ -626,6 +626,8 @@ export const INTERN_GLOSSARY: InternGlossaryTerm[] = [
   ...INTERN_AI_COMPANIONS,
   ...INTERN_PAYMENTS_INTERN_SAFE,
   ...INTERN_REPORT_SECTION_DEFINITIONS,
+  ...INTERN_REPORT_DRAFT_SECTIONS,
+  ...INTERN_REPORT_WEEKLY_BUILD_FIELDS,
   ...INTERN_PORTAL_WORD_DEFINITIONS,
   ...INTERN_VENDOR_EVENTS,
 ];
@@ -689,6 +691,8 @@ export function internGlossarySectionHtml() {
       ${groupHtml("Payments stay on SitGuru", INTERN_PAYMENTS_INTERN_SAFE)}
       ${groupHtml("PA and NJ vendor events", INTERN_VENDOR_EVENTS)}
       ${groupHtml("Contribution to your report", INTERN_REPORT_SECTION_DEFINITIONS)}
+      ${groupHtml("Business Growth Report draft chapters", INTERN_REPORT_DRAFT_SECTIONS)}
+      ${groupHtml("Weekly report build", INTERN_REPORT_WEEKLY_BUILD_FIELDS)}
       ${groupHtml("Intern portal words", words)}
     </section>`;
 }

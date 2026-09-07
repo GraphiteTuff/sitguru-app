@@ -78,12 +78,19 @@
     }
     section.break { page-break-before: always; }
     @media print {
-      section { page-break-inside: auto; break-inside: auto; }
-      figure { page-break-inside: avoid; break-inside: avoid; }
+      section { page-break-inside: auto; break-inside: auto; overflow: visible; }
+      figure { page-break-inside: avoid; break-inside: avoid; overflow: visible; }
       img {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        max-height: 8.2in;
+        width: auto;
+        max-width: 100%;
+        object-fit: contain;
       }
+      .cover img { max-height: 9in; margin: 0 auto; }
+      .two { display: block; }
+      .two figure { margin-bottom: 16px; }
     }
     .steps { margin: 0 0 16px; padding-left: 22px; }
     .steps li { margin: 0 0 8px; }
@@ -145,7 +152,7 @@
 <body>
   <div class="wrap">
     <div class="cover">
-      <img src="assets/syllabus-cover.jpg" alt="SitGuru Social Media & Community Growth Internship Program, Spring 2027 syllabus cover" />
+      <img src="assets/syllabus-cover.jpg" alt="SitGuru Social Media & Community Growth Internship Program, Spring 2027 student user guide cover" />
     </div>
 
     <header class="hero">
@@ -168,6 +175,7 @@
         <li><a href="#calendar">Calendar</a></li>
         <li><a href="#work">Work (tasks, social, campaigns)</a></li>
         <li><a href="#report">Report and hours</a></li>
+        <li><a href="#growth-report">Business Growth Report</a></li>
         <li><a href="#metrics">Metrics</a></li>
         <li><a href="#toolkit">Intern toolkit</a></li>
         <li><a href="#growth">Growth workplace</a></li>
@@ -333,8 +341,31 @@
       </div>
     </section>
 
+    <section id="growth-report" class="break">
+      <h2>10. Business Growth Report</h2>
+      <p>Report is also where you compile the semester story. Do a little self-research every week and write it down the same week — do <strong>not</strong> wait until week 15. SitGuru verifies numbers. Use intern-safe totals, not Pet Parent names or emails. Your school owns credit. SitGuru letters are not a university grade.</p>
+      <div class="callout">Compile as you go. The green banner on Report (for example “Feeds Final report: Starting Point”) tells you which chapter this week is feeding. Empty “What didn’t work?” starves Lessons Learned.</div>
+      <h3>Draft chapters</h3>
+      <ul class="steps">
+        <li><strong>Starting Point</strong> — where SitGuru and this market stood when you arrived. Market totals and public sources. Week 1–2, then keep adding citations.</li>
+        <li><strong>Baseline &amp; SMART Goals</strong> — starting numbers SitGuru can check. If you do not have a verified number yet, write “baseline pending SitGuru check.”</li>
+        <li><strong>How the work was done</strong> — audience, channels, brand kit, approval, tracking links, and the SOP so the next intern can repeat it.</li>
+        <li><strong>Campaign Experiments</strong> — named tests with one change and a tracking link. A flop still belongs here.</li>
+        <li><strong>Measurable Outcomes</strong> — only results SitGuru has checked. Guessing and screenshot likes do not belong.</li>
+        <li><strong>Lessons Learned</strong> — what did not work and what you would keep. Fill it every week.</li>
+        <li><strong>Recommendations</strong> — keep, stop, or try next term, specific enough to hand off.</li>
+      </ul>
+      <h3>This week’s build</h3>
+      <p>The form on Report files one week into a draft chapter. Same story as the Home weekly check-in: completeness beats poetry.</p>
+      <ol class="steps">
+        <li>Pick <strong>Week of</strong> and <strong>Contribution to your report</strong>.</li>
+        <li>Write what you added or improved, what you finished, what the numbers showed (including “no verified number yet”), what didn’t work, and what’s next.</li>
+        <li>Log <strong>Hours this week</strong> and <strong>Your number</strong>. SitGuru tries to verify the number. Bookings stay on SitGuru.</li>
+      </ol>
+    </section>
+
     <section id="metrics" class="break">
-      <h2>10. Metrics</h2>
+      <h2>11. Metrics</h2>
       <p>Metrics is where you send a number for SitGuru to check. Live people and social totals also show on Home. A letter (like I) is SitGuru’s current employer snapshot — it is not your university grade.</p>
       <figure>
         <img src="screenshots/15-metrics-letters.png" alt="Metrics tab with KPI letter board and live totals" />
@@ -353,7 +384,7 @@
     </section>
 
     <section id="toolkit" class="break">
-      <h2>11. Intern toolkit</h2>
+      <h2>12. Intern toolkit</h2>
       <p>On Home, tap a toolkit card. Each tool has a colored bar and a <strong>← Home</strong> back link.</p>
 
       <h3>Brand kit</h3>
@@ -399,7 +430,7 @@
     </section>
 
     <section id="growth" class="break">
-      <h2>12. Growth workplace</h2>
+      <h2>13. Growth workplace</h2>
       <p>Growth workplace is on-the-project training for the SitGuru Market Growth Project. Write posts, tracking links, and campaigns here. SitGuru approves drafts before they go live. You do not get Admin HQ, passwords, or Pet Parent personal information.</p>
       <p>Open it from the green <strong>Growth workplace</strong> button in the header, or from the Home card.</p>
       <figure>
@@ -430,7 +461,7 @@
     </section>
 
     <section id="page">
-      <h2>13. Your page</h2>
+      <h2>14. Your page</h2>
       <p>Tap <strong>Your page</strong> in the header (or <strong>Edit your page</strong> on Home). This is your intern profile for SitGuru — not a public SitGuru.com guru listing.</p>
       <p>You can update:</p>
       <ul class="steps">
@@ -446,7 +477,7 @@
     </section>
 
     <section id="rules">
-      <h2>14. Rules that keep you intern-safe</h2>
+      <h2>15. Rules that keep you intern-safe</h2>
       <ol class="steps">
         <li>Use only the intern portal and Growth workplace. Do not try Admin HQ, Pet Parent records, passwords, payments, or Stripe/bank setup.</li>
         <li>Do not share this login. Report a lost device or a leaked password to SitGuru right away.</li>
@@ -460,7 +491,7 @@
     </section>
 
     <section id="help">
-      <h2>15. If you get stuck</h2>
+      <h2>16. If you get stuck</h2>
       <ul class="steps">
         <li>Internship questions: <strong>intern@sitguru.com</strong></li>
         <li>Portal login: start again at <strong>https://www.sitguru.com/intern</strong></li>
