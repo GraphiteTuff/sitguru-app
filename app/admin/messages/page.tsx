@@ -766,13 +766,11 @@ function isUnreadMessage(message: MessageRow) {
   if (message.is_deleted) return false;
 
   const status = asString(message.status).toLowerCase();
+  if (status === "archived") return false;
+  if (message.is_read === true || message.read_at) return false;
+  if (status === "read") return false;
 
-  if (message.is_read === false) return true;
-  if (!message.read_at && status !== "read" && status !== "archived") {
-    return true;
-  }
-
-  return false;
+  return true;
 }
 
 function getStoredInquiryType(

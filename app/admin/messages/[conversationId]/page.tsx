@@ -324,10 +324,11 @@ function getMessageBody(message: MessageRow) {
 function isUnreadMessage(message: MessageRow) {
   const status = safeString(message.status).toLowerCase();
 
-  if (message.is_read === false) return true;
-  if (!message.read_at && status !== "read" && status !== "archived") return true;
+  if (status === "archived") return false;
+  if (message.is_read === true || message.read_at) return false;
+  if (status === "read") return false;
 
-  return false;
+  return true;
 }
 
 function normalizeUsPhone(phone: string) {

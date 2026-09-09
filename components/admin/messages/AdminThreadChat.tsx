@@ -77,6 +77,32 @@ export default function AdminThreadChat({
   }, [thread.id]);
 
   useEffect(() => {
+    const conversationId = thread.id.trim();
+    if (!conversationId || conversationId.startsWith("direct-message-")) return;
+
+    let cancelled = false;
+
+    void fetch("/api/messages/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ conversationId }),
+    })
+      .then((response) => {
+        if (!response.ok || cancelled) return;
+        window.dispatchEvent(new Event("sitguru:messages-refresh"));
+        router.refresh();
+      })
+      .catch(() => {
+        // Opening the thread should still work if the read receipt fails.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [thread.id, router]);
+
+  useEffect(() => {
     const node = scrollerRef.current;
     if (!node) return;
     node.scrollTop = node.scrollHeight;

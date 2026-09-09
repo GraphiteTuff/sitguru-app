@@ -66,6 +66,12 @@ export default function AdminInboxWorkspace({
 }) {
   const showThreadPane = Boolean(composeOpen || selectedThread);
   const listHiddenOnMobile = showThreadPane;
+  const selectedUnreadCount =
+    threads.find((thread) => thread.id === selectedThreadId)?.unreadCount || 0;
+  const displayFilters = filters.map((filter) => {
+    if (filter.key !== "unread" || selectedUnreadCount <= 0) return filter;
+    return { ...filter, count: Math.max(0, filter.count - 1) };
+  });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#f7f8f4]">
@@ -117,7 +123,7 @@ export default function AdminInboxWorkspace({
 
           <div className="shrink-0 overflow-x-auto border-b border-[#e5ebe2] px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="flex min-w-max gap-1.5">
-              {filters.map((filter) => {
+              {displayFilters.map((filter) => {
                 const active = filter.key === activeFilter;
                 return (
                   <Link
@@ -159,6 +165,7 @@ export default function AdminInboxWorkspace({
             ) : (
               threads.map((thread) => {
                 const active = thread.id === selectedThreadId;
+                const unreadCount = active ? 0 : thread.unreadCount;
                 return (
                   <Link
                     key={thread.id}
@@ -169,7 +176,7 @@ export default function AdminInboxWorkspace({
                   >
                     <div className="relative">
                       <Avatar name={thread.title} src={thread.avatar} />
-                      {thread.unreadCount > 0 ? (
+                      {unreadCount > 0 ? (
                         <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-[#0D5C3A] ring-2 ring-white" />
                       ) : null}
                     </div>
@@ -177,7 +184,7 @@ export default function AdminInboxWorkspace({
                       <div className="flex items-baseline justify-between gap-2">
                         <p
                           className={`truncate text-[17px] ${
-                            thread.unreadCount > 0
+                            unreadCount > 0
                               ? "font-black text-slate-950"
                               : "font-bold text-slate-800"
                           }`}
@@ -193,7 +200,7 @@ export default function AdminInboxWorkspace({
                       </p>
                       <p
                         className={`mt-0.5 truncate text-sm ${
-                          thread.unreadCount > 0
+                          unreadCount > 0
                             ? "font-semibold text-slate-700"
                             : "font-medium text-slate-500"
                         }`}
@@ -201,11 +208,15 @@ export default function AdminInboxWorkspace({
                         {thread.preview}
                       </p>
                     </div>
-                    {thread.unreadCount > 0 ? (
+                    {unreadCount > 0 ? (
                       <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#0D5C3A] px-1.5 text-[11px] font-black text-white">
-                        {thread.unreadCount}
+                        {unreadCount}
                       </span>
-                    ) : null}
+                    ) : (
+                      <span className="shrink-0 text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">
+                        Read
+                      </span>
+                    )}
                   </Link>
                 );
               })
