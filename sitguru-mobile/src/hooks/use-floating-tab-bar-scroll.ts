@@ -1,11 +1,14 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type {
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollViewProps,
 } from 'react-native';
 
-import { useOptionalTabBarMotion } from '@/context/TabBarMotionContext';
+import {
+  TAB_BAR_EXPAND_DELAY_MS,
+  useOptionalTabBarMotion,
+} from '@/context/TabBarMotionContext';
 
 export type FloatingTabBarScrollHandlers = Pick<
   ScrollViewProps,
@@ -38,21 +41,40 @@ function chainScrollHandlers(
 /**
  * Reusable scroll → floating tab bar bridge.
  * Writes only to shared motion state — no React setState on scroll.
+ * Also debounces expand for mouse-wheel / web scrolls that never emit
+ * drag or momentum end events.
  */
 export function useFloatingTabBarScroll(
   existing?: Partial<FloatingTabBarScrollHandlers>,
 ): FloatingTabBarScrollHandlers {
   const motion = useOptionalTabBarMotion();
   const lastOffsetY = useRef(0);
-  const dragging = useRef(false);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearIdleTimer = useCallback(() => {
+    if (idleTimer.current) {
+      clearTimeout(idleTimer.current);
+      idleTimer.current = null;
+    }
+  }, []);
+
+  const scheduleExpand = useCallback(() => {
+    clearIdleTimer();
+    idleTimer.current = setTimeout(() => {
+      motion?.reportScrollEnd();
+      idleTimer.current = null;
+    }, TAB_BAR_EXPAND_DELAY_MS);
+  }, [clearIdleTimer, motion]);
+
+  useEffect(() => () => clearIdleTimer(), [clearIdleTimer]);
 
   const onScrollBeginDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      dragging.current = true;
+      clearIdleTimer();
       lastOffsetY.current = event.nativeEvent.contentOffset.y;
       motion?.reportScrollBegin();
     },
-    [motion],
+    [clearIdleTimer, motion],
   );
 
   const onScroll = useCallback(
@@ -63,34 +85,35 @@ export function useFloatingTabBarScroll(
 
       if (Math.abs(delta) > 0) {
         motion?.reportScrollDelta(delta);
+        // Wheel / trackpad scrolls often skip end-drag + momentum events.
+        scheduleExpand();
       }
     },
-    [motion],
+    [motion, scheduleExpand],
   );
 
   const onScrollEndDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      dragging.current = false;
       lastOffsetY.current = event.nativeEvent.contentOffset.y;
       const velocity = event.nativeEvent.velocity?.y ?? 0;
-      // Momentum will continue — wait for momentum end before expanding.
       if (Math.abs(velocity) < 0.05) {
-        motion?.reportScrollEnd();
+        scheduleExpand();
       }
     },
-    [motion],
+    [scheduleExpand],
   );
 
   const onMomentumScrollBegin = useCallback(() => {
+    clearIdleTimer();
     motion?.reportScrollBegin();
-  }, [motion]);
+  }, [clearIdleTimer, motion]);
 
   const onMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       lastOffsetY.current = event.nativeEvent.contentOffset.y;
-      motion?.reportScrollEnd();
+      scheduleExpand();
     },
-    [motion],
+    [scheduleExpand],
   );
 
   return useMemo(
