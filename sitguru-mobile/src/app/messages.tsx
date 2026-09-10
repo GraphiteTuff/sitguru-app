@@ -24,6 +24,7 @@ import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
+import { getMobileChromePalette } from '@/constants/mobile-palette';
 import {
   setThemePreference,
   type SitGuruThemePreference,
@@ -1064,20 +1065,21 @@ function formatBadge(value: number) {
 }
 
 function getPalette(isDark: boolean) {
+  const chrome = getMobileChromePalette(isDark);
   return {
-    background: isDark ? '#06140F' : '#FFF9F1',
-    surface: isDark ? '#0B2118' : '#FFFEFA',
-    surfaceSoft: isDark ? '#102D21' : '#FFF6E9',
-    border: isDark ? '#234B38' : '#EADDCB',
-    title: isDark ? '#FFF5E8' : '#123F31',
-    text: isDark ? '#E8EEE9' : '#27483E',
-    muted: isDark ? '#9DB0A5' : '#738078',
-    placeholder: isDark ? '#809187' : '#9A9A90',
-    primary: isDark ? '#39D982' : '#087449',
-    primarySoft: isDark ? '#123E2A' : '#E4F5E9',
-    orange: '#F15A3A',
-    avatarBg: isDark ? '#173527' : '#EEF5EE',
-    avatarBorder: isDark ? '#2E6C4B' : '#FFFFFF',
+    background: chrome.background,
+    surface: chrome.surface,
+    surfaceSoft: chrome.surfaceSoft,
+    border: chrome.border,
+    title: chrome.title,
+    text: chrome.text,
+    muted: chrome.muted,
+    placeholder: chrome.placeholder,
+    primary: chrome.primary,
+    primarySoft: chrome.primarySoft,
+    orange: chrome.orange,
+    avatarBg: chrome.avatarBg,
+    avatarBorder: chrome.avatarBorder,
   };
 }
 

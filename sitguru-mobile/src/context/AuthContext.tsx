@@ -26,6 +26,7 @@ import {
   isSupabaseConfigured,
   supabase,
 } from '@/lib/supabase';
+import { trackMobileEvent } from '@/lib/analytics/track';
 import {
   normalizeRole,
   roleDashboardPath,
@@ -212,7 +213,7 @@ function friendlyAuthError(
       'audience',
     )
   ) {
-    return 'Apple sign-in is not fully enabled for this SitGuru app yet. Use email or try again.';
+    return 'Apple Sign In is not linked to the SitGuru iOS app yet. Use email or Google, or contact support if this keeps happening.';
   }
 
   if (
@@ -1174,9 +1175,27 @@ export function AuthProvider({
               });
 
           if (error) {
-            return await performBrowserOAuth(
-              'apple',
+            const message = friendlyAuthError(
+              error.message,
             );
+
+            void trackMobileEvent({
+              eventName: 'auth_apple_error',
+              eventType: 'auth',
+              source: 'sitguru_mobile',
+              pagePath: '/login',
+              metadata: {
+                method: 'native_id_token',
+                message,
+              },
+            });
+
+            setAuthError(message);
+
+            return {
+              error: message,
+              cancelled: false,
+            };
           }
 
           const fullName = [
@@ -1221,6 +1240,16 @@ export function AuthProvider({
 
           setAuthError(null);
 
+          void trackMobileEvent({
+            eventName: 'auth_apple_success',
+            eventType: 'auth',
+            source: 'sitguru_mobile',
+            pagePath: '/login',
+            metadata: {
+              method: 'native_id_token',
+            },
+          });
+
           await loadProfileAndRoles(
             data.session.user,
           );
@@ -1248,23 +1277,47 @@ export function AuthProvider({
             errorCode ===
             'ERR_REQUEST_CANCELED'
           ) {
+            void trackMobileEvent({
+              eventName: 'auth_apple_cancelled',
+              eventType: 'auth',
+              source: 'sitguru_mobile',
+              pagePath: '/login',
+            });
+
             return {
               error: null,
               cancelled: true,
             };
           }
 
-          return await performBrowserOAuth(
-            'apple',
+          const message = friendlyAuthError(
+            error instanceof Error
+              ? error.message
+              : undefined,
           );
+
+          void trackMobileEvent({
+            eventName: 'auth_apple_error',
+            eventType: 'auth',
+            source: 'sitguru_mobile',
+            pagePath: '/login',
+            metadata: {
+              code: errorCode || undefined,
+              message,
+            },
+          });
+
+          setAuthError(message);
+
+          return {
+            error: message,
+            cancelled: false,
+          };
         } finally {
           setSocialLoading(null);
         }
       },
-      [
-        loadProfileAndRoles,
-        performBrowserOAuth,
-      ],
+      [loadProfileAndRoles, performBrowserOAuth],
     );
 
   const refreshSession =

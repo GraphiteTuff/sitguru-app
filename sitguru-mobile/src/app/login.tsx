@@ -1,4 +1,4 @@
-import { Link, router } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import {
   ArrowRight,
   ChevronLeft,
@@ -34,6 +34,7 @@ import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SocialAuthButton from '@/components/SocialAuthButton';
 import { AppFonts } from '@/constants/fonts';
+import { WORKSPACES } from '@/constants/workspaces';
 import {
   setThemePreference,
   type SitGuruThemePreference,
@@ -300,6 +301,16 @@ export default function LoginScreen() {
     authError,
   } = useAuth();
 
+  const params = useLocalSearchParams<{ intent?: string }>();
+  const adminLoginIntent =
+    String(params.intent || '').trim().toLowerCase() === 'admin';
+
+  function postLoginPath() {
+    return adminLoginIntent
+      ? WORKSPACES.admin.dashboardPath
+      : '/role-selection';
+  }
+
   const [loginMethod, setLoginMethod] =
     useState<LoginMethod>('password');
 
@@ -530,9 +541,7 @@ export default function LoginScreen() {
     );
 
     setTimeout(() => {
-      router.replace(
-        '/role-selection',
-      );
+      router.replace(postLoginPath());
     }, 300);
   }
 
@@ -674,9 +683,7 @@ export default function LoginScreen() {
     );
 
     setTimeout(() => {
-      router.replace(
-        '/role-selection',
-      );
+      router.replace(postLoginPath());
     }, 300);
   }
 
@@ -799,9 +806,7 @@ export default function LoginScreen() {
     );
 
     setTimeout(() => {
-      router.replace(
-        '/role-selection',
-      );
+      router.replace(postLoginPath());
     }, 300);
   }
 
@@ -965,14 +970,18 @@ export default function LoginScreen() {
                         styles.eyebrowText
                       }
                     >
-                      Secure sign-in
+                      {adminLoginIntent
+                        ? 'Admin access'
+                        : 'Secure sign-in'}
                     </Text>
                   </View>
 
                   <Text
                     style={styles.title}
                   >
-                    Welcome back.
+                    {adminLoginIntent
+                      ? 'SitGuru admin sign in.'
+                      : 'Welcome back.'}
                   </Text>
 
                   <Text
@@ -980,18 +989,17 @@ export default function LoginScreen() {
                       styles.subtitle
                     }
                   >
-                    Get back to your
-                    bookings, messages,
-                    pets, earnings,
-                    referrals, and
-                    SitGuru dashboards.
+                    {adminLoginIntent
+                      ? 'Use your SitGuru admin credentials. You’ll land in Admin Operations after sign-in.'
+                      : 'Get back to your bookings, messages, pets, earnings, referrals, and SitGuru dashboards.'}
                   </Text>
                 </View>
 
                 <View
-                  style={
-                    styles.loginCard
-                  }
+                  style={[
+                    styles.loginCard,
+                    !isWebPreview && styles.loginCardFlat,
+                  ]}
                 >
                   {!isConfigured ? (
                     <View
@@ -1814,9 +1822,10 @@ export default function LoginScreen() {
                 </View>
 
                 <View
-                  style={
-                    styles.signupCard
-                  }
+                  style={[
+                    styles.signupCard,
+                    !isWebPreview && styles.signupCardFlat,
+                  ]}
                 >
                   <View
                     style={
@@ -1876,6 +1885,23 @@ export default function LoginScreen() {
                     </Text>
                   </BubblePressable>
                 </View>
+
+                {!adminLoginIntent ? (
+                  <BubblePressable
+                    accessibilityRole="button"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/login',
+                        params: { intent: 'admin' },
+                      })
+                    }
+                    style={styles.adminLink}
+                  >
+                    <Text style={styles.adminLinkText}>
+                      SitGuru admin sign in
+                    </Text>
+                  </BubblePressable>
+                ) : null}
 
                 <Text
                   style={
@@ -2232,6 +2258,14 @@ function createStyles(isDark: boolean) {
     shadowOpacity: isDark ? 0.22 : 0.06,
     shadowRadius: 18,
   },
+  loginCardFlat: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    elevation: 0,
+    gap: 14,
+    padding: 0,
+    shadowOpacity: 0,
+  },
   warningCard: {
     alignItems: 'center',
     backgroundColor: isDark ? '#3A2C10' : '#FFF8E8',
@@ -2543,12 +2577,12 @@ function createStyles(isDark: boolean) {
     alignItems: 'center',
     backgroundColor:
       colors.primary,
-    borderRadius: 999,
+    borderRadius: 18,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    minHeight: 54,
-    paddingHorizontal: 18,
+    minHeight: 58,
+    paddingHorizontal: 20,
   },
   loginButtonDisabled: {
     opacity: 0.45,
@@ -2557,7 +2591,7 @@ function createStyles(isDark: boolean) {
     color: '#FFFFFF',
     fontFamily:
       AppFonts.extraBold,
-    fontSize: 15,
+    fontSize: 17,
   },
   securityRow: {
     alignItems: 'flex-start',
@@ -2588,6 +2622,13 @@ function createStyles(isDark: boolean) {
     flexDirection: 'row',
     gap: 11,
     padding: 14,
+  },
+  signupCardFlat: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    justifyContent: 'center',
+    paddingHorizontal: 0,
+    paddingVertical: 4,
   },
   signupIcon: {
     alignItems: 'center',
@@ -2629,6 +2670,18 @@ function createStyles(isDark: boolean) {
     fontFamily:
       AppFonts.extraBold,
     fontSize: 12,
+  },
+  adminLink: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingVertical: 8,
+  },
+  adminLinkText: {
+    color: colors.textMuted,
+    fontFamily: AppFonts.bold,
+    fontSize: 14,
+    textDecorationLine: 'underline',
   },
   legalText: {
     color:

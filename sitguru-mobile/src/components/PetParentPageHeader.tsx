@@ -1208,7 +1208,7 @@ function getPalette(isDark: boolean) {
     title: isDark ? '#FFF5E8' : '#123F31',
     text: isDark ? '#E8EEE9' : '#27483E',
     muted: isDark ? '#9DB0A5' : '#738078',
-    primary: isDark ? '#39D982' : '#087449',
+    primary: isDark ? '#4CD98A' : '#1B7A52',
     primaryDark: isDark ? '#087A4C' : '#076A43',
     primarySoft: isDark ? '#123E2A' : '#E4F5E9',
     navMuted: isDark ? '#9BAAA1' : '#748079',

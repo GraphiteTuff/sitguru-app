@@ -168,7 +168,7 @@ function getPalette(isDark: boolean) {
     border: isDark ? '#315442' : '#E4D8C7',
     text: isDark ? '#FFF6E9' : '#123F31',
     muted: isDark ? '#A5B5AC' : '#718078',
-    primary: isDark ? '#39D982' : '#087449',
+    primary: isDark ? '#4CD98A' : '#1B7A52',
     primarySoft: isDark ? '#123E2A' : '#E4F5E9',
     buttonBackground: isDark ? '#159A61' : '#1A5C40',
   };
