@@ -61,12 +61,12 @@ const ICON_SPRING = {
   stiffness: 320,
 } as const;
 
-const EXPANDED_WIDTH_RATIO = 0.91;
-const COMPACT_WIDTH_RATIO = 0.8;
-const EXPANDED_HEIGHT = 66;
-const COMPACT_HEIGHT = 54;
+const EXPANDED_WIDTH_RATIO = 0.9;
+const COMPACT_WIDTH_RATIO = 0.78;
+const EXPANDED_HEIGHT = 68;
+const COMPACT_HEIGHT = 56;
 const BUBBLE_H_PAD = 4;
-const BUBBLE_V_PAD = 4;
+const BUBBLE_V_PAD = 5;
 
 type Palette = {
   fallback: string;
@@ -83,21 +83,21 @@ function usePalette(isDark: boolean): Palette {
     () =>
       isDark
         ? {
-            fallback: 'rgba(8, 28, 20, 0.92)',
-            border: 'rgba(88, 213, 138, 0.22)',
+            fallback: 'rgba(12, 28, 22, 0.94)',
+            border: 'rgba(88, 213, 138, 0.28)',
             activeColor: '#58D58A',
             mutedColor: '#8FA096',
-            bubble: 'rgba(88, 213, 138, 0.28)',
-            tint: '#081C14',
+            bubble: 'rgba(88, 213, 138, 0.32)',
+            tint: '#0A1A14',
             shadow: '#000000',
           }
         : {
-            fallback: 'rgba(255, 252, 247, 0.94)',
-            border: 'rgba(26, 78, 55, 0.12)',
-            activeColor: '#1A4E37',
-            mutedColor: '#79857B',
-            bubble: 'rgba(26, 78, 55, 0.14)',
-            tint: '#FFFCF7',
+            fallback: 'rgba(255, 255, 255, 0.96)',
+            border: 'rgba(13, 92, 58, 0.14)',
+            activeColor: '#0D5C3A',
+            mutedColor: '#6B776E',
+            bubble: 'rgba(13, 92, 58, 0.14)',
+            tint: '#FFFFFF',
             shadow: '#0D5C3A',
           },
     [isDark],
@@ -242,7 +242,7 @@ export default function FloatingBubbleTabBar({
     };
   }, [bubbleHeight, bubbleWidth]);
 
-  const bottomPad = Math.max(insets.bottom, 8) + 6;
+  const bottomPad = Math.max(insets.bottom, 10) + 10;
 
   return (
     <View
@@ -256,12 +256,18 @@ export default function FloatingBubbleTabBar({
             {
               shadowColor: palette.shadow,
               ...(Platform.OS === 'android'
-                ? { elevation: 10 }
-                : {
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: isDark ? 0.45 : 0.16,
-                    shadowRadius: 18,
-                  }),
+                ? { elevation: 14 }
+                : Platform.OS === 'web'
+                  ? ({
+                      boxShadow: isDark
+                        ? '0 14px 32px rgba(0,0,0,0.45)'
+                        : '0 14px 32px rgba(13,92,58,0.2)',
+                    } as object)
+                  : {
+                      shadowOffset: { width: 0, height: 10 },
+                      shadowOpacity: isDark ? 0.5 : 0.22,
+                      shadowRadius: 22,
+                    }),
             },
           ]}
         >
@@ -421,7 +427,7 @@ const styles = StyleSheet.create({
   },
   capsule: {
     borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     flex: 1,
     overflow: 'hidden',
   },
