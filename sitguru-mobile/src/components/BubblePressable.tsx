@@ -82,8 +82,13 @@ export default function BubblePressable({
       : withSpring(active ? 1 : 0, BUBBLE_SPRING);
   }, [active, bubbleProgress, reduceMotion]);
 
+  const slide = useSharedValue(0);
+
   const contentStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [
+      { scale: scale.value },
+      { translateY: slide.value },
+    ],
   }));
 
   const bubbleAnimatedStyle = useAnimatedStyle(() => ({
@@ -102,6 +107,7 @@ export default function BubblePressable({
           scale.value = reduceMotion
             ? scaleTo
             : withSpring(scaleTo, PRESS_SPRING);
+          slide.value = reduceMotion ? 2 : withSpring(2, PRESS_SPRING);
           bubbleProgress.value = reduceMotion
             ? 1
             : withSpring(1, BUBBLE_SPRING);
@@ -110,6 +116,7 @@ export default function BubblePressable({
       }}
       onPressOut={(event) => {
         scale.value = reduceMotion ? 1 : withSpring(1, RELEASE_SPRING);
+        slide.value = reduceMotion ? 0 : withSpring(0, RELEASE_SPRING);
         if (!active) {
           bubbleProgress.value = reduceMotion
             ? 0

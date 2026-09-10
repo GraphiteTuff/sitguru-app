@@ -12,9 +12,14 @@ type SitGuruButtonProps = {
   label: string;
   onPress?: () => void;
   size?: 'default' | 'compact';
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  /** Instagram-style Follow variants: primary stadium, compact follow row. */
+  variant?: 'primary' | 'follow' | 'secondary' | 'danger' | 'ghost';
 };
 
+/**
+ * SitGuru CTA with Instagram-style stadium pills plus
+ * bubble expand + slide/compress feedback on press.
+ */
 export default function SitGuruButton({
   accessibilityLabel,
   disabled = false,
@@ -25,6 +30,7 @@ export default function SitGuruButton({
   variant = 'primary',
 }: SitGuruButtonProps) {
   const isPrimary = variant === 'primary';
+  const isFollow = variant === 'follow';
   const isSecondary = variant === 'secondary';
   const isDanger = variant === 'danger';
 
@@ -32,14 +38,23 @@ export default function SitGuruButton({
     <BubblePressable
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
+      bubble
+      bubbleColor={
+        isPrimary || isFollow
+          ? 'rgba(255,255,255,0.28)'
+          : 'rgba(26,78,55,0.16)'
+      }
+      bubblePlacement="fill"
       disabled={disabled}
+      haptic="light"
       onPress={onPress}
-      scaleTo={disabled ? 1 : 0.96}
+      scaleTo={disabled ? 1 : 0.94}
       style={[
         styles.button,
         fullWidth ? styles.fullWidth : null,
         size === 'compact' ? styles.compactButton : styles.defaultButton,
         isPrimary ? styles.primaryButton : null,
+        isFollow ? styles.followButton : null,
         isSecondary ? styles.secondaryButton : null,
         isDanger ? styles.dangerButton : null,
         variant === 'ghost' ? styles.ghostButton : null,
@@ -52,7 +67,7 @@ export default function SitGuruButton({
         style={[
           styles.buttonText,
           size === 'compact' ? styles.compactText : null,
-          isPrimary ? styles.primaryText : null,
+          isPrimary || isFollow ? styles.primaryText : null,
           isSecondary ? styles.secondaryText : null,
           isDanger ? styles.dangerText : null,
           variant === 'ghost' ? styles.ghostText : null,
@@ -69,26 +84,32 @@ const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 56,
+    minHeight: 52,
+    overflow: 'visible',
   },
   fullWidth: {
     width: '100%',
   },
+  /* Stadium pill — matches Instagram Follow CTAs */
   defaultButton: {
-    paddingVertical: 17,
+    paddingVertical: 15,
     paddingHorizontal: 22,
-    borderRadius: 18,
+    borderRadius: 999,
   },
   compactButton: {
-    minHeight: 48,
-    minWidth: 48,
-    paddingVertical: 12,
+    minHeight: 36,
+    minWidth: 72,
+    paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 14,
+    borderRadius: 999,
   },
   primaryButton: {
     backgroundColor: SitGuruColors.primary,
     elevation: 4,
+  },
+  followButton: {
+    backgroundColor: '#121212',
+    elevation: 2,
   },
   secondaryButton: {
     backgroundColor: SitGuruColors.surface,
