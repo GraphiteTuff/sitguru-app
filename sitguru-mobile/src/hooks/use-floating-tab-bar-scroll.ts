@@ -1,14 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import type {
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollViewProps,
 } from 'react-native';
 
-import {
-  TAB_BAR_EXPAND_DELAY_MS,
-  useOptionalTabBarMotion,
-} from '@/context/TabBarMotionContext';
+import { useOptionalTabBarMotion } from '@/context/TabBarMotionContext';
 
 export type FloatingTabBarScrollHandlers = Pick<
   ScrollViewProps,
@@ -41,40 +38,21 @@ function chainScrollHandlers(
 /**
  * Reusable scroll → floating tab bar bridge.
  * Writes only to shared motion state — no React setState on scroll.
- * Also debounces expand for mouse-wheel / web scrolls that never emit
- * drag or momentum end events.
+ * onScroll also restarts the expand timer so mouse-wheel / web scrolls
+ * (which often skip drag + momentum end) still reopen the capsule.
  */
 export function useFloatingTabBarScroll(
   existing?: Partial<FloatingTabBarScrollHandlers>,
 ): FloatingTabBarScrollHandlers {
   const motion = useOptionalTabBarMotion();
   const lastOffsetY = useRef(0);
-  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearIdleTimer = useCallback(() => {
-    if (idleTimer.current) {
-      clearTimeout(idleTimer.current);
-      idleTimer.current = null;
-    }
-  }, []);
-
-  const scheduleExpand = useCallback(() => {
-    clearIdleTimer();
-    idleTimer.current = setTimeout(() => {
-      motion?.reportScrollEnd();
-      idleTimer.current = null;
-    }, TAB_BAR_EXPAND_DELAY_MS);
-  }, [clearIdleTimer, motion]);
-
-  useEffect(() => () => clearIdleTimer(), [clearIdleTimer]);
 
   const onScrollBeginDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      clearIdleTimer();
       lastOffsetY.current = event.nativeEvent.contentOffset.y;
       motion?.reportScrollBegin();
     },
-    [clearIdleTimer, motion],
+    [motion],
   );
 
   const onScroll = useCallback(
@@ -85,11 +63,11 @@ export function useFloatingTabBarScroll(
 
       if (Math.abs(delta) > 0) {
         motion?.reportScrollDelta(delta);
-        // Wheel / trackpad scrolls often skip end-drag + momentum events.
-        scheduleExpand();
+        // Restart expand countdown for wheel/trackpad scrolls.
+        motion?.reportScrollEnd();
       }
     },
-    [motion, scheduleExpand],
+    [motion],
   );
 
   const onScrollEndDrag = useCallback(
@@ -97,23 +75,22 @@ export function useFloatingTabBarScroll(
       lastOffsetY.current = event.nativeEvent.contentOffset.y;
       const velocity = event.nativeEvent.velocity?.y ?? 0;
       if (Math.abs(velocity) < 0.05) {
-        scheduleExpand();
+        motion?.reportScrollEnd();
       }
     },
-    [scheduleExpand],
+    [motion],
   );
 
   const onMomentumScrollBegin = useCallback(() => {
-    clearIdleTimer();
     motion?.reportScrollBegin();
-  }, [clearIdleTimer, motion]);
+  }, [motion]);
 
   const onMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       lastOffsetY.current = event.nativeEvent.contentOffset.y;
-      scheduleExpand();
+      motion?.reportScrollEnd();
     },
-    [scheduleExpand],
+    [motion],
   );
 
   return useMemo(
