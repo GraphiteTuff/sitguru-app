@@ -20,6 +20,7 @@ import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { AppFonts } from '@/constants/fonts';
 import {
   setThemePreference,
@@ -115,6 +116,8 @@ function formatDate(value: string): string {
 }
 
 export default function BookingsScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const isWebPreview = Platform.OS === 'web';
   const isDark = useThemeMode() === 'dark';
   const themePreference = useThemePreference();
@@ -172,6 +175,7 @@ export default function BookingsScreen() {
           >
             <View style={styles.screen}>
               <ScrollView
+              {...tabBarScroll}
                 contentContainerStyle={styles.scrollContent}
                 refreshControl={
                   <RefreshControl
