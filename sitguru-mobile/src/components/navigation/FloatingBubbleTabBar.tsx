@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import Animated, {
   Extrapolation,
@@ -115,7 +114,6 @@ export default function FloatingBubbleTabBar({
   onTabPress,
 }: FloatingBubbleTabBarProps) {
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
   const isDark = useThemeMode() === 'dark';
   const palette = usePalette(isDark);
   const reduceMotion = useReducedMotion();
@@ -126,6 +124,7 @@ export default function FloatingBubbleTabBar({
     tabs.findIndex((tab) => tab.key === activeKey),
   );
 
+  const [barWidth, setBarWidth] = useState(0);
   const [trackWidth, setTrackWidth] = useState(0);
   const trackPadding = 4;
   const contentWidth = Math.max(trackWidth - trackPadding * 2, 0);
@@ -211,14 +210,15 @@ export default function FloatingBubbleTabBar({
       Extrapolation.CLAMP,
     );
     const translateY = interpolate(progress, [0, 1], [0, 6], Extrapolation.CLAMP);
-    const horizontalPad = ((1 - widthRatio) / 2) * windowWidth;
+    const basis = barWidth > 0 ? barWidth : 0;
+    const horizontalPad = ((1 - widthRatio) / 2) * basis;
 
     return {
       height,
       marginHorizontal: horizontalPad,
       transform: [{ translateY }],
     };
-  }, [windowWidth]);
+  }, [barWidth]);
 
   const bubbleStyle = useAnimatedStyle(() => {
     const progress = navCompactProgress.value;
@@ -246,6 +246,10 @@ export default function FloatingBubbleTabBar({
 
   return (
     <View
+      onLayout={(event) => {
+        const next = Math.round(event.nativeEvent.layout.width);
+        setBarWidth((current) => (current === next ? current : next));
+      }}
       pointerEvents="box-none"
       style={[styles.outer, { paddingBottom: bottomPad }]}
     >
