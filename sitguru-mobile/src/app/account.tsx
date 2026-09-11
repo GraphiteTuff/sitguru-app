@@ -42,6 +42,7 @@ import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
 import { AppFonts } from '@/constants/fonts';
 import {
@@ -93,6 +94,8 @@ const THEME_OPTIONS: ThemeOption[] = [
 ];
 
 export default function AccountScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const { width } = useWindowDimensions();
   const {
     user,
@@ -319,6 +322,7 @@ export default function AccountScreen() {
               {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
               <ScrollView
+              {...tabBarScroll}
                 contentContainerStyle={[
                   styles.scrollContent,
                   isTablet && styles.scrollContentTablet,

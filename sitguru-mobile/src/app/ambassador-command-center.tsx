@@ -55,6 +55,7 @@ import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { useFloatingTabBarScroll } from '@/hooks/use-floating-tab-bar-scroll';
 import { getAppTheme } from '@/constants/theme';
 import {
   setThemePreference,
@@ -1217,6 +1218,8 @@ function PhoneStatusBar({
 }
 
 export default function AmbassadorCommandCenterScreen() {
+  const tabBarScroll = useFloatingTabBarScroll();
+
   const { width: windowWidth } = useWindowDimensions();
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
@@ -1995,6 +1998,7 @@ export default function AmbassadorCommandCenterScreen() {
                 </View>
 
           <ScrollView
+              {...tabBarScroll}
             keyboardShouldPersistTaps="always"
             nestedScrollEnabled
             showsVerticalScrollIndicator={false}
