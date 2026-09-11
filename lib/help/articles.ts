@@ -444,7 +444,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "career center",
       "faculty",
       "market growth",
-      "careers@sitguru.com",
+      "intern@sitguru.com",
       "intern",
     ],
   },

@@ -73,7 +73,12 @@ function mapRow(row: Record<string, unknown>): CareerJob {
     summary: String(row.summary || ""),
     description: String(row.description || ""),
     highlights,
-    applyEmail: String(row.apply_email || "jason@sitguru.com"),
+    applyEmail: String(
+      row.apply_email ||
+        (asCategory(row.category) === "internship"
+          ? "intern@sitguru.com"
+          : "careers@sitguru.com"),
+    ),
     applyUrl: String(row.apply_url || ""),
     sortOrder: Number(row.sort_order || 100),
     publishedAt: row.published_at ? String(row.published_at) : null,
@@ -196,7 +201,11 @@ export async function saveCareerJobRow(
     summary: input.summary.trim(),
     description: input.description.trim(),
     highlights: input.highlights.map((item) => item.trim()).filter(Boolean),
-    apply_email: input.applyEmail?.trim() || "jason@sitguru.com",
+    apply_email:
+      input.applyEmail?.trim() ||
+      (input.category === "internship"
+        ? "intern@sitguru.com"
+        : "careers@sitguru.com"),
     apply_url: input.applyUrl?.trim() || null,
     sort_order: Number.isFinite(input.sortOrder) ? Number(input.sortOrder) : 100,
     published_at:

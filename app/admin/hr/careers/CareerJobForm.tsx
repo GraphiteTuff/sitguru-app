@@ -203,7 +203,12 @@ export function CareerJobForm({
           <input
             name="applyEmail"
             type="email"
-            defaultValue={job?.applyEmail || "jason@sitguru.com"}
+            defaultValue={
+              job?.applyEmail ||
+              (job?.category === "internship"
+                ? "intern@sitguru.com"
+                : "careers@sitguru.com")
+            }
             className={fieldClass}
           />
         </label>

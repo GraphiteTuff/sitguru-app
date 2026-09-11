@@ -451,7 +451,7 @@ export const internshipFaqs: HelpFaqItem[] = [
   {
     question: "How do I apply for the internship?",
     answer:
-      "Read the live posting at sitguru.com/careers/social-media-community-growth-intern, then email a short note and any relevant work samples to careers@sitguru.com. Selected candidates are contacted for an interview.",
+      "Read the live posting at sitguru.com/careers/social-media-community-growth-intern, then email a short note and any relevant work samples to intern@sitguru.com. Selected candidates are contacted for an interview.",
   },
   {
     question: "Is this the same as Student Hire?",

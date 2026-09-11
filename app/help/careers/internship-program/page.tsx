@@ -36,10 +36,10 @@ export default function InternshipProgramHelpPage() {
           View internship posting
         </Link>
         <a
-          href="mailto:careers@sitguru.com?subject=SitGuru%20internship%20application"
+          href="mailto:intern@sitguru.com?subject=SitGuru%20internship%20application"
           className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-extrabold text-emerald-950 hover:bg-emerald-50"
         >
-          Email careers@sitguru.com
+          Email intern@sitguru.com
         </a>
       </div>
     </HelpArticleChrome>

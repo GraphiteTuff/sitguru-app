@@ -21,13 +21,19 @@ export default function CareersHelpHubPage() {
             to apply and how internships differ from Guru or Student Hire
             pathways.
           </p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
             <Link
               href="/careers#open-roles"
               className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-extrabold text-white hover:bg-[#09462c]"
             >
               Browse open roles
             </Link>
+            <a
+              href="mailto:intern@sitguru.com?subject=SitGuru%20internship%20application"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-extrabold text-emerald-950 hover:bg-emerald-50"
+            >
+              Email intern@sitguru.com
+            </a>
             <a
               href="mailto:careers@sitguru.com?subject=SitGuru%20application"
               className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-extrabold text-emerald-950 hover:bg-emerald-50"
