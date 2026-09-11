@@ -80,7 +80,10 @@ export type WalkActionName =
   | "resume"
   | "potty_break"
   | "end_walk"
-  | "ping_coordinate";
+  | "ping_coordinate"
+  | "care_update";
+
+export type WalkCareUpdateType = "water" | "food" | "note" | "photo";
 
 export function metersToMiles(meters: number) {
   const safe = Number.isFinite(meters) ? Math.max(0, meters) : 0;

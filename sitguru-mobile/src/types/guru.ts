@@ -22,6 +22,10 @@ export type PublicGuruProfile = {
   photo_url?: string | null;
   image_url?: string | null;
   profile_image_url?: string | null;
+  cover_url?: string | null;
+  intro_video_url?: string | null;
+  profile_video_url?: string | null;
+  video_url?: string | null;
   hourly_rate?: number | string | null;
   starting_rate?: number | string | null;
   rate?: number | string | null;
@@ -88,6 +92,18 @@ export function getGuruFirstName(guru: PublicGuruProfile) {
 
 export function getGuruPhotoUrl(guru: PublicGuruProfile) {
   return cleanString(guru.profile_photo_url) || cleanString(guru.avatar_url) || cleanString(guru.photo_url) || cleanString(guru.image_url) || cleanString(guru.profile_image_url) || '';
+}
+
+export function getGuruCoverUrl(guru: PublicGuruProfile) {
+  return cleanString(guru.cover_url);
+}
+
+export function getGuruIntroVideoUrl(guru: PublicGuruProfile) {
+  return (
+    cleanString(guru.intro_video_url) ||
+    cleanString(guru.profile_video_url) ||
+    cleanString(guru.video_url)
+  );
 }
 
 export function getGuruLocationLabel(guru: PublicGuruProfile) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sendExpoPushToUser } from "@/lib/notifications/expo-push";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   optionsWithMobileCors,
@@ -756,6 +757,24 @@ export async function POST(req: NextRequest) {
         bookingId: "",
         checkoutWarning:
           "Booking was created, but no booking ID was returned to start checkout.",
+      });
+    }
+
+    const guruUserId = getFirstText(guru || {}, ["user_id", "profile_id", "id"]);
+    if (guruUserId && guruUserId !== user.id) {
+      void sendExpoPushToUser({
+        userId: guruUserId,
+        title: "New booking request",
+        body: `${customerName || "A Pet Parent"} requested ${serviceType} for ${resolvedPetName || "their pet"}.`,
+        href: `/guru-requests?bookingId=${encodeURIComponent(bookingId)}`,
+        channelId: "sitguru-bookings",
+        categoryId: "booking_request",
+        data: {
+          type: "booking_request",
+          bookingId,
+        },
+      }).catch((pushError) => {
+        console.error("Booking request Expo push failed:", pushError);
       });
     }
 

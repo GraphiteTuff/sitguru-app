@@ -12,6 +12,7 @@ export { useBookings, useBooking } from '@/hooks/data/useBookings';
 export { useConversations, useConversation } from '@/hooks/data/useMessages';
 export { useNotifications } from '@/hooks/data/useNotifications';
 export { usePublicGurus, useGuruProfile } from '@/hooks/data/useGurus';
+export { useProfileMedia } from '@/hooks/data/useProfileMedia';
 export { useWalkSession } from '@/hooks/data/useWalkSession';
 export { usePawReportLive } from '@/hooks/data/usePawReportLive';
 export { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
@@ -39,6 +40,7 @@ export type { PublicGuru } from '@/hooks/data/useGurus';
 export type {
   WalkActionName,
   WalkActionInput,
+  WalkCareUpdateType,
 } from '@/hooks/data/useWalkSession';
 export type {
   PawReportLiveSnapshot,

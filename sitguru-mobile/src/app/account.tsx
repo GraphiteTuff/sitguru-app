@@ -11,12 +11,10 @@ import {
   Gift,
   HelpCircle,
   LockKeyhole,
-  LogOut,
   MapPin,
   MessageCircle,
   PawPrint,
   GraduationCap,
-  RefreshCw,
   ScanFace,
   Settings,
   ShieldCheck,
@@ -40,17 +38,18 @@ import {
 } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
-import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruButton from '@/components/SitGuruButton';
+import SitGuruIconButton from '@/components/SitGuruIconButton';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
+import ProfileMediaStudio from '@/components/account/ProfileMediaStudio';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { ButtonMetrics } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
-import {
-  setThemePreference,
-  useThemePreference,
-  type SitGuruThemePreference,
-} from '@/hooks/use-color-scheme';
+import { useThemePreference } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { useNotificationPreferences } from '@/hooks/data/useNotificationPreferences';
 import { useAuth } from '@/hooks/useAuth';
 import { confirmSensitiveAction } from '@/lib/security/biometrics';
@@ -58,12 +57,6 @@ import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { roleLabel, type AppRole } from '@/types/auth';
 
 type RecordRow = Record<string, unknown>;
-
-type ThemeOption = {
-  icon: 'sun' | 'moon';
-  label: string;
-  value: SitGuruThemePreference;
-};
 
 type Action = {
   href?: Href;
@@ -79,19 +72,6 @@ type AccountSectionKey =
   | 'payments'
   | 'support'
   | 'app';
-
-const THEME_OPTIONS: ThemeOption[] = [
-  {
-    icon: 'sun',
-    label: 'Light',
-    value: 'light',
-  },
-  {
-    icon: 'moon',
-    label: 'Dark',
-    value: 'dark',
-  },
-];
 
 export default function AccountScreen() {
   const { width } = useWindowDimensions();
@@ -116,6 +96,7 @@ export default function AccountScreen() {
   const isDark = themeMode === 'dark';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark, isTablet);
+  const tabBarScroll = useFloatingTabBarScroll();
 
   const [activeSection, setActiveSection] =
     useState<AccountSectionKey>('profile');
@@ -158,6 +139,20 @@ export default function AccountScreen() {
   const avatarUrl = rawAvatar
     ? resolveSupabaseStorageUrl(rawAvatar)
     : null;
+
+  const coverUrl =
+    resolveSupabaseStorageUrl(
+      firstString(profileRecord, ['cover_url', 'cover_photo_url', 'banner_url']),
+    ) || null;
+
+  const introVideoUrl =
+    resolveSupabaseStorageUrl(
+      firstString(profileRecord, [
+        'intro_video_url',
+        'profile_video_url',
+        'video_url',
+      ]),
+    ) || null;
 
   const rolePills: AppRole[] = authRoles.length
     ? authRoles
@@ -320,6 +315,7 @@ export default function AccountScreen() {
               {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
               <ScrollView
+                {...tabBarScroll}
                 contentContainerStyle={[
                   styles.scrollContent,
                   isTablet && styles.scrollContentTablet,
@@ -335,18 +331,15 @@ export default function AccountScreen() {
                 }
                 showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
-                  <BubblePressable
+                  <SitGuruIconButton
                     accessibilityLabel="Go back"
-                    accessibilityRole="button"
-                    onPress={() => router.back()}
-                    scaleTo={0.88}
-                    style={styles.headerBackButton}>
+                    onPress={() => router.back()}>
                     <ArrowLeft
                       color={palette.primary}
-                      size={20}
+                      size={ButtonMetrics.iconGlyph}
                       strokeWidth={2.5}
                     />
-                  </BubblePressable>
+                  </SitGuruIconButton>
 
                   <View style={styles.headerCopy}>
                     <Text style={styles.headerTitle}>Account</Text>
@@ -356,56 +349,17 @@ export default function AccountScreen() {
                   </View>
 
                   <View style={styles.headerActions}>
-                    <BubblePressable
+                    <SitGuruIconButton
                       accessibilityLabel="Open notifications"
-                      accessibilityRole="button"
-                      onPress={() => router.push('/notifications')}
-                      scaleTo={0.88}
-                      style={styles.headerIconButton}>
+                      onPress={() => router.push('/notifications')}>
                       <Bell
                         color={palette.title}
-                        size={18}
+                        size={ButtonMetrics.iconGlyph}
                         strokeWidth={2.3}
                       />
-                    </BubblePressable>
+                    </SitGuruIconButton>
 
-                    <View style={styles.modeToggle}>
-                      {THEME_OPTIONS.map((option) => {
-                        const active =
-                          themePreference === option.value;
-
-                        return (
-                          <BubblePressable
-                            key={option.value}
-                            accessibilityLabel={`Switch to ${option.label} mode`}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: active }}
-                            onPress={() =>
-                              setThemePreference(option.value)
-                            }
-                            scaleTo={0.88}
-                            style={[
-                              styles.modeButton,
-                              active && styles.modeButtonActive,
-                            ]}>
-                            <SitGuruIcon
-                              color={
-                                active
-                                  ? option.value === 'light'
-                                    ? '#F3AA1F'
-                                    : isDark
-                                      ? '#F0CF62'
-                                      : palette.primary
-                                  : palette.muted
-                              }
-                              name={option.icon}
-                              size={15}
-                              strokeWidth={2.4}
-                            />
-                          </BubblePressable>
-                        );
-                      })}
-                    </View>
+                    <SitGuruThemeToggle />
 
                     <BubblePressable
                       accessibilityLabel={
@@ -495,81 +449,58 @@ export default function AccountScreen() {
                   <View style={styles.profileHeroActions}>
                     {isAuthenticated ? (
                       <>
-                        <ActionButton
-                          icon={
-                            profileLoading ? (
-                              <RefreshCw
-                                color="#FFFFFF"
-                                size={17}
-                                strokeWidth={2.4}
-                              />
-                            ) : (
-                              <UserRound
-                                color="#FFFFFF"
-                                size={17}
-                                strokeWidth={2.4}
-                              />
-                            )
-                          }
+                        <SitGuruButton
+                          disabled={profileLoading}
+                          flex
                           label={
                             profileLoading
                               ? 'Refreshing...'
                               : 'Refresh profile'
                           }
-                          onPress={() =>
-                            void reloadProfileAndRoles()
-                          }
-                          primary
-                          styles={styles}
+                          onPress={() => void reloadProfileAndRoles()}
+                          size="compact"
                         />
 
-                        <ActionButton
-                          icon={
-                            <UsersRound
-                              color={palette.primary}
-                              size={17}
-                              strokeWidth={2.4}
-                            />
-                          }
+                        <SitGuruButton
+                          flex
                           label="Switch workspace"
-                          onPress={() =>
-                            setWorkspaceSwitcherOpen(true)
-                          }
-                          styles={styles}
+                          onPress={() => setWorkspaceSwitcherOpen(true)}
+                          size="compact"
+                          variant="secondary"
                         />
                       </>
                     ) : (
                       <>
-                        <ActionButton
-                          icon={
-                            <UserRound
-                              color="#FFFFFF"
-                              size={17}
-                              strokeWidth={2.4}
-                            />
-                          }
+                        <SitGuruButton
+                          flex
                           label="Log in"
                           onPress={() => router.push('/login')}
-                          primary
-                          styles={styles}
+                          size="compact"
                         />
 
-                        <ActionButton
-                          icon={
-                            <UsersRound
-                              color={palette.primary}
-                              size={17}
-                              strokeWidth={2.4}
-                            />
-                          }
+                        <SitGuruButton
+                          flex
                           label="Create account"
                           onPress={() => router.push('/signup')}
-                          styles={styles}
+                          size="compact"
+                          variant="secondary"
                         />
                       </>
                     )}
                   </View>
                 </View>
+
+                {isAuthenticated && user?.id ? (
+                  <ProfileMediaStudio
+                    avatarUrl={avatarUrl}
+                    coverUrl={coverUrl}
+                    introVideoUrl={introVideoUrl}
+                    isDark={isDark}
+                    isGuru={currentRole === 'guru'}
+                    onChanged={() => reloadProfileAndRoles()}
+                    userId={user.id}
+                  />
+                ) : null}
 
                 <View style={styles.quickSection}>
                   <Text style={styles.sectionEyebrow}>QUICK ACCESS</Text>
@@ -1056,20 +987,12 @@ export default function AccountScreen() {
                 </View>
 
                 {isAuthenticated ? (
-                  <BubblePressable
-                    accessibilityRole="button"
+                  <SitGuruButton
                     disabled={loading}
+                    label={loading ? 'Signing out...' : 'Sign out'}
                     onPress={() => void handleSignOut()}
-                    style={styles.signOutButton}>
-                    <LogOut
-                      color={palette.danger}
-                      size={18}
-                      strokeWidth={2.4}
-                    />
-                    <Text style={styles.signOutButtonText}>
-                      {loading ? 'Signing out...' : 'Sign out'}
-                    </Text>
-                  </BubblePressable>
+                    variant="danger"
+                  />
                 ) : null}
               </ScrollView>
 
@@ -1089,39 +1012,6 @@ export default function AccountScreen() {
         </View>
       </View>
     </SitGuruScreen>
-  );
-}
-
-function ActionButton({
-  icon,
-  label,
-  onPress,
-  primary = false,
-  styles,
-}: {
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  primary?: boolean;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <BubblePressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={[
-        styles.actionButton,
-        primary && styles.actionButtonPrimary,
-      ]}>
-      {icon}
-      <Text
-        style={[
-          styles.actionButtonText,
-          primary && styles.actionButtonTextPrimary,
-        ]}>
-        {label}
-      </Text>
-    </BubblePressable>
   );
 }
 
@@ -1787,7 +1677,7 @@ function createStyles(isDark: boolean, isTablet: boolean) {
       flexDirection: 'row',
       gap: 6,
       justifyContent: 'center',
-      minHeight: 46,
+      minHeight: 52,
       paddingHorizontal: 10,
     },
     actionButtonPrimary: {
@@ -1797,7 +1687,7 @@ function createStyles(isDark: boolean, isTablet: boolean) {
     actionButtonText: {
       color: palette.primary,
       fontFamily: AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 15,
     },
     actionButtonTextPrimary: {
       color: '#FFFFFF',
@@ -1809,7 +1699,7 @@ function createStyles(isDark: boolean, isTablet: boolean) {
     sectionEyebrow: {
       color: palette.primary,
       fontFamily: AppFonts.extraBold,
-      fontSize: 7,
+      fontSize: 11,
       letterSpacing: 0.85,
     },
     sectionTitle: {
@@ -1953,23 +1843,23 @@ function createStyles(isDark: boolean, isTablet: boolean) {
       borderWidth: 1,
       flexDirection: 'row',
       gap: 9,
-      minHeight: 50,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
+      minHeight: 56,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
     },
     actionRowIcon: {
       alignItems: 'center',
       backgroundColor: palette.surface,
-      borderRadius: 10,
-      height: 32,
+      borderRadius: 12,
+      height: 40,
       justifyContent: 'center',
-      width: 32,
+      width: 40,
     },
     actionRowLabel: {
       color: palette.title,
       flex: 1,
       fontFamily: AppFonts.bold,
-      fontSize: 9,
+      fontSize: 15,
     },
     actionRowChevron: {
       color: palette.muted,

@@ -1,6 +1,8 @@
-import { StyleSheet, Text } from 'react-native';
+import type { ReactNode } from 'react';
+import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
+import { ButtonMetrics, SitGuruAccent } from '@/constants/button-tokens';
 import { SitGuruColors } from '@/constants/colors';
 import { AppFonts } from '@/constants/fonts';
 import { MAX_FONT_SIZE_MULTIPLIER } from '@/lib/a11y/type-scale';
@@ -8,20 +10,26 @@ import { MAX_FONT_SIZE_MULTIPLIER } from '@/lib/a11y/type-scale';
 type SitGuruButtonProps = {
   accessibilityLabel?: string;
   disabled?: boolean;
+  flex?: boolean;
   fullWidth?: boolean;
   label: string;
   onPress?: () => void;
   size?: 'default' | 'compact';
+  style?: StyleProp<ViewStyle>;
+  trailing?: ReactNode;
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
 };
 
 export default function SitGuruButton({
   accessibilityLabel,
   disabled = false,
+  flex = false,
   fullWidth = true,
   label,
   onPress,
   size = 'default',
+  style,
+  trailing,
   variant = 'primary',
 }: SitGuruButtonProps) {
   const isPrimary = variant === 'primary';
@@ -37,13 +45,15 @@ export default function SitGuruButton({
       scaleTo={disabled ? 1 : 0.96}
       style={[
         styles.button,
-        fullWidth ? styles.fullWidth : null,
+        flex ? styles.flex : null,
+        fullWidth && !flex ? styles.fullWidth : null,
         size === 'compact' ? styles.compactButton : styles.defaultButton,
         isPrimary ? styles.primaryButton : null,
         isSecondary ? styles.secondaryButton : null,
         isDanger ? styles.dangerButton : null,
         variant === 'ghost' ? styles.ghostButton : null,
         disabled ? styles.disabledButton : null,
+        style,
       ]}
     >
       <Text
@@ -61,6 +71,7 @@ export default function SitGuruButton({
       >
         {label}
       </Text>
+      {trailing}
     </BubblePressable>
   );
 }
@@ -68,26 +79,31 @@ export default function SitGuruButton({
 const styles = StyleSheet.create({
   button: {
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
     justifyContent: 'center',
-    minHeight: 56,
+    minHeight: ButtonMetrics.ctaHeight,
+  },
+  flex: {
+    flex: 1,
   },
   fullWidth: {
     width: '100%',
   },
   defaultButton: {
-    paddingVertical: 17,
-    paddingHorizontal: 22,
-    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: ButtonMetrics.ctaPadX,
+    borderRadius: ButtonMetrics.ctaRadius,
   },
   compactButton: {
-    minHeight: 48,
-    minWidth: 48,
-    paddingVertical: 12,
+    minHeight: ButtonMetrics.ctaCompactHeight,
+    minWidth: ButtonMetrics.ctaCompactHeight,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 14,
   },
   primaryButton: {
-    backgroundColor: SitGuruColors.primary,
+    backgroundColor: SitGuruAccent.primary,
     elevation: 4,
   },
   secondaryButton: {
@@ -109,11 +125,11 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontFamily: AppFonts.extraBold,
-    fontSize: 16,
+    fontSize: ButtonMetrics.ctaFont,
     textAlign: 'center',
   },
   compactText: {
-    fontSize: 14,
+    fontSize: 16,
   },
   primaryText: {
     color: '#FFFFFF',

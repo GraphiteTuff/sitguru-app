@@ -31,12 +31,12 @@ export const ThumbZone = {
 } as const;
 
 export const MobileType = {
-  title: 22,
-  section: 17,
-  body: 15,
-  label: 13,
-  caption: 12,
-  micro: 11,
+  title: 24,
+  section: 18,
+  body: 16,
+  label: 14,
+  caption: 13,
+  micro: 12,
 } as const;
 
 /**

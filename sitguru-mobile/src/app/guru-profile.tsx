@@ -18,9 +18,11 @@ import {
 } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import {
   Alert,
   ActivityIndicator,
+  Image,
   Platform,
   RefreshControl,
   ScrollView,
@@ -30,26 +32,27 @@ import {
   View,
 } from 'react-native';
 
-import BubblePressable from '@/components/BubblePressable';
-import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruButton from '@/components/SitGuruButton';
+import SitGuruIconButton from '@/components/SitGuruIconButton';
 import SitGuruProfilePhotoFrame from '@/components/SitGuruProfilePhotoFrame';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
 import MarketplaceTrustNote from '@/components/mobile/MarketplaceTrustNote';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import { ButtonMetrics } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
 import { getGuruVerification, MARKETPLACE_TRUST_LINES } from '@/lib/marketplace-trust';
-import {
-  setThemePreference,
-  type SitGuruThemePreference,
-  useThemePreference,
-} from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
+import { useProfileMedia } from '@/hooks/data/useProfileMedia';
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { loadPublicGuruCatalog } from '@/lib/gurus/public-catalog';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import {
   getGuruBookingLabel,
+  getGuruCoverUrl,
   getGuruDisplayName,
   getGuruFirstName,
+  getGuruIntroVideoUrl,
   getGuruLocationLabel,
   getGuruPhotoUrl,
   getGuruProfileNotice,
@@ -63,24 +66,6 @@ import {
   type PublicGuruProfile,
 } from '@/types/guru';
 
-type ThemeOption = {
-  icon: 'sun' | 'moon';
-  label: string;
-  value: SitGuruThemePreference;
-};
-
-const THEME_OPTIONS: ThemeOption[] = [
-  {
-    icon: 'sun',
-    label: 'Light',
-    value: 'light',
-  },
-  {
-    icon: 'moon',
-    label: 'Dark',
-    value: 'dark',
-  },
-];
 
 const safetyNotes = [...MARKETPLACE_TRUST_LINES];
 
@@ -102,10 +87,10 @@ export default function GuruProfileScreen() {
   const isTablet = Platform.OS !== 'web' && width >= 768;
 
   const themeMode = useThemeMode();
-  const themePreference = useThemePreference();
   const isDark = themeMode === 'dark';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
+  const tabBarScroll = useFloatingTabBarScroll();
 
   const [gurus, setGurus] = useState<PublicGuruProfile[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -165,6 +150,13 @@ export default function GuruProfileScreen() {
   const guruPhotoUrl = selectedGuru
     ? resolveSupabaseStorageUrl(getGuruPhotoUrl(selectedGuru))
     : '';
+  const guruCoverUrl = selectedGuru
+    ? resolveSupabaseStorageUrl(getGuruCoverUrl(selectedGuru))
+    : '';
+  const guruIntroVideoUrl = selectedGuru
+    ? resolveSupabaseStorageUrl(getGuruIntroVideoUrl(selectedGuru))
+    : '';
+  const profileMedia = useProfileMedia(selectedGuru?.user_id || selectedGuru?.id);
   const preview = selectedGuru ? isKnownPreviewGuru(selectedGuru) : false;
   const bookable = selectedGuru ? isGuruBookable(selectedGuru) : false;
   const serviceList = selectedGuru ? getGuruServices(selectedGuru) : [];
@@ -204,7 +196,11 @@ export default function GuruProfileScreen() {
       pathname: '/conversation',
       params: {
         guruId: selectedGuru.id,
-        slug: getGuruSlug(selectedGuru),
+        guruSlug: getGuruSlug(selectedGuru),
+        ...(selectedGuru.user_id
+          ? { recipientId: selectedGuru.user_id }
+          : {}),
+        guruName: getGuruFirstName(selectedGuru),
       },
     } as never);
   }
@@ -264,6 +260,7 @@ export default function GuruProfileScreen() {
               ) : null}
 
               <ScrollView
+                {...tabBarScroll}
                 contentContainerStyle={[
                   styles.scrollContent,
                   isTablet && styles.scrollContentTablet,
@@ -278,18 +275,15 @@ export default function GuruProfileScreen() {
                 }
                 showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
-                  <BubblePressable
+                  <SitGuruIconButton
                     accessibilityLabel="Back to Find Care"
-                    accessibilityRole="button"
-                    onPress={() => router.push('/find-care')}
-                    scaleTo={0.88}
-                    style={styles.headerBackButton}>
+                    onPress={() => router.push('/find-care')}>
                     <ArrowLeft
                       color={palette.primary}
-                      size={20}
+                      size={ButtonMetrics.iconGlyph}
                       strokeWidth={2.5}
                     />
-                  </BubblePressable>
+                  </SitGuruIconButton>
 
                   <View style={styles.headerCopy}>
                     <Text style={styles.headerTitle}>
@@ -301,72 +295,27 @@ export default function GuruProfileScreen() {
                   </View>
 
                   <View style={styles.headerActions}>
-                    <BubblePressable
+                    <SitGuruIconButton
                       accessibilityLabel="Refresh profile"
-                      accessibilityRole="button"
-                      onPress={() => void handleRefresh()}
-                      scaleTo={0.88}
-                      style={styles.headerIconButton}>
+                      onPress={() => void handleRefresh()}>
                       <RefreshCw
                         color={palette.title}
-                        size={17}
+                        size={ButtonMetrics.iconGlyph}
                         strokeWidth={2.3}
                       />
-                    </BubblePressable>
+                    </SitGuruIconButton>
 
-                    <BubblePressable
+                    <SitGuruIconButton
                       accessibilityLabel="Open notifications"
-                      accessibilityRole="button"
-                      onPress={() => router.push('/notifications')}
-                      scaleTo={0.88}
-                      style={styles.headerIconButton}>
+                      onPress={() => router.push('/notifications')}>
                       <Bell
                         color={palette.title}
-                        size={17}
+                        size={ButtonMetrics.iconGlyph}
                         strokeWidth={2.3}
                       />
-                    </BubblePressable>
+                    </SitGuruIconButton>
 
-                    <View style={styles.modeToggle}>
-                      {THEME_OPTIONS.map((option) => {
-                        const active =
-                          themePreference === option.value;
-
-                        return (
-                          <BubblePressable
-                            key={option.value}
-                            accessibilityLabel={`Switch to ${option.label} mode`}
-                            accessibilityRole="button"
-                            accessibilityState={{
-                              selected: active,
-                            }}
-                            onPress={() =>
-                              setThemePreference(option.value)
-                            }
-                            scaleTo={0.88}
-                            style={[
-                              styles.modeButton,
-                              active &&
-                                styles.modeButtonActive,
-                            ]}>
-                            <SitGuruIcon
-                              color={
-                                active
-                                  ? option.value === 'light'
-                                    ? '#F3AA1F'
-                                    : isDark
-                                      ? '#F0CF62'
-                                      : palette.primary
-                                  : palette.muted
-                              }
-                              name={option.icon}
-                              size={15}
-                              strokeWidth={2.4}
-                            />
-                          </BubblePressable>
-                        );
-                      })}
-                    </View>
+                    <SitGuruThemeToggle />
                   </View>
                 </View>
 
@@ -399,6 +348,14 @@ export default function GuruProfileScreen() {
                 ) : (
                   <>
                 <View style={styles.heroCard}>
+                  {guruCoverUrl || profileMedia.cover?.fileUrl ? (
+                    <Image
+                      source={{
+                        uri: guruCoverUrl || profileMedia.cover?.fileUrl || '',
+                      }}
+                      style={styles.coverPhoto}
+                    />
+                  ) : null}
                   <View style={styles.heroPhotoWrap}>
                     <SitGuruProfilePhotoFrame
                       fallbackEmoji=""
@@ -523,42 +480,60 @@ export default function GuruProfileScreen() {
                     ) : null}
 
                     <View style={styles.heroActions}>
-                      <ActionButton
-                        icon={
-                          <MessageCircle
-                            color={palette.primary}
-                            size={17}
-                            strokeWidth={2.4}
-                          />
-                        }
+                      <SitGuruButton
+                        flex
                         label={
                           preview
                             ? 'Message preview'
                             : `Message ${guruFirstName}`
                         }
                         onPress={openConversation}
-                        styles={styles}
+                        size="compact"
+                        variant="secondary"
                       />
 
-                      <ActionButton
+                      <SitGuruButton
                         disabled={preview}
-                        icon={
-                          <CalendarCheck2
-                            color="#FFFFFF"
-                            size={17}
-                            strokeWidth={2.4}
-                          />
-                        }
-                        label={getGuruBookingLabel(
-                          selectedGuru,
-                        )}
+                        flex
+                        label={getGuruBookingLabel(selectedGuru)}
                         onPress={handleBookingAction}
-                        primary
-                        styles={styles}
+                        size="compact"
                       />
                     </View>
                   </View>
                 </View>
+
+                {profileMedia.gallery.length ||
+                guruIntroVideoUrl ||
+                profileMedia.video ? (
+                  <View style={styles.mediaCard}>
+                    {profileMedia.gallery.length ? (
+                      <View style={styles.galleryRow}>
+                        {profileMedia.gallery.map((item) => (
+                          <Image
+                            key={item.id}
+                            source={{ uri: item.fileUrl }}
+                            style={styles.galleryImage}
+                          />
+                        ))}
+                      </View>
+                    ) : null}
+                    {guruIntroVideoUrl || profileMedia.video?.fileUrl ? (
+                      <GuruIntroVideo
+                        key={
+                          guruIntroVideoUrl ||
+                          profileMedia.video?.fileUrl ||
+                          'intro'
+                        }
+                        uri={
+                          guruIntroVideoUrl ||
+                          profileMedia.video?.fileUrl ||
+                          ''
+                        }
+                      />
+                    ) : null}
+                  </View>
+                ) : null}
 
                 <View style={styles.quickFacts}>
                   <QuickFact
@@ -762,25 +737,11 @@ export default function GuruProfileScreen() {
                     {availabilityCopy}
                   </Text>
 
-                  <ActionButton
+                  <SitGuruButton
                     disabled={preview}
-                    icon={
-                      <CalendarCheck2
-                        color={
-                          preview
-                            ? palette.muted
-                            : '#FFFFFF'
-                        }
-                        size={17}
-                        strokeWidth={2.4}
-                      />
-                    }
-                    label={getGuruBookingLabel(
-                      selectedGuru,
-                    )}
+                    label={getGuruBookingLabel(selectedGuru)}
                     onPress={handleBookingAction}
-                    primary={!preview}
-                    styles={styles}
+                    variant={preview ? 'secondary' : 'primary'}
                   />
 
                   <MarketplaceTrustNote compact />
@@ -844,34 +805,20 @@ export default function GuruProfileScreen() {
                   </Text>
 
                   <View style={styles.connectActions}>
-                    <ActionButton
-                      icon={
-                        <MessageCircle
-                          color={palette.primary}
-                          size={17}
-                          strokeWidth={2.4}
-                        />
-                      }
+                    <SitGuruButton
+                      flex
                       label="Message"
                       onPress={openConversation}
-                      styles={styles}
+                      size="compact"
+                      variant="secondary"
                     />
 
-                    <ActionButton
+                    <SitGuruButton
                       disabled={preview}
-                      icon={
-                        <CalendarCheck2
-                          color="#FFFFFF"
-                          size={17}
-                          strokeWidth={2.4}
-                        />
-                      }
-                      label={getGuruBookingLabel(
-                        selectedGuru,
-                      )}
+                      flex
+                      label={getGuruBookingLabel(selectedGuru)}
                       onPress={handleBookingAction}
-                      primary
-                      styles={styles}
+                      size="compact"
                     />
                   </View>
                 </View>
@@ -889,6 +836,22 @@ export default function GuruProfileScreen() {
         </View>
       </View>
     </SitGuruScreen>
+  );
+}
+
+function GuruIntroVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (instance) => {
+    instance.loop = true;
+    instance.muted = true;
+  });
+
+  return (
+    <VideoView
+      contentFit="cover"
+      nativeControls
+      player={player}
+      style={{ borderRadius: 16, height: 188, width: '100%' }}
+    />
   );
 }
 
@@ -918,45 +881,6 @@ function Badge({
         {label}
       </Text>
     </View>
-  );
-}
-
-function ActionButton({
-  disabled = false,
-  icon,
-  label,
-  onPress,
-  primary = false,
-  styles,
-}: {
-  disabled?: boolean;
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  primary?: boolean;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  return (
-    <BubblePressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={[
-        styles.actionButton,
-        primary && styles.actionButtonPrimary,
-        disabled && styles.actionButtonDisabled,
-      ]}>
-      {icon}
-      <Text
-        style={[
-          styles.actionButtonText,
-          primary && styles.actionButtonTextPrimary,
-          disabled && styles.actionButtonTextDisabled,
-        ]}>
-        {label}
-      </Text>
-    </BubblePressable>
   );
 }
 
@@ -1353,6 +1277,34 @@ function createStyles(isDark: boolean) {
       shadowOpacity: isDark ? 0.2 : 0.07,
       shadowRadius: 16,
     },
+    coverPhoto: {
+      borderRadius: 18,
+      height: 120,
+      width: '100%',
+    },
+    mediaCard: {
+      backgroundColor: isDark ? '#0D2B20' : '#ECF8EE',
+      borderColor: isDark ? '#2D6548' : '#CFE8D5',
+      borderRadius: 22,
+      borderWidth: 1,
+      gap: 10,
+      padding: 12,
+    },
+    galleryRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    galleryImage: {
+      borderRadius: 14,
+      height: 88,
+      width: 88,
+    },
+    introVideo: {
+      borderRadius: 16,
+      height: 188,
+      width: '100%',
+    },
     heroPhotoWrap: {
       alignItems: 'center',
       backgroundColor: palette.surface,
@@ -1433,7 +1385,7 @@ function createStyles(isDark: boolean) {
     metaText: {
       color: palette.text,
       fontFamily: AppFonts.bold,
-      fontSize: 9,
+      fontSize: 14,
     },
     metaDivider: {
       backgroundColor: palette.border,
@@ -1469,7 +1421,7 @@ function createStyles(isDark: boolean) {
       flexDirection: 'row',
       gap: 6,
       justifyContent: 'center',
-      minHeight: 46,
+      minHeight: 52,
       paddingHorizontal: 10,
     },
     actionButtonPrimary: {
@@ -1483,7 +1435,7 @@ function createStyles(isDark: boolean) {
     actionButtonText: {
       color: palette.primary,
       fontFamily: AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
     },
     actionButtonTextPrimary: {
       color: '#FFFFFF',
@@ -1520,7 +1472,7 @@ function createStyles(isDark: boolean) {
     quickFactValue: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
       lineHeight: 12,
       textAlign: 'center',
     },
@@ -1597,7 +1549,7 @@ function createStyles(isDark: boolean) {
       flexDirection: 'row',
       gap: 8,
       justifyContent: 'space-between',
-      minHeight: 46,
+      minHeight: 52,
       paddingHorizontal: 10,
       paddingVertical: 8,
     },
@@ -1652,7 +1604,7 @@ function createStyles(isDark: boolean) {
       color: palette.text,
       flex: 1,
       fontFamily: AppFonts.bold,
-      fontSize: 9,
+      fontSize: 14,
       lineHeight: 13,
     },
 
@@ -1689,7 +1641,7 @@ function createStyles(isDark: boolean) {
     reviewName: {
       color: palette.title,
       fontFamily: AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
     },
     reviewStars: {
       flexDirection: 'row',
@@ -1728,7 +1680,7 @@ function createStyles(isDark: boolean) {
     connectText: {
       color: palette.text,
       fontFamily: AppFonts.medium,
-      fontSize: 9,
+      fontSize: 14,
       lineHeight: 14,
       textAlign: 'center',
     },

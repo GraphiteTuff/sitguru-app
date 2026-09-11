@@ -17,30 +17,19 @@ import {
 } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
-import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruButton from '@/components/SitGuruButton';
+import SitGuruIconButton from '@/components/SitGuruIconButton';
+import SitGuruChip from '@/components/mobile/SitGuruChip';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
+import { ButtonMetrics } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
-import {
-  setThemePreference,
-  type SitGuruThemePreference,
-  useThemePreference,
-} from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useBookings, type SitGuruBooking } from '@/hooks/data/useBookings';
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 
 type BookingFilter = 'upcoming' | 'past' | 'all';
-
-type ThemeOption = {
-  label: string;
-  value: SitGuruThemePreference;
-  icon: 'sun' | 'moon';
-};
-
-const themeOptions: ThemeOption[] = [
-  { label: 'Light', value: 'light', icon: 'sun' },
-  { label: 'Dark', value: 'dark', icon: 'moon' },
-];
 
 const filterOptions: Array<{ label: string; value: BookingFilter }> = [
   { label: 'Upcoming', value: 'upcoming' },
@@ -117,13 +106,13 @@ function formatDate(value: string): string {
 export default function BookingsScreen() {
   const isWebPreview = Platform.OS === 'web';
   const isDark = useThemeMode() === 'dark';
-  const themePreference = useThemePreference();
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
 
   const { bookings, loading, error, refresh } = useBookings({
     role: 'pet_parent',
   });
+  const tabBarScroll = useFloatingTabBarScroll();
 
   const [activeFilter, setActiveFilter] = useState<BookingFilter>('upcoming');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -172,6 +161,7 @@ export default function BookingsScreen() {
           >
             <View style={styles.screen}>
               <ScrollView
+                {...tabBarScroll}
                 contentContainerStyle={styles.scrollContent}
                 refreshControl={
                   <RefreshControl
@@ -194,86 +184,32 @@ export default function BookingsScreen() {
                   </View>
 
                   <View style={styles.headerActions}>
-                    <View style={styles.modeToggle}>
-                      {themeOptions.map((option) => {
-                        const active = themePreference === option.value;
+                    <SitGuruThemeToggle />
 
-                        return (
-                          <BubblePressable
-                            key={option.value}
-                            accessibilityLabel={`Switch to ${option.label} mode`}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: active }}
-                            onPress={() => setThemePreference(option.value)}
-                            scaleTo={0.88}
-                            style={[
-                              styles.modeButton,
-                              active && styles.modeButtonActive,
-                            ]}
-                          >
-                            <SitGuruIcon
-                              color={
-                                active
-                                  ? option.value === 'light'
-                                    ? '#F3AA1F'
-                                    : isDark
-                                      ? '#F0CF62'
-                                      : palette.primary
-                                  : palette.muted
-                              }
-                              name={option.icon}
-                              size={15}
-                              strokeWidth={2.4}
-                            />
-                          </BubblePressable>
-                        );
-                      })}
-                    </View>
-
-                    <BubblePressable
+                    <SitGuruIconButton
                       accessibilityHint="Starts a new care request."
                       accessibilityLabel="Request care"
-                      accessibilityRole="button"
                       onPress={() => router.push('/find-care')}
-                      scaleTo={0.88}
-                      style={styles.addButton}
+                      variant="accent"
                     >
                       <Plus
-                        color={palette.onPrimary}
-                        size={19}
+                        color="#FFFFFF"
+                        size={ButtonMetrics.iconGlyph}
                         strokeWidth={2.6}
                       />
-                    </BubblePressable>
+                    </SitGuruIconButton>
                   </View>
                 </View>
 
                 <View style={styles.filterRail}>
-                  {filterOptions.map((option) => {
-                    const active = activeFilter === option.value;
-
-                    return (
-                      <BubblePressable
-                        key={option.value}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: active }}
-                        onPress={() => setActiveFilter(option.value)}
-                        scaleTo={0.88}
-                        style={[
-                          styles.filterPill,
-                          active && styles.filterPillActive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.filterPillText,
-                            active && styles.filterPillTextActive,
-                          ]}
-                        >
-                          {option.label}
-                        </Text>
-                      </BubblePressable>
-                    );
-                  })}
+                  {filterOptions.map((option) => (
+                    <SitGuruChip
+                      key={option.value}
+                      label={option.label}
+                      onPress={() => setActiveFilter(option.value)}
+                      selected={activeFilter === option.value}
+                    />
+                  ))}
                 </View>
 
                 {error ? (
@@ -329,13 +265,10 @@ export default function BookingsScreen() {
                         : 'Find a Guru near you and request your first booking.'}
                     </Text>
 
-                    <BubblePressable
-                      accessibilityRole="button"
+                    <SitGuruButton
+                      label="Find a Guru"
                       onPress={() => router.push('/find-care')}
-                      style={styles.emptyButton}
-                    >
-                      <Text style={styles.emptyButtonText}>Find a Guru</Text>
-                    </BubblePressable>
+                    />
                   </View>
                 )}
               </ScrollView>
@@ -546,58 +479,10 @@ function createStyles(isDark: boolean) {
       flexDirection: 'row',
       gap: 8,
     },
-    modeToggle: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 13,
-      borderWidth: 1.2,
-      flexDirection: 'row',
-      gap: 2,
-      padding: 2,
-    },
-    modeButton: {
-      alignItems: 'center',
-      borderRadius: 11,
-      height: 26,
-      justifyContent: 'center',
-      width: 26,
-    },
-    modeButtonActive: {
-      backgroundColor: palette.primarySoft,
-    },
-    addButton: {
-      alignItems: 'center',
-      backgroundColor: palette.primary,
-      borderRadius: 999,
-      height: 38,
-      justifyContent: 'center',
-      width: 38,
-    },
 
     filterRail: {
       flexDirection: 'row',
       gap: 8,
-    },
-    filterPill: {
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 999,
-      borderWidth: 1,
-      paddingHorizontal: 14,
-      paddingVertical: 7,
-    },
-    filterPillActive: {
-      backgroundColor: palette.primary,
-      borderColor: palette.primary,
-    },
-    filterPillText: {
-      color: palette.muted,
-      fontFamily: AppFonts.semiBold,
-      fontSize: 12,
-    },
-    filterPillTextActive: {
-      color: palette.onPrimary,
     },
 
     noticeCard: {
@@ -767,19 +652,6 @@ function createStyles(isDark: boolean) {
       fontFamily: AppFonts.medium,
       fontSize: 12,
       textAlign: 'center',
-    },
-    emptyButton: {
-      alignItems: 'center',
-      backgroundColor: palette.primary,
-      borderRadius: 999,
-      marginTop: 6,
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-    },
-    emptyButtonText: {
-      color: palette.onPrimary,
-      fontFamily: AppFonts.bold,
-      fontSize: 13,
     },
   });
 }

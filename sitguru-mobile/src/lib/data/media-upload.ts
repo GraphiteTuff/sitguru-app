@@ -8,7 +8,31 @@ export const PAWREPORT_PHOTO_BUCKETS = [
   'pet-media',
 ] as const;
 
-export type MediaUploadKind = 'pawreport' | 'chat' | 'passport';
+export const PROFILE_PHOTO_BUCKETS = [
+  'profile-photos',
+  'avatars',
+  'guru-photos',
+] as const;
+
+export const PROFILE_AVATAR_BUCKETS = [
+  'avatars',
+  'profile-photos',
+  'guru-photos',
+] as const;
+
+export const PROFILE_VIDEO_BUCKETS = [
+  'profile-videos',
+  'guru-videos',
+] as const;
+
+export type MediaUploadKind =
+  | 'pawreport'
+  | 'chat'
+  | 'passport'
+  | 'avatar'
+  | 'cover'
+  | 'gallery'
+  | 'video';
 
 export type MediaUploadInput = {
   localUri: string;
@@ -34,9 +58,12 @@ function extensionFromMime(mimeType?: string | null, fileName?: string | null) {
   if (mime.includes('png')) return 'png';
   if (mime.includes('webp')) return 'webp';
   if (mime.includes('heic')) return 'heic';
+  if (mime.includes('quicktime')) return 'mov';
+  if (mime.includes('webm')) return 'webm';
   if (mime.includes('wav')) return 'wav';
   if (mime.includes('mpeg') || mime.includes('mp3')) return 'mp3';
   if (mime.includes('aac')) return 'aac';
+  if (mime.includes('video/mp4')) return 'mp4';
   if (
     mime.includes('m4a') ||
     mime.includes('mp4') ||
@@ -58,6 +85,9 @@ function contentTypeFromExt(ext: string, mimeType?: string | null) {
   if (ext === 'png') return 'image/png';
   if (ext === 'webp') return 'image/webp';
   if (ext === 'heic') return 'image/heic';
+  if (ext === 'mov') return 'video/quicktime';
+  if (ext === 'webm') return 'video/webm';
+  if (ext === 'mp4' && mime.startsWith('video/')) return 'video/mp4';
   if (ext === 'm4a' || ext === 'mp4') return 'audio/mp4';
   if (ext === 'mp3') return 'audio/mpeg';
   if (ext === 'aac') return 'audio/aac';
@@ -67,9 +97,20 @@ function contentTypeFromExt(ext: string, mimeType?: string | null) {
 
 function folderForKind(kind: MediaUploadKind, userId: string, scopeId?: string | null) {
   const scope = (scopeId || 'general').replace(/[^a-zA-Z0-9_-]/g, '');
-  if (kind === 'chat') return `chat/${userId}/${scope}`;
-  if (kind === 'passport') return `passports/${userId}/${scope}`;
-  return `pawreport/${userId}/${scope}`;
+  if (kind === 'chat') return `${userId}/chat/${scope}`;
+  if (kind === 'passport') return `${userId}/passports/${scope}`;
+  if (kind === 'avatar') return `${userId}/avatar`;
+  if (kind === 'cover') return `${userId}/cover`;
+  if (kind === 'gallery') return `${userId}/gallery`;
+  if (kind === 'video') return `${userId}/video`;
+  return `${userId}/pawreport/${scope}`;
+}
+
+function bucketsForKind(kind: MediaUploadKind) {
+  if (kind === 'avatar') return PROFILE_AVATAR_BUCKETS;
+  if (kind === 'cover' || kind === 'gallery') return PROFILE_PHOTO_BUCKETS;
+  if (kind === 'video') return PROFILE_VIDEO_BUCKETS;
+  return PAWREPORT_PHOTO_BUCKETS;
 }
 
 /**
@@ -109,7 +150,7 @@ export async function uploadSitGuruMedia(
 
   let lastError = 'Upload failed.';
 
-  for (const bucket of PAWREPORT_PHOTO_BUCKETS) {
+  for (const bucket of bucketsForKind(kind)) {
     const { error } = await supabase.storage.from(bucket).upload(path, arrayBuffer, {
       contentType,
       cacheControl: '3600',
@@ -134,7 +175,7 @@ export async function uploadSitGuruMedia(
   }
 
   throw new Error(
-    `${lastError} Ensure a public bucket named pawreport-photos (or provider-media) exists with upload policies for authenticated users.`,
+    `${lastError} Ensure the matching public bucket exists with upload policies for authenticated users.`,
   );
 }
 

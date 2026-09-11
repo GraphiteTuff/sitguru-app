@@ -42,10 +42,9 @@ import ServiceCoreGrid, {
   type CareServiceKey,
 } from '@/components/mobile/ServiceCoreGrid';
 import { DashboardSkeletonStack } from '@/components/mobile/SkeletonPanel';
-import StickyActionBar from '@/components/mobile/StickyActionBar';
+import ConvertActionBar from '@/components/mobile/ConvertActionBar';
 import TouchTarget from '@/components/mobile/TouchTarget';
-import SitGuruButton from '@/components/SitGuruButton';
-import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
@@ -58,23 +57,17 @@ import {
   StickyFooterClearance,
   TOUCH_MIN,
 } from '@/constants/mobile-layout';
-import {
-  setThemePreference,
-  type SitGuruThemePreference,
-  useThemePreference,
-} from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
+import {
+  bookAgainLabel,
+  canBookAgain,
+  pushBookAgain,
+} from '@/lib/navigation/book-again';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 type RecordRow = Record<string, unknown>;
-
-type ThemeOption = {
-  label: string;
-  value: SitGuruThemePreference;
-  icon: 'sun' | 'moon';
-};
 
 type DashboardPet = {
   id: string;
@@ -94,8 +87,10 @@ type DashboardBooking = {
   serviceLabel: string;
   startAt: Date | null;
   endAt: Date | null;
+  guruId: string;
   guruName: string;
   guruPhotoUrl: string | null;
+  petId: string;
   petName: string;
   petPhotoUrl: string | null;
   location: string;
@@ -109,8 +104,10 @@ type LiveCare = {
   status: string;
   isWalk: boolean;
   serviceLabel: string;
+  petId: string;
   petName: string;
   petPhotoUrl: string | null;
+  guruId: string;
   guruName: string;
   guruPhotoUrl: string | null;
   startedAt: Date | null;
@@ -140,11 +137,6 @@ const EMPTY_DATA: DashboardData = {
   activeCare: null,
   recentCompletedCare: null,
 };
-
-const themeOptions: ThemeOption[] = [
-  { label: 'Light', value: 'light', icon: 'sun' },
-  { label: 'Dark', value: 'dark', icon: 'moon' },
-];
 
 const BOOKING_TABLES = ['bookings', 'booking_requests', 'service_requests'];
 const BOOKING_OWNER_FIELDS = [
@@ -228,7 +220,6 @@ export default function PetParentDashboardScreen() {
     : params.welcomePetId;
 
   const themeMode = useThemeMode();
-  const themePreference = useThemePreference();
   const isDark = themeMode === 'dark';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
@@ -471,14 +462,37 @@ export default function PetParentDashboardScreen() {
     }
 
     if (recentCompletedCare) {
-      const careBookingId =
-        recentCompletedCare.bookingId || recentCompletedCare.id;
+      const againTarget = {
+        guruId: recentCompletedCare.guruId,
+        petId: recentCompletedCare.petId,
+        serviceType: recentCompletedCare.serviceLabel,
+      };
+
+      if (canBookAgain(againTarget)) {
+        return {
+          eyebrow: 'BOOK AGAIN',
+          title: bookAgainLabel(recentCompletedCare.guruName),
+          helper:
+            'Same Guru, same pet — nothing charged until they accept.',
+          route: '/request-booking' as const,
+          params: {
+            ...(againTarget.guruId ? { guruId: againTarget.guruId } : {}),
+            ...(againTarget.petId ? { petId: againTarget.petId } : {}),
+            ...(againTarget.serviceType
+              ? { serviceType: againTarget.serviceType }
+              : {}),
+          },
+        };
+      }
+
       return {
         eyebrow: 'PAWREPORT COMPLETE',
         title: 'View Care Report',
         helper: 'Review the completed care summary and updates.',
         route: '/pawreport-live' as const,
-        params: { bookingId: careBookingId },
+        params: {
+          bookingId: recentCompletedCare.bookingId || recentCompletedCare.id,
+        },
       };
     }
 
@@ -500,7 +514,7 @@ export default function PetParentDashboardScreen() {
     isUpcomingStatus(booking.status),
   ).length;
 
-  const scrollBottomInset = StickyFooterClearance.navOnly;
+  const scrollBottomInset = StickyFooterClearance.actionPlusNav;
 
   const priorityCards = useMemo<PriorityCard[]>(() => {
     const cards: PriorityCard[] = [];
@@ -771,12 +785,17 @@ export default function PetParentDashboardScreen() {
     (service) => service.key === selectedServiceKey,
   );
 
-  const requestCareLabel = selectedService
-    ? `Request ${selectedService.label}`
-    : primaryAction.title;
+  const idleBrowse = primaryAction.route === '/find-care';
+  const requestCareLabel =
+    selectedService && idleBrowse
+      ? `Request ${selectedService.label}`
+      : primaryAction.title;
+  const showConvertTrust =
+    primaryAction.route === '/find-care' ||
+    primaryAction.route === '/request-booking';
 
   return (
-    <SitGuruScreen center={false} maxWidth={620} scroll={false}>
+    <SitGuruScreen center={false} inset={false} maxWidth={620} scroll={false}>
       <RoleGate requiredRole="pet_parent">
         <MobileScreen
           scrollBottomInset={scrollBottomInset}
@@ -785,34 +804,48 @@ export default function PetParentDashboardScreen() {
           refreshColor={palette.primary}
           footer={
             <View>
-              <StickyActionBar embedded>
-                <SitGuruButton
-                  label={requestCareLabel}
-                  onPress={() => {
-                    if (selectedService) {
-                      router.push({
-                        pathname: '/find-care',
-                        params: { service: selectedService.serviceType },
-                      });
-                      return;
-                    }
+              <ConvertActionBar
+                embedded
+                helper={
+                  selectedService && idleBrowse
+                    ? selectedService.helper
+                    : primaryAction.helper
+                }
+                label={requestCareLabel}
+                showTrust={showConvertTrust}
+                onPress={() => {
+                  if (selectedService && idleBrowse) {
+                    router.push({
+                      pathname: '/find-care',
+                      params: { service: selectedService.serviceType },
+                    });
+                    return;
+                  }
 
-                    if (
-                      'params' in primaryAction &&
-                      primaryAction.params
-                    ) {
-                      router.push({
-                        pathname: primaryAction.route,
-                        params: primaryAction.params,
-                      } as never);
-                      return;
-                    }
+                  if (primaryAction.route === '/request-booking') {
+                    pushBookAgain(router, {
+                      guruId: recentCompletedCare?.guruId,
+                      petId: recentCompletedCare?.petId,
+                      serviceType: recentCompletedCare?.serviceLabel,
+                    });
+                    return;
+                  }
 
-                    router.push(primaryAction.route);
-                  }}
-                  accessibilityLabel={`${requestCareLabel}. ${selectedService?.helper || primaryAction.helper}`}
-                />
-              </StickyActionBar>
+                  if (
+                    'params' in primaryAction &&
+                    primaryAction.params
+                  ) {
+                    router.push({
+                      pathname: primaryAction.route,
+                      params: primaryAction.params,
+                    } as never);
+                    return;
+                  }
+
+                  router.push(primaryAction.route);
+                }}
+                accessibilityLabel={`${requestCareLabel}. ${selectedService?.helper || primaryAction.helper}`}
+              />
 
               <SitGuruTabBar
                 active="home"
@@ -868,40 +901,7 @@ export default function PetParentDashboardScreen() {
                   ) : null}
                 </TouchTarget>
 
-                <View style={styles.modeToggle}>
-                  {themeOptions.map((option) => {
-                    const active = themePreference === option.value;
-
-                    return (
-                      <TouchTarget
-                        key={option.value}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Switch to ${option.label} mode`}
-                        accessibilityState={{ selected: active }}
-                        onPress={() => setThemePreference(option.value)}
-                        style={[
-                          styles.modeButton,
-                          active && styles.modeButtonActive,
-                        ]}
-                      >
-                        <SitGuruIcon
-                          name={option.icon}
-                          size={15}
-                          color={
-                            active
-                              ? option.value === 'light'
-                                ? '#F3AA1F'
-                                : isDark
-                                  ? '#F0CF62'
-                                  : palette.primary
-                              : palette.muted
-                          }
-                          strokeWidth={2.4}
-                        />
-                      </TouchTarget>
-                    );
-                  })}
-                </View>
+                <SitGuruThemeToggle />
 
                 <TouchTarget
                   accessibilityRole="button"
@@ -1972,6 +1972,13 @@ function mapBookingRow(
       'completed_at',
       'end_date',
     ]),
+    guruId:
+      getFirstString(row, [
+        'guru_id',
+        'provider_id',
+        'sitter_id',
+        'caregiver_id',
+      ]) || '',
     guruName:
       getFirstString(row, [
         'guru_name',
@@ -1987,6 +1994,7 @@ function mapBookingRow(
         'caregiver_photo_url',
       ]),
     ),
+    petId: getFirstString(row, ['pet_id', 'animal_id']) || '',
     petName:
       getFirstString(row, ['pet_name', 'animal_name']) || 'Your pet',
     petPhotoUrl: resolveSupabaseStorageUrl(
@@ -2108,6 +2116,8 @@ function mapLiveCareRow(
     status,
     isWalk,
     serviceLabel,
+    petId:
+      getFirstString(row, ['pet_id', 'animal_id']) || booking?.petId || '',
     petName:
       getFirstString(row, ['pet_name', 'animal_name']) ||
       booking?.petName ||
@@ -2119,6 +2129,15 @@ function mapLiveCareRow(
         'animal_photo_url',
       ]) || booking?.petPhotoUrl,
     ),
+    guruId:
+      getFirstString(row, [
+        'guru_id',
+        'provider_id',
+        'sitter_id',
+        'caregiver_id',
+      ]) ||
+      booking?.guruId ||
+      '',
     guruName:
       getFirstString(row, [
         'guru_name',
@@ -3294,7 +3313,7 @@ function createStyles(isDark: boolean) {
     outlineButtonText: {
       color: palette.primary,
       fontFamily: AppFonts.extraBold,
-      fontSize: 14,
+      fontSize: 16,
     },
 
     completedCard: {

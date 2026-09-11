@@ -36,18 +36,19 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BubblePressable from "@/components/BubblePressable";
+import SitGuruButton from "@/components/SitGuruButton";
+import SitGuruIconButton from "@/components/SitGuruIconButton";
 import { useKeyboardSafe } from "@/components/mobile/KeyboardSafeHost";
+import SitGuruChip from "@/components/mobile/SitGuruChip";
 import SitGuruFeatureChips from "@/components/mobile/SitGuruFeatureChips";
 import { SitGuruIcon } from "@/components/SitGuruIcon";
 import SitGuruScreen from "@/components/SitGuruScreen";
 import SitGuruTabBar from "@/components/SitGuruTabBar";
+import SitGuruThemeToggle from "@/components/SitGuruThemeToggle";
+import { ButtonMetrics, SitGuruAccent } from "@/constants/button-tokens";
 import { AppFonts } from "@/constants/fonts";
-import {
-  setThemePreference,
-  SitGuruThemePreference,
-  useThemePreference,
-} from "@/hooks/use-color-scheme";
 import { useThemeMode } from "@/hooks/use-theme";
+import { useFloatingTabBarScroll } from "@/hooks/useFloatingTabBarScroll";
 import {
   getCompletedBookingCount,
   getGuruVerification,
@@ -190,12 +191,6 @@ type ServiceOption = {
   label: string;
   value: string;
   keywords: string[];
-};
-
-type ThemeOption = {
-  label: string;
-  value: SitGuruThemePreference;
-  icon: "sun" | "moon";
 };
 
 type ExploreView = "list" | "map";
@@ -362,11 +357,6 @@ const DARK_NATIVE_MAP_STYLE = [
     elementType: "labels.text.fill",
     stylers: [{ color: "#79A4A3" }],
   },
-];
-
-const themeOptions: ThemeOption[] = [
-  { label: "Light", value: "light", icon: "sun" },
-  { label: "Dark", value: "dark", icon: "moon" },
 ];
 
 const services: ServiceOption[] = [
@@ -700,7 +690,6 @@ async function loadMarketplaceFeeRules(): Promise<MarketplaceFeeRule[]> {
 
 export default function FindCareScreen() {
   const themeMode = useThemeMode();
-  const themePreference = useThemePreference();
   const isDark = themeMode === "dark";
   const isWebPreview = Platform.OS === "web";
   const insets = useSafeAreaInsets();
@@ -711,6 +700,11 @@ export default function FindCareScreen() {
   const searchFieldRef = useRef<View>(null);
   const homeZipFieldRef = useRef<View>(null);
   const scrollOffsetRef = useRef(0);
+  const tabBarScroll = useFloatingTabBarScroll({
+    onScroll: (event) => {
+      scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+    },
+  });
   const keyboardHeightRef = useRef(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const { revealFocusedInput } = useKeyboardSafe();
@@ -1426,7 +1420,16 @@ export default function FindCareScreen() {
       return;
     }
 
-    router.push("/conversation");
+    const slug = getGuruSlug(guru);
+    router.push({
+      pathname: "/conversation",
+      params: {
+        guruId: guru.id,
+        ...(slug ? { guruSlug: slug } : {}),
+        ...(getGuruUserId(guru) ? { recipientId: getGuruUserId(guru) } : {}),
+        guruName: getGuruFirstName(guru),
+      },
+    });
   }
 
   function handleToggleFavorite(guru: PublicGuruProfile) {
@@ -1493,6 +1496,7 @@ export default function FindCareScreen() {
               style={styles.keyboardView}
             >
             <ScrollView
+              {...tabBarScroll}
               ref={scrollRef}
               keyboardDismissMode={
                 Platform.OS === "ios" ? "interactive" : "on-drag"
@@ -1508,10 +1512,6 @@ export default function FindCareScreen() {
                   styles.mapScrollContentNative,
                 keyboardHeight > 0 && styles.scrollContentKeyboard,
               ]}
-              onScroll={(event) => {
-                scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
-              }}
-              scrollEventThrottle={16}
               showsVerticalScrollIndicator={false}
               scrollEnabled={activeView === "list"}
               bounces={activeView === "list"}
@@ -1545,8 +1545,7 @@ export default function FindCareScreen() {
                   !isWebPreview && { paddingTop: insets.top + 6 },
                 ]}
               >
-                <BubblePressable
-                  accessibilityRole="button"
+                <SitGuruIconButton
                   accessibilityLabel="Go back home"
                   onPress={() => {
                     if (activeView === "map") {
@@ -1559,54 +1558,19 @@ export default function FindCareScreen() {
 
                     router.push("/");
                   }}
-                  scaleTo={0.88}
-                  style={styles.backButton}
                 >
                   <ChevronLeft
-                    size={21}
+                    size={ButtonMetrics.iconGlyph}
                     color={palette.title}
                     strokeWidth={2.7}
                   />
-                </BubblePressable>
+                </SitGuruIconButton>
 
                 <Text style={styles.headerTitle}>
                   {activeView === "list" ? "Explore Gurus" : "Explore Map"}
                 </Text>
 
-                <View style={styles.modeToggle}>
-                  {themeOptions.map((option) => {
-                    const active = themePreference === option.value;
-
-                    return (
-                      <BubblePressable
-                        key={option.value}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Switch to ${option.label} mode`}
-                        onPress={() => setThemePreference(option.value)}
-                        scaleTo={0.88}
-                        style={[
-                          styles.modeButton,
-                          active && styles.modeButtonActive,
-                        ]}
-                      >
-                        <SitGuruIcon
-                          name={option.icon}
-                          size={16}
-                          color={
-                            active
-                              ? option.value === "light"
-                                ? "#F3AA1F"
-                                : isDark
-                                  ? "#F0CF62"
-                                  : "#0B4C38"
-                              : palette.muted
-                          }
-                          strokeWidth={2.4}
-                        />
-                      </BubblePressable>
-                    );
-                  })}
-                </View>
+                <SitGuruThemeToggle />
               </View>
 
               <View style={styles.searchPanel}>
@@ -1635,19 +1599,16 @@ export default function FindCareScreen() {
                     style={styles.searchInput}
                   />
 
-                  <BubblePressable
-                    accessibilityRole="button"
+                  <SitGuruIconButton
                     accessibilityLabel="Apply search filters"
                     onPress={handleSearch}
-                    scaleTo={0.88}
-                    style={styles.filterButton}
                   >
                     <SlidersHorizontal
-                      size={17}
+                      size={ButtonMetrics.chipIcon}
                       color={palette.title}
                       strokeWidth={2.4}
                     />
-                  </BubblePressable>
+                  </SitGuruIconButton>
                 </View>
 
                 <ScrollView
@@ -1655,123 +1616,67 @@ export default function FindCareScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.serviceChips}
                 >
-                  {services.map((service) => {
-                    const selected = selectedService.value === service.value;
-
-                    return (
-                      <BubblePressable
-                        key={service.value}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Filter by ${service.label}`}
-                        onPress={() => handleSelectService(service)}
-                        scaleTo={0.88}
-                        style={[
-                          styles.serviceChip,
-                          selected && styles.serviceChipSelected,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.serviceChipText,
-                            selected && styles.serviceChipTextSelected,
-                          ]}
-                        >
-                          {service.label}
-                        </Text>
-                      </BubblePressable>
-                    );
-                  })}
+                  {services.map((service) => (
+                    <SitGuruChip
+                      key={service.value}
+                      accessibilityLabel={`Filter by ${service.label}`}
+                      label={service.label}
+                      onPress={() => handleSelectService(service)}
+                      selected={selectedService.value === service.value}
+                    />
+                  ))}
                 </ScrollView>
 
                 <View style={styles.refineRow}>
-                  <BubblePressable
+                  <SitGuruChip
                     accessibilityLabel={`Change sort order. Currently ${appliedSortLabel}`}
-                    accessibilityRole="button"
+                    icon={
+                      <ArrowUpDown
+                        color={
+                          appliedSortKey !== "recommended"
+                            ? SitGuruAccent.primary
+                            : palette.muted
+                        }
+                        size={ButtonMetrics.chipIcon}
+                        strokeWidth={2.5}
+                      />
+                    }
+                    label={appliedSortLabel}
                     onPress={() => setOpenSheet("sort")}
-                    scaleTo={0.88}
-                    style={[
-                      styles.refinePill,
-                      appliedSortKey !== "recommended" &&
-                        styles.refinePillActive,
-                    ]}
-                  >
-                    <ArrowUpDown
-                      color={
-                        appliedSortKey !== "recommended"
-                          ? isDark
-                            ? "#DFFFEA"
-                            : "#FFFFFF"
-                          : palette.muted
-                      }
-                      size={13}
-                      strokeWidth={2.5}
-                    />
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.refinePillText,
-                        appliedSortKey !== "recommended" &&
-                          styles.refinePillTextActive,
-                      ]}
-                    >
-                      {appliedSortLabel}
-                    </Text>
-                  </BubblePressable>
+                    selected={appliedSortKey !== "recommended"}
+                  />
 
-                  <BubblePressable
+                  <SitGuruChip
                     accessibilityLabel={
                       activeFilterCount > 0
                         ? `Edit filters. ${activeFilterCount} active`
                         : "Add filters"
                     }
-                    accessibilityRole="button"
+                    badge={activeFilterCount > 0 ? activeFilterCount : null}
+                    icon={
+                      <SlidersHorizontal
+                        color={
+                          activeFilterCount > 0
+                            ? SitGuruAccent.primary
+                            : palette.muted
+                        }
+                        size={ButtonMetrics.chipIcon}
+                        strokeWidth={2.5}
+                      />
+                    }
+                    label="Filters"
                     onPress={() => setOpenSheet("filters")}
-                    scaleTo={0.88}
-                    style={[
-                      styles.refinePill,
-                      activeFilterCount > 0 && styles.refinePillActive,
-                    ]}
-                  >
-                    <SlidersHorizontal
-                      color={
-                        activeFilterCount > 0
-                          ? isDark
-                            ? "#DFFFEA"
-                            : "#FFFFFF"
-                          : palette.muted
-                      }
-                      size={13}
-                      strokeWidth={2.5}
-                    />
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.refinePillText,
-                        activeFilterCount > 0 && styles.refinePillTextActive,
-                      ]}
-                    >
-                      Filters
-                    </Text>
-
-                    {activeFilterCount > 0 ? (
-                      <View style={styles.refineBadge}>
-                        <Text style={styles.refineBadgeText}>
-                          {activeFilterCount}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </BubblePressable>
+                    selected={activeFilterCount > 0}
+                  />
 
                   {activeFilterCount > 0 || appliedSortKey !== "recommended" ? (
-                    <BubblePressable
-                      accessibilityLabel="Clear all sorts and filters"
-                      accessibilityRole="button"
+                    <SitGuruButton
+                      fullWidth={false}
+                      label="Clear all"
                       onPress={handleClearSortAndFilters}
-                      scaleTo={0.88}
-                      style={styles.refineClearButton}
-                    >
-                      <Text style={styles.refineClearText}>Clear all</Text>
-                    </BubblePressable>
+                      size="compact"
+                      variant="ghost"
+                    />
                   ) : null}
                 </View>
               </View>
@@ -2889,35 +2794,23 @@ function GuruDiscoveryCard({
         </BubblePressable>
 
         <View style={styles.guruProfileActionRow}>
-          <BubblePressable
+          <SitGuruButton
             accessibilityLabel={meetLabel}
-            accessibilityRole="button"
+            flex
+            label={meetLabel}
             onPress={() => onView(guru)}
-            style={styles.guruProfileMeetButton}
-          >
-            <Text style={styles.guruProfileMeetButtonText}>{meetLabel}</Text>
-          </BubblePressable>
+            size="compact"
+            variant="secondary"
+          />
 
-          <BubblePressable
+          <SitGuruButton
             accessibilityLabel={bookLabel}
-            accessibilityRole="button"
             disabled={!bookable || preview}
+            flex
+            label={bookLabel}
             onPress={() => onBook(guru)}
-            style={[
-              styles.guruProfileRequestButton,
-              (!bookable || preview) && styles.guruProfileRequestButtonSecondary,
-            ]}
-          >
-            <Text
-              style={[
-                styles.guruProfileRequestButtonText,
-                (!bookable || preview) &&
-                  styles.guruProfileRequestButtonTextSecondary,
-              ]}
-            >
-              {bookLabel}
-            </Text>
-          </BubblePressable>
+            size="compact"
+          />
         </View>
 
         <Text style={styles.guruProfileBookNote}>
@@ -3163,29 +3056,26 @@ function MapGuruPreviewCard({
           </Text>
         </View>
 
-        <BubblePressable
-          accessibilityRole="button"
+        <SitGuruButton
+          flex
+          label={`Meet ${firstName}`}
           onPress={() => onView(guru)}
-          style={styles.mapExpandedViewButton}
-        >
-          <Text style={styles.mapExpandedViewButtonText}>Meet {firstName}</Text>
-        </BubblePressable>
+          size="compact"
+          variant="secondary"
+        />
       </View>
 
-      <BubblePressable
-        accessibilityRole="button"
+      <SitGuruButton
         disabled={!bookable || preview}
-        onPress={() => onBook(guru)}
-        style={styles.mapExpandedRequestButton}
-      >
-        <Text style={styles.mapExpandedRequestButtonText}>
-          {preview
+        label={
+          preview
             ? "Preview only"
             : bookable
               ? `Book with ${firstName}`
-              : "Bookings opening soon"}
-        </Text>
-      </BubblePressable>
+              : "Bookings opening soon"
+        }
+        onPress={() => onBook(guru)}
+      />
     </View>
   );
 }
@@ -5244,7 +5134,7 @@ function createStyles(isDark: boolean) {
       borderRadius: 18,
       borderWidth: 1,
       flexDirection: "row",
-      minHeight: 46,
+      minHeight: 56,
       paddingHorizontal: 13,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 8 },
@@ -6171,23 +6061,23 @@ function createStyles(isDark: boolean) {
       borderRadius: 999,
       borderWidth: 1,
       justifyContent: "center",
-      minHeight: 34,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      minHeight: 48,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
     },
     viewButtonText: {
       color: palette.title,
       fontFamily: AppFonts.bold,
-      fontSize: 11,
+      fontSize: 15,
     },
     bookButton: {
       alignItems: "center",
       backgroundColor: isDark ? "#1D8E55" : palette.primary,
       borderRadius: 999,
       justifyContent: "center",
-      minHeight: 34,
-      paddingHorizontal: 13,
-      paddingVertical: 8,
+      minHeight: 48,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
     },
     bookButtonDisabled: {
       backgroundColor: palette.disabledBg,
@@ -6197,7 +6087,7 @@ function createStyles(isDark: boolean) {
     bookButtonText: {
       color: "#FFFFFF",
       fontFamily: AppFonts.bold,
-      fontSize: 11,
+      fontSize: 15,
     },
     bookButtonTextDisabled: {
       color: palette.disabledText,
@@ -6547,13 +6437,13 @@ function createStyles(isDark: boolean) {
       borderWidth: 1,
       flex: 1,
       justifyContent: "center",
-      minHeight: 42,
-      paddingHorizontal: 10,
+      minHeight: 52,
+      paddingHorizontal: 12,
     },
     guruProfileMeetButtonText: {
       color: "#FFFFFF",
       fontFamily: AppFonts.extraBold,
-      fontSize: 11,
+      fontSize: 15,
     },
     guruProfileContentButton: {
       gap: 8,
@@ -6700,8 +6590,8 @@ function createStyles(isDark: boolean) {
       borderWidth: 1,
       flex: 1,
       justifyContent: "center",
-      minHeight: 42,
-      paddingHorizontal: 10,
+      minHeight: 52,
+      paddingHorizontal: 12,
       shadowColor: "#000000",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.16,
@@ -6714,7 +6604,7 @@ function createStyles(isDark: boolean) {
     guruProfileRequestButtonText: {
       color: "#FFFFFF",
       fontFamily: AppFonts.extraBold,
-      fontSize: 11,
+      fontSize: 15,
       letterSpacing: 0.05,
     },
     guruProfileBookNote: {
@@ -7361,13 +7251,13 @@ function createStyles(isDark: boolean) {
       borderRadius: 999,
       flex: 1,
       justifyContent: "center",
-      minHeight: 40,
+      minHeight: 52,
       paddingHorizontal: 18,
     },
     mapExpandedViewButtonText: {
       color: "#FFFFFF",
       fontFamily: AppFonts.extraBold,
-      fontSize: 12,
+      fontSize: 15,
     },
     mapExpandedRequestButton: {
       alignItems: "center",
@@ -7377,12 +7267,12 @@ function createStyles(isDark: boolean) {
       borderWidth: 1,
       justifyContent: "center",
       marginTop: 8,
-      minHeight: 38,
+      minHeight: 52,
     },
     mapExpandedRequestButtonText: {
       color: isDark ? palette.greenBright : palette.primary,
       fontFamily: AppFonts.extraBold,
-      fontSize: 12,
+      fontSize: 15,
     },
 
     floatingMapButton: {

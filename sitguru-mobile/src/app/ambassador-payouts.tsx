@@ -47,6 +47,7 @@ import {
     type SitGuruThemePreference,
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 
@@ -494,6 +495,7 @@ export default function AmbassadorPayoutsScreen() {
   const isDark = themeMode === 'dark';
   const theme = getAppTheme(isDark ? 'dark' : 'light');
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const tabBarScroll = useFloatingTabBarScroll();
 
   const isWebPreview = Platform.OS === 'web';
   const isTablet = Platform.OS !== 'web' && windowWidth >= 768;
@@ -1122,6 +1124,7 @@ export default function AmbassadorPayoutsScreen() {
           </View>
 
           <ScrollView
+            {...tabBarScroll}
             keyboardShouldPersistTaps="handled"
             refreshControl={
               <RefreshControl

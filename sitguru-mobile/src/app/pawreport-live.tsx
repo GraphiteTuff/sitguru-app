@@ -90,7 +90,14 @@ export default function PawReportLiveScreen() {
               <>
                 <SitGuruButton
                   label="Message Guru"
-                  onPress={() => router.push('/messages')}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/conversation',
+                      params: {
+                        bookingId: activeId || bookingId || '',
+                      },
+                    })
+                  }
                 />
                 <SitGuruButton
                   label="Back to dashboard"
@@ -142,7 +149,11 @@ export default function PawReportLiveScreen() {
 
         {error ? (
           <View style={styles.notice}>
-            <Text style={styles.noticeText}>{error}</Text>
+            <Text style={styles.noticeText}>
+              {snapshot.logs.length || snapshot.photos.length
+                ? 'Live map is catching up. Care notes and photos below are still from this visit.'
+                : 'PawReport will appear when your Guru starts care. Pull down to refresh.'}
+            </Text>
           </View>
         ) : null}
 

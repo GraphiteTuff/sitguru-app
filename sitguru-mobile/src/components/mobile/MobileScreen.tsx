@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MobileSpace } from '@/constants/mobile-layout';
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { useTheme } from '@/hooks/use-theme';
 
 type MobileScreenProps = {
@@ -42,6 +43,7 @@ export default function MobileScreen({
   contentStyle,
 }: MobileScreenProps) {
   const theme = useTheme();
+  const tabBarScroll = useFloatingTabBarScroll();
   const [footerHeight, setFooterHeight] = useState(0);
   const bottomPad = footer
     ? Math.max(footerHeight, scrollBottomInset) + MobileSpace.sm
@@ -54,6 +56,7 @@ export default function MobileScreen({
     >
       <View style={styles.shell}>
         <ScrollView
+          {...tabBarScroll}
           automaticallyAdjustKeyboardInsets
           bounces
           contentContainerStyle={[

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { sendExpoPushToUser } from "@/lib/notifications/expo-push";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  mobileCorsHeaders,
+  optionsWithMobileCors,
+  resolveRequestUser,
+} from "@/lib/supabase/request-auth";
 import { CANONICAL_ROLE } from "@/lib/sitguru/display";
 import {
   collectMessagingRoles,
@@ -120,6 +125,16 @@ async function findGuruBySlugOrId(guruSlugOrId: string) {
       display_name: profileBySlug.data.display_name ?? null,
       email: profileBySlug.data.email ?? null,
     } satisfies GuruLookupRow;
+  }
+
+  const byUserId = await supabaseAdmin
+    .from("gurus")
+    .select("id, user_id, slug, full_name, display_name, email")
+    .eq("user_id", guruSlugOrId)
+    .maybeSingle<GuruLookupRow>();
+
+  if (!byUserId.error && byUserId.data) {
+    return byUserId.data;
   }
 
   return null;
@@ -321,19 +336,42 @@ async function createGuruNotification(params: {
   if (error) {
     console.error("Guru notification insert error:", error.message);
   }
+
+  void sendExpoPushToUser({
+    userId: params.guruUserId,
+    title: `New message from ${params.customerDisplayName || "a customer"}`,
+    body: params.subject
+      ? params.subject
+      : `You have a new message request${
+          params.guruDisplayName ? ` for ${params.guruDisplayName}` : ""
+        }.`,
+    href: `/conversation?id=${encodeURIComponent(params.conversationId)}`,
+    channelId: "sitguru-messages",
+    data: {
+      type: "new_message",
+      conversationId: params.conversationId,
+    },
+  }).catch((pushError) => {
+    console.error("Guru message Expo push failed:", pushError);
+  });
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return optionsWithMobileCors(req);
 }
 
 export async function POST(req: NextRequest) {
+  const cors = mobileCorsHeaders(req);
+
   try {
-    const supabase = await createClient();
+    const resolved = await resolveRequestUser(req);
+    const user = resolved?.user ?? null;
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized." },
+        { status: 401, headers: cors },
+      );
     }
 
     const body = await req.json().catch(() => null);
@@ -461,7 +499,7 @@ export async function POST(req: NextRequest) {
         petName: petName || null,
         redirectTo: buildMessageThreadHref(conversationId),
       },
-      { status: 200 }
+      { status: 200, headers: cors }
     );
   } catch (error) {
     console.error("Message start route error:", error);
@@ -473,7 +511,7 @@ export async function POST(req: NextRequest) {
             ? error.message
             : "Unable to start conversation.",
       },
-      { status: 500 }
+      { status: 500, headers: cors }
     );
   }
 }

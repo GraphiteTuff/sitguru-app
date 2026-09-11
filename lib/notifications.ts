@@ -4,14 +4,15 @@
  * -----------------------------------------------------------------------
  * Used by PawReport walk state handlers to notify Pet Parents instantly.
  *
- * Delivery adapters are stubbed for:
- *   - In-app notifications table (live today)
- *   - Expo / FCM push (native)
- *   - Twilio SMS (optional)
+ * Delivery adapters:
+ *   - In-app notifications table
+ *   - Expo push (resolves profiles.expo_push_token + expo: subscriptions)
+ *   - Twilio SMS (optional stub)
  *
  * Swap adapter implementations without changing call sites.
  */
 
+import { sendExpoPushToUser } from "@/lib/notifications/expo-push";
 import { supabaseAdmin } from "@/utils/supabase/admin";
 
 export type NotificationChannel = "in_app" | "push" | "sms";
@@ -104,27 +105,35 @@ async function sendInAppNotification(payload: NotificationPayload) {
   }
 }
 
-/**
- * Expo / FCM stub — wire EXPO_ACCESS_TOKEN or FCM server key later.
- * Logs intent in development so mobile teams can verify payloads.
- */
-async function sendPushNotificationStub(payload: NotificationPayload) {
-  if (!payload.pushToken) {
-    console.info("[notifications:push] skipped — no pushToken", {
+function channelForType(type: string) {
+  if (type.startsWith("pawreport") || type.includes("walk") || type.includes("care")) {
+    return "sitguru-care" as const;
+  }
+  if (type.includes("message")) {
+    return "sitguru-messages" as const;
+  }
+  return "sitguru-bookings" as const;
+}
+
+async function sendExpoPushNotification(payload: NotificationPayload) {
+  const result = await sendExpoPushToUser({
+    userId: payload.userId,
+    title: payload.title,
+    body: payload.body,
+    href: payload.href,
+    channelId: channelForType(payload.type),
+    data: {
+      type: payload.type,
+      ...(payload.metadata || {}),
+    },
+  });
+
+  if (!result.sent) {
+    console.info("[notifications:push] skipped — no Expo token", {
       userId: payload.userId,
       type: payload.type,
     });
-    return;
   }
-
-  // Example Expo call (disabled until credentials exist):
-  // await fetch("https://exp.host/--/api/v2/push/send", { ... })
-  console.info("[notifications:push] stub dispatch", {
-    to: payload.pushToken,
-    title: payload.title,
-    body: payload.body,
-    data: payload.metadata,
-  });
 }
 
 /**
@@ -147,7 +156,7 @@ async function sendSmsNotificationStub(payload: NotificationPayload) {
 
 const defaultAdapters: NotificationDeliveryAdapter[] = [
   { channel: "in_app", send: sendInAppNotification },
-  { channel: "push", send: sendPushNotificationStub },
+  { channel: "push", send: sendExpoPushNotification },
   { channel: "sms", send: sendSmsNotificationStub },
 ];
 

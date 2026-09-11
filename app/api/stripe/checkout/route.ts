@@ -1797,6 +1797,127 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const wantsPaymentSheet =
+      body?.paymentSheet === true ||
+      body?.uiMode === "payment_sheet" ||
+      firstNonEmpty(body?.checkoutMode, body?.checkout_mode) ===
+        "payment_sheet";
+
+    if (wantsPaymentSheet) {
+      if (!stripeCustomerId) {
+        const customer = await stripe.customers.create({
+          email: user.email || getBookingCustomerEmail(booking) || undefined,
+          name: getBookingCustomerName(booking) || undefined,
+          metadata: {
+            sitguru_user_id: user.id,
+            booking_id: bookingIdString,
+          },
+        });
+        stripeCustomerId = customer.id;
+      }
+
+      const ephemeralKey = await stripe.ephemeralKeys.create(
+        { customer: stripeCustomerId },
+        { apiVersion: "2024-06-20" },
+      );
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: totalCustomerPaidCents,
+        currency: currencyIso,
+        customer: stripeCustomerId,
+        automatic_payment_methods: { enabled: true },
+        description: `SitGuru Booking - ${petName}`,
+        metadata: checkoutMetadata,
+      });
+
+      await updateCheckoutStarted(bookingIdString, {
+        stripeSessionId: paymentIntent.id,
+        currency: currencyIso,
+        subtotalAmount: centsToDollars(subtotalCents),
+        sitguruFeeAmount: centsToDollars(sitguruFeeCents),
+        guruNetAmount: centsToDollars(guruNetCents),
+        totalCustomerPaid: centsToDollars(totalCustomerPaidCents),
+        marketplaceFeePercent: sitguruFeePercent,
+        marketplaceFeeSource: sitguruFeeSource,
+        marketplaceFeeRuleId: sitguruFeeRuleId,
+        marketplaceFeeRuleName: sitguruFeeRuleName,
+        marketplaceFeeMatchType: sitguruFeeMatchType,
+        marketplaceFeeDistanceMiles: sitguruFeeDistanceMiles,
+        tipAmount: centsToDollars(tipCents),
+        guruPayoutAmount: centsToDollars(guruPayoutCents),
+        guruName: resolvedGuruName,
+        guruAvatarUrl: resolvedGuruAvatarUrl,
+        petPhotoUrl: resolvedPetPhotoUrl,
+        requestedStartDate,
+        requestedEndDate,
+        dateSelectionMode,
+        dateRangeLabel,
+        selectedDates: normalizedSelectedDates,
+        selectedPaymentOption: paymentOptions.selectedPaymentOption,
+        paymentMethodLabel: paymentOptions.paymentMethodLabel,
+        paymentProvider: paymentOptions.paymentProvider,
+        paymentWalletType: paymentOptions.paymentWalletType,
+        savedPaymentMethodRequested: paymentOptions.savedPaymentMethodRequested,
+        achBankRequested: paymentOptions.achBankRequested,
+        pawperksCreditRequested: paymentOptions.pawperksCreditRequested,
+        referralCreditRequested: paymentOptions.referralCreditRequested,
+        sitguruCreditRequested: paymentOptions.sitguruCreditRequested,
+        promoCode: paymentOptions.promoCode,
+        giftCardCode: paymentOptions.giftCardCode,
+        pawperksCreditAmount: paymentOptions.pawperksCreditAmount,
+        referralCreditAmount: paymentOptions.referralCreditAmount,
+        sitguruCreditAmount: paymentOptions.sitguruCreditAmount,
+        paymentOptionSummary: paymentOptions.paymentOptionSummary,
+        quoteRequestStatus: paymentOptions.quoteRequestStatus,
+        customQuoteRequested: paymentOptions.customQuoteRequested,
+      });
+
+      return jsonResponse(req, {
+        paymentSheet: true,
+        paymentIntentClientSecret: paymentIntent.client_secret,
+        ephemeralKey: ephemeralKey.secret,
+        customerId: stripeCustomerId,
+        publishableKey:
+          process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
+          process.env.STRIPE_PUBLISHABLE_KEY ||
+          "",
+        amountCents: totalCustomerPaidCents,
+        financialPreview: {
+          subtotalAmount: centsToDollars(subtotalCents),
+          marketplaceFeePercent: sitguruFeePercent,
+          marketplaceFeeSource: sitguruFeeSource,
+          marketplaceFeeRuleId: sitguruFeeRuleId,
+          marketplaceFeeRuleName: sitguruFeeRuleName,
+          marketplaceFeeMatchType: sitguruFeeMatchType,
+          marketplaceFeeDistanceMiles: sitguruFeeDistanceMiles,
+          sitguruFeeAmount: centsToDollars(sitguruFeeCents),
+          marketplaceFeeAmount: centsToDollars(sitguruFeeCents),
+          tipAmount: centsToDollars(tipCents),
+          guruNetAmount: centsToDollars(guruNetCents),
+          guruPayoutAmount: centsToDollars(guruPayoutCents),
+          taxAmount: 0,
+          totalCustomerPaid: centsToDollars(totalCustomerPaidCents),
+          selectedPaymentOption: paymentOptions.selectedPaymentOption,
+          paymentMethodLabel: paymentOptions.paymentMethodLabel,
+          paymentProvider: paymentOptions.paymentProvider,
+          paymentWalletType: paymentOptions.paymentWalletType,
+          pawperksCreditRequested: paymentOptions.pawperksCreditRequested,
+          referralCreditRequested: paymentOptions.referralCreditRequested,
+          sitguruCreditRequested: paymentOptions.sitguruCreditRequested,
+          promoCode: paymentOptions.promoCode,
+          giftCardCode: paymentOptions.giftCardCode,
+          quoteRequestStatus: paymentOptions.quoteRequestStatus,
+          careZipCode: bookingCareZipCode,
+          careCity: bookingCareCity,
+          careState: bookingCareState,
+          careLocalityName: bookingCareLocalityName,
+          customerFeeMessage:
+            "SitGuru keeps marketplace fees lower than many major care platforms.",
+          tipMessage: "100% of your tip goes directly to your Guru.",
+        },
+      });
+    }
+
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",

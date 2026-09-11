@@ -23,6 +23,7 @@ export const TABLES = {
   guruPayouts: 'guru_payouts',
   userPayoutAccounts: 'user_payout_accounts',
   userPayoutPreferences: 'user_payout_preferences',
+  profileMedia: 'profile_media',
 } as const;
 
 /** Parent ownership columns on bookings (web order). */
@@ -79,9 +80,12 @@ export const REALTIME_CHANNELS = {
 export const API_PATHS = {
   createBooking: '/api/bookings/create',
   sendMessage: '/api/messages/send',
+  startConversation: '/api/messages/start',
   ensureBookingConversation: '/api/messaging/ensure-booking-conversation',
   ensureEventConversation: '/api/messaging/ensure-event-conversation',
   mobileCheckout: '/api/mobile/payments/checkout',
+  mobilePaymentSheet: '/api/mobile/payments/sheet',
+  bookingStatus: '/api/bookings/status',
   registerPushToken: '/api/mobile/push-token',
   payoutSetup: '/api/payouts/setup',
   walkAction: (bookingId: string) =>

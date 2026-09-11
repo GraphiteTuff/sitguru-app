@@ -66,6 +66,7 @@ import {
   useThemePreference,
   type SitGuruThemePreference,
 } from '@/hooks/use-color-scheme';
+import { useSitGuruPaymentSheet } from '@/hooks/useSitGuruPaymentSheet';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -1173,6 +1174,8 @@ export default function PaymentsScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { width } = useWindowDimensions();
   const isWebPreview = Platform.OS === 'web';
+  const { ready: nativeSheetReady, initPaymentSheet, presentPaymentSheet } =
+    useSitGuruPaymentSheet();
 
   const {
     user,
@@ -1592,6 +1595,98 @@ export default function PaymentsScreen() {
           ? tipChoice
           : undefined;
 
+      const checkoutPayload = {
+        bookingId: booking.id,
+        promoCode: promoCode.trim() || undefined,
+        applyCredits,
+        tipCents: tipCentsForCheckout,
+        tip_cents: tipCentsForCheckout,
+        tipAmount: hasTip
+          ? Number((tipCentsForCheckout / 100).toFixed(2))
+          : undefined,
+        tipPercent: tipPercentForCheckout,
+        returnUrl,
+        cancelUrl: Linking.createURL('/payments', {
+          queryParams: {
+            checkout: 'cancelled',
+            bookingId: booking.id,
+          },
+        }),
+        platform: Platform.OS,
+        requestedPaymentMethods: [
+          'card',
+          'apple_pay',
+          'google_pay',
+          'link',
+          'cashapp',
+          'us_bank_account',
+        ],
+      };
+
+      if (nativeSheetReady) {
+        const sheetResponse = await fetch(
+          `${apiBaseUrl}/api/mobile/payments/sheet`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ...checkoutPayload,
+              paymentSheet: true,
+            }),
+          },
+        );
+
+        const sheetBody = await readJson(sheetResponse);
+
+        if (sheetResponse.ok && sheetBody.paymentIntentClientSecret) {
+          const confirmedPreview = parseFinancialPreview(
+            sheetBody.financialPreview,
+          );
+
+          if (confirmedPreview) {
+            setServerPreview(confirmedPreview);
+            setServerPreviewBookingId(booking.id);
+          }
+
+          const { error: initError } = await initPaymentSheet({
+            merchantDisplayName: 'SitGuru',
+            customerId: sheetBody.customerId,
+            customerEphemeralKeySecret: sheetBody.ephemeralKey,
+            paymentIntentClientSecret: sheetBody.paymentIntentClientSecret,
+            allowsDelayedPaymentMethods: false,
+            returnURL: returnUrl,
+            applePay: {
+              merchantCountryCode: 'US',
+            },
+            googlePay: {
+              merchantCountryCode: 'US',
+              testEnv: false,
+            },
+          });
+
+          if (!initError) {
+            const { error: presentError } = await presentPaymentSheet();
+            if (!presentError) {
+              setFeedback({
+                tone: 'success',
+                title: 'Payment submitted',
+                message:
+                  'SitGuru is confirming this booking. Apple Pay and cards both settle through Stripe.',
+              });
+              return;
+            }
+
+            if (presentError.code !== 'Canceled') {
+              throw new Error(presentError.message);
+            }
+            return;
+          }
+        }
+      }
+
       const response = await fetch(
         `${apiBaseUrl}/api/mobile/payments/checkout`,
         {
@@ -1600,33 +1695,7 @@ export default function PaymentsScreen() {
             Authorization: `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            bookingId: booking.id,
-            promoCode: promoCode.trim() || undefined,
-            applyCredits,
-            tipCents: tipCentsForCheckout,
-            tip_cents: tipCentsForCheckout,
-            tipAmount: hasTip
-              ? Number((tipCentsForCheckout / 100).toFixed(2))
-              : undefined,
-            tipPercent: tipPercentForCheckout,
-            returnUrl,
-            cancelUrl: Linking.createURL('/payments', {
-              queryParams: {
-                checkout: 'cancelled',
-                bookingId: booking.id,
-              },
-            }),
-            platform: Platform.OS,
-            requestedPaymentMethods: [
-              'card',
-              'apple_pay',
-              'google_pay',
-              'link',
-              'cashapp',
-              'us_bank_account',
-            ],
-          }),
+          body: JSON.stringify(checkoutPayload),
         },
       );
 
@@ -2753,7 +2822,11 @@ export default function PaymentsScreen() {
                   <StickyActionBar embedded aboveBottomNav>
                     <SitGuruButton
                       label={
-                        startingCheckout ? 'Opening checkout…' : payActionLabel
+                        startingCheckout
+                          ? nativeSheetReady
+                            ? 'Opening Apple Pay…'
+                            : 'Opening checkout…'
+                          : payActionLabel
                       }
                       disabled={startingCheckout || !canOpenCheckout}
                       onPress={() => void startCheckout()}

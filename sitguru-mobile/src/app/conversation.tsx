@@ -36,18 +36,15 @@ import BubblePressable from '@/components/BubblePressable';
 import ChatComposerBar, {
   type ChatAttachment,
 } from '@/components/mobile/ChatComposerBar';
-import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruIconButton from '@/components/SitGuruIconButton';
 import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { ButtonMetrics } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
 import { LAST_WORKSPACE_KEY } from '@/constants/workspaces';
-import {
-  setThemePreference,
-  useThemePreference,
-  type SitGuruThemePreference,
-} from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import { clearDraft, readDraft, writeDraft } from '@/lib/drafts';
@@ -135,15 +132,6 @@ type NoticeState = {
 } | null;
 
 type RealtimeState = 'connecting' | 'live' | 'offline' | 'preview';
-
-const THEME_OPTIONS: Array<{
-  label: string;
-  value: SitGuruThemePreference;
-  icon: 'sun' | 'moon';
-}> = [
-  { label: 'Light', value: 'light', icon: 'sun' },
-  { label: 'Dark', value: 'dark', icon: 'moon' },
-];
 
 const QUICK_REPLIES = [
   'What dates work for you?',
@@ -671,6 +659,8 @@ export default function ConversationScreen() {
   const params = useLocalSearchParams<{
     conversationId?: string;
     guruId?: string;
+    guruSlug?: string;
+    slug?: string;
     recipientId?: string;
     bookingId?: string;
     petId?: string;
@@ -682,7 +672,6 @@ export default function ConversationScreen() {
   const { user, profile, roles, primaryRole, loading: authLoading } = useAuth();
   const isWebPreview = Platform.OS === 'web';
   const themeMode = useThemeMode();
-  const themePreference = useThemePreference();
   const isDark = themeMode === 'dark';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
@@ -750,9 +739,12 @@ export default function ConversationScreen() {
     activeWorkspaceRole ?? getFallbackRole(primaryRole, roles);
   const currentUserId = user?.id ?? '';
   const requestedConversationId = typeof params.conversationId === 'string' ? params.conversationId : '';
+  const requestedGuruId = typeof params.guruId === 'string' ? params.guruId : '';
+  const requestedGuruSlug =
+    (typeof params.guruSlug === 'string' ? params.guruSlug : '') ||
+    (typeof params.slug === 'string' ? params.slug : '');
   const requestedOtherUserId =
-    (typeof params.recipientId === 'string' ? params.recipientId : '') ||
-    (typeof params.guruId === 'string' ? params.guruId : '');
+    typeof params.recipientId === 'string' ? params.recipientId : '';
   const requestedBookingId = typeof params.bookingId === 'string' ? params.bookingId : '';
   const requestedPetId = typeof params.petId === 'string' ? params.petId : '';
   const requestedPetName = typeof params.petName === 'string' ? params.petName : '';
@@ -1034,6 +1026,40 @@ export default function ConversationScreen() {
         }
       }
 
+      if (!nextConversation && (requestedGuruId || requestedGuruSlug)) {
+        const started = await sitguruApiFetch<{
+          conversationId?: string;
+          id?: string;
+          error?: string;
+        }>(API_PATHS.startConversation, {
+          body: {
+            guruId: requestedGuruId || undefined,
+            guruSlug: requestedGuruSlug || undefined,
+            bookingId: requestedBookingId || undefined,
+            petId: requestedPetId || undefined,
+            petName: requestedPetName || undefined,
+            subject: requestedSubject || undefined,
+          },
+        });
+        const startedId =
+          String(started.data?.conversationId || started.data?.id || '').trim();
+        if (startedId) {
+          const result = await supabase
+            .from('conversations')
+            .select('*')
+            .eq('id', startedId)
+            .maybeSingle();
+          if (!result.error && result.data) {
+            nextConversation = result.data as ConversationRow;
+          }
+        } else if (started.error) {
+          setNotice({
+            tone: 'error',
+            text: started.error,
+          });
+        }
+      }
+
       if (!nextConversation && requestedOtherUserId) {
         nextConversation = await findConversationWithOtherUser({
           userId: currentUserId,
@@ -1051,7 +1077,15 @@ export default function ConversationScreen() {
         });
       }
 
-      if (!nextConversation) {
+      const hasSpecificTarget = Boolean(
+        requestedConversationId ||
+          requestedBookingId ||
+          requestedGuruId ||
+          requestedGuruSlug ||
+          requestedOtherUserId,
+      );
+
+      if (!nextConversation && !hasSpecificTarget) {
         nextConversation = await loadLatestConversationForUser(currentUserId);
       }
 
@@ -1109,6 +1143,8 @@ export default function ConversationScreen() {
     currentUserId,
     requestedBookingId,
     requestedConversationId,
+    requestedGuruId,
+    requestedGuruSlug,
     requestedOtherUserId,
     requestedPetId,
     requestedPetName,
@@ -1248,13 +1284,38 @@ export default function ConversationScreen() {
         throw new Error('Nothing to send after media processing.');
       }
 
-      const insertedRow = await insertMessageWithFallback({
-        conversationId: conversation.id,
-        senderId: currentUserId,
-        recipientId: otherUserId,
-        body,
+      const sent = await sitguruApiFetch<{
+        ok?: boolean;
+        message?: MessageRow;
+        error?: string;
+      }>(API_PATHS.sendMessage, {
+        body: {
+          conversationId: conversation.id,
+          message: body,
+          content: body,
+          body,
+          recipientId: otherUserId,
+          roleContext: currentRole === 'guru' ? 'guru' : 'customer',
+          source: 'sitguru-mobile',
+          clientMessageId: `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        },
       });
-      const insertedMessage = normalizeMessage(insertedRow);
+
+      if (sent.error || !sent.data?.ok) {
+        throw new Error(sent.error || 'Message was not delivered.');
+      }
+
+      const insertedMessage = normalizeMessage(
+        sent.data.message ?? {
+          id: `local-${Date.now()}`,
+          conversation_id: conversation.id,
+          sender_id: currentUserId,
+          recipient_id: otherUserId,
+          content: body,
+          body,
+          created_at: new Date().toISOString(),
+        },
+      );
 
       if (insertedMessage) {
         setMessages((current) => mergeMessages(current, [insertedMessage]));
@@ -1363,15 +1424,16 @@ export default function ConversationScreen() {
               {isWebPreview ? <PhoneStatusBar palette={palette} styles={styles} /> : null}
 
               <View style={styles.header}>
-                <BubblePressable
+                <SitGuruIconButton
                   accessibilityLabel="Go back"
-                  accessibilityRole="button"
                   onPress={() => router.back()}
-                  scaleTo={0.88}
-                  style={styles.headerButton}
                 >
-                  <ChevronLeft color={palette.title} size={20} strokeWidth={2.6} />
-                </BubblePressable>
+                  <ChevronLeft
+                    color={palette.title}
+                    size={ButtonMetrics.iconGlyph}
+                    strokeWidth={2.6}
+                  />
+                </SitGuruIconButton>
 
                 <BubblePressable
                   accessibilityLabel={`Open my ${currentRoleLabel} profile`}
@@ -1400,45 +1462,18 @@ export default function ConversationScreen() {
                 </BubblePressable>
 
                 <View style={styles.headerActions}>
-                  <View style={styles.modeToggle}>
-                    {THEME_OPTIONS.map((option) => {
-                      const active = themePreference === option.value;
+                  <SitGuruThemeToggle />
 
-                      return (
-                        <BubblePressable
-                          key={option.value}
-                          accessibilityLabel={`Switch to ${option.label} mode`}
-                          accessibilityRole="button"
-                          onPress={() => setThemePreference(option.value)}
-                          scaleTo={0.88}
-                          style={[styles.modeButton, active && styles.modeButtonActive]}
-                        >
-                          <SitGuruIcon
-                            color={
-                              active
-                                ? option.value === 'light'
-                                  ? '#F3A61D'
-                                  : '#F0CF62'
-                                : palette.muted
-                            }
-                            name={option.icon}
-                            size={14}
-                            strokeWidth={2.4}
-                          />
-                        </BubblePressable>
-                      );
-                    })}
-                  </View>
-
-                  <BubblePressable
+                  <SitGuruIconButton
                     accessibilityLabel="Open notifications"
-                    accessibilityRole="button"
                     onPress={() => router.push('/notifications')}
-                    scaleTo={0.88}
-                    style={styles.headerButton}
                   >
-                    <Bell color={palette.title} size={18} strokeWidth={2.4} />
-                  </BubblePressable>
+                    <Bell
+                      color={palette.title}
+                      size={ButtonMetrics.iconGlyph}
+                      strokeWidth={2.4}
+                    />
+                  </SitGuruIconButton>
 
                   <BubblePressable
                     accessibilityLabel="Open workspace switcher"
@@ -2365,12 +2400,12 @@ function createStyles(isDark: boolean) {
       flexDirection: 'row',
       gap: 5,
       justifyContent: 'center',
-      minHeight: 34,
+      minHeight: 48,
     },
     contextSecondaryText: {
       color: palette.primary,
       fontFamily: AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
     },
     contextPrimaryButton: {
       alignItems: 'center',
@@ -2380,12 +2415,12 @@ function createStyles(isDark: boolean) {
       flexDirection: 'row',
       gap: 5,
       justifyContent: 'center',
-      minHeight: 34,
+      minHeight: 48,
     },
     contextPrimaryText: {
       color: '#FFFFFF',
       fontFamily: AppFonts.extraBold,
-      fontSize: 9,
+      fontSize: 14,
     },
     noticeCard: {
       backgroundColor: palette.surfaceSoft,

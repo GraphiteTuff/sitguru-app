@@ -404,19 +404,34 @@ export function usePawReportLive(bookingIdParam?: string | null) {
       metrics?.durationMinutes ?? elapsedFromSession ?? 0,
     );
 
+    const sessionStatus = firstString(session ?? {}, ['status', 'session_status'], '')
+      .toLowerCase();
+    const sessionLive = [
+      'in_progress',
+      'active',
+      'started',
+      'paused',
+      'on_hold',
+    ].includes(sessionStatus);
+    const streamMessage = String(stream?.data?.message || '').toLowerCase();
+    const snapshotLooksLive =
+      stream?.eventType === 'SNAPSHOT' &&
+      (streamMessage.includes('live walk') ||
+        streamMessage.includes('on a break') ||
+        streamMessage.includes('on the move'));
     const liveTypes = new Set([
       'WALK_START',
       'GPS_PING',
-      'SNAPSHOT',
       'POTTY_PEE',
       'POTTY_POOP',
       'BREAK_END',
       'BREAK_START',
     ]);
     const isLive = Boolean(
-      stream?.eventType &&
-        liveTypes.has(stream.eventType) &&
-        stream.eventType !== 'WALK_END',
+      stream?.eventType !== 'WALK_END' &&
+        (sessionLive ||
+          snapshotLooksLive ||
+          (stream?.eventType && liveTypes.has(stream.eventType))),
     );
 
     const latestTrail = trail[trail.length - 1];
@@ -429,7 +444,9 @@ export function usePawReportLive(bookingIdParam?: string | null) {
         firstString(session ?? {}, ['pet_name'], 'Your pet'),
       guruName: booking?.guruName || 'Your Guru',
       statusLabel: isLive
-        ? 'Live now'
+        ? sessionStatus === 'paused' || streamMessage.includes('break')
+          ? 'On a break'
+          : 'Live now'
         : stream?.data?.message ||
           (preferredBookingId ? 'Waiting for care to start' : 'No active care'),
       isLive,
@@ -446,7 +463,9 @@ export function usePawReportLive(bookingIdParam?: string | null) {
       message:
         stream?.data?.message ||
         logs[0]?.detail ||
-        'Live metrics appear once your Guru starts care.',
+        (error
+          ? 'Live stream is offline. Care notes and photos still appear here when your Guru saves them.'
+          : 'Live metrics appear once your Guru starts care.'),
       badges: buildBadges(logs),
       logs,
       photos,
@@ -456,6 +475,7 @@ export function usePawReportLive(bookingIdParam?: string | null) {
     };
   }, [
     booking,
+    error,
     logs,
     now,
     photoPins,

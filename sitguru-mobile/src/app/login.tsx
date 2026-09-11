@@ -29,16 +29,15 @@ import {
 } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
-import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruButton from '@/components/SitGuruButton';
+import SitGuruIconButton from '@/components/SitGuruIconButton';
 import SitGuruLogo from '@/components/SitGuruLogo';
 import SitGuruScreen from '@/components/SitGuruScreen';
+import SitGuruSegmentedControl from '@/components/SitGuruSegmentedControl';
+import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
 import SocialAuthButton from '@/components/SocialAuthButton';
+import { ButtonMetrics, SitGuruAccent } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
-import {
-  setThemePreference,
-  type SitGuruThemePreference,
-  useThemePreference,
-} from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -50,17 +49,6 @@ type LoginMethod =
   | 'password'
   | 'email_code'
   | 'sms_code';
-
-type ThemeOption = {
-  icon: 'sun' | 'moon';
-  label: string;
-  value: SitGuruThemePreference;
-};
-
-const THEME_OPTIONS: ThemeOption[] = [
-  { icon: 'sun', label: 'Light', value: 'light' },
-  { icon: 'moon', label: 'Dark', value: 'dark' },
-];
 
 function normalizeLoginError(
   message: string,
@@ -281,7 +269,6 @@ export default function LoginScreen() {
     Platform.OS === 'web';
 
   const themeMode = useThemeMode();
-  const themePreference = useThemePreference();
   const isDark = themeMode === 'dark';
   const colors = getPalette(isDark);
   const styles = createStyles(isDark);
@@ -884,64 +871,23 @@ export default function LoginScreen() {
                 <View
                   style={styles.topBar}
                 >
-                  <BubblePressable
+                  <SitGuruIconButton
                     accessibilityLabel="Return home"
-                    accessibilityRole="button"
-                    onPress={() =>
-                      router.replace('/')
-                    }
-                    scaleTo={0.88}
-                    style={styles.backButton}
+                    onPress={() => router.replace('/')}
                   >
                     <ChevronLeft
-                      color={
-                        colors.text
-                      }
-                      size={20}
+                      color={colors.text}
+                      size={ButtonMetrics.iconGlyph}
                       strokeWidth={2.4}
                     />
-                  </BubblePressable>
+                  </SitGuruIconButton>
 
                   <SitGuruLogo
                     size="small"
                     variant="symbol"
                   />
 
-                  <View style={styles.modeToggle}>
-                    {THEME_OPTIONS.map((option) => {
-                      const active = themePreference === option.value;
-
-                      return (
-                        <BubblePressable
-                          key={option.value}
-                          accessibilityLabel={`Switch to ${option.label} mode`}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: active }}
-                          onPress={() => setThemePreference(option.value)}
-                          scaleTo={0.88}
-                          style={[
-                            styles.modeButton,
-                            active && styles.modeButtonActive,
-                          ]}
-                        >
-                          <SitGuruIcon
-                            color={
-                              active
-                                ? option.value === 'light'
-                                  ? '#F3AA1F'
-                                  : isDark
-                                    ? '#F0CF62'
-                                    : colors.primary
-                                : colors.textSoft
-                            }
-                            name={option.icon}
-                            size={16}
-                            strokeWidth={2.4}
-                          />
-                        </BubblePressable>
-                      );
-                    })}
-                  </View>
+                  <SitGuruThemeToggle />
                 </View>
 
                 <View
@@ -1160,143 +1106,58 @@ export default function LoginScreen() {
                     />
                   </View>
 
-                  <View
-                    style={
-                      styles.methodToggle
-                    }
-                  >
-                    <BubblePressable
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        selected:
-                          loginMethod ===
-                          'password',
-                      }}
-                      disabled={authBusy}
-                      onPress={() =>
-                        changeLoginMethod(
-                          'password',
-                        )
-                      }
-                      scaleTo={0.88}
-                      style={[
-                        styles.methodButton,
-                        loginMethod ===
-                          'password' &&
-                          styles.methodButtonActive,
-                      ]}
-                    >
-                      <LockKeyhole
-                        color={
-                          loginMethod ===
-                          'password'
-                            ? colors.primary
-                            : colors.textSoft
-                        }
-                        size={15}
-                        strokeWidth={2.3}
-                      />
-
-                      <Text
-                        style={[
-                          styles.methodButtonText,
-                          loginMethod ===
-                            'password' &&
-                            styles.methodButtonTextActive,
-                        ]}
-                      >
-                        Password
-                      </Text>
-                    </BubblePressable>
-
-                    <BubblePressable
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        selected:
-                          loginMethod ===
-                          'email_code',
-                      }}
-                      disabled={authBusy}
-                      onPress={() =>
-                        changeLoginMethod(
-                          'email_code',
-                        )
-                      }
-                      scaleTo={0.88}
-                      style={[
-                        styles.methodButton,
-                        loginMethod ===
-                          'email_code' &&
-                          styles.methodButtonActive,
-                      ]}
-                    >
-                      <Mail
-                        color={
-                          loginMethod ===
-                          'email_code'
-                            ? colors.primary
-                            : colors.textSoft
-                        }
-                        size={15}
-                        strokeWidth={2.3}
-                      />
-
-                      <Text
-                        style={[
-                          styles.methodButtonText,
-                          loginMethod ===
-                            'email_code' &&
-                            styles.methodButtonTextActive,
-                        ]}
-                      >
-                        Email code
-                      </Text>
-                    </BubblePressable>
-
-                    <BubblePressable
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        selected:
-                          loginMethod ===
-                          'sms_code',
-                      }}
-                      disabled={authBusy}
-                      onPress={() =>
-                        changeLoginMethod(
-                          'sms_code',
-                        )
-                      }
-                      scaleTo={0.88}
-                      style={[
-                        styles.methodButton,
-                        loginMethod ===
-                          'sms_code' &&
-                          styles.methodButtonActive,
-                      ]}
-                    >
-                      <Phone
-                        color={
-                          loginMethod ===
-                          'sms_code'
-                            ? colors.primary
-                            : colors.textSoft
-                        }
-                        size={15}
-                        strokeWidth={2.3}
-                      />
-
-                      <Text
-                        style={[
-                          styles.methodButtonText,
-                          loginMethod ===
-                            'sms_code' &&
-                            styles.methodButtonTextActive,
-                        ]}
-                      >
-                        Text code
-                      </Text>
-                    </BubblePressable>
-                  </View>
+                  <SitGuruSegmentedControl
+                    disabled={authBusy}
+                    onChange={changeLoginMethod}
+                    options={[
+                      {
+                        value: 'password',
+                        label: 'Password',
+                        icon: (
+                          <LockKeyhole
+                            color={
+                              loginMethod === 'password'
+                                ? SitGuruAccent.primary
+                                : colors.textSoft
+                            }
+                            size={16}
+                            strokeWidth={2.3}
+                          />
+                        ),
+                      },
+                      {
+                        value: 'email_code',
+                        label: 'Email code',
+                        icon: (
+                          <Mail
+                            color={
+                              loginMethod === 'email_code'
+                                ? SitGuruAccent.primary
+                                : colors.textSoft
+                            }
+                            size={16}
+                            strokeWidth={2.3}
+                          />
+                        ),
+                      },
+                      {
+                        value: 'sms_code',
+                        label: 'Text code',
+                        icon: (
+                          <Phone
+                            color={
+                              loginMethod === 'sms_code'
+                                ? SitGuruAccent.primary
+                                : colors.textSoft
+                            }
+                            size={16}
+                            strokeWidth={2.3}
+                          />
+                        ),
+                      },
+                    ]}
+                    value={loginMethod}
+                  />
 
                   <Text
                     style={
@@ -1742,53 +1603,34 @@ export default function LoginScreen() {
                     </View>
                   )}
 
-                  <BubblePressable
-                    accessibilityRole="button"
-                    accessibilityState={{
-                      disabled:
-                        !canSubmit,
-                    }}
+                  <SitGuruButton
                     disabled={!canSubmit}
-                    onPress={() =>
-                      void handlePrimaryAction()
-                    }
-                    style={[
-                      styles.loginButton,
-                      !canSubmit &&
-                        styles.loginButtonDisabled,
-                    ]}
-                  >
-                    <Text
-                      style={
-                        styles.loginButtonText
-                      }
-                    >
-                      {loading
-                        ? loginMethod ===
-                          'password'
+                    label={
+                      loading
+                        ? loginMethod === 'password'
                           ? 'Signing in…'
                           : codeSent
                             ? 'Verifying…'
                             : 'Sending code…'
-                        : loginMethod ===
-                            'password'
+                        : loginMethod === 'password'
                           ? 'Log In'
                           : codeSent
                             ? 'Verify & Log In'
-                            : loginMethod ===
-                                'sms_code'
+                            : loginMethod === 'sms_code'
                               ? 'Text 6-Digit Code'
-                              : 'Email 6-Digit Code'}
-                    </Text>
-
-                    {!loading ? (
-                      <ArrowRight
-                        color="#FFFFFF"
-                        size={19}
-                        strokeWidth={2.5}
-                      />
-                    ) : null}
-                  </BubblePressable>
+                              : 'Email 6-Digit Code'
+                    }
+                    onPress={() => void handlePrimaryAction()}
+                    trailing={
+                      loading ? null : (
+                        <ArrowRight
+                          color="#FFFFFF"
+                          size={19}
+                          strokeWidth={2.5}
+                        />
+                      )
+                    }
+                  />
 
                   <View
                     style={
@@ -2335,7 +2177,7 @@ function createStyles(isDark: boolean) {
     flexDirection: 'row',
     gap: 4,
     justifyContent: 'center',
-    minHeight: 42,
+    minHeight: 48,
     paddingHorizontal: 4,
   },
   methodButtonActive: {
@@ -2357,7 +2199,7 @@ function createStyles(isDark: boolean) {
     color:
       colors.textSoft,
     fontFamily: AppFonts.bold,
-    fontSize: 9,
+    fontSize: 13,
     textAlign: 'center',
   },
   methodButtonTextActive: {

@@ -3,9 +3,9 @@
  * Guru phone walk action endpoint
  * -----------------------------------------------------------------------
  * POST /api/walk/[bookingId]/actions
- * Body: { action, lat?, lng?, accuracy?, pottyKind?, note? }
+ * Body: { action, lat?, lng?, accuracy?, pottyKind?, note?, updateType?, photoUrl? }
  *
- * Actions: start_walk | take_break | resume | potty_break | end_walk | ping_coordinate
+ * Actions: start_walk | take_break | resume | potty_break | end_walk | ping_coordinate | care_update
  * Broadcasts SSE via walk-event-bus and triggers Pet Parent notifications.
  */
 
@@ -31,6 +31,7 @@ const ALLOWED_ACTIONS = new Set<WalkActionName>([
   "potty_break",
   "end_walk",
   "ping_coordinate",
+  "care_update",
 ]);
 
 export async function OPTIONS(request: NextRequest) {
@@ -66,6 +67,8 @@ export async function POST(request: Request, context: RouteContext) {
     accuracy?: number | null;
     pottyKind?: "pee" | "poop";
     note?: string;
+    updateType?: "water" | "food" | "note" | "photo";
+    photoUrl?: string | null;
   };
 
   const action = String(body.action || "").trim() as WalkActionName;
@@ -86,6 +89,8 @@ export async function POST(request: Request, context: RouteContext) {
     accuracy: body.accuracy,
     pottyKind: body.pottyKind,
     note: body.note,
+    updateType: body.updateType,
+    photoUrl: body.photoUrl,
   });
 
   if (!result.ok) {

@@ -15,6 +15,7 @@ import {
   type PawReportLiveEvent,
   type PawReportLiveEventType,
   type WalkActionName,
+  type WalkCareUpdateType,
   type WalkGeoPoint,
   type WalkTrackingState,
 } from "@/lib/pawreport/walk-events";
@@ -33,6 +34,8 @@ type ActionInput = {
   accuracy?: number | null;
   pottyKind?: "pee" | "poop";
   note?: string;
+  updateType?: WalkCareUpdateType;
+  photoUrl?: string | null;
 };
 
 type ActionResult =
@@ -184,12 +187,14 @@ async function insertTimeline(params: {
   updateType: string;
   note: string;
   point: WalkGeoPoint | null;
+  photoUrl?: string | null;
 }) {
   await supabaseAdmin.from("booking_visit_updates").insert({
     session_id: params.sessionId,
     booking_id: params.bookingId,
     update_type: params.updateType,
     note: params.note,
+    photo_url: params.photoUrl || null,
     lat: params.point?.lat ?? null,
     lng: params.point?.lng ?? null,
     accuracy: params.point?.accuracy ?? null,
@@ -647,6 +652,8 @@ export async function executeWalkAction(
       clearFlag: true,
     });
 
+    const finalNote = input.note?.trim() || null;
+
     await supabaseAdmin
       .from("booking_visit_sessions")
       .update({
@@ -655,6 +662,7 @@ export async function executeWalkAction(
         end_lat: point?.lat ?? null,
         end_lng: point?.lng ?? null,
         updated_at: timestamp,
+        ...(finalNote ? { final_note: finalNote } : {}),
       })
       .eq("id", session.id);
 
@@ -662,7 +670,9 @@ export async function executeWalkAction(
       sessionId: session.id,
       bookingId,
       updateType: "walk",
-      note: "Walk ended — route locked. Full PawReport ready.",
+      note: finalNote
+        ? `Walk ended — ${finalNote}`
+        : "Walk ended — route locked. Full PawReport ready.",
       point,
     });
 
@@ -679,6 +689,69 @@ export async function executeWalkAction(
     });
 
     await broadcastAndNotify({ access, event, notifyKey: "end_walk" });
+    return { ok: true, event };
+  }
+
+  if (input.action === "care_update") {
+    const allowedTypes = new Set<WalkCareUpdateType>([
+      "water",
+      "food",
+      "note",
+      "photo",
+    ]);
+    const updateType = allowedTypes.has(input.updateType as WalkCareUpdateType)
+      ? (input.updateType as WalkCareUpdateType)
+      : input.photoUrl
+        ? "photo"
+        : "note";
+    const note =
+      input.note?.trim() ||
+      (updateType === "water"
+        ? "Fresh water logged."
+        : updateType === "food"
+          ? "Food logged."
+          : updateType === "photo"
+            ? "Care photo added."
+            : "Care note added.");
+
+    await insertTimeline({
+      sessionId: session.id,
+      bookingId,
+      updateType,
+      note,
+      point,
+      photoUrl: input.photoUrl,
+    });
+
+    if (point) {
+      await supabaseAdmin.from("booking_walk_track_points").insert({
+        walk_track_id: walkId,
+        booking_id: bookingId,
+        session_id: session.id,
+        guru_id: input.userId,
+        lat: point.lat,
+        lng: point.lng,
+        accuracy: point.accuracy ?? null,
+        recorded_at: timestamp,
+      });
+    }
+
+    const event = createLiveEvent({
+      bookingId,
+      eventType: "SNAPSHOT",
+      petName,
+      timestamp,
+      point,
+      walkTrackId: walkId,
+      message:
+        updateType === "photo"
+          ? `${petName} has a new care photo.`
+          : note,
+      distanceMeters,
+      durationSeconds,
+    });
+
+    publishWalkEvent(event);
     return { ok: true, event };
   }
 

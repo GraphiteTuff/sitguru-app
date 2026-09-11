@@ -57,6 +57,7 @@ import {
 import { useGuruEarnings } from '@/hooks/data/useGuruEarnings';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { formatUsd } from '@/lib/data/money';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import {
@@ -295,6 +296,7 @@ export default function GuruDashboardScreen() {
   const isWebPreview = Platform.OS === 'web';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
+  const tabBarScroll = useFloatingTabBarScroll();
 
   const profileRecord = useMemo(
     () => (profile ?? {}) as RecordRow,
@@ -924,6 +926,7 @@ export default function GuruDashboardScreen() {
                 ) : null}
 
                 <ScrollView
+                  {...tabBarScroll}
                   contentContainerStyle={
                     styles.scrollContent
                   }

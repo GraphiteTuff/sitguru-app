@@ -1,59 +1,39 @@
-import {
-    StyleSheet,
-    View,
-} from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
 import { SitGuruIcon } from '@/components/SitGuruIcon';
+import { ButtonMetrics, SitGuruAccent } from '@/constants/button-tokens';
 import {
-    setThemePreference,
-    useThemePreference,
+  setThemePreference,
+  useThemePreference,
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 
 export default function SitGuruThemeToggle() {
-  const themePreference =
-    useThemePreference();
-
-  const themeMode =
-    useThemeMode();
-
-  const isDark =
-    themeMode === 'dark';
-
-  const styles =
-    createStyles(isDark);
+  const themePreference = useThemePreference();
+  const isDark = useThemeMode() === 'dark';
 
   return (
     <View
       accessibilityLabel="Appearance"
-      style={styles.container}
+      style={[styles.container, isDark && styles.containerDark]}
     >
       <BubblePressable
         accessibilityLabel="Use light mode"
         accessibilityRole="button"
-        accessibilityState={{
-          selected:
-            themePreference === 'light',
-        }}
-        onPress={() =>
-          setThemePreference('light')
-        }
+        accessibilityState={{ selected: themePreference === 'light' }}
+        onPress={() => setThemePreference('light')}
         scaleTo={0.88}
         style={[
           styles.option,
-          themePreference === 'light' &&
-            styles.optionActive,
+          themePreference === 'light' && styles.optionActive,
+          themePreference === 'light' && isDark && styles.optionActiveDark,
         ]}
       >
         <SitGuruIcon
-          color={
-            themePreference === 'light'
-              ? '#F3AA1F'
-              : styles.iconInactive.color
-          }
+          color={themePreference === 'light' ? '#F3AA1F' : styles.iconInactive.color}
           name="sun"
-          size={15}
+          size={16}
           strokeWidth={2.4}
         />
       </BubblePressable>
@@ -61,18 +41,13 @@ export default function SitGuruThemeToggle() {
       <BubblePressable
         accessibilityLabel="Use dark mode"
         accessibilityRole="button"
-        accessibilityState={{
-          selected:
-            themePreference === 'dark',
-        }}
-        onPress={() =>
-          setThemePreference('dark')
-        }
+        accessibilityState={{ selected: themePreference === 'dark' }}
+        onPress={() => setThemePreference('dark')}
         scaleTo={0.88}
         style={[
           styles.option,
-          themePreference === 'dark' &&
-            styles.optionActive,
+          themePreference === 'dark' && styles.optionActive,
+          themePreference === 'dark' && isDark && styles.optionActiveDark,
         ]}
       >
         <SitGuruIcon
@@ -84,7 +59,7 @@ export default function SitGuruThemeToggle() {
               : styles.iconInactive.color
           }
           name="moon"
-          size={15}
+          size={16}
           strokeWidth={2.4}
         />
       </BubblePressable>
@@ -92,40 +67,35 @@ export default function SitGuruThemeToggle() {
   );
 }
 
-function createStyles(
-  isDark: boolean,
-) {
-  return StyleSheet.create({
-    container: {
-      alignItems: 'center',
-      backgroundColor: isDark
-        ? '#0B2118'
-        : '#FFFEFA',
-      borderColor: isDark
-        ? '#B9831B'
-        : '#F2822E',
-      borderRadius: 13,
-      borderWidth: 1.2,
-      flexDirection: 'row',
-      gap: 2,
-      padding: 2,
-    },
-    option: {
-      alignItems: 'center',
-      borderRadius: 10,
-      height: 28,
-      justifyContent: 'center',
-      width: 31,
-    },
-    optionActive: {
-      backgroundColor: isDark
-        ? 'rgba(226, 170, 45, 0.18)'
-        : '#FFF4D8',
-    },
-    iconInactive: {
-      color: isDark
-        ? '#9DB0A5'
-        : '#738078',
-    },
-  });
-}
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    backgroundColor: '#FFFEFA',
+    borderColor: SitGuruAccent.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    minHeight: ButtonMetrics.iconButton,
+    padding: 2,
+  },
+  containerDark: {
+    backgroundColor: '#0B2118',
+    borderColor: '#3A6B52',
+  },
+  option: {
+    alignItems: 'center',
+    borderRadius: 12,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  optionActive: {
+    backgroundColor: SitGuruAccent.selectedPill,
+  },
+  optionActiveDark: {
+    backgroundColor: 'rgba(47, 163, 107, 0.22)',
+  },
+  iconInactive: {
+    color: '#738078',
+  },
+});

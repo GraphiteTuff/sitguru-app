@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { useTheme } from '@/hooks/use-theme';
 
 type SitGuruScreenProps = {
@@ -18,6 +19,11 @@ type SitGuruScreenProps = {
   scroll?: boolean;
   /** Full-bleed layouts (homepage hero video) — no side padding / cream chrome. */
   edgeToEdge?: boolean;
+  /**
+   * Skip the extra SafeArea wrapper. Use when a child (MobileScreen) already
+   * owns insets so the page is not double-padded.
+   */
+  inset?: boolean;
 };
 
 export default function SitGuruScreen({
@@ -26,80 +32,93 @@ export default function SitGuruScreen({
   maxWidth = 560,
   scroll = false,
   edgeToEdge = false,
+  inset = true,
 }: SitGuruScreenProps) {
   const { width } = useWindowDimensions();
   const theme = useTheme();
-  const horizontalPadding = edgeToEdge ? 0 : width < 390 ? 16 : 20;
+  const tabBarScroll = useFloatingTabBarScroll({ enabled: scroll });
+  const isNativeApp = Platform.OS !== 'web';
+  const fillNative = isNativeApp && !edgeToEdge;
+  const horizontalPadding = edgeToEdge || fillNative ? 0 : width < 390 ? 16 : 20;
   const backgroundStyle = { backgroundColor: theme.colors.screen };
-  const widthStyle = edgeToEdge ? styles.innerFullWidth : { maxWidth };
+  const widthStyle =
+    edgeToEdge || fillNative ? styles.innerFullWidth : { maxWidth };
+  const alignStyle =
+    fillNative || !center ? styles.topAligned : styles.centered;
+  const chromePadding = fillNative || edgeToEdge ? 0 : undefined;
 
-  /*
-   * Non-scrolling screens nest canvases that use flex: 1. Without a flexible
-   * wrapper the wrapper height stays auto and those children collapse to zero,
-   * which renders as a blank screen on device.
-   */
   const contentStyle = scroll
     ? [styles.inner, widthStyle]
     : [styles.inner, styles.innerFlexible, widthStyle];
 
-  if (scroll) {
+  const body = scroll ? (
+    <ScrollView
+      {...tabBarScroll}
+      contentContainerStyle={[
+        styles.scrollContent,
+        edgeToEdge && styles.scrollContentEdgeToEdge,
+        fillNative && styles.scrollContentNative,
+        {
+          paddingHorizontal: horizontalPadding,
+          ...(chromePadding === 0
+            ? { paddingTop: 0, paddingBottom: 0 }
+            : null),
+        },
+        alignStyle,
+      ]}
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode={
+        Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+      }
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={contentStyle}>{children}</View>
+    </ScrollView>
+  ) : (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.keyboardView}
+    >
+      <View
+        style={[
+          styles.content,
+          edgeToEdge && styles.contentEdgeToEdge,
+          fillNative && styles.contentNative,
+          {
+            paddingHorizontal: horizontalPadding,
+            ...(chromePadding === 0
+              ? { paddingTop: 0, paddingBottom: 0 }
+              : null),
+          },
+          alignStyle,
+        ]}
+      >
+        <View style={contentStyle}>{children}</View>
+      </View>
+    </KeyboardAvoidingView>
+  );
+
+  if (!inset || edgeToEdge) {
     return (
-      <SafeAreaView
-        edges={edgeToEdge ? [] : undefined}
+      <View
         style={[
           styles.safeArea,
           backgroundStyle,
           edgeToEdge && styles.safeAreaEdgeToEdge,
         ]}
       >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            edgeToEdge && styles.scrollContentEdgeToEdge,
-            {
-              paddingHorizontal: horizontalPadding,
-            },
-            center ? styles.centered : styles.topAligned,
-          ]}
-          automaticallyAdjustKeyboardInsets
-          keyboardDismissMode={
-            Platform.OS === 'ios' ? 'interactive' : 'on-drag'
-          }
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={contentStyle}>{children}</View>
-        </ScrollView>
-      </SafeAreaView>
+        {body}
+      </View>
     );
   }
 
   return (
     <SafeAreaView
-      edges={edgeToEdge ? [] : undefined}
-      style={[
-        styles.safeArea,
-        backgroundStyle,
-        edgeToEdge && styles.safeAreaEdgeToEdge,
-      ]}
+      edges={undefined}
+      style={[styles.safeArea, backgroundStyle]}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardView}
-      >
-        <View
-          style={[
-            styles.content,
-            edgeToEdge && styles.contentEdgeToEdge,
-            {
-              paddingHorizontal: horizontalPadding,
-            },
-            center ? styles.centered : styles.topAligned,
-          ]}
-        >
-          <View style={contentStyle}>{children}</View>
-        </View>
-      </KeyboardAvoidingView>
+      {body}
     </SafeAreaView>
   );
 }
@@ -125,6 +144,11 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
     paddingTop: 0,
   },
+  contentNative: {
+    alignItems: 'stretch',
+    paddingBottom: 0,
+    paddingTop: 0,
+  },
   scrollContent: {
     flexGrow: 1,
     paddingTop: 20,
@@ -132,6 +156,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollContentEdgeToEdge: {
+    paddingBottom: 0,
+    paddingTop: 0,
+  },
+  scrollContentNative: {
+    alignItems: 'stretch',
     paddingBottom: 0,
     paddingTop: 0,
   },

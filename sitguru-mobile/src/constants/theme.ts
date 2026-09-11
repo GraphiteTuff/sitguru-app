@@ -3,12 +3,12 @@ import { Platform } from 'react-native';
 export type AppThemeMode = 'light' | 'dark';
 
 export const BrandColors = {
-  green: '#1B7A52',
-  greenDark: '#0F5C3A',
-  guruGreen: '#2A9D6A',
-  guruGreenDark: '#1F7A52',
-  greenSoft: '#DCEFE6',
-  greenMist: '#EEF8F2',
+  green: '#2FA36B',
+  greenDark: '#258B59',
+  guruGreen: '#2FA36B',
+  guruGreenDark: '#258B59',
+  greenSoft: '#E8F5ED',
+  greenMist: '#E8F5ED',
 
   cream: '#FFF8EF',
   warmWhite: '#FFFCF7',
@@ -47,9 +47,10 @@ export const Colors = {
     backgroundElement: BrandColors.cream,
     backgroundSelected: BrandColors.greenSoft,
     textSecondary: BrandColors.slate,
+    textMuted: BrandColors.slate,
 
     primary: BrandColors.green,
-    primaryDark: BrandColors.greenDark,
+    primaryDark: '#214C35',
     primarySoft: BrandColors.greenSoft,
 
     accent: BrandColors.coral,
@@ -77,6 +78,7 @@ export const Colors = {
     backgroundElement: '#0D1A14',
     backgroundSelected: '#1E3B2B',
     textSecondary: '#B8C5BD',
+    textMuted: '#C5D4CB',
 
     primary: '#75C69A',
     primaryDark: '#A4E3BC',

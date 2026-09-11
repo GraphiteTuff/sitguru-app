@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { sendExpoPushToUser } from "@/lib/notifications/expo-push";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   mobileCorsHeaders,
@@ -873,6 +874,21 @@ async function createNotification(params: {
       console.error("Message notification insert failed:", error.message);
       return false;
     }
+
+    void sendExpoPushToUser({
+      userId: params.recipient.userId,
+      title: "New SitGuru Message",
+      body: params.preview || "You have a new SitGuru message.",
+      href: `/conversation?id=${encodeURIComponent(params.conversationId)}`,
+      channelId: "sitguru-messages",
+      data: {
+        type: "message",
+        conversationId: params.conversationId,
+        source: params.source,
+      },
+    }).catch((pushError) => {
+      console.error("Message Expo push failed:", pushError);
+    });
 
     return true;
   } catch (error) {

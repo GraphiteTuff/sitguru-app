@@ -12,7 +12,10 @@ export type WalkActionName =
   | 'resume'
   | 'potty_break'
   | 'end_walk'
-  | 'ping_coordinate';
+  | 'ping_coordinate'
+  | 'care_update';
+
+export type WalkCareUpdateType = 'water' | 'food' | 'note' | 'photo';
 
 export type WalkActionInput = {
   action: WalkActionName;
@@ -21,6 +24,8 @@ export type WalkActionInput = {
   accuracy?: number | null;
   pottyKind?: 'pee' | 'poop';
   note?: string;
+  updateType?: WalkCareUpdateType;
+  photoUrl?: string | null;
 };
 
 /**
@@ -130,11 +135,61 @@ export function useWalkSession(bookingId: string | null | undefined) {
         lng: coords?.lng,
         accuracy: coords?.accuracy,
       }),
-    takeBreak: () => runAction({ action: 'take_break' }),
-    resume: () => runAction({ action: 'resume' }),
-    pottyBreak: (pottyKind: 'pee' | 'poop', note?: string) =>
-      runAction({ action: 'potty_break', pottyKind, note }),
-    endWalk: () => runAction({ action: 'end_walk' }),
+    takeBreak: (coords?: { lat?: number; lng?: number; accuracy?: number }) =>
+      runAction({
+        action: 'take_break',
+        lat: coords?.lat,
+        lng: coords?.lng,
+        accuracy: coords?.accuracy,
+      }),
+    resume: (coords?: { lat?: number; lng?: number; accuracy?: number }) =>
+      runAction({
+        action: 'resume',
+        lat: coords?.lat,
+        lng: coords?.lng,
+        accuracy: coords?.accuracy,
+      }),
+    pottyBreak: (
+      pottyKind: 'pee' | 'poop',
+      note?: string,
+      coords?: { lat?: number; lng?: number; accuracy?: number },
+    ) =>
+      runAction({
+        action: 'potty_break',
+        pottyKind,
+        note,
+        lat: coords?.lat,
+        lng: coords?.lng,
+        accuracy: coords?.accuracy,
+      }),
+    endWalk: (
+      note?: string,
+      coords?: { lat?: number; lng?: number; accuracy?: number },
+    ) =>
+      runAction({
+        action: 'end_walk',
+        note,
+        lat: coords?.lat,
+        lng: coords?.lng,
+        accuracy: coords?.accuracy,
+      }),
+    careUpdate: (input: {
+      updateType: WalkCareUpdateType;
+      note?: string;
+      photoUrl?: string | null;
+      lat?: number;
+      lng?: number;
+      accuracy?: number;
+    }) =>
+      runAction({
+        action: 'care_update',
+        updateType: input.updateType,
+        note: input.note,
+        photoUrl: input.photoUrl,
+        lat: input.lat,
+        lng: input.lng,
+        accuracy: input.accuracy,
+      }),
     pingCoordinate: (lat: number, lng: number, accuracy?: number) =>
       runAction({ action: 'ping_coordinate', lat, lng, accuracy }),
     loadVisitUpdates,

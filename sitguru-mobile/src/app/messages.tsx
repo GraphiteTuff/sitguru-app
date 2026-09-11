@@ -20,29 +20,22 @@ import {
 } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
-import { SitGuruIcon } from '@/components/SitGuruIcon';
+import SitGuruIconButton from '@/components/SitGuruIconButton';
+import SitGuruChip from '@/components/mobile/SitGuruChip';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
+import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
+import { ButtonMetrics } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
-import {
-  setThemePreference,
-  type SitGuruThemePreference,
-  useThemePreference,
-} from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 type RecordRow = Record<string, unknown>;
 
 type MessageFilter = 'all' | 'unread' | 'bookings' | 'support';
-
-type ThemeOption = {
-  label: string;
-  value: SitGuruThemePreference;
-  icon: 'sun' | 'moon';
-};
 
 type ConversationPreview = {
   id: string;
@@ -58,11 +51,6 @@ type ConversationPreview = {
   isBookingRelated: boolean;
   activeCare: boolean;
 };
-
-const themeOptions: ThemeOption[] = [
-  { label: 'Light', value: 'light', icon: 'sun' },
-  { label: 'Dark', value: 'dark', icon: 'moon' },
-];
 
 const filterOptions: Array<{ label: string; value: MessageFilter }> = [
   { label: 'All', value: 'all' },
@@ -96,12 +84,12 @@ export default function MessagesScreen() {
   }>();
   const { user, profile, roles } = useAuth();
   const themeMode = useThemeMode();
-  const themePreference = useThemePreference();
   const isDark = themeMode === 'dark';
   const isWebPreview = Platform.OS === 'web';
 
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
+  const tabBarScroll = useFloatingTabBarScroll();
 
   const [conversations, setConversations] = useState<ConversationPreview[]>([]);
   const [activeFilter, setActiveFilter] = useState<MessageFilter>('all');
@@ -258,6 +246,7 @@ export default function MessagesScreen() {
                 {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
                 <ScrollView
+                  {...tabBarScroll}
                   contentContainerStyle={styles.scrollContent}
                   refreshControl={
                     <RefreshControl
@@ -278,62 +267,19 @@ export default function MessagesScreen() {
                     </View>
 
                     <View style={styles.headerActions}>
-                      <BubblePressable
-                        accessibilityRole="button"
+                      <SitGuruIconButton
                         accessibilityLabel="Open notifications"
+                        badge={unreadTotal > 0 ? formatBadge(unreadTotal) : null}
                         onPress={() => router.push('/notifications')}
-                        scaleTo={0.88}
-                        style={styles.headerIconButton}
                       >
                         <Bell
                           color={palette.title}
-                          size={18}
+                          size={ButtonMetrics.iconGlyph}
                           strokeWidth={2.3}
                         />
-                        {unreadTotal > 0 ? (
-                          <View style={styles.headerBadge}>
-                            <Text style={styles.headerBadgeText}>
-                              {formatBadge(unreadTotal)}
-                            </Text>
-                          </View>
-                        ) : null}
-                      </BubblePressable>
+                      </SitGuruIconButton>
 
-                      <View style={styles.modeToggle}>
-                        {themeOptions.map((option) => {
-                          const active = themePreference === option.value;
-
-                          return (
-                            <BubblePressable
-                              key={option.value}
-                              accessibilityRole="button"
-                              accessibilityLabel={`Switch to ${option.label} mode`}
-                              accessibilityState={{ selected: active }}
-                              onPress={() => setThemePreference(option.value)}
-                              scaleTo={0.88}
-                              style={[
-                                styles.modeButton,
-                                active && styles.modeButtonActive,
-                              ]}
-                            >
-                              <SitGuruIcon
-                                name={option.icon}
-                                size={15}
-                                color={
-                                  active
-                                    ? option.value === 'light'
-                                      ? '#F3AA1F'
-                                      : isDark
-                                        ? '#F0CF62'
-                                        : palette.primary
-                                    : palette.muted
-                                }
-                                strokeWidth={2.4}
-                              />
-                            </BubblePressable>
-                          );
-                        })}
-                      </View>
+                      <SitGuruThemeToggle />
 
                       <BubblePressable
                         accessibilityRole="button"
@@ -389,32 +335,14 @@ export default function MessagesScreen() {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.filterRail}
                   >
-                    {filterOptions.map((option) => {
-                      const active = activeFilter === option.value;
-
-                      return (
-                        <BubblePressable
-                          key={option.value}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: active }}
-                          onPress={() => setActiveFilter(option.value)}
-                          scaleTo={0.88}
-                          style={[
-                            styles.filterPill,
-                            active && styles.filterPillActive,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.filterPillText,
-                              active && styles.filterPillTextActive,
-                            ]}
-                          >
-                            {option.label}
-                          </Text>
-                        </BubblePressable>
-                      );
-                    })}
+                    {filterOptions.map((option) => (
+                      <SitGuruChip
+                        key={option.value}
+                        label={option.label}
+                        onPress={() => setActiveFilter(option.value)}
+                        selected={activeFilter === option.value}
+                      />
+                    ))}
                   </ScrollView>
 
                   {loadMessage ? (
@@ -1254,58 +1182,6 @@ function createStyles(isDark: boolean) {
       flexDirection: 'row',
       gap: 6,
     },
-    headerIconButton: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 999,
-      borderWidth: 1,
-      height: 48,
-      justifyContent: 'center',
-      position: 'relative',
-      width: 48,
-    },
-    headerBadge: {
-      alignItems: 'center',
-      backgroundColor: palette.orange,
-      borderColor: palette.surface,
-      borderRadius: 999,
-      borderWidth: 1.5,
-      justifyContent: 'center',
-      minHeight: 17,
-      minWidth: 17,
-      paddingHorizontal: 4,
-      position: 'absolute',
-      right: -2,
-      top: -4,
-    },
-    headerBadgeText: {
-      color: '#FFFFFF',
-      fontFamily: AppFonts.extraBold,
-      fontSize: 8,
-    },
-    modeToggle: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: isDark ? '#B9831B' : '#F2822E',
-      borderRadius: 13,
-      borderWidth: 1.2,
-      flexDirection: 'row',
-      gap: 2,
-      padding: 2,
-    },
-    modeButton: {
-      alignItems: 'center',
-      borderRadius: 10,
-      height: 28,
-      justifyContent: 'center',
-      width: 31,
-    },
-    modeButtonActive: {
-      backgroundColor: isDark
-        ? 'rgba(226,170,45,0.18)'
-        : '#FFF4D8',
-    },
     profileButton: {
       borderRadius: 999,
     },
@@ -1331,29 +1207,6 @@ function createStyles(isDark: boolean) {
     filterRail: {
       gap: 7,
       paddingRight: 10,
-    },
-    filterPill: {
-      alignItems: 'center',
-      backgroundColor: palette.surface,
-      borderColor: palette.border,
-      borderRadius: 999,
-      borderWidth: 1,
-      justifyContent: 'center',
-      minHeight: 48,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-    },
-    filterPillActive: {
-      backgroundColor: palette.primary,
-      borderColor: palette.primary,
-    },
-    filterPillText: {
-      color: palette.muted,
-      fontFamily: AppFonts.bold,
-      fontSize: 14,
-    },
-    filterPillTextActive: {
-      color: '#FFFFFF',
     },
 
     noticeCard: {

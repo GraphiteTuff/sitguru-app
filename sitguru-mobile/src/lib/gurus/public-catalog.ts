@@ -3,7 +3,7 @@ import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { PublicGuruProfile } from '@/types/guru';
 
 const SELECT_FIELDS =
-  'id, user_id, full_name, display_name, first_name, last_name, slug, username, handle, bio, title, city, state, service_city, service_state, service_area, zip_code, service_zip, service_zip_code, service_radius_miles, service_radius, radius_miles, avatar_url, profile_photo_url, photo_url, image_url, hourly_rate, starting_rate, rate, rating_avg, rating, review_count, is_verified, is_bookable, accepting_bookings, is_accepting_bookings, is_public_visible, admin_status, profile_quality_status, role, services, experience_years, latitude, longitude, lat, lng, service_latitude, service_longitude, completed_bookings';
+  'id, user_id, full_name, display_name, first_name, last_name, slug, username, handle, bio, title, city, state, service_city, service_state, service_area, zip_code, service_zip, service_zip_code, service_radius_miles, service_radius, radius_miles, avatar_url, profile_photo_url, photo_url, image_url, cover_url, intro_video_url, profile_video_url, video_url, hourly_rate, starting_rate, rate, rating_avg, rating, review_count, is_verified, is_bookable, accepting_bookings, is_accepting_bookings, is_public_visible, admin_status, profile_quality_status, role, services, experience_years, latitude, longitude, lat, lng, service_latitude, service_longitude, completed_bookings';
 
 const GURU_CATALOG_TTL_MS = 45_000;
 

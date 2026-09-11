@@ -36,6 +36,8 @@ import { TOUCH_MIN } from '@/constants/mobile-layout';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { sitguruApiFetch } from '@/lib/data/api';
+import { API_PATHS } from '@/lib/data/schema';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
@@ -239,15 +241,30 @@ export default function GuruRequestsScreen() {
             setUpdatingId(request.id);
 
             try {
-              const result = await supabase
-                .from(request.sourceTable)
-                .update({
+              const apiResult = await sitguruApiFetch<{
+                ok?: boolean;
+                error?: string;
+              }>(API_PATHS.bookingStatus, {
+                method: 'POST',
+                body: {
+                  bookingId: request.id,
                   status: nextStatus,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', request.id);
+                },
+              });
 
-              if (result.error) throw result.error;
+              if (apiResult.error || !apiResult.data?.ok) {
+                const result = await supabase
+                  .from(request.sourceTable)
+                  .update({
+                    status: nextStatus,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', request.id);
+
+                if (result.error) {
+                  throw new Error(apiResult.error || result.error.message);
+                }
+              }
 
               setRequests((current) =>
                 current.map((item) =>

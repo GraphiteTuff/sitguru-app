@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 11,
     justifyContent: 'center',
-    minHeight: 53,
+    minHeight: 56,
     paddingHorizontal: 16,
   },
   appleButton: {
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   label: {
     color: '#142019',
     fontFamily: AppFonts.extraBold,
-    fontSize: 14,
+    fontSize: 16,
   },
   appleLabel: {
     color: '#FFFFFF',

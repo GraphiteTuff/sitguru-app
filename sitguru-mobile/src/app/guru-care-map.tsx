@@ -23,6 +23,7 @@ import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { useAuth } from '@/hooks/useAuth';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
@@ -310,6 +311,7 @@ export default function GuruCareMapScreen() {
   const isWebPreview = Platform.OS === 'web';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
+  const tabBarScroll = useFloatingTabBarScroll();
 
   const profileRecord = (profile ?? {}) as RecordRow;
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -517,6 +519,7 @@ export default function GuruCareMapScreen() {
                 {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
                 <ScrollView
+                  {...tabBarScroll}
                   contentContainerStyle={styles.scrollContent}
                   refreshControl={
                     <RefreshControl

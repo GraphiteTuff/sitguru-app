@@ -1,4 +1,4 @@
-import { router, usePathname } from 'expo-router';
+import { router, useLocalSearchParams, usePathname } from 'expo-router';
 import {
   CalendarDays,
   Home,
@@ -12,15 +12,14 @@ import {
   User,
   Wallet,
 } from 'lucide-react-native';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useMemo } from 'react';
 
-import BubblePressable from '@/components/BubblePressable';
-import GlassChrome from '@/components/mobile/GlassChrome';
-import { AppFonts } from '@/constants/fonts';
-import { TOUCH_MIN } from '@/constants/mobile-layout';
+import FloatingBubbleTabBar from '@/components/navigation/FloatingBubbleTabBar';
 import { getTabChromePalette } from '@/constants/role-palettes';
-import { MAX_CHROME_FONT_MULTIPLIER } from '@/lib/a11y/type-scale';
+import {
+  ADDITIONAL_OVERFLOW_ITEMS,
+  overflowItemIsActive,
+} from '@/constants/toolbar-overflow';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import type { AppRole } from '@/types/auth';
@@ -163,15 +162,30 @@ type SitGuruTabBarProps = {
   floating?: boolean;
 };
 
+function navigateOverflowHref(
+  href: string,
+  params?: Record<string, string>,
+) {
+  if (params) {
+    router.push({
+      pathname: href as never,
+      params,
+    });
+    return;
+  }
+
+  router.navigate(href as never);
+}
+
 export default function SitGuruTabBar({
   active,
   role,
   badges,
   floating = true,
 }: SitGuruTabBarProps) {
-  const insets = useSafeAreaInsets();
   const isDark = useThemeMode() === 'dark';
   const pathname = usePathname();
+  const routeParams = useLocalSearchParams();
   const { primaryRole } = useAuth();
 
   const resolvedRole = role ?? toTabRole(primaryRole);
@@ -179,167 +193,38 @@ export default function SitGuruTabBar({
   const tabs = TAB_SETS[resolvedRole];
   const activeKey = resolveActiveTab(pathname, tabs, active);
 
+  const overflowItems = useMemo(
+    () => ADDITIONAL_OVERFLOW_ITEMS[resolvedRole],
+    [resolvedRole],
+  );
+
   return (
-    <View
-      style={[
-        styles.shell,
-        floating && styles.shellFloating,
-        {
-          paddingBottom: Math.max(insets.bottom, floating ? 6 : 10),
-        },
-      ]}
-    >
-      <GlassChrome
-        fallbackColor={palette.fallback}
-        style={[
-          styles.bar,
-          floating && styles.barFloating,
-          floating && { borderColor: palette.border },
-          !floating && { borderTopColor: palette.border },
-        ]}
-        tintColor={palette.tint}
-      >
-        <View accessibilityRole="tablist" style={styles.row}>
-          {tabs.map((tab) => {
-            const isActive = tab.key === activeKey;
-            const color = isActive ? palette.activeColor : palette.mutedColor;
-            const badge = badges?.[tab.key];
-            const Icon = tab.icon;
-
-            return (
-              <BubblePressable
-                key={tab.key}
-                accessibilityLabel={tab.label}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: isActive }}
-                active={isActive}
-                bubble
-                bubbleColor={palette.bubble}
-                bubblePlacement="glyph"
-                haptic="selection"
-                onPress={() => {
-                  if (isActive) return;
-
-                  if (tab.params) {
-                    router.push({
-                      pathname: tab.href as never,
-                      params: tab.params,
-                    });
-                    return;
-                  }
-
-                  router.navigate(tab.href as never);
-                }}
-                scaleTo={0.84}
-                style={styles.tab}
-              >
-                <View style={styles.iconWell}>
-                  <Icon
-                    color={color}
-                    size={24}
-                    strokeWidth={isActive ? 2.6 : 2.15}
-                  />
-
-                  {badge ? (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>
-                        {badge > 9 ? '9+' : badge}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                <Text
-                  adjustsFontSizeToFit
-                  allowFontScaling
-                  maxFontSizeMultiplier={MAX_CHROME_FONT_MULTIPLIER}
-                  minimumFontScale={0.88}
-                  numberOfLines={1}
-                  style={[styles.label, { color }]}
-                >
-                  {tab.label}
-                </Text>
-              </BubblePressable>
-            );
-          })}
-        </View>
-      </GlassChrome>
-    </View>
+    <FloatingBubbleTabBar
+      activeKey={activeKey}
+      additionalOverflowItems={overflowItems.map((item) => ({
+        key: item.key,
+        label: item.label,
+        icon: item.icon,
+        selected: overflowItemIsActive(pathname, item, routeParams),
+      }))}
+      floating={floating}
+      onOverflowItemPress={(item) => {
+        const destination = overflowItems.find((entry) => entry.key === item.key);
+        if (!destination) return;
+        navigateOverflowHref(destination.href, destination.params);
+      }}
+      onTabPress={(tab) => {
+        const definition = tabs.find((item) => item.key === tab.key);
+        if (!definition || definition.key === activeKey) return;
+        navigateOverflowHref(definition.href, definition.params);
+      }}
+      palette={palette}
+      tabs={tabs.map((tab) => ({
+        key: tab.key,
+        label: tab.label,
+        icon: tab.icon,
+        badge: badges?.[tab.key],
+      }))}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  shell: {
-    width: '100%',
-  },
-  shellFloating: {
-    paddingHorizontal: 12,
-    paddingTop: 4,
-  },
-  bar: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  barFloating: {
-    borderRadius: 24,
-    borderTopWidth: 0,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#18211C',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.12,
-        shadowRadius: 18,
-      },
-      android: {
-        elevation: 6,
-      },
-      default: {},
-    }),
-  },
-  row: {
-    flexDirection: 'row',
-    paddingTop: 8,
-    paddingBottom: 2,
-  },
-  tab: {
-    alignItems: 'center',
-    flex: 1,
-    gap: 2,
-    justifyContent: 'flex-start',
-    minHeight: TOUCH_MIN,
-    paddingTop: 2,
-    paddingVertical: 2,
-  },
-  iconWell: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 36,
-    width: 46,
-  },
-  label: {
-    fontFamily: AppFonts.bold,
-    fontSize: 11,
-    paddingHorizontal: 2,
-    textAlign: 'center',
-    width: '100%',
-  },
-  badge: {
-    alignItems: 'center',
-    backgroundColor: '#E5484D',
-    borderRadius: 999,
-    height: 16,
-    justifyContent: 'center',
-    minWidth: 16,
-    paddingHorizontal: 4,
-    position: 'absolute',
-    right: -8,
-    top: -5,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontFamily: AppFonts.extraBold,
-    fontSize: 10,
-    lineHeight: 13,
-  },
-});

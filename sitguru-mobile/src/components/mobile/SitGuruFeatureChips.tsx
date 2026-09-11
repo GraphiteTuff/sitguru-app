@@ -10,6 +10,7 @@ import type { LucideIcon } from 'lucide-react-native';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import BubblePressable from '@/components/BubblePressable';
+import { ButtonMetrics, SitGuruAccent } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
 import { MobileSpace } from '@/constants/mobile-layout';
 import {
@@ -91,7 +92,11 @@ export default function SitGuruFeatureChips({
                 },
               ]}
             >
-              <Icon color={theme.colors.primary} size={16} strokeWidth={2.2} />
+              <Icon
+                color={theme.colors.primary}
+                size={ButtonMetrics.chipIcon}
+                strokeWidth={2.2}
+              />
               <Text style={[styles.chipLabel, { color: theme.colors.text }]}>
                 {chip.label}
               </Text>
@@ -121,15 +126,17 @@ const styles = StyleSheet.create({
   },
   chip: {
     alignItems: 'center',
-    borderRadius: 999,
+    borderColor: SitGuruAccent.border,
+    borderRadius: ButtonMetrics.chipRadius,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    gap: ButtonMetrics.chipGap,
+    minHeight: ButtonMetrics.chipHeight,
+    paddingHorizontal: ButtonMetrics.chipPadX,
+    paddingVertical: 0,
   },
   chipLabel: {
     fontFamily: AppFonts.bold,
-    fontSize: 13,
+    fontSize: ButtonMetrics.chipFont,
   },
 });

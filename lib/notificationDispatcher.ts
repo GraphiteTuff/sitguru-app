@@ -15,6 +15,7 @@
  */
 
 import { supabaseAdmin } from "@/utils/supabase/admin";
+import { sendExpoPushToUser } from "@/lib/notifications/expo-push";
 import { sendFinalReportEmail } from "@/lib/services/resend";
 import { sendSms } from "@/lib/services/twilio";
 import { sendWebPushToUser } from "@/lib/services/webPush";
@@ -55,7 +56,7 @@ export type PawReportTrackingData = {
 export type DispatchPawReportEventResult = {
   ok: boolean;
   settled: Array<{
-    channel: "webPush" | "sms" | "email" | "inApp";
+    channel: "webPush" | "expoPush" | "sms" | "email" | "inApp";
     status: "fulfilled" | "rejected";
     value?: unknown;
     reason?: string;
@@ -329,7 +330,7 @@ export async function dispatchPawReportEvent(
     const copy = copyForEvent(eventType, name);
 
     const jobs: Array<{
-      channel: "webPush" | "sms" | "email" | "inApp";
+      channel: "webPush" | "expoPush" | "sms" | "email" | "inApp";
       run: () => Promise<unknown>;
     }> = [];
 
@@ -360,6 +361,24 @@ export async function dispatchPawReportEvent(
               bookingId: id,
               eventType,
               petName: name,
+            },
+          }),
+      });
+
+      jobs.push({
+        channel: "expoPush",
+        run: () =>
+          sendExpoPushToUser({
+            userId: petParentUserId,
+            title: copy.title,
+            body: trackingData.message || copy.body,
+            href: `/pawreport-live?bookingId=${encodeURIComponent(id)}`,
+            channelId: "sitguru-care",
+            data: {
+              bookingId: id,
+              eventType,
+              petName: name,
+              type: copy.type,
             },
           }),
       });

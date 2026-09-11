@@ -4,7 +4,7 @@
  */
 export const SitGuruBrand = {
   marketing: '#0D5C3A',
-  petParent: '#1B7A52',
+  petParent: '#2FA36B',
   guru: '#2A9D6A',
 } as const;
 
@@ -122,9 +122,9 @@ export function getDashboardPalette(
         title: '#123F31',
         text: '#27483E',
         muted: '#738078',
-        primary: '#1B7A52',
-        primaryDark: '#0F5C3A',
-        primarySoft: '#E4F5E9',
+        primary: '#2FA36B',
+        primaryDark: '#258B59',
+        primarySoft: '#E8F5ED',
         orange: '#F15A3A',
         gold: '#F4B93E',
         white: '#FFFFFF',
@@ -162,10 +162,10 @@ export function getTabChromePalette(
         }
       : {
           fallback: '#FFFFFF',
-          border: 'rgba(200,230,210,0.9)',
-          activeColor: '#2A9D6A',
-          mutedColor: '#7A9488',
-          bubble: 'rgba(42,157,106,0.18)',
+          border: '#CFE5D7',
+          activeColor: '#214C35',
+          mutedColor: '#6F8176',
+          bubble: '#DDF1E4',
           tint: '#F8FCF9',
         };
   }
@@ -182,10 +182,10 @@ export function getTabChromePalette(
         }
       : {
           fallback: '#FFFFFF',
-          border: 'rgba(229,223,212,0.85)',
-          activeColor: '#1B7A52',
-          mutedColor: '#79857B',
-          bubble: 'rgba(27,122,82,0.16)',
+          border: '#CFE5D7',
+          activeColor: '#214C35',
+          mutedColor: '#6F8176',
+          bubble: '#DDF1E4',
           tint: '#FFFCF7',
         };
   }
@@ -194,17 +194,17 @@ export function getTabChromePalette(
     ? {
         fallback: '#101A16',
         border: 'rgba(30,59,43,0.7)',
-        activeColor: '#58D58A',
+        activeColor: '#7ED9A8',
         mutedColor: '#8FA096',
-        bubble: 'rgba(88,213,138,0.28)',
+        bubble: 'rgba(47,163,107,0.32)',
         tint: '#101A16',
       }
     : {
         fallback: '#FFFFFF',
-        border: 'rgba(229,223,212,0.85)',
-        activeColor: '#1B7A52',
-        mutedColor: '#79857B',
-        bubble: 'rgba(27,122,82,0.16)',
+        border: '#CFE5D7',
+        activeColor: '#214C35',
+        mutedColor: '#6F8176',
+        bubble: '#DDF1E4',
         tint: '#FFFCF7',
       };
 }

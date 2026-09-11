@@ -41,6 +41,7 @@ import { AppFonts } from '@/constants/fonts';
 import { useWalkLocationStream } from '@/hooks/useWalkLocationStream';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { useWalkSession } from '@/hooks/data/useWalkSession';
 import { uploadSitGuruMedia } from '@/lib/data/media-upload';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
@@ -130,6 +131,7 @@ export default function GuruLiveWalkScreen() {
   const bookingId = Array.isArray(params.bookingId)
     ? params.bookingId[0]
     : params.bookingId;
+  const walk = useWalkSession(booking?.id || bookingId);
 
   const loadCare = useCallback(
     async (showRefresh = false) => {
@@ -247,6 +249,20 @@ export default function GuruLiveWalkScreen() {
     },
   });
 
+  function walkCoords() {
+    const coords = locationTracking.coords;
+    if (!coords) return undefined;
+    return {
+      lat: coords.latitude,
+      lng: coords.longitude,
+      accuracy: coords.accuracy ?? undefined,
+    };
+  }
+
+  function alreadyInProgress(error: string | null | undefined) {
+    return Boolean(error?.toLowerCase().includes('already in progress'));
+  }
+
   const photoPins = useMemo(
     () =>
       updates
@@ -271,7 +287,7 @@ export default function GuruLiveWalkScreen() {
   );
 
   async function startCare() {
-    if (!user?.id || !booking?.id) {
+    if (!booking?.id) {
       Alert.alert(
         'Booking required',
         'Open an accepted booking before starting PawReport Live.',
@@ -282,29 +298,19 @@ export default function GuruLiveWalkScreen() {
     setSaving(true);
 
     try {
-      const created = await createSession(user.id, booking);
+      const result = await walk.startWalk(walkCoords());
 
-      if (!created) {
-        throw new Error('No compatible session table found.');
+      if (!result.ok && !alreadyInProgress(result.error)) {
+        throw new Error(result.error || 'Could not start walk.');
       }
 
-      const mapped = mapSession(created.row, created.table);
-      setSession(mapped);
-      setUpdates((current) => [
-        {
-          id: `status-${Date.now()}`,
-          type: 'status',
-          label: 'Care started',
-          note: `PawReport Live started for ${booking.petName}.`,
-          photoUrl: null,
-          createdAt: new Date(),
-        },
-        ...current,
-      ]);
-    } catch {
+      await loadCare(false);
+    } catch (error) {
       Alert.alert(
         'Unable to start care',
-        'SitGuru could not create the PawReport session. Check the session table and permissions.',
+        error instanceof Error
+          ? error.message
+          : 'SitGuru could not start PawReport Live. Check your connection and try again.',
       );
     } finally {
       setSaving(false);
@@ -317,68 +323,37 @@ export default function GuruLiveWalkScreen() {
     setSaving(true);
 
     try {
-      if (nextStatus === 'completed' && user?.id && booking?.id) {
-        const moodLine = visitMood ? `Mood: ${visitMood}.` : '';
-        const note = [moodLine, summaryNote || visitSummary]
-          .map((part) => part.trim())
-          .filter(Boolean)
-          .join(' ');
+      const coords = walkCoords();
+      const result =
+        nextStatus === 'paused'
+          ? await walk.takeBreak(coords)
+          : nextStatus === 'completed'
+            ? await walk.endWalk(
+                [visitMood ? `Mood: ${visitMood}.` : '', summaryNote || visitSummary]
+                  .map((part) => part.trim())
+                  .filter(Boolean)
+                  .join(' '),
+                coords,
+              )
+            : await walk.resume(coords);
 
-        if (note) {
-          await createUpdate(
-            user.id,
-            booking.id,
-            session.id,
-            'note',
-            note,
-          );
-        }
+      if (!result.ok) {
+        throw new Error(result.error || 'Could not update walk.');
       }
 
-      await updateSessionStatus(session, nextStatus);
-
-      const nowDate = new Date();
-      setSession((current) =>
-        current
-          ? {
-              ...current,
-              status: nextStatus,
-              pausedAt: nextStatus === 'paused' ? nowDate : current.pausedAt,
-              completedAt:
-                nextStatus === 'completed' ? nowDate : current.completedAt,
-            }
-          : current,
-      );
-
-      setUpdates((current) => [
-        {
-          id: `status-${Date.now()}`,
-          type: 'status',
-          label:
-            nextStatus === 'completed'
-              ? 'Care completed'
-              : nextStatus === 'paused'
-                ? 'Care paused'
-                : 'Care resumed',
-          note:
-            nextStatus === 'completed'
-              ? summaryNote || visitSummary || 'Final PawReport is ready for review.'
-              : `PawReport status changed to ${nextStatus}.`,
-          photoUrl: null,
-          createdAt: nowDate,
-        },
-        ...current,
-      ]);
+      await loadCare(false);
 
       if (nextStatus === 'completed') {
         setSummaryOpen(false);
         setVisitMood(null);
         setVisitSummary('');
       }
-    } catch {
+    } catch (error) {
       Alert.alert(
         'Unable to update care',
-        'SitGuru could not save the PawReport status. Please try again.',
+        error instanceof Error
+          ? error.message
+          : 'SitGuru could not save the PawReport status. Please try again.',
       );
     } finally {
       setSaving(false);
@@ -469,40 +444,47 @@ export default function GuruLiveWalkScreen() {
       });
 
       const note = uploaded.publicUrl;
-      const saved = await createUpdate(
-        user.id,
-        booking.id,
-        session.id,
-        'photo',
+      const saved = await walk.careUpdate({
+        updateType: 'photo',
         note,
-        uploaded.publicUrl,
-        pinLat,
-        pinLng,
-      );
+        photoUrl: uploaded.publicUrl,
+        lat: pinLat ?? undefined,
+        lng: pinLng ?? undefined,
+      });
 
-      if (!saved) {
-        throw new Error('No compatible update table found.');
+      if (!saved.ok) {
+        const fallback = await createUpdate(
+          user.id,
+          booking.id,
+          session.id,
+          'photo',
+          note,
+          uploaded.publicUrl,
+          pinLat,
+          pinLng,
+        );
+        if (!fallback) {
+          throw new Error(saved.error || 'Could not save the care photo.');
+        }
       }
 
       setUpdates((current) =>
         current.map((item) =>
           item.id === optimisticId
             ? {
-                id:
-                  firstString(saved, ['id', 'update_id']) ||
-                  `photo-${Date.now()}`,
+                id: `photo-${Date.now()}`,
                 type: 'photo',
                 label: 'Photo update',
                 note: uploaded.publicUrl,
                 photoUrl: uploaded.publicUrl,
-                createdAt:
-                  firstDate(saved, ['created_at', 'updated_at']) || new Date(),
+                createdAt: new Date(),
                 latitude: pinLat,
                 longitude: pinLng,
               }
             : item,
         ),
       );
+      await loadCare(false);
     } catch (error) {
       setUpdates((current) =>
         current.filter((item) => item.id !== optimisticId),
@@ -532,13 +514,6 @@ export default function GuruLiveWalkScreen() {
       return;
     }
 
-    const labels: Record<Exclude<UpdateType, 'photo'>, string> = {
-      potty: 'Potty update',
-      water: 'Fresh water',
-      food: 'Food update',
-      note: 'Care note',
-    };
-
     const notes: Record<Exclude<UpdateType, 'photo'>, string> = {
       potty: `${booking.petName} had a potty break.`,
       water: `Fresh water was provided for ${booking.petName}.`,
@@ -546,39 +521,34 @@ export default function GuruLiveWalkScreen() {
       note: `A care note was added for ${booking.petName}.`,
     };
 
-    const label = labels[type];
     const note = notes[type];
 
     setSaving(true);
 
     try {
-      const saved = await createUpdate(
-        user.id,
-        booking.id,
-        session.id,
-        type,
-        note,
-      );
+      const coords = walkCoords();
+      const result =
+        type === 'potty'
+          ? await walk.pottyBreak('pee', note, coords)
+          : await walk.careUpdate({
+              updateType: type,
+              note,
+              lat: coords?.lat,
+              lng: coords?.lng,
+              accuracy: coords?.accuracy,
+            });
 
-      if (!saved) {
-        throw new Error('No compatible update table found.');
+      if (!result.ok) {
+        throw new Error(result.error || 'Could not save this update.');
       }
 
-      setUpdates((current) => [
-        {
-          id: firstString(saved, ['id', 'update_id']) || `update-${Date.now()}`,
-          type,
-          label,
-          note,
-          photoUrl: null,
-          createdAt: firstDate(saved, ['created_at', 'updated_at']) || new Date(),
-        },
-        ...current,
-      ]);
-    } catch {
+      await loadCare(false);
+    } catch (error) {
       Alert.alert(
         'Unable to save update',
-        'SitGuru could not save this PawReport update. Check the update table and permissions.',
+        error instanceof Error
+          ? error.message
+          : 'SitGuru could not save this PawReport update. Please try again.',
       );
     } finally {
       setSaving(false);
@@ -1574,7 +1544,9 @@ function mapUpdate(row: RecordRow, index: number): CareUpdate {
     firstString(row, ['update_type', 'type', 'event_type']),
   );
 
-  const type: CareUpdate['type'] = rawType.includes('potty')
+  const type: CareUpdate['type'] = rawType.includes('potty') ||
+    rawType.includes('pee') ||
+    rawType.includes('poop')
     ? 'potty'
     : rawType.includes('water')
       ? 'water'

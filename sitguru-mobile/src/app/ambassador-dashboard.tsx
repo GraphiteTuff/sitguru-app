@@ -56,6 +56,7 @@ import {
   useThemePreference,
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import {
@@ -242,6 +243,7 @@ export default function AmbassadorDashboardScreen() {
   const isDark = themeMode === 'dark';
   const palette = getPalette(isDark);
   const styles = createStyles(isDark);
+  const tabBarScroll = useFloatingTabBarScroll();
 
   const profileRecord = useMemo(
     () => (profile ?? {}) as RecordRow,
@@ -510,6 +512,7 @@ export default function AmbassadorDashboardScreen() {
                 {isWebPreview ? <PhoneStatusBar styles={styles} /> : null}
 
                 <ScrollView
+                  {...tabBarScroll}
                   contentContainerStyle={[
                     styles.scrollContent,
                     isTablet && styles.scrollContentTablet,

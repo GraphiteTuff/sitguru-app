@@ -45,6 +45,7 @@ import { AppFonts } from '@/constants/fonts';
 import { getAppTheme } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
@@ -823,6 +824,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
   const isDark = colorScheme === 'dark';
   const theme = getAppTheme(isDark ? 'dark' : 'light');
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const tabBarScroll = useFloatingTabBarScroll();
   const isWebPreview = Platform.OS === 'web';
 
   const { user, profile, roles, loading: authLoading } = useAuth();
@@ -1191,6 +1193,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
       </View>
 
       <ScrollView
+        {...tabBarScroll}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

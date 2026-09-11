@@ -21,6 +21,8 @@ export type PublicGuru = {
   zip: string;
   bio: string;
   photoUrl: string;
+  coverUrl: string;
+  introVideoUrl: string;
   isPublic: boolean;
   raw: RecordRow;
 };
@@ -53,6 +55,12 @@ function guruFromRow(row: RecordRow): PublicGuru | null {
       'avatar_url',
       'profile_photo_url',
       'image_url',
+    ]),
+    coverUrl: firstString(row, ['cover_url']),
+    introVideoUrl: firstString(row, [
+      'intro_video_url',
+      'profile_video_url',
+      'video_url',
     ]),
     isPublic: Boolean(isPublic),
     raw: row,

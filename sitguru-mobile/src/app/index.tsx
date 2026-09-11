@@ -52,6 +52,7 @@ import {
 } from '@/hooks/use-color-scheme';
 import { useTheme, useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { roleDashboardPath } from '@/types/auth';
 
 type ThemeOption = {
@@ -286,6 +287,16 @@ function MarketingHomeScreen() {
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
   const [heroTransitioning, setHeroTransitioning] = useState(false);
   const [heroBehindStatusBar, setHeroBehindStatusBar] = useState(true);
+  const tabBarScroll = useFloatingTabBarScroll({
+    onScroll: (event) => {
+      const past =
+        event.nativeEvent.contentOffset.y > heroHeight - insets.top - 24;
+
+      setHeroBehindStatusBar((current) =>
+        current === !past ? current : !past,
+      );
+    },
+  });
 
   const roleCards = useMemo<RoleCard[]>(
     () => [
@@ -420,6 +431,7 @@ function MarketingHomeScreen() {
             ]}
           >
             <ScrollView
+              {...tabBarScroll}
               contentContainerStyle={[
                 styles.scrollContent,
                 !isWebPreview && {
@@ -427,16 +439,6 @@ function MarketingHomeScreen() {
                 },
               ]}
               keyboardShouldPersistTaps="handled"
-              onScroll={(event) => {
-                const past =
-                  event.nativeEvent.contentOffset.y >
-                  heroHeight - insets.top - 24;
-
-                setHeroBehindStatusBar((current) =>
-                  current === !past ? current : !past,
-                );
-              }}
-              scrollEventThrottle={32}
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.scrollCanvas}>
