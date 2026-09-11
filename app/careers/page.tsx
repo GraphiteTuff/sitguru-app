@@ -121,13 +121,13 @@ const opportunityTypes = [
   {
     title: "Company careers & internships",
     description:
-      "Paid SitGuru roles and internships across any team funnel — searchable below. Interns earn experience and college credit while supporting a paid teammate.",
+      "SitGuru posts company careers and the Internship Program here. Credit, hours, and pay are listed on each opening.",
   },
 ];
 
 const quickStats = [
   "Open careers",
-  "Paid internships",
+  "Internships",
   "Guru opportunities",
   "Student Hire",
   "Community Hire",
@@ -321,10 +321,11 @@ export default async function CareersPage() {
               {VETERANS_MILITARY_FAMILIES_PROGRAM.shortName}.
             </p>
 
-            <p className="mt-4 max-w-3xl text-base font-semibold leading-8 !text-white/80">
-              Internships are paid, remote, and credit-eligible — across
-              marketing, community, events, design, product, and more. Students
-              join a live SitGuru team. They do not replace a paid hire.
+            <p className="mt-4 max-w-3xl text-base font-medium leading-8 tracking-normal !text-white/80">
+              Internships are remote, project-based, and open to students at any
+              college or university. Academic credit and hours are set by the
+              student&apos;s school. Company careers are listed separately when
+              SitGuru is hiring.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -398,9 +399,9 @@ export default async function CareersPage() {
 
               <div className="space-y-3">
                 {[
-                  "Search paid careers and internships in any SitGuru track",
+                  "Search company careers and internships by track",
                   "Or start as a Guru / apply to a hire program",
-                  "Interns get mentoring, portfolio work, and college credit",
+                  "Interns do real market-growth work and may earn school credit",
                   "Standout interns can grow into paid SitGuru roles",
                 ].map((item) => (
                   <div

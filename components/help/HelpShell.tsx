@@ -60,6 +60,9 @@ export default function HelpShell({
             <Link href="/help/billing" className="hover:text-emerald-800">
               Billing
             </Link>
+            <Link href="/help/careers" className="hover:text-emerald-800">
+              Careers
+            </Link>
             <Link href="/contact" className="hover:text-emerald-800">
               Contact
             </Link>

@@ -34,6 +34,7 @@ function asCategory(value: unknown): HelpCategory {
     "Account & Profiles",
     "Booking & Cancellations",
     "Trust & Safety",
+    "Careers & Internships",
   ];
   const v = String(value || "");
   return allowed.includes(v as HelpCategory)

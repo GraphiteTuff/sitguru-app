@@ -404,6 +404,62 @@ export const programFaqs: HelpFaqItem[] = [
   },
 ];
 
+export const careerFaqs: HelpFaqItem[] = [
+  {
+    question: "Where are SitGuru jobs posted?",
+    answer:
+      "Open company careers and internships are posted at sitguru.com/careers. Each listing shows the role type, location, compensation, and how to apply. SitGuru HR publishes roles when they are open — they are not always hiring for every track.",
+  },
+  {
+    question: "How do I apply for a SitGuru career?",
+    answer:
+      "Open the role on sitguru.com/careers, then use Apply now if a Handshake or application link is listed, or email careers@sitguru.com with the job title in the subject line. Include a short note and any relevant work samples.",
+  },
+  {
+    question: "Are SitGuru careers the same as becoming a Guru?",
+    answer:
+      "No. A SitGuru career is a company role with SitGuru / Graff Enterprises. Becoming a Guru means joining the marketplace as an independent pet care provider. Student Hire, Community Hire, and military family pathways are Guru on-ramps, not company internships or staff jobs.",
+  },
+  {
+    question: "Who reviews career applications?",
+    answer:
+      "SitGuru reviews complete applications sent through the posting or careers@sitguru.com. Applying does not guarantee an interview or an offer. For marketplace or program questions, use the Help Center or support@sitguru.com.",
+  },
+];
+
+export const internshipFaqs: HelpFaqItem[] = [
+  {
+    question: "What is the SitGuru Internship Program?",
+    answer:
+      "It is a structured, supervised, project-based internship. The current Social Media & Community Growth Intern works with the Founder & CEO on a real market-growth project: research, approved multi-platform campaigns, measurement, and a final playbook SitGuru can use.",
+  },
+  {
+    question: "Is the internship paid?",
+    answer:
+      "The current internship is an unpaid educational internship at the employer level. Academic credit and required hours are set by the student’s university and approved academic program. SitGuru supports credit-bearing placements with documentation, hour verification, supervision, and midpoint/final evaluations.",
+  },
+  {
+    question: "Which schools can apply?",
+    answer:
+      "The internship is open to students at any college or university whose academic program approves the experience. Corporate Communication and Business are especially strong fits. SitGuru does not limit the posting to one campus.",
+  },
+  {
+    question: "Is the internship remote?",
+    answer:
+      "Yes. The internship is 100% remote and flexible around the academic calendar. Hours follow the student’s approved school requirement rather than a fixed SitGuru schedule.",
+  },
+  {
+    question: "How do I apply for the internship?",
+    answer:
+      "Read the live posting at sitguru.com/careers/social-media-community-growth-intern, then email a short note and any relevant work samples to careers@sitguru.com. Selected candidates are contacted for an interview.",
+  },
+  {
+    question: "Is this the same as Student Hire?",
+    answer:
+      "No. Student Hire is a marketplace pathway toward becoming a Guru. The Internship Program is a SitGuru company educational placement. Students can explore both, but they are different applications.",
+  },
+];
+
 export const homeWifiAccessFaqs: HelpFaqItem[] = [
   {
     question: "Why might SitGuru open on cellular but not on home Wi‑Fi?",

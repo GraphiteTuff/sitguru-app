@@ -160,7 +160,7 @@ export function CareerJobForm({
         <input
           name="collegePartner"
           defaultValue={job?.collegePartner || ""}
-          placeholder="Bucks County Community College and partner colleges"
+          placeholder="Open to students at any college or university"
           className={fieldClass}
         />
       </label>

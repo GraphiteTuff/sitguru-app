@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Search } from "lucide-react";
+import { CareerApplyActions } from "@/components/careers/CareerApplyActions";
 import {
   CATEGORY_LABELS,
   TRACK_LABELS,
@@ -60,7 +61,7 @@ export function CareersJobBoard({ jobs }: { jobs: CareerJob[] }) {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search careers and internships"
-            className="min-h-12 w-full rounded-2xl border border-emerald-100 bg-white py-3 pl-11 pr-4 text-sm font-semibold text-slate-950 shadow-sm outline-none ring-emerald-200 placeholder:text-slate-400 focus:ring-4"
+            className="min-h-12 w-full rounded-2xl border border-emerald-100 bg-white py-3 pl-11 pr-4 text-sm font-semibold tracking-normal text-slate-950 shadow-sm outline-none ring-emerald-200 placeholder:text-slate-400 focus:ring-4"
           />
         </label>
         {tracks.length > 1 ? (
@@ -69,7 +70,7 @@ export function CareersJobBoard({ jobs }: { jobs: CareerJob[] }) {
             onChange={(event) =>
               setTrack(event.target.value as "all" | CareerTrack)
             }
-            className="min-h-12 rounded-2xl border border-emerald-100 bg-white px-4 text-sm font-black text-emerald-900"
+            className="min-h-12 rounded-2xl border border-emerald-100 bg-white px-4 text-sm font-extrabold text-emerald-900"
           >
             <option value="all">All tracks</option>
             {tracks.map((value) => (
@@ -89,9 +90,9 @@ export function CareersJobBoard({ jobs }: { jobs: CareerJob[] }) {
               key={item.id}
               type="button"
               onClick={() => setFilter(item.id)}
-              className={`rounded-full px-4 py-2 text-sm font-black transition ${
+              className={`min-h-11 rounded-full px-4 py-2 text-sm font-extrabold transition ${
                 active
-                  ? "bg-green-800 text-white"
+                  ? "bg-[#0D5C3A] text-white"
                   : "border border-emerald-100 bg-white text-emerald-900 hover:bg-emerald-50"
               }`}
             >
@@ -105,46 +106,49 @@ export function CareersJobBoard({ jobs }: { jobs: CareerJob[] }) {
         {visible.map((job) => (
           <article
             key={job.id}
-            className="flex flex-col rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md sm:p-6"
+            className="flex flex-col rounded-[28px] border border-[#e3ece5] bg-white p-5 shadow-sm sm:p-6"
           >
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-green-700">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-emerald-800">
               {CATEGORY_LABELS[job.category]} · {TRACK_LABELS[job.track]}
             </p>
-            <h3 className="mt-2 text-2xl font-black tracking-tight text-green-950">
+            <h3 className="mt-2 text-2xl font-extrabold leading-tight tracking-normal text-emerald-950">
               {job.title}
             </h3>
             <div className="mt-3 flex flex-wrap gap-2">
               {jobMetaChips(job)
-                .slice(0, 5)
+                .slice(0, 4)
                 .map((chip) => (
                   <span
                     key={chip}
-                    className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-900"
+                    className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold tracking-normal text-emerald-950"
                   >
                     {chip}
                   </span>
                 ))}
             </div>
-            <p className="mt-3 flex-1 text-sm font-semibold leading-6 text-slate-600">
+            <p className="mt-3 flex-1 text-sm font-medium leading-6 tracking-normal text-slate-600 sm:text-base sm:leading-7">
               {job.summary}
             </p>
-            <Link
-              href={`/careers/${job.slug}`}
-              className="mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-green-800 px-5 text-sm font-black text-white transition hover:bg-green-900"
-            >
-              View role
-              <ArrowRight size={16} />
-            </Link>
+            <div className="mt-5 grid gap-2">
+              <Link
+                href={`/careers/${job.slug}`}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#0D5C3A] px-5 text-sm font-extrabold text-white transition hover:bg-[#09462c]"
+              >
+                View role
+                <ArrowRight size={16} />
+              </Link>
+              <CareerApplyActions job={job} compact />
+            </div>
           </article>
         ))}
       </div>
 
       {!visible.length ? (
         <div className="mt-5 rounded-[28px] border border-dashed border-emerald-200 bg-emerald-50/60 p-6 text-center">
-          <p className="text-base font-black text-emerald-950">
+          <p className="text-base font-extrabold tracking-normal text-emerald-950">
             No openings match that search.
           </p>
-          <p className="mt-2 text-sm font-semibold text-slate-600">
+          <p className="mt-2 text-sm font-medium tracking-normal text-slate-600">
             Try All openings, or apply as a Guru / program participant while we
             add more roles.
           </p>

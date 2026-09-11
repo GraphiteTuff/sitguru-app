@@ -7,7 +7,7 @@ import { loadMergedHelpArticles } from "@/lib/help/load-articles";
 export const metadata: Metadata = {
   title: "Help Center",
   description:
-    "Search SitGuru’s Knowledge Base for PawReport Live, billing, bookings, accounts, and trust & safety.",
+    "Search SitGuru’s Knowledge Base for PawReport Live, billing, bookings, accounts, careers, internships, and trust & safety.",
 };
 
 export const dynamic = "force-dynamic";
@@ -28,8 +28,8 @@ export default async function HelpIndexPage() {
           How can we help?
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm font-semibold text-slate-600 sm:text-base">
-          Search live tracking, billing, onboarding, bookings, and safety —
-          instant results as you type.
+          Search live tracking, billing, onboarding, bookings, careers,
+          internships, and safety — instant results as you type.
         </p>
 
         <div className="mt-8 flex justify-center">
@@ -38,6 +38,39 @@ export default async function HelpIndexPage() {
             placeholder="Search articles, tags, and topics…"
             articles={articles}
           />
+        </div>
+
+        <div className="mt-8 rounded-3xl border border-emerald-200 bg-emerald-50/90 p-5 text-left shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
+            Careers & internships
+          </p>
+          <h2 className="mt-2 text-lg font-black tracking-[-0.03em] text-slate-950">
+            Looking for a SitGuru job or internship?
+          </h2>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+            Browse live openings, learn how company careers work, and see how
+            the Internship Program handles school credit and applications.
+          </p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <Link
+              href="/careers#open-roles"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#0D5C3A] px-4 text-sm font-extrabold text-white hover:bg-[#09462c]"
+            >
+              Open roles
+            </Link>
+            <Link
+              href="/help/careers/internship-program"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-extrabold text-emerald-950 hover:bg-white/80"
+            >
+              Internship help
+            </Link>
+            <Link
+              href="/help/careers"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-emerald-200 bg-white px-4 text-sm font-extrabold text-emerald-950 hover:bg-white/80"
+            >
+              Careers help
+            </Link>
+          </div>
         </div>
 
         <div className="mt-10 grid gap-3 sm:grid-cols-2">

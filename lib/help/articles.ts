@@ -13,7 +13,8 @@ export type HelpCategory =
   | "Billing & Refunds"
   | "Account & Profiles"
   | "Booking & Cancellations"
-  | "Trust & Safety";
+  | "Trust & Safety"
+  | "Careers & Internships";
 
 export type HelpArticle = {
   slug: string;
@@ -403,6 +404,50 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "outreach",
     ],
   },
+
+  /* —— Careers & Internships —— */
+  {
+    slug: "sitguru-careers",
+    href: "/help/careers/sitguru-careers",
+    title: "SitGuru Careers",
+    summary:
+      "How to find and apply for paid SitGuru company roles, what each listing includes, and how careers differ from Guru, Ambassador, and hire-program pathways.",
+    audience: "all",
+    category: "Careers & Internships",
+    tags: ["careers", "jobs", "hiring", "apply"],
+    keywords: [
+      "company job",
+      "full-time",
+      "remote",
+      "handshake",
+      "careers@sitguru.com",
+      "social media manager",
+      "job posting",
+      "open roles",
+    ],
+  },
+  {
+    slug: "internship-program",
+    href: "/help/careers/internship-program",
+    title: "SitGuru Internship Program",
+    summary:
+      "How the Social Media & Community Growth Internship works: remote project work, school credit, hours, and how students at any college or university apply.",
+    audience: "all",
+    category: "Careers & Internships",
+    tags: ["internship", "college credit", "students", "apply"],
+    keywords: [
+      "spring 2027",
+      "unpaid educational internship",
+      "academic credit",
+      "any college",
+      "university",
+      "career center",
+      "faculty",
+      "market growth",
+      "careers@sitguru.com",
+      "intern",
+    ],
+  },
 ];
 
 export const HELP_CATEGORIES = [
@@ -459,6 +504,15 @@ export const HELP_CATEGORIES = [
     href: "/help/safety/trust-and-safety",
     hubHref: "/help/safety",
     category: "Trust & Safety" as HelpCategory,
+  },
+  {
+    id: "careers",
+    title: "Careers & Internships",
+    description:
+      "Company job openings, the SitGuru Internship Program, how to apply, and how school credit works.",
+    href: "/help/careers/sitguru-careers",
+    hubHref: "/help/careers",
+    category: "Careers & Internships" as HelpCategory,
   },
 ] as const;
 

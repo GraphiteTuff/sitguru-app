@@ -69,6 +69,7 @@ const CATEGORIES: HelpCategory[] = [
   "Account & Profiles",
   "Booking & Cancellations",
   "Trust & Safety",
+  "Careers & Internships",
 ];
 
 const CHANNEL_LABELS: Record<string, string> = {
