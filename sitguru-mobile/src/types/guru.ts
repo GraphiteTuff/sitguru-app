@@ -1,3 +1,5 @@
+import { firstNameFromPerson } from '@/lib/people/first-name';
+
 export type PublicGuruProfile = {
   id: string;
   user_id?: string | null;
@@ -85,9 +87,15 @@ export function getGuruDisplayName(guru: PublicGuruProfile) {
 }
 
 export function getGuruFirstName(guru: PublicGuruProfile) {
-  const firstName = cleanString(guru.first_name);
-  if (firstName) return firstName;
-  return getGuruDisplayName(guru).split(/\s+/)[0] || 'Local';
+  return firstNameFromPerson(
+    {
+      first_name: guru.first_name,
+      full_name: guru.full_name,
+      display_name: guru.display_name,
+      name: [guru.first_name, guru.last_name].filter(Boolean).join(' '),
+    },
+    'this Guru',
+  );
 }
 
 export function getGuruPhotoUrl(guru: PublicGuruProfile) {

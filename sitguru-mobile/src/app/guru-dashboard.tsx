@@ -287,7 +287,7 @@ const REALTIME_TABLES = [
 ];
 
 export default function GuruDashboardScreen() {
-  const { user, profile } = useAuth();
+  const { user, profile, firstName } = useAuth();
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
   const { summary: earningsSummary, analytics, payoutSetup } = useGuruEarnings();
@@ -333,12 +333,6 @@ export default function GuruDashboardScreen() {
       .filter(Boolean)
       .join(' ') ||
     user?.email?.split('@')[0] ||
-    'Guru';
-
-  const firstName =
-    profileName
-      .split(/\s+/)
-      .filter(Boolean)[0] ||
     'Guru';
 
   const avatarUrl =
@@ -965,7 +959,9 @@ export default function GuruDashboardScreen() {
                           styles.dashboardTitle
                         }
                       >
-                        Good {dayPart()}, {firstName}
+                        {firstName === 'there'
+                          ? `Good ${dayPart()}`
+                          : `Good ${dayPart()}, ${firstName}`}
                       </Text>
 
                       <Text

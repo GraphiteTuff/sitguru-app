@@ -42,6 +42,7 @@ import {
 } from '@/hooks/use-color-scheme';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { firstNameFromPerson } from '@/lib/people/first-name';
 import { formatUsd } from '@/lib/data/money';
 import { requestContextualPushPriming } from '@/lib/push-priming';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
@@ -427,7 +428,7 @@ export default function BookingDetailsScreen() {
     return {
       eyebrow: 'AWAITING GURU',
       title: guruName
-        ? `Stay connected while ${guruName} reviews`
+        ? `Stay connected while ${firstNameFromPerson(guruName, 'your Guru')} reviews`
         : 'Stay connected while a Guru reviews',
       text: 'Use SitGuru messages for availability questions, pet details, and safe care planning.',
       label: 'Message Guru',

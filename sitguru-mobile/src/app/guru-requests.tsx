@@ -38,6 +38,7 @@ import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import { sitguruApiFetch } from '@/lib/data/api';
 import { API_PATHS } from '@/lib/data/schema';
+import { firstNameFromPerson } from '@/lib/people/first-name';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
@@ -880,13 +881,15 @@ function mapRequest(
         'animal_photo_url',
       ]),
     ),
-    parentName:
+    parentName: firstNameFromPerson(
       firstString(row, [
         'pet_parent_name',
         'customer_name',
         'client_name',
         'owner_name',
-      ]) || 'Pet Parent',
+      ]),
+      'there',
+    ),
     service:
       firstString(row, [
         'service_name',

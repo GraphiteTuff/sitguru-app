@@ -100,6 +100,7 @@ export default function RoleSelectionScreen() {
     profileLoading,
     profileError,
     reloadProfileAndRoles,
+    firstName,
     signOut,
   } = useAuth();
 
@@ -131,12 +132,6 @@ export default function RoleSelectionScreen() {
     providerName ||
     user?.email?.split('@')[0] ||
     'SitGuru member';
-
-  const firstName =
-    profileName
-      .split(/\s+/)
-      .filter(Boolean)[0] ||
-    'there';
 
   const providerAvatar =
     stringValue(userMetadata.avatar_url) ||

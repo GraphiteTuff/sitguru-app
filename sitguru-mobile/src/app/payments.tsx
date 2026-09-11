@@ -1184,6 +1184,7 @@ export default function PaymentsScreen() {
     roles,
     isAuthenticated,
     loading: authLoading,
+    firstName,
   } = useAuth();
 
   const requestedBookingId =
@@ -1234,9 +1235,6 @@ export default function PaymentsScreen() {
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
     user?.email?.split('@')[0] ||
     'SitGuru member';
-
-  const firstName =
-    currentUserName.split(/\s+/).filter(Boolean)[0] || 'Member';
 
   const profileRecord = (profile ?? {}) as RecordRow;
   const metadata = (user?.user_metadata ?? {}) as RecordRow;

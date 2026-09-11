@@ -1,3 +1,5 @@
+import { firstNameFromPerson } from '@/lib/people/first-name';
+
 export type BookAgainTarget = {
   guruId?: string | null;
   guruSlug?: string | null;
@@ -13,12 +15,7 @@ type BookAgainRouter = {
 };
 
 export function firstNameFromDisplay(name?: string | null) {
-  const trimmed = (name ?? '').trim();
-  if (!trimmed || trimmed.toLowerCase() === 'your guru') {
-    return 'this Guru';
-  }
-
-  return trimmed.split(/\s+/)[0];
+  return firstNameFromPerson(name, 'this Guru');
 }
 
 export function bookAgainLabel(guruName?: string | null) {

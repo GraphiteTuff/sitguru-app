@@ -1225,7 +1225,7 @@ export default function AmbassadorCommandCenterScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const isWebPreview = Platform.OS === 'web';
   const isTablet = Platform.OS !== 'web' && windowWidth >= 768;
-  const { session, user, profile, roles, loading: authLoading } = useAuth();
+  const { session, user, profile, roles, loading: authLoading, firstName } = useAuth();
 
   const [view, setView] = useState<CommandView>('today');
   const [composer, setComposer] = useState<ComposerMode>(null);
@@ -1817,15 +1817,6 @@ export default function AmbassadorCommandCenterScreen() {
 
   const profileRecord = (profile ?? {}) as Record<string, unknown>;
   const userMetadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
-
-  const firstName =
-    ambassador?.full_name?.split(' ')[0] ||
-    profile?.first_name ||
-    profile?.full_name?.split(' ')[0] ||
-    (typeof userMetadata.full_name === 'string'
-      ? userMetadata.full_name.split(' ')[0]
-      : '') ||
-    'Ambassador';
 
   const rawAvatar = [
     profileRecord.avatar_url,

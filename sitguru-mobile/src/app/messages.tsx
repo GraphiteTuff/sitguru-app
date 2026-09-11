@@ -29,6 +29,7 @@ import { ButtonMetrics } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { firstNameFromPerson } from '@/lib/people/first-name';
 import { useFloatingTabBarScroll } from '@/hooks/useFloatingTabBarScroll';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -728,6 +729,7 @@ function mapConversationRow(
       'title',
       'name',
     ]) || 'SitGuru Conversation';
+  const personalizedTitle = firstNameFromPerson(title, title);
 
   const serviceLabel = getFirstString(row, [
     'service_name',
@@ -762,7 +764,7 @@ function mapConversationRow(
 
   return {
     id,
-    title,
+    title: personalizedTitle,
     avatarUrl: resolveSupabaseStorageUrl(
       getFirstString(row, [
         'other_user_avatar_url',

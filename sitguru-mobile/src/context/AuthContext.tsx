@@ -26,6 +26,7 @@ import {
   isSupabaseConfigured,
   supabase,
 } from '@/lib/supabase';
+import { firstNameFromPerson } from '@/lib/people/first-name';
 import {
   normalizeRole,
   roleDashboardPath,
@@ -85,6 +86,7 @@ type AuthContextValue = {
   authError: string | null;
   profile:
     ProfileSummary | null;
+  firstName: string;
   roles: AppRole[];
   primaryRole:
     AppRole | null;
@@ -1920,6 +1922,28 @@ export function AuthProvider({
       [roles],
     );
 
+  const firstName = useMemo(() => {
+    const metadata = session?.user
+      ? getUserMetadata(session.user)
+      : {};
+
+    return firstNameFromPerson(
+      {
+        first_name: profile?.first_name,
+        given_name:
+          typeof metadata.given_name === 'string'
+            ? metadata.given_name
+            : null,
+        last_name: profile?.last_name,
+        full_name: profile?.full_name,
+        name:
+          typeof metadata.name === 'string' ? metadata.name : null,
+        email: profile?.email || session?.user?.email,
+      },
+      'there',
+    );
+  }, [profile, session?.user]);
+
   const value =
     useMemo<AuthContextValue>(
       () => ({
@@ -1937,6 +1961,7 @@ export function AuthProvider({
           isSupabaseConfigured,
         authError,
         profile,
+        firstName,
         roles,
         primaryRole,
         roleOptions,
@@ -1958,6 +1983,7 @@ export function AuthProvider({
       [
         authError,
         completeOAuthCallback,
+        firstName,
         loading,
         primaryRole,
         profile,

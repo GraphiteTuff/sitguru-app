@@ -47,6 +47,7 @@ import { AppFonts } from '@/constants/fonts';
 import { LAST_WORKSPACE_KEY } from '@/constants/workspaces';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { firstNameFromPerson } from '@/lib/people/first-name';
 import { clearDraft, readDraft, writeDraft } from '@/lib/drafts';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -172,16 +173,16 @@ function firstString(record: RecordRow | null | undefined, keys: string[]) {
   return '';
 }
 
-function profileName(profile?: ProfileRow | null, fallback = 'SitGuru User') {
-  if (!profile) return fallback;
-
-  return (
-    profile.full_name?.trim() ||
-    profile.display_name?.trim() ||
-    profile.name?.trim() ||
-    [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() ||
-    profile.email?.split('@')[0] ||
-    fallback
+function profileName(profile?: ProfileRow | null, fallback = 'there') {
+  return firstNameFromPerson(
+    {
+      first_name: profile?.first_name,
+      full_name: profile?.full_name,
+      display_name: profile?.display_name,
+      name: profile?.name,
+      email: profile?.email,
+    },
+    fallback,
   );
 }
 
@@ -669,7 +670,7 @@ export default function ConversationScreen() {
     subject?: string;
     viewerRole?: string;
   }>();
-  const { user, profile, roles, primaryRole, loading: authLoading } = useAuth();
+  const { user, profile, roles, primaryRole, loading: authLoading, firstName } = useAuth();
   const isWebPreview = Platform.OS === 'web';
   const themeMode = useThemeMode();
   const isDark = themeMode === 'dark';
@@ -770,11 +771,7 @@ export default function ConversationScreen() {
       'image_url',
     ]) || firstString(metadata, ['avatar_url', 'picture']),
   );
-  const currentUserFirstName =
-    firstString(profileRecord, ['first_name']) ||
-    firstString(metadata, ['first_name']) ||
-    currentUserName.split(/\s+/)[0] ||
-    currentUserName;
+  const currentUserFirstName = firstName;
 
   const participantIds = useMemo(() => {
     if (!conversation) return [] as string[];
@@ -890,8 +887,7 @@ export default function ConversationScreen() {
     ? currentUserFirstName
     : profileName(
         otherProfile,
-        requestedGuruName ||
-          (currentRole === 'pet_parent' ? 'Pet Care Guru' : 'Pet Parent'),
+        firstNameFromPerson(requestedGuruName, 'there'),
       );
   const otherAvatar = useCurrentUserAsHeaderFallback
     ? currentUserAvatar

@@ -43,6 +43,7 @@ import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
 import { useWalkSession } from '@/hooks/data/useWalkSession';
 import { uploadSitGuruMedia } from '@/lib/data/media-upload';
+import { firstNameFromPerson } from '@/lib/people/first-name';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -1451,13 +1452,15 @@ function mapBooking(row: RecordRow): Booking {
   return {
     id: firstString(row, ['id', 'booking_id', 'request_id']),
     petName: firstString(row, ['pet_name', 'animal_name']) || 'Pet',
-    parentName:
+    parentName: firstNameFromPerson(
       firstString(row, [
         'pet_parent_name',
         'customer_name',
         'client_name',
         'owner_name',
-      ]) || 'Pet Parent',
+      ]),
+      'there',
+    ),
     service:
       firstString(row, [
         'service_name',

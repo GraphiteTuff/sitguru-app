@@ -627,6 +627,7 @@ export default function SupportScreen() {
     primaryRole,
     isAuthenticated,
     loading: authLoading,
+    firstName,
   } = useAuth();
 
   const [topic, setTopic] = useState<SupportTopic>(
@@ -652,8 +653,6 @@ export default function SupportScreen() {
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
     user?.email?.split('@')[0] ||
     'SitGuru member';
-
-  const firstName = displayName.split(/\s+/).filter(Boolean)[0] || 'Member';
 
   const rawAvatar =
     firstText(profileRecord, [

@@ -87,6 +87,7 @@ export default function AccountScreen() {
     profileLoading,
     profileError,
     reloadProfileAndRoles,
+    firstName,
   } = useAuth();
 
   const isWebPreview = Platform.OS === 'web';
@@ -120,9 +121,6 @@ export default function AccountScreen() {
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
     user?.email?.split('@')[0] ||
     'SitGuru Member';
-
-  const firstName =
-    profileName.split(/\s+/).filter(Boolean)[0] || 'Member';
 
   const location = [profile?.city, profile?.state]
     .filter(Boolean)
@@ -399,7 +397,7 @@ export default function AccountScreen() {
 
                     <View style={styles.profileHeroCopy}>
                       <Text style={styles.profileGreeting}>
-                        Hi, {firstName}.
+                        {firstName === 'there' ? 'Hi there.' : `Hi, ${firstName}.`}
                       </Text>
                       <Text style={styles.profileEmail}>
                         {isAuthenticated

@@ -827,7 +827,7 @@ export default function AmbassadorReferralAnalyticsScreen() {
   const tabBarScroll = useFloatingTabBarScroll();
   const isWebPreview = Platform.OS === 'web';
 
-  const { user, profile, roles, loading: authLoading } = useAuth();
+  const { user, profile, roles, loading: authLoading, firstName } = useAuth();
 
   const [data, setData] = useState<AnalyticsData>({
     ambassador: null,
@@ -863,9 +863,6 @@ export default function AmbassadorReferralAnalyticsScreen() {
       metadata.name,
       user?.email?.split('@')[0],
     ) || 'Ambassador';
-
-  const firstName =
-    profileName.split(/\s+/).filter(Boolean)[0] || 'Ambassador';
 
   const rawAvatar = firstText(
     profileRecord.avatar_url,

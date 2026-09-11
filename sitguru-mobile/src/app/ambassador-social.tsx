@@ -232,7 +232,7 @@ const REALTIME_TABLES = [
 ];
 
 export default function AmbassadorDashboardScreen() {
-  const { user, profile } = useAuth();
+  const { user, profile, firstName } = useAuth();
   const isWebPreview = Platform.OS === 'web';
   const themeMode = useThemeMode();
   const themePreference = useThemePreference();
@@ -259,9 +259,6 @@ export default function AmbassadorDashboardScreen() {
     firstString(metadata, ['full_name', 'name']) ||
     user?.email?.split('@')[0] ||
     'Ambassador';
-
-  const firstName =
-    profileName.split(/\s+/).filter(Boolean)[0] || 'Ambassador';
 
   const rawAvatar =
     firstString(profileRecord, [

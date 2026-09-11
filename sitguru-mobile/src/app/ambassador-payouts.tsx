@@ -505,6 +505,7 @@ export default function AmbassadorPayoutsScreen() {
     session,
     user,
     profile,
+    firstName,
     roles,
     loading: authLoading,
   } = useAuth();
@@ -944,14 +945,6 @@ export default function AmbassadorPayoutsScreen() {
 
   const profileRecord = (profile ?? {}) as Record<string, unknown>;
   const userMetadata = (user.user_metadata ?? {}) as Record<string, unknown>;
-
-  const firstName =
-    profile?.first_name ||
-    profile?.full_name?.split(' ')[0] ||
-    (typeof userMetadata.full_name === 'string'
-      ? userMetadata.full_name.split(' ')[0]
-      : '') ||
-    'Ambassador';
 
   const rawAvatar = [
     profileRecord.avatar_url,

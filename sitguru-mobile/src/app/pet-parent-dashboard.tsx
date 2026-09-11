@@ -64,6 +64,7 @@ import {
   pushBookAgain,
 } from '@/lib/navigation/book-again';
 import { useAuth } from '@/hooks/useAuth';
+import { firstNameFromPerson } from '@/lib/people/first-name';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
@@ -207,7 +208,7 @@ const REALTIME_TABLES = [
 ];
 
 export default function PetParentDashboardScreen() {
-  const { user, profile } = useAuth();
+  const { user, profile, firstName } = useAuth();
   const params = useLocalSearchParams<{
     welcomePet?: string;
     welcomePetId?: string;
@@ -243,8 +244,6 @@ export default function PetParentDashboardScreen() {
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
     user?.email?.split('@')[0] ||
     'Pet Parent';
-
-  const firstName = profileName.split(/\s+/).filter(Boolean)[0] || 'Pet Parent';
   const avatarUrl = resolveSupabaseStorageUrl(
     getFirstString(profileRecord, [
       'avatar_url',
@@ -547,7 +546,7 @@ export default function PetParentDashboardScreen() {
         id: 'visit-review',
         eyebrow: 'Visit complete',
         title: recentCompletedCare.petName
-          ? `Rate ${recentCompletedCare.guruName || 'your Guru'} for ${recentCompletedCare.petName}`
+          ? `Rate ${firstNameFromPerson(recentCompletedCare.guruName, 'your Guru')} for ${recentCompletedCare.petName}`
           : 'Rate your Guru',
         helper:
           'Stars, praise tags, and a short note — the last step after care wraps.',
@@ -568,7 +567,7 @@ export default function PetParentDashboardScreen() {
         id: 'live-care',
         eyebrow: activeCare.isWalk ? 'Live walk' : 'Live care',
         title: activeCare.petName
-          ? `${activeCare.petName} is with ${activeCare.guruName || 'your Guru'}`
+          ? `${activeCare.petName} is with ${firstNameFromPerson(activeCare.guruName, 'your Guru')}`
           : 'Care in progress',
         helper:
           activeCare.photoCount > 0
@@ -863,7 +862,7 @@ export default function PetParentDashboardScreen() {
             <View style={styles.header}>
               <View style={styles.headerCopy}>
                 <Text style={styles.dashboardTitle}>
-                  Hey, {firstName}
+                  {firstName === 'there' ? 'Hey there' : `Hey, ${firstName}`}
                 </Text>
                 <Text style={styles.welcomeText}>
                   Your pets, bookings, and Gurus in one place.
@@ -1309,7 +1308,7 @@ function UpcomingCareCard({
               strokeWidth={2.2}
             />
             <Text style={styles.bookingMetaText}>
-              with {booking.guruName || 'your Guru'}
+              with {firstNameFromPerson(booking.guruName, 'your Guru')}
             </Text>
           </View>
 
@@ -1434,7 +1433,7 @@ function LiveCareCard({
             size={42}
           />
           <Text style={styles.liveGuruName} numberOfLines={2}>
-            with {care.guruName || 'your Guru'}
+            with {firstNameFromPerson(care.guruName, 'your Guru')}
           </Text>
         </View>
       </View>
