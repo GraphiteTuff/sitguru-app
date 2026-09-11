@@ -1,0 +1,57 @@
+﻿
+Step 1: Business Type “Individual”, click “Continue”
+
+Step 2: Personal Details: Enter personal information, click “Continue” 
+
+Step 3: Business Details: Industry “Other Personal Services”, You Website “www.SitGuru.com”, click “Continue” 
+
+Step 4: Bank Details: Search and Select your bank you want to use for your payouts, click “Continue”. (Note: you may have to manually search instead). 
+
+Step 5: Graff Enterprises LLC dba SitGuru, uses Stripes to connect to your accounts, click “Agree and continue”
+
+
+
+
+Step 6: Log in to “YOUR BANK NAME” and click, “Continue”
+
+
+
+
+
+
+Step 7: Log in to your designated bank’s Username and Password, and click, “Continue”
+
+
+
+Step 7: Log in to your designated bank’s Username and Password, and click, “Continue”
+
+
+
+
+
+
+
+Step 8: Stripe will retrieve your account(s) that you select for Payout”
+
+
+
+
+Step 9: Stripe will provide “Success” informing you accounts have been linked, and click, “Done”
+
+
+
+
+Step 10: Bank Details: Select which bank account you want for payout, and click, “Continue”
+
+
+
+
+
+
+Step 11: Review and submit: Verify all your information is accurate, and click, “Agree and submit”
+
+
+
+You will be rerouted back to your Dashboard Page, Select Your “Earnings Tab” to track your banking/payout/commission transactions.
+
+
