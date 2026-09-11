@@ -114,9 +114,6 @@ export function TabBarMotionProvider({ children }: { children: ReactNode }) {
     }, TAB_BAR_EXPAND_DELAY_MS);
   }, [clearExpandTimer, setCompact]);
 
-  // Alias used by scroll bridge — same single-delay expand path.
-  const scheduleExpand = reportScrollEnd;
-
   const resetCompact = useCallback(() => {
     clearExpandTimer();
     accumulatedDelta.current = 0;
