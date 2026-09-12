@@ -28,8 +28,15 @@ export function GuruProfileSnapshotCard({ guru }: { guru: GuruChatSnapshot }) {
               className="sg-face-photo absolute inset-0 h-full w-full"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-lg font-black text-[#0D5C3A]">
-              {guru.name.slice(0, 1).toUpperCase()}
+            <div className="absolute inset-0 flex items-center justify-center bg-[#0D5C3A] text-sm font-black tracking-wide text-white">
+              {guru.name
+                .trim()
+                .split(/[\s._-]+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part) => part[0] || "")
+                .join("")
+                .toUpperCase() || "SG"}
             </div>
           )}
         </div>

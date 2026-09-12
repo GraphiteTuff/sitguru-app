@@ -7,7 +7,6 @@ import {
   Compass,
   Dog,
   MapPin,
-  PawPrint,
   Send,
   Sparkles,
   Square,
@@ -592,6 +591,19 @@ function AssistantBubble({
       </View>
     </View>
   );
+}
+
+function initialsFromName(name?: string | null) {
+  const parts = String(name || '')
+    .trim()
+    .split(/[\s._-]+/)
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+
+  return (parts[0]?.slice(0, 2) || 'SG').toUpperCase();
 }
 
 function GuruSnapshotCard({
@@ -1260,10 +1272,16 @@ function createStyles(isDark: boolean) {
     },
     guruAvatarFallback: {
       alignItems: 'center',
-      backgroundColor: isDark ? '#183A2A' : '#E9F7EE',
+      backgroundColor: isDark ? '#0D5C3A' : '#0D5C3A',
       height: '100%',
       justifyContent: 'center',
       width: '100%',
+    },
+    guruAvatarInitials: {
+      color: '#FFFFFF',
+      fontFamily: AppFonts.extraBold,
+      fontSize: 14,
+      letterSpacing: 0.3,
     },
     guruCopy: {
       flex: 1,
