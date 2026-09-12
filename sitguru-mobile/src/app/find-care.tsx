@@ -1,4 +1,3 @@
-import { Asset } from "expo-asset";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
@@ -27,10 +26,12 @@ import {
   ScrollView,
   StyleSheet,
   type StyleProp,
+  type TextStyle,
   Text,
   TextInput,
   useWindowDimensions,
   View,
+  type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -58,6 +59,7 @@ import {
   getGuruBookingStatusLabel,
   getGuruDisplayName,
   getGuruFirstName,
+  getGuruInitials,
   getGuruLocationLabel,
   getGuruPhotoUrl,
   getGuruRateLabel,
@@ -75,41 +77,6 @@ const MapsModule = Platform.OS === "web" ? null : require("react-native-maps");
 const NativeMapView = MapsModule?.default ?? MapsModule?.MapView;
 const NativeMarker = MapsModule?.Marker;
 
-// Metro resolves bundled image assets through require().
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const SITGURU_FALLBACK_AVATAR = require("../assets/images/sitguru-symbol-green.jpg");
-
-function resolveBundledAssetUri(assetModule: unknown) {
-  try {
-    const asset = Asset.fromModule(assetModule as number | string);
-    const resolvedUri = asset.localUri || asset.uri;
-
-    if (resolvedUri) return resolvedUri;
-  } catch {
-    // Fall through to the web-module shapes below.
-  }
-
-  if (typeof assetModule === "string") return assetModule;
-
-  if (assetModule && typeof assetModule === "object") {
-    const assetRecord = assetModule as Record<string, unknown>;
-
-    if (typeof assetRecord.uri === "string") return assetRecord.uri;
-    if (typeof assetRecord.default === "string") return assetRecord.default;
-
-    if (assetRecord.default && typeof assetRecord.default === "object") {
-      const defaultRecord = assetRecord.default as Record<string, unknown>;
-      if (typeof defaultRecord.uri === "string") return defaultRecord.uri;
-    }
-  }
-
-  return "";
-}
-
-const SITGURU_FALLBACK_AVATAR_URI = resolveBundledAssetUri(
-  SITGURU_FALLBACK_AVATAR,
-);
-
 /**
  * Tracks the photo that failed rather than a boolean, so a new photoUrl clears
  * the failure during render instead of through a cascading effect.
@@ -125,39 +92,68 @@ function useFailedPhotoUrl(photoUrl?: string | null) {
 
 function GuruAvatarImage({
   photoUrl,
+  name,
   style,
+  fallbackStyle,
+  initialsStyle,
 }: {
   photoUrl?: string | null;
-  style: StyleProp<ImageStyle>;
+  name?: string | null;
+  style: StyleProp<ImageStyle | ViewStyle>;
+  fallbackStyle?: StyleProp<ViewStyle>;
+  initialsStyle?: StyleProp<TextStyle>;
 }) {
   const { imageFailed, markImageFailed } = useFailedPhotoUrl(photoUrl);
+  const initials = initialsFromName(name);
 
-  const source =
-    photoUrl && !imageFailed ? { uri: photoUrl } : SITGURU_FALLBACK_AVATAR;
+  if (photoUrl && !imageFailed) {
+    return (
+      <Image
+        accessibilityLabel={`${name || "Guru"} profile photo`}
+        alt={`${name || "Guru"} profile photo`}
+        onError={markImageFailed}
+        resizeMode="cover"
+        source={{ uri: photoUrl }}
+        style={style as StyleProp<ImageStyle>}
+      />
+    );
+  }
 
   return (
-    <Image
-      accessibilityLabel="Guru profile photo"
-      alt="Guru profile photo"
-      onError={markImageFailed}
-      resizeMode="cover"
-      source={source}
-      style={style}
-    />
+    <View
+      accessibilityLabel={`${name || "Guru"} initials`}
+      style={[
+        style as StyleProp<ViewStyle>,
+        { alignItems: "center", justifyContent: "center" },
+        fallbackStyle,
+      ]}
+    >
+      <Text style={initialsStyle}>{initials}</Text>
+    </View>
   );
 }
 
 function GuruCardHeroImage({
   photoUrl,
+  name,
   styles,
 }: {
   photoUrl?: string | null;
+  name?: string | null;
   styles: ReturnType<typeof createStyles>;
 }) {
   const { imageFailed, markImageFailed } = useFailedPhotoUrl(photoUrl);
+  const initials = initialsFromName(name);
 
-  const source =
-    photoUrl && !imageFailed ? { uri: photoUrl } : SITGURU_FALLBACK_AVATAR;
+  if (!photoUrl || imageFailed) {
+    return (
+      <View style={styles.guruProfilePhotoStage}>
+        <View style={styles.guruProfilePhotoInitialsWrap}>
+          <Text style={styles.guruProfilePhotoInitials}>{initials}</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.guruProfilePhotoStage}>
@@ -168,7 +164,7 @@ function GuruCardHeroImage({
         blurRadius={Platform.OS === "web" ? 0 : 6}
         onError={markImageFailed}
         resizeMode="cover"
-        source={source}
+        source={{ uri: photoUrl }}
         style={styles.guruProfilePhotoBackdrop}
       />
 
@@ -178,14 +174,27 @@ function GuruCardHeroImage({
       />
 
       <Image
-        accessibilityLabel="Guru profile photo"
-        alt="Guru profile photo"
+        accessibilityLabel={`${name || "Guru"} profile photo`}
+        alt={`${name || "Guru"} profile photo`}
         onError={markImageFailed}
         resizeMode="contain"
-        source={source}
+        source={{ uri: photoUrl }}
         style={styles.guruProfilePhoto}
       />
     </View>
+  );
+}
+
+function initialsFromName(name?: string | null) {
+  const cleaned = name?.trim();
+  if (!cleaned) return "SG";
+  return (
+    cleaned
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part.charAt(0))
+      .join("")
+      .toUpperCase() || "SG"
   );
 }
 
@@ -2550,7 +2559,7 @@ function GuruDiscoveryCard({
         scaleTo={0.97}
         style={styles.guruProfilePhotoButton}
       >
-        <GuruCardHeroImage photoUrl={photoUrl} styles={styles} />
+        <GuruCardHeroImage name={name} photoUrl={photoUrl} styles={styles} />
         <View pointerEvents="none" style={styles.guruProfilePhotoShade} />
       </BubblePressable>
 
@@ -2704,6 +2713,9 @@ function MapGuruPreviewCard({
         >
           <View style={styles.mapCompactAvatarWrap}>
             <GuruAvatarImage
+              fallbackStyle={styles.mapPreviewAvatarFallback}
+              initialsStyle={styles.mapPreviewAvatarInitials}
+              name={name}
               photoUrl={photoUrl}
               style={styles.mapPreviewAvatarImage}
             />
@@ -2782,6 +2794,9 @@ function MapGuruPreviewCard({
       <View style={styles.mapGuruExpandedTop}>
         <View style={styles.mapExpandedAvatarWrap}>
           <GuruAvatarImage
+            fallbackStyle={styles.mapPreviewAvatarFallback}
+            initialsStyle={styles.mapExpandedAvatarInitials}
+            name={name}
             photoUrl={photoUrl}
             style={styles.mapPreviewAvatarImage}
           />
@@ -2985,6 +3000,9 @@ function CoverageMap({
                   ]}
                 >
                   <GuruAvatarImage
+                    fallbackStyle={styles.nativeMarkerFallback}
+                    initialsStyle={styles.nativeMarkerInitials}
+                    name={point.name}
                     photoUrl={point.photoUrl}
                     style={styles.nativeMarkerImage}
                   />
@@ -3325,20 +3343,38 @@ function createWebGuruMarkerElement({
     "width 140ms ease, height 140ms ease, border 140ms ease";
   element.style.width = `${size}px`;
 
-  const image = documentRef.createElement("img");
-  image.alt = point.name;
-  image.draggable = false;
-  image.src = point.photoUrl || SITGURU_FALLBACK_AVATAR_URI;
-  image.onerror = () => {
-    image.onerror = null;
-    if (SITGURU_FALLBACK_AVATAR_URI) {
-      image.src = SITGURU_FALLBACK_AVATAR_URI;
-    }
-  };
-  image.style.height = "100%";
-  image.style.objectFit = "cover";
-  image.style.width = "100%";
-  element.appendChild(image);
+  if (point.photoUrl) {
+    const image = documentRef.createElement("img");
+    image.alt = point.name;
+    image.draggable = false;
+    image.src = point.photoUrl;
+    image.onerror = () => {
+      image.remove();
+      const fallback = documentRef.createElement("span");
+      fallback.textContent = getGuruInitials(point.guru);
+      fallback.style.color = palette.primaryDark;
+      fallback.style.fontFamily =
+        "system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
+      fallback.style.fontSize = `${highlighted ? 14 : 12}px`;
+      fallback.style.fontWeight = "800";
+      element.style.background = "#F5FBF6";
+      element.appendChild(fallback);
+    };
+    image.style.height = "100%";
+    image.style.objectFit = "cover";
+    image.style.width = "100%";
+    element.appendChild(image);
+  } else {
+    const fallback = documentRef.createElement("span");
+    fallback.textContent = getGuruInitials(point.guru);
+    fallback.style.color = palette.primaryDark;
+    fallback.style.fontFamily =
+      "system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
+    fallback.style.fontSize = `${highlighted ? 14 : 12}px`;
+    fallback.style.fontWeight = "800";
+    element.style.background = "#F5FBF6";
+    element.appendChild(fallback);
+  }
 
   return element;
 }
@@ -6036,6 +6072,19 @@ function createStyles(isDark: boolean) {
     },
     guruProfilePhoto: {
       ...StyleSheet.absoluteFill,
+    },
+    guruProfilePhotoInitialsWrap: {
+      alignItems: "center",
+      backgroundColor: isDark ? "#163326" : "#EEF7F1",
+      flex: 1,
+      justifyContent: "center",
+      width: "100%",
+    },
+    guruProfilePhotoInitials: {
+      color: palette.primaryDark,
+      fontFamily: AppFonts.extraBold,
+      fontSize: 42,
+      letterSpacing: -1,
     },
     guruProfilePhotoShade: {
       backgroundColor: "rgba(5, 29, 21, 0.12)",
