@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     router,
     type Href,
@@ -35,30 +34,14 @@ import BubblePressable from '@/components/BubblePressable';
 import { AppFonts } from '@/constants/fonts';
 import { useThemeMode } from '@/hooks/use-theme';
 import { useAuth } from '@/hooks/useAuth';
+import { playAppHaptic } from '@/lib/haptics';
 import { resolveSupabaseStorageUrl } from '@/lib/storage';
+import {
+    QUICK_WORKSPACE_ROLES,
+    WORKSPACE_ROLE_ORDER,
+    switchSitGuruWorkspace,
+} from '@/lib/workspace-switch';
 import type { AppRole } from '@/types/auth';
-
-const LAST_WORKSPACE_KEY =
-  'sitguru-last-workspace';
-
-const WORKSPACE_ORDER: AppRole[] = [
-  'pet_parent',
-  'guru',
-  'ambassador',
-  'admin',
-];
-
-const DASHBOARD_PATHS:
-  Record<AppRole, Href> = {
-    pet_parent:
-      '/pet-parent-dashboard',
-    guru:
-      '/guru-dashboard',
-    ambassador:
-      '/ambassador-dashboard',
-    admin:
-      '/admin-dashboard',
-  };
 
 type SitGuruWorkspaceSwitcherProps = {
   currentRole: AppRole;
@@ -66,6 +49,11 @@ type SitGuruWorkspaceSwitcherProps = {
   onClose: () => void;
   profileHref?: Href;
   profileLabel?: string;
+  /**
+   * `full` — roles + profile/account/settings/sign out (tap avatar).
+   * `quick` — authorized Pet Parent / Guru / Ambassador only (long-press).
+   */
+  variant?: 'full' | 'quick';
 };
 
 export default function SitGuruWorkspaceSwitcher({
@@ -74,7 +62,9 @@ export default function SitGuruWorkspaceSwitcher({
   onClose,
   profileHref = '/account',
   profileLabel = 'Manage profile',
+  variant = 'full',
 }: SitGuruWorkspaceSwitcherProps) {
+  const isQuick = variant === 'quick';
   const insets =
     useSafeAreaInsets();
 
@@ -157,33 +147,32 @@ export default function SitGuruWorkspaceSwitcher({
           currentRole,
         ]);
 
-      return WORKSPACE_ORDER.filter(
-        (role) =>
-          roleSet.has(role),
+      const order = isQuick
+        ? QUICK_WORKSPACE_ROLES
+        : WORKSPACE_ROLE_ORDER;
+
+      return order.filter((role) =>
+        roleSet.has(role),
       );
     }, [
       currentRole,
+      isQuick,
       roles,
     ]);
 
   async function openWorkspace(
     role: AppRole,
   ) {
+    const changing =
+      role !== currentRole;
+
     onClose();
 
-    try {
-      await AsyncStorage.setItem(
-        LAST_WORKSPACE_KEY,
-        role,
-      );
-    } catch {
-      // Navigation can continue even if
-      // local preference storage fails.
+    if (changing) {
+      playAppHaptic('success');
     }
 
-    router.replace(
-      DASHBOARD_PATHS[role],
-    );
+    await switchSitGuruWorkspace(role);
   }
 
   function openDestination(
@@ -279,7 +268,9 @@ export default function SitGuruWorkspaceSwitcher({
                       styles.title
                     }
                   >
-                    Switch workspace
+                    {isQuick
+                      ? 'Switch role'
+                      : 'Switch workspace'}
                   </Text>
 
                   <Text
@@ -326,6 +317,7 @@ export default function SitGuruWorkspaceSwitcher({
                       key={role}
                       accessibilityLabel={`Open ${workspaceLabel(
                         role,
+                        isQuick,
                       )}`}
                       accessibilityRole="button"
                       accessibilityState={{
@@ -373,6 +365,7 @@ export default function SitGuruWorkspaceSwitcher({
                         >
                           {workspaceLabel(
                             role,
+                            isQuick,
                           )}
                         </Text>
 
@@ -382,7 +375,9 @@ export default function SitGuruWorkspaceSwitcher({
                           }
                         >
                           {active
-                            ? 'Current workspace'
+                            ? isQuick
+                              ? 'Current role'
+                              : 'Current workspace'
                             : workspaceHelper(
                                 role,
                               )}
@@ -420,6 +415,8 @@ export default function SitGuruWorkspaceSwitcher({
               )}
             </View>
 
+            {!isQuick ? (
+              <>
             <View
               style={styles.divider}
             />
@@ -637,6 +634,8 @@ export default function SitGuruWorkspaceSwitcher({
                   : 'Sign out of SitGuru'}
               </Text>
             </BubblePressable>
+              </>
+            ) : null}
           </View>
         </View>
       </View>
@@ -764,13 +763,14 @@ function Avatar({
 
 function workspaceLabel(
   role: AppRole,
+  compact = false,
 ) {
   if (role === 'pet_parent') {
     return 'Pet Parent';
   }
 
   if (role === 'guru') {
-    return 'Pet Guru';
+    return compact ? 'Guru' : 'Pet Guru';
   }
 
   if (role === 'ambassador') {
