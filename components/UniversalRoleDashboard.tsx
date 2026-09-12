@@ -1,6 +1,8 @@
 /**
  * Universal role dashboard hero — Guru split layout (meta left / quick actions right)
  * shared by Guru, Pet Parent, and Ambassador workspaces.
+ *
+ * Color language: marketing brand green + sky/mint accents (not dark-on-mint).
  */
 
 import type { ReactNode } from "react";
@@ -19,12 +21,12 @@ import {
   MousePointerClick,
   PawPrint,
   Search,
-  Share2,
   Trophy,
   Users,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { PORTAL_ICON_TONES } from "@/lib/ui/portal-theme";
 
 export type UniversalDashboardRole = "guru" | "parent" | "ambassador";
 
@@ -173,13 +175,13 @@ export default function UniversalRoleDashboard({
 
   return (
     <section
-      className={`w-full overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-sm ${className}`}
+      className={`w-full overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-sm ${className}`}
     >
       <div className="grid w-full grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-        {/* LEFT — profile meta */}
-        <div className="bg-[radial-gradient(circle_at_95%_10%,rgba(16,185,129,0.18),transparent_28%),linear-gradient(135deg,#ffffff_0%,#ecfdf5_100%)] p-5 sm:p-6">
+        {/* LEFT — profile meta: cream + sky wash, brand green titles */}
+        <div className="bg-[radial-gradient(circle_at_92%_8%,rgba(56,189,248,0.22),transparent_32%),radial-gradient(circle_at_8%_90%,rgba(16,216,166,0.16),transparent_36%),linear-gradient(135deg,#ffffff_0%,#F7FBFD_55%,#EEF8FF_100%)] p-5 sm:p-6">
           <div className="flex min-w-0 flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left">
-            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-white bg-white text-xl font-black text-emerald-900 shadow-sm ring-1 ring-emerald-200">
+            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-white bg-[#0D5C3A] text-xl font-black text-white shadow-sm ring-1 ring-sky-100">
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -193,10 +195,10 @@ export default function UniversalRoleDashboard({
             </div>
 
             <div className="min-w-0 flex-1 space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] !text-emerald-700 sm:text-xs">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] !text-[#0D5C3A] sm:text-xs">
                 {copy.eyebrow}
               </p>
-              <h1 className="text-3xl font-black tracking-tight !text-emerald-950 sm:text-4xl">
+              <h1 className="text-3xl font-black tracking-tight !text-slate-950 sm:text-4xl">
                 {copy.titlePrefix} {userName}
               </h1>
               <p className="mx-auto max-w-xl text-sm font-semibold leading-6 !text-slate-600 sm:mx-0">
@@ -204,10 +206,16 @@ export default function UniversalRoleDashboard({
               </p>
 
               <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1 sm:justify-start">
-                {displayTags.map((tag) => (
+                {displayTags.map((tag, index) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-black text-emerald-800"
+                    className={`rounded-full border px-2.5 py-0.5 text-[10px] font-black ${
+                      index % 3 === 0
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : index % 3 === 1
+                          ? "border-sky-200 bg-sky-50 text-sky-800"
+                          : "border-violet-200 bg-violet-50 text-violet-800"
+                    }`}
                   >
                     {tag}
                   </span>
@@ -219,29 +227,32 @@ export default function UniversalRoleDashboard({
           </div>
         </div>
 
-        {/* RIGHT — quick actions */}
-        <div className="border-t border-emerald-100 bg-white p-5 lg:border-l lg:border-t-0">
-          <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] !text-emerald-700">
+        {/* RIGHT — quick actions with colorful icon chips (Ambassador header energy) */}
+        <div className="border-t border-sky-100 bg-white p-5 lg:border-l lg:border-t-0">
+          <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] !text-[#0D5C3A]">
             <LayoutDashboard className="h-3.5 w-3.5" aria-hidden />
             Quick actions
           </p>
 
           <div className="mt-3 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
-            {quickActions.map((action) => {
+            {quickActions.map((action, index) => {
               const Icon = action.icon;
+              const tone = PORTAL_ICON_TONES[index % PORTAL_ICON_TONES.length];
               return (
                 <Link
                   key={`${action.label}-${action.href}`}
                   href={action.href}
-                  className="flex min-h-12 w-full items-center justify-between gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-left text-xs font-black !text-emerald-950 transition hover:border-emerald-200 hover:bg-emerald-100"
+                  className="flex min-h-12 w-full items-center justify-between gap-2 rounded-2xl border border-slate-200/90 bg-white px-3 py-3 text-left text-xs font-black !text-slate-900 shadow-[0_1px_0_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50/60"
                 >
                   <span className="inline-flex min-w-0 items-center gap-2.5">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-emerald-800 shadow-sm">
+                    <span
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl shadow-sm ${tone}`}
+                    >
                       <Icon className="h-4 w-4" aria-hidden />
                     </span>
                     <span className="truncate">{action.label}</span>
                   </span>
-                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-emerald-700/70" />
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                 </Link>
               );
             })}
@@ -252,7 +263,7 @@ export default function UniversalRoleDashboard({
           ) : (
             <Link
               href={profileHref}
-              className="mt-3 flex min-h-11 w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-[0.12em] text-slate-600 transition hover:bg-slate-50"
+              className="mt-3 flex min-h-11 w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-black uppercase tracking-[0.12em] text-slate-600 transition hover:bg-sky-50 hover:text-[#0D5C3A]"
             >
               Update profile details
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -264,4 +275,7 @@ export default function UniversalRoleDashboard({
   );
 }
 
-export { DEFAULT_ACTIONS as UNIVERSAL_ROLE_QUICK_ACTIONS, HERO_COPY as UNIVERSAL_ROLE_HERO_COPY };
+export {
+  DEFAULT_ACTIONS as UNIVERSAL_ROLE_QUICK_ACTIONS,
+  HERO_COPY as UNIVERSAL_ROLE_HERO_COPY,
+};

@@ -3360,12 +3360,12 @@ function createWebGuruMarkerElement({
       image.remove();
       const fallback = documentRef.createElement("span");
       fallback.textContent = getGuruInitials(point.guru);
-      fallback.style.color = palette.primaryDark;
+      fallback.style.color = "#FFFFFF";
       fallback.style.fontFamily =
         "system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
       fallback.style.fontSize = `${highlighted ? 14 : 12}px`;
       fallback.style.fontWeight = "800";
-      element.style.background = "#F5FBF6";
+      element.style.background = palette.primary;
       element.appendChild(fallback);
     };
     image.style.height = "100%";
@@ -3375,12 +3375,12 @@ function createWebGuruMarkerElement({
   } else {
     const fallback = documentRef.createElement("span");
     fallback.textContent = getGuruInitials(point.guru);
-    fallback.style.color = palette.primaryDark;
+    fallback.style.color = "#FFFFFF";
     fallback.style.fontFamily =
       "system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
     fallback.style.fontSize = `${highlighted ? 14 : 12}px`;
     fallback.style.fontWeight = "800";
-    element.style.background = "#F5FBF6";
+    element.style.background = palette.primary;
     element.appendChild(fallback);
   }
 
