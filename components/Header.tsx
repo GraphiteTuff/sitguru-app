@@ -727,6 +727,8 @@ export default function Header({ user = null }: HeaderProps) {
       : isAdmin
         ? [
             { label: "Dashboard", href: "/admin" },
+            { label: "Manage Accounts", href: "/admin/accounts" },
+            { label: "Account Lifecycle", href: "/admin/account-lifecycle" },
             { label: "Admin Settings", href: "/admin/settings" },
             { label: "Messages", href: "/admin/messages" },
             { label: "Pet Parents", href: "/admin/petparents" },
@@ -926,6 +928,7 @@ export default function Header({ user = null }: HeaderProps) {
 
                     <div className="grid gap-1 p-3">
                       <AccountRoleSwitcher
+                        includeAdmin
                         currentRole={currentSwitchRole}
                         authorizedRoles={authorizedRoles}
                         onNavigate={() => setAvatarOpen(false)}
@@ -1051,6 +1054,7 @@ export default function Header({ user = null }: HeaderProps) {
                   <NotificationBell />
                 </div>
                 <AccountRoleSwitcher
+                        includeAdmin
                   currentRole={currentSwitchRole}
                   authorizedRoles={authorizedRoles}
                   onNavigate={() => setMobileOpen(false)}

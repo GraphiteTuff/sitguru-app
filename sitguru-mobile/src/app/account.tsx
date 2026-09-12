@@ -71,6 +71,7 @@ type AccountSectionKey =
   | 'roles'
   | 'notifications'
   | 'security'
+  | 'admin'
   | 'payments'
   | 'support'
   | 'app';
@@ -731,6 +732,51 @@ export default function AccountScreen() {
                       }
                     />
                   </SectionCard>
+
+                  {authRoles.includes('admin') ? (
+                    <SectionCard
+                      expanded={activeSection === 'admin'}
+                      icon={
+                        <ShieldCheck
+                          color={palette.primary}
+                          size={20}
+                          strokeWidth={2.35}
+                        />
+                      }
+                      onPress={() => toggleSection('admin')}
+                      styles={styles}
+                      subtitle="Review and update member accounts when required"
+                      title="Admin">
+                      <ActionRow
+                        icon={
+                          <ShieldCheck
+                            color={palette.primary}
+                            size={18}
+                            strokeWidth={2.3}
+                          />
+                        }
+                        label="Admin operations"
+                        onPress={() => router.push('/admin-operations')}
+                        styles={styles}
+                      />
+                      <ActionRow
+                        icon={
+                          <Settings
+                            color={palette.primary}
+                            size={18}
+                            strokeWidth={2.3}
+                          />
+                        }
+                        label="Open Admin workspace"
+                        onPress={() => router.push('/admin-operations')}
+                        styles={styles}
+                      />
+                      <InlineNotice
+                        styles={styles}
+                        text="Admin tools use your authorized SitGuru Admin role on this same login."
+                      />
+                    </SectionCard>
+                  ) : null}
 
                   <SectionCard
                     expanded={activeSection === 'security'}

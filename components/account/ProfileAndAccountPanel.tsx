@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   type FormEvent,
   useCallback,
@@ -26,6 +26,12 @@ import {
   UserRound,
 } from "lucide-react";
 import DeleteAccountFlow from "@/components/account/DeleteAccountFlow";
+import { AccountRoleSwitcher } from "@/components/sitguru/AccountRoleSwitcher";
+import {
+  resolveAuthorizedRolesFromProfile,
+  resolveDashboardRoleFromPath,
+  type DashboardSwitchRole,
+} from "@/lib/dashboard/role-switch";
 import { supabase } from "@/lib/supabase";
 
 type ProfileRow = {
@@ -73,6 +79,7 @@ function providerLabel(provider: string) {
 
 export default function ProfileAndAccountPanel() {
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
@@ -86,6 +93,7 @@ export default function ProfileAndAccountPanel() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
+  const [authorizedRoles, setAuthorizedRoles] = useState<DashboardSwitchRole[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -107,15 +115,65 @@ export default function ProfileAndAccountPanel() {
     setUser(authUser);
     setEmailDraft(authUser.email || "");
 
-    const { data: profileRow } = await supabase
-      .from("profiles")
-      .select(
-        "id, full_name, first_name, last_name, phone, avatar_url, profile_photo_url",
-      )
-      .eq("id", authUser.id)
-      .maybeSingle();
+    const email = authUser.email || "";
+    const [{ data: profileRow }, { data: roleRows }, { data: guru }, { data: ambassador }] =
+      await Promise.all([
+        supabase
+          .from("profiles")
+          .select(
+            "id, full_name, first_name, last_name, phone, avatar_url, profile_photo_url, role, account_type",
+          )
+          .eq("id", authUser.id)
+          .maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", authUser.id),
+        email
+          ? supabase
+              .from("gurus")
+              .select("id")
+              .or(`user_id.eq.${authUser.id},email.eq.${email}`)
+              .maybeSingle()
+          : supabase
+              .from("gurus")
+              .select("id")
+              .eq("user_id", authUser.id)
+              .maybeSingle(),
+        supabase
+          .from("ambassadors")
+          .select("id")
+          .eq("user_id", authUser.id)
+          .maybeSingle(),
+      ]);
 
-    setProfile((profileRow as ProfileRow | null) || { id: authUser.id });
+    const profileRecord = (profileRow as Record<string, unknown> | null) || null;
+    setProfile(
+      profileRow
+        ? {
+            id: String(profileRow.id),
+            full_name: profileRow.full_name ?? null,
+            first_name: profileRow.first_name ?? null,
+            last_name: profileRow.last_name ?? null,
+            phone: profileRow.phone ?? null,
+            avatar_url: profileRow.avatar_url ?? null,
+            profile_photo_url: profileRow.profile_photo_url ?? null,
+          }
+        : { id: authUser.id },
+    );
+
+    setAuthorizedRoles(
+      resolveAuthorizedRolesFromProfile({
+        profile: profileRecord,
+        roleRows: ((roleRows || []) as Array<{ role?: string | null }>).map(
+          (row) => row.role,
+        ),
+        metadata: {
+          ...(authUser.app_metadata || {}),
+          ...(authUser.user_metadata || {}),
+        },
+        email,
+        hasGuruRecord: Boolean(guru?.id),
+        hasAmbassadorRecord: Boolean(ambassador?.id),
+      }),
+    );
     setLoading(false);
   }, [router]);
 
@@ -330,6 +388,65 @@ export default function ProfileAndAccountPanel() {
           </div>
         </div>
       </section>
+
+      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-2xl font-black tracking-[-0.04em] text-slate-950">
+          Workspaces
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+          Switch between Pet Parent, Guru, Ambassador, Intern, and Admin using
+          the same SitGuru login. Admin appears only when this account is
+          authorized.
+        </p>
+        <div className="mt-5">
+          <AccountRoleSwitcher
+            currentRole={resolveDashboardRoleFromPath(pathname)}
+            authorizedRoles={authorizedRoles}
+            includeAdmin
+          />
+        </div>
+      </section>
+
+      {authorizedRoles.includes("admin") ? (
+        <section className="rounded-[2rem] border border-emerald-200 bg-emerald-50/40 p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+            Admin
+          </p>
+          <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-950">
+            Account updates
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            This login has Admin access. Use these tools when a member needs
+            account status, role, or lifecycle updates.
+          </p>
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            <Link
+              href="/admin/accounts"
+              className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 transition hover:border-emerald-300 hover:bg-emerald-50"
+            >
+              Manage accounts
+            </Link>
+            <Link
+              href="/admin/account-lifecycle"
+              className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 transition hover:border-emerald-300 hover:bg-emerald-50"
+            >
+              Account lifecycle
+            </Link>
+            <Link
+              href="/admin/settings"
+              className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 transition hover:border-emerald-300 hover:bg-emerald-50"
+            >
+              Admin settings
+            </Link>
+            <Link
+              href="/admin"
+              className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 transition hover:border-emerald-300 hover:bg-emerald-50"
+            >
+              Admin dashboard
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <section
         id="login-security"

@@ -243,6 +243,7 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
 
           <div className="grid gap-1 p-3">
             <AccountRoleSwitcher
+                        includeAdmin
               currentRole={currentRole}
               authorizedRoles={loadedAccount.authorizedRoles}
               onNavigate={() => setOpen(false)}

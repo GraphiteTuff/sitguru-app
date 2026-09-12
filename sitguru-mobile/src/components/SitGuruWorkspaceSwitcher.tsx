@@ -57,7 +57,7 @@ const DASHBOARD_PATHS:
     ambassador:
       '/ambassador-dashboard',
     admin:
-      '/admin-dashboard',
+      '/admin-operations',
   };
 
 type SitGuruWorkspaceSwitcherProps = {
@@ -620,6 +620,37 @@ export default function SitGuruWorkspaceSwitcher({
                 strokeWidth={2.3}
               />
             </BubblePressable>
+
+            {availableRoles.includes('admin') ? (
+              <>
+                <BubblePressable
+                  accessibilityRole="button"
+                  onPress={() => openDestination('/admin-operations')}
+                  scaleTo={0.97}
+                  style={styles.actionRow}
+                >
+                  <View style={styles.actionIcon}>
+                    <ShieldCheck
+                      color={palette.primary}
+                      size={19}
+                      strokeWidth={2.3}
+                    />
+                  </View>
+                  <View style={styles.actionCopy}>
+                    <Text style={styles.actionTitle}>Admin operations</Text>
+                    <Text style={styles.actionText}>
+                      Open Admin tools to review and update accounts when needed.
+                    </Text>
+                  </View>
+                  <ChevronRight
+                    color={palette.muted}
+                    size={18}
+                    strokeWidth={2.3}
+                  />
+                </BubblePressable>
+              </>
+            ) : null}
+
 <BubblePressable
               accessibilityRole="button"
               onPress={() => {

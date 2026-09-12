@@ -624,6 +624,7 @@ export default function GuruDashboardHeader({
 
                 <div className="grid gap-1 bg-white p-3">
                   <AccountRoleSwitcher
+                        includeAdmin
                     currentRole="guru"
                     authorizedRoles={loadedProfile.authorizedRoles}
                     onNavigate={() => setAccountMenuOpen(false)}
@@ -804,6 +805,7 @@ export default function GuruDashboardHeader({
               </div>
 
               <AccountRoleSwitcher
+                        includeAdmin
                 currentRole="guru"
                 authorizedRoles={loadedProfile.authorizedRoles}
                 onNavigate={() => setAccountMenuOpen(false)}
