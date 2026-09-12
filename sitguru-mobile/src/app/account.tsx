@@ -45,6 +45,8 @@ import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruThemeToggle from '@/components/SitGuruThemeToggle';
 import ProfileMediaStudio from '@/components/account/ProfileMediaStudio';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { useOwnAvatarMenus } from '@/hooks/useOwnAvatarMenus';
+
 import { ButtonMetrics } from '@/constants/button-tokens';
 import { AppFonts } from '@/constants/fonts';
 import { useThemePreference } from '@/hooks/use-color-scheme';
@@ -102,7 +104,7 @@ export default function AccountScreen() {
   const [activeSection, setActiveSection] =
     useState<AccountSectionKey>('profile');
   const [refreshing, setRefreshing] = useState(false);
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
+  const avatarMenus = useOwnAvatarMenus();
   const {
     preferences: notificationPreferences,
     options: notificationOptions,
@@ -368,7 +370,7 @@ export default function AccountScreen() {
                       accessibilityRole="button"
                       onPress={() => {
                         if (isAuthenticated) {
-                          setWorkspaceSwitcherOpen(true);
+                          avatarMenus.openFull();
                           return;
                         }
 
@@ -462,7 +464,7 @@ export default function AccountScreen() {
                         <SitGuruButton
                           flex
                           label="Switch workspace"
-                          onPress={() => setWorkspaceSwitcherOpen(true)}
+                          onPress={avatarMenus.openFull}
                           size="compact"
                           variant="secondary"
                         />
@@ -753,7 +755,10 @@ export default function AccountScreen() {
                       }
                       label="Password and sign-in"
                       onPress={() =>
-                        showPreviewWarning('Password and sign-in')
+                        Alert.alert(
+                          'Password and sign-in',
+                          'Verified email and password changes are available in SitGuru Profile & Account on the web. Mobile login still supports SMS OTP and forgot-password email reset.',
+                        )
                       }
                       styles={styles}
                     />
@@ -999,8 +1004,9 @@ export default function AccountScreen() {
               {isAuthenticated ? (
                 <SitGuruWorkspaceSwitcher
                   currentRole={currentRole}
-                  onClose={() => setWorkspaceSwitcherOpen(false)}
-                  visible={workspaceSwitcherOpen}
+                  onClose={() => avatarMenus.close()}
+                  variant={avatarMenus.variant}
+                  visible={avatarMenus.visible}
                 />
               ) : null}
             </View>

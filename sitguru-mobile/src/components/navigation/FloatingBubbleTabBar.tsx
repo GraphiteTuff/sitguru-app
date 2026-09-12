@@ -27,7 +27,6 @@ import { AppFonts } from '@/constants/fonts';
 import { ButtonMetrics } from '@/constants/button-tokens';
 import { TOUCH_MIN } from '@/constants/mobile-layout';
 import type { TabChromePalette } from '@/constants/role-palettes';
-import { SitGuruAccent } from '@/constants/button-tokens';
 import { TAB_BAR_MOTION } from '@/constants/tab-bar-motion';
 import { useTabBarMotion } from '@/context/TabBarMotionContext';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
@@ -363,9 +362,7 @@ function FloatingTabItem({
         accessibilityRole="tab"
         accessibilityState={{ selected: active }}
         active={active}
-        bubble
-        bubbleColor={SitGuruAccent.soft}
-        bubblePlacement="glyph"
+        // One sliding selection bubble on the bar — no per-tab glyph bubble.
         haptic="selection"
         hitSlop={10}
         onPress={onPress}

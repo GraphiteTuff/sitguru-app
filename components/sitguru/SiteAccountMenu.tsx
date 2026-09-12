@@ -143,15 +143,15 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
   const currentRole = resolveDashboardRoleFromPath(pathname);
   const roleLabel =
     currentRole === "guru"
-      ? "SitGuru Guru"
+      ? "Guru"
       : currentRole === "ambassador"
-        ? "SitGuru Ambassador"
+        ? "Ambassador"
         : currentRole === "intern"
-          ? "SitGuru Intern"
+          ? "Intern"
           : currentRole === "parent"
-            ? "SitGuru Pet Parent"
+            ? "Pet Parent"
             : currentRole === "admin"
-              ? "SitGuru Admin"
+              ? "Admin"
               : "SitGuru";
   const dashboardHref =
     currentRole === "guru"
@@ -248,19 +248,61 @@ export function SiteAccountMenu({ compact = false }: { compact?: boolean }) {
               onNavigate={() => setOpen(false)}
               className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
             />
-            <Link
-              href={dashboardHref}
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
-            >
-              Dashboard
-            </Link>
+            <div className="my-1 border-t border-slate-100 pt-1">
+              <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                Account
+              </p>
+              <Link
+                href="/account"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="block rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+              >
+                Profile & Account
+              </Link>
+              <Link
+                href="/account/settings"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="block rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+              >
+                Settings
+              </Link>
+              <Link
+                href="/customer/dashboard/profile/notifications"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="block rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+              >
+                Notifications
+              </Link>
+              <Link
+                href="/help/account"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="block rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+              >
+                Help & Support
+              </Link>
+            </div>
+            <div className="my-1 border-t border-slate-100 pt-1">
+              <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                Workspace
+              </p>
+              <Link
+                href={dashboardHref}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="block rounded-2xl px-4 py-3 text-[15px] font-semibold text-slate-800 transition hover:bg-emerald-50 hover:text-emerald-700"
+              >
+                Dashboard
+              </Link>
+            </div>
             <button
               type="button"
               role="menuitem"
               onClick={handleLogout}
-              className="mt-2 flex items-center gap-3 rounded-2xl bg-emerald-600 px-4 py-4 text-left text-[15px] font-semibold text-white transition hover:bg-emerald-700"
+              className="mt-2 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left text-[15px] font-semibold text-slate-800 transition hover:bg-slate-50"
             >
               <LogOut className="h-5 w-5" />
               Log Out

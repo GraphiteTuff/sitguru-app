@@ -66,6 +66,11 @@ type SitGuruWorkspaceSwitcherProps = {
   onClose: () => void;
   profileHref?: Href;
   profileLabel?: string;
+  /**
+   * `full` — identity, workspaces, account destinations, sign out (tap avatar).
+   * `quick` — authorized roles only (long-press avatar).
+   */
+  variant?: 'full' | 'quick';
 };
 
 export default function SitGuruWorkspaceSwitcher({
@@ -73,8 +78,10 @@ export default function SitGuruWorkspaceSwitcher({
   visible,
   onClose,
   profileHref = '/account',
-  profileLabel = 'Manage profile',
+  profileLabel = 'Role profile',
+  variant = 'full',
 }: SitGuruWorkspaceSwitcherProps) {
+  const isQuick = variant === 'quick';
   const insets =
     useSafeAreaInsets();
 
@@ -420,6 +427,8 @@ export default function SitGuruWorkspaceSwitcher({
               )}
             </View>
 
+{!isQuick ? (
+              <>
             <View
               style={styles.divider}
             />
@@ -466,8 +475,7 @@ export default function SitGuruWorkspaceSwitcher({
                     styles.actionText
                   }
                 >
-                  Update your workspace
-                  profile and availability.
+                  Role-specific profile details for this workspace.
                 </Text>
               </View>
 
@@ -512,7 +520,7 @@ export default function SitGuruWorkspaceSwitcher({
                     styles.actionTitle
                   }
                 >
-                  Manage account
+                  Profile & Account
                 </Text>
 
                 <Text
@@ -520,9 +528,9 @@ export default function SitGuruWorkspaceSwitcher({
                     styles.actionText
                   }
                 >
-                  Security, phone,
-                  payments, roles, and
-                  account settings.
+                  Login email, security,
+                  privacy, and account
+                  ownership.
                 </Text>
               </View>
 
@@ -533,7 +541,86 @@ export default function SitGuruWorkspaceSwitcher({
               />
             </BubblePressable>
 
+                        <BubblePressable
+              accessibilityRole="button"
+              onPress={() =>
+                openDestination('/account')
+              }
+              scaleTo={0.97}
+              style={styles.actionRow}
+            >
+              <View style={styles.actionIcon}>
+                <Settings
+                  color={palette.primary}
+                  size={19}
+                  strokeWidth={2.3}
+                />
+              </View>
+              <View style={styles.actionCopy}>
+                <Text style={styles.actionTitle}>Settings</Text>
+                <Text style={styles.actionText}>
+                  Account preferences and security shortcuts.
+                </Text>
+              </View>
+              <ChevronRight
+                color={palette.muted}
+                size={18}
+                strokeWidth={2.3}
+              />
+            </BubblePressable>
+
             <BubblePressable
+              accessibilityRole="button"
+              onPress={() => openDestination('/notifications')}
+              scaleTo={0.97}
+              style={styles.actionRow}
+            >
+              <View style={styles.actionIcon}>
+                <Settings
+                  color={palette.primary}
+                  size={19}
+                  strokeWidth={2.3}
+                />
+              </View>
+              <View style={styles.actionCopy}>
+                <Text style={styles.actionTitle}>Notifications</Text>
+                <Text style={styles.actionText}>
+                  Alerts for bookings, messages, and care updates.
+                </Text>
+              </View>
+              <ChevronRight
+                color={palette.muted}
+                size={18}
+                strokeWidth={2.3}
+              />
+            </BubblePressable>
+
+            <BubblePressable
+              accessibilityRole="button"
+              onPress={() => openDestination('/support')}
+              scaleTo={0.97}
+              style={styles.actionRow}
+            >
+              <View style={styles.actionIcon}>
+                <Settings
+                  color={palette.primary}
+                  size={19}
+                  strokeWidth={2.3}
+                />
+              </View>
+              <View style={styles.actionCopy}>
+                <Text style={styles.actionTitle}>Help & Support</Text>
+                <Text style={styles.actionText}>
+                  Get help with your SitGuru account.
+                </Text>
+              </View>
+              <ChevronRight
+                color={palette.muted}
+                size={18}
+                strokeWidth={2.3}
+              />
+            </BubblePressable>
+<BubblePressable
               accessibilityRole="button"
               onPress={() => {
                 onClose();
@@ -589,7 +676,11 @@ export default function SitGuruWorkspaceSwitcher({
               />
             </BubblePressable>
 
-            <View
+
+              </>
+            ) : null}
+
+                        <View
               style={styles.divider}
             />
 

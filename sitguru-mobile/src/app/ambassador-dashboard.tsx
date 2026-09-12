@@ -49,6 +49,8 @@ import SitGuruRoleStatus from '@/components/SitGuruRoleStatus';
 import SitGuruScreen from '@/components/SitGuruScreen';
 import SitGuruTabBar from '@/components/SitGuruTabBar';
 import SitGuruWorkspaceSwitcher from '@/components/SitGuruWorkspaceSwitcher';
+import { useOwnAvatarMenus } from '@/hooks/useOwnAvatarMenus';
+
 import { AppFonts } from '@/constants/fonts';
 import {
   setThemePreference,
@@ -254,7 +256,7 @@ export default function AmbassadorDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadMessage, setLoadMessage] = useState('');
-  const [workspaceSwitcherOpen, setWorkspaceSwitcherOpen] = useState(false);
+  const avatarMenus = useOwnAvatarMenus();
 
   const metadata = (user?.user_metadata ?? {}) as RecordRow;
 
@@ -610,7 +612,9 @@ export default function AmbassadorDashboardScreen() {
                       <BubblePressable
                         accessibilityLabel="Switch workspace"
                         accessibilityRole="button"
-                        onPress={() => setWorkspaceSwitcherOpen(true)}
+                        onPress={avatarMenus.openFull}
+                  onLongPress={avatarMenus.openQuick}
+                  delayLongPress={380}
                         scaleTo={0.88}
                         style={styles.profileButton}
                       >
@@ -1240,8 +1244,9 @@ export default function AmbassadorDashboardScreen() {
 
                 <SitGuruWorkspaceSwitcher
                   currentRole="ambassador"
-                  onClose={() => setWorkspaceSwitcherOpen(false)}
-                  visible={workspaceSwitcherOpen}
+                  onClose={() => avatarMenus.close()}
+                  variant={avatarMenus.variant}
+                  visible={avatarMenus.visible}
                 />
               </View>
             </View>

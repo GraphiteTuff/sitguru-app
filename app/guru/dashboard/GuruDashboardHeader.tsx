@@ -630,6 +630,47 @@ export default function GuruDashboardHeader({
                     className="mb-1 rounded-2xl border border-emerald-100 bg-emerald-50 p-2"
                   />
 
+                  <div className="my-1 border-t border-slate-100 pt-1">
+                    <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                      Account
+                    </p>
+                    <Link
+                      href="/account"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="block rounded-2xl px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-emerald-50"
+                    >
+                      Profile & Account
+                    </Link>
+                    <Link
+                      href="/account/settings"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="block rounded-2xl px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-emerald-50"
+                    >
+                      Settings
+                    </Link>
+                    <Link
+                      href="/customer/dashboard/profile/notifications"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="block rounded-2xl px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-emerald-50"
+                    >
+                      Notifications
+                    </Link>
+                    <Link
+                      href="/help/account"
+                      role="menuitem"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="block rounded-2xl px-4 py-3 text-[15px] font-semibold tracking-[-0.01em] text-slate-800 transition hover:bg-emerald-50"
+                    >
+                      Help & Support
+                    </Link>
+                  </div>
+                  <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                    Workspace
+                  </p>
+
                   {guruAccountMenuLinks.map((item) => (
                     <Link
                       key={item.href}
@@ -768,6 +809,42 @@ export default function GuruDashboardHeader({
                 onNavigate={() => setAccountMenuOpen(false)}
                 className="mt-3 rounded-2xl border border-emerald-100 bg-white/80 p-2"
               />
+              <div className="mt-2 border-t border-slate-100 pt-2">
+                <p className="px-4 pb-1 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                  Account
+                </p>
+                <Link
+                  href="/account"
+                  onClick={() => setAccountMenuOpen(false)}
+                  className="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-emerald-50"
+                >
+                  Profile & Account
+                </Link>
+                <Link
+                  href="/account/settings"
+                  onClick={() => setAccountMenuOpen(false)}
+                  className="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-emerald-50"
+                >
+                  Settings
+                </Link>
+                <Link
+                  href="/customer/dashboard/profile/notifications"
+                  onClick={() => setAccountMenuOpen(false)}
+                  className="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-emerald-50"
+                >
+                  Notifications
+                </Link>
+                <Link
+                  href="/help/account"
+                  onClick={() => setAccountMenuOpen(false)}
+                  className="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-emerald-50"
+                >
+                  Help & Support
+                </Link>
+              </div>
+              <p className="px-4 pb-1 pt-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                Workspace
+              </p>
             </div>
 
             {guruAccountMenuLinks.map((item) => (
