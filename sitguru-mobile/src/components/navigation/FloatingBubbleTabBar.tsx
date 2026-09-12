@@ -354,7 +354,7 @@ function FloatingTabItem({
     const opacity = interpolate(
       emphasis.value,
       [0, 1],
-      [0.7, 1],
+      [0.92, 1],
       Extrapolation.CLAMP,
     );
 
